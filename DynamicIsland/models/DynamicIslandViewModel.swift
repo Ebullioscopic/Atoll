@@ -105,7 +105,10 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     var effectiveClosedNotchHeight: CGFloat {
         let currentScreen = NSScreen.screens.first { $0.localizedName == screen }
         let noNotchAndFullscreen = hideOnClosed && (currentScreen?.safeAreaInsets.top ?? 0 <= 0 || currentScreen == nil)
-        return noNotchAndFullscreen ? 0 : closedNotchSize.height
+        if noNotchAndFullscreen { return 0 }
+        // Reduce height slightly during download sneak peek to match compact music style
+        // Reverted: no special height reduction here
+        return closedNotchSize.height
     }
 
     func isMouseHovering(position: NSPoint = NSEvent.mouseLocation) -> Bool {
@@ -171,15 +174,6 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             coordinator.currentView = .shelf
         } else if !coordinator.openLastTabByDefault {
             coordinator.currentView = .home
-        }
-    }
-
-    func closeForLockScreen() {
-        let targetSize = getClosedNotchSize(screen: screen)
-        withAnimation(.none) {
-            notchSize = targetSize
-            closedNotchSize = targetSize
-            notchState = .closed
         }
     }
 

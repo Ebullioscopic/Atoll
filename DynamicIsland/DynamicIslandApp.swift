@@ -11,7 +11,6 @@ import Defaults
 import KeyboardShortcuts
 import Sparkle
 import SwiftUI
-import SkyLightWindow
 
 @main
 struct DynamicNotchApp: App {
@@ -83,15 +82,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var timer: Timer?
     let calendarManager = CalendarManager.shared
     let webcamManager = WebcamManager.shared
-    let dndManager = DoNotDisturbManager.shared  // NEW: DND detection
-    let bluetoothAudioManager = BluetoothAudioManager.shared  // NEW: Bluetooth audio detection
-    let idleAnimationManager = IdleAnimationManager.shared  // NEW: Custom idle animations
-    let lockScreenPanelManager = LockScreenPanelManager.shared  // NEW: Lock screen music panel
     var closeNotchWorkItem: DispatchWorkItem?
     private var previousScreens: [NSScreen]?
     private var onboardingWindowController: NSWindowController?
     private var cancellables = Set<AnyCancellable>()
-    private var windowsHiddenForLock = false
+    
+    // Media key monitoring
+    private var globalEventMonitor: Any?
+    private var localEventMonitor: Any?
     
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
@@ -101,7 +99,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 //    private var previousScreens: [NSScreen]?
 //    private var onboardingWindowController: NSWindowController?
 //    private var cancellables = Set<AnyCancellable>()
-//    
+//
 //    // Debouncing mechanism for window size updates
 //    private var windowSizeUpdateWorkItem: DispatchWorkItem?
     
@@ -123,53 +121,97 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
     
+    // MARK: - Media Key Monitoring
+    
+    private func setupMediaKeyMonitoring() {
+        // Monitor both global and local events to catch media keys
+        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .systemDefined) { [weak self] event in
+            self?.handleSystemEvent(event)
+        }
+        
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .systemDefined) { [weak self] event in
+            self?.handleSystemEvent(event)
+            return event
+        }
+        
+        print("media key monitoring started using NSEvent")
+    }
+    
+    private func handleSystemEvent(_ event: NSEvent) {
+        guard event.subtype.rawValue == 8 else { return }
+        
+        let data1 = event.data1
+        let keyCode = Int32((data1 & 0xFFFF0000) >> 16)
+        let keyFlags = Int(data1 & 0x0000FFFF)
+        let keyState = ((keyFlags & 0xFF00) >> 8) == 0xA  // KeyDown
+        let keyRepeat = (keyFlags & 0x1) != 0
+
+        guard keyState && !keyRepeat else { return }  // Only handle key down, ignore repeats
+        
+        switch keyCode {
+        case NX_KEYTYPE_SOUND_UP, NX_KEYTYPE_SOUND_DOWN, NX_KEYTYPE_MUTE:
+            print("volume key detected: \(keyCode)")
+            SystemHUDManager.shared.handleVolumeKeyEvent()
+        case NX_KEYTYPE_BRIGHTNESS_UP, NX_KEYTYPE_BRIGHTNESS_DOWN:
+            print("brightness key detected: \(keyCode)")
+            SystemHUDManager.shared.handleBrightnessKeyEvent()
+        default:
+            break
+        }
+    }
+    
+    private func stopMediaKeyMonitoring() {
+        if let globalMonitor = globalEventMonitor {
+            NSEvent.removeMonitor(globalMonitor)
+            globalEventMonitor = nil
+        }
+        
+        if let localMonitor = localEventMonitor {
+            NSEvent.removeMonitor(localMonitor)
+            localEventMonitor = nil
+        }
+        
+        print("🎹 Media key monitoring stopped")
+    }
+    
+    // MARK: - MediaKeyApplicationDelegate (for future use)
+    
+    func didDetectVolumeKey() {
+        SystemHUDManager.shared.handleVolumeKeyEvent()
+    }
+    
+    func didDetectBrightnessKey() {
+        SystemHUDManager.shared.handleBrightnessKeyEvent()
+    }
+    
     func applicationWillTerminate(_ notification: Notification) {
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
+        
+        // Stop media key monitoring
+        stopMediaKeyMonitoring()
+        
+        print("🚪 Application terminating - ensuring system HUD is restored...")
+        
+        // Re-enable system HUD on app termination
+        SystemOSDManager.enableSystemHUD()
+        
+        // Give it time to complete
+        usleep(500000) // 500ms
+        
         NotificationCenter.default.removeObserver(self)
     }
     
     @objc func onScreenLocked(_: Notification) {
         print("Screen locked")
-        hideWindowsForLock()
+        cleanupWindows()
     }
-
+    
     @objc func onScreenUnlocked(_: Notification) {
         print("Screen unlocked")
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            guard let self = self else { return }
-            self.restoreWindowsAfterLock()
-            self.adjustWindowPosition(changeAlpha: true)
-        }
-    }
-
-    private func hideWindowsForLock() {
-        guard !windowsHiddenForLock else { return }
-        windowsHiddenForLock = true
-
-        if Defaults[.showOnAllDisplays] {
-            for window in windows.values {
-                window.alphaValue = 0
-                window.orderOut(nil)
-            }
-        } else if let window = window {
-            window.alphaValue = 0
-            window.orderOut(nil)
-        }
-    }
-
-    private func restoreWindowsAfterLock() {
-        guard windowsHiddenForLock else { return }
-        windowsHiddenForLock = false
-
-        if Defaults[.showOnAllDisplays] {
-            for window in windows.values {
-                window.orderFrontRegardless()
-                window.alphaValue = 1
-            }
-        } else if let window = window {
-            window.orderFrontRegardless()
-            window.alphaValue = 1
+            self?.cleanupWindows()
+            self?.adjustWindowPosition(changeAlpha: true)
         }
     }
     
@@ -206,12 +248,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             rootView: ContentView()
                 .environmentObject(viewModel)
                 .environmentObject(webcamManager)
-                //.moveToSky()
         )
         
         window.orderFrontRegardless()
         NotchSpaceManager.shared.notchSpace.windows.insert(window)
-        //SkyLightOperator.shared.delegateWindow(window)
+        
         return window
     }
 
@@ -309,10 +350,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func calculateRequiredNotchSize() -> CGSize {
         // Check if inline sneak peek is showing and notch is closed
-        let isInlineSneakPeekActive = vm.notchState == .closed && 
-                                      coordinator.expandingView.show && 
-                                      (coordinator.expandingView.type == .music || coordinator.expandingView.type == .timer) && 
-                                      Defaults[.enableSneakPeek] && 
+        let isInlineSneakPeekActive = vm.notchState == .closed &&
+                                      coordinator.expandingView.show &&
+                                      (coordinator.expandingView.type == .music || coordinator.expandingView.type == .timer) &&
+                                      Defaults[.enableSneakPeek] &&
                                       Defaults[.sneakPeekStyles] == .inline
         
         // If inline sneak peek is active, use a wider width to accommodate the expanded content
@@ -333,7 +374,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let enabledGraphsCount = [
             Defaults[.showCpuGraph],
-            Defaults[.showMemoryGraph], 
+            Defaults[.showMemoryGraph],
             Defaults[.showGpuGraph],
             Defaults[.showNetworkGraph],
             Defaults[.showDiskGraph]
@@ -355,14 +396,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         coordinator.setupWorkersNotificationObservers()
-        LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
-        LockScreenManager.shared.configure(viewModel: vm)
         
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()
-        
-        // Initialize idle animations (load bundled + built-in face)
-        idleAnimationManager.initializeDefaultAnimations()
         
         // Setup SystemHUD Manager
         SystemHUDManager.shared.setup(coordinator: coordinator)
@@ -372,8 +408,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ScreenRecordingManager.shared.startMonitoring()
         }
         
-        // Setup Privacy Indicator Manager (camera and microphone monitoring)
-        PrivacyIndicatorManager.shared.startMonitoring()
+        // Setup media key monitoring
+        setupMediaKeyMonitoring()
         
         // Observe tab changes - use debounced updates
         coordinator.$currentView.sink { [weak self] newView in
@@ -411,8 +447,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if change.newValue == true && Defaults[.sneakPeekStyles] != .standard {
                 Defaults[.sneakPeekStyles] = .standard
             }
-            // Update window size IMMEDIATELY (no debouncing) to prevent position shift
-            self?.updateWindowSizeIfNeeded()
+            self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
         
         // Observe screen recording settings changes
@@ -656,6 +691,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         previousScreens = NSScreen.screens
+
+        // Initialize Downloads monitoring so it actually starts at launch
+        _ = DownloadManager.shared
     }
     
     func playWelcomeSound() {

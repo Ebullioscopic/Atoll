@@ -1,97 +1,164 @@
+//
+//  SystemChangesObserver.swift
+//  DynamicIsland
+//
+//  Adapted from TheBoringWorker-HUD ChangesObserver.swift
+//  Created by GitHub Copilot on 06/09/25.
+//
+
+import Cocoa
 import Foundation
-import CoreGraphics
 import Defaults
 
-final class SystemChangesObserver: MediaKeyInterceptorDelegate {
+class SystemChangesObserver {
+    private var oldVolume: Float = 0
+    private var oldMuted: Bool = false
+    private var oldBrightness: Float = 0
+    
     private weak var coordinator: DynamicIslandViewCoordinator?
-    private let volumeController = SystemVolumeController.shared
-    private let brightnessController = SystemBrightnessController.shared
-    private let mediaKeyInterceptor = MediaKeyInterceptor.shared
-
-    private let volumeStep: Float = 1.0 / 16.0
-    private let brightnessStep: Float = 1.0 / 16.0
-
-    private var volumeEnabled = false
-    private var brightnessEnabled = false
+    
+    // Backup timer for edge cases only
+    private var backupTimer: Timer?
 
     init(coordinator: DynamicIslandViewCoordinator) {
         self.coordinator = coordinator
-    }
-
-    func startObserving(volumeEnabled: Bool, brightnessEnabled: Bool) {
-        self.volumeEnabled = volumeEnabled
-        self.brightnessEnabled = brightnessEnabled
-
-        volumeController.onVolumeChange = { [weak self] volume, muted in
-            guard let self, self.volumeEnabled else { return }
-            let value = muted ? 0 : volume
-            self.sendVolumeNotification(value: value)
+        
+        // Initialize baseline values only once
+        oldVolume = SystemVolumeManager.getOutputVolume()
+        oldMuted = SystemVolumeManager.isMuted()
+        
+        do {
+            oldBrightness = try SystemDisplayManager.getDisplayBrightness()
+        } catch {
+            NSLog("Failed to retrieve initial display brightness: \(error)")
         }
-        volumeController.onRouteChange = { [weak self] in
-            guard let self, self.volumeEnabled else { return }
-            self.sendVolumeNotification(value: self.volumeController.isMuted ? 0 : self.volumeController.currentVolume)
+    }
+
+    func startObserving() {
+        guard Defaults[.enableSystemHUD] else { return }
+        
+        startMinimalBackupTimer()
+    }
+    
+    private func startMinimalBackupTimer() {
+        // More frequent backup check (every 300ms) for better responsiveness
+        // This is a reasonable compromise between the original 200ms and the previous 5s
+        backupTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard Defaults[.enableSystemHUD] else { return }
+            self?.performBackupCheck()
         }
-        volumeController.start()
-
-        brightnessController.onBrightnessChange = { [weak self] brightness in
-            guard let self, self.brightnessEnabled else { return }
-            self.sendBrightnessNotification(value: brightness)
+    }
+    
+    private func performBackupCheck() {
+        // Only check if we haven't had recent activity
+        checkVolumeChanges()
+        checkBrightnessChanges()
+    }
+    
+    // MARK: - Public Media Key Event Handlers (called from MediaKeyApplication)
+    
+    func handleVolumeKeyEvent() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            self.handleVolumeKeyPress()
         }
-        brightnessController.start()
-
-        mediaKeyInterceptor.delegate = self
-        let tapStarted = mediaKeyInterceptor.start()
-        if !tapStarted {
-            NSLog("⚠️ Media key interception unavailable; system HUD will remain visible")
+    }
+    
+    func handleBrightnessKeyEvent() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            self.handleBrightnessKeyPress()
         }
-        mediaKeyInterceptor.configuration = MediaKeyConfiguration(
-            interceptVolume: volumeEnabled,
-            interceptBrightness: brightnessEnabled
-        )
+    }
+    
+    // MARK: - Key Press Event Handlers
+    
+    private func handleVolumeKeyPress() {
+        guard Defaults[.enableVolumeHUD] else { return }
+        
+        let newVolume = SystemVolumeManager.getOutputVolume()
+        let newMuted = SystemVolumeManager.isMuted()
+        
+        // Always show HUD for key press feedback, even if value doesn't change
+        print("🔊 Volume key pressed - showing HUD: volume=\(newVolume), muted=\(newMuted)")
+        
+        if newMuted {
+            sendVolumeNotification(value: 0.0)
+        } else {
+            sendVolumeNotification(value: newVolume)
+        }
+        
+        // Update stored values
+        oldVolume = newVolume
+        oldMuted = newMuted
+    }
+    
+    private func handleBrightnessKeyPress() {
+        guard Defaults[.enableBrightnessHUD] else { return }
+        guard NSScreen.screens.count > 0 else { return }
+        
+        do {
+            let newBrightness = try SystemDisplayManager.getDisplayBrightness()
+            
+            // Always show HUD for key press feedback, even if value doesn't change
+            print("☀️ Brightness key pressed - showing HUD: brightness=\(newBrightness)")
+            sendBrightnessNotification(value: newBrightness)
+            
+            // Update stored value
+            oldBrightness = newBrightness
+        } catch {
+            // Silently ignore brightness errors to reduce log spam
+        }
     }
 
-    func update(volumeEnabled: Bool, brightnessEnabled: Bool) {
-        self.volumeEnabled = volumeEnabled
-        self.brightnessEnabled = brightnessEnabled
-        mediaKeyInterceptor.configuration = MediaKeyConfiguration(
-            interceptVolume: volumeEnabled,
-            interceptBrightness: brightnessEnabled
-        )
+    private func checkVolumeChanges() {
+        guard Defaults[.enableVolumeHUD] else { return }
+        
+        let newVolume = SystemVolumeManager.getOutputVolume()
+        let newMuted = SystemVolumeManager.isMuted()
+        
+        let volumeChanged = !isAlmost(firstNumber: oldVolume, secondNumber: newVolume)
+        let muteChanged = newMuted != oldMuted
+        
+        if volumeChanged || muteChanged {
+            print("🔊 Volume change detected: \(oldVolume) → \(newVolume), muted: \(oldMuted) → \(newMuted)")
+            
+            if newMuted {
+                sendVolumeNotification(value: 0.0)
+            } else {
+                sendVolumeNotification(value: newVolume)
+            }
+            oldVolume = newVolume
+            oldMuted = newMuted
+        }
     }
 
-    func stopObserving() {
-        mediaKeyInterceptor.stop()
-        mediaKeyInterceptor.delegate = nil
-
-        volumeController.stop()
-        volumeController.onVolumeChange = nil
-        volumeController.onRouteChange = nil
-
-        brightnessController.stop()
-        brightnessController.onBrightnessChange = nil
+    private func checkBrightnessChanges() {
+        guard Defaults[.enableBrightnessHUD] else { return }
+        guard NSScreen.screens.count > 0 else { return }
+        
+        do {
+            let newBrightness = try SystemDisplayManager.getDisplayBrightness()
+            let brightnessChanged = !isAlmost(firstNumber: oldBrightness, secondNumber: newBrightness)
+            
+            if brightnessChanged {
+                print("☀️ Brightness change detected: \(oldBrightness) → \(newBrightness)")
+                sendBrightnessNotification(value: newBrightness)
+                oldBrightness = newBrightness
+            }
+        } catch {
+            // Silently ignore brightness errors to reduce log spam
+        }
     }
-
-    // MARK: - MediaKeyInterceptorDelegate
-
-    func mediaKeyInterceptor(_ interceptor: MediaKeyInterceptor, didReceiveVolumeCommand direction: MediaKeyDirection, isRepeat: Bool) {
-        guard volumeEnabled else { return }
-        let delta = (direction == .up ? volumeStep : -volumeStep)
-        volumeController.adjust(by: delta)
+    
+    private func isAlmost(firstNumber: Float, secondNumber: Float) -> Bool {
+        // Convert sensitivity setting to a more responsive threshold
+        // Sensitivity 1-10 scale maps to 0.01-0.10 threshold range
+        let marginValue = Float(Defaults[.systemHUDSensitivity]) / 100.0
+        let threshold = max(0.01, marginValue) // Minimum threshold for responsiveness
+        return abs(firstNumber - secondNumber) <= threshold
     }
-
-    func mediaKeyInterceptorDidToggleMute(_ interceptor: MediaKeyInterceptor) {
-        guard volumeEnabled else { return }
-        volumeController.toggleMute()
-    }
-
-    func mediaKeyInterceptor(_ interceptor: MediaKeyInterceptor, didReceiveBrightnessCommand direction: MediaKeyDirection, isRepeat: Bool) {
-        guard brightnessEnabled else { return }
-        let delta = (direction == .up ? brightnessStep : -brightnessStep)
-        brightnessController.adjust(by: delta)
-    }
-
-    // MARK: - HUD Dispatch
-
+    
+    // MARK: - Internal Notification Methods
+    
     private func sendVolumeNotification(value: Float) {
         coordinator?.toggleSneakPeek(
             status: true,
@@ -100,7 +167,7 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
             icon: ""
         )
     }
-
+    
     private func sendBrightnessNotification(value: Float) {
         coordinator?.toggleSneakPeek(
             status: true,
@@ -108,6 +175,18 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
             value: CGFloat(value),
             icon: ""
         )
+    }
+    
+    deinit {
+        stopObserving()
+    }
+    
+    func stopObserving() {
+        // Clean up backup timer
+        backupTimer?.invalidate()
+        backupTimer = nil
+        
+        print("🎹 Media key detection stopped")
     }
 }
 

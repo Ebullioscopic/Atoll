@@ -68,7 +68,6 @@ struct RecordingLiveActivity: View {
 }
 
 // Pulsing animation modifier for recording indicator
-// Note: Also used by PrivacyLiveActivity
 struct PulsingModifier: ViewModifier {
     @State private var isPulsing = false
     

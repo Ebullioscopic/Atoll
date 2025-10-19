@@ -152,64 +152,48 @@ struct CalendarView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject private var calendarManager = CalendarManager.shared
     @State private var selectedDate = Date()
-
+    
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading) {
-                    Text(selectedDate.formatted(.dateTime.month(.abbreviated)))
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                    Text(selectedDate.formatted(.dateTime.year()))
-                        .font(.title3)
-                        .fontWeight(.light)
-                        .foregroundColor(Color(white: 0.65))
-                }
-
-                ZStack(alignment: .top) {
+        VStack(spacing: 8) {
+            HStack {
+                Text("\(selectedDate, format: .dateTime.month())")
+                    .font(.system(size: 18))
+                    .fontWeight(.semibold)
+                ZStack {
                     WheelPicker(selectedDate: $selectedDate, config: Config())
-                    HStack(alignment: .top) {
+                    HStack {
                         LinearGradient(
-                            colors: [Color.black, .clear], startPoint: .leading, endPoint: .trailing
+                            colors: [.black, .clear], startPoint: .leading, endPoint: .trailing
                         )
                         .frame(width: 20)
                         Spacer()
                         LinearGradient(
-                            colors: [.clear, Color.black], startPoint: .leading, endPoint: .trailing
+                            colors: [.clear, .black], startPoint: .leading, endPoint: .trailing
                         )
                         .frame(width: 20)
                     }
                 }
             }
-
-            let filteredEvents = EventListView.filteredEvents(
-                events: calendarManager.events
-            )
-            if filteredEvents.isEmpty {
+            if calendarManager.events.isEmpty {
                 EmptyEventsView()
-                Spacer(minLength: 0)
             } else {
                 EventListView(events: calendarManager.events)
             }
         }
         .listRowBackground(Color.clear)
-        .frame(height: 120)
-        .onChange(of: selectedDate) {
+        .onChange(of: selectedDate) { _, newDate in
             Task {
-                await calendarManager.updateCurrentDate(selectedDate)
+                await calendarManager.updateCurrentDate(newDate)
             }
         }
         .onChange(of: vm.notchState) { _, _ in
             Task {
                 await calendarManager.updateCurrentDate(Date.now)
-                selectedDate = Date.now
             }
         }
         .onAppear {
             Task {
                 await calendarManager.updateCurrentDate(Date.now)
-                selectedDate = Date.now
             }
         }
     }
@@ -217,100 +201,77 @@ struct CalendarView: View {
 
 struct EmptyEventsView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "calendar.badge.checkmark")
-                .font(.title)
-                .foregroundColor(Color(white: 0.65))
+        ScrollView {
             Text("No events today")
-                .font(.subheadline)
-                .foregroundColor(.white)
+                .font(.headline)
+                .foregroundStyle(.white)
             Text("Enjoy your free time!")
-                .font(.caption)
-                .foregroundColor(Color(white: 0.65))
+                .font(.subheadline)
+                .foregroundColor(.gray)
         }
     }
 }
 
 struct EventListView: View {
     @Environment(\.openURL) private var openURL
-    @ObservedObject private var calendarManager = CalendarManager.shared
     let events: [EventModel]
 
-
-    static func filteredEvents(events: [EventModel]) -> [EventModel] {
-        events.filter { event in
-            // Filter out all-day events if setting is enabled
-            if event.isAllDay && Defaults[.hideAllDayEvents] {
-                return false
-            }
-            return true
-        }
-    }
-
-    private var filteredEvents: [EventModel] {
-        Self.filteredEvents(events: events)
-    }
-
     var body: some View {
-        List {
-            ForEach(filteredEvents) { event in
-                Button(action: {
-                    if let url = event.calendarAppURL() {
-                        openURL(url)
+        ScrollView(showsIndicators: false) {
+            HStack(alignment: .top) {
+                VStack(alignment: .trailing, spacing: 5) {
+                    ForEach(events.indices, id: \.self) { index in
+                        VStack(alignment: .trailing) {
+                            if events[index].isAllDay {
+                                Text("All-day")
+                            } else {
+                                Text("\(events[index].start, style: .time)")
+                                Text("\(events[index].end, style: .time)")
+                            }
+                        }
+                        .multilineTextAlignment(.trailing)
+                        .padding(.bottom, 8)
+                        .font(.caption2)
                     }
-                }) {
-                    eventRow(event)
                 }
-                .padding(.leading, -5)
-                .buttonStyle(PlainButtonStyle())
-                .listRowSeparator(.automatic)
-                .listRowSeparatorTint(.gray.opacity(0.2))
-                .listRowBackground(Color.clear)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(events.indices, id: \.self) { index in
+                        HStack(alignment: .top) {
+                            VStack(spacing: 5) {
+                                Image(
+                                    systemName: events[index].eventStatus == .ended
+                                        ? "checkmark.circle" : "circle"
+                                )
+                                .foregroundColor(events[index].eventStatus == .ended ? .green : .gray)
+                                .font(.footnote)
+                                Rectangle()
+                                    .frame(width: 1)
+                                    .foregroundStyle(.gray.opacity(0.5))
+                                    .opacity(index == events.count - 1 ? 0 : 1)
+                            }
+                            .padding(.top, 1)
+
+                            Button {
+                                if let url = events[index].calendarAppURL() {
+                                    openURL(url)
+                                }
+                            } label: {
+                                Text(events[index].title)
+                                    .font(.footnote)
+                                    .foregroundStyle(.gray)
+                            }
+                            .buttonStyle(.plain)
+
+                            Spacer(minLength: 0)
+                        }
+                        .opacity((events[index].eventStatus == .ended) ? 0.6 : 1)
+                    }
+                }
             }
         }
-        .listStyle(.plain)
         .scrollIndicators(.never)
-        .scrollContentBackground(.hidden)
-        .background(Color.clear)
-        Spacer(minLength: 0)
-    }
-
-    private func eventRow(_ event: EventModel) -> some View {
-        // Regular event row
-        return AnyView(
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(Color(event.calendar.color))
-                    .frame(width: 8, height: 8)
-                HStack {
-                    Text(event.title)
-                        .font(.callout)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                    VStack(alignment: .trailing, spacing: 4) {
-                        if event.isAllDay {
-                            Text("All-day")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                        } else {
-                            Text("\(event.start, style: .time)")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                            Text("\(event.end, style: .time)")
-                                .font(.caption2)
-                                .foregroundColor(Color(white: 0.65))
-                                .lineLimit(1)
-                        }
-                    }
-                }
-                .contentShape(Rectangle())
-            }
-        )
+        .scrollTargetBehavior(.viewAligned)
     }
 }
 

@@ -1,58 +1,5 @@
 .DS_Store
 # Xcode
-*.xcuserstate
-*.xcuserdata
-*.xcuserdatad
-*.pbxuser
-*.xccheckout
-*.xcplayground
-*.xcuserdatad
-*.xctest
-*.xcuserdata
-*.xcodeproj/xcshareddata/WorkspaceSettings.xcsettings
-
-# CocoaPods
-Pods/
-podfile.lock
-
-# Carthage
-Carthage/Build/
-
-# Swift Package Manager
-.swiftpm/
-.build/
-
-# Derived data
-DerivedData/
-
-# Build output
-build/
-*.app
-*.dSYM
-
-# Temporary files
-*.swp
-*.swo
-*.tmp
-*.log
-
-# Other
-*.DS_Store
-*.vscode/
-*.idea/
-
-# User-specific files
-*.xcuserdatad/
-*.xcodeproj/xcuserdata
-*.xcodeproj/project.xcuserdata
-
-# Build artifacts
-*.ipa
-*.xcarchive
-*.dSYM
-
-
-# Xcode
 #
 build/
 DerivedData/
@@ -125,24 +72,8 @@ segmentedhud.swift.ref
 gemini-apireference.md
 
 ScreenshotApp-main
-/stats/
+stats
 boring.notch
 referenceimages
 
 PrivateWorks
-
-*.py 
-*.sh
-comparison_report.json
-*.txt
-ANIMATION_DEBUG_GUIDE.md
-MIGRATION_SUMMARY.md
-ONBOARDING_ENHANCEMENT.md
-SHEET_PRESENTATION_FIX.md
-lock_mode_reference.md
-liquid_glass.md
-huds.md
-borrow_migrations.md
-borrowing/
-MoveToSky.xcodeproj
-/MoveToSky/

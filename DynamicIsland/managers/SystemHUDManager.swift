@@ -23,7 +23,7 @@ class SystemHUDManager {
     }
     
     private func setupSettingsObserver() {
-        // Observe master toggle
+        // Use Defaults publisher instead of @Default property wrapper
         Defaults.publisher(.enableSystemHUD, options: []).sink { [weak self] change in
             guard let self = self, self.isSetupComplete else {
                 return
@@ -35,27 +35,6 @@ class SystemHUDManager {
                     await self.stopSystemHUD()
                 }
             }
-        }.store(in: &cancellables)
-        
-        // Observe individual HUD toggles
-        Defaults.publisher(.enableVolumeHUD, options: []).sink { [weak self] change in
-            guard let self = self, self.isSetupComplete, Defaults[.enableSystemHUD] else {
-                return
-            }
-            self.changesObserver?.update(
-                volumeEnabled: change.newValue,
-                brightnessEnabled: Defaults[.enableBrightnessHUD]
-            )
-        }.store(in: &cancellables)
-        
-        Defaults.publisher(.enableBrightnessHUD, options: []).sink { [weak self] change in
-            guard let self = self, self.isSetupComplete, Defaults[.enableSystemHUD] else {
-                return
-            }
-            self.changesObserver?.update(
-                volumeEnabled: Defaults[.enableVolumeHUD],
-                brightnessEnabled: change.newValue
-            )
         }.store(in: &cancellables)
     }
     
@@ -87,9 +66,10 @@ class SystemHUDManager {
         await stopSystemHUD() // Stop any existing observer
         
         changesObserver = SystemChangesObserver(coordinator: coordinator)
-        let volumeEnabled = Defaults[.enableVolumeHUD]
-        let brightnessEnabled = Defaults[.enableBrightnessHUD]
-        changesObserver?.startObserving(volumeEnabled: volumeEnabled, brightnessEnabled: brightnessEnabled)
+        changesObserver?.startObserving()
+        
+        // Disable system HUD if possible
+        disableSystemHUD()
         
         print("System HUD replacement started")
         isSystemOperationInProgress = false
@@ -103,8 +83,42 @@ class SystemHUDManager {
         changesObserver?.stopObserving()
         changesObserver = nil
         
+        // Re-enable system HUD
+        enableOriginalSystemHUD()
+        
         print("System HUD replacement stopped")
         isSystemOperationInProgress = false
+    }
+    
+    private func disableSystemHUD() {
+        print("🔇 Disabling system HUD (OSDUIHelper running: \(SystemOSDManager.isOSDUIHelperRunning()))")
+        // Disable the system HUD using SystemOSDManager
+        SystemOSDManager.disableSystemHUD()
+    }
+    
+    private func enableOriginalSystemHUD() {
+        print("🔊 Re-enabling system HUD (OSDUIHelper running: \(SystemOSDManager.isOSDUIHelperRunning()))")
+        // Re-enable the system HUD using SystemOSDManager
+        SystemOSDManager.enableSystemHUD()
+        
+        // Check status after a reasonable delay, using async to avoid blocking
+        Task {
+            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds instead of 1
+            let isRunning = await SystemOSDManager.isOSDUIHelperRunningAsync()
+            print("🔍 OSDUIHelper status after re-enable: \(isRunning ? "✅ Running" : "❌ Not running")")
+        }
+    }
+    
+    // MARK: - Media Key Event Handling
+    
+    /// Handle volume key press events from MediaKeyApplication
+    public func handleVolumeKeyEvent() {
+        changesObserver?.handleVolumeKeyEvent()
+    }
+    
+    /// Handle brightness key press events from MediaKeyApplication
+    public func handleBrightnessKeyEvent() {
+        changesObserver?.handleBrightnessKeyEvent()
     }
     
     deinit {
@@ -112,5 +126,12 @@ class SystemHUDManager {
         Task { @MainActor in
             await stopSystemHUD()
         }
+        // Emergency restore is available via SystemHUDManager.emergencyRestoreSystemHUD() if needed
+    }
+    
+    /// Emergency restore function - call this if system HUD is not working
+    public static func emergencyRestoreSystemHUD() {
+        print("🚨 Emergency system HUD restore initiated")
+        SystemHUDDebugger.forceRestartOSDUIHelper()
     }
 }
