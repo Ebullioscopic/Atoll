@@ -15,7 +15,7 @@ struct MinimalisticMusicPlayerView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header area with album art (matching DynamicIslandHeader height of 24pt)
-            HStack(alignment: .center, spacing: 10) {
+            HStack(alignment: .bottom, spacing: 10) {
                 MinimalisticAlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace)
                     .frame(width: 50, height: 50)
                 
@@ -37,21 +37,22 @@ struct MinimalisticMusicPlayerView: View {
                 // Visualizer aligned to bottom
                 if useMusicVisualizer {
                     visualizer
+                        .padding(.bottom, 2)
                 }
             }
             .frame(height: 50) // Fixed height to accommodate album art
             
             // Compact progress bar
             progressBar
-                .padding(.top, 6)
+                .padding(.top, 4)
             
             // Compact playback controls
             playbackControls
                 .padding(.top, 4)
         }
         .padding(.horizontal, 12)
-        .padding(.top, -15)
-        .padding(.bottom, 3)
+        .padding(.top, 0)
+        .padding(.bottom, 4)
         .frame(maxWidth: .infinity)
     }
     
@@ -78,17 +79,15 @@ struct MinimalisticMusicPlayerView: View {
     @State private var lastDragged: Date = .distantPast
     
     private var progressBar: some View {
-        TimelineView(.animation(minimumInterval: musicManager.playbackRate > 0 ? 0.1 : nil)) { timeline in
-            let currentElapsed = currentSliderValue(timeline.date)
+        HStack(spacing: 8) {
+            // Elapsed time - left
+            Text(formatTime(dragging ? sliderValue : musicManager.elapsedTime))
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.7))
+                .frame(width: 42, alignment: .leading)
             
-            HStack(spacing: 8) {
-                // Elapsed time - left
-                Text(formatTime(dragging ? sliderValue : currentElapsed))
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.7))
-                    .frame(width: 42, alignment: .leading)
-                
-                // Progress bar
+            // Progress bar
+            TimelineView(.animation(minimumInterval: 0.05)) { timeline in
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         // Background track
@@ -115,14 +114,14 @@ struct MinimalisticMusicPlayerView: View {
                             }
                     )
                 }
-                .frame(height: 6)
-                
-                // Time remaining - right
-                Text("-\(formatTime(musicManager.songDuration - (dragging ? sliderValue : currentElapsed)))")
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.7))
-                    .frame(width: 48, alignment: .trailing)
             }
+            .frame(height: 6)
+            
+            // Time remaining - right
+            Text("-\(formatTime(musicManager.songDuration - (dragging ? sliderValue : musicManager.elapsedTime)))")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.7))
+                .frame(width: 48, alignment: .trailing)
         }
         .onAppear {
             sliderValue = musicManager.elapsedTime
@@ -136,7 +135,7 @@ struct MinimalisticMusicPlayerView: View {
         
         // Update slider value based on playback
         if musicManager.isPlaying {
-            let timeSinceLastUpdate = date.timeIntervalSince(musicManager.timestampDate)
+            let timeSinceLastUpdate = date.timeIntervalSince(musicManager.lastUpdated)
             let estimatedElapsed = musicManager.elapsedTime + (timeSinceLastUpdate * musicManager.playbackRate)
             return min(estimatedElapsed, musicManager.songDuration)
         }
@@ -192,29 +191,24 @@ struct MinimalisticMusicPlayerView: View {
     }
     
     private var playPauseButton: some View {
-        MinimalisticSquircircleButton(
-            icon: musicManager.isPlaying ? "pause.fill" : "play.fill",
-            fontSize: 24,
-            fontWeight: .semibold,
-            frameSize: CGSize(width: 54, height: 54),
-            cornerRadius: 20,
-            foregroundColor: .white,
-            action: {
-                Task { await musicManager.togglePlay() }
-            }
-        )
+        Button(action: {
+            Task { await musicManager.togglePlay() }
+        }) {
+            Image(systemName: musicManager.isPlaying ? "pause.fill" : "play.fill")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 50, height: 50)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
     
     private func controlButton(icon: String, size: CGFloat = 18, isActive: Bool = false, action: @escaping () -> Void) -> some View {
-        MinimalisticSquircircleButton(
-            icon: icon,
-            fontSize: size,
-            fontWeight: .medium,
-            frameSize: CGSize(width: 40, height: 40),
-            cornerRadius: 16,
-            foregroundColor: isActive ? .red : .white.opacity(0.85),
-            action: action
-        )
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: size, weight: .medium))
+                .foregroundColor(isActive ? .red : .white.opacity(0.8))
+        }
+        .buttonStyle(PlainButtonStyle())
     }
     
     private var repeatIcon: String {
@@ -251,7 +245,7 @@ struct MinimalisticAlbumArtView: View {
                     .aspectRatio(contentMode: .fill)
             )
             .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
             .scaleEffect(x: 1.3, y: 1.4)
             .rotationEffect(.degrees(92))
             .blur(radius: 35)
@@ -268,48 +262,14 @@ struct MinimalisticAlbumArtView: View {
                     Image(nsImage: musicManager.albumArt)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: musicManager.isFlipping)
                 )
                 .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
                 .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-                .albumArtFlip(angle: musicManager.flipAngle)
         }
         .buttonStyle(PlainButtonStyle())
         .opacity(musicManager.isPlaying ? 1 : 0.4)
         .scaleEffect(musicManager.isPlaying ? 1 : 0.85)
-    }
-}
-
-// MARK: - Hover-highlighted control button
-
-private struct MinimalisticSquircircleButton: View {
-    let icon: String
-    let fontSize: CGFloat
-    let fontWeight: Font.Weight
-    let frameSize: CGSize
-    let cornerRadius: CGFloat
-    let foregroundColor: Color
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: fontSize, weight: fontWeight))
-                .foregroundColor(foregroundColor)
-                .frame(width: frameSize.width, height: frameSize.height)
-                .background(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(isHovering ? Color.white.opacity(0.18) : .clear)
-                )
-                .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        }
-        .buttonStyle(PlainButtonStyle())
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.18)) {
-                isHovering = hovering
-            }
-        }
     }
 }

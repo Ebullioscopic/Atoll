@@ -70,10 +70,3 @@ enum SliderColorEnum: String, CaseIterable, Defaults.Serializable {
     case albumArt = "Match album art"
     case accent = "Accent color"
 }
-
-enum LockScreenGlassStyle: String, CaseIterable, Defaults.Serializable, Identifiable {
-    case liquid = "Liquid Glass"
-    case frosted = "Frosted Glass"
-
-    var id: String { rawValue }
-}

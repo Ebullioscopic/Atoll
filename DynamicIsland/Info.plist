@@ -7,10 +7,16 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Dynamic Island needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Dynamic Island uses AppleScripts to control Spotify and Apple Music</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Show calender events inside the notch</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Dynamic Island needs screen recording permission to capture screenshots for the AI assistant feature.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Dynamic Island needs access to save screenshots to your desktop.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Dynamic Island needs access to save and read AI assistant files.</string>
 	<key>SUEnableDownloaderService</key>
 	<true/>
 	<key>SUEnableInstallerLauncherService</key>

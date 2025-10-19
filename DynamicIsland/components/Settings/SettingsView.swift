@@ -157,7 +157,6 @@ struct GeneralSettings: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject var recordingManager = ScreenRecordingManager.shared
-    @ObservedObject var privacyManager = PrivacyIndicatorManager.shared
 
     @Default(.mirrorShape) var mirrorShape
     @Default(.showEmojis) var showEmojis
@@ -174,10 +173,6 @@ struct GeneralSettings: View {
     @Default(.enableScreenRecordingDetection) var enableScreenRecordingDetection
     @Default(.showRecordingIndicator) var showRecordingIndicator
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
-    @Default(.lockScreenGlassStyle) var lockScreenGlassStyle
-    @Default(.lockScreenShowAppIcon) var lockScreenShowAppIcon
-    @Default(.lockScreenPanelShowsBorder) var lockScreenPanelShowsBorder
-    @Default(.lockScreenPanelUsesBlur) var lockScreenPanelUsesBlur
 
     var body: some View {
         Form {
@@ -250,86 +245,9 @@ struct GeneralSettings: View {
                     }
                 }
             } header: {
-                Text("Screen Recording Detection")
+                Text("Privacy & Security")
             } footer: {
-                Text("Uses event-driven private API for real-time screen recording detection")
-            }
-            
-            Section {
-                Defaults.Toggle("Enable Camera Detection", key: .enableCameraDetection)
-                Defaults.Toggle("Enable Microphone Detection", key: .enableMicrophoneDetection)
-                
-                if privacyManager.isMonitoring {
-                    HStack {
-                        Text("Camera Status")
-                        Spacer()
-                        if privacyManager.cameraActive {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 8, height: 8)
-                                Text("Camera Active")
-                                    .foregroundColor(.green)
-                            }
-                        } else {
-                            Text("Inactive")
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    HStack {
-                        Text("Microphone Status")
-                        Spacer()
-                        if privacyManager.microphoneActive {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(Color.yellow)
-                                    .frame(width: 8, height: 8)
-                                Text("Microphone Active")
-                                    .foregroundColor(.yellow)
-                            }
-                        } else {
-                            Text("Inactive")
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-            } header: {
-                Text("Privacy Indicators")
-            } footer: {
-                Text("Shows green camera icon and yellow microphone icon when in use. Uses event-driven CoreAudio and CoreMediaIO APIs.")
-            }
-            
-            Section {
-                Defaults.Toggle("Enable Lock Screen Live Activity", key: .enableLockScreenLiveActivity)
-                if #available(macOS 26.0, *) {
-                    Picker("Lock screen material", selection: $lockScreenGlassStyle) {
-                        ForEach(LockScreenGlassStyle.allCases) { style in
-                            Text(style.rawValue).tag(style)
-                        }
-                    }
-                } else {
-                    Picker("Lock screen material", selection: $lockScreenGlassStyle) {
-                        ForEach(LockScreenGlassStyle.allCases) { style in
-                            Text(style.rawValue).tag(style)
-                        }
-                    }
-                    .disabled(true)
-                    Text("Liquid Glass requires macOS 26 or later.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Defaults.Toggle("Show media app icon", key: .lockScreenShowAppIcon)
-                Defaults.Toggle("Show panel border", key: .lockScreenPanelShowsBorder)
-                Defaults.Toggle("Enable blur", key: .lockScreenPanelUsesBlur)
-                
-                Button("Copy Latest Crash Report") {
-                    copyLatestCrashReport()
-                }
-            } header: {
-                Text("Lock Screen")
-            } footer: {
-                Text("Shows a lock icon in the Dynamic Island when the screen is locked. The lock screen music panel can be toggled separately in Media settings.")
+                Text("Screen recording detection shows a red indicator when your screen is being captured. Detection uses minimal system resources and can be disabled at any time.")
             }
 
             Section {
@@ -407,43 +325,6 @@ struct GeneralSettings: View {
             if !openNotchOnHover {
                 enableGestures = true
             }
-        }
-    }
-    
-    private func copyLatestCrashReport() {
-        let crashReportsPath = NSString(string: "~/Library/Logs/DiagnosticReports").expandingTildeInPath
-        let fileManager = FileManager.default
-        
-        do {
-            let files = try fileManager.contentsOfDirectory(atPath: crashReportsPath)
-            let crashFiles = files.filter { $0.contains("DynamicIsland") && $0.hasSuffix(".crash") }
-            
-            guard let latestCrash = crashFiles.sorted(by: >).first else {
-                let alert = NSAlert()
-                alert.messageText = "No Crash Reports Found"
-                alert.informativeText = "No crash reports found for DynamicIsland"
-                alert.alertStyle = .informational
-                alert.runModal()
-                return
-            }
-            
-            let crashPath = (crashReportsPath as NSString).appendingPathComponent(latestCrash)
-            let crashContent = try String(contentsOfFile: crashPath, encoding: .utf8)
-            
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(crashContent, forType: .string)
-            
-            let alert = NSAlert()
-            alert.messageText = "Crash Report Copied"
-            alert.informativeText = "Crash report '\(latestCrash)' has been copied to clipboard"
-            alert.alertStyle = .informational
-            alert.runModal()
-        } catch {
-            let alert = NSAlert()
-            alert.messageText = "Error"
-            alert.informativeText = "Failed to read crash reports: \(error.localizedDescription)"
-            alert.alertStyle = .warning
-            alert.runModal()
         }
     }
 
@@ -663,43 +544,6 @@ struct HUD: View {
             }
             
             Section {
-                Defaults.Toggle("Show Bluetooth device connections", key: .showBluetoothDeviceConnections)
-            } header: {
-                Text("Bluetooth Audio Devices")
-            } footer: {
-                Text("Displays a HUD notification when Bluetooth audio devices (headphones, AirPods, speakers) connect, showing device name and battery level.")
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
-            
-            Section {
-                Defaults.Toggle("Color-coded battery display", key: .useColorCodedBatteryDisplay)
-                    .disabled(progressBarStyle != .gradient)
-                Defaults.Toggle("Color-coded volume display", key: .useColorCodedVolumeDisplay)
-                    .disabled(progressBarStyle != .gradient)
-                
-                if progressBarStyle == .gradient && (Defaults[.useColorCodedBatteryDisplay] || Defaults[.useColorCodedVolumeDisplay]) {
-                    Defaults.Toggle("Smooth color transitions", key: .useSmoothColorGradient)
-                }
-            } header: {
-                Text("Color-Coded Progress Bars")
-            } footer: {
-                if progressBarStyle != .gradient {
-                    Text("Color-coded displays are only available in Gradient mode. Switch Progressbar style to Gradient to enable this feature.")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                } else if Defaults[.useSmoothColorGradient] {
-                    Text("Smooth: Battery/Volume gradually transitions through all colors\nBattery: Green (high) → Yellow-Green → Yellow → Orange → Red (low)\nVolume: Green (quiet) → Yellow → Orange → Red (loud)")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                } else {
-                    Text("Discrete: Battery/Volume uses 3 distinct colors only\nBattery: Green (high), Yellow (medium), Red (low)\nVolume: Green (quiet), Yellow (medium), Red (loud)")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-            }
-            
-            Section {
                 Picker("HUD style", selection: $inlineHUD) {
                     Text("Default")
                         .tag(false)
@@ -782,12 +626,6 @@ struct Media: View {
                         customBadge(text: "Beta")
                     }
                 }
-                // Enable/disable the lock screen media widget
-                Defaults.Toggle(key: .enableLockScreenMediaWidget) {
-                    HStack {
-                        Text("Enable lock screen media widget")
-                    }
-                }
             } header: {
                 Text("Media controls")
             }
@@ -862,47 +700,18 @@ struct CalendarSettings: View {
 
     var body: some View {
         Form {
-            if calendarManager.calendarAuthorizationStatus != .fullAccess {
+            if calendarManager.authorizationStatus != .fullAccess {
                 Text("Calendar access is denied. Please enable it in System Settings.")
                     .foregroundColor(.red)
                     .multilineTextAlignment(.center)
                     .padding()
-                
-                HStack {
-                    Button("Request Access") {
-                        Task {
-                            await calendarManager.checkCalendarAuthorization()
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    
-                    Button("Open System Settings") {
-                        if let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
-                            NSWorkspace.shared.open(settingsURL)
-                        }
+                Button("Open System Settings") {
+                    if let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
+                        NSWorkspace.shared.open(settingsURL)
                     }
                 }
             } else {
-                // Permissions status
-                Section {
-                    HStack {
-                        Text("Calendars")
-                        Spacer()
-                        Text(statusText(for: calendarManager.calendarAuthorizationStatus))
-                            .foregroundColor(color(for: calendarManager.calendarAuthorizationStatus))
-                    }
-                    HStack {
-                        Text("Reminders")
-                        Spacer()
-                        Text(statusText(for: calendarManager.reminderAuthorizationStatus))
-                            .foregroundColor(color(for: calendarManager.reminderAuthorizationStatus))
-                    }
-                } header: {
-                    Text("Permissions")
-                }
-                
                 Defaults.Toggle("Show calendar", key: .showCalendar)
-                
                 Section(header: Text("Select Calendars")) {
                     List {
                         ForEach(calendarManager.allCalendars, id: \.id) { calendar in
@@ -927,28 +736,8 @@ struct CalendarSettings: View {
                 await calendarManager.checkCalendarAuthorization()
             }
         }
+        // Add navigation title if it's missing or adjust as needed
         .navigationTitle("Calendar")
-    }
-    
-    private func statusText(for status: EKAuthorizationStatus) -> String {
-        switch status {
-        case .fullAccess: return "Full Access"
-        case .writeOnly: return "Write Only"
-        case .denied: return "Denied"
-        case .restricted: return "Restricted"
-        case .notDetermined: return "Not Determined"
-        @unknown default: return "Unknown"
-        }
-    }
-    
-    private func color(for status: EKAuthorizationStatus) -> Color {
-        switch status {
-        case .fullAccess: return .green
-        case .writeOnly: return .yellow
-        case .denied, .restricted: return .red
-        case .notDetermined: return .secondary
-        @unknown default: return .secondary
-        }
     }
 }
 
@@ -1401,9 +1190,6 @@ struct Appearance: View {
                     Text("Additional features")
                 }
             }
-            
-            // MARK: - Custom Idle Animations Section
-            IdleAnimationsSettingsSection()
 
             Section {
                 HStack {

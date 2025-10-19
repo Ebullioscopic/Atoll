@@ -144,10 +144,10 @@ extension CalendarModel {
     init(from calendar: EKCalendar) {
         self.init(
             id: calendar.calendarIdentifier,
+            account: calendar.accountTitle,
             title: calendar.title,
             color: calendar.color,
-            isSubscribed: calendar.isSubscribed || calendar.isDelegate,
-            isReminder: calendar.allowedEntityTypes.contains(.reminder)
+            isSubscribed: calendar.isSubscribed || calendar.isDelegate
         )
     }
 }

@@ -41,7 +41,7 @@ struct DownloadArea: View {
                 }
             }
             Spacer()
-            HStack(spacing: 12) {
+            HStack(spacing: 6) {
                 VStack(alignment: .trailing) {
                     Text(watcher.downloadFiles.first!.formattedSize)
                     Text(watcher.downloadFiles.first!.name).font(.caption2).foregroundStyle(.gray)

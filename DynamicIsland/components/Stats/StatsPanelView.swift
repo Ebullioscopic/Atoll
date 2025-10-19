@@ -67,10 +67,65 @@ struct StatsPanelView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // Stats content - Compact two-row layout
-                CPUStatsDetailView()
+                VStack(spacing: 16) {
+                    // Top row: System overview cards
+                    HStack(spacing: 12) {
+                        CompactOverviewCard(
+                            title: "CPU",
+                            value: statsManager.cpuUsageString,
+                            color: .blue,
+                            icon: "cpu",
+                            data: statsManager.cpuHistory
+                        )
+                        
+                        CompactOverviewCard(
+                            title: "Memory",
+                            value: statsManager.memoryUsageString,
+                            color: .green,
+                            icon: "memorychip",
+                            data: statsManager.memoryHistory
+                        )
+                        
+                        CompactOverviewCard(
+                            title: "GPU",
+                            value: statsManager.gpuUsageString,
+                            color: .purple,
+                            icon: "display",
+                            data: statsManager.gpuHistory
+                        )
+                    }
+                    
+                    // Bottom row: Network and Disk graphs
+                    HStack(spacing: 12) {
+                        CompactDualGraph(
+                            title: "Network",
+                            primaryLabel: "Down",
+                            primaryValue: "\(String(format: "%.1f", statsManager.networkDownload / 1024 / 1024)) MB/s",
+                            primaryData: statsManager.networkDownloadHistory,
+                            primaryColor: .green,
+                            secondaryLabel: "Up",
+                            secondaryValue: "\(String(format: "%.1f", statsManager.networkUpload / 1024 / 1024)) MB/s",
+                            secondaryData: statsManager.networkUploadHistory,
+                            secondaryColor: .orange
+                        )
+                        
+                        CompactDualGraph(
+                            title: "Disk",
+                            primaryLabel: "Read",
+                            primaryValue: "\(String(format: "%.1f", statsManager.diskRead / 1024 / 1024)) MB/s",
+                            primaryData: statsManager.diskReadHistory,
+                            primaryColor: .cyan,
+                            secondaryLabel: "Write",
+                            secondaryValue: "\(String(format: "%.1f", statsManager.diskWrite / 1024 / 1024)) MB/s",
+                            secondaryData: statsManager.diskWriteHistory,
+                            secondaryColor: .pink
+                        )
+                    }
+                }
+                .padding(16)
             }
         }
-        .frame(width: 520, height: 620)
+        .frame(width: 650, height: 300)
         .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)

@@ -56,9 +56,6 @@
 - **Audio Visualizer**: Dynamic spectrum visualization with color adaptation
 - **Multi-Platform Support**: Apple Music, Spotify, YouTube Music, and more
 - **Smooth Transitions**: Elegant animations between tracks and states
-- **Minimalistic Mode**: Streamlined 420px compact layout for essential controls
-- **Lighting Effects**: Beautiful album art glow effects with player tinting
-- **Sneak Peek**: Standard and inline preview modes for quick glances
 
 ### 📊 Advanced System Monitoring
 - **CPU, Memory, GPU, Network, Disk**: Real-time stats with live graphs
@@ -66,9 +63,8 @@
 - **Intelligent Layout**: Vertical expansion, 1-5 graph layouts, perfect centering
 - **Customizable Visibility**: Toggle individual graphs on/off
 - **Smooth Animations**: Debounced updates for fluid transitions
-- **Stats Panel**: Floating window with detailed system metrics
 
-### 🎨 ColorPicker
+### 🎨 ColorPicker (NEW!)
 <div align="center">
    <img src="https://github.com/Ebullioscopic/DynamicIsland/blob/main/DynamicIslandSamples/colorpickerpanel.png" alt="ColorPicker Panel" width="350"/>
    <br>
@@ -76,43 +72,10 @@
 </div>
 
 - **Screen Color Picking**: Raycast-inspired panel, real-time magnification
-- **Multiple Formats**: HEX, RGB, HSL, SwiftUI, UIColor, NSColor, CSS, and more
+- **Multiple Formats**: HEX, RGB, HSL, SwiftUI, UIColor, and more
 - **History & Quick Copy**: Recent colors, hover info, click to copy
 - **Global Shortcut**: Cmd+Shift+P (customizable)
-- **Panel & Popover Modes**: Choose between floating panel or integrated popover
-- **Settings Integration**: Full control over features and appearance
-
-### 📋 Clipboard Manager
-<div align="center">
-   <img src="https://github.com/Ebullioscopic/DynamicIsland/blob/main/DynamicIslandSamples/clipboardpanel.png" alt="Clipboard Panel" width="350"/>
-   <br>
-   <img src="https://github.com/Ebullioscopic/DynamicIsland/blob/main/DynamicIslandSamples/clipboardpopover.png" alt="Clipboard Popover" width="350"/>
-</div>
-
-- **Clipboard History**: Access recent clipboard items with thumbnails
-- **Panel & Popover**: Dual display modes for flexible access
-- **Always Active**: Clipboard monitoring enabled by default
-- **Quick Access**: Click to copy, keyboard shortcuts for rapid paste
-
-### 🧠 Screen Assistant
-- **AI-Powered Analysis**: Intelligent screen content understanding
-- **Panel & Popover Modes**: Flexible display options
-- **Context-Aware**: Smart suggestions based on screen content
-- **Keyboard Shortcut**: Quick access to screen analysis
-
-### ✨ Minimalistic Mode (NEW!)
-- **Compact Layout**: 420px width (vs 640px normal)
-- **Essential Features Only**: Music controls, HUDs, timer - no clutter
-- **Perfect for Light Use**: Minimal interface for everyday tasks
-- **Auto-Configuration**: Profile-based setup during onboarding
-- **Smooth Transitions**: Seamless switching between modes
-
-### 🎯 Smart Onboarding (NEW!)
-- **User Profiles**: Developer, Designer, Light Use, Student
-- **Multi-Select**: Choose multiple profiles for combined features
-- **Auto-Configuration**: Settings applied based on selected profiles
-- **Privacy Policy**: Integrated privacy policy links
-- **Guided Setup**: Camera, calendar, music permissions with clear explanations
+- **Settings Integration**: Enable/disable, customize controls
 
 ### ⏱️ Timer & Productivity
 - **Multiple Timers**: Create/manage named timers
@@ -133,33 +96,15 @@
 - **Perfect Alignment**: Maintains center positioning across all states
 
 ### 🗂️ Widgets & Panels
-- **Multiple Panel Modes**: Floating panels and integrated popovers
-- **Clipboard Manager**: Quick access to recent clipboard items (always enabled)
-- **Screen Assistant**: AI-powered screen content analysis
-- **ColorPicker**: Professional color picking tool
-- **Stats Panel**: Floating system monitoring window
+<div align="center">
+   <img src="https://github.com/Ebullioscopic/DynamicIsland/blob/main/DynamicIslandSamples/clipboardpanel.png" alt="Clipboard Panel" width="350"/>
+   <br>
+   <img src="https://github.com/Ebullioscopic/DynamicIsland/blob/main/DynamicIslandSamples/clipboardpopover.png" alt="Clipboard Popover" width="350"/>
+</div>
+
+- **Clipboard Manager**: Quick access to recent clipboard items
 - **Weather Widget**: Displays current weather (location access required)
-- **Calendar Integration**: View upcoming events and schedules
 - **App Switcher**: Swipe gestures for fast app switching
-
-### ⌨️ Keyboard Shortcuts
-- **Toggle Notch**: Customizable shortcut to open/close DynamicIsland
-- **Clipboard Panel**: Quick access to clipboard history
-- **ColorPicker**: Instant color picker activation (Cmd+Shift+P)
-- **Screen Assistant**: AI analysis shortcut
-- **Stats Panel**: Toggle system monitoring window
-- **Demo Timer**: Start 5-minute demo timer
-- **Sneak Peek**: Quick preview toggle
-- **Fully Customizable**: All shortcuts can be remapped
-
-### 🎨 Customization & Theming
-- **Minimalistic Mode**: Toggle between full-featured and minimal layouts
-- **Corner Radius Scaling**: Adjust notch roundness
-- **Lighting Effects**: Album art glow and player tinting
-- **Shadow Effects**: Customize drop shadows
-- **Mirror Feature**: Quick camera preview
-- **Custom Animations**: Modern or classic close animations
-- **Profile-Based Setup**: Auto-configure based on use case
 
 ---
 
@@ -167,7 +112,7 @@
 
 ### Prerequisites
 - **macOS Sonoma 14.0+** (Optimized for Sequoia 15.0+)
-- **MacBook with Notch** (Pro 14"/16" M1/M2/M3/M4 series)
+- **MacBook with Notch** (Pro 14"/16" M1/M2/M3 series)
 - **Xcode 15.0+**, **Swift 5.9+**
 - **Admin privileges** for system monitoring features
 
@@ -177,33 +122,9 @@ git clone https://github.com/Ebullioscopic/DynamicIsland.git
 cd DynamicIsland
 open DynamicIsland.xcodeproj
 ```
-1. Build and run in Xcode (`Cmd + R`)
-2. **First Launch Onboarding**:
-   - Choose your profile(s): Developer, Designer, Light Use, or Student
-   - Grant permissions: Camera (for mirror), Calendar, Music
-   - Settings auto-configured based on your selection
-3. Enable **Accessibility** for advanced features (ColorPicker, Screen Assistant)
-4. The app will appear in your menu bar and activate the notch
-
-### Quick Start Profiles
-
-**🔧 Developer**
-- ColorPicker, Stats, Screen Assistant, Timer enabled
-- Full feature set for coding workflows
-
-**🎨 Designer**
-- ColorPicker, Mirror, Lighting Effects enabled
-- Visual-focused tools and aesthetics
-
-**✨ Light Use**
-- Minimalistic Mode (420px compact layout)
-- Essential features only: Music, HUDs, Timer
-
-**📚 Student**
-- Calendar, Timer, Clipboard enabled
-- Organization-focused feature set
-
-**Note**: Clipboard Manager is always enabled regardless of profile selection.
+1. Enable **Accessibility**, **Screen Recording**, and **Full Disk Access** in System Settings
+2. Build and run in Xcode (`Cmd + R`)
+3. The app will appear in your menu bar and activate the notch
 
 ---
 
@@ -213,128 +134,43 @@ open DynamicIsland.xcodeproj
 - **Hover to Activate**: Move cursor near the notch to expand
 - **Click to Open**: Tap the notch area for full controls
 - **Gesture Support**: Swipe down to expand, swipe up to close
-- **Tab Navigation**: Switch between Home, Stats, Timer, and more
-
-### First Time Setup
-1. **Choose Your Profile**: Select Developer, Designer, Light Use, or Student
-2. **Grant Permissions**: Camera, Calendar, Music access as needed
-3. **Enable Accessibility**: For ColorPicker and Screen Assistant (optional)
-4. **Customize**: Visit Settings to fine-tune features
-
-### Music & Media
-- **Now Playing**: Album art, track info, playback controls
-- **Visualizer**: Real-time audio spectrum (enable in Settings)
-- **Minimalistic Mode**: Compact 420px layout for essential controls
-- **Sneak Peek**: Quick preview without fully opening
+- **Tab Navigation**: Switch between Home, Shelf, Timer, Stats, ColorPicker, and more
 
 ### System Monitoring
 - **Stats Tab**: CPU, Memory, GPU, Network, Disk with live graphs
-- **Layout Intelligence**: 1-3 graphs in a row, 4+ in grid layout
-- **Stats Panel**: Floating window for persistent monitoring
+- **Layout Intelligence**: 1-3 graphs in a row, 4 in 2×2 grid, 5 in 3+2 layout
 - **Smooth Transitions**: Animated layout changes, perfect centering
 
 ### ColorPicker
-- **Quick Access**: Cmd+Shift+P or from tab navigation
-- **Pick Colors**: Click anywhere on screen to sample
-- **Copy Formats**: HEX, RGB, HSL, SwiftUI, CSS, and more
-- **History**: Access recently picked colors
-- **Panel/Popover**: Choose your preferred display mode
+- **Panel & Popover**: Pick colors anywhere, see recent colors, copy formats
+- **Shortcut**: Cmd+Shift+P to open picker
 
-### Clipboard Manager
-- **Always Active**: Clipboard history automatically tracked
-- **Panel Access**: Keyboard shortcut or tab navigation
-- **Quick Copy**: Click any item to copy to clipboard
-- **Visual Previews**: See thumbnails of copied content
-
-### Screen Assistant
-- **AI Analysis**: Intelligent screen content understanding
-- **Context Aware**: Smart suggestions based on what you're viewing
-- **Keyboard Shortcut**: Quick activation
-- **Privacy First**: Local processing, no data sent externally
+### Clipboard & Widgets
+- **Clipboard Panel**: Access recent clipboard items
+- **Weather Widget**: Current weather in notch (location access required)
+- **App Switcher**: Swipe to switch apps
 
 ### Customization
-- **Settings Window**: Click menubar icon → Settings
-- **Profile Switch**: Change between Developer/Designer/Light/Student modes
-- **Minimalistic Toggle**: Enable/disable compact layout
-- **Feature Toggles**: Enable/disable individual features
-- **Keyboard Shortcuts**: Customize all hotkeys
+- **Preferences Pane**: Long-press notch to open
 - **Themes**: Light, dark, system adaptive
+- **Widget Settings**: Enable/disable, adjust sizes, display preferences
+- **Gestures**: Customize swipe, tap, long-press actions
 
 ---
 
 ## ⚙️ Configuration
 
 ### Settings Categories
-
-#### General
-- **Menubar Icon**: Show/hide menubar icon
-- **Multi-Display Support**: Choose main monitor, show on all displays
-- **Minimalistic Mode**: Enable compact 420px layout
-- **User Profiles**: Switch between Developer/Designer/Light/Student
-
-#### Appearance
-- **Corner Radius Scaling**: Adjust notch roundness
-- **Lighting Effects**: Album art glow and player tinting
-- **Shadow Effects**: Enable/disable drop shadows
-- **Mirror Feature**: Toggle camera preview
-- **Modern Animations**: Choose animation styles
-- **Themes**: Light, dark, system adaptive
-
-#### Behavior
-- **Hover Sensitivity**: Adjust activation distance
-- **Open on Hover**: Auto-expand on cursor proximity
-- **Haptic Feedback**: Enable/disable haptics
-- **Gestures**: Customize swipe, tap, long-press actions
-
-#### Features
-- **Stats Monitoring**: Enable/disable CPU, Memory, GPU, Network, Disk
-- **ColorPicker**: Toggle feature, set keyboard shortcut, panel/popover mode
-- **Clipboard Manager**: Always enabled, configure display mode
-- **Screen Assistant**: Enable/disable, set keyboard shortcut
-- **Timer**: Default duration, notification style, colors
+- **Stats**: Enable/disable CPU, Memory, GPU, Network, Disk monitoring
 - **Music & Media**: Visualizer type, color adaptation, media sources
-
-#### Keyboard Shortcuts
-- **Toggle Notch**: Open/close DynamicIsland
-- **Sneak Peek**: Quick preview toggle
-- **Clipboard**: Open clipboard panel
-- **ColorPicker**: Activate color picker (default: Cmd+Shift+P)
-- **Screen Assistant**: Open AI assistant
-- **Stats Panel**: Toggle monitoring window
-- **Demo Timer**: Start 5-minute timer
-- **All Customizable**: Remap any shortcut
-
-#### Privacy & Permissions
-- **Accessibility**: Required for ColorPicker, Screen Assistant
-- **Camera**: For mirror feature
-- **Calendar**: For event display
-- **Music**: For playback controls
-
-### Reset to Defaults
-Use the included script to reset all settings:
-```bash
-./reset_app_defaults.sh
-```
-This will:
-- Clear all UserDefaults
-- Remove application support files
-- Remove caches and preferences
-- Reset to fresh install state (shows onboarding)
+- **Timer**: Default duration, notification style, colors, auto-start
+- **Appearance & Behavior**: Theme, hover sensitivity, animation speed, corner radius, shadow effects
+- **Multi-Display Support**: Choose main monitor, show on all displays
+- **Keyboard Shortcuts**: Toggle DynamicIsland, open settings, quick stats, timer control
 
 ---
 
 ## 🚧 Roadmap
-
-### ✅ Recently Added
-- **Minimalistic Mode**: Compact 420px layout for light use
-- **Smart Onboarding**: Profile-based setup (Developer/Designer/Light/Student)
-- **ColorPicker**: Professional screen color picking tool
-- **Clipboard Manager**: Always-on clipboard history
-- **Screen Assistant**: AI-powered screen analysis
-- **Panel System**: Floating windows and integrated popovers
-- **Lighting Effects**: Album art glow and player tinting
-- **Stats Panel**: Floating system monitoring window
-- **Enhanced Keyboard Shortcuts**: Full customization support
 
 ### 🔄 Upcoming Features
 - **Enhanced Calendar Integration**: Weekly/monthly views, event details
@@ -349,91 +185,28 @@ This will:
 - **3D Animations**: Enhanced visual effects
 - **Plugin Architecture**: Third-party extensions
 - **Cross-Platform**: iPad/iPhone companion apps
-- **Localization**: Multi-language support
 
 ---
 
 ## 🔧 Troubleshooting
 
 ### Common Issues & Solutions
+- **Permissions**: Enable Accessibility, Screen Recording, Full Disk Access
+- **Stats Not Updating**: Check feature toggles, restart monitoring, verify permissions
+- **Music Controls Not Working**: Ensure media app is playing, check permissions, restart app
+- **Performance Issues**: Reduce update frequency, disable unused features, restart app
 
-#### Permissions
-- **Accessibility**: Required for ColorPicker and Screen Assistant
-  - Go to System Settings → Privacy & Security → Accessibility
-  - Enable DynamicIsland
-  - **Important**: Quit and restart the app after granting permission
-- **Camera**: For mirror feature
-- **Calendar**: For event display
-- **Screen Recording**: For advanced features (optional)
-
-#### Stats Not Updating
-- Check feature toggles in Settings → Stats
-- Verify Stats feature is enabled
-- Restart monitoring from Settings
-- Check Activity Monitor for CPU/memory usage
-
-#### Music Controls Not Working
-- Ensure media app (Music, Spotify, etc.) is playing
-- Check Music permission in System Settings
-- Restart DynamicIsland
-- Try switching between media apps
-
-#### ColorPicker Not Working
-- Grant Accessibility permission (see above)
-- **Must quit and restart** app after granting permission
-- Check keyboard shortcut isn't conflicting
-- Verify ColorPicker feature is enabled in Settings
-
-#### Window Positioning Issues
-- If notch appears shifted after toggling Minimalistic Mode:
-  - This was fixed in recent updates
-  - Update to latest version
-  - Window now repositions immediately
-
-#### Performance Issues
-- Reduce stats update frequency in Settings
-- Disable unused features (Stats, Visualizer, etc.)
-- Check "Minimalistic Mode" for lighter resource usage
-- Close other resource-intensive apps
-- Restart DynamicIsland
-
-### Advanced Troubleshooting
-
-#### Reset to Factory Defaults
-Use the included reset script:
-```bash
-cd /path/to/DynamicIsland
-./reset_app_defaults.sh
-```
-
-Or manually:
-```bash
-# Clear UserDefaults
-defaults delete com.karthikinformationtechnology.DynamicIsland
-
-# Remove app data
-rm -rf ~/Library/Application\ Support/DynamicIsland
-rm -rf ~/Library/Caches/com.karthikinformationtechnology.DynamicIsland
-rm -f ~/Library/Preferences/com.karthikinformationtechnology.DynamicIsland.plist
-rm -rf ~/Library/Saved\ Application\ State/com.karthikinformationtechnology.DynamicIsland.savedState
-```
-
-#### Clean Reinstall
-1. Quit DynamicIsland
-2. Delete app from Applications
-3. Run reset script (above)
-4. Rebuild from Xcode
-
-#### Debug Mode
-- Hold `⌥` while opening Settings
-- Navigate to Advanced → Debug Mode
-- Enable Verbose Logging
-- Check Console.app for detailed logs
-
-### Getting Help
-- **GitHub Issues**: [Report bugs or request features](https://github.com/Ebullioscopic/DynamicIsland/issues)
-- **Discussions**: [Ask questions, share ideas](https://github.com/Ebullioscopic/DynamicIsland/discussions)
-- **Documentation**: Check `ONBOARDING_ENHANCEMENT.md`, `SYSTEM_TIMER_DETECTION.md` for detailed guides
+### Advanced
+- **Reset to Defaults**:
+   ```bash
+   defaults delete com.ebullioscopic.DynamicIsland
+   ```
+- **Clean Reinstall**:
+   1. Quit DynamicIsland
+   2. Delete app from Applications
+   3. Remove settings: `~/Library/Preferences/com.ebullioscopic.DynamicIsland.plist`
+   4. Reinstall from latest build
+- **Debug Mode**: Hold `⌥` while opening Settings → Advanced → Debug Mode → Enable Verbose Logging
 
 ---
 

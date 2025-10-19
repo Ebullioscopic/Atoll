@@ -12,8 +12,7 @@ import SwiftUI
 class AppleMusicController: MediaControllerProtocol {
     // MARK: - Properties
     @Published private var playbackState: PlaybackState = PlaybackState(
-        bundleIdentifier: "com.apple.Music",
-        playbackRate: 1
+        bundleIdentifier: "com.apple.Music"
     )
     
     var playbackStatePublisher: AnyPublisher<PlaybackState, Never> {
@@ -80,8 +79,7 @@ class AppleMusicController: MediaControllerProtocol {
     
     func toggleShuffle() async {
         await executeCommand("set shuffle enabled to not shuffle enabled")
-        try? await Task.sleep(for: .milliseconds(150))
-        await updatePlaybackInfo()
+        playbackState.isShuffled.toggle()
     }
     
     func toggleRepeat() async {
@@ -94,8 +92,14 @@ class AppleMusicController: MediaControllerProtocol {
                 set song repeat to off
             end if
             """)
-        try? await Task.sleep(for: .milliseconds(150))
-        await updatePlaybackInfo()
+        
+        if playbackState.repeatMode == .off {
+            playbackState.repeatMode = .all
+        } else if playbackState.repeatMode == .all {
+            playbackState.repeatMode = .one
+        } else {
+            playbackState.repeatMode = .off
+        }
     }
     
     func isActive() -> Bool {
@@ -118,7 +122,7 @@ class AppleMusicController: MediaControllerProtocol {
         let repeatModeValue = descriptor.atIndex(8)?.int32Value ?? 0
         updatedState.repeatMode = RepeatMode(rawValue: Int(repeatModeValue)) ?? .off
         updatedState.artwork = descriptor.atIndex(9)?.data as Data?
-        updatedState.lastUpdated = Date()
+
         self.playbackState = updatedState
     }
     
@@ -143,11 +147,11 @@ class AppleMusicController: MediaControllerProtocol {
                 set shuffleState to shuffle enabled
                 set repeatState to song repeat
                 if repeatState is off then
+                    set repeatValue to 0
+                else if repeatState is all then
                     set repeatValue to 1
                 else if repeatState is one then
                     set repeatValue to 2
-                else if repeatState is all then
-                    set repeatValue to 3
                 end if
 
                 try

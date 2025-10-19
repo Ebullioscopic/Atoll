@@ -9,12 +9,13 @@ import Defaults
 import MacroVisionKit
 import SwiftUI
 
+@MainActor
 class FullscreenMediaDetector: ObservableObject {
     static let shared = FullscreenMediaDetector()
     private let detector: MacroVisionKit
     @ObservedObject private var musicManager = MusicManager.shared
-    @MainActor @Published private(set) var fullscreenStatus: [String: Bool] = [:]
-    private var notificationTask: Task<Void, Never>?
+
+    @Published private(set) var fullscreenStatus: [String: Bool] = [:]
 
     private init() {
         self.detector = MacroVisionKit.shared
@@ -24,34 +25,17 @@ class FullscreenMediaDetector: ObservableObject {
     }
 
     private func setupNotificationObservers() {
-        notificationTask = Task { @Sendable [weak self] in
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    let activeSpaceNotifications = NSWorkspace.shared.notificationCenter.notifications(
-                        named: NSWorkspace.activeSpaceDidChangeNotification
-                    )
-                    
-                    for await _ in activeSpaceNotifications {
-                        await self?.handleChange()
-                    }
-                }
-                
-                group.addTask {
-                    let screenParameterNotifications = NSWorkspace.shared.notificationCenter.notifications(
-                        named:  NSApplication.didChangeScreenParametersNotification
-                    )
-                    
-                    for await _ in screenParameterNotifications {
-                        await  self?.handleChange()
-                    }
-                }
-            }
-        }
+        let nc = NSWorkspace.shared.notificationCenter
+        nc.addObserver(self, selector: #selector(handleChange),
+                       name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
+        nc.addObserver(self, selector: #selector(handleChange),
+                       name: NSApplication.didChangeScreenParametersNotification, object: nil)
     }
 
-    private func handleChange() async {
-        try? await Task.sleep(for: .milliseconds(500))
-        self.updateFullScreenStatus()
+    @objc private func handleChange() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.updateFullScreenStatus()
+        }
     }
 
     private func updateFullScreenStatus() {

@@ -13,7 +13,6 @@ import KeyboardShortcuts
 import SwiftUI
 import SwiftUIIntrospect
 
-@MainActor
 struct ContentView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @EnvironmentObject var webcamManager: WebcamManager
@@ -24,8 +23,6 @@ struct ContentView: View {
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var statsManager = StatsManager.shared
     @ObservedObject var recordingManager = ScreenRecordingManager.shared
-    @ObservedObject var privacyManager = PrivacyIndicatorManager.shared
-    @ObservedObject var lockScreenManager = LockScreenManager.shared
     
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
@@ -34,29 +31,43 @@ struct ContentView: View {
     @Default(.showNetworkGraph) var showNetworkGraph
     @Default(.showDiskGraph) var showDiskGraph
     
-    // Dynamic sizing based on view type and graph count with smooth transitions
+        // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
+        // Use minimalistic or normal size based on settings
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize : openNotchSize
         
-        guard coordinator.currentView == .stats else {
-            return baseSize
+        // Always return the target size for the current view to ensure smooth transitions
+        let targetSize: CGSize
+        
+        if coordinator.currentView == .stats {
+            // Count enabled graphs using the same logic as NotchStatsView
+            var enabledGraphsCount = 0
+            if showCpuGraph { enabledGraphsCount += 1 }
+            if showMemoryGraph { enabledGraphsCount += 1 }
+            if showGpuGraph { enabledGraphsCount += 1 }
+            if showNetworkGraph { enabledGraphsCount += 1 }
+            if showDiskGraph { enabledGraphsCount += 1 }
+            
+            if enabledGraphsCount > 3 {
+                // Expand height for 4+ graphs
+                targetSize = CGSize(
+                    width: baseSize.width,
+                    height: baseSize.height + 65  // Add extra height for second row
+                )
+            } else {
+                targetSize = baseSize
+            }
+        } else {
+            targetSize = baseSize
         }
         
-        let rows = statsRowCount()
-        if rows <= 1 {
-            return baseSize
-        }
-        
-        let additionalRows = max(rows - 1, 0)
-        let extraHeight = CGFloat(additionalRows) * statsAdditionalRowHeight
-        return CGSize(width: baseSize.width, height: baseSize.height + extraHeight)
+        return targetSize
     }
     
 
-    @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
-    @State private var hoverWorkItem: DispatchWorkItem?  // Used by handleSimpleHover for stats closing logic
-    @State private var debounceWorkItem: DispatchWorkItem?  // Used by handleSimpleHover
+    @State private var hoverWorkItem: DispatchWorkItem?
+    @State private var debounceWorkItem: DispatchWorkItem?
     
     @State private var isHoverStateChanging: Bool = false
     @State private var isStatsTransitioning: Bool = false
@@ -81,7 +92,6 @@ struct ContentView: View {
     
     private let extendedHoverPadding: CGFloat = 30
     private let zeroHeightHoverPadding: CGFloat = 10
-    private let statsAdditionalRowHeight: CGFloat = 110
     
     // Use minimalistic corner radius ONLY when opened, keep normal when closed
     private var activeCornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) {
@@ -93,8 +103,6 @@ struct ContentView: View {
     }
 
     var body: some View {
-        let interactionsEnabled = !lockScreenManager.isLocked
-
         ZStack(alignment: .top) {
             let mainLayout = NotchLayout()
                 .frame(alignment: .top)
@@ -137,12 +145,12 @@ struct ContentView: View {
                         .animation(notchStateAnimation, value: vm.notchState)
                         .animation(viewTransitionAnimation, value: coordinator.currentView)
                 }
-                .conditionalModifier(Defaults[.openNotchOnHover] && interactionsEnabled) { view in
+                .conditionalModifier(Defaults[.openNotchOnHover]) { view in
                     view.onHover { hovering in
                         handleHover(hovering)
                     }
                 }
-                .conditionalModifier(!Defaults[.openNotchOnHover] && interactionsEnabled) { view in
+                .conditionalModifier(!Defaults[.openNotchOnHover]) { view in
                     view
                         .onHover { hovering in
                             handleSimpleHover(hovering)
@@ -153,14 +161,14 @@ struct ContentView: View {
                             }
                             doOpen()
                         }
-                        .conditionalModifier(Defaults[.enableGestures] && interactionsEnabled) { view in
+                        .conditionalModifier(Defaults[.enableGestures]) { view in
                             view
                                 .panGesture(direction: .down) { translation, phase in
                                     handleDownGesture(translation: translation, phase: phase)
                                 }
                         }
                 }
-                .conditionalModifier(Defaults[.closeGestureEnabled] && Defaults[.enableGestures] && interactionsEnabled) { view in
+                .conditionalModifier(Defaults[.closeGestureEnabled] && Defaults[.enableGestures]) { view in
                     view
                         .panGesture(direction: .up) { translation, phase in
                             handleUpGesture(translation: translation, phase: phase)
@@ -252,12 +260,10 @@ struct ContentView: View {
                     isViewTransitioning = false
                     
                     // Check if this transition will cause a size change
-                    let baseOpenSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize : openNotchSize
-                    let expandedHeight = baseOpenSize.height + statsAdditionalRowHeight
-                    let oldSize = oldValue == .stats && statsTabHasExpandedHeight() ?
-                        CGSize(width: baseOpenSize.width, height: expandedHeight) : baseOpenSize
-                    let newSize = newValue == .stats && statsTabHasExpandedHeight() ?
-                        CGSize(width: baseOpenSize.width, height: expandedHeight) : baseOpenSize
+                    let oldSize = oldValue == .stats && statsTabHasExpandedHeight() ? 
+                        CGSize(width: openNotchSize.width, height: openNotchSize.height + 65) : openNotchSize
+                    let newSize = newValue == .stats && statsTabHasExpandedHeight() ? 
+                        CGSize(width: openNotchSize.width, height: openNotchSize.height + 65) : openNotchSize
                     let sizeWillChange = oldSize != newSize
                     
                     // Set flags for transition tracking
@@ -336,10 +342,9 @@ struct ContentView: View {
 //                    .keyboardShortcut("E", modifiers: .command)
                 }
         }
-        .frame(maxWidth: dynamicNotchSize.width, maxHeight: dynamicNotchSize.height, alignment: .top)
+        .frame(maxWidth: dynamicNotchSize.width, maxHeight: dynamicNotchSize.height - (coordinator.sneakPeek.show && coordinator.sneakPeek.type == .download && vm.notchState == .closed ? 32 : 0), alignment: .top)
         .animation(.easeInOut(duration: 0.4), value: dynamicNotchSize)
         .animation(.easeInOut(duration: 0.4), value: coordinator.currentView)
-        .environmentObject(privacyManager)
         .onChange(of: dynamicNotchSize) { oldSize, newSize in
             // Protect against hover interference during frame size changes
             if oldSize != newSize {
@@ -407,16 +412,12 @@ struct ContentView: View {
                       } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(.opacity)
-                      } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed && !lockScreenManager.isLocked {
+                      } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed {
                           MusicLiveActivity()
                       } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .timer) && vm.notchState == .closed && timerManager.isTimerActive && coordinator.timerLiveActivityEnabled && !vm.hideOnClosed {
                           TimerLiveActivity()
                       } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .recording) && vm.notchState == .closed && (recordingManager.isRecording || !recordingManager.isRecorderIdle) && Defaults[.enableScreenRecordingDetection] && !vm.hideOnClosed {
                           RecordingLiveActivity()
-                      } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .lockScreen) && vm.notchState == .closed && (lockScreenManager.isLocked || !lockScreenManager.isLockIdle) && Defaults[.enableLockScreenLiveActivity] && !vm.hideOnClosed {
-                          LockScreenLiveActivity()
-                      } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .privacy) && vm.notchState == .closed && privacyManager.hasAnyIndicator && (Defaults[.enableCameraDetection] || Defaults[.enableMicrophoneDetection]) && !vm.hideOnClosed {
-                          PrivacyLiveActivity()
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
                           DynamicIslandFaceAnimation().animation(.interactiveSpring, value: musicManager.isPlayerIdle)
                       } else if vm.notchState == .open {
@@ -433,9 +434,16 @@ struct ContentView: View {
                               SystemEventIndicatorModifier(eventType: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, sendEventBack: { _ in
                                   //
                               })
-                              .padding(.bottom, 10)
+                              .padding(.bottom, -5)
                               .padding(.leading, 4)
-                              .padding(.trailing, 8)
+                              .padding(.trailing, 4)
+                          }
+                          // Download sneak peek
+                          else if coordinator.sneakPeek.type == .download {
+                              DownloadSneakPeekView()
+                                  .padding(.bottom, -5)
+                                  .padding(.leading, 4)
+                                  .padding(.trailing, 4)
                           }
                           // Old sneak peek music
                           else if coordinator.sneakPeek.type == .music {
@@ -513,7 +521,7 @@ struct ContentView: View {
                 Rectangle()
                     .fill(.black)
                     .frame(width: vm.closedNotchSize.width - 20)
-                IdleAnimationView()
+                MinimalFaceFeatures()
             }
         }.frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
     }
@@ -532,7 +540,6 @@ struct ContentView: View {
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: MusicPlayerImageSizes.cornerRadiusInset.closed))
                     .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-                    .albumArtFlip(angle: musicManager.flipAngle)
                     .frame(width: max(0, vm.effectiveClosedNotchHeight - 12), height: max(0, vm.effectiveClosedNotchHeight - 12))
             }
             .frame(width: max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12) + gestureProgress / 2), height: max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)))
@@ -602,9 +609,7 @@ struct ContentView: View {
     
     @ViewBuilder
     var dragDetector: some View {
-        if lockScreenManager.isLocked {
-            EmptyView()
-        } else if Defaults[.dynamicShelf] && !Defaults[.enableMinimalisticUI] {
+        if Defaults[.dynamicShelf] && !Defaults[.enableMinimalisticUI] {
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
@@ -645,48 +650,72 @@ struct ContentView: View {
     
     /// Handle hover state changes with debouncing
     private func handleHover(_ hovering: Bool) {
-        hoverTask?.cancel()
+        // Don't process events if we're already transitioning
+        if isHoverStateChanging { return }
+        
+        // Cancel any pending tasks
+        hoverWorkItem?.cancel()
+        hoverWorkItem = nil
+        debounceWorkItem?.cancel()
+        debounceWorkItem = nil
         
         if hovering {
+            // Handle mouse enter
             withAnimation(.bouncy.speed(1.2)) {
                 isHovering = true
             }
             
+            // Only provide haptic feedback if notch is closed
             if vm.notchState == .closed && Defaults[.enableHaptics] {
                 triggerHapticIfAllowed()
             }
             
-            guard vm.notchState == .closed,
-                  !coordinator.sneakPeek.show,
-                  Defaults[.openNotchOnHover] else { return }
+            // Delay opening the notch
+            let task = DispatchWorkItem {
+                // ContentView is a struct, so we don't use weak self here
+                guard vm.notchState == .closed, isHovering else { return }
+                
+                // Additional check: don't open if a sneak peek just started showing
+                // to avoid conflicts during system HUD display
+                if coordinator.sneakPeek.show {
+                    // Schedule a retry after the sneak peek should be gone (default duration + small buffer)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                        if isHovering && vm.notchState == .closed && !coordinator.sneakPeek.show {
+                            doOpen()
+                        }
+                    }
+                    return
+                }
+                
+                doOpen()
+            }
             
-            hoverTask = Task {
-                try? await Task.sleep(for: .seconds(Defaults[.minimumHoverDuration]))
-                guard !Task.isCancelled else { return }
-                
-                await MainActor.run {
-                    guard self.vm.notchState == .closed,
-                          self.isHovering,
-                          !self.coordinator.sneakPeek.show else { return }
-                    
-                    self.doOpen()
-                }
-            }
+            hoverWorkItem = task
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + Defaults[.minimumHoverDuration],
+                execute: task
+            )
         } else {
-            hoverTask = Task {
-                try? await Task.sleep(for: .milliseconds(100))
-                guard !Task.isCancelled else { return }
+            // Handle mouse exit with debounce to prevent flickering
+            let debounce = DispatchWorkItem {
+                // ContentView is a struct, so we don't use weak self here
                 
-                await MainActor.run {
-                    withAnimation(.bouncy.speed(1.2)) {
-                        self.isHovering = false
-                    }
-                    
-                    if self.vm.notchState == .open && !self.hasAnyActivePopovers() {
-                        self.vm.close()
-                    }
+                // Update visual state
+                withAnimation(.bouncy.speed(1.2)) {
+                    isHovering = false
+                }
+                
+                // Close the notch if it's open and no popovers are active
+                let hasActivePopovers = vm.isBatteryPopoverActive || vm.isClipboardPopoverActive || vm.isColorPickerPopoverActive || vm.isStatsPopoverActive
+                
+                if vm.notchState == .open && !hasActivePopovers {
+                    vm.close()
                 }
             }
+            
+            debounceWorkItem = debounce
+            // Add a small delay to debounce rapid mouse movements
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: debounce)
         }
     }
     
@@ -768,23 +797,13 @@ struct ContentView: View {
     
     // Helper to check if stats tab has 4+ graphs (needs expanded height)
     private func statsTabHasExpandedHeight() -> Bool {
-        return statsRowCount() > 1
-    }
-
-    private func enabledStatsGraphCount() -> Int {
         var enabledCount = 0
         if showCpuGraph { enabledCount += 1 }
         if showMemoryGraph { enabledCount += 1 }
         if showGpuGraph { enabledCount += 1 }
         if showNetworkGraph { enabledCount += 1 }
         if showDiskGraph { enabledCount += 1 }
-        return enabledCount
-    }
-
-    private func statsRowCount() -> Int {
-        let count = enabledStatsGraphCount()
-        if count == 0 { return 0 }
-        return count <= 3 ? 1 : 2
+        return enabledCount > 3
     }
     
     // MARK: - Gesture Handling
