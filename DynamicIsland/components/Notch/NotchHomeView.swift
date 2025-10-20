@@ -382,6 +382,85 @@ struct CustomSlider: View {
     }
 }
 
+struct DownloadSneakPeekView: View {
+    @ObservedObject var manager = DownloadManager.shared
+    @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
+    
+    // Local state to force refresh
+    @State private var isCompleted: Bool = false
+    @State private var progress: Double = 0.0
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Left: Progress circle or checkmark
+            ZStack {
+                if isCompleted {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.green)
+                        .transition(.scale.combined(with: .opacity))
+                } else {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 3)
+                            .frame(width: 18, height: 18)
+                        Circle()
+                            .trim(from: 0, to: progress)
+                            .stroke(Color.blue, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                            .frame(width: 18, height: 18)
+                            .animation(.easeOut(duration: 0.25), value: progress)
+                    }
+                }
+            }
+            .frame(width: 26, height: 26)
+
+            Spacer()
+
+            // Right: Download icon or folder button
+            if isCompleted {
+                Button(action: {
+                    manager.openDownloadsFolder()
+                }) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.blue)
+                        .padding(4)
+                }
+                .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
+            } else {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.blue)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        //QUESTO PERMETTE DI MODFICARE L'ALTEZZA
+        .frame(height: 0)
+        .padding(.horizontal, 8)
+        .padding(.vertical, -25)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCompleted)
+        .onChange(of: manager.currentDownload?.isCompleted) { _, newValue in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isCompleted = newValue ?? false
+            }
+            print("📱 View updated: isCompleted = \(isCompleted)")
+        }
+        .onChange(of: manager.currentDownload?.progress) { _, newValue in
+            let newProgress = max(0.0, min(1.0, newValue ?? 0.0))
+            withAnimation(.easeOut(duration: 0.25)) {
+                progress = newProgress
+            }
+        }
+        .onAppear {
+            isCompleted = manager.currentDownload?.isCompleted ?? false
+            progress = manager.currentDownload?.progress ?? 0.0
+            print("📱 View appeared: isCompleted = \(isCompleted), progress = \(progress)")
+        }
+    }
+}
+
 #Preview {
     NotchHomeView(
         albumArtNamespace: Namespace().wrappedValue

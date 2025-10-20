@@ -336,7 +336,7 @@ struct ContentView: View {
 //                    .keyboardShortcut("E", modifiers: .command)
                 }
         }
-        .frame(maxWidth: dynamicNotchSize.width, maxHeight: dynamicNotchSize.height, alignment: .top)
+        .frame(maxWidth: dynamicNotchSize.width, maxHeight: dynamicNotchSize.height - (coordinator.sneakPeek.show && coordinator.sneakPeek.type == .download && vm.notchState == .closed ? 32 : 0), alignment: .top)
         .animation(.easeInOut(duration: 0.4), value: dynamicNotchSize)
         .animation(.easeInOut(duration: 0.4), value: coordinator.currentView)
         .environmentObject(privacyManager)
@@ -436,6 +436,13 @@ struct ContentView: View {
                               .padding(.bottom, 10)
                               .padding(.leading, 4)
                               .padding(.trailing, 8)
+                          }
+                          // Download sneak peek
+                          else if coordinator.sneakPeek.type == .download {
+                              DownloadSneakPeekView()
+                                  .padding(.bottom, -5)
+                                  .padding(.leading, 4)
+                                  .padding(.trailing, 4)
                           }
                           // Old sneak peek music
                           else if coordinator.sneakPeek.type == .music {

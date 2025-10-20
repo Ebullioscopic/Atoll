@@ -10,7 +10,7 @@ import Defaults
 
 struct LockScreenMusicPanel: View {
     static let collapsedSize = CGSize(width: 420, height: 180)
-    static let expandedSize = CGSize(width: 720, height: 340)
+    static let expandedSize = CGSize(width: 720, height: 340) // Kept for compatibility; window will go fullscreen when expanded
 
     @ObservedObject var musicManager = MusicManager.shared
     @State private var sliderValue: Double = 0
@@ -26,7 +26,7 @@ struct LockScreenMusicPanel: View {
     private let collapsedPanelCornerRadius: CGFloat = 28
     private let expandedPanelCornerRadius: CGFloat = 52
     private let collapsedAlbumArtCornerRadius: CGFloat = 16
-    private let expandedAlbumArtCornerRadius: CGFloat = 60
+    private let expandedAlbumArtCornerRadius: CGFloat = 20
     private let expandedContentSpacing: CGFloat = 40
     private let collapseTimeout: TimeInterval = 5
 
@@ -56,7 +56,11 @@ struct LockScreenMusicPanel: View {
     
     private var panelContent: some View {
         panelCore
-            .frame(width: currentSize.width, height: currentSize.height)
+            .frame(
+                width: isExpanded ? nil : currentSize.width,
+                height: isExpanded ? nil : currentSize.height
+            )
+            .frame(maxWidth: isExpanded ? .infinity : nil, maxHeight: isExpanded ? .infinity : nil)
             .animation(.spring(response: 0.48, dampingFraction: 0.82, blendDuration: 0.18), value: isExpanded)
             .onAppear {
                 sliderValue = musicManager.elapsedTime
@@ -77,24 +81,44 @@ struct LockScreenMusicPanel: View {
     private var panelCore: some View {
         Group {
             if isExpanded {
-                expandedLayout
+                ZStack {
+                    // Fullscreen blurred album art background
+                    GeometryReader { proxy in
+                        Image(nsImage: musicManager.albumArt)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: proxy.size.width, height: proxy.size.height)
+                            .clipped()
+                            .blur(radius: 18)
+                            .overlay(Color.black.opacity(0.18))
+                            .ignoresSafeArea(.all)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+
+                    // Foreground content
+                    expandedLayout
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 28)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        .ignoresSafeArea(.all)
+                }
             } else {
                 collapsedLayout
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                    .frame(width: currentSize.width, height: currentSize.height, alignment: .topLeading)
+                    .background(panelBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
+                    .overlay {
+                        if showPanelBorder {
+                            RoundedRectangle(cornerRadius: panelCornerRadius)
+                                .stroke(Color.white.opacity(0.35), lineWidth: 1.4)
+                        }
+                    }
+                    .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
+                    .contentShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
             }
         }
-        .padding(.horizontal, isExpanded ? 24 : 20)
-        .padding(.vertical, isExpanded ? 22 : 16)
-        .frame(width: currentSize.width, height: currentSize.height, alignment: .topLeading)
-        .background(panelBackground)
-        .clipShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
-        .overlay {
-            if showPanelBorder {
-                RoundedRectangle(cornerRadius: panelCornerRadius)
-                    .stroke(Color.white.opacity(0.35), lineWidth: 1.4)
-            }
-        }
-        .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
-        .contentShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
     }
 
     private var collapsedLayout: some View {
@@ -110,17 +134,18 @@ struct LockScreenMusicPanel: View {
 
     private var expandedLayout: some View {
         HStack(alignment: .center, spacing: expandedContentSpacing) {
-            albumArtButton(size: 230, cornerRadius: expandedAlbumArtCornerRadius)
-                .frame(width: 230, height: 230)
+            albumArtButton(size: 300, cornerRadius: expandedAlbumArtCornerRadius)
+                .frame(width: 400, height: 400)
 
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .center, spacing: 20) {
                 expandedHeader
                 progressBar
                     .padding(.top, 10)
-                    .frame(maxWidth: .infinity)
-                playbackControls(alignment: .leading)
+                    .frame(maxWidth: 520)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                playbackControls(alignment: .center)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .frame(maxHeight: .infinity, alignment: .center)
     }
@@ -149,22 +174,21 @@ struct LockScreenMusicPanel: View {
     }
 
     private var expandedHeader: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(musicManager.songTitle.isEmpty ? "No Music Playing" : musicManager.songTitle)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
+        VStack(alignment: .center, spacing: 10) {
+            Text(musicManager.songTitle.isEmpty ? "No Music Playing" : musicManager.songTitle)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
 
-                Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.7) : .gray)
-                    .lineLimit(2)
-            }
-
-            Spacer()
+            Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.7) : .gray)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
 
             visualizer(width: 24, height: 20)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 
@@ -223,7 +247,8 @@ struct LockScreenMusicPanel: View {
 
     private func registerInteraction() {
         cancelCollapseTimer()
-        guard isExpanded else { return }
+        // In fullscreen mode we do not auto-collapse; exit is by clicking the small album art
+        guard isExpanded == false else { return }
 
         let workItem = DispatchWorkItem {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
@@ -490,3 +515,4 @@ struct LockScreenMusicPanel: View {
         print("[\(formatter.string(from: Date()))] LockScreenMusicPanel: \(event) – \(styleDescriptor)")
     }
 }
+
