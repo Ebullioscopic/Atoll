@@ -3,27 +3,25 @@ import SwiftUI
 struct LockScreenWeatherWidget: View {
     let snapshot: LockScreenWeatherSnapshot
 
-    var body: some View {
-        let segments = infoSegments
-        HStack(spacing: 8) {
-            Image(systemName: snapshot.symbolName)
-                .font(.system(size: 26, weight: .medium))
-                .symbolRenderingMode(.hierarchical)
-            Text(snapshot.temperatureText)
-                .font(.system(size: 24, weight: .semibold, design: .rounded))
-                .kerning(-0.4)
+    private let primaryFont = Font.system(size: 22, weight: .semibold, design: .rounded)
 
-            if !segments.isEmpty {
-                Color.clear.frame(width: 6)
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            if let charging = snapshot.charging {
+                chargingSegment(for: charging)
             }
 
-            ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
-                if index > 0 {
-                    Color.clear.frame(width: 12)
-                }
-                segmentView(for: segment)
+            if let bluetooth = snapshot.bluetooth {
+                bluetoothSegment(for: bluetooth)
+            }
+
+            weatherSegment
+
+            if shouldShowLocation {
+                locationSegment
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .foregroundStyle(Color.white.opacity(0.65))
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -33,56 +31,88 @@ struct LockScreenWeatherWidget: View {
         .accessibilityLabel(accessibilityLabel)
     }
 
-    private enum InfoSegment: Equatable {
-        case location(String)
-        case charging(String)
-        case bluetooth(String, Int)
-    }
-
-    private var infoSegments: [InfoSegment] {
-        var segments: [InfoSegment] = []
-
-        if snapshot.showsLocation, let locationName = snapshot.locationName, !locationName.isEmpty {
-            segments.append(.location(locationName))
+    private var weatherSegment: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: snapshot.symbolName)
+                .font(.system(size: 26, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+            Text(snapshot.temperatureText)
+                .font(primaryFont)
+                .kerning(-0.3)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
+                .layoutPriority(2)
         }
-
-        if let charging = snapshot.charging {
-            let iconName = charging.iconName
-            if !iconName.isEmpty {
-                segments.append(.charging(iconName))
-            }
-        }
-
-        if let bluetooth = snapshot.bluetooth {
-            segments.append(.bluetooth(bluetooth.iconName, bluetooth.batteryLevel))
-        }
-
-        return segments
     }
 
     @ViewBuilder
-    private func segmentView(for segment: InfoSegment) -> some View {
-        switch segment {
-        case .location(let value):
-            Text(value)
-                .font(.system(size: 20, weight: .medium, design: .rounded))
+    private func chargingSegment(for info: LockScreenWeatherSnapshot.ChargingInfo) -> some View {
+        if let iconName = chargingIconName(for: info) {
+            HStack(spacing: 4) {
+                Image(systemName: iconName)
+                    .font(.system(size: 20, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+
+                if let text = formattedChargingTime(for: info) {
+                    Text(text)
+                        .font(primaryFont)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .layoutPriority(1.2)
+                }
+            }
+            .layoutPriority(1)
+        }
+    }
+
+    @ViewBuilder
+    private func bluetoothSegment(for info: LockScreenWeatherSnapshot.BluetoothInfo) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: info.iconName)
+                .font(.system(size: 20, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+            Text("\(clampedBatteryLevel(info.batteryLevel))%")
+                .font(primaryFont)
                 .lineLimit(1)
                 .truncationMode(.tail)
-        case .charging(let icon):
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-        case .bluetooth(let icon, let value):
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                Text("\(clampedBatteryLevel(value))%")
-                    .font(.system(size: 20, weight: .medium, design: .rounded))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
+                .minimumScaleFactor(0.85)
+                .layoutPriority(1.4)
         }
+    }
+
+    @ViewBuilder
+    private var locationSegment: some View {
+        if let locationName = snapshot.locationName {
+            Text(locationName)
+                .font(primaryFont)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .minimumScaleFactor(0.75)
+                .layoutPriority(0.7)
+        }
+    }
+
+    private var shouldShowLocation: Bool {
+        snapshot.showsLocation && (snapshot.locationName?.isEmpty == false)
+    }
+
+    private func chargingIconName(for info: LockScreenWeatherSnapshot.ChargingInfo) -> String? {
+        let icon = info.iconName
+        return icon.isEmpty ? nil : icon
+    }
+
+    private func formattedChargingTime(for info: LockScreenWeatherSnapshot.ChargingInfo) -> String? {
+        guard let minutes = info.minutesRemaining, minutes > 0 else {
+            return nil
+        }
+
+        let hours = minutes / 60
+        let remainingMinutes = minutes % 60
+
+        if hours > 0 {
+            return "\(hours)h \(remainingMinutes)m"
+        }
+        return "\(remainingMinutes)m"
     }
 
     private func clampedBatteryLevel(_ level: Int) -> Int {

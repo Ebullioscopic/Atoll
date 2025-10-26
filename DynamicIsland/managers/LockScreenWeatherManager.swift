@@ -85,7 +85,20 @@ final class LockScreenWeatherManager: ObservableObject {
             return snapshot
         } catch {
             NSLog("LockScreenWeatherManager: failed to fetch weather - \(error.localizedDescription)")
-            return snapshot
+
+            let fallback = LockScreenWeatherSnapshot(
+                temperatureText: snapshot?.temperatureText ?? "--",
+                symbolName: snapshot?.symbolName ?? "cloud.fill",
+                description: snapshot?.description ?? "",
+                locationName: snapshot?.locationName,
+                charging: Defaults[.lockScreenWeatherShowsCharging] ? makeChargingInfo() : nil,
+                bluetooth: Defaults[.lockScreenWeatherShowsBluetooth] ? makeBluetoothInfo() : nil,
+                showsLocation: snapshot?.showsLocation ?? false
+            )
+
+            self.snapshot = fallback
+            deliver(fallback, forceShow: false)
+            return fallback
         }
     }
 
@@ -177,15 +190,17 @@ final class LockScreenWeatherManager: ObservableObject {
 
     private func makeChargingInfo() -> LockScreenWeatherSnapshot.ChargingInfo? {
         let battery = BatteryStatusViewModel.shared
-        let isPluggedIn = battery.isPluggedIn
-        let isCharging = battery.isCharging
+        let macStatus = MacBatteryManager.shared.currentStatus()
+
+        let isPluggedIn = battery.isPluggedIn || battery.isCharging
+        let isCharging = macStatus.isCharging || battery.isCharging
 
         guard isPluggedIn || isCharging else {
             return nil
         }
 
-        let minutes = battery.timeToFullCharge
-        let remaining = minutes > 0 ? minutes : nil
+        let rawMinutes = macStatus.timeRemainingMinutes ?? (battery.timeToFullCharge > 0 ? battery.timeToFullCharge : nil)
+        let remaining = (rawMinutes ?? 0) > 0 ? rawMinutes : nil
 
         return LockScreenWeatherSnapshot.ChargingInfo(
             minutesRemaining: remaining,
@@ -234,7 +249,7 @@ struct LockScreenWeatherSnapshot: Equatable {
                 return "bolt.fill"
             }
             if isPluggedIn {
-                return "powerplug.fill"
+                return "powerplug.portrait.fill"
             }
             return ""
         }

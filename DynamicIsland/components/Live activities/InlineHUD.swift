@@ -150,9 +150,8 @@ struct InlineHUD: View {
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .contentTransition(.interpolate)
                 } else if (type == .bluetoothAudio) {
-                    // Bluetooth device battery display
-                    HStack(spacing: useCircularIndicator ? 8 : 6) {
-                        if hasBatteryLevel {
+                    if hasBatteryLevel {
+                        HStack(spacing: useCircularIndicator ? 8 : 6) {
                             if useCircularIndicator {
                                 CircularBatteryIndicator(
                                     value: value,
@@ -176,16 +175,9 @@ struct InlineHUD: View {
                                     .foregroundStyle(.white)
                                     .lineLimit(1)
                             }
-                        } else {
-                            // No battery info available
-                            Text("Connected")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.gray)
-                                .lineLimit(1)
                         }
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                     }
-                    .frame(maxWidth: .infinity, alignment: .trailing)
                 } else {
                     // Volume and brightness displays
                     Group {
