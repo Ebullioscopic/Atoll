@@ -178,6 +178,10 @@ struct GeneralSettings: View {
     @Default(.lockScreenShowAppIcon) var lockScreenShowAppIcon
     @Default(.lockScreenPanelShowsBorder) var lockScreenPanelShowsBorder
     @Default(.lockScreenPanelUsesBlur) var lockScreenPanelUsesBlur
+    @Default(.enableLockScreenWeatherWidget) var enableLockScreenWeatherWidget
+    @Default(.lockScreenWeatherShowsLocation) var lockScreenWeatherShowsLocation
+    @Default(.lockScreenWeatherShowsCharging) var lockScreenWeatherShowsCharging
+    @Default(.lockScreenWeatherShowsBluetooth) var lockScreenWeatherShowsBluetooth
 
     var body: some View {
         Form {
@@ -324,6 +328,11 @@ struct GeneralSettings: View {
                 Defaults.Toggle("Enable blur", key: .lockScreenPanelUsesBlur)
                 Defaults.Toggle("Show lock screen media panel", key: .enableLockScreenMediaWidget)
                 Defaults.Toggle("Show lock screen weather", key: .enableLockScreenWeatherWidget)
+                if enableLockScreenWeatherWidget {
+                    Defaults.Toggle("Show location label", key: .lockScreenWeatherShowsLocation)
+                    Defaults.Toggle("Show charging status", key: .lockScreenWeatherShowsCharging)
+                    Defaults.Toggle("Show Bluetooth battery", key: .lockScreenWeatherShowsBluetooth)
+                }
                 
                 Button("Copy Latest Crash Report") {
                     copyLatestCrashReport()

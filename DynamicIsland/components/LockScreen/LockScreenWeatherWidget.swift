@@ -11,12 +11,13 @@ struct LockScreenWeatherWidget: View {
             Text(snapshot.temperatureText)
                 .font(.system(size: 24, weight: .semibold, design: .rounded))
                 .kerning(-0.4)
-            if let locationName = snapshot.locationName, !locationName.isEmpty {
-                Text("•")
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                Text(locationName)
-                    .font(.system(size: 20, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.65))
+
+            ForEach(Array(infoSegments.enumerated()), id: \.offset) { _, segment in
+                HStack(spacing: 4) {
+                    Text("•")
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    segmentView(for: segment)
+                }
             }
         }
         .foregroundStyle(Color.white.opacity(0.65))
@@ -28,20 +29,119 @@ struct LockScreenWeatherWidget: View {
         .accessibilityLabel(accessibilityLabel)
     }
 
+    private enum InfoSegment: Equatable {
+        case location(String)
+        case charging(String)
+        case bluetooth(String, Int)
+    }
+
+    private var infoSegments: [InfoSegment] {
+        var segments: [InfoSegment] = []
+
+        if snapshot.showsLocation, let locationName = snapshot.locationName, !locationName.isEmpty {
+            segments.append(.location(locationName))
+        }
+
+        if let charging = snapshot.charging {
+            let iconName = charging.iconName
+            if !iconName.isEmpty {
+                segments.append(.charging(iconName))
+            }
+        }
+
+        if let bluetooth = snapshot.bluetooth {
+            segments.append(.bluetooth(bluetooth.iconName, bluetooth.batteryLevel))
+        }
+
+        return segments
+    }
+
+    @ViewBuilder
+    private func segmentView(for segment: InfoSegment) -> some View {
+        switch segment {
+        case .location(let value):
+            Text(value)
+                .font(.system(size: 20, weight: .medium, design: .rounded))
+                .lineLimit(1)
+                .truncationMode(.tail)
+        case .charging(let icon):
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+        case .bluetooth(let icon, let value):
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                Text("\(clampedBatteryLevel(value))%")
+                    .font(.system(size: 20, weight: .medium, design: .rounded))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+    }
+
+    private func clampedBatteryLevel(_ level: Int) -> Int {
+        min(max(level, 0), 100)
+    }
+
     private var accessibilityLabel: String {
-        if let locationName = snapshot.locationName, !locationName.isEmpty {
-            return String(
-                format: NSLocalizedString("Weather: %@ %@ in %@", comment: "Weather description, temperature, and location"),
-                snapshot.description,
-                snapshot.temperatureText,
-                locationName
+        var components: [String] = []
+
+        if snapshot.showsLocation, let locationName = snapshot.locationName, !locationName.isEmpty {
+            components.append(
+                String(
+                    format: NSLocalizedString("Weather: %@ %@ in %@", comment: "Weather description, temperature, and location"),
+                    snapshot.description,
+                    snapshot.temperatureText,
+                    locationName
+                )
+            )
+        } else {
+            components.append(
+                String(
+                    format: NSLocalizedString("Weather: %@ %@", comment: "Weather description and temperature"),
+                    snapshot.description,
+                    snapshot.temperatureText
+                )
             )
         }
 
+        if let charging = snapshot.charging {
+            components.append(accessibilityChargingText(for: charging))
+        }
+
+        if let bluetooth = snapshot.bluetooth {
+            components.append(accessibilityBluetoothText(for: bluetooth))
+        }
+
+        return components.joined(separator: ". ")
+    }
+
+    private func accessibilityChargingText(for charging: LockScreenWeatherSnapshot.ChargingInfo) -> String {
+        if let minutes = charging.minutesRemaining, minutes > 0 {
+            let formatter = DateComponentsFormatter()
+            formatter.allowedUnits = [.hour, .minute]
+            formatter.unitsStyle = .full
+            let duration = formatter.string(from: TimeInterval(minutes * 60)) ?? "\(minutes) minutes"
+            return String(
+                format: NSLocalizedString("Battery charging, %@ remaining", comment: "Charging time remaining"),
+                duration
+            )
+        }
+
+        if charging.isPluggedIn && !charging.isCharging {
+            return NSLocalizedString("Battery fully charged", comment: "Battery is full")
+        }
+
+        return NSLocalizedString("Battery charging", comment: "Battery charging without estimate")
+    }
+
+    private func accessibilityBluetoothText(for bluetooth: LockScreenWeatherSnapshot.BluetoothInfo) -> String {
         return String(
-            format: NSLocalizedString("Weather: %@ %@", comment: "Weather description and temperature"),
-            snapshot.description,
-            snapshot.temperatureText
+            format: NSLocalizedString("Bluetooth device %@ at %d percent", comment: "Bluetooth device battery"),
+            bluetooth.deviceName,
+            bluetooth.batteryLevel
         )
     }
 }
