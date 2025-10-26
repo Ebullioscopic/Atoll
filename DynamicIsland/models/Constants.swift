@@ -391,6 +391,8 @@ extension Defaults.Keys {
     static let useColorCodedBatteryDisplay = Key<Bool>("useColorCodedBatteryDisplay", default: true)
     static let useColorCodedVolumeDisplay = Key<Bool>("useColorCodedVolumeDisplay", default: false)
     static let useSmoothColorGradient = Key<Bool>("useSmoothColorGradient", default: true)
+    static let showBluetoothBatteryPercentageText = Key<Bool>("showBluetoothBatteryPercentageText", default: true)
+    static let showBluetoothDeviceNameMarquee = Key<Bool>("showBluetoothDeviceNameMarquee", default: true)
     
     // MARK: Stats Feature
     static let enableStatsFeature = Key<Bool>("enableStatsFeature", default: false)

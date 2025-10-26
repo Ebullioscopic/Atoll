@@ -87,6 +87,13 @@ extension ColorCodedProgressBar {
         }
         return AnyShapeStyle(ColorCodedPalette.discreteColor(for: intensity))
     }
+
+    /// Returns the palette color that matches the configured thresholds. Useful for non-linear indicators.
+    static func paletteColor(for value: CGFloat, mode: ColorCodingMode, smoothGradient: Bool) -> Color {
+        let normalized = min(max(value, 0), 1)
+        let intensity = mode.intensity(for: normalized)
+        return ColorCodedPalette.color(for: intensity, smooth: smoothGradient)
+    }
 }
 
 // MARK: - Palette Helpers
@@ -95,6 +102,13 @@ private enum ColorCodedPalette {
     private static let greenComponents: (CGFloat, CGFloat, CGFloat) = (0.2, 0.78, 0.35)
     private static let yellowComponents: (CGFloat, CGFloat, CGFloat) = (0.93, 0.75, 0.2)
     private static let redComponents: (CGFloat, CGFloat, CGFloat) = (0.95, 0.36, 0.3)
+
+    static func color(for intensity: CGFloat, smooth: Bool) -> Color {
+        if smooth {
+            return smoothColor(for: intensity)
+        }
+        return discreteColor(for: intensity)
+    }
     
     static func discreteColor(for intensity: CGFloat) -> Color {
         let clamped = min(max(intensity, 0), 1)

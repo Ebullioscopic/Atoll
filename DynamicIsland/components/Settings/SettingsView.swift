@@ -675,6 +675,8 @@ struct HUD: View {
             
             Section {
                 Defaults.Toggle("Show Bluetooth device connections", key: .showBluetoothDeviceConnections)
+                Defaults.Toggle("Show battery percentage text in HUD", key: .showBluetoothBatteryPercentageText)
+                Defaults.Toggle("Scroll device name in HUD", key: .showBluetoothDeviceNameMarquee)
             } header: {
                 Text("Bluetooth Audio Devices")
             } footer: {
