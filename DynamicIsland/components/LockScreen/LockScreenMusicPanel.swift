@@ -70,7 +70,11 @@ struct LockScreenMusicPanel: View {
                 sliderValue = musicManager.elapsedTime
                 isActive = true
                 logPanelAppearance()
-                LockScreenPanelManager.shared.updatePanelSize(expanded: false, additionalHeight: sliderExtraHeight, animated: false)
+                LockScreenPanelManager.shared.updatePanelSize(
+                    expanded: isExpanded,
+                    additionalHeight: sliderHeight(forExpanded: isExpanded, visible: shouldShowVolumeSlider),
+                    animated: false
+                )
                 routeManager.refreshDevices()
             }
             .onDisappear {
@@ -79,10 +83,10 @@ struct LockScreenMusicPanel: View {
                 isVolumeSliderVisible = false
             }
             .onChange(of: isExpanded) { _, expanded in
-                LockScreenPanelManager.shared.updatePanelSize(expanded: expanded, additionalHeight: sliderExtraHeight)
-            }
-            .onChange(of: isVolumeSliderVisible) { _, _ in
-                LockScreenPanelManager.shared.updatePanelSize(expanded: isExpanded, additionalHeight: sliderExtraHeight)
+                LockScreenPanelManager.shared.updatePanelSize(
+                    expanded: expanded,
+                    additionalHeight: sliderHeight(forExpanded: expanded, visible: shouldShowVolumeSlider)
+                )
             }
             .onChange(of: showMediaOutputControl) { _, enabled in
                 if !enabled {
@@ -90,7 +94,10 @@ struct LockScreenMusicPanel: View {
                         isVolumeSliderVisible = false
                     }
                 }
-                LockScreenPanelManager.shared.updatePanelSize(expanded: isExpanded, additionalHeight: sliderExtraHeight)
+                LockScreenPanelManager.shared.updatePanelSize(
+                    expanded: isExpanded,
+                    additionalHeight: sliderHeight(forExpanded: isExpanded, visible: shouldShowVolumeSlider)
+                )
             }
     }
 
@@ -359,7 +366,7 @@ struct LockScreenMusicPanel: View {
             if shouldShowVolumeSlider {
                 volumeSlider
                     .frame(maxWidth: .infinity, alignment: alignment)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.scale(scale: 0.98, anchor: .top).combined(with: .opacity))
             }
         }
         .frame(maxWidth: .infinity, alignment: alignment)
@@ -432,18 +439,10 @@ struct LockScreenMusicPanel: View {
         let frameSize: CGFloat = isExpanded ? 56 : 32
         let iconSize: CGFloat = isExpanded ? 26 : 18
 
-        return Button(action: {
-            registerInteraction()
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                isVolumeSliderVisible.toggle()
-            }
-            if isVolumeSliderVisible {
-                routeManager.refreshDevices()
-            }
-        }) {
+        return Button(action: toggleVolumeSlider) {
             Image(systemName: mediaOutputIcon)
                 .font(.system(size: iconSize, weight: .medium))
-                .foregroundColor(isVolumeSliderVisible ? .accentColor : .white.opacity(0.8))
+                .foregroundColor(shouldShowVolumeSlider ? .accentColor : .white.opacity(0.8))
                 .frame(width: frameSize, height: frameSize)
                 .contentShape(Rectangle())
         }
@@ -499,8 +498,7 @@ struct LockScreenMusicPanel: View {
     }
 
     private var sliderExtraHeight: CGFloat {
-        guard shouldShowVolumeSlider else { return 0 }
-        return isExpanded ? expandedSliderExtraHeight : collapsedSliderExtraHeight
+        sliderHeight(forExpanded: isExpanded, visible: shouldShowVolumeSlider)
     }
 
     private var volumeIconName: String {
@@ -516,6 +514,29 @@ struct LockScreenMusicPanel: View {
 
     private var volumePercentage: String {
         "\(Int(round(volumeModel.level * 100)))%"
+    }
+
+    private func toggleVolumeSlider() {
+        registerInteraction()
+        let newState = !isVolumeSliderVisible
+        if newState {
+            routeManager.refreshDevices()
+        }
+
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+            isVolumeSliderVisible = newState
+        }
+
+        let targetHeight = sliderHeight(forExpanded: isExpanded, visible: shouldShowVolumeSlider)
+        LockScreenPanelManager.shared.updatePanelSize(
+            expanded: isExpanded,
+            additionalHeight: targetHeight
+        )
+    }
+
+    private func sliderHeight(forExpanded expanded: Bool, visible: Bool) -> CGFloat {
+        guard visible else { return 0 }
+        return expanded ? expandedSliderExtraHeight : collapsedSliderExtraHeight
     }
 
     @ViewBuilder

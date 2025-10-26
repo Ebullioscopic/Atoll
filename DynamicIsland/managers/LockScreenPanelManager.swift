@@ -9,6 +9,7 @@ import SwiftUI
 import AppKit
 import SkyLightWindow
 import Defaults
+import QuartzCore
 
 @MainActor
 class LockScreenPanelManager {
@@ -102,7 +103,11 @@ class LockScreenPanelManager {
         let targetFrame = NSRect(x: originX, y: originY, width: targetWidth, height: targetHeight)
 
         if animated {
-            window.animator().setFrame(targetFrame, display: true)
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.45
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                window.animator().setFrame(targetFrame, display: true)
+            }
         } else {
             window.setFrame(targetFrame, display: true)
         }
