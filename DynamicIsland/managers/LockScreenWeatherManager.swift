@@ -1,6 +1,7 @@
 import Foundation
 import Defaults
 import CoreLocation
+import Combine
 
 @MainActor
 final class LockScreenWeatherManager: ObservableObject {
@@ -11,8 +12,12 @@ final class LockScreenWeatherManager: ObservableObject {
     private let provider = LockScreenWeatherProvider()
     private let locationProvider = LockScreenWeatherLocationProvider()
     private var lastFetchDate: Date?
+    private var latestWeatherPayload: LockScreenWeatherSnapshot?
+    private var cancellables = Set<AnyCancellable>()
 
-    private init() {}
+    private init() {
+        observeAccessoryChanges()
+    }
 
     func prepareLocationAccess() {
         locationProvider.prepareAuthorization()
@@ -28,9 +33,15 @@ final class LockScreenWeatherManager: ObservableObject {
 
         Task { @MainActor [weak self] in
             guard let self else { return }
-            await self.refresh(force: self.snapshot == nil)
-            if let snapshot = self.snapshot {
-                LockScreenWeatherPanelManager.shared.show(with: snapshot)
+            let snapshot = await self.refresh(force: self.snapshot == nil)
+
+            guard LockScreenManager.shared.currentLockStatus else {
+                LockScreenWeatherPanelManager.shared.hide()
+                return
+            }
+
+            if let snapshot {
+                self.deliver(snapshot, forceShow: true)
             } else {
                 LockScreenWeatherPanelManager.shared.hide()
             }
@@ -41,32 +52,222 @@ final class LockScreenWeatherManager: ObservableObject {
         LockScreenWeatherPanelManager.shared.hide()
     }
 
-    func refresh(force: Bool = false) async {
+    @discardableResult
+    func refresh(force: Bool = false) async -> LockScreenWeatherSnapshot? {
         let interval = Defaults[.lockScreenWeatherRefreshInterval]
         if !force, let lastFetchDate, Date().timeIntervalSince(lastFetchDate) < interval {
-            if let snapshot = snapshot {
-                LockScreenWeatherPanelManager.shared.update(with: snapshot)
+            if let payload = latestWeatherPayload {
+                if Defaults[.lockScreenWeatherShowsBluetooth] {
+                    BluetoothAudioManager.shared.refreshConnectedDeviceBatteries()
+                }
+                let snapshot = makeSnapshot(from: payload)
+                self.snapshot = snapshot
+                deliver(snapshot, forceShow: false)
+                return snapshot
+            } else if let snapshot = snapshot {
+                deliver(snapshot, forceShow: false)
+                return snapshot
             }
-            return
+            return snapshot
         }
 
         do {
             let location = await locationProvider.currentLocation()
-            let snapshot = try await provider.fetchSnapshot(location: location)
+            let payload = try await provider.fetchSnapshot(location: location)
+            latestWeatherPayload = payload
+            if Defaults[.lockScreenWeatherShowsBluetooth] {
+                BluetoothAudioManager.shared.refreshConnectedDeviceBatteries()
+            }
+            let snapshot = makeSnapshot(from: payload)
             self.snapshot = snapshot
             lastFetchDate = Date()
-            LockScreenWeatherPanelManager.shared.update(with: snapshot)
+            deliver(snapshot, forceShow: false)
+            return snapshot
         } catch {
             NSLog("LockScreenWeatherManager: failed to fetch weather - \(error.localizedDescription)")
+
+            let fallback = LockScreenWeatherSnapshot(
+                temperatureText: snapshot?.temperatureText ?? "--",
+                symbolName: snapshot?.symbolName ?? "cloud.fill",
+                description: snapshot?.description ?? "",
+                locationName: snapshot?.locationName,
+                charging: Defaults[.lockScreenWeatherShowsCharging] ? makeChargingInfo() : nil,
+                bluetooth: Defaults[.lockScreenWeatherShowsBluetooth] ? makeBluetoothInfo() : nil,
+                showsLocation: snapshot?.showsLocation ?? false
+            )
+
+            self.snapshot = fallback
+            deliver(fallback, forceShow: false)
+            return fallback
         }
+    }
+
+    private func observeAccessoryChanges() {
+        let bluetoothManager = BluetoothAudioManager.shared
+
+        bluetoothManager.$connectedDevices
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.handleAccessoryUpdate(triggerBluetoothRefresh: false)
+            }
+            .store(in: &cancellables)
+
+        bluetoothManager.$lastConnectedDevice
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.handleAccessoryUpdate(triggerBluetoothRefresh: false)
+            }
+            .store(in: &cancellables)
+
+        let battery = BatteryStatusViewModel.shared
+        let batteryPublishers: [AnyPublisher<Void, Never>] = [
+            battery.$isCharging.map { _ in () }.eraseToAnyPublisher(),
+            battery.$isPluggedIn.map { _ in () }.eraseToAnyPublisher(),
+            battery.$timeToFullCharge.map { _ in () }.eraseToAnyPublisher()
+        ]
+
+        Publishers.MergeMany(batteryPublishers)
+            .debounce(for: .milliseconds(150), scheduler: RunLoop.main)
+            .sink { [weak self] in
+                self?.handleAccessoryUpdate(triggerBluetoothRefresh: false)
+            }
+            .store(in: &cancellables)
+
+        let defaultsPublishers: [AnyPublisher<Void, Never>] = [
+            Defaults.publisher(.lockScreenWeatherShowsLocation, options: [])
+                .map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.lockScreenWeatherShowsCharging, options: [])
+                .map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.lockScreenWeatherShowsBluetooth, options: [])
+                .map { _ in () }.eraseToAnyPublisher()
+        ]
+
+        Publishers.MergeMany(defaultsPublishers)
+            .sink { [weak self] in
+                self?.handleAccessoryUpdate(triggerBluetoothRefresh: true)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handleAccessoryUpdate(triggerBluetoothRefresh: Bool) {
+        guard let payload = latestWeatherPayload else { return }
+
+        if triggerBluetoothRefresh {
+            BluetoothAudioManager.shared.refreshConnectedDeviceBatteries()
+        }
+
+        let snapshot = makeSnapshot(from: payload)
+        self.snapshot = snapshot
+        deliver(snapshot, forceShow: false)
+    }
+
+    private func deliver(_ snapshot: LockScreenWeatherSnapshot, forceShow: Bool) {
+        guard LockScreenManager.shared.currentLockStatus else { return }
+
+        if forceShow {
+            LockScreenWeatherPanelManager.shared.show(with: snapshot)
+        } else {
+            LockScreenWeatherPanelManager.shared.update(with: snapshot)
+        }
+    }
+
+    private func makeSnapshot(from payload: LockScreenWeatherSnapshot) -> LockScreenWeatherSnapshot {
+        let locationName = payload.locationName
+        let shouldShowLocation = Defaults[.lockScreenWeatherShowsLocation] && !(locationName?.isEmpty ?? true)
+        let chargingInfo = Defaults[.lockScreenWeatherShowsCharging] ? makeChargingInfo() : nil
+        let bluetoothInfo = Defaults[.lockScreenWeatherShowsBluetooth] ? makeBluetoothInfo() : nil
+
+        return LockScreenWeatherSnapshot(
+            temperatureText: payload.temperatureText,
+            symbolName: payload.symbolName,
+            description: payload.description,
+            locationName: locationName,
+            charging: chargingInfo,
+            bluetooth: bluetoothInfo,
+            showsLocation: shouldShowLocation
+        )
+    }
+
+    private func makeChargingInfo() -> LockScreenWeatherSnapshot.ChargingInfo? {
+        let battery = BatteryStatusViewModel.shared
+        let macStatus = MacBatteryManager.shared.currentStatus()
+
+        let isPluggedIn = battery.isPluggedIn || battery.isCharging
+        let isCharging = macStatus.isCharging || battery.isCharging
+
+        guard isPluggedIn || isCharging else {
+            return nil
+        }
+
+        let rawMinutes = macStatus.timeRemainingMinutes ?? (battery.timeToFullCharge > 0 ? battery.timeToFullCharge : nil)
+        let remaining = (rawMinutes ?? 0) > 0 ? rawMinutes : nil
+
+        return LockScreenWeatherSnapshot.ChargingInfo(
+            minutesRemaining: remaining,
+            isCharging: isCharging,
+            isPluggedIn: isPluggedIn
+        )
+    }
+
+    private func makeBluetoothInfo() -> LockScreenWeatherSnapshot.BluetoothInfo? {
+        let manager = BluetoothAudioManager.shared
+
+        guard manager.isBluetoothAudioConnected else {
+            return nil
+        }
+
+        let device = manager.connectedDevices.last ?? manager.lastConnectedDevice
+
+        guard let device else {
+            return nil
+        }
+
+        guard let batteryLevel = device.batteryLevel else {
+            return nil
+        }
+
+        return LockScreenWeatherSnapshot.BluetoothInfo(
+            deviceName: device.name,
+            batteryLevel: clampBluetoothBatteryLevel(batteryLevel),
+            iconName: device.deviceType.sfSymbol
+        )
+    }
+
+    private func clampBluetoothBatteryLevel(_ level: Int) -> Int {
+        min(max(level, 0), 100)
     }
 }
 
 struct LockScreenWeatherSnapshot: Equatable {
+    struct ChargingInfo: Equatable {
+        let minutesRemaining: Int?
+        let isCharging: Bool
+        let isPluggedIn: Bool
+
+        var iconName: String {
+            if isCharging {
+                return "bolt.fill"
+            }
+            if isPluggedIn {
+                return "powerplug.portrait.fill"
+            }
+            return ""
+        }
+    }
+
+    struct BluetoothInfo: Equatable {
+        let deviceName: String
+        let batteryLevel: Int
+        let iconName: String
+    }
+
     let temperatureText: String
     let symbolName: String
     let description: String
     let locationName: String?
+    let charging: ChargingInfo?
+    let bluetooth: BluetoothInfo?
+    let showsLocation: Bool
 }
 
 private actor LockScreenWeatherProvider {
@@ -122,7 +323,10 @@ private actor LockScreenWeatherProvider {
             temperatureText: temperatureText,
             symbolName: symbol,
             description: description,
-            locationName: locationName
+            locationName: locationName,
+            charging: nil,
+            bluetooth: nil,
+            showsLocation: true
         )
     }
 }

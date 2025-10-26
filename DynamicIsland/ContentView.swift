@@ -200,14 +200,14 @@ struct ContentView: View {
                 }
                 .onChange(of: vm.isBatteryPopoverActive) { _, newPopoverState in
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if !newPopoverState && !isHovering && vm.notchState == .open && !vm.isStatsPopoverActive {
+                        if !newPopoverState && !isHovering && vm.notchState == .open && !vm.isStatsPopoverActive && !vm.isMediaOutputPopoverActive {
                             vm.close()
                         }
                     }
                 }
                 .onChange(of: vm.isStatsPopoverActive) { _, newPopoverState in
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if !newPopoverState && !isHovering && vm.notchState == .open && !vm.isBatteryPopoverActive && !vm.isClipboardPopoverActive && !vm.isColorPickerPopoverActive {
+                        if !newPopoverState && !isHovering && vm.notchState == .open && !vm.isBatteryPopoverActive && !vm.isClipboardPopoverActive && !vm.isColorPickerPopoverActive && !vm.isMediaOutputPopoverActive {
                             vm.close()
                         }
                     }
@@ -215,7 +215,7 @@ struct ContentView: View {
                 .onChange(of: vm.shouldRecheckHover) { _, _ in
                     // Recheck hover state when popovers are closed
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if vm.notchState == .open && !vm.isBatteryPopoverActive && !vm.isClipboardPopoverActive && !vm.isColorPickerPopoverActive && !vm.isStatsPopoverActive && !isHovering {
+                        if vm.notchState == .open && !vm.isBatteryPopoverActive && !vm.isClipboardPopoverActive && !vm.isColorPickerPopoverActive && !vm.isStatsPopoverActive && !vm.isMediaOutputPopoverActive && !isHovering {
                             vm.close()
                         }
                     }
@@ -320,10 +320,9 @@ struct ContentView: View {
                 }
                 .sensoryFeedback(.alignment, trigger: haptics)
                 .contextMenu {
-                    SettingsLink(label: {
-                        Text("Settings")
-                    })
-                    .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
+                    Button("Settings") {
+                        SettingsWindowController.shared.showWindow()
+                    }
 //                    Button("Edit") { // Doesnt work....
 //                        let dn = DynamicNotch(content: EditPanelView())
 //                        dn.toggle()
@@ -404,7 +403,7 @@ struct ContentView: View {
                             .frame(width: 76, alignment: .trailing)
                         }
                         .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
-                      } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) {
+                      } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .volume || vm.notchState == .closed) {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(.opacity)
                       } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed && !lockScreenManager.isLocked {
@@ -429,7 +428,7 @@ struct ContentView: View {
                        }
                       
                       if coordinator.sneakPeek.show {
-                          if (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && !Defaults[.inlineHUD] {
+                          if (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && !Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .volume || vm.notchState == .closed) {
                               SystemEventIndicatorModifier(eventType: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, sendEventBack: { _ in
                                   //
                               })
@@ -751,10 +750,11 @@ struct ContentView: View {
     
     // Helper function to check if any popovers are active
     private func hasAnyActivePopovers() -> Bool {
-        return vm.isBatteryPopoverActive || 
-               vm.isClipboardPopoverActive || 
-               vm.isColorPickerPopoverActive || 
-               vm.isStatsPopoverActive
+     return vm.isBatteryPopoverActive || 
+         vm.isClipboardPopoverActive || 
+         vm.isColorPickerPopoverActive || 
+         vm.isStatsPopoverActive ||
+         vm.isMediaOutputPopoverActive
     }
     
     // Helper to prevent rapid haptic feedback

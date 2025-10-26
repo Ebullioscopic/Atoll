@@ -178,6 +178,10 @@ struct GeneralSettings: View {
     @Default(.lockScreenShowAppIcon) var lockScreenShowAppIcon
     @Default(.lockScreenPanelShowsBorder) var lockScreenPanelShowsBorder
     @Default(.lockScreenPanelUsesBlur) var lockScreenPanelUsesBlur
+    @Default(.enableLockScreenWeatherWidget) var enableLockScreenWeatherWidget
+    @Default(.lockScreenWeatherShowsLocation) var lockScreenWeatherShowsLocation
+    @Default(.lockScreenWeatherShowsCharging) var lockScreenWeatherShowsCharging
+    @Default(.lockScreenWeatherShowsBluetooth) var lockScreenWeatherShowsBluetooth
 
     var body: some View {
         Form {
@@ -324,6 +328,11 @@ struct GeneralSettings: View {
                 Defaults.Toggle("Enable blur", key: .lockScreenPanelUsesBlur)
                 Defaults.Toggle("Show lock screen media panel", key: .enableLockScreenMediaWidget)
                 Defaults.Toggle("Show lock screen weather", key: .enableLockScreenWeatherWidget)
+                if enableLockScreenWeatherWidget {
+                    Defaults.Toggle("Show location label", key: .lockScreenWeatherShowsLocation)
+                    Defaults.Toggle("Show charging status", key: .lockScreenWeatherShowsCharging)
+                    Defaults.Toggle("Show Bluetooth battery", key: .lockScreenWeatherShowsBluetooth)
+                }
                 
                 Button("Copy Latest Crash Report") {
                     copyLatestCrashReport()
@@ -666,6 +675,9 @@ struct HUD: View {
             
             Section {
                 Defaults.Toggle("Show Bluetooth device connections", key: .showBluetoothDeviceConnections)
+                Defaults.Toggle("Use circular battery indicator", key: .useCircularBluetoothBatteryIndicator)
+                Defaults.Toggle("Show battery percentage text in HUD", key: .showBluetoothBatteryPercentageText)
+                Defaults.Toggle("Scroll device name in HUD", key: .showBluetoothDeviceNameMarquee)
             } header: {
                 Text("Bluetooth Audio Devices")
             } footer: {
@@ -675,27 +687,30 @@ struct HUD: View {
             }
             
             Section {
+                let colorCodingDisabled = progressBarStyle == .segmented
                 Defaults.Toggle("Color-coded battery display", key: .useColorCodedBatteryDisplay)
-                    .disabled(progressBarStyle != .gradient)
+                    .disabled(colorCodingDisabled)
                 Defaults.Toggle("Color-coded volume display", key: .useColorCodedVolumeDisplay)
-                    .disabled(progressBarStyle != .gradient)
-                
-                if progressBarStyle == .gradient && (Defaults[.useColorCodedBatteryDisplay] || Defaults[.useColorCodedVolumeDisplay]) {
+                    .disabled(colorCodingDisabled)
+
+                if !colorCodingDisabled && (Defaults[.useColorCodedBatteryDisplay] || Defaults[.useColorCodedVolumeDisplay]) {
                     Defaults.Toggle("Smooth color transitions", key: .useSmoothColorGradient)
                 }
+
+                Defaults.Toggle("Show percentages beside progress bars", key: .showProgressPercentages)
             } header: {
                 Text("Color-Coded Progress Bars")
             } footer: {
-                if progressBarStyle != .gradient {
-                    Text("Color-coded displays are only available in Gradient mode. Switch Progressbar style to Gradient to enable this feature.")
+                if progressBarStyle == .segmented {
+                    Text("Color-coded fills and smooth gradients are unavailable in Segmented mode. Switch to Hierarchical or Gradient to adjust these options.")
                         .foregroundStyle(.secondary)
                         .font(.caption)
                 } else if Defaults[.useSmoothColorGradient] {
-                    Text("Smooth: Battery/Volume gradually transitions through all colors\nBattery: Green (high) → Yellow-Green → Yellow → Orange → Red (low)\nVolume: Green (quiet) → Yellow → Orange → Red (loud)")
+                    Text("Smooth transitions blend Green (0–60%), Yellow (60–85%), and Red (85–100%) through the entire fill.")
                         .foregroundStyle(.secondary)
                         .font(.caption)
                 } else {
-                    Text("Discrete: Battery/Volume uses 3 distinct colors only\nBattery: Green (high), Yellow (medium), Red (low)\nVolume: Green (quiet), Yellow (medium), Red (loud)")
+                    Text("Discrete transitions snap between Green (0–60%), Yellow (60–85%), and Red (85–100%).")
                         .foregroundStyle(.secondary)
                         .font(.caption)
                 }
@@ -744,6 +759,7 @@ struct Media: View {
     @Default(.enableSneakPeek) private var enableSneakPeek
     @Default(.sneakPeekStyles) var sneakPeekStyles
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
+    @Default(.showShuffleAndRepeat) private var showShuffleAndRepeat
 
     var body: some View {
         Form {
@@ -784,6 +800,10 @@ struct Media: View {
                         customBadge(text: "Beta")
                     }
                 }
+                Defaults.Toggle(key: .showMediaOutputControl) {
+                    Text("Replace repeat button with media output control")
+                }
+                .disabled(!showShuffleAndRepeat)
             } header: {
                 Text("Media controls")
             }

@@ -334,10 +334,14 @@ extension Defaults.Keys {
     static let enableFullscreenMediaDetection = Key<Bool>("enableFullscreenMediaDetection", default: true)
     static let waitInterval = Key<Double>("waitInterval", default: 3)
     static let showShuffleAndRepeat = Key<Bool>("showShuffleAndRepeat", default: false)
+    static let showMediaOutputControl = Key<Bool>("showMediaOutputControl", default: false)
     // Enable lock screen media widget (shows the standalone panel when screen is locked)
     static let enableLockScreenMediaWidget = Key<Bool>("enableLockScreenMediaWidget", default: true)
     static let enableLockScreenWeatherWidget = Key<Bool>("enableLockScreenWeatherWidget", default: true)
     static let lockScreenWeatherRefreshInterval = Key<TimeInterval>("lockScreenWeatherRefreshInterval", default: 30 * 60)
+    static let lockScreenWeatherShowsLocation = Key<Bool>("lockScreenWeatherShowsLocation", default: true)
+    static let lockScreenWeatherShowsCharging = Key<Bool>("lockScreenWeatherShowsCharging", default: true)
+    static let lockScreenWeatherShowsBluetooth = Key<Bool>("lockScreenWeatherShowsBluetooth", default: true)
     static let lockScreenGlassStyle = Key<LockScreenGlassStyle>("lockScreenGlassStyle", default: .liquid)
     static let lockScreenShowAppIcon = Key<Bool>("lockScreenShowAppIcon", default: false)
     static let lockScreenPanelShowsBorder = Key<Bool>("lockScreenPanelShowsBorder", default: true)
@@ -362,6 +366,7 @@ extension Defaults.Keys {
     static let enableGradient = Key<Bool>("enableGradient", default: false)
     static let systemEventIndicatorShadow = Key<Bool>("systemEventIndicatorShadow", default: false)
     static let systemEventIndicatorUseAccent = Key<Bool>("systemEventIndicatorUseAccent", default: false)
+    static let showProgressPercentages = Key<Bool>("showProgressPercentages", default: false)
     
         // MARK: Shelf
     static let dynamicShelf = Key<Bool>("dynamicShelf", default: true)
@@ -386,6 +391,9 @@ extension Defaults.Keys {
     static let useColorCodedBatteryDisplay = Key<Bool>("useColorCodedBatteryDisplay", default: true)
     static let useColorCodedVolumeDisplay = Key<Bool>("useColorCodedVolumeDisplay", default: false)
     static let useSmoothColorGradient = Key<Bool>("useSmoothColorGradient", default: true)
+    static let useCircularBluetoothBatteryIndicator = Key<Bool>("useCircularBluetoothBatteryIndicator", default: true)
+    static let showBluetoothBatteryPercentageText = Key<Bool>("showBluetoothBatteryPercentageText", default: true)
+    static let showBluetoothDeviceNameMarquee = Key<Bool>("showBluetoothDeviceNameMarquee", default: true)
     
     // MARK: Stats Feature
     static let enableStatsFeature = Key<Bool>("enableStatsFeature", default: false)

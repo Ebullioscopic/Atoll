@@ -20,12 +20,42 @@ struct InlineHUD: View {
     @Default(.useColorCodedVolumeDisplay) var useColorCodedVolumeDisplay
     @Default(.useSmoothColorGradient) var useSmoothColorGradient
     @Default(.progressBarStyle) var progressBarStyle
+    @Default(.showProgressPercentages) var showProgressPercentages
+    @Default(.useCircularBluetoothBatteryIndicator) var useCircularBluetoothBatteryIndicator
+    @Default(.showBluetoothBatteryPercentageText) var showBluetoothBatteryPercentageText
+    @Default(.showBluetoothDeviceNameMarquee) var showBluetoothDeviceNameMarquee
     @ObservedObject var bluetoothManager = BluetoothAudioManager.shared
     
     @State private var displayName: String = ""
     
     var body: some View {
-        HStack {
+        let useCircularIndicator = useCircularBluetoothBatteryIndicator
+        let hasBatteryLevel = value > 0
+
+        let baseInfoWidth: CGFloat = {
+            if type == .bluetoothAudio {
+                return showBluetoothDeviceNameMarquee ? 100 : 52
+            }
+            return 100
+        }()
+        let infoWidth = baseInfoWidth - (hoverAnimation ? 0 : 12) + gestureProgress / 2
+        let baseTrailingWidth: CGFloat = {
+            if type == .bluetoothAudio {
+                if !hasBatteryLevel {
+                    return showBluetoothDeviceNameMarquee ? 100 : 70
+                }
+
+                if useCircularIndicator {
+                    return showBluetoothBatteryPercentageText ? 100 : 70
+                } else {
+                    return showBluetoothBatteryPercentageText ? 112 : 82
+                }
+            }
+            return 100
+        }()
+        let trailingWidth = baseTrailingWidth - (hoverAnimation ? 0 : 12) + gestureProgress / 2
+
+        return HStack {
             HStack(spacing: 5) {
                 Group {
                     switch (type) {
@@ -77,22 +107,15 @@ struct InlineHUD: View {
                 
                 // Use marquee text for device names to handle long names
                 if type == .bluetoothAudio {
-                    MarqueeText(
-                        $displayName,
-                        font: .system(size: 13, weight: .medium),
-                        nsFont: .body,
-                        textColor: .white,
-                        minDuration: 0.5,
-                        frameWidth: 85 - (hoverAnimation ? 0 : 12) + gestureProgress / 2
-                    )
-                    .onAppear {
-                        displayName = Type2Name(type)
-                    }
-                    .onChange(of: type) { _, _ in
-                        displayName = Type2Name(type)
-                    }
-                    .onChange(of: bluetoothManager.lastConnectedDevice?.name) { _, _ in
-                        displayName = Type2Name(type)
+                    if showBluetoothDeviceNameMarquee {
+                        MarqueeText(
+                            $displayName,
+                            font: .system(size: 13, weight: .medium),
+                            nsFont: .body,
+                            textColor: .white,
+                            minDuration: 0.2,
+                            frameWidth: infoWidth
+                        )
                     }
                 } else {
                     Text(Type2Name(type))
@@ -103,7 +126,7 @@ struct InlineHUD: View {
                         .contentTransition(.numericText())
                 }
             }
-            .frame(width: 100 - (hoverAnimation ? 0 : 12) + gestureProgress / 2, height: vm.notchSize.height - (hoverAnimation ? 0 : 12), alignment: .leading)
+            .frame(width: infoWidth, height: vm.notchSize.height - (hoverAnimation ? 0 : 12), alignment: .leading)
             
             Rectangle()
                 .fill(.black)
@@ -127,62 +150,147 @@ struct InlineHUD: View {
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .contentTransition(.interpolate)
                 } else if (type == .bluetoothAudio) {
-                    // Bluetooth device battery display
-                    HStack(spacing: 4) {
-                        if value > 0 {
-                            // Show color-coded battery bar if battery info available
-                            // Color-coding disabled for segmented or hierarchical mode
-                            if useColorCodedBatteryDisplay && progressBarStyle == .gradient {
-                                ColorCodedProgressBar.battery(value: value, width: 60, height: 4, smoothGradient: useSmoothColorGradient)
+                    if hasBatteryLevel {
+                        HStack(spacing: useCircularIndicator ? 8 : 6) {
+                            if useCircularIndicator {
+                                CircularBatteryIndicator(
+                                    value: value,
+                                    useColorCoding: useColorCodedBatteryDisplay && progressBarStyle != .segmented,
+                                    smoothGradient: useSmoothColorGradient
+                                )
+                                .allowsHitTesting(false)
                             } else {
-                                DraggableProgressBar(value: .constant(value))
-                                    .frame(width: 60)
+                                LinearBatteryIndicator(
+                                    value: value,
+                                    useColorCoding: useColorCodedBatteryDisplay && progressBarStyle != .segmented,
+                                    smoothGradient: useSmoothColorGradient
+                                )
+                                .allowsHitTesting(false)
                             }
-                            Text("\(Int(value * 100))%")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
+
+                            if showBluetoothBatteryPercentageText {
+                                Text("\(Int(value * 100))%")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                } else {
+                    // Volume and brightness displays
+                    Group {
+                        if type == .volume {
+                            Group {
+                                if value.isZero {
+                                    Text("muted")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(.gray)
+                                        .lineLimit(1)
+                                        .allowsTightening(true)
+                                        .multilineTextAlignment(.trailing)
+                                        .contentTransition(.numericText())
+                                } else {
+                                    HStack(spacing: 6) {
+                                        DraggableProgressBar(value: $value, colorMode: .volume)
+                                        PercentageLabel(value: value, isVisible: showProgressPercentages)
+                                    }
+                                    .transition(.opacity.combined(with: .scale))
+                                }
+                            }
+                            .animation(.smooth(duration: 0.2), value: value.isZero)
                         } else {
-                            // No battery info available
-                            Text("Connected")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.gray)
-                                .lineLimit(1)
+                            HStack(spacing: 6) {
+                                DraggableProgressBar(value: $value)
+                                PercentageLabel(value: value, isVisible: showProgressPercentages)
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .trailing)
-                } else {
-                    // Volume and brightness displays
-                    HStack {
-                        // Color-coding only available in gradient mode, not hierarchical or segmented
-                        if type == .volume && useColorCodedVolumeDisplay && progressBarStyle == .gradient {
-                            // Color-coded volume (reversed: red at high, green at low)
-                            ColorCodedProgressBar.volume(value: value, width: 70, height: 4, smoothGradient: useSmoothColorGradient)
-                        } else {
-                            // Default draggable progress bar
-                            DraggableProgressBar(value: $value)
-                        }
-                        
-                        if (type == .volume && value.isZero) {
-                            Text("muted")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.gray)
-                                .lineLimit(1)
-                                .allowsTightening(true)
-                                .multilineTextAlignment(.trailing)
-                        }
-                    }
                 }
             }
             .padding(.trailing, 4)
-            .frame(width: 100 - (hoverAnimation ? 0 : 12) + gestureProgress / 2, height: vm.closedNotchSize.height - (hoverAnimation ? 0 : 12), alignment: .center)
+            .frame(width: trailingWidth, height: vm.closedNotchSize.height - (hoverAnimation ? 0 : 12), alignment: .center)
         }
         .frame(height: vm.closedNotchSize.height + (hoverAnimation ? 8 : 0), alignment: .center)
+        .onAppear {
+            displayName = Type2Name(type)
+        }
+        .onChange(of: type) { _, _ in
+            displayName = Type2Name(type)
+        }
+        .onChange(of: bluetoothManager.lastConnectedDevice?.name) { _, _ in
+            displayName = Type2Name(type)
+        }
     }
     
+    private struct CircularBatteryIndicator: View {
+        let value: CGFloat
+        let useColorCoding: Bool
+        let smoothGradient: Bool
+
+        private var clampedValue: CGFloat {
+            min(max(value, 0), 1)
+        }
+
+        private var indicatorColor: Color {
+            if useColorCoding {
+                return ColorCodedProgressBar.paletteColor(for: clampedValue, mode: .battery, smoothGradient: smoothGradient)
+            }
+            return .white
+        }
+
+        var body: some View {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.18), lineWidth: 2.6)
+
+                Circle()
+                    .trim(from: 0, to: max(clampedValue, 0.015))
+                    .rotation(.degrees(-90))
+                    .stroke(indicatorColor, style: StrokeStyle(lineWidth: 2.8, lineCap: .round))
+            }
+            .frame(width: 22, height: 22)
+            .animation(.smooth(duration: 0.18), value: clampedValue)
+        }
+    }
+
+    private struct LinearBatteryIndicator: View {
+        let value: CGFloat
+        let useColorCoding: Bool
+        let smoothGradient: Bool
+
+        private let trackWidth: CGFloat = 54
+        private let trackHeight: CGFloat = 6
+
+        private var clampedValue: CGFloat {
+            min(max(value, 0), 1)
+        }
+
+        private var fillColor: Color {
+            if useColorCoding {
+                return ColorCodedProgressBar.paletteColor(for: clampedValue, mode: .battery, smoothGradient: smoothGradient)
+            }
+            return .white
+        }
+
+        var body: some View {
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.18))
+                    .frame(width: trackWidth, height: trackHeight)
+
+                Capsule()
+                    .fill(fillColor)
+                    .frame(width: trackWidth * clampedValue, height: trackHeight)
+            }
+            .frame(width: trackWidth, height: trackHeight)
+            .animation(.smooth(duration: 0.18), value: clampedValue)
+        }
+    }
+
     func SpeakerSymbol(_ value: CGFloat) -> String {
         switch(value) {
             case 0:

@@ -93,6 +93,9 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
     // MARK: - HUD Dispatch
 
     private func sendVolumeNotification(value: Float) {
+        if HUDSuppressionCoordinator.shared.shouldSuppressVolumeHUD {
+            return
+        }
         coordinator?.toggleSneakPeek(
             status: true,
             type: .volume,
