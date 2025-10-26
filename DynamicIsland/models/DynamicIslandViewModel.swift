@@ -32,6 +32,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     @Published var isClipboardPopoverActive: Bool = false
     @Published var isColorPickerPopoverActive: Bool = false
     @Published var isStatsPopoverActive: Bool = false
+    @Published var isMediaOutputPopoverActive: Bool = false
     @Published var shouldRecheckHover: Bool = false
     
     let webcamManager = WebcamManager.shared

@@ -11,6 +11,7 @@ import Defaults
 struct MinimalisticMusicPlayerView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     let albumArtNamespace: Namespace.ID
+    @Default(.showMediaOutputControl) var showMediaOutputControl
 
     var body: some View {
         VStack(spacing: 0) {
@@ -182,8 +183,12 @@ struct MinimalisticMusicPlayerView: View {
             }
             
             if Defaults[.showShuffleAndRepeat] {
-                controlButton(icon: repeatIcon, isActive: musicManager.repeatMode != .off) {
-                    Task { await musicManager.toggleRepeat() }
+                if showMediaOutputControl {
+                    MinimalisticMediaOutputButton()
+                } else {
+                    controlButton(icon: repeatIcon, isActive: musicManager.repeatMode != .off) {
+                        Task { await musicManager.toggleRepeat() }
+                    }
                 }
             }
         }
@@ -216,7 +221,61 @@ struct MinimalisticMusicPlayerView: View {
             action: action
         )
     }
-    
+    private struct MinimalisticMediaOutputButton: View {
+        @ObservedObject private var routeManager = AudioRouteManager.shared
+        @StateObject private var volumeModel = MediaOutputVolumeViewModel()
+        @EnvironmentObject private var vm: DynamicIslandViewModel
+        @State private var isPopoverPresented = false
+        @State private var isHoveringPopover = false
+
+        var body: some View {
+            MinimalisticSquircircleButton(
+                icon: routeManager.activeDevice?.iconName ?? "speaker.wave.2",
+                fontSize: 18,
+                fontWeight: .medium,
+                frameSize: CGSize(width: 40, height: 40),
+                cornerRadius: 16,
+                foregroundColor: .white.opacity(0.85)
+            ) {
+                isPopoverPresented.toggle()
+                if isPopoverPresented {
+                    routeManager.refreshDevices()
+                }
+            }
+            .accessibilityLabel("Media output")
+            .popover(isPresented: $isPopoverPresented, arrowEdge: .bottom) {
+                MediaOutputSelectorPopover(
+                    routeManager: routeManager,
+                    volumeModel: volumeModel,
+                    onHoverChanged: { hovering in
+                        isHoveringPopover = hovering
+                        updateActivity()
+                    }
+                ) {
+                    isPopoverPresented = false
+                    isHoveringPopover = false
+                    updateActivity()
+                }
+            }
+            .onChange(of: isPopoverPresented) { _, presented in
+                if !presented {
+                    isHoveringPopover = false
+                }
+                updateActivity()
+            }
+            .onAppear {
+                routeManager.refreshDevices()
+            }
+            .onDisappear {
+                vm.isMediaOutputPopoverActive = false
+            }
+        }
+
+        private func updateActivity() {
+            vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+        }
+    }
+
     private var repeatIcon: String {
         switch musicManager.repeatMode {
         case .off: return "repeat"

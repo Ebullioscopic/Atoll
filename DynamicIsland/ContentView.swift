@@ -200,14 +200,14 @@ struct ContentView: View {
                 }
                 .onChange(of: vm.isBatteryPopoverActive) { _, newPopoverState in
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if !newPopoverState && !isHovering && vm.notchState == .open && !vm.isStatsPopoverActive {
+                        if !newPopoverState && !isHovering && vm.notchState == .open && !vm.isStatsPopoverActive && !vm.isMediaOutputPopoverActive {
                             vm.close()
                         }
                     }
                 }
                 .onChange(of: vm.isStatsPopoverActive) { _, newPopoverState in
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if !newPopoverState && !isHovering && vm.notchState == .open && !vm.isBatteryPopoverActive && !vm.isClipboardPopoverActive && !vm.isColorPickerPopoverActive {
+                        if !newPopoverState && !isHovering && vm.notchState == .open && !vm.isBatteryPopoverActive && !vm.isClipboardPopoverActive && !vm.isColorPickerPopoverActive && !vm.isMediaOutputPopoverActive {
                             vm.close()
                         }
                     }
@@ -215,7 +215,7 @@ struct ContentView: View {
                 .onChange(of: vm.shouldRecheckHover) { _, _ in
                     // Recheck hover state when popovers are closed
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if vm.notchState == .open && !vm.isBatteryPopoverActive && !vm.isClipboardPopoverActive && !vm.isColorPickerPopoverActive && !vm.isStatsPopoverActive && !isHovering {
+                        if vm.notchState == .open && !vm.isBatteryPopoverActive && !vm.isClipboardPopoverActive && !vm.isColorPickerPopoverActive && !vm.isStatsPopoverActive && !vm.isMediaOutputPopoverActive && !isHovering {
                             vm.close()
                         }
                     }
@@ -751,10 +751,11 @@ struct ContentView: View {
     
     // Helper function to check if any popovers are active
     private func hasAnyActivePopovers() -> Bool {
-        return vm.isBatteryPopoverActive || 
-               vm.isClipboardPopoverActive || 
-               vm.isColorPickerPopoverActive || 
-               vm.isStatsPopoverActive
+     return vm.isBatteryPopoverActive || 
+         vm.isClipboardPopoverActive || 
+         vm.isColorPickerPopoverActive || 
+         vm.isStatsPopoverActive ||
+         vm.isMediaOutputPopoverActive
     }
     
     // Helper to prevent rapid haptic feedback

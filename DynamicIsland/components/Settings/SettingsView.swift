@@ -747,6 +747,7 @@ struct Media: View {
     @Default(.enableSneakPeek) private var enableSneakPeek
     @Default(.sneakPeekStyles) var sneakPeekStyles
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
+    @Default(.showShuffleAndRepeat) private var showShuffleAndRepeat
 
     var body: some View {
         Form {
@@ -787,6 +788,10 @@ struct Media: View {
                         customBadge(text: "Beta")
                     }
                 }
+                Defaults.Toggle(key: .showMediaOutputControl) {
+                    Text("Replace repeat button with media output control")
+                }
+                .disabled(!showShuffleAndRepeat)
             } header: {
                 Text("Media controls")
             }
