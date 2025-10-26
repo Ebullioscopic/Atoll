@@ -18,9 +18,10 @@
 </p>
 
 <p align="center">
-  <a href="https://discord.gg/zvjB4tJBkt">Join our Discord community</a> — <b>1,200+ members</b>
+  <a href="https://discord.gg/zvjB4tJBkt">Join our Discord community</a>
 </p>
-> **Project rename:** DynamicIsland is now called **Atoll**. Visit the new repository at [github.com/Ebullioscopic/Atoll](https://github.com/Ebullioscopic/Atoll).
+
+**Project rename:** DynamicIsland is now called **Atoll**. Visit the new repository at [github.com/Ebullioscopic/Atoll](https://github.com/Ebullioscopic/Atoll).
 
 # Atoll
 
