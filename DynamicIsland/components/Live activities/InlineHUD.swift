@@ -20,6 +20,7 @@ struct InlineHUD: View {
     @Default(.useColorCodedVolumeDisplay) var useColorCodedVolumeDisplay
     @Default(.useSmoothColorGradient) var useSmoothColorGradient
     @Default(.progressBarStyle) var progressBarStyle
+    @Default(.showProgressPercentages) var showProgressPercentages
     @ObservedObject var bluetoothManager = BluetoothAudioManager.shared
     
     @State private var displayName: String = ""
@@ -130,14 +131,15 @@ struct InlineHUD: View {
                     // Bluetooth device battery display
                     HStack(spacing: 4) {
                         if value > 0 {
-                            // Show color-coded battery bar if battery info available
-                            // Color-coding disabled for segmented or hierarchical mode
-                            if useColorCodedBatteryDisplay && progressBarStyle == .gradient {
-                                ColorCodedProgressBar.battery(value: value, width: 60, height: 4, smoothGradient: useSmoothColorGradient)
-                            } else {
-                                DraggableProgressBar(value: .constant(value))
-                                    .frame(width: 60)
+                            Group {
+                                if useColorCodedBatteryDisplay && progressBarStyle != .segmented {
+                                    DraggableProgressBar(value: .constant(value), colorMode: .battery)
+                                } else {
+                                    DraggableProgressBar(value: .constant(value))
+                                }
                             }
+                            .frame(width: 60)
+                            .allowsHitTesting(false)
                             Text("\(Int(value * 100))%")
                                 .font(.caption)
                                 .fontWeight(.medium)
@@ -155,26 +157,35 @@ struct InlineHUD: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 } else {
                     // Volume and brightness displays
-                    HStack {
-                        // Color-coding only available in gradient mode, not hierarchical or segmented
-                        if type == .volume && useColorCodedVolumeDisplay && progressBarStyle == .gradient {
-                            // Color-coded volume (reversed: red at high, green at low)
-                            ColorCodedProgressBar.volume(value: value, width: 70, height: 4, smoothGradient: useSmoothColorGradient)
+                    Group {
+                        if type == .volume {
+                            Group {
+                                if value.isZero {
+                                    Text("muted")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(.gray)
+                                        .lineLimit(1)
+                                        .allowsTightening(true)
+                                        .multilineTextAlignment(.trailing)
+                                        .contentTransition(.numericText())
+                                } else {
+                                    HStack(spacing: 6) {
+                                        DraggableProgressBar(value: $value, colorMode: .volume)
+                                        PercentageLabel(value: value, isVisible: showProgressPercentages)
+                                    }
+                                    .transition(.opacity.combined(with: .scale))
+                                }
+                            }
+                            .animation(.smooth(duration: 0.2), value: value.isZero)
                         } else {
-                            // Default draggable progress bar
-                            DraggableProgressBar(value: $value)
-                        }
-                        
-                        if (type == .volume && value.isZero) {
-                            Text("muted")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.gray)
-                                .lineLimit(1)
-                                .allowsTightening(true)
-                                .multilineTextAlignment(.trailing)
+                            HStack(spacing: 6) {
+                                DraggableProgressBar(value: $value)
+                                PercentageLabel(value: value, isVisible: showProgressPercentages)
+                            }
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
             .padding(.trailing, 4)
