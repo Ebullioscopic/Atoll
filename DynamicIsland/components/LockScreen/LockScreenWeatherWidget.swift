@@ -4,6 +4,7 @@ struct LockScreenWeatherWidget: View {
     let snapshot: LockScreenWeatherSnapshot
 
     var body: some View {
+        let segments = infoSegments
         HStack(spacing: 8) {
             Image(systemName: snapshot.symbolName)
                 .font(.system(size: 26, weight: .medium))
@@ -12,12 +13,15 @@ struct LockScreenWeatherWidget: View {
                 .font(.system(size: 24, weight: .semibold, design: .rounded))
                 .kerning(-0.4)
 
-            ForEach(Array(infoSegments.enumerated()), id: \.offset) { _, segment in
-                HStack(spacing: 4) {
-                    Text("•")
-                        .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    segmentView(for: segment)
+            if !segments.isEmpty {
+                Color.clear.frame(width: 6)
+            }
+
+            ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
+                if index > 0 {
+                    Color.clear.frame(width: 12)
                 }
+                segmentView(for: segment)
             }
         }
         .foregroundStyle(Color.white.opacity(0.65))

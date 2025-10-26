@@ -1015,6 +1015,8 @@ class BluetoothAudioManager: ObservableObject {
         } else {
             0.0  // 0 means battery info not available
         }
+
+        HUDSuppressionCoordinator.shared.suppressVolumeHUD(for: 1.5)
         
         // Show HUD via coordinator
         coordinator.toggleSneakPeek(

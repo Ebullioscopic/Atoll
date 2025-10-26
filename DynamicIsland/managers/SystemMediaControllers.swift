@@ -9,6 +9,38 @@ extension Notification.Name {
     static let systemAudioRouteDidChange = Notification.Name("DynamicIsland.systemAudioRouteDidChange")
 }
 
+final class HUDSuppressionCoordinator {
+    static let shared = HUDSuppressionCoordinator()
+
+    private let queue = DispatchQueue(label: "com.dynamicisland.hud-suppression")
+    private var volumeSuppressedUntil: Date?
+
+    func suppressVolumeHUD(for interval: TimeInterval) {
+        guard interval > 0 else { return }
+        queue.sync {
+            let proposed = Date().addingTimeInterval(interval)
+            if let current = volumeSuppressedUntil {
+                volumeSuppressedUntil = max(current, proposed)
+            } else {
+                volumeSuppressedUntil = proposed
+            }
+        }
+    }
+
+    var shouldSuppressVolumeHUD: Bool {
+        queue.sync {
+            guard let expiration = volumeSuppressedUntil else {
+                return false
+            }
+            if Date() < expiration {
+                return true
+            }
+            volumeSuppressedUntil = nil
+            return false
+        }
+    }
+}
+
 final class SystemVolumeController {
     static let shared = SystemVolumeController()
 

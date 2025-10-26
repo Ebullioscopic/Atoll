@@ -21,6 +21,7 @@ struct InlineHUD: View {
     @Default(.useSmoothColorGradient) var useSmoothColorGradient
     @Default(.progressBarStyle) var progressBarStyle
     @Default(.showProgressPercentages) var showProgressPercentages
+    @Default(.useCircularBluetoothBatteryIndicator) var useCircularBluetoothBatteryIndicator
     @Default(.showBluetoothBatteryPercentageText) var showBluetoothBatteryPercentageText
     @Default(.showBluetoothDeviceNameMarquee) var showBluetoothDeviceNameMarquee
     @ObservedObject var bluetoothManager = BluetoothAudioManager.shared
@@ -28,19 +29,27 @@ struct InlineHUD: View {
     @State private var displayName: String = ""
     
     var body: some View {
+        let useCircularIndicator = useCircularBluetoothBatteryIndicator
+        let hasBatteryLevel = value > 0
+
         let baseInfoWidth: CGFloat = {
             if type == .bluetoothAudio {
-                return showBluetoothDeviceNameMarquee ? 100 : 58
+                return showBluetoothDeviceNameMarquee ? 100 : 52
             }
             return 100
         }()
         let infoWidth = baseInfoWidth - (hoverAnimation ? 0 : 12) + gestureProgress / 2
         let baseTrailingWidth: CGFloat = {
             if type == .bluetoothAudio {
-                if showBluetoothDeviceNameMarquee {
-                    return 100
+                if !hasBatteryLevel {
+                    return showBluetoothDeviceNameMarquee ? 100 : 70
                 }
-                return showBluetoothBatteryPercentageText ? 88 : 64
+
+                if useCircularIndicator {
+                    return showBluetoothBatteryPercentageText ? 100 : 70
+                } else {
+                    return showBluetoothBatteryPercentageText ? 112 : 82
+                }
             }
             return 100
         }()
@@ -104,7 +113,7 @@ struct InlineHUD: View {
                             font: .system(size: 13, weight: .medium),
                             nsFont: .body,
                             textColor: .white,
-                            minDuration: 0.5,
+                            minDuration: 0.2,
                             frameWidth: infoWidth
                         )
                     }
@@ -142,14 +151,23 @@ struct InlineHUD: View {
                         .contentTransition(.interpolate)
                 } else if (type == .bluetoothAudio) {
                     // Bluetooth device battery display
-                    HStack(spacing: 8) {
-                        if value > 0 {
-                            CircularBatteryIndicator(
-                                value: value,
-                                useColorCoding: useColorCodedBatteryDisplay && progressBarStyle != .segmented,
-                                smoothGradient: useSmoothColorGradient
-                            )
-                            .allowsHitTesting(false)
+                    HStack(spacing: useCircularIndicator ? 8 : 6) {
+                        if hasBatteryLevel {
+                            if useCircularIndicator {
+                                CircularBatteryIndicator(
+                                    value: value,
+                                    useColorCoding: useColorCodedBatteryDisplay && progressBarStyle != .segmented,
+                                    smoothGradient: useSmoothColorGradient
+                                )
+                                .allowsHitTesting(false)
+                            } else {
+                                LinearBatteryIndicator(
+                                    value: value,
+                                    useColorCoding: useColorCodedBatteryDisplay && progressBarStyle != .segmented,
+                                    smoothGradient: useSmoothColorGradient
+                                )
+                                .allowsHitTesting(false)
+                            }
 
                             if showBluetoothBatteryPercentageText {
                                 Text("\(Int(value * 100))%")
@@ -243,6 +261,40 @@ struct InlineHUD: View {
                     .stroke(indicatorColor, style: StrokeStyle(lineWidth: 2.8, lineCap: .round))
             }
             .frame(width: 22, height: 22)
+            .animation(.smooth(duration: 0.18), value: clampedValue)
+        }
+    }
+
+    private struct LinearBatteryIndicator: View {
+        let value: CGFloat
+        let useColorCoding: Bool
+        let smoothGradient: Bool
+
+        private let trackWidth: CGFloat = 54
+        private let trackHeight: CGFloat = 6
+
+        private var clampedValue: CGFloat {
+            min(max(value, 0), 1)
+        }
+
+        private var fillColor: Color {
+            if useColorCoding {
+                return ColorCodedProgressBar.paletteColor(for: clampedValue, mode: .battery, smoothGradient: smoothGradient)
+            }
+            return .white
+        }
+
+        var body: some View {
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.18))
+                    .frame(width: trackWidth, height: trackHeight)
+
+                Capsule()
+                    .fill(fillColor)
+                    .frame(width: trackWidth * clampedValue, height: trackHeight)
+            }
+            .frame(width: trackWidth, height: trackHeight)
             .animation(.smooth(duration: 0.18), value: clampedValue)
         }
     }
