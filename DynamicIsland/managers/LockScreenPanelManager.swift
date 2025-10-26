@@ -89,15 +89,17 @@ class LockScreenPanelManager {
         print("[\(timestamp())] LockScreenPanelManager: panel visible")
     }
 
-    func updatePanelSize(expanded: Bool, animated: Bool = true) {
+    func updatePanelSize(expanded: Bool, additionalHeight: CGFloat = 0, animated: Bool = true) {
         guard let window = panelWindow, let baseFrame = collapsedFrame else {
             return
         }
 
-        let targetSize = expanded ? LockScreenMusicPanel.expandedSize : LockScreenMusicPanel.collapsedSize
-        let originX = baseFrame.midX - (targetSize.width / 2)
+        let baseSize = expanded ? LockScreenMusicPanel.expandedSize : LockScreenMusicPanel.collapsedSize
+        let targetWidth = baseSize.width
+        let targetHeight = baseSize.height + additionalHeight
+        let originX = baseFrame.midX - (targetWidth / 2)
         let originY = baseFrame.origin.y
-        let targetFrame = NSRect(x: originX, y: originY, width: targetSize.width, height: targetSize.height)
+        let targetFrame = NSRect(x: originX, y: originY, width: targetWidth, height: targetHeight)
 
         if animated {
             window.animator().setFrame(targetFrame, display: true)
