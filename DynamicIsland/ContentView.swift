@@ -320,10 +320,9 @@ struct ContentView: View {
                 }
                 .sensoryFeedback(.alignment, trigger: haptics)
                 .contextMenu {
-                    SettingsLink(label: {
-                        Text("Settings")
-                    })
-                    .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
+                    Button("Settings") {
+                        SettingsWindowController.shared.showWindow()
+                    }
 //                    Button("Edit") { // Doesnt work....
 //                        let dn = DynamicNotch(content: EditPanelView())
 //                        dn.toggle()
