@@ -2,7 +2,26 @@
   <img src=".github/assets/atoll-logo.png" alt="Atoll logo" width="120">
 </p>
 
-> **Project rename:** DynamicIsland is now called **Atoll**. Visit the new repository at [github.com/Ebullioscopic/Atoll](https://github.com/Ebullioscopic/Atoll).
+<p align="center">
+  <a href="https://github.com/Ebullioscopic/Atoll/stargazers">
+    <img src="https://img.shields.io/github/stars/Ebullioscopic/Atoll?style=social" alt="GitHub stars"/>
+  </a>
+  <a href="https://github.com/Ebullioscopic/Atoll/network/members">
+    <img src="https://img.shields.io/github/forks/Ebullioscopic/Atoll?style=social" alt="GitHub forks"/>
+  </a>
+  <a href="https://github.com/Ebullioscopic/Atoll/releases">
+    <img src="https://img.shields.io/github/downloads/Ebullioscopic/Atoll/total?label=Downloads" alt="GitHub downloads"/>
+  </a>
+  <a href="https://discord.gg/zvjB4tJBkt">
+    <img src="https://img.shields.io/discord/1120176554840510494?label=Discord&logo=discord&color=7289da" alt="Discord server"/>
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://discord.gg/zvjB4tJBkt">Join our Discord community</a>
+</p>
+
+**Project rename:** DynamicIsland is now called **Atoll**. Visit the new repository at [github.com/Ebullioscopic/Atoll](https://github.com/Ebullioscopic/Atoll).
 
 # Atoll
 
@@ -55,6 +74,16 @@ The application provides a comprehensive interface for monitoring system perform
 <p align="center">
   <img src=".github/assets/atoll-colorpicker.png" alt="Colour picker" width="320">
   <img src=".github/assets/atoll-clipboard.png" alt="Clipboard manager" width="320">
+</p>
+
+### LockScreen Widgets
+- **Weather**
+- **Media Player**
+- **Device Charging status**
+- **Bluetooth Peripheral Battery status**
+
+<p align="center">
+  <img src=".github/assets/lockscreen.gif" alt="Lockscreen demo" width="720">
 </p>
 
 ### Layout and customisation

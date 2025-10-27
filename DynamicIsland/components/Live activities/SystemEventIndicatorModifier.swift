@@ -22,6 +22,7 @@ struct SystemEventIndicatorModifier: View {
     @Binding var icon: String
     let showSlider: Bool = false
     var sendEventBack: (CGFloat) -> Void
+    @Default(.showProgressPercentages) private var showProgressPercentages
     
     var body: some View {
         HStack(spacing: 14) {
@@ -58,13 +59,21 @@ struct SystemEventIndicatorModifier: View {
                 default:
                     EmptyView()
             }
-            if (eventType != .mic) {
-                DraggableProgressBar(value: $value)
-            } else {
-                Text("Mic \(value > 0 ? "unmuted" : "muted")")
+            switch eventType {
+            case .mic:
+                Text(value > 0 ? "Mic unmuted" : "Mic muted")
                     .foregroundStyle(.gray)
                     .lineLimit(1)
                     .allowsTightening(true)
+                    .contentTransition(.numericText())
+            case .volume:
+                VolumeProgressSection(value: $value, showPercentages: showProgressPercentages)
+            case .brightness:
+                ProgressSection(value: $value, showPercentages: showProgressPercentages)
+            case .backlight:
+                ProgressSection(value: $value, showPercentages: showProgressPercentages)
+            default:
+                ProgressSection(value: $value, showPercentages: showProgressPercentages)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -88,18 +97,106 @@ struct SystemEventIndicatorModifier: View {
     }
 }
 
+struct ProgressSection: View {
+    @Binding var value: CGFloat
+    var showPercentages: Bool
+    var colorMode: ProgressColorMode? = nil
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            DraggableProgressBar(value: $value, colorMode: colorMode)
+            PercentageLabel(value: value, isVisible: showPercentages)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct VolumeProgressSection: View {
+    @Binding var value: CGFloat
+    var showPercentages: Bool
+    
+    var body: some View {
+        Group {
+            if value.isZero {
+                Text("muted")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.gray)
+                    .contentTransition(.numericText())
+            } else {
+                ProgressSection(value: $value, showPercentages: showPercentages, colorMode: .volume)
+                    .transition(.opacity.combined(with: .scale))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.smooth(duration: 0.2), value: value.isZero)
+    }
+}
+
+struct PercentageLabel: View {
+    let value: CGFloat
+    let isVisible: Bool
+    @Default(.progressBarStyle) private var progressBarStyle
+    
+    var body: some View {
+        Group {
+            if shouldShow {
+                Text(formattedValue)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.9))
+                    .contentTransition(.numericText())
+                    .frame(width: 28, alignment: .trailing)
+            }
+        }
+    }
+    
+    private var shouldShow: Bool {
+        isVisible && progressBarStyle != .segmented
+    }
+
+    private var formattedValue: String {
+        let raw = max(0, min(100, Int(round(value * 100))))
+        return String(format: "%3d", raw)
+    }
+}
+
+enum ProgressColorMode {
+    case volume
+    case battery
+}
+
+private extension ProgressColorMode {
+    var colorCodingMode: ColorCodingMode {
+        switch self {
+        case .volume:
+            return .volume
+        case .battery:
+            return .battery
+        }
+    }
+}
+
 struct DraggableProgressBar: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @Binding var value: CGFloat
+    var colorMode: ProgressColorMode? = nil
     
     @State private var isDragging = false
-    @State private var dragOffset: CGFloat = 0
+    @Default(.progressBarStyle) private var progressBarStyle
+    @Default(.useColorCodedVolumeDisplay) private var useColorCodedVolumeDisplay
+    @Default(.useColorCodedBatteryDisplay) private var useColorCodedBatteryDisplay
+    @Default(.useSmoothColorGradient) private var useSmoothColorGradient
+    @Default(.systemEventIndicatorUseAccent) private var useAccentColor
+    @Default(.systemEventIndicatorShadow) private var useShadow
+    @Default(.inlineHUD) private var inlineHUD
     
     var body: some View {
         VStack {
             GeometryReader { geo in
                 Group {
-                    if Defaults[.progressBarStyle] == .segmented {
+                    if progressBarStyle == .segmented {
                         // Segmented progress bar - completely different layout
                         SegmentedProgressContent(value: value, geometry: geo)
                     } else {
@@ -107,23 +204,8 @@ struct DraggableProgressBar: View {
                         ZStack(alignment: .leading) {
                             Capsule()
                                 .fill(.tertiary)
-                            Group {
-                                switch Defaults[.progressBarStyle] {
-                                case .gradient:
-                                    Capsule()
-                                        .fill(LinearGradient(colors: Defaults[.systemEventIndicatorUseAccent] ? [Defaults[.accentColor], Defaults[.accentColor].ensureMinimumBrightness(factor: 0.2)] : [.white, .white.opacity(0.2)], startPoint: .trailing, endPoint: .leading))
-                                        .frame(width: max(0, min(geo.size.width * value, geo.size.width)))
-                                        .shadow(color: Defaults[.systemEventIndicatorShadow] ? Defaults[.systemEventIndicatorUseAccent] ? Defaults[.accentColor].ensureMinimumBrightness(factor: 0.7) : .white : .clear, radius: 8, x: 3)
-                                case .hierarchical:
-                                    Capsule()
-                                        .fill(Defaults[.systemEventIndicatorUseAccent] ? Defaults[.accentColor] : .white)
-                                        .frame(width: max(0, min(geo.size.width * value, geo.size.width)))
-                                        .shadow(color: Defaults[.systemEventIndicatorShadow] ? Defaults[.systemEventIndicatorUseAccent] ? Defaults[.accentColor].ensureMinimumBrightness(factor: 0.7) : .white : .clear, radius: 8, x: 3)
-                                case .segmented:
-                                    EmptyView() // This case won't be reached due to the outer if condition
-                                }
-                            }
-                            .opacity(value.isZero ? 0 : 1)
+                            progressFill(width: geo.size.width)
+                                .opacity(value.isZero ? 0 : 1)
                         }
                     }
                 }
@@ -142,7 +224,7 @@ struct DraggableProgressBar: View {
                         }
                 )
             }
-            .frame(height: Defaults[.inlineHUD] ? isDragging ? 8 : 5 : isDragging ? 9 : 6)
+            .frame(height: inlineHUD ? (isDragging ? 8 : 5) : (isDragging ? 9 : 6))
         }
     }
     
@@ -151,6 +233,59 @@ struct DraggableProgressBar: View {
         let newValue = dragPosition / geometry.size.width
         
         value = max(0, min(newValue, 1))
+    }
+
+    private func progressFill(width: CGFloat) -> some View {
+        let clampedWidth = max(0, min(width * value, width))
+        let accentColor = Defaults[.accentColor]
+        let shadowColor: Color = {
+            guard useShadow else { return .clear }
+            if useAccentColor {
+                return accentColor.ensureMinimumBrightness(factor: 0.7)
+            }
+            return .white
+        }()
+
+        return Group {
+            if shouldUseColorCoding, let mode = colorMode?.colorCodingMode {
+                Capsule()
+                    .fill(ColorCodedProgressBar.shapeStyle(for: value, mode: mode, smoothGradient: useSmoothColorGradient))
+                    .frame(width: clampedWidth)
+                    .shadow(color: shadowColor, radius: useShadow ? 8 : 0, x: 3)
+            } else {
+                switch progressBarStyle {
+                case .gradient:
+                    Capsule()
+                        .fill(LinearGradient(
+                            colors: useAccentColor
+                                ? [accentColor, accentColor.ensureMinimumBrightness(factor: 0.2)]
+                                : [.white, .white.opacity(0.2)],
+                            startPoint: .trailing,
+                            endPoint: .leading
+                        ))
+                        .frame(width: clampedWidth)
+                        .shadow(color: shadowColor, radius: useShadow ? 8 : 0, x: 3)
+                case .hierarchical:
+                    Capsule()
+                        .fill(useAccentColor ? accentColor : .white)
+                        .frame(width: clampedWidth)
+                        .shadow(color: shadowColor, radius: useShadow ? 8 : 0, x: 3)
+                case .segmented:
+                    EmptyView()
+                }
+            }
+        }
+    }
+
+    private var shouldUseColorCoding: Bool {
+        guard let colorMode else { return false }
+        guard progressBarStyle != .segmented else { return false }
+        switch colorMode {
+        case .volume:
+            return useColorCodedVolumeDisplay
+        case .battery:
+            return useColorCodedBatteryDisplay
+        }
     }
 }
 
@@ -164,8 +299,8 @@ struct SegmentedProgressContent: View {
     
     var body: some View {
         let spacing: CGFloat = 1.5
-        let computed = (geometry.size.width - CGFloat(segmentCount - 1) * spacing) / CGFloat(segmentCount)
-        let barWidth = max(3.0, min(6.0, computed))
+    let computed = (geometry.size.width - CGFloat(segmentCount - 1) * spacing) / CGFloat(segmentCount)
+    let barWidth = max(3.0, computed)
         let activeCount = Int(round(value * CGFloat(segmentCount)))
         
         HStack(spacing: spacing) {

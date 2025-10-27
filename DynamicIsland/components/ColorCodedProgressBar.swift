@@ -9,16 +9,31 @@
 import SwiftUI
 import Defaults
 
+enum ColorCodingMode {
+    case volume
+    case battery
+    
+    func intensity(for value: CGFloat) -> CGFloat {
+        let clamped = min(max(value, 0), 1)
+        switch self {
+        case .volume:
+            return clamped
+        case .battery:
+            return 1 - clamped
+        }
+    }
+}
+
 struct ColorCodedProgressBar: View {
     let value: CGFloat  // 0.0 to 1.0
-    let reversed: Bool  // If true: green at low, red at high (for volume)
+    let mode: ColorCodingMode
     let width: CGFloat
     let height: CGFloat
     let smoothGradient: Bool  // If true: smooth gradient, if false: discrete colors
     
-    init(value: CGFloat, reversed: Bool = false, width: CGFloat = 100, height: CGFloat = 4, smoothGradient: Bool = true) {
+    init(value: CGFloat, mode: ColorCodingMode = .battery, width: CGFloat = 100, height: CGFloat = 4, smoothGradient: Bool = true) {
         self.value = min(max(value, 0), 1)  // Clamp between 0 and 1
-        self.reversed = reversed
+        self.mode = mode
         self.width = width
         self.height = height
         self.smoothGradient = smoothGradient
@@ -34,100 +49,19 @@ struct ColorCodedProgressBar: View {
                 
                 // Filled track with color gradient or solid color
                 RoundedRectangle(cornerRadius: height / 2)
-                    .fill(smoothGradient ? 
-                        AnyShapeStyle(LinearGradient(
-                            gradient: gradientForValue,
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )) :
-                        AnyShapeStyle(colorForPercentage(value, reversed: reversed))
-                    )
+                    .fill(fillStyle)
                     .frame(width: width * value, height: height)
             }
         }
         .frame(width: width, height: height)
     }
     
-    /// Generates a gradient based on the current value
-    private var gradientForValue: Gradient {
-        let color = colorForPercentage(value, reversed: reversed)
-        
-        // Create a gradient that transitions smoothly
-        let startColor = colorForPercentage(max(value - 0.1, 0), reversed: reversed)
-        let endColor = color
-        
-        return Gradient(colors: [startColor, endColor])
-    }
-    
-    /// Calculates discrete color for a given percentage (no smooth transitions)
-    /// - Parameters:
-    ///   - percentage: Value from 0.0 to 1.0
-    ///   - reversed: If true, reverses the color scale (green at low, red at high)
-    /// - Returns: Discrete color (red, yellow, or green only)
-    private func discreteColorForPercentage(_ percentage: CGFloat, reversed: Bool) -> Color {
-        let normalized = reversed ? (1.0 - percentage) : percentage
-        
-        switch normalized {
-        case 0.0..<0.33:
-            // Red zone (critical/low)
-            return Color(red: 1.0, green: 0.23, blue: 0.19)
-        case 0.33..<0.67:
-            // Yellow zone (medium)
-            return Color(red: 1.0, green: 0.8, blue: 0.0)
-        default:
-            // Green zone (healthy/high)
-            return Color(red: 0.2, green: 0.78, blue: 0.35)
-        }
-    }
-    
-    /// Calculates color for a given percentage with smooth transitions
-    /// - Parameters:
-    ///   - percentage: Value from 0.0 to 1.0
-    ///   - reversed: If true, reverses the color scale (green at low, red at high)
-    /// - Returns: Color with smooth gradient transitions
-    private func colorForPercentage(_ percentage: CGFloat, reversed: Bool) -> Color {
-        let normalized = reversed ? (1.0 - percentage) : percentage
-        
-        switch normalized {
-        case 0.0..<0.2:
-            // Pure Red zone (critical/low)
-            return Color(red: 1.0, green: 0.23, blue: 0.19)
-            
-        case 0.2..<0.35:
-            // Red → Orange transition
-            let t = (normalized - 0.2) / 0.15
-            let red: CGFloat = 1.0
-            let green: CGFloat = 0.23 + (0.37 * t)  // 0.23 → 0.6
-            let blue: CGFloat = 0.19
-            return Color(red: red, green: green, blue: blue)
-            
-        case 0.35..<0.5:
-            // Orange → Yellow transition
-            let t = (normalized - 0.35) / 0.15
-            let red: CGFloat = 1.0
-            let green: CGFloat = 0.6 + (0.4 * t)  // 0.6 → 1.0
-            let blue: CGFloat = 0.19
-            return Color(red: red, green: green, blue: blue)
-            
-        case 0.5..<0.65:
-            // Yellow → Yellow-Green transition
-            let t = (normalized - 0.5) / 0.15
-            let red: CGFloat = 1.0 - (0.4 * t)  // 1.0 → 0.6
-            let green: CGFloat = 1.0
-            let blue: CGFloat = 0.19 + (0.4 * t)  // 0.19 → 0.59
-            return Color(red: red, green: green, blue: blue)
-            
-        case 0.65..<0.8:
-            // Yellow-Green → Green transition
-            let t = (normalized - 0.65) / 0.15
-            let red: CGFloat = 0.6 - (0.4 * t)  // 0.6 → 0.2
-            let green: CGFloat = 1.0 - (0.22 * t)  // 1.0 → 0.78
-            let blue: CGFloat = 0.59 - (0.24 * t)  // 0.59 → 0.35
-            return Color(red: red, green: green, blue: blue)
-            
-        default:
-            // Pure Green zone (healthy/high)
-            return Color(red: 0.2, green: 0.78, blue: 0.35)
+    private var fillStyle: AnyShapeStyle {
+        let intensity = mode.intensity(for: value)
+        if smoothGradient {
+            return AnyShapeStyle(ColorCodedPalette.gradient(for: intensity))
+        } else {
+            return AnyShapeStyle(ColorCodedPalette.discreteColor(for: intensity))
         }
     }
 }
@@ -137,12 +71,92 @@ struct ColorCodedProgressBar: View {
 extension ColorCodedProgressBar {
     /// Creates a battery-style progress bar (green at high, red at low)
     static func battery(value: CGFloat, width: CGFloat = 100, height: CGFloat = 4, smoothGradient: Bool = true) -> some View {
-        ColorCodedProgressBar(value: value, reversed: false, width: width, height: height, smoothGradient: smoothGradient)
+        ColorCodedProgressBar(value: value, mode: .battery, width: width, height: height, smoothGradient: smoothGradient)
     }
     
     /// Creates a volume-style progress bar (red at high, green at low)
     static func volume(value: CGFloat, width: CGFloat = 100, height: CGFloat = 4, smoothGradient: Bool = true) -> some View {
-        ColorCodedProgressBar(value: value, reversed: true, width: width, height: height, smoothGradient: smoothGradient)
+        ColorCodedProgressBar(value: value, mode: .volume, width: width, height: height, smoothGradient: smoothGradient)
+    }
+
+    /// Shared helper for other progress bar implementations that need the same palette.
+    static func shapeStyle(for value: CGFloat, mode: ColorCodingMode, smoothGradient: Bool) -> AnyShapeStyle {
+        let intensity = mode.intensity(for: min(max(value, 0), 1))
+        if smoothGradient {
+            return AnyShapeStyle(ColorCodedPalette.gradient(for: intensity))
+        }
+        return AnyShapeStyle(ColorCodedPalette.discreteColor(for: intensity))
+    }
+
+    /// Returns the palette color that matches the configured thresholds. Useful for non-linear indicators.
+    static func paletteColor(for value: CGFloat, mode: ColorCodingMode, smoothGradient: Bool) -> Color {
+        let normalized = min(max(value, 0), 1)
+        let intensity = mode.intensity(for: normalized)
+        return ColorCodedPalette.color(for: intensity, smooth: smoothGradient)
+    }
+}
+
+// MARK: - Palette Helpers
+
+private enum ColorCodedPalette {
+    private static let greenComponents: (CGFloat, CGFloat, CGFloat) = (0.2, 0.78, 0.35)
+    private static let yellowComponents: (CGFloat, CGFloat, CGFloat) = (0.93, 0.75, 0.2)
+    private static let redComponents: (CGFloat, CGFloat, CGFloat) = (0.95, 0.36, 0.3)
+
+    static func color(for intensity: CGFloat, smooth: Bool) -> Color {
+        if smooth {
+            return smoothColor(for: intensity)
+        }
+        return discreteColor(for: intensity)
+    }
+    
+    static func discreteColor(for intensity: CGFloat) -> Color {
+        let clamped = min(max(intensity, 0), 1)
+        switch clamped {
+        case ..<0.6:
+            return color(from: greenComponents)
+        case ..<0.85:
+            return color(from: yellowComponents)
+        default:
+            return color(from: redComponents)
+        }
+    }
+    
+    static func gradient(for intensity: CGFloat) -> LinearGradient {
+        let endColor = smoothColor(for: intensity)
+        let startColor = smoothColor(for: max(intensity - 0.15, 0))
+        return LinearGradient(colors: [startColor, endColor], startPoint: .leading, endPoint: .trailing)
+    }
+    
+    private static func smoothColor(for intensity: CGFloat) -> Color {
+        let clamped = min(max(intensity, 0), 1)
+        switch clamped {
+        case ..<0.6:
+            // Stay green within the comfort zone
+            return color(from: greenComponents)
+        case ..<0.85:
+            let t = (clamped - 0.6) / 0.25
+            return blend(from: greenComponents, to: yellowComponents, fraction: t)
+        default:
+            let t = (clamped - 0.85) / 0.15
+            return blend(from: yellowComponents, to: redComponents, fraction: t)
+        }
+    }
+    
+    private static func blend(from start: (CGFloat, CGFloat, CGFloat), to end: (CGFloat, CGFloat, CGFloat), fraction: CGFloat) -> Color {
+        let t = min(max(fraction, 0), 1)
+        let red = lerp(start.0, end.0, t)
+        let green = lerp(start.1, end.1, t)
+        let blue = lerp(start.2, end.2, t)
+        return color(from: (red, green, blue))
+    }
+    
+    private static func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat {
+        a + (b - a) * t
+    }
+    
+    private static func color(from components: (CGFloat, CGFloat, CGFloat)) -> Color {
+        Color(red: Double(components.0), green: Double(components.1), blue: Double(components.2))
     }
 }
 

@@ -116,6 +116,7 @@ struct MusicControlsView: View {
     @State private var dragging: Bool = false
     @State private var lastDragged: Date = .distantPast
     let showShuffleAndRepeat: Bool
+    @Default(.showMediaOutputControl) private var showMediaOutputControl
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -192,8 +193,12 @@ struct MusicControlsView: View {
                 MusicManager.shared.nextTrack()
             }
             if showShuffleAndRepeat {
-                HoverButton(icon: repeatIcon, iconColor: repeatIconColor, scale: .medium) {
-                    MusicManager.shared.toggleRepeat()
+                if showMediaOutputControl {
+                    MediaOutputPickerButton()
+                } else {
+                    HoverButton(icon: repeatIcon, iconColor: repeatIconColor, scale: .medium) {
+                        MusicManager.shared.toggleRepeat()
+                    }
                 }
             }
         }
@@ -379,6 +384,239 @@ struct CustomSlider: View {
             )
             .animation(.bouncy.speed(1.4), value: dragging)
         }
+    }
+}
+
+private struct MediaOutputPickerButton: View {
+    @ObservedObject private var routeManager = AudioRouteManager.shared
+    @StateObject private var volumeModel = MediaOutputVolumeViewModel()
+    @State private var isPopoverPresented = false
+    @State private var isHoveringPopover = false
+    @EnvironmentObject private var vm: DynamicIslandViewModel
+
+    var body: some View {
+        HoverButton(icon: buttonIcon, iconColor: .white, scale: .medium) {
+            isPopoverPresented.toggle()
+            if isPopoverPresented {
+                routeManager.refreshDevices()
+            }
+        }
+        .accessibilityLabel("Media output")
+        .popover(isPresented: $isPopoverPresented, arrowEdge: .bottom) {
+            MediaOutputSelectorPopover(
+                routeManager: routeManager,
+                volumeModel: volumeModel,
+                onHoverChanged: { hovering in
+                    isHoveringPopover = hovering
+                    updatePopoverActivity()
+                }
+            ) {
+                isPopoverPresented = false
+                isHoveringPopover = false
+                updatePopoverActivity()
+            }
+        }
+        .onAppear {
+            routeManager.refreshDevices()
+        }
+        .onChange(of: isPopoverPresented) { _, presented in
+            if !presented {
+                isHoveringPopover = false
+            }
+            updatePopoverActivity()
+        }
+        .onDisappear {
+            vm.isMediaOutputPopoverActive = false
+        }
+    }
+
+    private var buttonIcon: String {
+        routeManager.activeDevice?.iconName ?? "speaker.wave.2"
+    }
+
+    private func updatePopoverActivity() {
+        vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+    }
+}
+
+struct MediaOutputSelectorPopover: View {
+    @ObservedObject var routeManager: AudioRouteManager
+    @ObservedObject var volumeModel: MediaOutputVolumeViewModel
+    var onHoverChanged: (Bool) -> Void
+    var dismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            volumeSection
+            Divider()
+            devicesSection
+        }
+        .frame(width: 240)
+        .padding(16)
+        .onHover { hovering in
+            onHoverChanged(hovering)
+        }
+        .onDisappear {
+            onHoverChanged(false)
+        }
+    }
+
+    private var volumeSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Button {
+                    volumeModel.toggleMute()
+                } label: {
+                    Image(systemName: volumeIconName)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            Circle()
+                                .fill(Color.secondary.opacity(0.18))
+                        )
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+
+                Slider(
+                    value: Binding(
+                        get: { Double(volumeModel.level) },
+                        set: { newValue in
+                            volumeModel.setVolume(Float(newValue))
+                        }
+                    ),
+                    in: 0 ... 1
+                )
+                .tint(.accentColor)
+            }
+
+            HStack {
+                Text("Output volume")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(volumePercentage)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    private var devicesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Output devices")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            if routeManager.devices.isEmpty {
+                Text("No audio outputs available")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ScrollView {
+                    VStack(spacing: 6) {
+                        ForEach(routeManager.devices) { device in
+                            Button {
+                                routeManager.select(device: device)
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: device.iconName)
+                                        .font(.system(size: 14, weight: .medium))
+                                    Text(device.name)
+                                        .foregroundColor(.primary)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    if device.id == routeManager.activeDeviceID {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 12, weight: .bold))
+                                    }
+                                }
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(device.id == routeManager.activeDeviceID ? Color.primary.opacity(0.12) : .clear)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 180)
+            }
+        }
+    }
+
+    private var volumeIconName: String {
+        if volumeModel.isMuted || volumeModel.level <= 0.001 {
+            return "speaker.slash.fill"
+        } else if volumeModel.level < 0.33 {
+            return "speaker.wave.1.fill"
+        } else if volumeModel.level < 0.66 {
+            return "speaker.wave.2.fill"
+        }
+        return "speaker.wave.3.fill"
+    }
+
+    private var volumePercentage: String {
+        "\(Int(round(volumeModel.level * 100)))%"
+    }
+}
+
+final class MediaOutputVolumeViewModel: ObservableObject {
+    @Published var level: Float
+    @Published var isMuted: Bool
+
+    private let controller: SystemVolumeController
+    private var cancellables: Set<AnyCancellable> = []
+
+    init(controller: SystemVolumeController = .shared) {
+        self.controller = controller
+        controller.start()
+        level = controller.currentVolume
+        isMuted = controller.isMuted
+
+        NotificationCenter.default.publisher(for: .systemVolumeDidChange)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let value = notification.userInfo?["value"] as? Float,
+                      let muted = notification.userInfo?["muted"] as? Bool else { return }
+                self.level = value
+                self.isMuted = muted
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .systemAudioRouteDidChange)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.syncFromController()
+            }
+            .store(in: &cancellables)
+    }
+
+    func setVolume(_ value: Float) {
+        level = value
+        if value > 0 {
+            isMuted = false
+        }
+        controller.setVolume(value)
+    }
+
+    func toggleMute() {
+        isMuted.toggle()
+        controller.toggleMute()
+    }
+
+    private func syncFromController() {
+        level = controller.currentVolume
+        isMuted = controller.isMuted
     }
 }
 

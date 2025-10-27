@@ -70,6 +70,15 @@ struct DynamicNotchApp: App {
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
     }
+
+    var commands: some Commands {
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings…") {
+                SettingsWindowController.shared.showWindow()
+            }
+            .keyboardShortcut(",", modifiers: .command)
+        }
+    }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -404,6 +413,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.publisher(.showDiskGraph, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
+
+        Defaults.publisher(.enableShortcuts, options: []).sink { change in
+            KeyboardShortcuts.isEnabled = change.newValue
+        }.store(in: &cancellables)
         
         // Observe minimalistic UI setting changes - trigger window resize
         Defaults.publisher(.enableMinimalisticUI, options: []).sink { [weak self] change in
@@ -477,12 +490,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self, selector: #selector(onScreenUnlocked(_:)),
             name: NSNotification.Name(rawValue: "com.apple.screenIsUnlocked"), object: nil)
 
-        KeyboardShortcuts.onKeyDown(for: .toggleSneakPeek) { [weak self] in
+        _ = KeyboardShortcuts.onKeyDown(for: .toggleSneakPeek) { [weak self] in
             guard let self = self else { return }
-            
-            // Only execute if shortcuts are enabled
             guard Defaults[.enableShortcuts] else { return }
-            
+
             self.coordinator.toggleSneakPeek(
                 status: !self.coordinator.sneakPeek.show,
                 type: .music,
@@ -490,14 +501,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        KeyboardShortcuts.onKeyDown(for: .toggleNotchOpen) { [weak self] in
+        _ = KeyboardShortcuts.onKeyDown(for: .toggleNotchOpen) { [weak self] in
             guard let self = self else { return }
-            
-            // Only execute if shortcuts are enabled
             guard Defaults[.enableShortcuts] else { return }
-            
+
             let mouseLocation = NSEvent.mouseLocation
-            
+
             var viewModel = self.vm
 
             if Defaults[.showOnAllDisplays] {
@@ -510,131 +519,91 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
-            
+
             self.closeNotchWorkItem?.cancel()
             self.closeNotchWorkItem = nil
-            
+
             switch viewModel.notchState {
             case .closed:
                 viewModel.open()
-                
+
                 let workItem = DispatchWorkItem { [weak viewModel] in
                     viewModel?.close()
                 }
                 self.closeNotchWorkItem = workItem
-                
+
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: workItem)
             case .open:
                 viewModel.close()
             }
         }
-        
-        KeyboardShortcuts.onKeyDown(for: .startDemoTimer) { [weak self] in
-            guard let self = self else { return }
-            
-            // Only execute if shortcuts are enabled
+
+        _ = KeyboardShortcuts.onKeyDown(for: .startDemoTimer) {
             guard Defaults[.enableShortcuts] else { return }
-            
-            // Only start timer if the timer feature is enabled
             guard Defaults[.enableTimerFeature] else { return }
-            
-            // Start a 5-minute demo timer
             TimerManager.shared.startDemoTimer(duration: 300)
         }
-        
-        KeyboardShortcuts.onKeyDown(for: .clipboardHistoryPanel) { [weak self] in
+
+        _ = KeyboardShortcuts.onKeyDown(for: .clipboardHistoryPanel) { [weak self] in
             guard let self = self else { return }
-            
-            // Only execute if shortcuts are enabled
             guard Defaults[.enableShortcuts] else { return }
-            
-            // Only open clipboard if the feature is enabled
             guard Defaults[.enableClipboardManager] else { return }
-            
-            // Start clipboard monitoring if not already running
+
             if !ClipboardManager.shared.isMonitoring {
                 ClipboardManager.shared.startMonitoring()
             }
-            
-            // Handle keyboard shortcut based on display mode
+
             switch Defaults[.clipboardDisplayMode] {
             case .panel:
                 ClipboardPanelManager.shared.toggleClipboardPanel()
             case .popover:
-                // For popover mode, first ensure notch is open, then toggle popover
-                
-                // If notch is closed, open it first
                 if self.vm.notchState == .closed {
                     self.vm.open()
-                    // Wait a moment for the notch to open, then show popover
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         NotificationCenter.default.post(name: NSNotification.Name("ToggleClipboardPopover"), object: nil)
                     }
                 } else {
-                    // Notch is already open, toggle popover immediately
                     NotificationCenter.default.post(name: NSNotification.Name("ToggleClipboardPopover"), object: nil)
                 }
             }
         }
-        
-        KeyboardShortcuts.onKeyDown(for: .colorPickerPanel) { [weak self] in
-            guard let self = self else { return }
-            
-            // Only execute if shortcuts are enabled
+
+        _ = KeyboardShortcuts.onKeyDown(for: .colorPickerPanel) {
             guard Defaults[.enableShortcuts] else { return }
-            
-            // Only open color picker panel if the feature is enabled
             guard Defaults[.enableColorPickerFeature] else { return }
-            
-            // Toggle color picker panel
             ColorPickerPanelManager.shared.toggleColorPickerPanel()
         }
-        
-        KeyboardShortcuts.onKeyDown(for: .screenAssistantPanel) { [weak self] in
+
+        _ = KeyboardShortcuts.onKeyDown(for: .screenAssistantPanel) { [weak self] in
             guard let self = self else { return }
-            
-            // Only execute if shortcuts are enabled
             guard Defaults[.enableShortcuts] else { return }
-            
-            // Only open screen assistant if the feature is enabled
             guard Defaults[.enableScreenAssistant] else { return }
-            
-            // Handle keyboard shortcut based on display mode
+
             switch Defaults[.screenAssistantDisplayMode] {
             case .panel:
                 ScreenAssistantPanelManager.shared.toggleScreenAssistantPanel()
             case .popover:
-                // For popover mode, first ensure notch is open, then toggle popover
-                
-                // If notch is closed, open it first
                 if self.vm.notchState == .closed {
                     self.vm.open()
-                    // Wait a moment for the notch to open, then show popover
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         NotificationCenter.default.post(name: NSNotification.Name("ToggleScreenAssistantPopover"), object: nil)
                     }
                 } else {
-                    // Notch is already open, toggle popover immediately
                     NotificationCenter.default.post(name: NSNotification.Name("ToggleScreenAssistantPopover"), object: nil)
                 }
             }
         }
-        
-        KeyboardShortcuts.onKeyDown(for: .statsPanel) { [weak self] in
-            guard let self = self else { return }
-            
-            // Only execute if shortcuts are enabled
+
+        KeyboardShortcuts.isEnabled = Defaults[.enableShortcuts]
+
+        _ = KeyboardShortcuts.onKeyDown(for: .statsPanel) {
             guard Defaults[.enableShortcuts] else { return }
-            
-            // Only open stats panel if both stats feature and panel are enabled
             guard Defaults[.enableStatsFeature] && Defaults[.showStatsPanel] else { return }
-            
-            // Start stats monitoring if not already running
+
             if !StatsManager.shared.isMonitoring {
                 StatsManager.shared.startMonitoring()
             }
-            
-            // Toggle stats panel
+
             StatsPanelManager.shared.toggleStatsPanel()
         }
         
