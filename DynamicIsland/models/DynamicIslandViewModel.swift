@@ -173,6 +173,10 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         } else if !coordinator.openLastTabByDefault {
             coordinator.currentView = .home
         }
+        // Riattiva lo sneakpeek del download se c'è un download attivo
+        if let download = DownloadManager.shared.currentDownload, !download.isCompleted {
+            coordinator.toggleSneakPeek(status: true, type: .download, duration: 3600)
+        }
     }
 
     func closeForLockScreen() {

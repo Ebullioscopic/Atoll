@@ -620,6 +620,184 @@ final class MediaOutputVolumeViewModel: ObservableObject {
     }
 }
 
+
+struct DownloadSneakPeekView: View {
+    @ObservedObject var manager = DownloadManager.shared
+    @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
+    
+    // Local state to force refresh
+    @State private var isCompleted: Bool = false
+    @State private var progress: Double = 0.0
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Left: Progress circle or checkmark
+            ZStack {
+                if isCompleted {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.green)
+                        .transition(.scale.combined(with: .opacity))
+                } else {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 2.5)
+                            .frame(width: 14, height: 14)
+                        Circle()
+                            .trim(from: 0, to: progress)
+                            .stroke(Color.blue, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                            .frame(width: 14, height: 14)
+                            .animation(.easeOut(duration: 0.25), value: progress)
+                    }
+                }
+            }
+            .frame(width: 10, height: 10)
+
+            Spacer()
+
+            // Right: Download icon or folder button
+            if isCompleted {
+                Button(action: {
+                    manager.openDownloadsFolder()
+                }) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.blue)
+                        .padding(4)
+                }
+                .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
+            } else {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.blue)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .frame(height: 0)
+        .padding(.horizontal, 8)
+        .padding(. vertical, -25)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isCompleted)
+        .onChange(of: manager.currentDownload?.isCompleted) { _, newValue in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isCompleted = newValue ?? false
+            }
+            print("📱 View updated: isCompleted = \(isCompleted)")
+        }
+        .onChange(of: manager.currentDownload?.progress) { _, newValue in
+            let newProgress = max(0.0, min(1.0, newValue ?? 0.0))
+            withAnimation(.easeOut(duration: 0.25)) {
+                progress = newProgress
+            }
+        }
+        .onAppear {
+            isCompleted = manager.currentDownload?.isCompleted ?? false
+            progress = manager.currentDownload?.progress ?? 0.0
+            print("📱 View appeared: isCompleted = \(isCompleted), progress = \(progress)")
+        }
+    }
+}
+
+struct DownloadExpandedView: View {
+    @ObservedObject var manager = DownloadManager.shared
+    @State private var isCompleted: Bool = false
+    @State private var progress: Double = 0.0
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            if let download = manager.currentDownload {
+                HStack {
+                    // File icon
+                    Image(systemName: isCompleted ? "checkmark.circle.fill" : "arrow.down.circle.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(isCompleted ? .green : .blue)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(download.url.lastPathComponent)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        
+                        if isCompleted {
+                            Text("Download Complete")
+                                .font(.subheadline)
+                                .foregroundColor(.green)
+                        } else {
+                            Text("\(Int(progress * 100))%")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Actions
+                    VStack(spacing: 8) {
+                        if isCompleted {
+                            Button(action: {
+                                manager.openDownloadsFolder()
+                            }) {
+                                Image(systemName: "folder")
+                                    .font(.system(size: 18))
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Button(action: {
+                                // Cancel download - this will trigger the manager to close the sneak peek
+                                manager.currentDownload = nil
+                                DynamicIslandViewCoordinator.shared.toggleSneakPeek(status: false, type: .download)
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                
+                // Progress bar
+                if !isCompleted {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .fill(.gray.opacity(0.3))
+                                .frame(height: 6)
+                                .cornerRadius(3)
+                            
+                            Rectangle()
+                                .fill(.blue)
+                                .frame(width: geometry.size.width * progress, height: 6)
+                                .cornerRadius(3)
+                                .animation(.easeOut(duration: 0.25), value: progress)
+                        }
+                    }
+                    .frame(height: 6)
+                }
+            }
+        }
+        .padding()
+        .onChange(of: manager.currentDownload?.isCompleted) { _, newValue in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isCompleted = newValue ?? false
+            }
+        }
+        .onChange(of: manager.currentDownload?.progress) { _, newValue in
+            let newProgress = max(0.0, min(1.0, newValue ?? 0.0))
+            withAnimation(.easeOut(duration: 0.25)) {
+                progress = newProgress
+            }
+        }
+        .onAppear {
+            isCompleted = manager.currentDownload?.isCompleted ?? false
+            progress = manager.currentDownload?.progress ?? 0.0
+        }
+    }
+}
+
+
+
 #Preview {
     NotchHomeView(
         albumArtNamespace: Namespace().wrappedValue

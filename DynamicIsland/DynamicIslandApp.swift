@@ -625,6 +625,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         previousScreens = NSScreen.screens
+        // Initialize Downloads monitoring so it actually starts at launch
+        _ = DownloadManager.shared
 
         if Defaults[.enableLockScreenWeatherWidget] {
             LockScreenWeatherManager.shared.prepareLocationAccess()
