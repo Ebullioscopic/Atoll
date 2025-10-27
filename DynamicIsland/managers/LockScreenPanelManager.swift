@@ -18,6 +18,8 @@ class LockScreenPanelManager {
     private var panelWindow: NSWindow?
     private var hasDelegated = false
     private var collapsedFrame: NSRect?
+    private let collapsedPanelCornerRadius: CGFloat = 28
+    private let expandedPanelCornerRadius: CGFloat = 52
 
     private init() {
         print("[\(timestamp())] LockScreenPanelManager: initialized")
@@ -77,7 +79,16 @@ class LockScreenPanelManager {
         }
 
         window.setFrame(targetFrame, display: true)
-        window.contentView = NSHostingView(rootView: LockScreenMusicPanel())
+        let hosting = NSHostingView(rootView: LockScreenMusicPanel())
+        hosting.frame = NSRect(origin: .zero, size: targetFrame.size)
+        window.contentView = hosting
+
+        // Ensure the underlying window content is clipped to rounded corners
+        if let content = window.contentView {
+            content.wantsLayer = true
+            content.layer?.masksToBounds = true
+            content.layer?.cornerRadius = collapsedPanelCornerRadius
+        }
 
         if !hasDelegated {
             SkyLightOperator.shared.delegateWindow(window)
@@ -110,6 +121,17 @@ class LockScreenPanelManager {
             }
         } else {
             window.setFrame(targetFrame, display: true)
+        }
+
+        // Update corner radius to match the SwiftUI panel's style
+        let targetRadius = expanded ? expandedPanelCornerRadius : collapsedPanelCornerRadius
+        if animated {
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(0.28)
+            window.contentView?.layer?.cornerRadius = targetRadius
+            CATransaction.commit()
+        } else {
+            window.contentView?.layer?.cornerRadius = targetRadius
         }
     }
 
