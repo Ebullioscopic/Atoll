@@ -23,15 +23,20 @@ struct MinimalisticMusicView: View {
             Rectangle()
                 .fill(.black)
                 .overlay(
-                    HStack(alignment: .center) {
-                        if !musicManager.songTitle.isEmpty {
-                            MarqueeText(
-                                .constant(musicManager.songTitle),
-                                textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
-                                minDuration: 0.4,
-                                frameWidth: 100
-                            )
+                    GeometryReader { geo in
+                        HStack(alignment: .center) {
+                            if !musicManager.songTitle.isEmpty {
+                                MarqueeText(
+                                    $musicManager.songTitle,
+                                    font: .system(size: 12, weight: .semibold),
+                                    nsFont: .subheadline,
+                                    textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
+                                    minDuration: 0.4,
+                                    frameWidth: max(0, geo.size.width - 8)
+                                )
+                            }
                         }
+                        .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
                     }
                 )
                 .frame(width: vm.closedNotchSize.width)

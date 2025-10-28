@@ -18,10 +18,14 @@ struct MusicPlayerView: View {
     let showShuffleAndRepeat: Bool
 
     var body: some View {
-        HStack {
+        HStack(alignment: .top, spacing: 12) {
             AlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace).padding(.all, 5)
-            MusicControlsView(showShuffleAndRepeat: showShuffleAndRepeat).drawingGroup().compositingGroup()
+            MusicControlsView(showShuffleAndRepeat: showShuffleAndRepeat)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .drawingGroup()
+                .compositingGroup()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -124,6 +128,7 @@ struct MusicControlsView: View {
             playbackControls
         }
         .buttonStyle(PlainButtonStyle())
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var songInfoAndSlider: some View {
@@ -135,6 +140,7 @@ struct MusicControlsView: View {
         }
         .padding(.top, 10)
         .padding(.leading, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func songInfo(width: CGFloat) -> some View {
@@ -252,6 +258,7 @@ struct NotchHomeView: View {
             } else {
                 // Normal mode: Show full music player with optional calendar and webcam
                 MusicPlayerView(albumArtNamespace: albumArtNamespace, showShuffleAndRepeat: Defaults[.showShuffleAndRepeat])
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 
                 if Defaults[.showCalendar] {
                     CalendarView()

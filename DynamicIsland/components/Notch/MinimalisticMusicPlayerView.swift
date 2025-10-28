@@ -16,31 +16,40 @@ struct MinimalisticMusicPlayerView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header area with album art (matching DynamicIslandHeader height of 24pt)
-            HStack(alignment: .center, spacing: 10) {
-                MinimalisticAlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace)
-                    .frame(width: 50, height: 50)
-                
-                // Song info aligned to bottom of album art
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(MusicManager.shared.songTitle)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    
-                    Text(MusicManager.shared.artistName)
-                        .font(.system(size: 10, weight: .regular))
-                        .foregroundColor(Defaults[.playerColorTinting] ? Color(nsColor: MusicManager.shared.avgColor).ensureMinimumBrightness(factor: 0.6) : .gray)
-                        .lineLimit(1)
-                }
-                
-                Spacer()
-                
-                // Visualizer aligned to bottom
-                if useMusicVisualizer {
-                    visualizer
+            GeometryReader { headerGeo in
+                let albumArtWidth: CGFloat = 50
+                let spacing: CGFloat = 10
+                let visualizerWidth: CGFloat = useMusicVisualizer ? 24 : 0
+                let textWidth = max(0, headerGeo.size.width - albumArtWidth - spacing - (useMusicVisualizer ? (visualizerWidth + spacing) : 0))
+                HStack(alignment: .center, spacing: spacing) {
+                    MinimalisticAlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace)
+                        .frame(width: albumArtWidth, height: albumArtWidth)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        if !musicManager.songTitle.isEmpty {
+                            MarqueeText(
+                                $musicManager.songTitle,
+                                font: .system(size: 12, weight: .semibold),
+                                nsFont: .subheadline,
+                                textColor: .white,
+                                frameWidth: textWidth
+                            )
+                        }
+
+                        Text(musicManager.artistName)
+                            .font(.system(size: 10, weight: .regular))
+                            .foregroundColor(Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .gray)
+                            .lineLimit(1)
+                    }
+                    .frame(width: textWidth, alignment: .leading)
+
+                    if useMusicVisualizer {
+                        visualizer
+                            .frame(width: visualizerWidth)
+                    }
                 }
             }
-            .frame(height: 50) // Fixed height to accommodate album art
+            .frame(height: 50)
             
             // Compact progress bar
             progressBar
