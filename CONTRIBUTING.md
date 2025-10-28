@@ -14,7 +14,9 @@ Thank you for your interest in contributing to Atoll! We welcome contributions f
 - [Coding Guidelines](#coding-guidelines)
 - [Design Contributions](#design-contributions)
 - [Documentation](#documentation)
+- [Code Review process](#code-review-process)
 - [Community & Support](#community--support)
+
 
 ---
 
@@ -78,6 +80,12 @@ We are committed to fostering a welcoming and inclusive environment. Please read
 - Improve user guides, API docs, and troubleshooting sections.
 - Translate documentation into other languages.
 - Clarify setup instructions and add usage examples.
+
+## Code review process
+- All pull requests require review from project maintainers before merging.
+- Automated testing must pass via continuous integration workflows.
+- Changes should not significantly decrease test coverage without justification.
+- Breaking changes require major version updates following semantic versioning.
 
 ## Community & Support
 

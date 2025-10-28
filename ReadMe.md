@@ -294,57 +294,6 @@ This operation clears UserDefaults, removes application support files and caches
 - Search Console.app for process name "DynamicIsland" to filter relevant log entries.
 - Report persistent issues with Console logs attached at the project's GitHub Issues page.
 
-## Contributing
-
-Contributions are welcome from developers, designers, and documentation writers. Follow these guidelines to ensure smooth collaboration:
-
-### For developers
-1. **Fork the repository** and clone your fork locally:
-   ```bash
-   git clone https://github.com/your-username/Atoll.git
-   cd Atoll
-   ```
-2. **Create a feature branch** from main with a descriptive name:
-   ```bash
-   git switch -c feature/your-feature-name
-   ```
-3. **Follow existing architecture**: Maintain the SwiftUI structure, leverage Combine for reactive data flow, and avoid introducing unnecessary dependencies.
-4. **Code style**: Follow Swift API Design Guidelines, use meaningful variable names, and keep functions focused on single responsibilities.
-5. **Testing**: Add unit tests for new functionality where practical, particularly for data models and utility functions.
-6. **Documentation**: Update inline documentation for public APIs and add explanatory comments for complex logic.
-7. **Commit changes** with clear, concise commit messages:
-   ```bash
-   git add .
-   git commit -m "Add feature: brief description of changes"
-   ```
-8. **Push to your fork** and submit a pull request:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-### Pull request guidelines
-- Provide a clear description of the changes, motivation, and any related issues.
-- Include testing notes explaining how to verify the changes.
-- Attach screenshots or screen recordings for UI changes.
-- Ensure the code builds without errors or warnings.
-- Respond to review feedback promptly and update the PR as needed.
-
-### For designers
-- Contribute UI/UX improvements, mockups, and design refinements.
-- Submit icon designs, animation concepts, or visual asset enhancements.
-- Provide design rationale and maintain consistency with macOS Human Interface Guidelines.
-
-### For documentation
-- Improve user guides, API documentation, and troubleshooting sections.
-- Translate documentation into additional languages.
-- Clarify setup instructions and add missing usage examples.
-
-### Code review process
-- All pull requests require review from project maintainers before merging.
-- Automated testing must pass via continuous integration workflows.
-- Changes should not significantly decrease test coverage without justification.
-- Breaking changes require major version updates following semantic versioning.
-
 ## License
 Atoll is released under the GPL v3 License. Refer to [LICENSE](LICENSE) for the full terms.
 
@@ -358,7 +307,11 @@ Atoll builds upon the work of several open-source projects and draws inspiration
 
 - [**Stats**](https://github.com/exelban/stats) - source implementation for CPU temperature monitoring via SMC (System Management Controller) access, frequency sampling through IOReport bindings, and per-core CPU utilisation tracking. The system metrics collection architecture derives from Stats project readers.
 
+## Contributors
 
+<a href="https://github.com/Ebullioscopic/Atoll/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Ebullioscopic/Atoll" />
+</a>
 
 ## Updating Existing Clones
 If you previously cloned DynamicIsland, update the remote to track the Atoll repository:
