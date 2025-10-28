@@ -34,7 +34,6 @@ struct DynamicNotchApp: App {
             Button("Settings") {
                 SettingsWindowController.shared.showWindow()
             }
-            .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
             if false {
                 Button("Activate License") {
                     openWindow(id: "activation")
@@ -76,7 +75,6 @@ struct DynamicNotchApp: App {
             Button("Settings…") {
                 SettingsWindowController.shared.showWindow()
             }
-            .keyboardShortcut(",", modifiers: .command)
         }
     }
 }
@@ -364,8 +362,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
 
         coordinator.setupWorkersNotificationObservers()
-        LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
-        LockScreenManager.shared.configure(viewModel: vm)
+    LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
+    LockScreenManager.shared.configure(viewModel: vm)
         
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()
