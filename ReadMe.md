@@ -313,6 +313,10 @@ Atoll builds upon the work of several open-source projects and draws inspiration
   <img src="https://contrib.rocks/image?repo=Ebullioscopic/Atoll" />
 </a>
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Ebullioscopic/Atoll&type=timeline&legend=top-left)](https://www.star-history.com/#Ebullioscopic/Atoll&type=timeline&legend=top-left)
+
 ## Updating Existing Clones
 If you previously cloned DynamicIsland, update the remote to track the Atoll repository:
 
