@@ -9,7 +9,6 @@ import SwiftUI
 import AppKit
 import SkyLightWindow
 import Defaults
-import QuartzCore
 
 @MainActor
 class LockScreenPanelManager {
@@ -68,7 +67,8 @@ class LockScreenPanelManager {
             newWindow.isReleasedWhenClosed = false
             newWindow.isOpaque = false
             newWindow.backgroundColor = .clear
-            newWindow.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
+            // Use a level below CGShieldingWindowLevel to ensure lock screen elements (like the lock icon) remain visible
+            newWindow.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()) - 1)
             newWindow.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
             newWindow.isMovable = false
             newWindow.hasShadow = false
@@ -101,24 +101,37 @@ class LockScreenPanelManager {
         print("[\(timestamp())] LockScreenPanelManager: panel visible")
     }
 
-    func updatePanelSize(expanded: Bool, additionalHeight: CGFloat = 0, animated: Bool = true) {
-        guard let window = panelWindow, let baseFrame = collapsedFrame else {
+    func updatePanelSize(expanded: Bool, animated: Bool = true) {
+        guard let window = panelWindow else {
             return
         }
 
-        let baseSize = expanded ? LockScreenMusicPanel.expandedSize : LockScreenMusicPanel.collapsedSize
-        let targetWidth = baseSize.width
-        let targetHeight = baseSize.height + additionalHeight
-        let originX = baseFrame.midX - (targetWidth / 2)
-        let originY = baseFrame.origin.y
-        let targetFrame = NSRect(x: originX, y: originY, width: targetWidth, height: targetHeight)
+        let targetFrame: NSRect
+        
+        if expanded {
+            // Fullscreen mode - occupies entire screen
+            guard let screen = NSScreen.main else { return }
+            targetFrame = screen.frame
+            
+            // Hide weather widget when music panel is fullscreen
+            LockScreenWeatherPanelManager.shared.hide()
+        } else {
+            // Collapsed mode - use the stored collapsed frame
+            guard let baseFrame = collapsedFrame else { return }
+            let targetSize = LockScreenMusicPanel.collapsedSize
+            let originX = baseFrame.midX - (targetSize.width / 2)
+            let originY = baseFrame.origin.y
+            targetFrame = NSRect(x: originX, y: originY, width: targetSize.width, height: targetSize.height)
+            
+            // Show weather widget again when music panel is collapsed
+            // Only if weather data is available
+            if let snapshot = LockScreenWeatherManager.shared.snapshot {
+                LockScreenWeatherPanelManager.shared.show(with: snapshot)
+            }
+        }
 
         if animated {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.45
-                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                window.animator().setFrame(targetFrame, display: true)
-            }
+            window.animator().setFrame(targetFrame, display: true)
         } else {
             window.setFrame(targetFrame, display: true)
         }

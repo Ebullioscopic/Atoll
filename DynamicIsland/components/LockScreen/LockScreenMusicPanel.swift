@@ -10,35 +10,28 @@ import Defaults
 
 struct LockScreenMusicPanel: View {
     static let collapsedSize = CGSize(width: 420, height: 180)
-    static let expandedSize = CGSize(width: 720, height: 340)
+    static let expandedSize = CGSize(width: 720, height: 340) // Kept for compatibility; window will go fullscreen when expanded
 
     @ObservedObject var musicManager = MusicManager.shared
-    @ObservedObject private var routeManager = AudioRouteManager.shared
-    @StateObject private var volumeModel = MediaOutputVolumeViewModel()
     @State private var sliderValue: Double = 0
     @State private var dragging: Bool = false
     @State private var isActive = true
     @State private var isExpanded = false
-    @State private var isVolumeSliderVisible = false
     @State private var collapseWorkItem: DispatchWorkItem?
     @Default(.lockScreenGlassStyle) var lockScreenGlassStyle
     @Default(.lockScreenShowAppIcon) var showAppIcon
     @Default(.lockScreenPanelShowsBorder) var showPanelBorder
     @Default(.lockScreenPanelUsesBlur) var enableBlur
-    @Default(.showMediaOutputControl) var showMediaOutputControl
     
     private let collapsedPanelCornerRadius: CGFloat = 28
     private let expandedPanelCornerRadius: CGFloat = 52
     private let collapsedAlbumArtCornerRadius: CGFloat = 16
-    private let expandedAlbumArtCornerRadius: CGFloat = 60
+    private let expandedAlbumArtCornerRadius: CGFloat = 20
     private let expandedContentSpacing: CGFloat = 40
     private let collapseTimeout: TimeInterval = 5
-    private let collapsedSliderExtraHeight: CGFloat = 72
-    private let expandedSliderExtraHeight: CGFloat = 88
 
     private var currentSize: CGSize {
-        let base = isExpanded ? Self.expandedSize : Self.collapsedSize
-        return CGSize(width: base.width, height: base.height + sliderExtraHeight)
+        isExpanded ? Self.expandedSize : Self.collapsedSize
     }
 
     private var panelCornerRadius: CGFloat {
@@ -63,41 +56,24 @@ struct LockScreenMusicPanel: View {
     
     private var panelContent: some View {
         panelCore
-            .frame(width: currentSize.width, height: currentSize.height)
+            .frame(
+                width: isExpanded ? nil : currentSize.width,
+                height: isExpanded ? nil : currentSize.height
+            )
+            .frame(maxWidth: isExpanded ? .infinity : nil, maxHeight: isExpanded ? .infinity : nil)
             .animation(.spring(response: 0.48, dampingFraction: 0.82, blendDuration: 0.18), value: isExpanded)
-            .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.18), value: shouldShowVolumeSlider)
             .onAppear {
                 sliderValue = musicManager.elapsedTime
                 isActive = true
                 logPanelAppearance()
-                LockScreenPanelManager.shared.updatePanelSize(
-                    expanded: isExpanded,
-                    additionalHeight: sliderHeight(forExpanded: isExpanded, visible: shouldShowVolumeSlider),
-                    animated: false
-                )
-                routeManager.refreshDevices()
+                LockScreenPanelManager.shared.updatePanelSize(expanded: false, animated: false)
             }
             .onDisappear {
                 isActive = false
                 cancelCollapseTimer()
-                isVolumeSliderVisible = false
             }
             .onChange(of: isExpanded) { _, expanded in
-                LockScreenPanelManager.shared.updatePanelSize(
-                    expanded: expanded,
-                    additionalHeight: sliderHeight(forExpanded: expanded, visible: shouldShowVolumeSlider)
-                )
-            }
-            .onChange(of: showMediaOutputControl) { _, enabled in
-                if !enabled {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                        isVolumeSliderVisible = false
-                    }
-                }
-                LockScreenPanelManager.shared.updatePanelSize(
-                    expanded: isExpanded,
-                    additionalHeight: sliderHeight(forExpanded: isExpanded, visible: shouldShowVolumeSlider)
-                )
+                LockScreenPanelManager.shared.updatePanelSize(expanded: expanded)
             }
     }
 
@@ -105,26 +81,83 @@ struct LockScreenMusicPanel: View {
     private var panelCore: some View {
         Group {
             if isExpanded {
-                expandedLayout
+                fullscreenExpandedView
             } else {
                 collapsedLayout
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                    .frame(width: currentSize.width, height: currentSize.height, alignment: .topLeading)
+                    .background(panelBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
+                    .overlay {
+                        if showPanelBorder {
+                            RoundedRectangle(cornerRadius: panelCornerRadius)
+                                .stroke(Color.white.opacity(0.35), lineWidth: 1.4)
+                        }
+                    }
+                    .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
+                    .contentShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
             }
         }
-        .padding(.horizontal, isExpanded ? 24 : 20)
-        .padding(.vertical, isExpanded ? 22 : 16)
-        .frame(width: currentSize.width, height: currentSize.height, alignment: .topLeading)
-        .background(panelBackground)
-        .clipShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
-        .overlay {
-            if showPanelBorder {
-                RoundedRectangle(cornerRadius: panelCornerRadius)
-                    .stroke(Color.white.opacity(0.35), lineWidth: 1.4)
-            }
-        }
-        .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
-        .contentShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
     }
 
+    // MARK: - Fullscreen Expanded View
+    
+    private var fullscreenExpandedView: some View {
+        ZStack {
+            // Blurred background
+            Image(nsImage: musicManager.albumArt)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .blur(radius: 0.6)
+                .overlay(Color.black.opacity(0.4))
+                .ignoresSafeArea(.all)
+            
+            // Content overlay
+            HStack(alignment: .center, spacing: 60) {
+                // Clickable album art (left side) - not blurred
+                Button(action: toggleExpanded) {
+                    Image(nsImage: musicManager.albumArt)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 400, height: 400)
+                        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                        .shadow(color: Color.black.opacity(0.5), radius: 30, x: 0, y: 15)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Info and controls (right side)
+                VStack(alignment: .leading, spacing: 30) {
+                    // Song info
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(musicManager.songTitle.isEmpty ? "No Music Playing" : musicManager.songTitle)
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                        
+                        Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
+                            .font(.system(size: 24, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .lineLimit(1)
+                    }
+                    
+                    // Progress bar
+                    progressBar
+                        .frame(maxWidth: 500)
+                    
+                    // Playback controls
+                    fullscreenPlaybackControls
+                        .padding(.top, 10)
+                }
+                .frame(maxWidth: 500)
+            }
+            .padding(.horizontal, 80)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+    
     private var collapsedLayout: some View {
         VStack(spacing: 12) {
             collapsedHeader
@@ -136,22 +169,6 @@ struct LockScreenMusicPanel: View {
         }
     }
 
-    private var expandedLayout: some View {
-        HStack(alignment: .center, spacing: expandedContentSpacing) {
-            albumArtButton(size: 230, cornerRadius: expandedAlbumArtCornerRadius)
-                .frame(width: 230, height: 230)
-
-            VStack(alignment: .leading, spacing: 20) {
-                expandedHeader
-                progressBar
-                    .padding(.top, 10)
-                    .frame(maxWidth: .infinity)
-                playbackControls(alignment: .leading)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(maxHeight: .infinity, alignment: .center)
-    }
 
     private var collapsedHeader: some View {
         HStack(alignment: .center, spacing: 16) {
@@ -176,25 +193,6 @@ struct LockScreenMusicPanel: View {
         .frame(height: 60)
     }
 
-    private var expandedHeader: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(musicManager.songTitle.isEmpty ? "No Music Playing" : musicManager.songTitle)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-
-                Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.7) : .gray)
-                    .lineLimit(2)
-            }
-
-            Spacer()
-
-            visualizer(width: 24, height: 20)
-        }
-    }
 
     private func albumArtButton(size: CGFloat, cornerRadius: CGFloat) -> some View {
         Button(action: toggleExpanded) {
@@ -251,7 +249,8 @@ struct LockScreenMusicPanel: View {
 
     private func registerInteraction() {
         cancelCollapseTimer()
-        guard isExpanded else { return }
+        // In fullscreen mode we do not auto-collapse; exit is by clicking the small album art
+        guard isExpanded == false else { return }
 
         let workItem = DispatchWorkItem {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
@@ -357,48 +356,68 @@ struct LockScreenMusicPanel: View {
     
     // MARK: - Playback Controls
     
+    private var fullscreenPlaybackControls: some View {
+        HStack(spacing: 32) {
+            controlButton(icon: "shuffle", size: 24, isActive: musicManager.isShuffled) {
+                musicManager.toggleShuffle()
+            }
+            
+            controlButton(icon: "backward.fill", size: 28) {
+                musicManager.previousTrack()
+            }
+            
+            // Large play/pause button
+            Button(action: {
+                registerInteraction()
+                musicManager.togglePlay()
+            }) {
+                Image(systemName: musicManager.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 40, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 90, height: 90)
+                    .background(Color.white.opacity(0.2))
+                    .clipShape(Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            controlButton(icon: "forward.fill", size: 28) {
+                musicManager.nextTrack()
+            }
+            
+            controlButton(icon: repeatIcon, size: 24, isActive: musicManager.repeatMode != .off) {
+                musicManager.toggleRepeat()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
     private func playbackControls(alignment: Alignment) -> some View {
         let spacing: CGFloat = isExpanded ? 24 : 20
 
-        return VStack(spacing: shouldShowVolumeSlider ? 14 : 10) {
-            controlsRow(alignment: alignment, spacing: spacing)
-
-            if shouldShowVolumeSlider {
-                volumeSlider
-                    .frame(maxWidth: .infinity, alignment: alignment)
-                    .transition(.scale(scale: 0.98, anchor: .top).combined(with: .opacity))
+        return HStack(spacing: spacing) {
+            // Always show shuffle on lock screen
+            controlButton(icon: "shuffle", isActive: musicManager.isShuffled) {
+                musicManager.toggleShuffle()
+            }
+            
+            controlButton(icon: "backward.fill", size: 18) {
+                musicManager.previousTrack()
+            }
+            
+            playPauseButton
+            
+            controlButton(icon: "forward.fill", size: 18) {
+                musicManager.nextTrack()
+            }
+            
+            // Always show repeat on lock screen
+            controlButton(icon: repeatIcon, isActive: musicManager.repeatMode != .off) {
+                musicManager.toggleRepeat()
             }
         }
         .frame(maxWidth: .infinity, alignment: alignment)
         .padding(.top, isExpanded ? 6 : 2)
-        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: shouldShowVolumeSlider)
-    }
-
-    private func controlsRow(alignment: Alignment, spacing: CGFloat) -> some View {
-        HStack(spacing: spacing) {
-            controlButton(icon: "shuffle", isActive: musicManager.isShuffled) {
-                musicManager.toggleShuffle()
-            }
-
-            controlButton(icon: "backward.fill", size: 18) {
-                musicManager.previousTrack()
-            }
-
-            playPauseButton
-
-            controlButton(icon: "forward.fill", size: 18) {
-                musicManager.nextTrack()
-            }
-
-            if showMediaOutputControl {
-                mediaOutputControlButton
-            } else {
-                controlButton(icon: repeatIcon, isActive: musicManager.repeatMode != .off) {
-                    musicManager.toggleRepeat()
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: alignment)
     }
     
     private var playPauseButton: some View {
@@ -435,108 +454,12 @@ struct LockScreenMusicPanel: View {
         .buttonStyle(PlainButtonStyle())
     }
     
-    private var mediaOutputControlButton: some View {
-        let frameSize: CGFloat = isExpanded ? 56 : 32
-        let iconSize: CGFloat = isExpanded ? 26 : 18
-
-        return Button(action: toggleVolumeSlider) {
-            Image(systemName: mediaOutputIcon)
-                .font(.system(size: iconSize, weight: .medium))
-                .foregroundColor(shouldShowVolumeSlider ? .accentColor : .white.opacity(0.8))
-                .frame(width: frameSize, height: frameSize)
-                .contentShape(Rectangle())
-        }
-        .accessibilityLabel("Media output")
-        .buttonStyle(PlainButtonStyle())
-    }
-
     private var repeatIcon: String {
         switch musicManager.repeatMode {
         case .off: return "repeat"
         case .all: return "repeat"
         case .one: return "repeat.1"
         }
-    }
-
-    private var mediaOutputIcon: String {
-        routeManager.activeDevice?.iconName ?? "speaker.wave.2"
-    }
-
-    private var volumeSlider: some View {
-        HStack(spacing: 14) {
-            Image(systemName: volumeIconName)
-                .font(.system(size: isExpanded ? 16 : 14, weight: .semibold))
-                .foregroundColor(.white.opacity(0.8))
-
-            Slider(
-                value: Binding(
-                    get: { Double(volumeModel.level) },
-                    set: { newValue in
-                        registerInteraction()
-                        volumeModel.setVolume(Float(newValue))
-                    }
-                ),
-                in: 0 ... 1
-            )
-            .tint(sliderColor)
-
-            Text(volumePercentage)
-                .font(.system(size: isExpanded ? 12 : 11, weight: .medium, design: .monospaced))
-                .foregroundColor(.white.opacity(0.7))
-                .frame(width: 48, alignment: .trailing)
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
-                .fill(Color.white.opacity(0.08))
-        )
-    }
-
-    private var shouldShowVolumeSlider: Bool {
-        showMediaOutputControl && isVolumeSliderVisible
-    }
-
-    private var sliderExtraHeight: CGFloat {
-        sliderHeight(forExpanded: isExpanded, visible: shouldShowVolumeSlider)
-    }
-
-    private var volumeIconName: String {
-        if volumeModel.isMuted || volumeModel.level <= 0.001 {
-            return "speaker.slash.fill"
-        } else if volumeModel.level < 0.33 {
-            return "speaker.wave.1.fill"
-        } else if volumeModel.level < 0.66 {
-            return "speaker.wave.2.fill"
-        }
-        return "speaker.wave.3.fill"
-    }
-
-    private var volumePercentage: String {
-        "\(Int(round(volumeModel.level * 100)))%"
-    }
-
-    private func toggleVolumeSlider() {
-        registerInteraction()
-        let newState = !isVolumeSliderVisible
-        if newState {
-            routeManager.refreshDevices()
-        }
-
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-            isVolumeSliderVisible = newState
-        }
-
-        let targetHeight = sliderHeight(forExpanded: isExpanded, visible: shouldShowVolumeSlider)
-        LockScreenPanelManager.shared.updatePanelSize(
-            expanded: isExpanded,
-            additionalHeight: targetHeight
-        )
-    }
-
-    private func sliderHeight(forExpanded expanded: Bool, visible: Bool) -> CGFloat {
-        guard visible else { return 0 }
-        return expanded ? expandedSliderExtraHeight : collapsedSliderExtraHeight
     }
 
     @ViewBuilder
