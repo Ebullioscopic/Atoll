@@ -7,14 +7,6 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
-	<key>LSUIElement</key>
-	<true/>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Dynamic Island needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.</string>
-	<key>NSLocationUsageDescription</key>
-	<string>Dynamic Island uses your location to display accurate lock screen weather.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Dynamic Island uses your location to display accurate lock screen weather.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Dynamic Island needs screen recording permission to capture screenshots for the AI assistant feature.</string>
 	<key>SUEnableDownloaderService</key>

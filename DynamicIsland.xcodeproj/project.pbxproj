@@ -59,7 +59,7 @@
 		7EE1D73C2E6B1E0B00997219 /* ApplicationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ApplicationServices.framework; path = System/Library/Frameworks/ApplicationServices.framework; sourceTree = SDKROOT; };
 		7EE1D73E2E6B1E1200997219 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		F4C1DD09EC134302938E84F6 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = Frameworks/MediaRemoteAdapter.framework; sourceTree = SOURCE_ROOT; };
-		F54406E72CD4987A00C7AFD9 /* DynamicIsland.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DynamicIsland.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F54406E72CD4987A00C7AFD9 /* Atoll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atoll.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -144,7 +144,7 @@
 		F54406E82CD4987A00C7AFD9 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F54406E72CD4987A00C7AFD9 /* DynamicIsland.app */,
+				F54406E72CD4987A00C7AFD9 /* Atoll.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -182,7 +182,7 @@
 				7E61181E2E24071E0050006C /* SkyLightWindow */,
 			);
 			productName = DynamicIsland;
-			productReference = F54406E72CD4987A00C7AFD9 /* DynamicIsland.app */;
+			productReference = F54406E72CD4987A00C7AFD9 /* Atoll.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -403,20 +403,24 @@
 				INFOPLIST_FILE = DynamicIsland/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Atoll;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Dynamic Island uses AppleScripts to control Spotify and Apple Music";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Dynamic Island needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show calender events inside the notch";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Need for Calendar Mode";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need your camera for Mirror mode";
 				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Dynamic Island needs access to save screenshots to your desktop.";
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Dynamic Island needs access to save and read AI assistant files.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSLocationUsageDescription = "Dynamic Island uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Dynamic Island uses your location to display accurate lock screen weather.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = "1.0.2-beta";
-				PRODUCT_BUNDLE_IDENTIFIER = com.karthikinformationtechnology.DynamicIsland;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.Ebullioscopic.Atoll;
+				PRODUCT_NAME = Atoll;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -453,20 +457,24 @@
 				INFOPLIST_FILE = DynamicIsland/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Atoll;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Dynamic Island uses AppleScripts to control Spotify and Apple Music";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Dynamic Island needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show calender events inside the notch";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Need for Calendar Mode";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need your camera for Mirror mode";
 				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Dynamic Island needs access to save screenshots to your desktop.";
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Dynamic Island needs access to save and read AI assistant files.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSLocationUsageDescription = "Dynamic Island uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Dynamic Island uses your location to display accurate lock screen weather.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = "1.0.2-beta";
-				PRODUCT_BUNDLE_IDENTIFIER = com.karthikinformationtechnology.DynamicIsland;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.Ebullioscopic.Atoll;
+				PRODUCT_NAME = Atoll;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
