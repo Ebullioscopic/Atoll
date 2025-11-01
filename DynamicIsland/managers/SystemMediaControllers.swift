@@ -418,17 +418,50 @@ final class SystemVolumeController {
     }
 
     private func volumeElements() -> [AudioObjectPropertyElement] {
-        candidateElements.filter { element in
+        // For Bluetooth devices, prioritize master element to avoid stereo balance issues
+        if isBluetoothDevice() {
+            if candidateElements.contains(kAudioObjectPropertyElementMaster) {
+                var address = makeAddress(selector: kAudioDevicePropertyVolumeScalar, element: kAudioObjectPropertyElementMaster)
+                if propertyExists(deviceID: currentDeviceID, address: &address) {
+                    return [kAudioObjectPropertyElementMaster]
+                }
+            }
+        }
+
+        return candidateElements.filter { element in
             var address = makeAddress(selector: kAudioDevicePropertyVolumeScalar, element: element)
             return propertyExists(deviceID: currentDeviceID, address: &address)
         }
     }
 
     private func muteElements() -> [AudioObjectPropertyElement] {
-        candidateElements.filter { element in
+        // For Bluetooth devices, prioritize master element to avoid stereo balance issues
+        if isBluetoothDevice() {
+            if candidateElements.contains(kAudioObjectPropertyElementMaster) {
+                var address = makeAddress(selector: kAudioDevicePropertyMute, element: kAudioObjectPropertyElementMaster)
+                if propertyExists(deviceID: currentDeviceID, address: &address) {
+                    return [kAudioObjectPropertyElementMaster]
+                }
+            }
+        }
+
+        return candidateElements.filter { element in
             var address = makeAddress(selector: kAudioDevicePropertyMute, element: element)
             return propertyExists(deviceID: currentDeviceID, address: &address)
         }
+    }
+
+    private func isBluetoothDevice() -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var transportType: UInt32 = 0
+        var dataSize = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(currentDeviceID, &address, 0, nil, &dataSize, &transportType)
+        return status == noErr && transportType == kAudioDeviceTransportTypeBluetooth
     }
 }
 
