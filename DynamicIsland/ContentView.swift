@@ -416,7 +416,13 @@ struct ContentView: View {
                           LockScreenLiveActivity()
                       } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .privacy) && vm.notchState == .closed && privacyManager.hasAnyIndicator && (Defaults[.enableCameraDetection] || Defaults[.enableMicrophoneDetection]) && !vm.hideOnClosed {
                           PrivacyLiveActivity()
-                      } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
+                      } else if coordinator.sneakPeek.show && coordinator.sneakPeek.type == .download && vm.notchState == .closed && !vm.hideOnClosed {
+                              DownloadSneakPeekView()
+                                  .transition(.opacity.combined(with: .scale))
+                                  .onHover { hovering in
+                                      handleDownloadHover(hovering)
+                                  }
+                      } else if  !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
                           DynamicIslandFaceAnimation().animation(.interactiveSpring, value: musicManager.isPlayerIdle)
                       } else if vm.notchState == .open {
                           DynamicIslandHeader()
@@ -436,6 +442,15 @@ struct ContentView: View {
                               .padding(.leading, 4)
                               .padding(.trailing, 8)
                           }
+                          //Download sneak peek
+                          else if coordinator.sneakPeek.type == .download {
+                              DownloadSneakPeekView()
+                                  .padding(.bottom, -5)
+                                  .padding(.leading, 4)
+                                  .padding(.trailing, 4)
+                          }
+
+
                           // Old sneak peek music
                           else if coordinator.sneakPeek.type == .music {
                               if vm.notchState == .closed && !vm.hideOnClosed && Defaults[.sneakPeekStyles] == .standard {
@@ -634,6 +649,10 @@ struct ContentView: View {
         if timerManager.isTimerActive {
             coordinator.currentView = .timer
         }
+        // Nascondi lo sneakpeek del download quando si apre
+        if coordinator.sneakPeek.show && coordinator.sneakPeek.type == .download {
+            coordinator.toggleSneakPeek(status: false, type: .download)
+        }
         
         withAnimation(.bouncy.speed(1.2)) {
             vm.open()
@@ -656,7 +675,7 @@ struct ContentView: View {
             }
             
             guard vm.notchState == .closed,
-                  !coordinator.sneakPeek.show,
+                  !coordinator.sneakPeek.show || coordinator.sneakPeek.type == .download,
                   Defaults[.openNotchOnHover] else { return }
             
             hoverTask = Task {
@@ -666,7 +685,7 @@ struct ContentView: View {
                 await MainActor.run {
                     guard self.vm.notchState == .closed,
                           self.isHovering,
-                          !self.coordinator.sneakPeek.show else { return }
+                          !self.coordinator.sneakPeek.show || self.coordinator.sneakPeek.type == .download else { return }
                     
                     self.doOpen()
                 }
@@ -699,6 +718,11 @@ struct ContentView: View {
             // Mouse entered - always update visual state immediately
             withAnimation(vm.animation) {
                 isHovering = true
+            }
+            if vm.notchState == .closed &&
+               coordinator.sneakPeek.show &&
+               coordinator.sneakPeek.type == .download {
+                doOpen()
             }
             return
         }
@@ -756,6 +780,36 @@ struct ContentView: View {
          vm.isStatsPopoverActive ||
          vm.isMediaOutputPopoverActive
     }
+          
+  // Handle download hover - open notch but keep sneak peek visible
+  private func handleDownloadHover(_ hovering: Bool) {
+      if hovering {
+          withAnimation(.bouncy.speed(1.2)) {
+              isHovering = true
+          }
+          
+          // Open the notch when hovering over download
+          if vm.notchState == .closed {
+              if Defaults[.enableHaptics] {
+                  triggerHapticIfAllowed()
+              }
+              doOpen()
+          }
+      } else {
+          withAnimation(.bouncy.speed(1.2)) {
+              isHovering = false
+          }
+          
+          // When mouse exits, close the notch and return to sneak peek
+          if vm.notchState == .open && !hasAnyActivePopovers() {
+              DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                  if !self.isHovering && self.vm.notchState == .open && !self.hasAnyActivePopovers() {
+                      self.vm.close()
+                  }
+              }
+          }
+      }
+  }
     
     // Helper to prevent rapid haptic feedback
     private func triggerHapticIfAllowed() {
