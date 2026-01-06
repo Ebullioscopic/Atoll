@@ -304,6 +304,7 @@ enum FocusModeType: String, CaseIterable {
     case sleep = "com.apple.focus.sleep"
     case driving = "com.apple.focus.driving"
     case fitness = "com.apple.focus.fitness"
+    case reduceInterruptions = "com.apple.focus.reduce-interruptions"
     case gaming = "com.apple.focus.gaming"
     case mindfulness = "com.apple.focus.mindfulness"
     case reading = "com.apple.focus.reading"
@@ -318,6 +319,7 @@ enum FocusModeType: String, CaseIterable {
         case .sleep: return "Sleep"
         case .driving: return "Driving"
         case .fitness: return "Fitness"
+        case .reduceInterruptions: return "Reduce Interruptions"
         case .gaming: return "Gaming"
         case .mindfulness: return "Mindfulness"
         case .reading: return "Reading"
@@ -334,6 +336,7 @@ enum FocusModeType: String, CaseIterable {
         case .sleep: return "bed.double.fill"
         case .driving: return "car.fill"
         case .fitness: return "figure.run"
+        case .reduceInterruptions: return "apple.intelligence"
         case .gaming: return "gamecontroller.fill"
         case .mindfulness: return "circle.hexagongrid"
         case .reading: return "book.closed.fill"
@@ -347,12 +350,18 @@ enum FocusModeType: String, CaseIterable {
         case .work: return "person.lanyardcard.fill"
         case .mindfulness: return "apple.mindfulness"
         case .gaming: return "rocket.fill"
+        case .reduceInterruptions: return "apple.intelligence"
         default: return nil
         }
     }
 
     var activeIcon: Image {
-        if let internalSymbolName,
+        resolvedActiveIcon()
+    }
+
+    func resolvedActiveIcon(usePrivateSymbol: Bool = true) -> Image {
+        if usePrivateSymbol,
+           let internalSymbolName,
            let image = Image(internalSystemName: internalSymbolName) {
             return image
         }
@@ -371,9 +380,11 @@ enum FocusModeType: String, CaseIterable {
         case .sleep:
             return Color(red: 0.341, green: 0.384, blue: 0.980)
         case .driving:
-            return Color(red: 0.988, green: 0.561, blue: 0.153)
+            return Color(red: 0.427, green: 0.486, blue: 0.996)
         case .fitness:
             return Color(red: 0.176, green: 0.804, blue: 0.459)
+        case .reduceInterruptions:
+            return Color(red: 0.878, green: 0.475, blue: 0.912, opacity: 1.0)
         case .gaming:
             return Color(red: 0.043, green: 0.518, blue: 1.000, opacity: 1.0)
         case .mindfulness:
