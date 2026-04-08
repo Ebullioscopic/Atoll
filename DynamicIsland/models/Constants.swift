@@ -405,6 +405,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     case appleMusic = "Apple Music"
     case spotify = "Spotify"
     case youtubeMusic = "Youtube Music"
+    case all = "All Music"
     
     var id: String { self.rawValue }
     
@@ -414,6 +415,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
         case .appleMusic: return String(localized: "Apple Music")
         case .spotify: return String(localized: "Spotify")
         case .youtubeMusic: return String(localized: "Youtube Music")
+        case .all: return String(localized: "All Music")
         }
     }
 }
@@ -1183,13 +1185,9 @@ extension Defaults.Keys {
     static let enableNoteCharCount = Key<Bool>("enableNoteCharCount", default: true)
     static let savedNotes = Key<[NoteItem]>("savedNotes", default: [])
     
-    // Helper to determine the default media controller based on macOS version
+    // Helper to determine the default media controller
     static var defaultMediaController: MediaControllerType {
-        if #available(macOS 15.4, *) {
-            return .appleMusic
-        } else {
-            return .nowPlaying
-        }
+        return .all
     }
     
     // Migration helper to convert from legacy enableGradient Boolean to new ProgressBarStyle enum

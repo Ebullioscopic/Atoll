@@ -2486,22 +2486,26 @@ struct Media: View {
                 .settingsHighlight(id: highlightID("Music Source"))
             } header: {
                 Text("Media Source")
-            } footer: {
-                if MusicManager.shared.isNowPlayingDeprecated {
-                    HStack {
-                        Text("YouTube Music requires this third-party app to be installed: ")
+                } footer: {
+                    if mediaController == .all {
+                        Text("All Music automatically detects your active player and switches to the best source for high-quality metadata.")
                             .foregroundStyle(.secondary)
                             .font(.caption)
-                        Link("https://github.com/th-ch/youtube-music", destination: URL(string: "https://github.com/th-ch/youtube-music")!)
+                    } else if MusicManager.shared.isNowPlayingDeprecated {
+                        HStack {
+                            Text("YouTube Music requires this third-party app to be installed: ")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                            Link("https://github.com/th-ch/youtube-music", destination: URL(string: "https://github.com/th-ch/youtube-music")!)
+                                .font(.caption)
+                                .foregroundColor(.blue) // Ensures it's visibly a link
+                        }
+                    } else {
+                        Text("'Now Playing' was the only option on previous versions and works with all media apps.")
+                            .foregroundStyle(.secondary)
                             .font(.caption)
-                            .foregroundColor(.blue) // Ensures it's visibly a link
                     }
-                } else {
-                    Text("'Now Playing' was the only option on previous versions and works with all media apps.")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
                 }
-            }
             Section {
                 Defaults.Toggle(key: .showStandardMediaControls) {
                     Text("Show media controls in Dynamic Island")

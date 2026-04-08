@@ -72,8 +72,11 @@ class MusicManager: ObservableObject {
     private var activeController: (any MediaControllerProtocol)?
 
     // Pear Desktop auto-detection
+    private static let appleMusicBundleID = "com.apple.Music"
+    private static let spotifyBundleID = "com.spotify.client"
     private static let pearDesktopBundleID = YouTubeMusicConfiguration.default.bundleIdentifier
     private var isPearDesktopAutoSwitched: Bool = false
+    private var isSmartAutoSwitched: Bool = false
 
     // Published properties for UI
     @Published var songTitle: String = "I'm Handsome"
@@ -246,12 +249,12 @@ class MusicManager: ObservableObject {
         let newController: (any MediaControllerProtocol)?
 
         switch type {
-        case .nowPlaying:
+        case .nowPlaying, .all:
             // Only create NowPlayingController if not deprecated on this macOS version
             if !self.isNowPlayingDeprecated {
                 newController = NowPlayingController()
             } else {
-                return nil
+                newController = AppleMusicController()
             }
         case .appleMusic:
             newController = AppleMusicController()
@@ -375,6 +378,11 @@ class MusicManager: ObservableObject {
             if shouldAutoPeekOnTrackChange && !state.title.isEmpty && !state.artist.isEmpty && state.isPlaying {
                 self.updateSneakPeek()
             }
+        }
+
+        // Smart switching logic for "All Music" mode
+        if Defaults[.mediaController] == .all {
+            self.switchSmartControllerIfNeeded(for: state.bundleIdentifier, isPlaying: state.isPlaying)
         }
 
         let timeChanged = state.currentTime != self.elapsedTime
@@ -593,6 +601,56 @@ class MusicManager: ObservableObject {
                 coordinator.toggleSneakPeek(status: true, type: .music)
             } else {
                 coordinator.toggleExpandingView(status: true, type: .music)
+            }
+        }
+    }
+
+    private func switchSmartControllerIfNeeded(for bundleID: String?, isPlaying: Bool) {
+        let currentType = Defaults[.mediaController]
+        guard currentType == .all else { return }
+        
+        // Determine the current active controller type
+        let activeType: MediaControllerType
+        if let _ = activeController as? AppleMusicController {
+            activeType = .appleMusic
+        } else if let _ = activeController as? SpotifyController {
+            activeType = .spotify
+        } else if let _ = activeController as? YouTubeMusicController {
+            activeType = .youtubeMusic
+        } else {
+            activeType = .nowPlaying
+        }
+
+        // Determine the target controller type based on bundleID and playback status
+        var targetType: MediaControllerType = .nowPlaying
+        
+        if let bundleID = bundleID {
+            if bundleID == Self.appleMusicBundleID {
+                targetType = .appleMusic
+            } else if bundleID == Self.spotifyBundleID {
+                targetType = .spotify
+            } else if bundleID == Self.pearDesktopBundleID {
+                targetType = .youtubeMusic
+            }
+        }
+        
+        // If we are on a dedicated controller but it's not playing and not the current bundle,
+        // we should probably switch back to NowPlaying to see what else might be playing.
+        if activeType != .nowPlaying && !isPlaying && targetType == .nowPlaying {
+            // Revert to nowPlaying to scan for other sources
+             print("[MusicManager] Smart switching back to nowPlaying (dedicated controller inactive)")
+             if let controller = createController(for: .nowPlaying) {
+                 setActiveController(controller)
+                 isSmartAutoSwitched = false
+             }
+             return
+        }
+
+        if targetType != activeType && isPlaying {
+            print("[MusicManager] Smart switching from \(activeType) to \(targetType) based on bundle: \(bundleID ?? "none")")
+            if let controller = createController(for: targetType) {
+                setActiveController(controller)
+                isSmartAutoSwitched = (targetType != .nowPlaying)
             }
         }
     }
