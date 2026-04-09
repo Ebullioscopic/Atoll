@@ -63,6 +63,7 @@ struct LockScreenMusicPanel: View {
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.lockScreenMusicMergedAirPlayOutput) private var mergedAirPlayOutput
     @Default(.enableLyrics) private var enableLyrics
+    @Default(.mediaController) private var mediaController
     @Default(.lockScreenMusicAlbumParallaxEnabled) private var lockScreenParallaxEnabled
     @Default(.lockScreenMusicPanelWidth) private var collapsedPanelWidth
 
@@ -231,6 +232,7 @@ struct LockScreenMusicPanel: View {
                 .frame(maxWidth: .infinity)
             playbackControls(alignment: .center)
                 .padding(.top, 4)
+            MultiSourceMediaList()
         }
     }
 
@@ -245,6 +247,7 @@ struct LockScreenMusicPanel: View {
                     .padding(.top, 10)
                     .frame(maxWidth: .infinity)
                 playbackControls(alignment: .leading)
+                MultiSourceMediaList()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -500,7 +503,7 @@ struct LockScreenMusicPanel: View {
             return fallbackSlots
         }
 
-        let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive)
+        let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive, isAllMusicMode: isAllMusicMode)
         return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
     }
 
@@ -596,6 +599,16 @@ struct LockScreenMusicPanel: View {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
                     enableLyrics.toggle()
                 }
+            }
+        case .mediaSources:
+            controlButton(
+                icon: "list.bullet.below.rectangle",
+                size: 18,
+                isActive: musicManager.isMultiSourceListExpanded,
+                activeColor: brandAccentColor,
+                symbolEffect: .replace
+            ) {
+                musicManager.toggleMultiSourceList()
             }
         }
     }
@@ -884,6 +897,10 @@ struct LockScreenMusicPanel: View {
 
     private var isAppleMusicActive: Bool {
         musicManager.bundleIdentifier == "com.apple.Music"
+    }
+
+    private var isAllMusicMode: Bool {
+        mediaController == .all
     }
 
     private var useMergedAirPlayOutput: Bool {
@@ -1303,3 +1320,4 @@ private struct GlassTextBackdrop: View {
         .accessibilityHidden(true)
     }
 }
+

@@ -78,6 +78,18 @@ class MusicManager: ObservableObject {
     private var isPearDesktopAutoSwitched: Bool = false
     private var isSmartAutoSwitched: Bool = false
 
+    // Multi-source tracking (All Music mode)
+    private var knownSources: [String: MediaSource] = [:]
+    private var multiSourceCleanupTask: Task<Void, Never>?
+    private var backgroundNowPlayingController: NowPlayingController?
+    private var backgroundNPCancellables = Set<AnyCancellable>()
+    @Published var secondarySources: [MediaSource] = []
+    @Published var isMultiSourceListExpanded: Bool = false
+
+    /// When a non-native source (e.g. Safari) is promoted, this holds its bundle ID
+    /// so that main playback controls are routed to it via `controlSource`.
+    private(set) var promotedSourceBundleID: String?
+
     // Published properties for UI
     @Published var songTitle: String = "I'm Handsome"
     @Published var artistName: String = "Me"
@@ -92,11 +104,17 @@ class MusicManager: ObservableObject {
     /// unknown/not-playing placeholders). Paused music with real metadata is still
     /// considered an active session.
     private static let placeholderTitles: Set<String> = [
-        "i'm handsome", "unknown", "not playing"
+        "i'm handsome", "i’m handsome", "unknown", "not playing"
     ]
     private static let placeholderArtists: Set<String> = [
         "me", "unknown"
     ]
+
+    private func isPlaceholder(title: String, artist: String) -> Bool {
+        let t = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let a = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return Self.placeholderTitles.contains(t) || Self.placeholderArtists.contains(a)
+    }
 
     var hasActiveSession: Bool {
         if isPlaying { return true }
@@ -233,6 +251,7 @@ class MusicManager: ObservableObject {
         cancellables.removeAll()
         controllerCancellables.removeAll()
         transitionWorkItem?.cancel()
+        stopMultiSourceDetection()
 
         // Release active controller
         activeController = nil
@@ -282,6 +301,7 @@ class MusicManager: ObservableObject {
     private func setActiveControllerBasedOnPreference() {
         let preferredType = Defaults[.mediaController]
         print("Preferred Media Controller: \(preferredType)")
+        promotedSourceBundleID = nil
 
         // If NowPlaying is deprecated but that's the preference, use Apple Music instead
         let controllerType = (self.isNowPlayingDeprecated && preferredType == .nowPlaying)
@@ -293,6 +313,13 @@ class MusicManager: ObservableObject {
         } else if controllerType != .appleMusic, let fallbackController = createController(for: .appleMusic) {
             // Fallback to Apple Music if preferred controller couldn't be created
             setActiveController(fallbackController)
+        }
+
+        // Start/stop multi-source detection based on mode
+        if preferredType == .all {
+            startMultiSourceDetection()
+        } else {
+            stopMultiSourceDetection()
         }
     }
 
@@ -383,6 +410,8 @@ class MusicManager: ObservableObject {
         // Smart switching logic for "All Music" mode
         if Defaults[.mediaController] == .all {
             self.switchSmartControllerIfNeeded(for: state.bundleIdentifier, isPlaying: state.isPlaying)
+            // Track this source for the multi-source list
+            self.trackSource(from: state)
         }
 
         let timeChanged = state.currentTime != self.elapsedTime
@@ -655,20 +684,371 @@ class MusicManager: ObservableObject {
         }
     }
 
+    // MARK: - Multi-Source Tracking (All Music mode)
+
+    /// Track a playback state update as a known media source.
+    private func trackSource(from state: PlaybackState) {
+        let bundleID = state.bundleIdentifier
+        guard !bundleID.isEmpty else { return }
+
+        let source = MediaSource(
+            id: bundleID,
+            bundleIdentifier: bundleID,
+            title: state.title,
+            artist: state.artist,
+            artworkData: state.artwork,
+            isPlaying: state.isPlaying,
+            lastUpdated: Date()
+        )
+        knownSources[bundleID] = source
+        rebuildSecondarySources()
+    }
+
+    /// Called from the background NowPlaying listener to detect other media sources.
+    private func trackBackgroundSource(from state: PlaybackState) {
+        let bundleID = state.bundleIdentifier
+        guard !bundleID.isEmpty else { return }
+
+        // Filter out ghost sources (e.g. Apple Music placeholder)
+        if bundleID == "com.apple.Music" {
+            // If it's a placeholder, and it's not the primary, skip it.
+            if isPlaceholder(title: state.title, artist: state.artist) && bundleID != self.bundleIdentifier {
+                return
+            }
+        }
+
+        // Don't overwrite the primary source with stale NP data
+        if bundleID == self.bundleIdentifier {
+            // Update isPlaying status only
+            if var existing = knownSources[bundleID] {
+                existing.isPlaying = state.isPlaying
+                existing.lastUpdated = Date()
+                knownSources[bundleID] = existing
+            }
+        } else {
+            let source = MediaSource(
+                id: bundleID,
+                bundleIdentifier: bundleID,
+                title: state.title,
+                artist: state.artist,
+                artworkData: state.artwork,
+                isPlaying: state.isPlaying,
+                lastUpdated: Date()
+            )
+            knownSources[bundleID] = source
+        }
+        rebuildSecondarySources()
+    }
+
+    /// Rebuild the published secondarySources array from knownSources,
+    /// excluding the current primary source.
+    private func rebuildSecondarySources() {
+        // Use the absolute latest data from the primary player
+        let pTitle = self.songTitle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let pArtist = self.artistName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let pBundle = self.bundleIdentifier ?? ""
+        
+        // Fuzzy matching helper
+        func isMatch(title: String, artist: String, bundle: String) -> Bool {
+            if bundle == pBundle && !bundle.isEmpty { return true }
+            
+            let t = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let a = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            
+            // If titles match exactly and it's not empty, it's likely a duplicate (e.g. Safari)
+            if !t.isEmpty && t == pTitle && (a == pArtist || a.isEmpty || pArtist.isEmpty) {
+                return true
+            }
+            return false
+        }
+        
+        let sources = knownSources.values
+            .filter { source in
+                // 1. Check if it matches the primary player
+                if isMatch(title: source.title, artist: source.artist, bundle: source.bundleIdentifier) {
+                    return false
+                }
+                
+                // 2. Final ghost check (placeholder removal)
+                if source.bundleIdentifier == "com.apple.Music" && isPlaceholder(title: source.title, artist: source.artist) {
+                    return false
+                }
+                
+                return true
+            }
+            .sorted { $0.lastUpdated > $1.lastUpdated }
+        
+        DispatchQueue.main.async {
+            self.secondarySources = sources
+        }
+    }
+
+    /// Start the background NowPlaying listener for multi-source detection.
+    func startMultiSourceDetection() {
+        guard backgroundNowPlayingController == nil else { return }
+        guard let bgController = NowPlayingController() else {
+            print("[MusicManager] Could not create background NowPlayingController for multi-source detection")
+            return
+        }
+        backgroundNowPlayingController = bgController
+
+        bgController.playbackStatePublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                self?.trackBackgroundSource(from: state)
+            }
+            .store(in: &backgroundNPCancellables)
+
+        // Periodic cleanup: remove sources not updated in 30s
+        multiSourceCleanupTask?.cancel()
+        multiSourceCleanupTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 10_000_000_000) // 10s
+                guard let self = self else { return }
+                let cutoff = Date().addingTimeInterval(-30)
+                var changed = false
+                for (key, source) in self.knownSources {
+                    if source.lastUpdated < cutoff && !source.isPlaying {
+                        self.knownSources.removeValue(forKey: key)
+                        changed = true
+                    }
+                }
+                if changed {
+                    self.rebuildSecondarySources()
+                }
+            }
+        }
+
+        print("[MusicManager] Multi-source detection started")
+    }
+
+    /// Stop the background NowPlaying listener.
+    func stopMultiSourceDetection() {
+        multiSourceCleanupTask?.cancel()
+        multiSourceCleanupTask = nil
+        backgroundNPCancellables.removeAll()
+        backgroundNowPlayingController = nil
+        knownSources.removeAll()
+        secondarySources = []
+        isMultiSourceListExpanded = false
+        print("[MusicManager] Multi-source detection stopped")
+    }
+
+    /// Whether a bundle ID has a dedicated native controller.
+    private func hasNativeController(for bundleID: String) -> Bool {
+        return bundleID == Self.appleMusicBundleID
+            || bundleID == Self.spotifyBundleID
+            || bundleID == Self.pearDesktopBundleID
+    }
+
+    /// Promote a secondary source to be the primary player.
+    func promoteSource(_ source: MediaSource) {
+        let bundleID = source.bundleIdentifier
+        print("[MusicManager] Promoting source: \(bundleID)")
+
+        if hasNativeController(for: bundleID) {
+            // Native source: switch to its dedicated controller
+            promotedSourceBundleID = nil
+
+            var targetType: MediaControllerType = .nowPlaying
+            if bundleID == Self.appleMusicBundleID {
+                targetType = .appleMusic
+            } else if bundleID == Self.spotifyBundleID {
+                targetType = .spotify
+            } else if bundleID == Self.pearDesktopBundleID {
+                targetType = .youtubeMusic
+            }
+
+            if let controller = createController(for: targetType) {
+                setActiveController(controller)
+                isSmartAutoSwitched = true
+            }
+        } else {
+            // Non-native source (Safari, Chrome, etc.): take over metadata manually
+            // and route commands through controlSource
+            promotedSourceBundleID = bundleID
+
+            // Update displayed metadata from the source
+            DispatchQueue.main.async {
+                self.songTitle = source.title.isEmpty ? "Unknown" : source.title
+                self.artistName = source.artist.isEmpty ? "Unknown" : source.artist
+                self.isPlaying = source.isPlaying
+                self.bundleIdentifier = bundleID
+                self.isPlayerIdle = false
+
+                if let artworkData = source.artworkData, let nsImage = NSImage(data: artworkData) {
+                    self.albumArt = nsImage
+                    self.usingAppIconForArtwork = false
+                } else if let appIcon = AppIconAsNSImage(for: bundleID) {
+                    self.albumArt = appIcon
+                    self.usingAppIconForArtwork = true
+                }
+            }
+        }
+
+        rebuildSecondarySources()
+    }
+
+    /// Toggle expand/collapse of the multi-source list.
+    func toggleMultiSourceList() {
+        withAnimation(.smooth(duration: 0.25)) {
+            isMultiSourceListExpanded.toggle()
+        }
+    }
+
+    enum MediaControlAction {
+        case play, pause, togglePlay, next, previous
+        
+        var rawCommand: Int {
+            switch self {
+            case .play: return 0
+            case .pause: return 1
+            case .togglePlay: return 2
+            case .next: return 4
+            case .previous: return 5
+            }
+        }
+    }
+
+    /// Control a specific media source without promoting it to the primary slot.
+    private static let safariBundleID = "com.apple.Safari"
+
+    func controlSource(_ source: MediaSource, action: MediaControlAction) {
+        let bundleID = source.bundleIdentifier ?? "unknown"
+        print("[MusicManager] Controlling source \(bundleID) with action \(action)")
+
+        // Ensure background NowPlaying controller is initialized for multi-source commands
+        if backgroundNowPlayingController == nil {
+            startMultiSourceDetection()
+        }
+
+        // Use AppleScript for reliable targeted control of supported apps
+        if bundleID == Self.appleMusicBundleID || bundleID == Self.spotifyBundleID {
+            let appName = bundleID == Self.appleMusicBundleID ? "Music" : "Spotify"
+            let scriptVerb: String
+            switch action {
+            case .play: scriptVerb = "play"
+            case .pause: scriptVerb = "pause"
+            case .togglePlay: scriptVerb = "playpause"
+            case .next: scriptVerb = "next track"
+            case .previous: scriptVerb = "previous track"
+            }
+
+            let script = "tell application \"\(appName)\" to \(scriptVerb)"
+            Task {
+                do {
+                    try await AppleScriptHelper.executeVoid(script)
+                    print("[MusicManager] Successfully controlled \(bundleID) via AppleScript")
+                } catch {
+                    print("[MusicManager] AppleScript failed for \(bundleID): \(error)")
+                }
+            }
+        } else if bundleID == Self.safariBundleID {
+            // Safari: use JavaScript via AppleScript to control the media element
+            let jsAction: String
+            switch action {
+            case .play:
+                jsAction = "var v = document.querySelector('video') || document.querySelector('audio'); if(v) v.play();"
+            case .pause:
+                jsAction = "var v = document.querySelector('video') || document.querySelector('audio'); if(v) v.pause();"
+            case .togglePlay:
+                jsAction = "var v = document.querySelector('video') || document.querySelector('audio'); if(v) { if(v.paused) v.play(); else v.pause(); }"
+            case .next:
+                jsAction = "var v = document.querySelector('video') || document.querySelector('audio'); if(v) v.currentTime = Math.min(v.currentTime + 10, v.duration);"
+            case .previous:
+                jsAction = "var v = document.querySelector('video') || document.querySelector('audio'); if(v) v.currentTime = Math.max(v.currentTime - 10, 0);"
+            }
+
+            let script = """
+            tell application "Safari"
+                do JavaScript "\(jsAction)" in current tab of front window
+            end tell
+            """
+            Task {
+                do {
+                    try await AppleScriptHelper.executeVoid(script)
+                    print("[MusicManager] Successfully controlled Safari via JavaScript")
+                } catch {
+                    print("[MusicManager] Safari JavaScript failed: \(error). Trying MediaRemote.")
+                    self.sendMediaRemoteCommandByPID(bundleID: bundleID, command: action.rawCommand)
+                }
+            }
+        } else {
+            // Other apps: try MediaRemote with PID-based targeting
+            sendMediaRemoteCommandByPID(bundleID: bundleID, command: action.rawCommand)
+        }
+        
+        // Optimistically update the isPlaying state in our tracking
+        if action == .play || action == .pause || action == .togglePlay {
+            if var existing = knownSources[bundleID] {
+                if action == .play { existing.isPlaying = true }
+                else if action == .pause { existing.isPlaying = false }
+                else { existing.isPlaying.toggle() }
+                
+                knownSources[bundleID] = existing
+                rebuildSecondarySources()
+            }
+        }
+    }
+
+    /// Send a MediaRemote command targeted by PID lookup from bundle identifier.
+    private func sendMediaRemoteCommandByPID(bundleID: String, command: Int) {
+        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleID }) else {
+            print("[MusicManager] Could not find running app for \(bundleID)")
+            // Last resort: untargeted command
+            backgroundNowPlayingController?.sendCommand(command, bundleID: bundleID)
+            return
+        }
+
+        let pid = app.processIdentifier
+        print("[MusicManager] Sending MediaRemote command \(command) to PID \(pid) (\(bundleID))")
+
+        // Use kMRMediaRemoteOptionSendCommandPID for PID-based targeting
+        let options: NSDictionary = [
+            "kMRMediaRemoteOptionSendCommandPID": pid as NSNumber
+        ]
+
+        // Access the send function through the background controller
+        backgroundNowPlayingController?.sendCommand(command, options: options)
+    }
+
+    // MARK: - Promoted source routing
+
+    /// Routes a command to the promoted non-native source if one is active.
+    /// Returns `true` if the command was handled by the promoted source.
+    private func routeToPromotedSourceIfNeeded(action: MediaControlAction) -> Bool {
+        guard let bundleID = promotedSourceBundleID,
+              let source = knownSources[bundleID] else { return false }
+        controlSource(source, action: action)
+
+        // Update local isPlaying state for UI
+        if action == .togglePlay {
+            DispatchQueue.main.async { self.isPlaying.toggle() }
+        } else if action == .play {
+            DispatchQueue.main.async { self.isPlaying = true }
+        } else if action == .pause {
+            DispatchQueue.main.async { self.isPlaying = false }
+        }
+        return true
+    }
+
     // MARK: - Public Methods for controlling playback
     func playPause() {
+        if routeToPromotedSourceIfNeeded(action: .togglePlay) { return }
         Task {
             await activeController?.togglePlay()
         }
     }
 
     func play() {
+        if routeToPromotedSourceIfNeeded(action: .play) { return }
         Task {
             await activeController?.play()
         }
     }
 
     func pause() {
+        if routeToPromotedSourceIfNeeded(action: .pause) { return }
         Task {
             await activeController?.pause()
         }
@@ -685,8 +1065,9 @@ class MusicManager: ObservableObject {
             await activeController?.toggleRepeat()
         }
     }
-    
+
     func togglePlay() {
+        if routeToPromotedSourceIfNeeded(action: .togglePlay) { return }
         guard let controller = activeController else { return }
         let targetState = !isPlaying
 
@@ -705,12 +1086,14 @@ class MusicManager: ObservableObject {
     }
 
     func nextTrack() {
+        if routeToPromotedSourceIfNeeded(action: .next) { return }
         Task {
             await activeController?.nextTrack()
         }
     }
 
     func previousTrack() {
+        if routeToPromotedSourceIfNeeded(action: .previous) { return }
         Task {
             await activeController?.previousTrack()
         }
@@ -1033,7 +1416,7 @@ extension MusicManager {
             return appleMusicPink
         case .spotify:
             return spotifyGreen
-        case .nowPlaying:
+        case .nowPlaying, .all:
             if let bundleIdentifier,
                let bundleColor = brandAccentColor(forBundleIdentifier: bundleIdentifier) {
                 return bundleColor

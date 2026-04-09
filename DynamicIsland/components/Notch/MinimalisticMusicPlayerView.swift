@@ -40,6 +40,7 @@ struct MinimalisticMusicPlayerView: View {
     @State private var hudLastDragged: Date = .distantPast
     @Default(.enableReminderLiveActivity) private var enableReminderLiveActivity
     @Default(.enableLyrics) private var enableLyrics
+    @Default(.mediaController) private var mediaController
     @Default(.timerPresets) private var timerPresets
     private let seekInterval: TimeInterval = 10
     private let skipMagnitude: CGFloat = 8
@@ -120,6 +121,8 @@ struct MinimalisticMusicPlayerView: View {
                     playbackControls
                         .padding(.top, 4)
                 }
+
+                MultiSourceMediaList()
 
                 if enableLyrics {
                     lyricsView
@@ -242,6 +245,8 @@ struct MinimalisticMusicPlayerView: View {
         var signature = reminderEntries.count * 10
         if enableLyrics { signature += 1 }
         if shouldShowTimerCountdown { signature += 100 }
+        if musicManager.isMultiSourceListExpanded { signature += 1000 }
+        signature += musicManager.secondarySources.count * 200
         return signature
     }
 
@@ -253,6 +258,14 @@ struct MinimalisticMusicPlayerView: View {
 
         // Add playback controls height
         height += 40 + 2 // controls + top padding
+
+        // Add multi-source list height if in All Music mode
+        if isAllMusicMode && !musicManager.secondarySources.isEmpty {
+            height += 30 // toggle bar height
+            if musicManager.isMultiSourceListExpanded {
+                height += CGFloat(musicManager.secondarySources.count) * 56 // each row is 56pt
+            }
+        }
 
         // Add lyrics height if enabled in settings (reserve space even while loading)
         if enableLyrics {
@@ -880,9 +893,13 @@ private struct MinimalisticReminderDetailsView: View {
         musicManager.bundleIdentifier == "com.apple.Music"
     }
 
+    private var isAllMusicMode: Bool {
+        mediaController == .all
+    }
+
     private var displayedSlots: [MusicControlButton] {
         if showCustomControls {
-            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive)
+            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive, isAllMusicMode: isAllMusicMode)
             return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
         }
 
@@ -957,6 +974,15 @@ private struct MinimalisticReminderDetailsView: View {
                 symbolEffect: .replace
             ) {
                 enableLyrics.toggle()
+            }
+        case .mediaSources:
+            controlButton(
+                icon: "list.bullet.below.rectangle",
+                isActive: musicManager.isMultiSourceListExpanded,
+                activeColor: brandAccentColor,
+                symbolEffect: .replace
+            ) {
+                musicManager.toggleMultiSourceList()
             }
         }
     }

@@ -33,6 +33,7 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
     case lyrics
     case seekBackward
     case seekForward
+    case mediaSources
     case none
 
     static let slotCount = 5
@@ -63,7 +64,8 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
         .repeatMode,
         .lyrics,
         .mediaOutput,
-        .airPlay
+        .airPlay,
+        .mediaSources
     ]
 
     /// Controls that are only available when Apple Music is the active media source.
@@ -95,6 +97,8 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
             return String(localized: "Rewind 10s")
         case .seekForward:
             return String(localized: "Forward 10s")
+        case .mediaSources:
+            return String(localized: "Media Sources")
         case .none:
             return String(localized: "Empty Slot")
         }
@@ -122,6 +126,8 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
             return "gobackward.10"
         case .seekForward:
             return "goforward.10"
+        case .mediaSources:
+            return "list.bullet.below.rectangle"
         case .none:
             return ""
         }
@@ -133,9 +139,10 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
 }
 
 extension Array where Element == MusicControlButton {
-    func normalized(allowingMediaOutput: Bool, isAppleMusicActive: Bool = true) -> [MusicControlButton] {
+    func normalized(allowingMediaOutput: Bool, isAppleMusicActive: Bool = true, isAllMusicMode: Bool = false) -> [MusicControlButton] {
         var sanitized = map { button -> MusicControlButton in
             if button == .mediaOutput && !allowingMediaOutput { return .none }
+            if button == .mediaSources && !isAllMusicMode { return .none }
             if button.isAppleMusicExclusive && !isAppleMusicActive { return .none }
             return button
         }

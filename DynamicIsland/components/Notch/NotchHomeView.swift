@@ -157,6 +157,7 @@ struct MusicControlsView: View {
     @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.enableLyrics) private var enableLyrics
+    @Default(.mediaController) private var mediaController
     private let seekInterval: TimeInterval = 10
     private let skipMagnitude: CGFloat = 6
 
@@ -409,9 +410,13 @@ struct MusicControlsView: View {
         musicManager.bundleIdentifier == "com.apple.Music"
     }
 
+    private var isAllMusicMode: Bool {
+        mediaController == .all
+    }
+
     private var displayedSlots: [MusicControlButton] {
         if showCustomControls {
-            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive)
+            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive, isAllMusicMode: isAllMusicMode)
             return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
         }
 
@@ -495,6 +500,8 @@ struct MusicControlsView: View {
             ) {
                 enableLyrics.toggle()
             }
+        case .mediaSources:
+            MediaSourcePickerButton()
         }
     }
 
@@ -960,6 +967,52 @@ private struct AirPlayPickerButton: View {
             if newBundle == "com.apple.Music" {
                 Task { await airPlayManager.refreshDevices() }
             }
+        }
+        .onDisappear {
+            vm.isMediaOutputPopoverActive = false
+        }
+    }
+
+    private func updatePopoverActivity() {
+        vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+    }
+}
+
+private struct MediaSourcePickerButton: View {
+    @ObservedObject private var musicManager = MusicManager.shared
+    @State private var isPopoverPresented = false
+    @State private var isHoveringPopover = false
+    @EnvironmentObject private var vm: DynamicIslandViewModel
+
+    private var hasSecondarySources: Bool {
+        !musicManager.secondarySources.isEmpty
+    }
+
+    var body: some View {
+        HoverButton(
+            icon: "list.bullet.below.rectangle",
+            iconColor: hasSecondarySources ? .white : .white.opacity(0.4),
+            scale: .medium
+        ) {
+            isPopoverPresented.toggle()
+        }
+        .accessibilityLabel("Media sources")
+        .popover(isPresented: $isPopoverPresented, arrowEdge: .bottom) {
+            MediaSourceSelectorPopover(
+                musicManager: musicManager,
+                onHoverChanged: { hovering in
+                    isHoveringPopover = hovering
+                    updatePopoverActivity()
+                }
+            ) {
+                isPopoverPresented = false
+                isHoveringPopover = false
+                updatePopoverActivity()
+            }
+        }
+        .onChange(of: isPopoverPresented) { _, presented in
+            if !presented { isHoveringPopover = false }
+            updatePopoverActivity()
         }
         .onDisappear {
             vm.isMediaOutputPopoverActive = false
