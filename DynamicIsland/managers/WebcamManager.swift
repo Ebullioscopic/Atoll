@@ -22,6 +22,7 @@
 
 import AVFoundation
 import SwiftUI
+import Defaults
 
 class WebcamManager: NSObject, ObservableObject {
     static let shared = WebcamManager()
@@ -46,6 +47,12 @@ class WebcamManager: NSObject, ObservableObject {
     }
     
     @Published var cameraAvailable: Bool = false {
+        didSet {
+            objectWillChange.send()
+        }
+    }
+
+    @Published var availableCameras: [AVCaptureDevice] = [] {
         didSet {
             objectWillChange.send()
         }
@@ -132,7 +139,7 @@ class WebcamManager: NSObject, ObservableObject {
     /// Checks if any camera devices are available and sets up capture session if needed
     func checkCameraAvailability() {
         let availableDevices = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.external, .builtInWideAngleCamera],
+            deviceTypes: [.external, .builtInWideAngleCamera, .deskViewCamera, .externalUnknown],
             mediaType: .video,
             position: .unspecified
         ).devices
@@ -140,6 +147,7 @@ class WebcamManager: NSObject, ObservableObject {
         let hasAvailableDevices = !availableDevices.isEmpty
         
         DispatchQueue.main.async {
+            self.availableCameras = availableDevices
             self.cameraAvailable = hasAvailableDevices
         }
     }
@@ -158,14 +166,24 @@ class WebcamManager: NSObject, ObservableObject {
             let session = AVCaptureSession()
             
             do {
-                // Get available devices and prefer external camera if available
+                // Get available devices
                 let discoverySession = AVCaptureDevice.DiscoverySession(
-                    deviceTypes: [.external, .builtInWideAngleCamera],
+                    deviceTypes: [.external, .builtInWideAngleCamera, .deskViewCamera, .externalUnknown],
                     mediaType: .video,
                     position: .unspecified
                 )
                 
-                guard let videoDevice = discoverySession.devices.first else {
+                let devices = discoverySession.devices
+                let selectedID = Defaults[.selectedCameraID]
+                
+                let videoDevice: AVCaptureDevice?
+                if !selectedID.isEmpty {
+                    videoDevice = devices.first(where: { $0.uniqueID == selectedID }) ?? devices.first
+                } else {
+                    videoDevice = devices.first
+                }
+                
+                guard let videoDevice = videoDevice else {
                     NSLog("No video devices available")
                     DispatchQueue.main.async {
                         self.isSessionRunning = false
@@ -175,7 +193,7 @@ class WebcamManager: NSObject, ObservableObject {
                     return
                 }
                 
-                NSLog("Using camera: \(videoDevice.localizedName)")
+                NSLog("Using camera: \(videoDevice.localizedName) (ID: \(videoDevice.uniqueID))")
                 
                 // Lock device for configuration
                 try videoDevice.lockForConfiguration()

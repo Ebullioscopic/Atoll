@@ -2488,7 +2488,7 @@ struct Media: View {
                 Text("Media Source")
                 } footer: {
                     if mediaController == .all {
-                        Text("All Music automatically detects your active player and switches to the best source for high-quality metadata.")
+                        Text("All Music detects every active media source and shows them in a switchable list below the main player.")
                             .foregroundStyle(.secondary)
                             .font(.caption)
                     } else if MusicManager.shared.isNowPlayingDeprecated {
@@ -3834,7 +3834,9 @@ struct LiveActivitiesSettings: View {
 
 struct Appearance: View {
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
+    @ObservedObject var webcamManager = WebcamManager.shared
     @Default(.mirrorShape) var mirrorShape
+    @Default(.selectedCameraID) var selectedCameraID
     @Default(.sliderColor) var sliderColor
     @Default(.useMusicVisualizer) var useMusicVisualizer
     @Default(.customVisualizers) var customVisualizers
@@ -4241,6 +4243,22 @@ struct Appearance: View {
                         .tag(MirrorShapeEnum.rectangle)
                 }
                 .settingsHighlight(id: highlightID("Mirror shape"))
+
+                if webcamManager.cameraAvailable {
+                    Picker("Mirror Camera", selection: $selectedCameraID) {
+                        ForEach(webcamManager.availableCameras, id: \.uniqueID) { device in
+                            Text(device.localizedName)
+                                .tag(device.uniqueID)
+                        }
+                    }
+                    .onChange(of: selectedCameraID) { _, _ in
+                        if Defaults[.showMirror] {
+                            webcamManager.stopSession()
+                            webcamManager.startSession()
+                        }
+                    }
+                    .settingsHighlight(id: highlightID("Mirror Camera"))
+                }
                 Defaults.Toggle(key: .showNotHumanFace) {
                     Text("Idle Animation")
                 }

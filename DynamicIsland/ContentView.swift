@@ -124,6 +124,17 @@ struct ContentView: View {
             return baseSize
         }
 
+        if coordinator.currentView == .home && Defaults[.mediaController] == .all && !musicManager.secondarySources.isEmpty {
+            let toggleBarHeight: CGFloat = 34
+            let rowHeight: CGFloat = 58
+            let safetyPadding: CGFloat = 16
+            var extraHeight = toggleBarHeight + safetyPadding
+            if musicManager.isMultiSourceListExpanded {
+                extraHeight += CGFloat(musicManager.secondarySources.count) * rowHeight
+            }
+            return CGSize(width: baseSize.width, height: baseSize.height + extraHeight)
+        }
+
         if enableMinimalisticUI,
            coordinator.currentView == .home,
            let preferredHeight = extensionMinimalisticPreferredHeight(baseSize: baseSize) {
@@ -1594,9 +1605,13 @@ struct ContentView: View {
             return false
         }
 
-        let horizontalPadding: CGFloat = 8
+        let horizontalPadding: CGFloat = 12
         let activationWidth = vm.closedNotchSize.width + horizontalPadding * 2
-        let activationHeight = max(vm.closedNotchSize.height + zeroHeightHoverPadding, 14)
+        
+        // Hysteresis: Use a taller activation area when already hovering to prevent rapid flickering
+        let baseHeight = max(vm.closedNotchSize.height + zeroHeightHoverPadding, 16)
+        let activationHeight = isHovering ? baseHeight + 20 : baseHeight
+        
         let activationRect = CGRect(
             x: screen.frame.midX - activationWidth / 2,
             y: screen.frame.maxY - activationHeight,
