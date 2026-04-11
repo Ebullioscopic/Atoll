@@ -148,7 +148,7 @@ class MusicManager: ObservableObject {
     // Task used to periodically sync displayed lyric with playback position
     private var lyricSyncTask: Task<Void, Never>?
 
-    private var artworkData: Data? = nil
+    private(set) var artworkData: Data? = nil
 
     private var liveStreamUnknownDurationCount: Int = 0
     private var liveStreamEdgeObservationCount: Int = 0
@@ -412,6 +412,13 @@ class MusicManager: ObservableObject {
             self.switchSmartControllerIfNeeded(for: state.bundleIdentifier, isPlaying: state.isPlaying)
             // Track this source for the multi-source list
             self.trackSource(from: state)
+
+            // If a non-native source is promoted and this update is from a different app,
+            // skip UI updates to preserve the promoted source's metadata
+            if let promoted = promotedSourceBundleID,
+               state.bundleIdentifier != promoted {
+                return
+            }
         }
 
         let timeChanged = state.currentTime != self.elapsedTime
@@ -637,6 +644,9 @@ class MusicManager: ObservableObject {
     private func switchSmartControllerIfNeeded(for bundleID: String?, isPlaying: Bool) {
         let currentType = Defaults[.mediaController]
         guard currentType == .all else { return }
+
+        // Don't auto-switch when a non-native source has been manually promoted
+        if promotedSourceBundleID != nil { return }
         
         // Determine the current active controller type
         let activeType: MediaControllerType
@@ -844,10 +854,67 @@ class MusicManager: ObservableObject {
     /// Promote a secondary source to be the primary player.
     func promoteSource(_ source: MediaSource) {
         let bundleID = source.bundleIdentifier
+        guard bundleID != self.bundleIdentifier else { return }
         print("[MusicManager] Promoting source: \(bundleID)")
 
+        // Haptic feedback on source switch
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
+
+        // 1. Save current primary as a known source so it appears in the secondary list
+        if let oldBundle = self.bundleIdentifier, !oldBundle.isEmpty {
+            if var existing = knownSources[oldBundle] {
+                // Update the existing entry with latest UI metadata
+                existing.title = self.songTitle
+                existing.artist = self.artistName
+                existing.artworkData = self.artworkData
+                existing.isPlaying = self.isPlaying
+                existing.lastUpdated = Date()
+                knownSources[oldBundle] = existing
+            } else {
+                knownSources[oldBundle] = MediaSource(
+                    id: oldBundle,
+                    bundleIdentifier: oldBundle,
+                    title: self.songTitle,
+                    artist: self.artistName,
+                    artworkData: self.artworkData,
+                    isPlaying: self.isPlaying,
+                    lastUpdated: Date()
+                )
+            }
+        }
+
+        // 2. Immediately update displayed metadata from the promoted source.
+        //    This must happen synchronously BEFORE rebuildSecondarySources so the
+        //    primary bundleIdentifier is correct when filtering.
+        self.bundleIdentifier = bundleID
+        self.songTitle = source.title.isEmpty ? "Unknown" : source.title
+        self.artistName = source.artist.isEmpty ? "Unknown" : source.artist
+        self.isPlaying = source.isPlaying
+        self.isPlayerIdle = false
+
+        // Cancel any pending debounced artwork from the previous source
+        workItem?.cancel()
+        if let artData = source.artworkData, let nsImage = NSImage(data: artData) {
+            self.albumArt = nsImage
+            self.artworkData = artData
+            self.usingAppIconForArtwork = false
+            if Defaults[.coloredSpectrogram] {
+                self.calculateAverageColor()
+            }
+        } else if let appIcon = AppIconAsNSImage(for: bundleID) {
+            self.albumArt = appIcon
+            self.artworkData = nil
+            self.usingAppIconForArtwork = true
+        }
+
+        // Update artwork tracking to prevent false "content changed" triggers
+        self.lastArtworkTitle = self.songTitle
+        self.lastArtworkArtist = self.artistName
+        self.lastArtworkAlbum = self.album
+        self.lastArtworkBundleIdentifier = bundleID
+
+        // 3. Switch controller or set promoted source routing
         if hasNativeController(for: bundleID) {
-            // Native source: switch to its dedicated controller
             promotedSourceBundleID = nil
 
             var targetType: MediaControllerType = .nowPlaying
@@ -864,28 +931,11 @@ class MusicManager: ObservableObject {
                 isSmartAutoSwitched = true
             }
         } else {
-            // Non-native source (Safari, Chrome, etc.): take over metadata manually
-            // and route commands through controlSource
+            // Non-native source: route commands through controlSource
             promotedSourceBundleID = bundleID
-
-            // Update displayed metadata from the source
-            DispatchQueue.main.async {
-                self.songTitle = source.title.isEmpty ? "Unknown" : source.title
-                self.artistName = source.artist.isEmpty ? "Unknown" : source.artist
-                self.isPlaying = source.isPlaying
-                self.bundleIdentifier = bundleID
-                self.isPlayerIdle = false
-
-                if let artworkData = source.artworkData, let nsImage = NSImage(data: artworkData) {
-                    self.albumArt = nsImage
-                    self.usingAppIconForArtwork = false
-                } else if let appIcon = AppIconAsNSImage(for: bundleID) {
-                    self.albumArt = appIcon
-                    self.usingAppIconForArtwork = true
-                }
-            }
         }
 
+        // 4. Rebuild secondary sources with the updated primary
         rebuildSecondarySources()
     }
 
@@ -914,7 +964,7 @@ class MusicManager: ObservableObject {
     private static let safariBundleID = "com.apple.Safari"
 
     func controlSource(_ source: MediaSource, action: MediaControlAction) {
-        let bundleID = source.bundleIdentifier ?? "unknown"
+        let bundleID = source.bundleIdentifier
         print("[MusicManager] Controlling source \(bundleID) with action \(action)")
 
         // Ensure background NowPlaying controller is initialized for multi-source commands
@@ -1012,43 +1062,60 @@ class MusicManager: ObservableObject {
         backgroundNowPlayingController?.sendCommand(command, options: options)
     }
 
-    // MARK: - Promoted source routing
+    // MARK: - All Music mode targeted routing
 
-    /// Routes a command to the promoted non-native source if one is active.
-    /// Returns `true` if the command was handled by the promoted source.
-    private func routeToPromotedSourceIfNeeded(action: MediaControlAction) -> Bool {
-        guard let bundleID = promotedSourceBundleID,
-              let source = knownSources[bundleID] else { return false }
+    /// In "All Music" mode, routes playback commands to the primary source using
+    /// app-specific targeting (AppleScript / PID) instead of untargeted MediaRemote.
+    /// This ensures only the intended source is affected.
+    /// Returns `true` if the command was handled.
+    private func routeInAllMusicMode(action: MediaControlAction) -> Bool {
+        guard Defaults[.mediaController] == .all else { return false }
+        guard let bundleID = self.bundleIdentifier, !bundleID.isEmpty else { return false }
+
+        // Use tracked source data if available, otherwise build from current UI state
+        let source = knownSources[bundleID] ?? MediaSource(
+            id: bundleID,
+            bundleIdentifier: bundleID,
+            title: self.songTitle,
+            artist: self.artistName,
+            artworkData: self.artworkData,
+            isPlaying: self.isPlaying,
+            lastUpdated: Date()
+        )
+
         controlSource(source, action: action)
 
-        // Update local isPlaying state for UI
+        // Optimistically update UI play state
         if action == .togglePlay {
-            DispatchQueue.main.async { self.isPlaying.toggle() }
+            self.isPlaying.toggle()
+            self.updateIdleState(state: self.isPlaying)
         } else if action == .play {
-            DispatchQueue.main.async { self.isPlaying = true }
+            self.isPlaying = true
+            self.updateIdleState(state: true)
         } else if action == .pause {
-            DispatchQueue.main.async { self.isPlaying = false }
+            self.isPlaying = false
+            self.updateIdleState(state: false)
         }
         return true
     }
 
     // MARK: - Public Methods for controlling playback
     func playPause() {
-        if routeToPromotedSourceIfNeeded(action: .togglePlay) { return }
+        if routeInAllMusicMode(action: .togglePlay) { return }
         Task {
             await activeController?.togglePlay()
         }
     }
 
     func play() {
-        if routeToPromotedSourceIfNeeded(action: .play) { return }
+        if routeInAllMusicMode(action: .play) { return }
         Task {
             await activeController?.play()
         }
     }
 
     func pause() {
-        if routeToPromotedSourceIfNeeded(action: .pause) { return }
+        if routeInAllMusicMode(action: .pause) { return }
         Task {
             await activeController?.pause()
         }
@@ -1067,7 +1134,7 @@ class MusicManager: ObservableObject {
     }
 
     func togglePlay() {
-        if routeToPromotedSourceIfNeeded(action: .togglePlay) { return }
+        if routeInAllMusicMode(action: .togglePlay) { return }
         guard let controller = activeController else { return }
         let targetState = !isPlaying
 
@@ -1086,14 +1153,14 @@ class MusicManager: ObservableObject {
     }
 
     func nextTrack() {
-        if routeToPromotedSourceIfNeeded(action: .next) { return }
+        if routeInAllMusicMode(action: .next) { return }
         Task {
             await activeController?.nextTrack()
         }
     }
 
     func previousTrack() {
-        if routeToPromotedSourceIfNeeded(action: .previous) { return }
+        if routeInAllMusicMode(action: .previous) { return }
         Task {
             await activeController?.previousTrack()
         }

@@ -36,7 +36,7 @@ struct MediaSourceSelectorPopover: View {
                 bundleIdentifier: primaryBundle,
                 title: musicManager.songTitle,
                 artist: musicManager.artistName,
-                artworkData: nil,
+                artworkData: musicManager.artworkData,
                 isPlaying: musicManager.isPlaying,
                 lastUpdated: Date()
             )
