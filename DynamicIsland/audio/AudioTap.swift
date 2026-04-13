@@ -126,6 +126,7 @@ class AudioTap: NSObject {
     private let targetBundleIDs = [
         "com.apple.Music",
         "com.spotify.client",
+        "com.amazon.music",
         "com.apple.Safari",
         "com.tidal.desktop",
         "tv.plex.plexamp",

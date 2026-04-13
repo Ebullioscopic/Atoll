@@ -143,6 +143,8 @@ extension MediaControllerType {
             return String(localized: "Connects directly to the Apple Music app.")
         case .youtubeMusic:
             return String(localized: "Requires a third-party client with API plugin enabled.")
+        case .amazonMusic:
+            return String(localized: "Uses macOS Now Playing when the Amazon Music app is the active media source. Playback controls follow the system Now Playing target.")
         }
     }
 }

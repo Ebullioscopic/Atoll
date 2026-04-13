@@ -259,6 +259,8 @@ class MusicManager: ObservableObject {
             newController = SpotifyController()
         case .youtubeMusic:
             newController = YouTubeMusicController()
+        case .amazonMusic:
+            newController = AmazonMusicController()
         }
 
         // Set up state observation for the new controller
@@ -975,6 +977,8 @@ extension MusicManager {
             return appleMusicPink
         case .spotify:
             return spotifyGreen
+        case .amazonMusic:
+            return amazonOrange
         case .nowPlaying:
             if let bundleIdentifier,
                let bundleColor = brandAccentColor(forBundleIdentifier: bundleIdentifier) {
@@ -992,6 +996,8 @@ extension MusicManager {
             return appleMusicPink
         case "com.spotify.client":
             return spotifyGreen
+        case AmazonMusicController.bundleIdentifier:
+            return amazonOrange
         default:
             return nil
         }
@@ -999,6 +1005,7 @@ extension MusicManager {
 
     private static let appleMusicPink = Color(red: 0.999, green: 0.171, blue: 0.331)
     private static let spotifyGreen = Color(red: 0.0, green: 0.857, blue: 0.302)
+    private static let amazonOrange = Color(red: 1.0, green: 0.6, blue: 0.0)
 }
 
 // MARK: - Album Art Flip Helper
