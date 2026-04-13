@@ -121,7 +121,9 @@ final class AmazonMusicController: ObservableObject, MediaControllerProtocol {
     }
 
     func seek(to time: Double) async {
-        MRMediaRemoteSetElapsedTimeFunction(time)
+        await MainActor.run {
+            MRMediaRemoteSetElapsedTimeFunction(time)
+        }
     }
 
     func isActive() -> Bool {

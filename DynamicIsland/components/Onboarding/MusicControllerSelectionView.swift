@@ -144,7 +144,7 @@ extension MediaControllerType {
         case .youtubeMusic:
             return String(localized: "Requires a third-party client with API plugin enabled.")
         case .amazonMusic:
-            return String(localized: "Uses macOS Now Playing when the Amazon Music app is the active media source. Playback controls follow the system Now Playing target.")
+            return String(localized: "Uses macOS Now Playing when the Amazon Music app is the active media source. Playback controls follow the system Now Playing target. Scrubbing the timeline may not work if the Amazon Music app does not support remote seek.")
         }
     }
 }
