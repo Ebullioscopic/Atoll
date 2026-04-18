@@ -68,12 +68,12 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
                 bundle, "MRMediaRemoteSetShuffleMode" as CFString),
             let MRMediaRemoteSetRepeatModePointer = CFBundleGetFunctionPointerForName(
                 bundle, "MRMediaRemoteSetRepeatMode" as CFString)
-            
         else { return nil }
 
         mediaRemoteBundle = bundle
         MRMediaRemoteSendCommandFunction = unsafeBitCast(
             MRMediaRemoteSendCommandPointer, to: (@convention(c) (Int, AnyObject?) -> Void).self)
+            
         MRMediaRemoteSetElapsedTimeFunction = unsafeBitCast(
             MRMediaRemoteSetElapsedTimePointer, to: (@convention(c) (Double) -> Void).self)
         MRMediaRemoteSetShuffleModeFunction = unsafeBitCast(
@@ -126,6 +126,33 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
     func seek(to time: Double) async {
         MRMediaRemoteSetElapsedTimeFunction(time)
+    }
+
+    /// Sends a media command targeted to a specific app bundle.
+    func sendCommand(_ command: Int, bundleID: String? = nil) {
+        guard let bundleID = bundleID else {
+            MRMediaRemoteSendCommandFunction(command, nil)
+            return
+        }
+
+        print("[NowPlayingController] Sending targeted command \(command) to \(bundleID)")
+
+        // Construct a safe targeting dictionary using NSDictionary for reliable bridging
+        let options: NSDictionary = [
+            "kMRMediaRemoteOptionAppBundleIdentifier": bundleID,
+            "DestinationAppBundleIdentifier": bundleID,
+            "AppBundleIdentifier": bundleID,
+            "kMRMediaRemoteOptionRemoteControlInterface": 1 as NSNumber,
+            "RemoteControlInterface": 1 as NSNumber
+        ]
+
+        MRMediaRemoteSendCommandFunction(command, options)
+    }
+
+    /// Sends a media command with a custom options dictionary (e.g. PID-based targeting).
+    func sendCommand(_ command: Int, options: NSDictionary) {
+        print("[NowPlayingController] Sending command \(command) with custom options")
+        MRMediaRemoteSendCommandFunction(command, options)
     }
 
     func isActive() -> Bool {

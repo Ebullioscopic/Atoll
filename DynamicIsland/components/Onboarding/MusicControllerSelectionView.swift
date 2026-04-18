@@ -143,6 +143,8 @@ extension MediaControllerType {
             return String(localized: "Connects directly to the Apple Music app.")
         case .youtubeMusic:
             return String(localized: "Requires a third-party client with API plugin enabled.")
+        case .all:
+            return String(localized: "Automatically detects and switches to the best available source for your music.")
         }
     }
 }

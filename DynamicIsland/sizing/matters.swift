@@ -138,7 +138,7 @@ var minimalisticOpenNotchSize: CGSize {
     if Defaults[.enableLyrics] {
         size.height += minimalisticLyricsExtraHeight
     }
-    
+
     let reminderCount = ReminderLiveActivityManager.shared.activeWindowReminders.count
     if reminderCount > 0 {
         let reminderHeight = ReminderLiveActivityManager.additionalHeight(forRowCount: reminderCount)
@@ -147,6 +147,15 @@ var minimalisticOpenNotchSize: CGSize {
 
     if DynamicIslandViewCoordinator.shared.timerLiveActivityEnabled && TimerManager.shared.isExternalTimerActive {
         size.height += minimalisticTimerCountdownBlockHeight
+    }
+
+    // Multi-source media list (All Music mode)
+    let musicManager = MusicManager.shared
+    if Defaults[.mediaController] == .all && !musicManager.secondarySources.isEmpty {
+        size.height += 30 // toggle bar
+        if musicManager.isMultiSourceListExpanded {
+            size.height += CGFloat(musicManager.secondarySources.count) * 56 // each source row
+        }
     }
 
     return size

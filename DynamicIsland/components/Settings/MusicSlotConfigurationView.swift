@@ -27,6 +27,7 @@ import UniformTypeIdentifiers
 struct MusicSlotConfigurationView: View {
     @Default(.musicControlSlots) private var musicControlSlots
     @Default(.showMediaOutputControl) private var showMediaOutputControl
+    @Default(.mediaController) private var mediaController
     @ObservedObject private var musicManager = MusicManager.shared
     @State private var hoveredSlotIndex: Int? = nil
     @State private var targetedSlotIndex: Int? = nil
@@ -36,6 +37,10 @@ struct MusicSlotConfigurationView: View {
 
     private var isAppleMusicActive: Bool {
         musicManager.bundleIdentifier == "com.apple.Music"
+    }
+
+    private var isAllMusicMode: Bool {
+        mediaController == .all
     }
 
     var body: some View {
@@ -201,6 +206,7 @@ private struct ScrollHintIndicator: View {
 
     private func isControlDisabled(_ control: MusicControlButton) -> Bool {
         if control == .mediaOutput && !showMediaOutputControl { return true }
+        if control == .mediaSources && !isAllMusicMode { return true }
         if control.isAppleMusicExclusive && !isAppleMusicActive { return true }
         return false
     }
@@ -245,7 +251,7 @@ private struct ScrollHintIndicator: View {
     }
 
     private func slotValue(at index: Int) -> MusicControlButton {
-        let normalized = musicControlSlots.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive)
+        let normalized = musicControlSlots.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive, isAllMusicMode: isAllMusicMode)
         guard normalized.indices.contains(index) else { return .none }
         return normalized[index]
     }
@@ -257,6 +263,9 @@ private struct ScrollHintIndicator: View {
         }
         if !isAppleMusicActive {
             base = base.filter { !$0.isAppleMusicExclusive }
+        }
+        if !isAllMusicMode {
+            base = base.filter { $0 != .mediaSources }
         }
         return base
     }
