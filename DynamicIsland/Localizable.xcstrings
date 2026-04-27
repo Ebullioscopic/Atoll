@@ -5623,6 +5623,9 @@
         }
       }
     },
+    "Amazon Music" : {
+
+    },
     "Animation" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -41026,6 +41029,9 @@
           }
         }
       }
+    },
+    "Terminal opacity only affects the terminal backdrop; text stays fully opaque. Blur uses the system material behind the window." : {
+
     },
     "Text" : {
       "comment" : "Name of a clipboard item type that contains plain text.",

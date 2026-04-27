@@ -102,6 +102,7 @@ struct ExpandedItem {
 class DynamicIslandViewCoordinator: ObservableObject {
     static let shared = DynamicIslandViewCoordinator()
     private var cancellables = Set<AnyCancellable>()
+    private var hoverOpenSuppressedUntil: Date = .distantPast
     
     private static let tabOrder: [NotchViews] = [.home, .shelf, .timer, .stats, .colorPicker, .notes, .clipboard, .terminal, .extensionExperience]
     
@@ -244,6 +245,14 @@ class DynamicIslandViewCoordinator: ObservableObject {
 
         // Enforce minimum width on launch for existing configurations
         enforceMinimumNotchWidth()
+    }
+
+    var isHoverOpenSuppressed: Bool {
+        Date() < hoverOpenSuppressedUntil
+    }
+
+    func suppressHoverOpen(for duration: TimeInterval = 0.35) {
+        hoverOpenSuppressedUntil = Date().addingTimeInterval(max(0, duration))
     }
 
     private func handleStatsTabTransition(from oldValue: NotchViews, to newValue: NotchViews) {

@@ -154,6 +154,46 @@ var minimalisticOpenNotchSize: CGSize {
 let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 19, bottom: 24), closed: (top: 6, bottom: 14))
 let minimalisticCornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 35, bottom: 35), closed: cornerRadiusInsets.closed)
 
+// MARK: - Terminal tab clip (notch surface)
+
+/// Padding on the terminal block inside the notch. Inner corner radius = outer shell radius on that edge, minus the matching edge padding.
+let notchTerminalContentEdgePadding: (top: CGFloat, horizontal: CGFloat, bottom: CGFloat) = (4, 8, 8)
+
+/// Bottom radii for the shell (outer) and the terminal ``clipShape`` (inner), per design: inner = outer shell bottom radius − `notchTerminalContentEdgePadding.bottom`.
+func notchTerminalBottomCornerRadii(
+    isDynamicIslandMode: Bool,
+    notchState: NotchState,
+    cornerRadiusScaling: Bool,
+    enableMinimalisticUI: Bool,
+    closedNotchHeight: CGFloat
+) -> (outerBottom: CGFloat, innerBottom: CGFloat) {
+    let p = notchTerminalContentEdgePadding.bottom
+    if isDynamicIslandMode {
+        let outer: CGFloat
+        if notchState == .open {
+            outer = enableMinimalisticUI
+                ? minimalisticCornerRadiusInsets.opened.top
+                : dynamicIslandPillCornerRadiusInsets.opened
+        } else {
+            outer = max(closedNotchHeight / 2, dynamicIslandPillCornerRadiusInsets.closed.standard)
+        }
+        return (outer, max(0, outer - p))
+    }
+    let active: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = {
+        if enableMinimalisticUI {
+            return (opened: minimalisticCornerRadiusInsets.opened, closed: cornerRadiusInsets.closed)
+        }
+        return cornerRadiusInsets
+    }()
+    let outerBottom: CGFloat
+    if notchState == .open && cornerRadiusScaling {
+        outerBottom = active.opened.bottom
+    } else {
+        outerBottom = active.closed.bottom
+    }
+    return (outerBottom, max(0, outerBottom - p))
+}
+
 func statsAdjustedNotchSize(
     from baseSize: CGSize,
     isStatsTabActive: Bool,

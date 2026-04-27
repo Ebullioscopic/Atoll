@@ -549,7 +549,7 @@ struct ContentView: View {
                 // When sneak peek finishes, check if user is still hovering and open notch if needed
                 if !sneakPeekShowing {
                     runAfter(0.2) {
-                        if isHovering && vm.notchState == .closed {
+                        if isHovering && vm.notchState == .closed && !coordinator.isHoverOpenSuppressed {
                             openNotch()
                         }
                     }
@@ -1799,6 +1799,7 @@ struct ContentView: View {
                 guard let vm, let lockScreenManager else { return }
                 guard !lockScreenManager.isLocked else { return }
                 guard vm.notchState == .closed else { return }
+                guard !self.coordinator.isHoverOpenSuppressed else { return }
                 guard self.isHovering else { return }
                 guard !self.handleClosedMusicWaveformTapIfNeeded() else { return }
                 if Defaults[.enableHaptics] {
@@ -1850,6 +1851,10 @@ struct ContentView: View {
         stickyTerminalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak vm] _ in
             Task { @MainActor in
                 guard let vm, vm.notchState == .open else { return }
+                let clickLocation = NSEvent.mouseLocation
+                if self.isPointInsideNotchWindow(clickLocation) {
+                    return
+                }
                 vm.close()
             }
         }
@@ -1902,7 +1907,8 @@ struct ContentView: View {
                 await MainActor.run {
                     guard self.vm.notchState == .closed,
                           self.isHovering,
-                          !self.isSneakPeekVisibleOnCurrentScreen else { return }
+                          !self.isSneakPeekVisibleOnCurrentScreen,
+                          !self.coordinator.isHoverOpenSuppressed else { return }
 
                     if shouldFocusTimerTab {
                         withAnimation(.smooth) {
@@ -1927,13 +1933,26 @@ struct ContentView: View {
                     } else if self.vm.notchState == .open
                                 && Defaults[.terminalStickyMode]
                                 && self.coordinator.currentView == .terminal {
-                        // Terminal sticky mode kept the notch open — install a
-                        // global click monitor so a click outside closes it.
-                        self.installStickyTerminalClickMonitor()
+                        // Re-sync monitor state through one code path to avoid
+                        // monitor lifecycle races between hover and state updates.
+                        self.syncStickyTerminalOutsideClickMonitor()
                     }
                 }
             }
         }
+    }
+
+    private func isPointInsideNotchWindow(_ point: CGPoint) -> Bool {
+        if let appDelegate = AppDelegate.shared {
+            if Defaults[.showOnAllDisplays] {
+                return appDelegate.windows.values.contains(where: { $0.frame.contains(point) })
+            }
+            if let window = appDelegate.window {
+                return window.frame.contains(point)
+            }
+        }
+
+        return NSApp.windows.contains(where: { $0.frame.contains(point) })
     }
     
     // Helper function to check if any popovers are active

@@ -86,8 +86,38 @@ struct NotchTerminalView: View {
     @ObservedObject var terminalManager = TerminalManager.shared
     @EnvironmentObject var vm: DynamicIslandViewModel
     @Default(.enableTerminalFeature) var enableTerminalFeature
+    @Default(.cornerRadiusScaling) var cornerRadiusScaling
+    @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @State private var suppressionToken = UUID()
     @State private var isSuppressing = false
+
+    /// Top corners stay mild; bottom follows shell − padding (see `notchTerminalBottomCornerRadii`).
+    private static let terminalClipTopCornerRadius: CGFloat = 6
+
+    private var currentScreenName: String {
+        vm.screen ?? DynamicIslandViewCoordinator.shared.selectedScreen
+    }
+
+    private var isDynamicIslandMode: Bool {
+        shouldUseDynamicIslandMode(for: currentScreenName)
+    }
+
+    private var terminalClipShape: UnevenRoundedRectangle {
+        let innerBottom = notchTerminalBottomCornerRadii(
+            isDynamicIslandMode: isDynamicIslandMode,
+            notchState: vm.notchState,
+            cornerRadiusScaling: cornerRadiusScaling,
+            enableMinimalisticUI: enableMinimalisticUI,
+            closedNotchHeight: vm.closedNotchSize.height
+        ).innerBottom
+        return UnevenRoundedRectangle(
+            topLeadingRadius: Self.terminalClipTopCornerRadius,
+            bottomLeadingRadius: innerBottom,
+            bottomTrailingRadius: innerBottom,
+            topTrailingRadius: Self.terminalClipTopCornerRadius,
+            style: .continuous
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -121,15 +151,20 @@ struct NotchTerminalView: View {
                 .padding(.bottom, 4)
 
                 Divider()
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, notchTerminalContentEdgePadding.horizontal)
 
                 // Terminal content — the containerView is stable across
                 // notch close/open cycles; updateNSView handles restart.
                 TerminalNSViewRepresentable(terminalManager: terminalManager)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
-                    .padding(.top, 4)
+                    .clipShape(terminalClipShape)
+                    .padding(
+                        EdgeInsets(
+                            top: notchTerminalContentEdgePadding.top,
+                            leading: notchTerminalContentEdgePadding.horizontal,
+                            bottom: notchTerminalContentEdgePadding.bottom,
+                            trailing: notchTerminalContentEdgePadding.horizontal
+                        )
+                    )
                     .onHover { hovering in
                         updateSuppression(for: hovering)
                     }
@@ -153,6 +188,10 @@ struct NotchTerminalView: View {
         }
         .onDisappear {
             updateSuppression(for: false)
+        }
+        .onAppear {
+            terminalManager.refreshTerminalAppearanceIfNeeded()
+            terminalManager.focusTerminalIfPossible()
         }
     }
 

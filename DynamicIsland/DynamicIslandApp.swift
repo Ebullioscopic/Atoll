@@ -1046,13 +1046,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 closeNotchWorkItem = nil
                 vm.open()
                 coordinator.currentView = .terminal
+                TerminalManager.shared.refreshTerminalAppearanceIfNeeded()
+                TerminalManager.shared.focusTerminalIfPossible()
+                TerminalManager.shared.refreshTerminalAppearanceIfNeeded()
             } else {
                 if coordinator.currentView == .terminal {
+                    coordinator.suppressHoverOpen()
+                    TerminalManager.shared.resignTerminalFirstResponderIfNeeded()
                     vm.close()
                 } else {
                     closeNotchWorkItem?.cancel()
                     closeNotchWorkItem = nil
                     coordinator.currentView = .terminal
+                    TerminalManager.shared.refreshTerminalAppearanceIfNeeded()
+                    TerminalManager.shared.focusTerminalIfPossible()
+                    TerminalManager.shared.refreshTerminalAppearanceIfNeeded()
                 }
             }
         }
