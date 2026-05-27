@@ -1124,6 +1124,20 @@ extension Defaults.Keys {
     static let extensionNotchExperienceCapacity = Key<Int>("extensionNotchExperienceCapacity", default: 2)
     static let enableExtensionFileSharing = Key<Bool>("enableExtensionFileSharing", default: true)
     
+    // MARK: Supercharged Agent Features (10 Features)
+    static let enableAgentInteractiveActions = Key<Bool>("enableAgentInteractiveActions", default: true)
+    static let enableAgentAudioCues = Key<Bool>("enableAgentAudioCues", default: true)
+    static let enableAgentSpeedometer = Key<Bool>("enableAgentSpeedometer", default: true)
+    static let enableAgentConnectionMonitor = Key<Bool>("enableAgentConnectionMonitor", default: true)
+    static let enableAgentHistoryShelf = Key<Bool>("enableAgentHistoryShelf", default: true)
+    static let enableAgentBreathingGlow = Key<Bool>("enableAgentBreathingGlow", default: true)
+    static let enableAgentFluidProgress = Key<Bool>("enableAgentFluidProgress", default: true)
+    static let enableAgentDoubleClickDetails = Key<Bool>("enableAgentDoubleClickDetails", default: true)
+    static let enableAgentCustomAvatars = Key<Bool>("enableAgentCustomAvatars", default: true)
+    static let enableAgentSwipeDismiss = Key<Bool>("enableAgentSwipeDismiss", default: true)
+    static let enableAgentHoverDetails = Key<Bool>("enableAgentHoverDetails", default: true)
+    static let enableFolderAccessChecking = Key<Bool>("enableFolderAccessChecking", default: false)
+    
     // MARK: Keyboard Shortcuts
     static let enableShortcuts = Key<Bool>("enableShortcuts", default: true)
     

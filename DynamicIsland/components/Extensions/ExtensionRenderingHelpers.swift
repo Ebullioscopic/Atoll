@@ -22,6 +22,7 @@ import AtollExtensionKit
 import Lottie
 import LottieUI
 import CryptoKit
+import Defaults
 
 // MARK: - Color Conversion
 
@@ -340,6 +341,64 @@ private final class ExtensionLottieCache {
     }
 }
 
+struct FluidShimmerProgressView: View {
+    let progress: Double
+    let width: CGFloat
+    let height: CGFloat
+    let barColor: Color
+    
+    @State private var shimmerOffset: CGFloat = -1.0
+    
+    var body: some View {
+        let fillWidth = width * CGFloat(max(0, min(progress, 1)))
+        
+        ZStack(alignment: .leading) {
+            Capsule()
+                .fill(Color.white.opacity(0.15))
+                .frame(width: width, height: height)
+            
+            if Defaults[.enableAgentFluidProgress] {
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                barColor,
+                                barColor.opacity(0.85),
+                                Color.white,
+                                barColor.opacity(0.85),
+                                barColor
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: fillWidth, height: height)
+                    .overlay(
+                        GeometryReader { _ in
+                            LinearGradient(
+                                colors: [.clear, .white.opacity(0.55), .clear],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .offset(x: fillWidth * shimmerOffset)
+                        }
+                        .clipShape(Capsule())
+                    )
+                    .onAppear {
+                        withAnimation(Animation.linear(duration: 1.8).repeatForever(autoreverses: false)) {
+                            shimmerOffset = 1.0
+                        }
+                    }
+            } else {
+                Capsule()
+                    .fill(barColor)
+                    .frame(width: fillWidth, height: height)
+            }
+        }
+        .animation(.smooth(duration: 0.25), value: progress)
+    }
+}
+
 // MARK: - Progress Rendering
 
 struct ExtensionProgressIndicatorView: View {
@@ -380,15 +439,12 @@ struct ExtensionProgressIndicatorView: View {
             .frame(width: resolvedDiameter, height: resolvedDiameter)
         case let .bar(width, height, cornerRadius, color):
             let barColor = color?.resolvedColor(fallback: accent) ?? accent
-            Capsule()
-                .fill(Color.white.opacity(0.18))
-                .frame(width: width ?? 80, height: height)
-                .overlay(alignment: .leading) {
-                    Capsule()
-                        .fill(barColor)
-                        .frame(width: (width ?? 80) * CGFloat(max(0, min(progress, 1))), height: height)
-                        .animation(.smooth(duration: 0.25), value: progress)
-                }
+            FluidShimmerProgressView(
+                progress: progress,
+                width: width ?? 80,
+                height: height,
+                barColor: barColor
+            )
         case let .percentage(font, color):
             let textColor = color?.resolvedColor(fallback: accent) ?? accent
             Text("\(Int(progress * 100))%")

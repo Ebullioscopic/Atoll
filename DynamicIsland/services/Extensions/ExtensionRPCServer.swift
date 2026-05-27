@@ -27,6 +27,10 @@ import Defaults
 final class ExtensionRPCServer {
     static let shared = ExtensionRPCServer()
 
+    var hasActiveConnections: Bool {
+        !connections.isEmpty
+    }
+
     private var listener: NWListener?
     private var connections: [UUID: RPCClientConnection] = [:]
     private var shelfSubscribers: Set<String> = [] // bundleIdentifiers subscribed to shelf events
@@ -45,7 +49,7 @@ final class ExtensionRPCServer {
             return
         }
 
-        let params = NWParameters(tls: nil)
+        let params = NWParameters.tcp
         let wsOptions = NWProtocolWebSocket.Options()
         wsOptions.autoReplyPing = true
         params.defaultProtocolStack.applicationProtocols.insert(wsOptions, at: 0)

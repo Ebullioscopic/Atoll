@@ -381,6 +381,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func calculateRequiredNotchSize() -> CGSize {
+        // If details HUD is visible, expand the height to accommodate the glassmorphic details HUD
+        let showHUD = ExtensionLiveActivityManager.shared.showDetailsHUD && (Defaults[.enableAgentDoubleClickDetails] || Defaults[.enableAgentHoverDetails])
+        if showHUD && !ExtensionLiveActivityManager.shared.activeActivities.isEmpty {
+            let width: CGFloat = max(Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize.width : openNotchSize.width, 380)
+            let height = vm.effectiveClosedNotchHeight + 280
+            return addShadowPadding(to: CGSize(width: width, height: height), isMinimalistic: Defaults[.enableMinimalisticUI])
+        }
+
         // Check if inline sneak peek is showing and notch is closed
         let isInlineSneakPeekActive = vm.notchState == .closed && 
                                       coordinator.expandingView.show && 

@@ -359,7 +359,6 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             adjustedSize.height = max(adjustedSize.height, preferred)
             return adjustedSize
         }
-
         return statsAdjustedNotchSize(
             from: adjustedSize,
             isStatsTabActive: coordinator.currentView == .stats,

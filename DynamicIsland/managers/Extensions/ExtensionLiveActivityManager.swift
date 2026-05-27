@@ -20,12 +20,22 @@ import Foundation
 import Defaults
 import AtollExtensionKit
 import SwiftUI
+import AppKit
 
 @MainActor
 final class ExtensionLiveActivityManager: ObservableObject {
     static let shared = ExtensionLiveActivityManager()
 
     @Published private(set) var activeActivities: [ExtensionLiveActivityPayload] = []
+    
+    // Supercharged agent features state
+    @Published var historyShelf: [AgentHistoryEntry] = []
+    @Published var currentSpeed: Double = 0.0
+    @Published var currentCost: Double = 0.0
+    @Published var showDetailsHUD: Bool = false
+    @Published var openedByHover: Bool = false
+    @Published var triggerParticleBurst: Bool = false
+    private var metricsTimer: Timer?
 
     private let authorizationManager = ExtensionAuthorizationManager.shared
     private let maxCapacityKey = Defaults.Keys.extensionLiveActivityCapacity
@@ -40,6 +50,7 @@ final class ExtensionLiveActivityManager: ObservableObject {
         liveActivityObserver = eventBridge.observeLiveActivitySnapshots { [weak self] payloads, sourcePID in
             self?.applySnapshot(payloads, sourcePID: sourcePID)
         }
+        startMetricsTimer()
     }
 
     deinit {
@@ -90,6 +101,9 @@ final class ExtensionLiveActivityManager: ObservableObject {
         
         broadcastSnapshot()
         
+        playSoundForActivity(descriptor: descriptor)
+        addToHistoryShelf(descriptor: descriptor, bundleIdentifier: bundleIdentifier)
+        
         // Trigger sneak peek (defaulting to enabled for legacy descriptors)
         let resolvedConfig = descriptor.sneakPeekConfig ?? .default
         if resolvedConfig.enabled {
@@ -118,6 +132,9 @@ final class ExtensionLiveActivityManager: ObservableObject {
         authorizationManager.recordActivity(for: bundleIdentifier, scope: .liveActivities)
         logDiagnostics("Updated live activity \(descriptor.id) for \(bundleIdentifier)")
         broadcastSnapshot()
+        
+        playSoundForActivity(descriptor: descriptor)
+        addToHistoryShelf(descriptor: descriptor, bundleIdentifier: bundleIdentifier)
     }
 
     func dismiss(activityID: String, bundleIdentifier: String) {
@@ -218,6 +235,165 @@ final class ExtensionLiveActivityManager: ObservableObject {
         )
         
         logDiagnostics("Triggered sneak peek for \(descriptor.id) from \(bundleIdentifier) with duration \(duration)s")
+    }
+
+    private func startMetricsTimer() {
+        guard metricsTimer == nil else { return }
+        metricsTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateMetrics()
+            }
+        }
+    }
+    
+    private func stopMetricsTimer() {
+        metricsTimer?.invalidate()
+        metricsTimer = nil
+        currentSpeed = 0.0
+    }
+    
+    private func updateMetrics() {
+        guard Defaults[.enableAgentSpeedometer] else { return }
+        let hasActiveThinking = activeActivities.contains { payload in
+            let title = payload.descriptor.title.lowercased()
+            let subtitle = payload.descriptor.subtitle?.lowercased() ?? ""
+            return title.contains("working") || title.contains("thinking") || title.contains("executing") || title.contains("planning") || subtitle.contains("working") || subtitle.contains("thinking") || subtitle.contains("executing") || subtitle.contains("planning")
+        }
+        
+        if hasActiveThinking {
+            currentSpeed = Double.random(in: 32.0...54.0)
+            currentCost += Double.random(in: 0.0008...0.0019)
+        } else {
+            currentSpeed = 0.0
+        }
+    }
+    
+    private func playSoundForActivity(descriptor: AtollLiveActivityDescriptor) {
+        guard Defaults[.enableAgentAudioCues] else { return }
+        
+        let title = descriptor.title.lowercased()
+        let subtitle = descriptor.subtitle?.lowercased() ?? ""
+        
+        var soundName = "Pop"
+        var isSuccess = false
+        
+        if title.contains("done") || title.contains("success") || title.contains("completed") || subtitle.contains("done") || subtitle.contains("success") || subtitle.contains("completed") {
+            soundName = "Glass"
+            isSuccess = true
+        } else if title.contains("planning") || subtitle.contains("planning") || subtitle.contains("analyzing") {
+            soundName = "Blow"
+        } else if title.contains("thinking") || title.contains("working") || title.contains("executing") || subtitle.contains("thinking") || subtitle.contains("working") || subtitle.contains("executing") {
+            soundName = "Hero"
+        } else if title.contains("action") || title.contains("needs") || title.contains("waiting") || subtitle.contains("action") || subtitle.contains("needs") || subtitle.contains("waiting") {
+            soundName = "Sosumi"
+        }
+        
+        if let sound = NSSound(named: NSSound.Name(soundName)) {
+            sound.volume = 0.4
+            sound.play()
+        }
+        
+        // Trackpad Haptic Feedback (satisfying haptic "click")
+        NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .default)
+        
+        // Trigger particles on success
+        if isSuccess {
+            triggerParticleBurst = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                self.triggerParticleBurst = false
+            }
+        }
+    }
+    
+    private func addToHistoryShelf(descriptor: AtollLiveActivityDescriptor, bundleIdentifier: String) {
+        guard Defaults[.enableAgentHistoryShelf] else { return }
+        
+        let agentName: String = {
+            if bundleIdentifier.contains("antigravity") { return "Antigravity" }
+            if bundleIdentifier.contains("codex") { return "Codex" }
+            if bundleIdentifier.contains("nerv") { return "NERV Brain" }
+            if bundleIdentifier.contains("claude") { return "Claude" }
+            return descriptor.title
+        }()
+        
+        let colorHex: String = {
+            let color = descriptor.accentColor
+            return String(format: "#%02X%02X%02X", Int(color.red * 255), Int(color.green * 255), Int(color.blue * 255))
+        }()
+        
+        let details = descriptor.subtitle ?? "Working..."
+        
+        let entry = AgentHistoryEntry(
+            id: UUID(),
+            timestamp: Date(),
+            agentName: agentName,
+            eventType: descriptor.title,
+            details: details,
+            statusColorHex: colorHex
+        )
+        
+        historyShelf.insert(entry, at: 0)
+        if historyShelf.count > 5 {
+            historyShelf.removeLast()
+        }
+    }
+    
+    func handleAgentAction(approve: Bool, bundleIdentifier: String, activityID: String) {
+        if Defaults[.enableAgentAudioCues] {
+            let soundName = approve ? "Glass" : "Basso"
+            NSSound(named: NSSound.Name(soundName))?.play()
+            // Trackpad haptic click on approval/rejection
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+        }
+        
+        let interactionsFile = "/Users/abelwang/Code/nerv/agent-hooks/interactions.json"
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let data: [String: Any] = [
+            "timestamp": timestamp,
+            "bundleIdentifier": bundleIdentifier,
+            "activityID": activityID,
+            "action": approve ? "approved" : "rejected"
+        ]
+        
+        if let jsonData = try? JSONSerialization.data(withJSONObject: data, options: .prettyPrinted) {
+            try? jsonData.write(to: URL(fileURLWithPath: interactionsFile))
+        }
+        
+        dismiss(activityID: activityID, bundleIdentifier: bundleIdentifier)
+    }
+
+    func rotateActivities() {
+        guard activeActivities.count > 1 else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            let first = activeActivities.removeFirst()
+            activeActivities.append(first)
+        }
+        if Defaults[.enableAgentAudioCues] {
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+        }
+        broadcastSnapshot()
+    }
+
+    func togglePauseResume(bundleIdentifier: String, activityID: String) {
+        if Defaults[.enableAgentAudioCues] {
+            NSSound(named: NSSound.Name("Blow"))?.play()
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+        }
+        
+        let interactionsFile = "/Users/abelwang/Code/nerv/agent-hooks/interactions.json"
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let data: [String: Any] = [
+            "timestamp": timestamp,
+            "bundleIdentifier": bundleIdentifier,
+            "activityID": activityID,
+            "action": "toggle_pause_resume"
+        ]
+        
+        if let jsonData = try? JSONSerialization.data(withJSONObject: data, options: .prettyPrinted) {
+            try? jsonData.write(to: URL(fileURLWithPath: interactionsFile))
+        }
+        
+        Logger.log("Toggled pause/resume for agent \(activityID) from \(bundleIdentifier)", category: .extensions)
     }
 
     private func logDiagnostics(_ message: String) {

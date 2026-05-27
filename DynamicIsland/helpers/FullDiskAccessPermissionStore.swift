@@ -19,6 +19,7 @@
 import AppKit
 import Combine
 import Foundation
+import Defaults
 
 enum FullDiskAccessAuthorization {
     private static let probeURLs: [URL] = [
@@ -63,18 +64,22 @@ enum ShelfFolderAccessAuthorization {
     }
 
     static func hasDocumentsAccess() -> Bool {
-        canReadDirectory(at: documentsDirectoryURL)
+        guard Defaults[.enableFolderAccessChecking] else { return false }
+        return canReadDirectory(at: documentsDirectoryURL)
     }
 
     static func hasDownloadsAccess() -> Bool {
-        canReadDirectory(at: downloadsDirectoryURL)
+        guard Defaults[.enableFolderAccessChecking] else { return false }
+        return canReadDirectory(at: downloadsDirectoryURL)
     }
 
     static func hasDocumentsAndDownloadsAccess() -> Bool {
-        hasDocumentsAccess() && hasDownloadsAccess()
+        guard Defaults[.enableFolderAccessChecking] else { return false }
+        return hasDocumentsAccess() && hasDownloadsAccess()
     }
 
     static func requestAccessProbe() {
+        guard Defaults[.enableFolderAccessChecking] else { return }
         if let documentsDirectoryURL {
             _ = try? FileManager.default.contentsOfDirectory(at: documentsDirectoryURL, includingPropertiesForKeys: nil)
         }

@@ -43,6 +43,7 @@ struct ExtensionLiveActivityStandaloneView: View {
     var body: some View {
         HStack(spacing: 0) {
             ExtensionLeadingContentView(
+                bundleIdentifier: payload.bundleIdentifier,
                 content: resolvedLeadingContent,
                 badge: descriptor.badgeIcon,
                 accent: accentColor,
@@ -133,7 +134,152 @@ struct ExtensionMusicWingView: View {
     }
 }
 
+struct PremiumAgentAvatarView: View {
+    let bundleIdentifier: String
+    let size: CGFloat
+    @State private var isBreathing = false
+
+    var body: some View {
+        ZStack {
+            // Neon radial breathing backdrop
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [accentColor.opacity(0.35), accentColor.opacity(0)],
+                        center: .center,
+                        startRadius: size * 0.1,
+                        endRadius: size * 0.6
+                    )
+                )
+                .scaleEffect(isBreathing ? 1.15 : 0.95)
+                .animation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true), value: isBreathing)
+            
+            // Outer glowing ring
+            Circle()
+                .stroke(
+                    LinearGradient(
+                        colors: [accentColor.opacity(0.8), accentColor.opacity(0.1), accentColor.opacity(0.6)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+                .frame(width: size - 2, height: size - 2)
+
+            // Dynamic agent icon/vector
+            agentIcon
+                .frame(width: size * 0.65, height: size * 0.65)
+                .foregroundStyle(.white)
+        }
+        .frame(width: size, height: size)
+        .onAppear {
+            isBreathing = true
+        }
+    }
+
+    private var accentColor: Color {
+        let id = bundleIdentifier.lowercased()
+        if id.contains("antigravity") {
+            return Color(red: 0.15, green: 0.67, blue: 0.99) // Tech Cyan/Blue
+        } else if id.contains("codex") {
+            return Color(red: 0.6, green: 0.6, blue: 0.65) // Dark Gray/Purple
+        } else if id.contains("nerv") {
+            return Color(red: 0.96, green: 0.31, blue: 0.08) // Eva Orange/Red
+        } else if id.contains("claude") {
+            return Color(red: 0.85, green: 0.44, blue: 0.28) // Claude Amber
+        }
+        return Color.purple
+    }
+
+    @ViewBuilder
+    private var agentIcon: some View {
+        let id = bundleIdentifier.lowercased()
+        if id.contains("antigravity") {
+            VStack(spacing: 1) {
+                Capsule()
+                    .fill(Color.cyan)
+                    .frame(width: size * 0.22, height: size * 0.12)
+                    .shadow(color: .cyan, radius: 2)
+                
+                Ellipse()
+                    .fill(
+                        LinearGradient(
+                            colors: [.white, .cyan.opacity(0.7)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: size * 0.48, height: size * 0.14)
+                
+                Path { path in
+                    path.move(to: CGPoint(x: size * 0.08, y: 0))
+                    path.addLine(to: CGPoint(x: size * 0.40, y: 0))
+                    path.addLine(to: CGPoint(x: size * 0.48, y: size * 0.15))
+                    path.addLine(to: CGPoint(x: size * 0.0, y: size * 0.15))
+                    path.closeSubpath()
+                }
+                .fill(
+                    LinearGradient(
+                        colors: [.cyan.opacity(0.4), .cyan.opacity(0.0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: size * 0.48, height: size * 0.15)
+            }
+        } else if id.contains("codex") {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.8), lineWidth: 1.5)
+                    .frame(width: size * 0.45, height: size * 0.45)
+                
+                Text("{ }")
+                    .font(.system(size: size * 0.24, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .shadow(color: .white, radius: 3)
+            }
+        } else if id.contains("nerv") {
+            ZStack {
+                Circle()
+                    .stroke(Color.orange, lineWidth: 1)
+                    .frame(width: size * 0.52, height: size * 0.52)
+                
+                Image(systemName: "waveform.path")
+                    .font(.system(size: size * 0.28, weight: .semibold))
+                    .foregroundStyle(Color.orange)
+                    .shadow(color: .orange, radius: 4)
+            }
+        } else if id.contains("claude") {
+            VStack(spacing: 2) {
+                Circle()
+                    .fill(Color.orange)
+                    .frame(width: size * 0.08, height: size * 0.08)
+                
+                Rectangle()
+                    .fill(Color.orange)
+                    .frame(width: 1.5, height: size * 0.08)
+                
+                RoundedRectangle(cornerRadius: size * 0.08)
+                    .stroke(Color.white, lineWidth: 1.5)
+                    .background(RoundedRectangle(cornerRadius: size * 0.08).fill(Color.black.opacity(0.6)))
+                    .frame(width: size * 0.38, height: size * 0.24)
+                    .overlay(
+                        HStack(spacing: size * 0.06) {
+                            Circle().fill(Color.orange).frame(width: size * 0.06, height: size * 0.06)
+                            Circle().fill(Color.orange).frame(width: size * 0.06, height: size * 0.06)
+                        }
+                    )
+            }
+        } else {
+            Image(systemName: "cpu")
+                .font(.system(size: size * 0.35, weight: .medium))
+                .foregroundStyle(.white)
+        }
+    }
+}
+
 struct ExtensionLeadingContentView: View {
+    let bundleIdentifier: String
     let content: AtollTrailingContent
     let badge: AtollIconDescriptor?
     let accent: Color
@@ -143,32 +289,37 @@ struct ExtensionLeadingContentView: View {
 
     var body: some View {
         Group {
-            switch content {
-            case let .icon(iconDescriptor):
-                ExtensionCompositeIconView(
-                    leading: iconDescriptor,
-                    badge: badge,
-                    accent: accent,
-                    size: frameHeight
-                )
-            case let .animation(data, size):
-                let resolvedSize = CGSize(
-                    width: min(size.width, frameHeight),
-                    height: min(size.height, frameHeight)
-                )
-                ExtensionLottieView(data: data, size: resolvedSize)
-                    .frame(width: frameHeight, height: frameHeight)
-                    .background(
-                        RoundedRectangle(cornerRadius: frameHeight * 0.18, style: .continuous)
-                            .fill(Color.white.opacity(0.08))
+            let isCustomAgent = ["antigravity", "codex", "nerv", "claude"].contains { bundleIdentifier.lowercased().contains($0) }
+            if isCustomAgent && Defaults[.enableAgentCustomAvatars] {
+                PremiumAgentAvatarView(bundleIdentifier: bundleIdentifier, size: frameHeight)
+            } else {
+                switch content {
+                case let .icon(iconDescriptor):
+                    ExtensionCompositeIconView(
+                        leading: iconDescriptor,
+                        badge: badge,
+                        accent: accent,
+                        size: frameHeight
                     )
-            default:
-                ExtensionCompositeIconView(
-                    leading: defaultIcon,
-                    badge: badge,
-                    accent: accent,
-                    size: frameHeight
-                )
+                case let .animation(data, size):
+                    let resolvedSize = CGSize(
+                        width: min(size.width, frameHeight),
+                        height: min(size.height, frameHeight)
+                    )
+                    ExtensionLottieView(data: data, size: resolvedSize)
+                        .frame(width: frameHeight, height: frameHeight)
+                        .background(
+                            RoundedRectangle(cornerRadius: frameHeight * 0.18, style: .continuous)
+                                .fill(Color.white.opacity(0.08))
+                        )
+                default:
+                    ExtensionCompositeIconView(
+                        leading: defaultIcon,
+                        badge: badge,
+                        accent: accent,
+                        size: frameHeight
+                    )
+                }
             }
         }
         .frame(width: frameWidth, height: frameHeight)

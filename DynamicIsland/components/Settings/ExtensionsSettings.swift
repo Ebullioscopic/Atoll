@@ -59,6 +59,7 @@ struct ExtensionsSettingsView: View {
         }
     }
     
+    @ViewBuilder
     private var globalTogglesSection: some View {
         Section {
             Defaults.Toggle(String(localized:"Enable third-party extensions"), key: .enableThirdPartyExtensions)
@@ -101,6 +102,57 @@ struct ExtensionsSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+        
+        Section {
+            Defaults.Toggle(String(localized:"Interactive Agent Actions"), key: .enableAgentInteractiveActions)
+                .tint(.blue)
+            Defaults.Toggle(String(localized:"Audio & Haptic Status Cues"), key: .enableAgentAudioCues)
+                .tint(.blue)
+            Defaults.Toggle(String(localized:"Agent Speedometer & Cost Monitor"), key: .enableAgentSpeedometer)
+                .tint(.blue)
+            Defaults.Toggle(String(localized:"WebSocket Reconnection status dot"), key: .enableAgentConnectionMonitor)
+                .tint(.blue)
+            Defaults.Toggle(String(localized:"Agent History Shelf"), key: .enableAgentHistoryShelf)
+                .tint(.blue)
+        } header: {
+            Text("Supercharged Functionality (ROI-Ordered)")
+        } footer: {
+            Text("High impact tools for agentic and CLI developer workflows inside the Dynamic Island.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        
+        Section {
+            Defaults.Toggle(String(localized:"Neon Aura breathing glow"), key: .enableAgentBreathingGlow)
+                .tint(.purple)
+            Defaults.Toggle(String(localized:"Fluid shimmer progress wave"), key: .enableAgentFluidProgress)
+                .tint(.purple)
+            Defaults.Toggle(String(localized:"Double-click to expand rich details HUD"), key: .enableAgentDoubleClickDetails)
+                .tint(.purple)
+            Defaults.Toggle(String(localized:"Hover to expand rich details HUD"), key: .enableAgentHoverDetails)
+                .tint(.purple)
+            Defaults.Toggle(String(localized:"Premium Custom Agent Avatars"), key: .enableAgentCustomAvatars)
+                .tint(.purple)
+            Defaults.Toggle(String(localized:"Sweep to minimize or mute gesture"), key: .enableAgentSwipeDismiss)
+                .tint(.purple)
+        } header: {
+            Text("Supercharged UIX/UX (ROI-Ordered)")
+        } footer: {
+            Text("Stunning aesthetic upgrades and high-fidelity micro-interactions for active sessions.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        
+        Section {
+            Defaults.Toggle(String(localized:"Check Documents & Downloads Folder Access"), key: .enableFolderAccessChecking)
+                .tint(.blue)
+        } header: {
+            Text("Permissions Guard")
+        } footer: {
+            Text("Enable to scan Documents and Downloads folders for the Shelf feature. Leave off to completely avoid macOS security prompts on startup.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
     

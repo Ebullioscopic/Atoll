@@ -27,6 +27,7 @@ import SwiftUI
 let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
+@MainActor
 var openNotchSize: CGSize {
     let storedWidth = Defaults[.openNotchWidth]
     let minWidth = currentRecommendedMinimumNotchWidth()
@@ -59,6 +60,7 @@ func maxAllowedNotchWidth() -> CGFloat {
 
 /// Counts the number of currently enabled standard notch tabs.
 /// Mirrors the tab-building logic in ``TabSelectionView``.
+@MainActor
 func enabledStandardTabCount() -> Int {
     var count = 0
 
@@ -103,6 +105,7 @@ func recommendedMinimumNotchWidth(forTabCount count: Int) -> CGFloat {
 }
 
 /// Returns the recommended minimum notch width for the current tab configuration.
+@MainActor
 func currentRecommendedMinimumNotchWidth() -> CGFloat {
     recommendedMinimumNotchWidth(forTabCount: enabledStandardTabCount())
 }
@@ -110,6 +113,7 @@ func currentRecommendedMinimumNotchWidth() -> CGFloat {
 /// Enforces the minimum notch width based on current tab count.
 /// Also clamps to screen width so the notch never exceeds the display.
 /// Only adjusts when not in minimalistic mode.
+@MainActor
 func enforceMinimumNotchWidth() {
     guard !Defaults[.enableMinimalisticUI] else { return }
     let minWidth = currentRecommendedMinimumNotchWidth()

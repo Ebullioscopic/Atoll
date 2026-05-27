@@ -31,6 +31,15 @@ struct ExtensionLiveActivityPayload: Identifiable, Hashable, Codable {
     var priority: AtollLiveActivityPriority { descriptor.priority }
 }
 
+struct AgentHistoryEntry: Identifiable, Codable, Hashable {
+    let id: UUID
+    let timestamp: Date
+    let agentName: String
+    let eventType: String
+    let details: String
+    let statusColorHex: String
+}
+
 struct ExtensionLockScreenWidgetPayload: Identifiable, Hashable, Codable {
     let bundleIdentifier: String
     let descriptor: AtollLockScreenWidgetDescriptor

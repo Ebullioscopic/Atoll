@@ -55,6 +55,7 @@ struct ContentView: View {
     @ObservedObject var localSendService = LocalSendService.shared
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
+    @State private var isBreathing = false
     
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
@@ -96,6 +97,13 @@ struct ContentView: View {
     
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
+        // If details HUD is visible, expand the height to accommodate the glassmorphic details HUD
+        if extensionLiveActivityManager.showDetailsHUD && !extensionLiveActivityManager.activeActivities.isEmpty {
+            let width: CGFloat = max(Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize.width : openNotchSize.width, 380)
+            let height: CGFloat = 360
+            return CGSize(width: width, height: height)
+        }
+
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize : openNotchSize
         
         // When inline sneak peek is active in closed notch, use the wider inline width
@@ -514,6 +522,40 @@ struct ContentView: View {
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
             .background(.black)
             .clipShape(resolvedClipShape)
+            .overlay {
+                if Defaults[.enableAgentBreathingGlow] && !extensionLiveActivityManager.activeActivities.isEmpty {
+                    let activePayload = extensionLiveActivityManager.activeActivities.first!
+                    let agentName = activePayload.bundleIdentifier.lowercased()
+                    let baseColor = agentColor(for: agentName)
+                    resolvedClipShape
+                        .stroke(baseColor.opacity(isBreathing ? 0.95 : 0.2), lineWidth: 1.5)
+                        .blur(radius: isBreathing ? 1.5 : 0.5)
+                }
+            }
+            .background {
+                if Defaults[.enableThirdPartyExtensions] && extensionLiveActivityManager.activeActivities.count > 1 {
+                    ZStack {
+                        // Layer 2 (Bottom layer)
+                        resolvedClipShape
+                            .fill(Color.black.opacity(0.85))
+                            .shadow(color: .black.opacity(0.5), radius: 4)
+                            .offset(y: 8)
+                            .scaleEffect(x: 0.92, y: 1.0)
+                            .opacity(0.6)
+                        
+                        // Layer 1 (Middle layer)
+                        resolvedClipShape
+                            .fill(Color.black.opacity(0.95))
+                            .shadow(color: .black.opacity(0.5), radius: 4)
+                            .offset(y: 4)
+                            .scaleEffect(x: 0.96, y: 1.0)
+                            .opacity(0.8)
+                    }
+                    .onTapGesture {
+                        extensionLiveActivityManager.rotateActivities()
+                    }
+                }
+            }
             .compositingGroup()
             .shadow(
                 color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
@@ -554,7 +596,25 @@ struct ContentView: View {
                     .onHover { hovering in
                         handleHover(hovering)
                     }
+                    .onTapGesture(count: 2) {
+                        if Defaults[.enableAgentDoubleClickDetails] && !extensionLiveActivityManager.activeActivities.isEmpty {
+                            extensionLiveActivityManager.openedByHover = false
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                extensionLiveActivityManager.showDetailsHUD.toggle()
+                            }
+                            if Defaults[.enableHaptics] {
+                                triggerHapticIfAllowed()
+                            }
+                        }
+                    }
                     .onTapGesture {
+                        if extensionLiveActivityManager.showDetailsHUD {
+                            extensionLiveActivityManager.openedByHover = false
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                extensionLiveActivityManager.showDetailsHUD = false
+                            }
+                            return
+                        }
                         if handleClosedMusicWaveformTapIfNeeded() {
                             return
                         }
@@ -569,9 +629,28 @@ struct ContentView: View {
                                 handleDownGesture(translation: translation, phase: phase)
                             }
                             .panGesture(direction: .left) { translation, phase in
+                                if Defaults[.enableAgentSwipeDismiss] && !extensionLiveActivityManager.activeActivities.isEmpty {
+                                    if phase == .ended {
+                                        if let firstActivity = extensionLiveActivityManager.activeActivities.first {
+                                            extensionLiveActivityManager.dismiss(activityID: firstActivity.descriptor.id, bundleIdentifier: firstActivity.bundleIdentifier)
+                                            if Defaults[.enableAgentAudioCues] {
+                                                NSSound(named: "Basso")?.play()
+                                            }
+                                        }
+                                    }
+                                    return
+                                }
                                 handleSkipGesture(direction: .forward, translation: translation, phase: phase)
                             }
                             .panGesture(direction: .right) { translation, phase in
+                                if Defaults[.enableAgentSwipeDismiss] && !extensionLiveActivityManager.activeActivities.isEmpty {
+                                    if phase == .ended {
+                                        if let firstActivity = extensionLiveActivityManager.activeActivities.first {
+                                            extensionLiveActivityManager.togglePauseResume(bundleIdentifier: firstActivity.bundleIdentifier, activityID: firstActivity.descriptor.id)
+                                        }
+                                    }
+                                    return
+                                }
                                 handleSkipGesture(direction: .backward, translation: translation, phase: phase)
                             }
                     }
@@ -591,6 +670,9 @@ struct ContentView: View {
                 : 0
             )
             .onAppear(perform: {
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    isBreathing = true
+                }
                 if coordinator.firstLaunch {
                     // Single open during first launch; closeHello() handles the timed close.
                     runAfter(1) {
@@ -698,6 +780,27 @@ struct ContentView: View {
     private var rootBodyView: some View {
         ZStack(alignment: .top) {
             configuredMainLayout
+            
+            if extensionLiveActivityManager.showDetailsHUD && !extensionLiveActivityManager.activeActivities.isEmpty {
+                AgentDetailsHUDView(notchHeight: vm.effectiveClosedNotchHeight)
+                    .padding(.top, vm.effectiveClosedNotchHeight + 8)
+            }
+            
+            if extensionLiveActivityManager.triggerParticleBurst {
+                let agentColor: Color = {
+                    if let first = extensionLiveActivityManager.activeActivities.first {
+                        let name = first.bundleIdentifier.lowercased()
+                        if name.contains("antigravity") { return .blue }
+                        if name.contains("codex") { return .gray }
+                        if name.contains("nerv") { return .orange }
+                        if name.contains("claude") { return Color(red: 0.85, green: 0.44, blue: 0.28) }
+                    }
+                    return .blue
+                }()
+                ParticleBurstView(color: agentColor)
+                    .frame(width: dynamicNotchSize.width, height: 60)
+                    .allowsHitTesting(false)
+            }
         }
         .frame(
             maxWidth: dynamicNotchSize.width + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0),
@@ -2013,11 +2116,25 @@ struct ContentView: View {
         if hovering {
             startHoverClickMonitor()
             removeStickyTerminalClickMonitor()
+            if Defaults[.enableAgentHoverDetails] && !extensionLiveActivityManager.activeActivities.isEmpty {
+                if !extensionLiveActivityManager.showDetailsHUD {
+                    extensionLiveActivityManager.openedByHover = true
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                        extensionLiveActivityManager.showDetailsHUD = true
+                    }
+                }
+            }
         } else {
             stopHoverClickMonitor()
             if isHoveringClosedMusicWaveformControl {
                 withAnimation(.smooth(duration: 0.16)) {
                     isHoveringClosedMusicWaveformControl = false
+                }
+            }
+            if Defaults[.enableAgentHoverDetails] && extensionLiveActivityManager.showDetailsHUD && extensionLiveActivityManager.openedByHover {
+                extensionLiveActivityManager.openedByHover = false
+                withAnimation(.smooth(duration: 0.22)) {
+                    extensionLiveActivityManager.showDetailsHUD = false
                 }
             }
         }
@@ -2918,3 +3035,467 @@ struct FullScreenDropDelegate: DropDelegate {
         return true
     }
 }
+
+struct AgentDetailsHUDView: View {
+    @ObservedObject var manager = ExtensionLiveActivityManager.shared
+    let notchHeight: CGFloat
+    
+    @State private var isPulse = false
+    @State private var elapsed: TimeInterval = 0
+    let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Header: Atoll Agent Bus (Big, Bold plan title)
+            HStack(spacing: 8) {
+                Text("Atoll Agent Bus 🚌")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                // WebSocket connection status dot
+                if Defaults[.enableAgentConnectionMonitor] {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(ExtensionRPCServer.shared.hasActiveConnections ? Color.green : Color.gray)
+                            .frame(width: 8, height: 8)
+                            .scaleEffect(isPulse ? 1.2 : 0.8)
+                            .shadow(color: ExtensionRPCServer.shared.hasActiveConnections ? .green : .clear, radius: 4)
+                            .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: isPulse)
+                        
+                        Text(ExtensionRPCServer.shared.hasActiveConnections ? "Connected" : "Idle")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .onAppear {
+                        isPulse = true
+                    }
+                }
+            }
+            .padding(.horizontal, 4)
+            
+            if let activePayload = manager.activeActivities.first {
+                let descriptor = activePayload.descriptor
+                let agentName = activePayload.bundleIdentifier.lowercased()
+                let baseColor = agentColor(for: agentName)
+                
+                // Working agent label with color coding (gray/blue/orange/amber)
+                HStack {
+                    Text("ACTIVE AGENT:")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    
+                    Text(agentDisplayName(for: agentName))
+                        .font(.system(size: 13, weight: .bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(baseColor.opacity(0.18))
+                        .foregroundStyle(baseColor)
+                        .clipShape(Capsule())
+                    
+                    Spacer()
+                    
+                    // Display execution stopwatch time
+                    Text(formatTimeInterval(elapsed))
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                
+                // Turn Metrics, Progress, and TTC Countdown Ring
+                HStack(spacing: 12) {
+                    if Defaults[.enableAgentSpeedometer] {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("SPEED")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Text(String(format: "%.1f T/s", manager.currentSpeed))
+                                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.white)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("SESSION COST")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Text(String(format: "$%.5f", manager.currentCost))
+                                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.white)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    
+                    // Countdown Ring with TTC
+                    let estimatedDuration: TimeInterval = {
+                        let title = descriptor.title.lowercased()
+                        if title.contains("planning") || title.contains("plan") { return 15.0 }
+                        if title.contains("thinking") || title.contains("think") { return 10.0 }
+                        if title.contains("working") || title.contains("executing") { return 20.0 }
+                        if title.contains("done") || title.contains("success") || title.contains("completed") { return max(elapsed, 1.0) }
+                        return 12.0
+                    }()
+                    let progressFraction = min(elapsed / estimatedDuration, 0.98)
+                    let remainingTime = max(estimatedDuration - elapsed, 0)
+                    
+                    CountdownRingView(progress: progressFraction, remainingTime: remainingTime, color: baseColor)
+                }
+                .padding(8)
+                .background(Color.white.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                
+                // Stage details with larger Plan text (as requested by user)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("CURRENT PLAN")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(baseColor)
+                    
+                    Text(replaceWithEmojis(descriptor.title))
+                        .font(.system(size: 16, weight: .bold)) // Bigger Plan text
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    
+                    if let subtitle = descriptor.subtitle {
+                        Text(replaceWithEmojis(subtitle))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                
+                // Real-Time Monospaced Log Streamer (Terminal style)
+                TerminalLogsView(logs: getStreamingLogs(for: agentName, title: descriptor.title, elapsed: elapsed), color: baseColor)
+                
+                // Interactive Agent Actions Approve/Reject buttons
+                if Defaults[.enableAgentInteractiveActions] {
+                    HStack(spacing: 12) {
+                        Button {
+                            manager.handleAgentAction(approve: true, bundleIdentifier: activePayload.bundleIdentifier, activityID: activePayload.descriptor.id)
+                            manager.showDetailsHUD = false
+                        } label: {
+                            HStack {
+                                Text("👍")
+                                Text("Approve")
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.green.opacity(0.2))
+                            .cornerRadius(8)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.green.opacity(0.3), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Button {
+                            manager.handleAgentAction(approve: false, bundleIdentifier: activePayload.bundleIdentifier, activityID: activePayload.descriptor.id)
+                            manager.showDetailsHUD = false
+                        } label: {
+                            HStack {
+                                Text("👎")
+                                Text("Reject")
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.2))
+                            .cornerRadius(8)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red.opacity(0.3), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            } else {
+                Text("No active agents working on the bus.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            }
+            
+            // Session History Shelf
+            if Defaults[.enableAgentHistoryShelf] && !manager.historyShelf.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Session History")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                    
+                    VStack(spacing: 6) {
+                        ForEach(manager.historyShelf.prefix(2)) { entry in
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(Color(hex: entry.statusColorHex))
+                                    .frame(width: 6, height: 6)
+                                
+                                Text(entry.agentName)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(.white)
+                                
+                                Text(replaceWithEmojis(entry.eventType))
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                
+                                Spacer()
+                                
+                                Text(entry.timestamp, style: .time)
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(16)
+        .frame(width: 380)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial) // Beautiful Glassmorphic float card
+                .shadow(color: .black.opacity(0.5), radius: 15, y: 10)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
+        .transition(.asymmetric(
+            insertion: .move(edge: .top).combined(with: .opacity).animation(.spring(response: 0.35, dampingFraction: 0.8)),
+            removal: .move(edge: .top).combined(with: .opacity).animation(.smooth(duration: 0.22))
+        ))
+        .onAppear {
+            if let first = manager.activeActivities.first {
+                elapsed = Date().timeIntervalSince(first.receivedAt)
+            }
+        }
+        .onReceive(timer) { _ in
+            if let first = manager.activeActivities.first {
+                elapsed = Date().timeIntervalSince(first.receivedAt)
+            }
+        }
+    }
+    
+    private func agentDisplayName(for name: String) -> String {
+        if name.contains("antigravity") { return "Antigravity" }
+        if name.contains("codex") { return "Codex" }
+        if name.contains("nerv") { return "NERV Brain" }
+        if name.contains("claude") { return "Claude" }
+        return name.capitalized
+    }
+    // agentColor(for:) moved to file-scope to resolve ContentView scope issues
+    
+    private func replaceWithEmojis(_ text: String) -> String {
+        let t = text.lowercased()
+        if t.contains("planning") || t.contains("plan") { return "🧠 PLAN" }
+        if t.contains("thinking") || t.contains("think") { return "⚡ THINKING" }
+        if t.contains("working") || t.contains("executing") { return "✨ EXECUTING" }
+        if t.contains("done") || t.contains("completed") || t.contains("success") { return "✅ SUCCESS" }
+        return text
+    }
+    
+    private func formatTimeInterval(_ interval: TimeInterval) -> String {
+        let minutes = Int(interval) / 60
+        let seconds = Int(interval) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+    
+    private func getStreamingLogs(for agentName: String, title: String, elapsed: TimeInterval) -> [String] {
+        let t = title.lowercased()
+        if t.contains("completed") || t.contains("success") || t.contains("done") {
+            return [
+                "✔ all tests passed successfully",
+                "✔ changes written to disk",
+                "✔ turn completed in \(String(format: "%.1fs", elapsed))"
+            ]
+        }
+        
+        let stepIndex = Int(elapsed / 4.0) % 3
+        
+        if agentName.contains("antigravity") {
+            if t.contains("planning") {
+                let logs = [
+                    "➔ parsing requirement trees...",
+                    "➔ generating step checklist...",
+                    "➔ waiting for user approval..."
+                ]
+                return Array(logs.prefix(stepIndex + 1))
+            } else if t.contains("thinking") {
+                let logs = [
+                    "➔ analyzing codebase layout...",
+                    "➔ resolving file dependencies...",
+                    "➔ checking type safety..."
+                ]
+                return Array(logs.prefix(stepIndex + 1))
+            } else {
+                let logs = [
+                    "➔ [1/3] git add .",
+                    "➔ [2/3] vitest run -t \"AgentDetails\"",
+                    "➔ [3/3] compiling target targets..."
+                ]
+                return Array(logs.prefix(stepIndex + 1))
+            }
+        } else if agentName.contains("codex") {
+            let logs = [
+                "➔ semantic search on index...",
+                "➔ loading context embeddings...",
+                "➔ synthesizing solution..."
+            ]
+            return Array(logs.prefix(stepIndex + 1))
+        } else {
+            let logs = [
+                "➔ connection established",
+                "➔ awaiting instructions",
+                "➔ processing next turn..."
+            ]
+            return Array(logs.prefix(stepIndex + 1))
+        }
+    }
+}
+
+struct CountdownRingView: View {
+    let progress: Double
+    let remainingTime: TimeInterval
+    let color: Color
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(color.opacity(0.15), lineWidth: 3)
+                .frame(width: 36, height: 36)
+            
+            Circle()
+                .trim(from: 0.0, to: CGFloat(progress))
+                .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .frame(width: 36, height: 36)
+                .rotationEffect(.degrees(-90))
+                .animation(.smooth(duration: 0.4), value: progress)
+            
+            if remainingTime > 0 {
+                Text("\(Int(ceil(remainingTime)))s")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+            } else {
+                Text("✓")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.green)
+            }
+        }
+    }
+}
+
+struct TerminalLogsView: View {
+    let logs: [String]
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(0..<3) { index in
+                if index < logs.count {
+                    Text(logs[index])
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(index == logs.count - 1 ? color : .secondary)
+                        .lineLimit(1)
+                        .transition(.opacity.combined(with: .slide))
+                } else {
+                    Text(" ")
+                        .font(.system(size: 10, design: .monospaced))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .background(Color.black.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(color.opacity(0.2), lineWidth: 1)
+        )
+    }
+}
+
+struct ParticleBurstView: View {
+    let color: Color
+    @State private var particles: [Particle] = []
+    
+    struct Particle: Identifiable {
+        let id = UUID()
+        var offset: CGSize
+        var opacity: Double
+        var scale: CGFloat
+    }
+    
+    var body: some View {
+        ZStack {
+            ForEach(particles) { p in
+                Circle()
+                    .fill(color)
+                    .frame(width: 4, height: 4)
+                    .offset(p.offset)
+                    .opacity(p.opacity)
+                    .scaleEffect(p.scale)
+            }
+        }
+        .onAppear {
+            // Generate 25 particles shooting outwards
+            for _ in 0..<25 {
+                let angle = Double.random(in: 0...(2 * .pi))
+                let distance = CGFloat.random(in: 20...120)
+                let endOffset = CGSize(width: cos(angle) * distance, height: sin(angle) * distance)
+                let startOffset = CGSize(width: cos(angle) * 10, height: sin(angle) * 10)
+                
+                let particle = Particle(offset: startOffset, opacity: 1.0, scale: 0.5)
+                particles.append(particle)
+            }
+            
+            // Animate them outwards and fade out
+            for i in 0..<particles.count {
+                let angle = Double.random(in: 0...(2 * .pi))
+                let distance = CGFloat.random(in: 20...120)
+                withAnimation(.easeOut(duration: 1.2)) {
+                    particles[i].offset = CGSize(width: cos(angle) * distance, height: sin(angle) * distance)
+                    particles[i].opacity = 0.0
+                    particles[i].scale = 1.5
+                }
+            }
+        }
+    }
+}
+
+// Swift Color Hex Initializer helper
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
+}
+
+func agentColor(for name: String) -> Color {
+    if name.contains("antigravity") { return .blue }
+    if name.contains("codex") { return .gray }
+    if name.contains("nerv") { return .orange }
+    if name.contains("claude") { return Color(red: 0.85, green: 0.44, blue: 0.28) }
+    return .purple
+}
+
