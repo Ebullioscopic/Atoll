@@ -421,7 +421,7 @@ class StatsManager: ObservableObject {
     private struct StatsCollectionResult {
         let snapshot: PublishedStatsSnapshot
         let previousNetworkStats: (bytesIn: UInt64, bytesOut: UInt64)
-        let previousDiskStats: (readBytes: UInt64, writtenBytes: UInt64)
+        let previousDiskStats: (bytesRead: UInt64, bytesWritten: UInt64)
         let previousTimestamp: Date
     }
     
