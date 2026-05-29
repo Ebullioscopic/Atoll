@@ -1136,10 +1136,11 @@ extension Defaults.Keys {
     static let enableAgentBreathingGlow = Key<Bool>("enableAgentBreathingGlow", default: true)
     static let pauseAgentBreathingGlowWhenCollapsed = Key<Bool>("pauseAgentBreathingGlowWhenCollapsed", default: true)
     static let enableAgentFluidProgress = Key<Bool>("enableAgentFluidProgress", default: true)
-    static let enableAgentDoubleClickDetails = Key<Bool>("enableAgentDoubleClickDetails", default: true)
+    static let enableAgentDoubleClickDetails = Key<Bool>("enableAgentDoubleClickDetails", default: false)
     static let enableAgentCustomAvatars = Key<Bool>("enableAgentCustomAvatars", default: true)
     static let enableAgentSwipeDismiss = Key<Bool>("enableAgentSwipeDismiss", default: true)
-    static let enableAgentHoverDetails = Key<Bool>("enableAgentHoverDetails", default: true)
+    static let enableAgentHoverDetails = Key<Bool>("enableAgentHoverDetails", default: false)
+    static let enableAgentBusTab = Key<Bool>("enableAgentBusTab", default: true)
     static let enableFolderAccessChecking = Key<Bool>("enableFolderAccessChecking", default: false)
     
     // MARK: Keyboard Shortcuts
