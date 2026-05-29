@@ -313,6 +313,8 @@ final class ExtensionLiveActivityManager: ObservableObject {
             if bundleIdentifier.contains("codex") { return "Codex" }
             if bundleIdentifier.contains("nerv") { return "NERV Brain" }
             if bundleIdentifier.contains("claude") { return "Claude" }
+            if bundleIdentifier.contains("copilot") { return "Copilot" }
+            if bundleIdentifier.contains("kilo") { return "Kilo" }
             return descriptor.title
         }()
         

@@ -6,6 +6,8 @@
 	<array>
 		<string>com.ebullioscopic.Atoll.xpc</string>
 	</array>
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
 	<key>com.apple.security.temporary-exception.apple-events</key>
 	<array>
 		<string>com.spotify.client</string>
