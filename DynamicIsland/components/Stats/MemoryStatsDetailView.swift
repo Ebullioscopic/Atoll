@@ -44,8 +44,8 @@ struct MemoryStatsDetailView: View {
             .padding(16)
         }
         .frame(minWidth: 380, minHeight: 420)
-        .onAppear(perform: refreshProcesses)
-        .onReceive(statsManager.$lastUpdated) { _ in
+        .onAppear(perform: refreshProcessesOnAppear)
+        .onReceive(statsManager.objectWillChange) { _ in
             refreshProcesses()
         }
     }
@@ -53,6 +53,11 @@ struct MemoryStatsDetailView: View {
     private func refreshProcesses() {
         let processes = statsManager.getProcessesRankedByMemory()
         topProcesses = Array(processes.prefix(processDisplayLimit))
+    }
+    
+    private func refreshProcessesOnAppear() {
+        statsManager.refreshProcessStatsNow()
+        refreshProcesses()
     }
 }
 

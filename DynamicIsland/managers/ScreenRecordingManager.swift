@@ -201,7 +201,7 @@ class ScreenRecordingManager: ObservableObject {
         recordingStartTime = Date()
         recordingDuration = 0
         
-        durationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        durationTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.updateDuration()
             }

@@ -28,6 +28,10 @@ struct MusicControlOverlay: View {
 
     private let seekInterval: TimeInterval = MusicManager.skipGestureSeekInterval
     private let skipPressMagnitude: CGFloat = 8
+    private let useExplicitAnimations = true
+    private let legacyOverlayAnimation = Animation.smooth(duration: 0.2)
+    private let skipControlAnimation = Animation.smooth(duration: 0.2)
+    private let playPauseStateAnimation = Animation.spring(response: 0.2, dampingFraction: 0.82)
 
     private var trackBackwardPressEffect: FloatingMediaButton.PressEffect { .nudge(-skipPressMagnitude) }
     private var trackForwardPressEffect: FloatingMediaButton.PressEffect { .nudge(skipPressMagnitude) }
@@ -105,6 +109,18 @@ struct MusicControlOverlay: View {
     }
 
     var body: some View {
+        if useExplicitAnimations {
+            overlayContent
+        } else {
+            overlayContent
+                .animation(legacyOverlayAnimation, value: musicManager.isPlaying)
+                .animation(legacyOverlayAnimation, value: musicSkipBehavior)
+                .animation(legacyOverlayAnimation, value: controlsEnabled)
+        }
+    }
+
+    @ViewBuilder
+    private var overlayContent: some View {
         let verticalPadding = max(8, notchHeight * 0.12)
 
         let backwardGestureTrigger = skipGestureTrigger(for: .backward)
@@ -118,6 +134,7 @@ struct MusicControlOverlay: View {
                 foregroundColor: .white.opacity(controlsEnabled ? 0.9 : 0.35),
                 pressEffect: backwardConfig.pressEffect,
                 symbolEffectStyle: backwardConfig.symbolEffect,
+                stateChangeAnimation: useExplicitAnimations ? skipControlAnimation : nil,
                 externalTriggerToken: backwardGestureTrigger?.token,
                 externalTriggerEffect: backwardGestureTrigger?.pressEffect,
                 isEnabled: controlsEnabled,
@@ -131,6 +148,7 @@ struct MusicControlOverlay: View {
                 foregroundColor: .white,
                 pressEffect: playPauseConfig.pressEffect,
                 symbolEffectStyle: playPauseConfig.symbolEffect,
+                stateChangeAnimation: useExplicitAnimations ? playPauseStateAnimation : nil,
                 externalTriggerToken: nil,
                 externalTriggerEffect: nil,
                 isEnabled: controlsEnabled,
@@ -144,6 +162,7 @@ struct MusicControlOverlay: View {
                 foregroundColor: .white.opacity(controlsEnabled ? 0.9 : 0.35),
                 pressEffect: forwardConfig.pressEffect,
                 symbolEffectStyle: forwardConfig.symbolEffect,
+                stateChangeAnimation: useExplicitAnimations ? skipControlAnimation : nil,
                 externalTriggerToken: forwardGestureTrigger?.token,
                 externalTriggerEffect: forwardGestureTrigger?.pressEffect,
                 isEnabled: controlsEnabled,
@@ -156,12 +175,9 @@ struct MusicControlOverlay: View {
         .frame(minWidth: buttonSide * 3.2)
         .background {
             RoundedRectangle(cornerRadius: windowCornerRadius, style: .continuous)
-            .fill(Color.black)
+                .fill(Color.black)
         }
         .compositingGroup()
-        .animation(.smooth(duration: 0.2), value: musicManager.isPlaying)
-        .animation(.smooth(duration: 0.2), value: musicSkipBehavior)
-        .animation(.smooth(duration: 0.2), value: controlsEnabled)
     }
 
     private struct ButtonConfig {
@@ -179,6 +195,7 @@ private struct FloatingMediaButton: View {
     let foregroundColor: Color
     let pressEffect: PressEffect
     let symbolEffectStyle: SymbolEffectStyle
+    let stateChangeAnimation: Animation?
     let externalTriggerToken: Int?
     let externalTriggerEffect: PressEffect?
     let isEnabled: Bool
@@ -197,6 +214,7 @@ private struct FloatingMediaButton: View {
             action()
         } label: {
             iconView
+                .animation(stateChangeAnimation, value: icon)
                 .frame(width: frameSize.width, height: frameSize.height)
                 .background(
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

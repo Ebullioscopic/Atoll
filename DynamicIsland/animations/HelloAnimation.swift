@@ -122,6 +122,7 @@ struct HelloAnimation: View {
             blurRadius: 8.0,
             shape: { HelloShape() }
         )
+        .drawingGroup()
         .onAppear {
             withAnimation(
                 .easeInOut(duration: 4.0)

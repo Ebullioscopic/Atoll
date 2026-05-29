@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import Defaults
 import Foundation
 import os
 
@@ -30,6 +31,11 @@ class SystemOSDManager {
         var lastSuspendedPID: Int32 = -1
     }
     private static let suppressionState = OSAllocatedUnfairLock(initialState: SuppressionState())
+    private static let legacySuppressionWatcherIdlePollingInterval: TimeInterval = 0.15
+
+    private static var suppressionWatcherIdlePollingInterval: TimeInterval {
+        max(Defaults[.systemOSDSuppressionWatcherIdlePollingInterval], legacySuppressionWatcherIdlePollingInterval)
+    }
 
     /// Re-enables the system HUD by restarting OSDUIHelper
     public static func enableSystemHUD() {
@@ -163,9 +169,7 @@ class SystemOSDManager {
     /// helper after a short idle period (JETSAM_REASON_MEMORY_IDLE_EXIT) and
     /// launchd spins up a brand-new process on the next volume/brightness
     /// keypress — that fresh PID renders the native OSD before any one-shot
-    /// SIGSTOP can hit it. Polling every 150ms is cheap (a single pgrep per
-    /// tick when nothing changed) and shrinks the visible-OSD window enough
-    /// to feel instant.
+    /// SIGSTOP can hit it.
     private static func startSuppressionWatcher() {
         let newTask = Task.detached(priority: .background) {
             while !Task.isCancelled {
@@ -176,7 +180,8 @@ class SystemOSDManager {
                     suspendOSDUIHelper()
                     suppressionState.withLock { $0.lastSuspendedPID = pid }
                 }
-                try? await Task.sleep(nanoseconds: 150_000_000) // 150ms
+                let idlePollingIntervalNanos = UInt64(suppressionWatcherIdlePollingInterval * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: idlePollingIntervalNanos)
             }
         }
 
