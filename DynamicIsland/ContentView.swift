@@ -98,7 +98,7 @@ struct ContentView: View {
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
         // If details HUD is visible, expand the height to accommodate the glassmorphic details HUD
-        if extensionLiveActivityManager.showDetailsHUD && !extensionLiveActivityManager.activeActivities.isEmpty {
+        if extensionLiveActivityManager.showDetailsHUD && !extensionLiveActivityManager.activeActivities.isEmpty && (Defaults[.enableAgentHoverDetails] || Defaults[.enableAgentDoubleClickDetails]) {
             let width: CGFloat = max(Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize.width : openNotchSize.width, 380)
             let height: CGFloat = 360
             return CGSize(width: width, height: height)
@@ -813,7 +813,7 @@ struct ContentView: View {
         ZStack(alignment: .top) {
             configuredMainLayout
             
-            if extensionLiveActivityManager.showDetailsHUD && !extensionLiveActivityManager.activeActivities.isEmpty {
+            if extensionLiveActivityManager.showDetailsHUD && !extensionLiveActivityManager.activeActivities.isEmpty && (Defaults[.enableAgentHoverDetails] || Defaults[.enableAgentDoubleClickDetails]) {
                 AgentDetailsHUDView(notchHeight: vm.effectiveClosedNotchHeight)
                     .padding(.top, vm.effectiveClosedNotchHeight + 8)
             }
