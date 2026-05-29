@@ -184,6 +184,9 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
         isRepeat: Bool,
         modifiers: NSEvent.ModifierFlags
     ) {
+        let isBacklight = modifiers.contains(.command) && keyboardBacklightEnabled
+        guard isBacklight || brightnessEnabled else { return }
+
         // Elastic Limit Detection (Vertical HUD)
         if Defaults[.enableVerticalHUD] {
             let brightness = brightnessController.currentBrightness
@@ -193,12 +196,12 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
                 Task { @MainActor in VerticalHUDWindowManager.shared.triggerBump(direction: -1) }
             }
         }
-        
+
         let baseStep = brightnessStep(for: step)
         let delta = direction == .up ? baseStep : -baseStep
-        if modifiers.contains(.command) && keyboardBacklightEnabled {
+        if isBacklight {
             keyboardBacklightController.adjust(by: delta)
-        } else if brightnessEnabled {
+        } else {
             brightnessController.adjust(by: delta)
         }
     }
