@@ -199,8 +199,7 @@ final class ExtensionRPCServer {
     private func handleConnectionState(connID: UUID, state: NWConnection.State) {
         switch state {
         case .failed, .cancelled:
-            connections.removeValue(forKey: connID)
-            logDiagnostics("RPC client disconnected (id: \(connID.uuidString.prefix(8)))")
+            cleanupDisconnectedClient(connID: connID)
         default:
             break
         }
@@ -216,7 +215,7 @@ final class ExtensionRPCServer {
             if let error {
                 Task { @MainActor in
                     self.logDiagnostics("RPC receive error for \(connID.uuidString.prefix(8)): \(error.localizedDescription)")
-                    self.connections.removeValue(forKey: connID)
+                    self.cleanupDisconnectedClient(connID: connID)
                 }
                 return
             }
@@ -230,6 +229,20 @@ final class ExtensionRPCServer {
             // Continue receiving
             Task { @MainActor in
                 self.receiveMessage(connID: connID)
+            }
+        }
+    }
+
+    private func cleanupDisconnectedClient(connID: UUID) {
+        guard let clientConn = connections.removeValue(forKey: connID) else { return }
+        logDiagnostics("RPC client disconnected (id: \(connID.uuidString.prefix(8)))")
+
+        if let bundleID = clientConn.bundleIdentifier {
+            // Check if any other connection shares this bundle identifier
+            let otherConnectionsExist = connections.values.contains { $0.bundleIdentifier == bundleID }
+            if !otherConnectionsExist {
+                ExtensionLiveActivityManager.shared.dismissAll(for: bundleID)
+                logDiagnostics("Dismissed orphaned activities for \(bundleID) after disconnect")
             }
         }
     }
