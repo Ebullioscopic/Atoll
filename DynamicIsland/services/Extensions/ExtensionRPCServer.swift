@@ -38,6 +38,7 @@ final class ExtensionRPCServer {
     private let queue = DispatchQueue(label: "com.ebullioscopic.Atoll.rpc.server", qos: .userInitiated)
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
+    private var disconnectGraceTasks: [String: Task<Void, Never>] = [:]
 
     private init() {}
 
@@ -237,13 +238,24 @@ final class ExtensionRPCServer {
         guard let clientConn = connections.removeValue(forKey: connID) else { return }
         logDiagnostics("RPC client disconnected (id: \(connID.uuidString.prefix(8)))")
 
-        if let bundleID = clientConn.bundleIdentifier {
-            // Check if any other connection shares this bundle identifier
-            let otherConnectionsExist = connections.values.contains { $0.bundleIdentifier == bundleID }
-            if !otherConnectionsExist {
+        guard let bundleID = clientConn.bundleIdentifier else { return }
+
+        // If another connection from the same bundle is still alive, no cleanup needed
+        let otherConnectionsExist = connections.values.contains { $0.bundleIdentifier == bundleID }
+        if otherConnectionsExist { return }
+
+        // Grace period: wait 15s before dismissing activities (client may reconnect)
+        disconnectGraceTasks[bundleID]?.cancel()
+        disconnectGraceTasks[bundleID] = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(15))
+            guard !Task.isCancelled else { return }
+            // Re-check: did the client reconnect during grace period?
+            let reconnected = self.connections.values.contains { $0.bundleIdentifier == bundleID }
+            if !reconnected {
                 ExtensionLiveActivityManager.shared.dismissAll(for: bundleID)
-                logDiagnostics("Dismissed orphaned activities for \(bundleID) after disconnect")
+                self.logDiagnostics("Dismissed orphaned activities for \(bundleID) after 15s grace period")
             }
+            self.disconnectGraceTasks.removeValue(forKey: bundleID)
         }
     }
 
@@ -266,6 +278,9 @@ final class ExtensionRPCServer {
            let bi = params["bundleIdentifier"]?.stringValue {
             clientConn.bundleIdentifier = bi
             connections[connID] = clientConn
+            // Cancel any pending grace-period dismissal — client reconnected
+            disconnectGraceTasks[bi]?.cancel()
+            disconnectGraceTasks.removeValue(forKey: bi)
         }
 
         let service = ExtensionRPCService(
