@@ -84,6 +84,8 @@ final class ExtensionRPCServer {
             conn.connection.cancel()
         }
         connections.removeAll()
+        disconnectGraceTasks.values.forEach { $0.cancel() }
+        disconnectGraceTasks.removeAll()
         shelfSubscribers.removeAll()
         logDiagnostics("RPC server stopped")
     }
