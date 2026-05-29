@@ -478,8 +478,10 @@ final class SystemBrightnessController {
     private var lastEmittedBrightness: Float = 0.5
     private let coreBrightnessClient = CoreBrightnessDisplayClient.shared
     private var pollTimer: Timer?
-    private let pollInterval: TimeInterval = 0.15
+    private let pollInterval: TimeInterval = 2.0
     private let pollChangeThreshold: Float = 0.005
+    private var displayServicesFailedAt: Date?
+    private let displayServicesBackoff: TimeInterval = 30
 
     private init() {
         registerExternalNotifications()
@@ -657,21 +659,30 @@ final class SystemBrightnessController {
     }
 
     private func getBrightnessViaDisplayServices() -> Float? {
+        // Skip if we recently failed — avoids hammering a broken API path
+        if let failedAt = displayServicesFailedAt,
+           Date().timeIntervalSince(failedAt) < displayServicesBackoff {
+            return nil
+        }
+
         guard let result = DisplayServicesDynamic.shared.getBrightness(displayID: displayID) else {
             return nil
         }
         if result.status == kIOReturnSuccess {
+            displayServicesFailedAt = nil
             return result.value
         }
         displayID = CGMainDisplayID()
         guard let retry = DisplayServicesDynamic.shared.getBrightness(displayID: displayID) else {
-            NSLog("⚠️ DisplayServicesGetBrightness unavailable after display refresh")
+            displayServicesFailedAt = Date()
             return nil
         }
         if retry.status == kIOReturnSuccess {
+            displayServicesFailedAt = nil
             return retry.value
         }
-        NSLog("⚠️ DisplayServicesGetBrightness failed: \(retry.status)")
+        displayServicesFailedAt = Date()
+        NSLog("⚠️ DisplayServicesGetBrightness failed: \(retry.status) — backing off for \(Int(displayServicesBackoff))s")
         return nil
     }
 
@@ -685,6 +696,7 @@ final class SystemBrightnessController {
         ]
         observers = names.map { name in
             DistributedNotificationCenter.default().addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.displayServicesFailedAt = nil
                 self?.notifyCurrentBrightness()
             }
         }
