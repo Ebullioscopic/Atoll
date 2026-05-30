@@ -3616,9 +3616,11 @@ extension Color {
 
 func agentColor(for name: String) -> Color {
     if name.contains("antigravity") { return .blue }
-    if name.contains("codex") { return .gray }
+    if name.contains("codex") { return .white }
     if name.contains("nerv") { return .orange }
-    if name.contains("claude") { return Color(red: 0.85, green: 0.44, blue: 0.28) }
+    if name.contains("claude") { return Color(red: 0.96, green: 0.55, blue: 0.14) }
+    if name.contains("copilot") { return .green }
+    if name.contains("kilo") { return .yellow }
     return .purple
 }
 

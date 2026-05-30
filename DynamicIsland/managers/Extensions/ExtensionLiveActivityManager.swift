@@ -348,7 +348,7 @@ final class ExtensionLiveActivityManager: ObservableObject {
             NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
         }
         
-        let interactionsFile = "/Users/abelwang/Code/nerv/agent-hooks/interactions.json"
+        let interactionsFile = NSHomeDirectory() + "/Code/nerv/agent-hooks/interactions.json"
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let data: [String: Any] = [
             "timestamp": timestamp,
@@ -382,7 +382,7 @@ final class ExtensionLiveActivityManager: ObservableObject {
             NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
         }
         
-        let interactionsFile = "/Users/abelwang/Code/nerv/agent-hooks/interactions.json"
+        let interactionsFile = NSHomeDirectory() + "/Code/nerv/agent-hooks/interactions.json"
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let data: [String: Any] = [
             "timestamp": timestamp,

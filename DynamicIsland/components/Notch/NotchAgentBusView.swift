@@ -17,6 +17,7 @@
  */
 
 import SwiftUI
+import Combine
 import Defaults
 
 struct NotchAgentBusView: View {
@@ -24,7 +25,7 @@ struct NotchAgentBusView: View {
 
     @State private var elapsed: TimeInterval = 0
     @State private var isPulse = false
-    let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+    @State private var timerSubscription: AnyCancellable?
 
     var body: some View {
         VStack(spacing: 14) {
@@ -239,11 +240,17 @@ struct NotchAgentBusView: View {
             if let first = manager.activeActivities.first {
                 elapsed = Date().timeIntervalSince(first.receivedAt)
             }
+            timerSubscription = Timer.publish(every: 0.5, on: .main, in: .common)
+                .autoconnect()
+                .sink { _ in
+                    if let first = manager.activeActivities.first {
+                        elapsed = Date().timeIntervalSince(first.receivedAt)
+                    }
+                }
         }
-        .onReceive(timer) { _ in
-            if let first = manager.activeActivities.first {
-                elapsed = Date().timeIntervalSince(first.receivedAt)
-            }
+        .onDisappear {
+            timerSubscription?.cancel()
+            timerSubscription = nil
         }
     }
 
@@ -253,6 +260,7 @@ struct NotchAgentBusView: View {
         if name.contains("nerv") { return "NERV Brain" }
         if name.contains("claude") { return "Claude" }
         if name.contains("copilot") { return "Copilot" }
+        if name.contains("kilo") { return "Kilo" }
         return name.capitalized
     }
 
