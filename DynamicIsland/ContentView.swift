@@ -819,17 +819,13 @@ struct ContentView: View {
             }
             
             if extensionLiveActivityManager.triggerParticleBurst {
-                let agentColor: Color = {
+                let burstColor: Color = {
                     if let first = extensionLiveActivityManager.activeActivities.first {
-                        let name = first.bundleIdentifier.lowercased()
-                        if name.contains("antigravity") { return .blue }
-                        if name.contains("codex") { return .gray }
-                        if name.contains("nerv") { return .orange }
-                        if name.contains("claude") { return Color(red: 0.85, green: 0.44, blue: 0.28) }
+                        return agentColor(for: first.bundleIdentifier.lowercased())
                     }
                     return .blue
                 }()
-                ParticleBurstView(color: agentColor)
+                ParticleBurstView(color: burstColor)
                     .frame(width: dynamicNotchSize.width, height: 60)
                     .allowsHitTesting(false)
             }
@@ -3165,7 +3161,7 @@ struct AgentDetailsHUDView: View {
     
     @State private var isPulse = false
     @State private var elapsed: TimeInterval = 0
-    let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+    @State private var timerSubscription: AnyCancellable?
     
     var body: some View {
         VStack(spacing: 12) {
@@ -3393,11 +3389,17 @@ struct AgentDetailsHUDView: View {
             if let first = manager.activeActivities.first {
                 elapsed = Date().timeIntervalSince(first.receivedAt)
             }
+            timerSubscription = Timer.publish(every: 0.5, on: .main, in: .common)
+                .autoconnect()
+                .sink { _ in
+                    if let first = manager.activeActivities.first {
+                        elapsed = Date().timeIntervalSince(first.receivedAt)
+                    }
+                }
         }
-        .onReceive(timer) { _ in
-            if let first = manager.activeActivities.first {
-                elapsed = Date().timeIntervalSince(first.receivedAt)
-            }
+        .onDisappear {
+            timerSubscription?.cancel()
+            timerSubscription = nil
         }
     }
     
@@ -3406,6 +3408,8 @@ struct AgentDetailsHUDView: View {
         if name.contains("codex") { return "Codex" }
         if name.contains("nerv") { return "NERV Brain" }
         if name.contains("claude") { return "Claude" }
+        if name.contains("copilot") { return "Copilot" }
+        if name.contains("kilo") { return "Kilo" }
         return name.capitalized
     }
     // agentColor(for:) moved to file-scope to resolve ContentView scope issues
