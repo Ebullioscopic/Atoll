@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		11E0444CAE34247C721C567B /* PanelsVisualEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE374CE38B46A93712B83CFD /* PanelsVisualEffect.swift */; };
+		6DF34A4F8CD43786E761B59E /* ChatMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56FB4147B8B14C679081490E /* ChatMessages.swift */; };
 		7E1ADF1D2EA209B1001DA867 /* SkyLightWindow in Frameworks */ = {isa = PBXBuildFile; productRef = 7E61181E2E24071E0050006C /* SkyLightWindow */; };
 		7E288D122F1659EF0020C117 /* AtollExtensionKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7E288D112F1659EF0020C117 /* AtollExtensionKit */; };
 		7E6118142E24071E0050006C /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = 14D032192C68F32E0096E6A1 /* LaunchAtLogin */; };
@@ -28,6 +30,10 @@
 		7EE1D73F2E6B1E1200997219 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EE1D73E2E6B1E1200997219 /* IOKit.framework */; };
 		7EF10C122F817ECF004229A0 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EF10C112F817ECF004229A0 /* Accelerate.framework */; };
 		7EF19C172F577040005B9929 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 7EF19C162F577040005B9929 /* SwiftTerm */; };
+		95444CB4A9E599287A28E204 /* MessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA804881AFDA65CA8BE25B38 /* MessageBubble.swift */; };
+		B3ED415BB5C107E7843BE281 /* ScreenshotOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB1A441BAD1DCAE1AA7A4555 /* ScreenshotOptions.swift */; };
+		BF1742EC95B57ED03E128C37 /* PopoverBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C72472DAAFF908FD9092EE5 /* PopoverBackground.swift */; };
+		C9B64B698841C0293E557EC7 /* ChatInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045D44C983370CAC30C5B75E /* ChatInput.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -43,6 +49,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		045D44C983370CAC30C5B75E /* ChatInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ChatInput.swift; path = DynamicIsland/components/ScreenAssistant/Views/ChatInput.swift; sourceTree = SOURCE_ROOT; };
+		3C72472DAAFF908FD9092EE5 /* PopoverBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PopoverBackground.swift; path = DynamicIsland/components/ScreenAssistant/Views/PopoverBackground.swift; sourceTree = SOURCE_ROOT; };
+		56FB4147B8B14C679081490E /* ChatMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ChatMessages.swift; path = DynamicIsland/components/ScreenAssistant/Views/ChatMessages.swift; sourceTree = SOURCE_ROOT; };
 		7E25ECA02E6C6C3800700E72 /* CoreBrightness.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBrightness.framework; path = /System/Library/PrivateFrameworks/CoreBrightness.framework; sourceTree = "<absolute>"; };
 		7E25ECA22E6C6E2600700E72 /* OSD.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OSD.framework; path = /System/Library/PrivateFrameworks/OSD.framework; sourceTree = "<absolute>"; };
 		7E25ECA42E6C6E7800700E72 /* DisplayServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DisplayServices.framework; path = /System/Library/PrivateFrameworks/DisplayServices.framework; sourceTree = "<absolute>"; };
@@ -55,19 +64,22 @@
 		7EE1D73C2E6B1E0B00997219 /* ApplicationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ApplicationServices.framework; path = System/Library/Frameworks/ApplicationServices.framework; sourceTree = SDKROOT; };
 		7EE1D73E2E6B1E1200997219 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		7EF10C112F817ECF004229A0 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		EB1A441BAD1DCAE1AA7A4555 /* ScreenshotOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ScreenshotOptions.swift; path = DynamicIsland/components/ScreenAssistant/Views/ScreenshotOptions.swift; sourceTree = SOURCE_ROOT; };
 		F4C1DD09EC134302938E84F6 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = Frameworks/MediaRemoteAdapter.framework; sourceTree = SOURCE_ROOT; };
 		F54406E72CD4987A00C7AFD9 /* Atoll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atoll.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA804881AFDA65CA8BE25B38 /* MessageBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MessageBubble.swift; path = DynamicIsland/components/ScreenAssistant/Views/MessageBubble.swift; sourceTree = SOURCE_ROOT; };
+		FE374CE38B46A93712B83CFD /* PanelsVisualEffect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PanelsVisualEffect.swift; path = DynamicIsland/components/ScreenAssistant/Views/PanelsVisualEffect.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		7EA69B1E2F5AE61200EB2D16 /* Exceptions for "Contents" folder in "DynamicIsland" target */ = {
+		7EA69B1E2F5AE61200EB2D16 = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Helpers/NowPlayingTestClient,
 			);
 			target = F54406E62CD4987A00C7AFD9 /* DynamicIsland */;
 		};
-		7EA69B212F5B100000EB2D16 /* Exceptions for "DynamicIsland" folder in "DynamicIsland" target */ = {
+		7EA69B212F5B100000EB2D16 = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -77,10 +89,12 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		7EA69B202F5AE63200EB2D16 /* Exceptions for "Contents" folder in "Copy Files" phase from "DynamicIsland" target */ = {
+		7EA69B202F5AE63200EB2D16 = {
 			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
 			attributesByRelativePath = {
-				Helpers/NowPlayingTestClient = (CodeSignOnCopy, );
+				Helpers/NowPlayingTestClient = (
+					CodeSignOnCopy,
+				);
 			};
 			buildPhase = 7EA69B1B2F5AE13500EB2D16 /* CopyFiles */;
 			membershipExceptions = (
@@ -90,23 +104,8 @@
 /* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		7EA69B1C2F5AE15C00EB2D16 /* Contents */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				7EA69B1E2F5AE61200EB2D16 /* Exceptions for "Contents" folder in "DynamicIsland" target */,
-				7EA69B202F5AE63200EB2D16 /* Exceptions for "Contents" folder in "Copy Files" phase from "DynamicIsland" target */,
-			);
-			path = Contents;
-			sourceTree = "<group>";
-		};
-		F54406E92CD4987A00C7AFD9 /* DynamicIsland */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				7EA69B212F5B100000EB2D16 /* Exceptions for "DynamicIsland" folder in "DynamicIsland" target */,
-			);
-			path = DynamicIsland;
-			sourceTree = "<group>";
-		};
+		7EA69B1C2F5AE15C00EB2D16 /* Contents */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (7EA69B1E2F5AE61200EB2D16, 7EA69B202F5AE63200EB2D16, ); path = Contents; sourceTree = "<group>"; };
+		F54406E92CD4987A00C7AFD9 /* DynamicIsland */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (7EA69B212F5B100000EB2D16, ); path = DynamicIsland; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -177,6 +176,12 @@
 				7E81303F2E3FB40500E08F3F /* mediaremote-adapter */,
 				F54406E92CD4987A00C7AFD9 /* DynamicIsland */,
 				F54406E82CD4987A00C7AFD9 /* Products */,
+				56FB4147B8B14C679081490E /* ChatMessages.swift */,
+				045D44C983370CAC30C5B75E /* ChatInput.swift */,
+				FA804881AFDA65CA8BE25B38 /* MessageBubble.swift */,
+				EB1A441BAD1DCAE1AA7A4555 /* ScreenshotOptions.swift */,
+				FE374CE38B46A93712B83CFD /* PanelsVisualEffect.swift */,
+				3C72472DAAFF908FD9092EE5 /* PopoverBackground.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -323,6 +328,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6DF34A4F8CD43786E761B59E /* ChatMessages.swift in Sources */,
+				C9B64B698841C0293E557EC7 /* ChatInput.swift in Sources */,
+				95444CB4A9E599287A28E204 /* MessageBubble.swift in Sources */,
+				B3ED415BB5C107E7843BE281 /* ScreenshotOptions.swift in Sources */,
+				11E0444CAE34247C721C567B /* PanelsVisualEffect.swift in Sources */,
+				BF1742EC95B57ED03E128C37 /* PopoverBackground.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
