@@ -56,6 +56,7 @@ class CalendarManager: ObservableObject {
     private var lastLockScreenEventsFetchDate: Date?
     private let lockScreenRefreshInterval: TimeInterval = 15
     private var lockScreenRefreshTask: Task<Void, Never>?
+    private var midnightRefreshTask: Task<Void, Never>?
 
     var hasCalendarAccess: Bool { isAuthorized(calendarAuthorizationStatus) }
     var hasReminderAccess: Bool { isAuthorized(reminderAuthorizationStatus) }
@@ -64,6 +65,7 @@ class CalendarManager: ObservableObject {
         currentWeekStartDate = CalendarManager.startOfDay(Date())
         setupEventStoreChangedObserver()
         startLockScreenRefreshLoop()
+        startMidnightRefreshScheduler()
         Task {
             await reloadCalendarAndReminderLists()
         }
@@ -75,6 +77,7 @@ class CalendarManager: ObservableObject {
         }
         pendingEventStoreRefreshTask?.cancel()
         lockScreenRefreshTask?.cancel()
+        midnightRefreshTask?.cancel()
     }
 
     private func setupEventStoreChangedObserver() {
@@ -353,6 +356,34 @@ class CalendarManager: ObservableObject {
                 if Task.isCancelled { break }
                 guard self.hasCalendarAccess else { continue }
                 await self.updateLockScreenEvents(force: false)
+            }
+        }
+    }
+
+    /// Schedules a forced refresh of events immediately after midnight so that
+    /// all-day events for the new day appear without waiting for user interaction (#156).
+    private func startMidnightRefreshScheduler() {
+        midnightRefreshTask?.cancel()
+        midnightRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                let now = Date()
+                let calendar = Calendar.current
+                guard let nextMidnight = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) else {
+                    try? await Task.sleep(nanoseconds: 3600 * 1_000_000_000)
+                    continue
+                }
+                // Sleep until just after midnight (add 2 seconds buffer)
+                let delay = nextMidnight.timeIntervalSince(now) + 2.0
+                let sleepNanos = UInt64(max(delay, 1.0) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: sleepNanos)
+                if Task.isCancelled { break }
+
+                // Force refresh all events for the new day
+                Logger.log("CalendarManager: Midnight refresh — updating events for new day", category: .lifecycle)
+                self.currentWeekStartDate = calendar.startOfDay(for: Date())
+                await self.updateEvents(force: true)
+                await self.updateLockScreenEvents(force: true)
             }
         }
     }

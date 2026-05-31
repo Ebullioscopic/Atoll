@@ -88,6 +88,9 @@ struct NotchTerminalView: View {
     @Default(.enableTerminalFeature) var enableTerminalFeature
     @Default(.cornerRadiusScaling) var cornerRadiusScaling
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
+    @Default(.terminalAutoFocus) var terminalAutoFocus
+    @Default(.terminalFloatingMode) var terminalFloatingMode
+    @Default(.terminalCustomWidth) var terminalCustomWidth
     @State private var suppressionToken = UUID()
     @State private var isSuppressing = false
 
@@ -134,6 +137,17 @@ struct NotchTerminalView: View {
                         .lineLimit(1)
 
                     Spacer()
+
+                    // Float-out button (detach to floating panel)
+                    Button {
+                        TerminalFloatingPanelController.shared.showPanel()
+                    } label: {
+                        Image(systemName: "rectangle.portrait.and.arrow.forward")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Detach to floating window")
 
                     // Restart button
                     Button {
@@ -191,7 +205,9 @@ struct NotchTerminalView: View {
         }
         .onAppear {
             terminalManager.refreshTerminalAppearanceIfNeeded()
-            terminalManager.focusTerminalIfPossible()
+            if terminalAutoFocus {
+                terminalManager.focusTerminalIfPossible()
+            }
         }
     }
 

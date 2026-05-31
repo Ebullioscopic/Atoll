@@ -1839,7 +1839,9 @@ class MusicManager: ObservableObject {
         }
 
         if Defaults[.enableLyrics] {
-            startLyricSync()
+            // Force-restart to ensure the sync task picks up new lyrics immediately
+            // (avoids stale lyrics from a previous track if the old task is still draining)
+            restartLyricSync()
         } else {
             stopLyricSync()
         }
@@ -1918,8 +1920,8 @@ class MusicManager: ObservableObject {
                     self.updateCurrentLyric(for: position)
                 }
 
-                // Sleep ~300ms between updates
-                try? await Task.sleep(nanoseconds: 300_000_000)
+                // Sleep ~200ms between updates for more responsive lyric sync
+                try? await Task.sleep(nanoseconds: 200_000_000)
             }
         }
     }
@@ -1927,6 +1929,12 @@ class MusicManager: ObservableObject {
     private func stopLyricSync() {
         lyricSyncTask?.cancel()
         lyricSyncTask = nil
+    }
+
+    /// Force-restart the lyric sync task (used after track changes to avoid stale state)
+    private func restartLyricSync() {
+        stopLyricSync()
+        startLyricSync()
     }
 
     // MARK: - Video Artwork
