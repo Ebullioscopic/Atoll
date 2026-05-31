@@ -1264,6 +1264,9 @@ extension Defaults.Keys {
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)
     
+    // MARK: Weather Tab
+    static let enableWeatherTab = Key<Bool>("enableWeatherTab", default: false)
+    
     // MARK: Notes Feature
     static let enableNotes = Key<Bool>("enableNotes", default: false)
     static let enableNotePinning = Key<Bool>("enableNotePinning", default: true)
