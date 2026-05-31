@@ -134,6 +134,8 @@ class AudioTap: NSObject {
         "com.audirvana.Audirvana-Studio",
         "com.vox.vox",
         "com.coppertino.Vox",
+        "sh.cider.classic",
+        "sh.cider.cider",
     ]
 
     private override init() {

@@ -1947,6 +1947,8 @@ extension MusicManager {
             return spotifyGreen
         case AmazonMusicController.bundleIdentifier:
             return amazonOrange
+        case "sh.cider.classic", "sh.cider.cider":
+            return ciderPink
         default:
             return nil
         }
@@ -1955,6 +1957,7 @@ extension MusicManager {
     private static let appleMusicPink = Color(red: 0.999, green: 0.171, blue: 0.331)
     private static let spotifyGreen = Color(red: 0.0, green: 0.857, blue: 0.302)
     private static let amazonOrange = Color(red: 1.0, green: 0.6, blue: 0.0)
+    private static let ciderPink = Color(red: 0.98, green: 0.34, blue: 0.45)
 }
 
 // MARK: - Album Art Flip Helper

@@ -43,6 +43,11 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     private var lastMusicItem:
         (title: String, artist: String, album: String, duration: TimeInterval, artworkData: Data?)?
 
+    // MARK: - Cider Artwork Fallback
+    private static let ciderBundleIDs: Set<String> = ["sh.cider.classic", "sh.cider.cider"]
+    private var lastCiderArtworkKey: String?
+    private var cachedCiderArtwork: Data?
+
     // MARK: - Media Remote Functions
     private let mediaRemoteBundle: CFBundle
     private let MRMediaRemoteSendCommandFunction: @convention(c) (Int, AnyObject?) -> Void
@@ -306,8 +311,65 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             (diff ? self.playbackState.bundleIdentifier : "")
         )
         
+        // Cider artwork fallback: if the source is Cider and artwork is missing/tiny,
+        // fetch from iTunes Search API.
+        if Self.ciderBundleIDs.contains(newPlaybackState.bundleIdentifier),
+           (newPlaybackState.artwork == nil || (newPlaybackState.artwork?.count ?? 0) < 512),
+           !newPlaybackState.title.isEmpty {
+            let fallback = await fetchCiderArtworkFallback(
+                title: newPlaybackState.title,
+                artist: newPlaybackState.artist,
+                album: newPlaybackState.album
+            )
+            if let fallback {
+                newPlaybackState.artwork = fallback
+            }
+        }
+
         self.playbackState = newPlaybackState
         self.updateKnownSources(from: newPlaybackState)
+    }
+
+    // MARK: - Cider Artwork Fallback (iTunes Search API)
+    private func fetchCiderArtworkFallback(title: String, artist: String, album: String) async -> Data? {
+        let key = "\(title)|\(artist)|\(album)"
+        if key == lastCiderArtworkKey, let cached = cachedCiderArtwork {
+            return cached
+        }
+
+        let query = "\(title) \(artist)"
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty,
+              let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=song&limit=5")
+        else { return nil }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let response = try JSONDecoder().decode(CiderITunesSearchResponse.self, from: data)
+            guard !response.results.isEmpty else { return nil }
+
+            let normalizedTitle = title.lowercased()
+            let normalizedAlbum = album.lowercased()
+
+            let match = response.results.first(where: {
+                $0.trackName?.lowercased() == normalizedTitle &&
+                $0.collectionName?.lowercased() == normalizedAlbum
+            }) ?? response.results.first(where: {
+                $0.trackName?.lowercased() == normalizedTitle
+            }) ?? response.results.first
+
+            guard let artworkURLString = match?.artworkUrl100 else { return nil }
+            // Request higher resolution
+            let hiRes = artworkURLString.replacingOccurrences(of: "100x100", with: "600x600")
+            guard let artworkURL = URL(string: hiRes) else { return nil }
+
+            let (artData, _) = try await URLSession.shared.data(from: artworkURL)
+            lastCiderArtworkKey = key
+            cachedCiderArtwork = artData
+            return artData
+        } catch {
+            return nil
+        }
     }
 }
 
@@ -330,6 +392,18 @@ struct NowPlayingPayload: Codable {
     let playing: Bool?
     let parentApplicationBundleIdentifier: String?
     let bundleIdentifier: String?
+}
+
+// MARK: - iTunes Search API Models (Cider artwork fallback)
+private struct CiderITunesSearchResponse: Decodable {
+    let results: [CiderITunesTrack]
+}
+
+private struct CiderITunesTrack: Decodable {
+    let trackName: String?
+    let artistName: String?
+    let collectionName: String?
+    let artworkUrl100: String?
 }
 
 actor JSONLinesPipeHandler {
