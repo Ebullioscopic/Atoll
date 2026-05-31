@@ -740,6 +740,16 @@ struct LockScreenMusicPanel: View {
                     enableLyrics.toggle()
                 }
             }
+        case .spotifyLike:
+            controlButton(
+                icon: musicManager.isSpotifyLiked ? "heart.fill" : "heart",
+                size: 18,
+                isActive: musicManager.isSpotifyLiked,
+                activeColor: .green,
+                symbolEffect: .replace
+            ) {
+                MusicManager.shared.toggleSpotifyLike()
+            }
         }
     }
 

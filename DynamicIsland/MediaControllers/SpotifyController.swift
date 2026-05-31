@@ -121,6 +121,45 @@ class SpotifyController: MediaControllerProtocol {
         await executeAndRefresh("set repeating to not repeating")
     }
 
+    /// Check if the current track is saved in the user's Spotify library.
+    func isTrackLiked(trackID: String) async -> Bool {
+        guard !trackID.isEmpty,
+              let accessToken = await SpotifyAuthManager.shared.validAccessToken() else { return false }
+
+        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me/tracks/contains?ids=\(trackID)")!)
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200..<300).contains(httpResponse.statusCode),
+                  let results = try? JSONDecoder().decode([Bool].self, from: data),
+                  let liked = results.first else { return false }
+            return liked
+        } catch {
+            return false
+        }
+    }
+
+    /// Save or remove the current track from the user's Spotify library.
+    func setTrackLiked(trackID: String, liked: Bool) async -> Bool {
+        guard !trackID.isEmpty,
+              let accessToken = await SpotifyAuthManager.shared.validAccessToken() else { return false }
+
+        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me/tracks?ids=\(trackID)")!)
+        request.httpMethod = liked ? "PUT" : "DELETE"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else { return false }
+            return (200..<300).contains(httpResponse.statusCode)
+        } catch {
+            return false
+        }
+    }
+
     func isActive() -> Bool {
         NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == playbackState.bundleIdentifier }
     }
