@@ -56,6 +56,19 @@ class DynamicIslandWindow: NSPanel {
 
         ScreenCaptureVisibilityManager.shared.register(self, scope: .entireInterface)
     }
+
+    /// The default window level when not in fullscreen mode.
+    private static let normalLevel: NSWindow.Level = .mainMenu + 3
+    /// Elevated window level to appear above fullscreen apps (e.g. for live activities).
+    private static let fullscreenLevel: NSWindow.Level = .screenSaver
+
+    /// Call when fullscreen state changes to ensure the window appears above fullscreen apps.
+    func adjustLevelForFullscreen(_ isFullscreen: Bool) {
+        let target: NSWindow.Level = isFullscreen ? Self.fullscreenLevel : Self.normalLevel
+        if level != target {
+            level = target
+        }
+    }
     
     override var canBecomeKey: Bool {
         true
