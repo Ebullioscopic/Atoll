@@ -136,8 +136,8 @@ final class CustomOSDWindowManager {
         
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.level = .statusBar + 1
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        window.level = .screenSaver
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary, .fullScreenDisallowsTiling]
         window.hasShadow = false
         window.contentView = hostingView
         window.alphaValue = 0

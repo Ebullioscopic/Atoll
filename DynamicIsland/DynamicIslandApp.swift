@@ -865,6 +865,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             adjustWindowPosition(changeAlpha: true)
         }
+
+        // Observe fullscreen state to elevate window level for live activities
+        setupFullscreenWindowLevelObserver()
         
         if coordinator.firstLaunch {
             DispatchQueue.main.async {
@@ -887,6 +890,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let timerWidgetManager = LockScreenTimerWidgetManager.shared
         timerWidgetManager.handleLockStateChange(isLocked: LockScreenManager.shared.currentLockStatus)
 
+    }
+
+    /// Observes `fullscreenActive` on all view models and elevates/restores window levels
+    /// so that live activities remain visible above fullscreen apps.
+    private func setupFullscreenWindowLevelObserver() {
+        vm.$fullscreenActive
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isFullscreen in
+                guard let self else { return }
+                // Adjust single-display window
+                if let w = self.window as? DynamicIslandWindow {
+                    w.adjustLevelForFullscreen(isFullscreen)
+                }
+                // Adjust multi-display windows
+                for (_, w) in self.windows {
+                    if let diw = w as? DynamicIslandWindow {
+                        diw.adjustLevelForFullscreen(isFullscreen)
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        // Also observe per-screen view models for multi-display setups
+        for (_, viewModel) in viewModels {
+            viewModel.$fullscreenActive
+                .removeDuplicates()
+                .receive(on: RunLoop.main)
+                .sink { [weak self, weak viewModel] isFullscreen in
+                    guard let self, let viewModel else { return }
+                    // Find the window for this view model's screen
+                    if let screen = NSScreen.screens.first(where: { $0.localizedName == viewModel.screen }),
+                       let w = self.windows[screen] as? DynamicIslandWindow {
+                        w.adjustLevelForFullscreen(isFullscreen)
+                    }
+                }
+                .store(in: &cancellables)
+        }
     }
 
     private func installTopMenuItemsIfNeeded() {
@@ -1181,8 +1222,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if screensChanged {
             DispatchQueue.main.async { [weak self] in
-                self?.cleanupWindows()
-                self?.adjustWindowPosition()
+                guard let self = self else { return }
+                self.cleanupWindows()
+                self.adjustWindowPosition(changeAlpha: true)
+                // Force recalculate window size for new screen geometry
+                self.updateWindowSizeIfNeeded()
+            }
+            
+            // After clamshell/lid-open transitions the display may still be
+            // settling when the first notification arrives. Re-position after
+            // a short delay to handle late geometry updates (fixes #327).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                guard let self = self else { return }
+                self.adjustWindowPosition(changeAlpha: true)
+                self.updateWindowSizeIfNeeded()
             }
         }
     }
