@@ -241,7 +241,11 @@ class TerminalManager: ObservableObject {
     /// SwiftTerm’s `TerminalView.isOpaque` is read-only; translucency relies on alpha in `nativeBackgroundColor`.
     private func applyTerminalBackgroundAppearance(to view: LocalProcessTerminalView) {
         view.layer?.opacity = 1
+        let opacity = CGFloat(Defaults[.terminalOpacity])
         view.nativeBackgroundColor = resolvedTerminalBackgroundNSColor()
+        // Fade the frosted backdrop in sync with background alpha so that reducing
+        // opacity makes the terminal see-through rather than revealing a dark blur layer.
+        terminalBackgroundEffectView.alphaValue = opacity
     }
 
     /// Upstream `TerminalView.setupOptions()` assigns `layer.backgroundColor` from `nativeBackgroundColor`, which
@@ -322,6 +326,9 @@ class TerminalManager: ObservableObject {
         guard let view = terminalView else { return }
         view.layer?.opacity = 1
         view.nativeBackgroundColor = resolvedTerminalBackgroundNSColor(opacitySlider: CGFloat(opacity))
+        // Sync frosted backdrop alpha so the terminal becomes truly transparent
+        // rather than revealing the dark NSVisualEffectView underneath.
+        terminalBackgroundEffectView.alphaValue = CGFloat(opacity)
         refreshTerminalOpacityAndTranslucency(for: view)
     }
 
