@@ -79,7 +79,10 @@ private final class LiquidGlassContainerView: NSView {
     private func setBackdropProperties(in layer: CALayer) {
         if NSStringFromClass(type(of: layer)).contains("CABackdropLayer") {
             layer.setValue(true, forKey: windowServerAwareKeyPath)
-            layer.setValue(1.0, forKey: scaleKeyPath)
+            // Don't override scale — NSGlassEffectView sets variant-specific
+            // scale values on its backdrop layers to control blur intensity.
+            // Forcing 1.0 here causes lower variants (< v11) to appear overly
+            // frosted/opaque because it overrides their intended transparency.
         }
         layer.sublayers?.forEach { setBackdropProperties(in: $0) }
     }
@@ -104,9 +107,12 @@ private final class LiquidGlassContainerView: NSView {
                 configureBackdropLayers()
             }
         } else if keyPath == scaleKeyPath {
+            // Observe scale changes but don't fight them — NSGlassEffectView
+            // sets variant-appropriate scale values. Only re-assert windowServerAware
+            // if the backdrop was fully zeroed (layer became invisible).
             guard let layer = object as? CALayer else { return }
-            if let newScale = (change?[.newKey] as? NSNumber)?.doubleValue, newScale != 1.0 {
-                layer.setValue(1.0, forKey: scaleKeyPath)
+            if let newScale = (change?[.newKey] as? NSNumber)?.doubleValue, newScale == 0.0 {
+                layer.setValue(true, forKey: windowServerAwareKeyPath)
             }
         } else {
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)

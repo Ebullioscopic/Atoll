@@ -910,6 +910,16 @@ class MusicManager: ObservableObject {
         if hasContentChange {
             self.triggerFlipAnimation()
 
+             // Reset live stream counters on track change to prevent
+             // brief zero-duration windows from falsely triggering LIVE (#356)
+             liveStreamUnknownDurationCount = 0
+             liveStreamEdgeObservationCount = 0
+             liveStreamCompletionObservationCount = 0
+             liveStreamCompletionReleaseCount = 0
+             if isLiveStream {
+                 isLiveStream = false
+             }
+
             if artworkChanged, let artwork = state.artwork {
                 self.updateArtwork(artwork)
             } else if state.artwork == nil {
@@ -1192,7 +1202,7 @@ class MusicManager: ObservableObject {
             liveStreamCompletionReleaseCount = 0
 
             liveStreamUnknownDurationCount = min(liveStreamUnknownDurationCount + 1, 8)
-            if liveStreamUnknownDurationCount >= 3 && !isLiveStream {
+            if liveStreamUnknownDurationCount >= 6 && !isLiveStream {
                 isLiveStream = true
             }
         } else {

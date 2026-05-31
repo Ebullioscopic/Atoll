@@ -806,7 +806,14 @@ struct MusicSliderView: View {
         .onChange(of: currentDate) { newDate in
             guard !isLiveStream else { return }
             guard !dragging, timestampDate.timeIntervalSince(lastDragged) > -1 else { return }
-            sliderValue = MusicManager.shared.estimatedPlaybackPosition(at: newDate)
+            let newPosition = MusicManager.shared.estimatedPlaybackPosition(at: newDate)
+            // Debounce: reject backward jumps > 2s that aren't near track start,
+            // which indicate stale position data arriving before fresh data (#356)
+            let delta = newPosition - sliderValue
+            if delta < -2.0 && newPosition > 1.0 && sliderValue > 3.0 {
+                return
+            }
+            sliderValue = newPosition
         }
         .onChange(of: isPlaying) { _, playing in
             // Snap slider to the exact position when music pauses so

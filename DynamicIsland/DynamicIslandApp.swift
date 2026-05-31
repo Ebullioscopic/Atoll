@@ -836,12 +836,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             case .closed:
                 viewModel.open()
 
-                let workItem = DispatchWorkItem { [weak viewModel] in
-                    viewModel?.close()
-                }
-                self.closeNotchWorkItem = workItem
+                if !Defaults[.hotkeyDisablesAutoHide] {
+                    let workItem = DispatchWorkItem { [weak viewModel] in
+                        viewModel?.close()
+                    }
+                    self.closeNotchWorkItem = workItem
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: workItem)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: workItem)
+                }
             case .open:
                 viewModel.close()
             }
