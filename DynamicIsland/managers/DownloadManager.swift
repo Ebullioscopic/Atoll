@@ -122,7 +122,7 @@ class DownloadManager {
             crDownloadFiles = Set(contents
                 .filter {
                     let ext = $0.pathExtension.lowercased()
-                    return ext == "crdownload" || ext == "download"
+                    return ext == "crdownload" || ext == "download" || ext == "fdmdownload"
                 }
                 .map { $0.lastPathComponent }
             )

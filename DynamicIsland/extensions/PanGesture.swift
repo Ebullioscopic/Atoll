@@ -122,6 +122,25 @@ private struct ScrollMonitor: NSViewRepresentable {
             lastEventTimestamp = event.timestamp
             guard isCursorNearObservedView(using: event) else { return }
 
+            // Ignore momentum (inertial) scroll events — they should never
+            // trigger open/close gestures or affect blur/opacity (fixes #330).
+            if event.momentumPhase != [] && event.momentumPhase != .ended {
+                return
+            }
+
+            // Discrete scroll wheel events (regular mouse) have no phase — treat
+            // each one as a complete gesture to prevent lingering blur (fixes #330).
+            let isDiscreteScroll = event.phase == [] && event.momentumPhase == []
+            if isDiscreteScroll {
+                let s = direction.signed(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
+                guard s.magnitude > noiseThreshold else { return }
+                if s > 0 && s >= threshold {
+                    action(s, .began)
+                    action(s, .ended)
+                }
+                return
+            }
+
             if event.phase == .ended || event.momentumPhase == .ended {
                 if active {
                     action(accumulated.magnitude, .ended)

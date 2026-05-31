@@ -197,8 +197,8 @@ final class MediaKeyInterceptor {
         let keyFlags = data1 & 0x0000FFFF
         let keyState = ((keyFlags & 0xFF00) >> 8) == 0xA // 0xA = keyDown, 0xB = keyUp
         let isRepeat = (keyFlags & 0x0001) == 1
-        let step = step(for: nsEvent)
-        let modifiers = nsEvent.modifierFlags
+        let step = step(for: nsEvent, cgEvent: cgEvent)
+        let modifiers = combinedModifiers(nsEvent: nsEvent, cgEvent: cgEvent)
 
         guard keyState else {
             // Swallow key-up events only when intercepting, otherwise let them pass through
@@ -252,12 +252,35 @@ final class MediaKeyInterceptor {
         return configuration.interceptCommandModifiedBrightness && modifiers.contains(.command)
     }
 
-    private func step(for event: NSEvent) -> MediaKeyStep {
-        let modifiers = event.modifierFlags
+    private func step(for event: NSEvent, cgEvent: CGEvent) -> MediaKeyStep {
+        let modifiers = combinedModifiers(nsEvent: event, cgEvent: cgEvent)
         if modifiers.contains(.option) && modifiers.contains(.shift) {
             return .fine
         }
         return .standard
+    }
+
+    /// Combines modifier flags from both NSEvent and the underlying CGEvent.
+    /// Karabiner Elements and similar tools may inject synthetic media key events
+    /// where the modifier flags are only set on the CGEvent level, not propagated
+    /// to the NSEvent's modifierFlags for NX_SYSDEFINED subtype-8 events.
+    private func combinedModifiers(nsEvent: NSEvent, cgEvent: CGEvent) -> NSEvent.ModifierFlags {
+        let nsFlags = nsEvent.modifierFlags
+        let cgFlags = CGEventFlags(rawValue: cgEvent.flags.rawValue)
+        var combined = nsFlags
+        if cgFlags.contains(.maskAlternate) {
+            combined.insert(.option)
+        }
+        if cgFlags.contains(.maskShift) {
+            combined.insert(.shift)
+        }
+        if cgFlags.contains(.maskCommand) {
+            combined.insert(.command)
+        }
+        if cgFlags.contains(.maskControl) {
+            combined.insert(.control)
+        }
+        return combined
     }
 }
 
