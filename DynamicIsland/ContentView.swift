@@ -52,6 +52,7 @@ struct ContentView: View {
     private let capsLockManager = CapsLockManager.shared
     @ObservedObject var extensionLiveActivityManager = ExtensionLiveActivityManager.shared
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
+    @ObservedObject private var notificationManager = NotificationManager.shared
     private let localSendService = LocalSendService.shared
     @State private var downloadManager = DownloadManager.shared
     private let shelfState = ShelfStateViewModel.shared
@@ -1241,6 +1242,8 @@ struct ContentView: View {
                                 } else {
                                     NotchHomeView(albumArtNamespace: albumArtNamespace)
                                 }
+                            case .messages:
+                                MessageNotificationView()
                           }
                       }
                       .id(coordinator.currentView)

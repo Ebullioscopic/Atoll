@@ -880,6 +880,12 @@ extension Defaults.Keys {
     static let musicControlWindowEnabled = Key<Bool>("musicControlWindowEnabled", default: false)
     static let showStandardMediaControls = Key<Bool>("showStandardMediaControls", default: true)
     static let autoHideInactiveNotchMediaPlayer = Key<Bool>("autoHideInactiveNotchMediaPlayer", default: true)
+    // MARK: - Message Notifications
+    static let enableMessageNotifications = Key<Bool>("enableMessageNotifications", default: false)
+    static let showProfilePictures = Key<Bool>("showProfilePictures", default: true)
+    static let enableQuickReply = Key<Bool>("enableQuickReply", default: true)
+    static let autoExpandNotifications = Key<Bool>("autoExpandNotifications", default: true)
+
     static let cachedMusicLiveActivityPreference = Key<Bool?>("cachedMusicLiveActivityPreference", default: nil)
     static let cachedLockScreenMediaWidgetPreference = Key<Bool?>("cachedLockScreenMediaWidgetPreference", default: nil)
     static let cachedMusicControlWindowPreference = Key<Bool?>("cachedMusicControlWindowPreference", default: nil)
