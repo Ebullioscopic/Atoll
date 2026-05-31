@@ -3766,6 +3766,7 @@ private final class SettingsLoopingPlayerController {
 }
 
 struct Shelf: View {
+    @Default(.dynamicShelf) var shelfEnabled
     @Default(.quickShareProvider) var quickShareProvider
     @Default(.expandedDragDetection) var expandedDragDetection
     @Default(.copyOnDrag) var copyOnDrag
@@ -3796,7 +3797,7 @@ struct Shelf: View {
 
     var body: some View {
         Form {
-            if !canEnableShelf || !fullDiskAccessPermission.isAuthorized {
+            if shelfEnabled && (!canEnableShelf || !fullDiskAccessPermission.isAuthorized) {
                 Section {
                     if !canEnableShelf {
                         SettingsPermissionCallout(
@@ -3832,7 +3833,6 @@ struct Shelf: View {
                 Defaults.Toggle(key: .dynamicShelf) {
                     Text("Enable shelf")
                 }
-                .disabled(!canEnableShelf)
                 .settingsHighlight(id: highlightID("Enable shelf"))
 
                 Defaults.Toggle(key: .openShelfByDefault) {

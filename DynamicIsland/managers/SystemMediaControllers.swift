@@ -246,6 +246,13 @@ final class SystemVolumeController {
     }
 
     private func notifyCurrentState() {
+        // Re-resolve the default output device to avoid stale references when
+        // BetterDisplay/MonitorControl switch devices under us (fixes #324).
+        let freshDeviceID = resolveDefaultDevice()
+        if freshDeviceID != currentDeviceID && freshDeviceID != 0 {
+            currentDeviceID = freshDeviceID
+            refreshPropertyElements()
+        }
         let volume = getVolume()
         let muted = getMuteState()
         DispatchQueue.main.async {

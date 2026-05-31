@@ -163,6 +163,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleIncomingShelfURLs(_ urls: [URL]) -> Bool {
+        guard Defaults[.dynamicShelf] else { return false }
         let fileURLs = urls.filter(\.isFileURL)
         guard !fileURLs.isEmpty else { return false }
 
