@@ -545,12 +545,26 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var notchBackgroundLayer: some View {
+        if #available(macOS 26.0, *), Defaults[.notchGlassEnabled] {
+            LiquidGlassBackground(
+                variant: Defaults[.notchLiquidGlassVariant],
+                cornerRadius: vm.notchState == .open ? 20 : 10
+            ) {
+                Color.clear
+            }
+        } else {
+            Color.black
+        }
+    }
+
     private var mainLayoutBase: some View {
         NotchLayout()
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-            .background(.black)
+            .background(notchBackgroundLayer)
             .clipShape(resolvedClipShape)
             .overlay {
                 if Defaults[.enableAgentBreathingGlow] && !extensionLiveActivityManager.activeActivities.isEmpty {
