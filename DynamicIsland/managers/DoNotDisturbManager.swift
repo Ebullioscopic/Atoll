@@ -132,12 +132,77 @@ final class DoNotDisturbManager: ObservableObject {
 
     @objc private func handleFocusEnabled(_ notification: Notification) {
         lastNotificationTimestamp = Date()
+
+        // Guard against spurious system notifications (issue #415): verify that
+        // focus is genuinely active by checking the assertions file when FDA is
+        // available. If the file shows no active assertions this notification is
+        // a false positive triggered by an unrelated system event (e.g. volume
+        // change, Bluetooth connection).
+        if FullDiskAccessAuthorization.hasPermission() {
+            metadataExtractionQueue.async { [weak self] in
+                guard let self else { return }
+                let url = self.assertionsURL
+                let focusConfirmed: Bool = {
+                    guard let data = try? Data(contentsOf: url),
+                          !data.isEmpty,
+                          let root = (try? JSONSerialization.jsonObject(with: data, options: [])) as? [String: Any],
+                          let dataArray = root["data"] as? [[String: Any]],
+                          let firstItem = dataArray.first else {
+                        return false
+                    }
+                    let assertions = (firstItem["storeAssertionRecords"] as? [Any]) ?? []
+                    return !assertions.isEmpty
+                }()
+
+                guard focusConfirmed else {
+                    debugPrint("[DoNotDisturbManager] Ignoring spurious focusModeEnabled notification (assertions empty)")
+                    return
+                }
+
+                self.applyEnabled(notification: notification)
+            }
+        } else {
+            applyEnabled(notification: notification)
+        }
+    }
+
+    private func applyEnabled(notification: Notification) {
         apply(notification: notification, isActive: true)
     }
 
     @objc private func handleFocusDisabled(_ notification: Notification) {
         lastNotificationTimestamp = Date()
-        apply(notification: notification, isActive: false)
+
+        // Guard against spurious system disabled notifications (#362): verify that
+        // focus is genuinely inactive by checking the assertions file when FDA is
+        // available. If the file still shows active assertions, this notification
+        // is a false positive and should be ignored.
+        if FullDiskAccessAuthorization.hasPermission() {
+            metadataExtractionQueue.async { [weak self] in
+                guard let self else { return }
+                let url = self.assertionsURL
+                let focusStillActive: Bool = {
+                    guard let data = try? Data(contentsOf: url),
+                          !data.isEmpty,
+                          let root = (try? JSONSerialization.jsonObject(with: data, options: [])) as? [String: Any],
+                          let dataArray = root["data"] as? [[String: Any]],
+                          let firstItem = dataArray.first else {
+                        return false
+                    }
+                    let assertions = (firstItem["storeAssertionRecords"] as? [Any]) ?? []
+                    return !assertions.isEmpty
+                }()
+
+                guard !focusStillActive else {
+                    debugPrint("[DoNotDisturbManager] Ignoring spurious focusModeDisabled notification (assertions still active)")
+                    return
+                }
+
+                self.apply(notification: notification, isActive: false)
+            }
+        } else {
+            apply(notification: notification, isActive: false)
+        }
     }
 
     private func apply(notification: Notification, isActive: Bool) {
@@ -244,7 +309,9 @@ final class DoNotDisturbManager: ObservableObject {
             }
 
             // If Focus remains active and the mode switches (e.g., DND -> Sleep), trigger an ON toast for the new mode.
-            if isActive == nil, previousActive == true, identifierChanged {
+            // Only trigger when the previous identifier was non-empty — a transition from "" to a real value
+            // is metadata resolution for the current mode, not a mode switch (#362).
+            if isActive == nil, previousActive == true, identifierChanged, !previousIdentifier.isEmpty {
                 self.focusToastTrigger = UUID()
             }
 
