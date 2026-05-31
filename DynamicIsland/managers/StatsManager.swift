@@ -599,7 +599,6 @@ class StatsManager: ObservableObject {
     func startMonitoring() {
         guard !isMonitoring else { return }
         
-        print("StatsManager: Starting monitoring...")
         
         // Reset baseline for accurate measurement
         let initialStats = getNetworkStats()
@@ -622,8 +621,6 @@ class StatsManager: ObservableObject {
         Task { @MainActor in
             self.updateSystemStats()
         }
-        
-        print("StatsManager: Monitoring started")
     }
     
     func stopMonitoring() {
@@ -637,7 +634,6 @@ class StatsManager: ObservableObject {
         
         isMonitoring = false
         isStatsCollectionInFlight = false
-        print("StatsManager: Monitoring stopped")
         cachedProcessStats.removeAll()
         lastProcessStatsUpdate = .distantPast
         isProcessRefreshInFlight = false
@@ -673,9 +669,8 @@ class StatsManager: ObservableObject {
 
         monitoringTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-
-            Task { @MainActor in
-                self.updateSystemStats()
+            self.statsCollectionQueue.async {
+                self.collectStatsOffMain()
             }
         }
     }
@@ -829,6 +824,28 @@ class StatsManager: ObservableObject {
     }
     
     // MARK: - Private Methods
+    
+    /// Runs on statsCollectionQueue – does heavy IOKit/sysctl work off main thread,
+    /// then publishes results on MainActor.
+    private func collectStatsOffMain() {
+        // isStatsCollectionInFlight is only read/written on statsCollectionQueue
+        guard !isStatsCollectionInFlight else { return }
+        isStatsCollectionInFlight = true
+        
+        let currentSnapshot = publishedStats
+        let result = collectSystemStatsSnapshot(from: currentSnapshot)
+        
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            guard self.isMonitoring else {
+                self.statsCollectionQueue.async { self.isStatsCollectionInFlight = false }
+                return
+            }
+            self.applyStatsCollectionResult(result)
+            self.statsCollectionQueue.async { self.isStatsCollectionInFlight = false }
+        }
+    }
+    
     @MainActor
     private func updateSystemStats() {
         guard isMonitoring else { return }

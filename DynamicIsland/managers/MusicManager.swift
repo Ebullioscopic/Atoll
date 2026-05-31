@@ -402,6 +402,42 @@ private actor SpotifyExplicitnessResolver {
 }
 
 class MusicManager: ObservableObject {
+    // MARK: - Music State Snapshot
+    struct MusicStateSnapshot {
+        var songTitle: String = "I'm Handsome"
+        var artistName: String = "Me"
+        var albumArt: NSImage = defaultImage
+        var isPlaying: Bool = false
+        var album: String = "Self Love"
+        var isPlayerIdle: Bool = true
+        var isCurrentTrackExplicit: Bool = false
+        var bundleIdentifier: String? = nil
+        var songDuration: TimeInterval = 0
+        var elapsedTime: TimeInterval = 0
+        var timestampDate: Date = .init()
+        var playbackRate: Double = 1
+        var isShuffled: Bool = false
+        var repeatMode: RepeatMode = .off
+        var isLiveStream: Bool = false
+        var usingAppIconForArtwork: Bool = false
+        var skipGesturePulse: SkipGesturePulse? = nil
+        var videoArtworkURL: URL? = nil
+        var avgColor: NSColor = .white
+        var animations: DynamicIslandAnimations = .init()
+        var flipAngle: Double = 0
+        var lastFlipDirection: SkipDirection = .forward
+        var isTransitioning: Bool = false
+        var currentLyrics: String = ""
+        var syncedLyrics: [LyricLine] = []
+        var showLyrics: Bool = false
+        var currentLyricIndex: Int = -1
+    }
+    private static let albumArtCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 20
+        return cache
+    }()
+
     enum SkipDirection: Equatable {
         case backward
         case forward
@@ -433,14 +469,43 @@ class MusicManager: ObservableObject {
     private static let pearDesktopBundleID = YouTubeMusicConfiguration.default.bundleIdentifier
     private var isPearDesktopAutoSwitched: Bool = false
 
-    // Published properties for UI
-    @Published var songTitle: String = "I'm Handsome"
-    @Published var artistName: String = "Me"
-    @Published var albumArt: NSImage = defaultImage
-    @Published var isPlaying = false
-    @Published var album: String = "Self Love"
-    @Published var isPlayerIdle: Bool = true
-    @Published var isCurrentTrackExplicit: Bool = false
+    // MARK: - Consolidated State
+    @Published private(set) var musicState = MusicStateSnapshot()
+
+    /// Batches multiple state mutations into a single objectWillChange notification.
+    func updateState(_ transform: (inout MusicStateSnapshot) -> Void) {
+        transform(&musicState)
+    }
+
+    // Computed properties for backward compatibility
+    var songTitle: String {
+        get { musicState.songTitle }
+        set { musicState.songTitle = newValue }
+    }
+    var artistName: String {
+        get { musicState.artistName }
+        set { musicState.artistName = newValue }
+    }
+    var albumArt: NSImage {
+        get { musicState.albumArt }
+        set { musicState.albumArt = newValue }
+    }
+    var isPlaying: Bool {
+        get { musicState.isPlaying }
+        set { musicState.isPlaying = newValue }
+    }
+    var album: String {
+        get { musicState.album }
+        set { musicState.album = newValue }
+    }
+    var isPlayerIdle: Bool {
+        get { musicState.isPlayerIdle }
+        set { musicState.isPlayerIdle = newValue }
+    }
+    var isCurrentTrackExplicit: Bool {
+        get { musicState.isCurrentTrackExplicit }
+        set { musicState.isCurrentTrackExplicit = newValue }
+    }
 
     /// Whether there is an active music session with real metadata.
     /// Returns `false` only when the metadata is still placeholder/fallback defaults
@@ -463,25 +528,73 @@ class MusicManager: ObservableObject {
         return hasRealTitle || hasRealArtist
     }
 
-    @Published var animations: DynamicIslandAnimations = .init()
-    @Published var avgColor: NSColor = .white
-    @Published var bundleIdentifier: String? = nil
-    @Published var songDuration: TimeInterval = 0
-    @Published var elapsedTime: TimeInterval = 0
-    @Published var timestampDate: Date = .init()
-    @Published var playbackRate: Double = 1
-    @Published var isShuffled: Bool = false
-    @Published var repeatMode: RepeatMode = .off
-    @Published var isLiveStream: Bool = false
+    var animations: DynamicIslandAnimations {
+        get { musicState.animations }
+        set { musicState.animations = newValue }
+    }
+    var avgColor: NSColor {
+        get { musicState.avgColor }
+        set { musicState.avgColor = newValue }
+    }
+    var bundleIdentifier: String? {
+        get { musicState.bundleIdentifier }
+        set { musicState.bundleIdentifier = newValue }
+    }
+    var songDuration: TimeInterval {
+        get { musicState.songDuration }
+        set { musicState.songDuration = newValue }
+    }
+    var elapsedTime: TimeInterval {
+        get { musicState.elapsedTime }
+        set { musicState.elapsedTime = newValue }
+    }
+    var timestampDate: Date {
+        get { musicState.timestampDate }
+        set { musicState.timestampDate = newValue }
+    }
+    var playbackRate: Double {
+        get { musicState.playbackRate }
+        set { musicState.playbackRate = newValue }
+    }
+    var isShuffled: Bool {
+        get { musicState.isShuffled }
+        set { musicState.isShuffled = newValue }
+    }
+    var repeatMode: RepeatMode {
+        get { musicState.repeatMode }
+        set { musicState.repeatMode = newValue }
+    }
+    var isLiveStream: Bool {
+        get { musicState.isLiveStream }
+        set { musicState.isLiveStream = newValue }
+    }
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
-    @Published var usingAppIconForArtwork: Bool = false
-    @Published private(set) var skipGesturePulse: SkipGesturePulse?
+    var usingAppIconForArtwork: Bool {
+        get { musicState.usingAppIconForArtwork }
+        set { musicState.usingAppIconForArtwork = newValue }
+    }
+    var skipGesturePulse: SkipGesturePulse? {
+        get { musicState.skipGesturePulse }
+        set { musicState.skipGesturePulse = newValue }
+    }
 
     // MARK: - Lyrics Properties
-    @Published var currentLyrics: String = ""
-    @Published var syncedLyrics: [LyricLine] = []
-    @Published var showLyrics: Bool = false
-    @Published var currentLyricIndex: Int = -1
+    var currentLyrics: String {
+        get { musicState.currentLyrics }
+        set { musicState.currentLyrics = newValue }
+    }
+    var syncedLyrics: [LyricLine] {
+        get { musicState.syncedLyrics }
+        set { musicState.syncedLyrics = newValue }
+    }
+    var showLyrics: Bool {
+        get { musicState.showLyrics }
+        set { musicState.showLyrics = newValue }
+    }
+    var currentLyricIndex: Int {
+        get { musicState.currentLyricIndex }
+        set { musicState.currentLyricIndex = newValue }
+    }
 
     // Task used to periodically sync displayed lyric with playback position
     private var lyricSyncTask: Task<Void, Never>?
@@ -494,7 +607,10 @@ class MusicManager: ObservableObject {
 
     private(set) var artworkData: Data? = nil
 
-    @Published var videoArtworkURL: URL? = nil
+    var videoArtworkURL: URL? {
+        get { musicState.videoArtworkURL }
+        set { musicState.videoArtworkURL = newValue }
+    }
 
     private var liveStreamUnknownDurationCount: Int = 0
     private var liveStreamEdgeObservationCount: Int = 0
@@ -509,12 +625,21 @@ class MusicManager: ObservableObject {
     private var lastArtworkContentIdentifier: String? = nil
     private var lastArtworkContentURL: String? = nil
 
-    @Published var flipAngle: Double = 0
-    @Published var lastFlipDirection: SkipDirection = .forward
+    var flipAngle: Double {
+        get { musicState.flipAngle }
+        set { musicState.flipAngle = newValue }
+    }
+    var lastFlipDirection: SkipDirection {
+        get { musicState.lastFlipDirection }
+        set { musicState.lastFlipDirection = newValue }
+    }
     private let flipAnimationDuration: TimeInterval = 0.45
     private var flipCooldownActive: Bool = false
 
-    @Published var isTransitioning: Bool = false
+    var isTransitioning: Bool {
+        get { musicState.isTransitioning }
+        set { musicState.isTransitioning = newValue }
+    }
     private var transitionWorkItem: DispatchWorkItem?
     private var skipGestureToken: Int = 0
 
@@ -790,46 +915,44 @@ class MusicManager: ObservableObject {
         let shuffleChanged = state.isShuffled != self.isShuffled
         let repeatModeChanged = state.repeatMode != self.repeatMode
 
-        if state.title != self.songTitle {
-            self.songTitle = state.title
-        }
-
-        if state.artist != self.artistName {
-            self.artistName = state.artist
-        }
-
-        if state.album != self.album {
-            self.album = state.album
+        // Batch all metadata updates into a single objectWillChange
+        updateState { snapshot in
+            if state.title != snapshot.songTitle {
+                snapshot.songTitle = state.title
+            }
+            if state.artist != snapshot.artistName {
+                snapshot.artistName = state.artist
+            }
+            if state.album != snapshot.album {
+                snapshot.album = state.album
+            }
+            if timeChanged {
+                snapshot.elapsedTime = state.currentTime
+            }
+            if durationChanged {
+                snapshot.songDuration = state.duration
+            }
+            if playbackRateChanged {
+                snapshot.playbackRate = state.playbackRate
+            }
+            if shuffleChanged {
+                snapshot.isShuffled = state.isShuffled
+            }
+            if state.bundleIdentifier != snapshot.bundleIdentifier {
+                snapshot.bundleIdentifier = state.bundleIdentifier
+            }
+            if repeatModeChanged {
+                snapshot.repeatMode = state.repeatMode
+            }
+            snapshot.timestampDate = state.lastUpdated
         }
 
         if timeChanged {
-            self.elapsedTime = state.currentTime
             // Update current lyric based on elapsed time
             self.updateCurrentLyric(for: state.currentTime)
         }
 
-        if durationChanged {
-            self.songDuration = state.duration
-        }
-
-        if playbackRateChanged {
-            self.playbackRate = state.playbackRate
-        }
-        
-        if shuffleChanged {
-            self.isShuffled = state.isShuffled
-        }
-
-        if state.bundleIdentifier != self.bundleIdentifier {
-            self.bundleIdentifier = state.bundleIdentifier
-        }
-
-        if repeatModeChanged {
-            self.repeatMode = state.repeatMode
-        }
-        
         updateLiveStreamState(with: state)
-        self.timestampDate = state.lastUpdated
 
         // Manage lyric sync task based on playback/lyrics availability
         if Defaults[.enableLyrics] && !self.syncedLyrics.isEmpty {
@@ -1046,10 +1169,18 @@ class MusicManager: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
 
-            if let artworkImage = NSImage(data: artworkData) {
+            let cacheKey = "\(self.songTitle)-\(self.artistName)" as NSString
+            if let cached = MusicManager.albumArtCache.object(forKey: cacheKey) {
                 DispatchQueue.main.async { [weak self] in
                     self?.usingAppIconForArtwork = false
-                    self?.updateAlbumArt(newAlbumArt: artworkImage)
+                    self?.updateAlbumArt(newAlbumArt: cached)
+                }
+            } else if let artworkImage = NSImage(data: artworkData) {
+                let downscaled = self.downscaledImage(artworkImage)
+                MusicManager.albumArtCache.setObject(downscaled, forKey: cacheKey)
+                DispatchQueue.main.async { [weak self] in
+                    self?.usingAppIconForArtwork = false
+                    self?.updateAlbumArt(newAlbumArt: downscaled)
                 }
             }
         }
@@ -1077,13 +1208,28 @@ class MusicManager: ObservableObject {
         workItem?.cancel()
         workItem = DispatchWorkItem { [weak self] in
             withAnimation(.smooth) {
-                self?.albumArt = newAlbumArt
+                self?.albumArt = self?.downscaledImage(newAlbumArt) ?? newAlbumArt
                 if Defaults[.coloredSpectrogram] {
                     self?.calculateAverageColor()
                 }
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: workItem!)
+    }
+
+    private func downscaledImage(_ image: NSImage, maxDimension: CGFloat = 200) -> NSImage {
+        let size = image.size
+        guard max(size.width, size.height) > maxDimension else { return image }
+        let scale = maxDimension / max(size.width, size.height)
+        let newSize = NSSize(width: size.width * scale, height: size.height * scale)
+        let resized = NSImage(size: newSize)
+        resized.lockFocus()
+        image.draw(in: NSRect(origin: .zero, size: newSize),
+                   from: NSRect(origin: .zero, size: size),
+                   operation: .copy,
+                   fraction: 1.0)
+        resized.unlockFocus()
+        return resized
     }
 
     // MARK: - Playback Position Estimation

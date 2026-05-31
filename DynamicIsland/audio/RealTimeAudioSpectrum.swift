@@ -83,7 +83,7 @@ class RealTimeAudioSpectrum: NSView {
     private func startAnimating() {
         guard animationTimer == nil else { return }
         // Use a timer at ~30fps for smooth animation
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { [weak self] _ in
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0/15.0, repeats: true) { [weak self] _ in
             self?.updateBarsFromAudio()
         }
     }
@@ -94,8 +94,6 @@ class RealTimeAudioSpectrum: NSView {
         resetBars()
     }
     
-    private var debugLogCounter = 0
-    
     private func updateBarsFromAudio() {
         guard isPlaying else {
             resetBars()
@@ -104,12 +102,6 @@ class RealTimeAudioSpectrum: NSView {
         
         // Get real-time magnitudes from AudioTap
         let magnitudes = AudioTap.shared.getSmoothedMagnitudes()
-        
-        // Debug: log magnitudes periodically
-        debugLogCounter += 1
-        if debugLogCounter % 60 == 0 { // Every 2 seconds at 30fps
-            print("📊 [Spectrum] Magnitudes: [\(magnitudes.x), \(magnitudes.y), \(magnitudes.z), \(magnitudes.w)]")
-        }
         
         // Update each bar with its corresponding band magnitude
         for (index, barLayer) in barLayers.enumerated() {

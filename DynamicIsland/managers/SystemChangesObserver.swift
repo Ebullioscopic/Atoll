@@ -29,6 +29,9 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
     private let keyboardBacklightController = SystemKeyboardBacklightController.shared
     private let mediaKeyInterceptor = MediaKeyInterceptor.shared
     private let volumeFeedbackPlayer = VolumeFeedbackPlayer.shared
+    private var volumeDebounceWorkItem: DispatchWorkItem?
+    private var brightnessDebounceWorkItem: DispatchWorkItem?
+    private let debounceInterval: TimeInterval = 0.016 // one frame
 
     private static let headsetIconSymbols: Set<String> = [
         "airpods",
@@ -67,9 +70,15 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
         volumeController.onVolumeChange = { [weak self] volume, muted in
             guard let self, self.volumeEnabled else { return }
             let value = muted ? 0 : volume
-            Task { @MainActor in
-                self.sendVolumeNotification(value: value, isMuted: muted)
+            self.volumeDebounceWorkItem?.cancel()
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                Task { @MainActor in
+                    self.sendVolumeNotification(value: value, isMuted: muted)
+                }
             }
+            self.volumeDebounceWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + self.debounceInterval, execute: workItem)
         }
         volumeController.onRouteChange = { [weak self] in
             guard let self, self.volumeEnabled else { return }
@@ -82,7 +91,13 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
 
         brightnessController.onBrightnessChange = { [weak self] brightness in
             guard let self, self.brightnessEnabled else { return }
-            self.sendBrightnessNotification(value: brightness)
+            self.brightnessDebounceWorkItem?.cancel()
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.sendBrightnessNotification(value: brightness)
+            }
+            self.brightnessDebounceWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + self.debounceInterval, execute: workItem)
         }
         brightnessController.start()
 
