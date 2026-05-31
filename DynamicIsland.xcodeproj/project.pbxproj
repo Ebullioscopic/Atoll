@@ -47,6 +47,7 @@
 		DEFC4A6DBA7E057CC250051D /* NotificationFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DD549FE835934856A46F9AB /* NotificationFeedView.swift */; };
 		DFA74FDEAEE339648BD6A210 /* AgentStatusManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E44133B2B2D990445CD527 /* AgentStatusManager.swift */; };
 		E5DA4C9F8AE667FEF4AC74A7 /* CopilotBudgetManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E249A199E4C8D023018FA7 /* CopilotBudgetManager.swift */; };
+		EFA64F3DBCA47A16936932C8 /* AgentNotchTicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66234E98BA4040C2CFCD63C6 /* AgentNotchTicker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -74,6 +75,7 @@
 		56E44133B2B2D990445CD527 /* AgentStatusManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AgentStatusManager.swift; path = DynamicIsland/managers/AgentStatusManager.swift; sourceTree = SOURCE_ROOT; };
 		56FB4147B8B14C679081490E /* ChatMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ChatMessages.swift; path = DynamicIsland/components/ScreenAssistant/Views/ChatMessages.swift; sourceTree = SOURCE_ROOT; };
 		5C444644A92545A04044BD05 /* TerminalFloatingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TerminalFloatingPanel.swift; path = DynamicIsland/components/Notch/TerminalFloatingPanel.swift; sourceTree = SOURCE_ROOT; };
+		66234E98BA4040C2CFCD63C6 /* AgentNotchTicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AgentNotchTicker.swift; path = DynamicIsland/components/AgentNotchTicker.swift; sourceTree = SOURCE_ROOT; };
 		7E25ECA02E6C6C3800700E72 /* CoreBrightness.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBrightness.framework; path = /System/Library/PrivateFrameworks/CoreBrightness.framework; sourceTree = "<absolute>"; };
 		7E25ECA22E6C6E2600700E72 /* OSD.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OSD.framework; path = /System/Library/PrivateFrameworks/OSD.framework; sourceTree = "<absolute>"; };
 		7E25ECA42E6C6E7800700E72 /* DisplayServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DisplayServices.framework; path = /System/Library/PrivateFrameworks/DisplayServices.framework; sourceTree = "<absolute>"; };
@@ -221,6 +223,7 @@
 				5C444644A92545A04044BD05 /* TerminalFloatingPanel.swift */,
 				531B464FAB4F2933FABF3967 /* CallIndicatorView.swift */,
 				AC3B4878981C91E4A53F8427 /* CallDetectionManager.swift */,
+				66234E98BA4040C2CFCD63C6 /* AgentNotchTicker.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -358,7 +361,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"$CONFIGURATION\" != \"Release\" ] || [ \"$ACTION\" != \"install\" ]; then\n\	exit 0\nfi\n\nAPP=\"$CODESIGNING_FOLDER_PATH\"\nSPARKLE=\"$APP/Contents/Frameworks/Sparkle.framework\"\nXPC_DIR=\"$SPARKLE/Versions/Current/XPCServices\"\n\nif [ ! -d \"$XPC_DIR\" ]; then\n\	exit 0\nfi\n\nfor xpc in \"$XPC_DIR\"/*.xpc; do\n\	/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$xpc\"\ndone\n\n/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$SPARKLE\"\n";
+			shellScript = "if [ \"$CONFIGURATION\" != \"Release\" ] || [ \"$ACTION\" != \"install\" ]; then\n\\\	exit 0\nfi\n\nAPP=\"$CODESIGNING_FOLDER_PATH\"\nSPARKLE=\"$APP/Contents/Frameworks/Sparkle.framework\"\nXPC_DIR=\"$SPARKLE/Versions/Current/XPCServices\"\n\nif [ ! -d \"$XPC_DIR\" ]; then\n\\\	exit 0\nfi\n\nfor xpc in \"$XPC_DIR\"/*.xpc; do\n\\\	/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$xpc\"\ndone\n\n/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$SPARKLE\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -386,6 +389,7 @@
 				A6AC48BE90434970FB2B691A /* TerminalFloatingPanel.swift in Sources */,
 				5F1D47109037CB538A09CBCB /* CallIndicatorView.swift in Sources */,
 				B1284A838792F38415E3AD9A /* CallDetectionManager.swift in Sources */,
+				EFA64F3DBCA47A16936932C8 /* AgentNotchTicker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

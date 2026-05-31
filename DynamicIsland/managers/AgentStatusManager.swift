@@ -81,7 +81,7 @@ class AgentStatusManager: ObservableObject {
     
     private init() {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        self.dbPath = "\(home)/.hermes/sessions/sessions.db"
+        self.dbPath = "\(home)/.hermes/state.db"
         startPolling()
     }
     
@@ -133,22 +133,17 @@ class AgentStatusManager: ObservableObject {
         }
         defer { sqlite3_finalize(stmt) }
         
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        let fallbackFormatter = ISO8601DateFormatter()
-        fallbackFormatter.formatOptions = [.withInternetDateTime]
-        
         while sqlite3_step(stmt) == SQLITE_ROW {
             let id = String(cString: sqlite3_column_text(stmt, 0))
             let title = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? "Agent Task"
             let model = sqlite3_column_text(stmt, 2).map { String(cString: $0) } ?? "unknown"
-            let startedAtStr = sqlite3_column_text(stmt, 3).map { String(cString: $0) } ?? ""
+            let startedAtUnix = sqlite3_column_double(stmt, 3)
             let source = sqlite3_column_text(stmt, 4).map { String(cString: $0) } ?? "hermes"
             
-            let startedAt = dateFormatter.date(from: startedAtStr)
-                ?? fallbackFormatter.date(from: startedAtStr)
-                ?? Date()
+            let startedAt = Date(timeIntervalSince1970: startedAtUnix)
+            
+            // Skip sessions older than 4 hours (likely stale/orphaned)
+            guard Date().timeIntervalSince(startedAt) < 4 * 3600 else { continue }
             
             let tokenCount = getTokenCount(db: db, sessionId: id)
             
@@ -168,7 +163,7 @@ class AgentStatusManager: ObservableObject {
     }
     
     private func getTokenCount(db: OpaquePointer?, sessionId: String) -> Int {
-        let query = "SELECT COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) FROM messages WHERE session_id = ?"
+        let query = "SELECT COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0) FROM sessions WHERE id = ?"
         var stmt: OpaquePointer?
         
         guard sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK else {

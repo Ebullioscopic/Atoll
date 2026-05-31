@@ -55,7 +55,7 @@ class NotificationFeedManager: ObservableObject {
 
     private var hermesDBPath: String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return "\(home)/.hermes/sessions/sessions.db"
+        return "\(home)/.hermes/state.db"
     }
 
     private init() {
