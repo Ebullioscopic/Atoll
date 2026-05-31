@@ -191,7 +191,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "com.audirvana.Audirvana-Studio",
             "com.vox.vox",
             "com.coppertino.Vox",
-        ]
+             "sh.cider.classic",
+             "sh.cider.cider",
+            ]
         
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification,
@@ -538,6 +540,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
         LockScreenManager.shared.configure(viewModel: vm)
+        _ = LauncherIntegrationManager.shared
         extensionXPCServiceHost.start()
         extensionRPCServer.start()
         
