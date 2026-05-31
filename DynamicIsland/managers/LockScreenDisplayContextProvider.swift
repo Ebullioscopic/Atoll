@@ -31,6 +31,7 @@ final class LockScreenDisplayContextProvider {
 
     private(set) var context: LockScreenDisplayContext?
     private var screenChangeObserver: NSObjectProtocol?
+    private var preferredScreenObserver: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
 
     private init() {
@@ -41,6 +42,9 @@ final class LockScreenDisplayContextProvider {
     deinit {
         if let screenChangeObserver {
             NotificationCenter.default.removeObserver(screenChangeObserver)
+        }
+        if let preferredScreenObserver {
+            NotificationCenter.default.removeObserver(preferredScreenObserver)
         }
 
         let workspaceCenter = NSWorkspace.shared.notificationCenter
@@ -72,6 +76,16 @@ final class LockScreenDisplayContextProvider {
     }
 
     private func preferredLockScreen() -> NSScreen? {
+        // Follow the notch window's preferred screen (issue #374).
+        // The notch screen is stored in UserDefaults as "preferred_screen_name".
+        let preferredScreenName = UserDefaults.standard.string(forKey: "preferred_screen_name")
+
+        if let preferredScreenName,
+           let matched = NSScreen.screens.first(where: { $0.localizedName == preferredScreenName }) {
+            return matched
+        }
+
+        // Fallback: built-in display
         if let builtin = NSScreen.screens.first(where: { screen in
             guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
                 return false
@@ -101,6 +115,14 @@ final class LockScreenDisplayContextProvider {
             queue: .main
         ) { [weak self] _ in
             self?.refresh(reason: "screen-parameters")
+        }
+
+        preferredScreenObserver = NotificationCenter.default.addObserver(
+            forName: Notification.Name("SelectedScreenChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.refresh(reason: "preferred-screen-changed")
         }
 
         let workspaceCenter = NSWorkspace.shared.notificationCenter
