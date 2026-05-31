@@ -742,6 +742,7 @@ struct NotchHomeView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, Defaults[.showMirror] ? 8 : 0)
                     .onHover { isHovering in
                         vm.isHoveringCalendar = isHovering
                     }
