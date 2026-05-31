@@ -35,6 +35,7 @@ struct ShelfItemView: View {
     @State private var showStack = false
     @State private var cachedPreviewImage: NSImage?
     @State private var debouncedDropTarget = false
+    @State private var isHovered = false
 
     private var isSelected: Bool { viewModel.isSelected }
     private var shouldHideDuringDrag: Bool { selection.isDragging && selection.isSelected(item.id) && false }
@@ -71,6 +72,28 @@ struct ShelfItemView: View {
                         viewModel.handleClick(event: event, view: nsview)
                     }
                 )
+                .overlay(alignment: .topTrailing) {
+                    if isHovered {
+                        Button(action: {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                ShelfStateViewModel.shared.remove(item)
+                            }
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.white, Color.black.opacity(0.6))
+                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(4)
+                        .transition(.opacity)
+                    }
+                }
+                .onHover { hovering in
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        isHovered = hovering
+                    }
+                }
             } else {
                 Color.clear
                     .frame(width: 105)
