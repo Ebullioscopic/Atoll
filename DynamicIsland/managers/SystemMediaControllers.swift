@@ -476,6 +476,7 @@ final class SystemBrightnessController {
     private let maximumBrightnessAnimationDuration: TimeInterval = 0.3
     private let brightnessAnimationDurationScale: TimeInterval = 1.6
     private var lastEmittedBrightness: Float = 0.5
+    private var pendingAdjustTarget: Float?
     private let coreBrightnessClient = CoreBrightnessDisplayClient.shared
     private var pollTimer: Timer?
     private let pollInterval: TimeInterval = 2.0
@@ -502,9 +503,14 @@ final class SystemBrightnessController {
     }
 
     func adjust(by delta: Float) {
-        // Refresh baseline to avoid jumping if auto-brightness changed the level.
-        syncWithSystemBrightnessIfNeeded()
-        setBrightness(lastEmittedBrightness + delta)
+        let base = pendingAdjustTarget ?? lastEmittedBrightness
+        let target = max(0, min(1, base + delta))
+        pendingAdjustTarget = target
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.pendingAdjustTarget = nil
+            self.beginBrightnessAnimation(to: target)
+        }
     }
 
     func setBrightness(_ value: Float) {

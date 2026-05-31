@@ -176,6 +176,15 @@ final class MediaKeyInterceptor {
     }
 
     private func handleEvent(cgEvent: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap = eventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+                NSLog("⚠️ Media key event tap was disabled by the system (reason: %@); re-enabled",
+                      type == .tapDisabledByTimeout ? "timeout" : "user input")
+            }
+            return Unmanaged.passUnretained(cgEvent)
+        }
+
         guard let systemDefinedType = systemDefinedEventType,
               type == systemDefinedType,
               let nsEvent = NSEvent(cgEvent: cgEvent),
