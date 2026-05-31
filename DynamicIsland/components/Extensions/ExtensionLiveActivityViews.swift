@@ -172,6 +172,7 @@ struct PremiumAgentAvatarView: View {
                 .foregroundStyle(.white)
         }
         .frame(width: size, height: size)
+        .drawingGroup()
         .onAppear {
             isBreathing = true
         }

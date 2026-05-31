@@ -40,21 +40,21 @@ struct ContentView: View {
     @EnvironmentObject var webcamManager: WebcamManager
 
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
-    @ObservedObject var musicManager = MusicManager.shared
-    @ObservedObject var timerManager = TimerManager.shared
-    @ObservedObject var reminderManager = ReminderLiveActivityManager.shared
+    private let musicManager = MusicManager.shared
+    private let timerManager = TimerManager.shared
+    private let reminderManager = ReminderLiveActivityManager.shared
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
-    @ObservedObject var statsManager = StatsManager.shared
-    @ObservedObject var recordingManager = ScreenRecordingManager.shared
+    private let statsManager = StatsManager.shared
+    private let recordingManager = ScreenRecordingManager.shared
     @ObservedObject var privacyManager = PrivacyIndicatorManager.shared
-    @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
+    private let doNotDisturbManager = DoNotDisturbManager.shared
     @ObservedObject var lockScreenManager = LockScreenManager.shared
-    @ObservedObject var capsLockManager = CapsLockManager.shared
+    private let capsLockManager = CapsLockManager.shared
     @ObservedObject var extensionLiveActivityManager = ExtensionLiveActivityManager.shared
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
-    @ObservedObject var localSendService = LocalSendService.shared
+    private let localSendService = LocalSendService.shared
     @State private var downloadManager = DownloadManager.shared
-    @ObservedObject var shelfState = ShelfStateViewModel.shared
+    private let shelfState = ShelfStateViewModel.shared
     @State private var isBreathing = false
     
     @Default(.enableStatsFeature) var enableStatsFeature
@@ -98,7 +98,7 @@ struct ContentView: View {
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
         // If details HUD is visible, expand the height to accommodate the glassmorphic details HUD
-        if extensionLiveActivityManager.showDetailsHUD && !extensionLiveActivityManager.activeActivities.isEmpty {
+        if extensionLiveActivityManager.showDetailsHUD && !extensionLiveActivityManager.activeActivities.isEmpty && (Defaults[.enableAgentHoverDetails] || Defaults[.enableAgentDoubleClickDetails]) {
             let width: CGFloat = max(Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize.width : openNotchSize.width, 380)
             let height: CGFloat = 360
             return CGSize(width: width, height: height)
@@ -515,6 +515,35 @@ struct ContentView: View {
         installRootLifecycleHandlers(on: rootBodyView)
     }
 
+    private var shouldAnimateBreathingGlow: Bool {
+        guard Defaults[.enableAgentBreathingGlow], !extensionLiveActivityManager.activeActivities.isEmpty else {
+            return false
+        }
+
+        if Defaults[.pauseAgentBreathingGlowWhenCollapsed] {
+            return vm.notchState == .open
+        }
+
+        return true
+    }
+
+    private func syncBreathingAnimation() {
+        guard shouldAnimateBreathingGlow else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                isBreathing = false
+            }
+            return
+        }
+
+        guard !isBreathing else { return }
+
+        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+            isBreathing = true
+        }
+    }
+
     private var mainLayoutBase: some View {
         NotchLayout()
             .frame(alignment: .top)
@@ -670,9 +699,7 @@ struct ContentView: View {
                 : 0
             )
             .onAppear(perform: {
-                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                    isBreathing = true
-                }
+                syncBreathingAnimation()
                 if coordinator.firstLaunch {
                     // Single open during first launch; closeHello() handles the timed close.
                     runAfter(1) {
@@ -682,7 +709,12 @@ struct ContentView: View {
                     }
                 }
             })
+            .onChange(of: shouldAnimateBreathingGlow) { _, _ in
+                syncBreathingAnimation()
+            }
             .onChange(of: vm.notchState) { _, newState in
+                syncBreathingAnimation()
+
                 // Update smart monitoring based on notch state
                 if enableStatsFeature {
                     let currentViewString = coordinator.currentView == .stats ? "stats" : "other"
@@ -781,23 +813,19 @@ struct ContentView: View {
         ZStack(alignment: .top) {
             configuredMainLayout
             
-            if extensionLiveActivityManager.showDetailsHUD && !extensionLiveActivityManager.activeActivities.isEmpty {
+            if extensionLiveActivityManager.showDetailsHUD && !extensionLiveActivityManager.activeActivities.isEmpty && (Defaults[.enableAgentHoverDetails] || Defaults[.enableAgentDoubleClickDetails]) {
                 AgentDetailsHUDView(notchHeight: vm.effectiveClosedNotchHeight)
                     .padding(.top, vm.effectiveClosedNotchHeight + 8)
             }
             
             if extensionLiveActivityManager.triggerParticleBurst {
-                let agentColor: Color = {
+                let burstColor: Color = {
                     if let first = extensionLiveActivityManager.activeActivities.first {
-                        let name = first.bundleIdentifier.lowercased()
-                        if name.contains("antigravity") { return .blue }
-                        if name.contains("codex") { return .gray }
-                        if name.contains("nerv") { return .orange }
-                        if name.contains("claude") { return Color(red: 0.85, green: 0.44, blue: 0.28) }
+                        return agentColor(for: first.bundleIdentifier.lowercased())
                     }
                     return .blue
                 }()
-                ParticleBurstView(color: agentColor)
+                ParticleBurstView(color: burstColor)
                     .frame(width: dynamicNotchSize.width, height: 60)
                     .allowsHitTesting(false)
             }
@@ -921,12 +949,6 @@ struct ContentView: View {
                     enqueueMusicControlWindowSync(forceRefresh: true, delay: hovering ? 0.05 : 0.12)
                 }
             }
-            .onChange(of: musicManager.isPlaying) { _, isPlaying in
-                handleMusicControlPlaybackChange(isPlaying: isPlaying)
-            }
-            .onChange(of: musicManager.isPlayerIdle) { _, isIdle in
-                handleMusicControlIdleChange(isIdle: isIdle)
-            }
             .onChange(of: vm.closedNotchSize) { _, _ in
                 if shouldShowMusicControlWindow() {
                     enqueueMusicControlWindowSync(forceRefresh: true)
@@ -954,7 +976,19 @@ struct ContentView: View {
     @ViewBuilder
       func NotchLayout() -> some View {
           VStack(alignment: .leading) {
-              VStack(alignment: .leading) {
+              MediaNotchSection(
+                  musicManager: musicManager,
+                  timerManager: timerManager,
+                  reminderManager: reminderManager,
+                  recordingManager: recordingManager,
+                  doNotDisturbManager: doNotDisturbManager,
+                  capsLockManager: capsLockManager,
+                  localSendService: localSendService,
+                  shelfState: shelfState,
+                  onPlaybackChange: handleMusicControlPlaybackChange,
+                  onIdleChange: handleMusicControlIdleChange
+              ) {
+                  VStack(alignment: .leading) {
                   if coordinator.firstLaunch {
                       Spacer()
                       HelloAnimation().frame(width: 200, height: 80).onAppear(perform: {
@@ -1157,6 +1191,7 @@ struct ContentView: View {
                       }
                   }
               }
+              }
               .conditionalModifier(shouldFixSizeForSneakPeek()) { view in
                   view
                       .fixedSize()
@@ -1174,15 +1209,21 @@ struct ContentView: View {
                               case .timer:
                                   NotchTimerView()
                               case .stats:
-                                  NotchStatsView()
+                                  StatsNotchSection(statsManager: statsManager) {
+                                      NotchStatsView()
+                                  }
                               case .colorPicker:
                                   NotchColorPickerView()
                             case .notes:
                                 NotchNotesView()
                             case .clipboard:
-                                NotchNotesView()
+                                ClipboardNotchSection {
+                                    NotchNotesView()
+                                }
                             case .terminal:
                                 NotchTerminalView()
+                            case .agentBus:
+                                NotchAgentBusView()
                             case .extensionExperience:
                                 if let payload = currentExtensionTabPayload() {
                                     ExtensionNotchExperienceTabView(payload: payload)
@@ -1632,7 +1673,7 @@ struct ContentView: View {
                 .frame(width: 50, alignment: .center)
                 .matchedGeometryEffect(id: "spectrum", in: albumArtNamespace)
                 .mask {
-                    AudioVisualizerView(isPlaying: $musicManager.isPlaying)
+                    AudioVisualizerView(isPlaying: Binding(get: { musicManager.isPlaying }, set: { musicManager.isPlaying = $0 }))
                         .frame(width: 16, height: 12)
                 }
                 .blur(radius: (enableClosedPlayPauseOverlay && isHoveringClosedMusicWaveformControl) ? 2.4 : 0)
@@ -2721,6 +2762,84 @@ struct ContentView: View {
     }
 }
 
+private struct MediaNotchSection<Content: View>: View {
+    @ObservedObject private var musicManager: MusicManager
+    @ObservedObject private var timerManager: TimerManager
+    @ObservedObject private var reminderManager: ReminderLiveActivityManager
+    @ObservedObject private var recordingManager: ScreenRecordingManager
+    @ObservedObject private var doNotDisturbManager: DoNotDisturbManager
+    @ObservedObject private var capsLockManager: CapsLockManager
+    @ObservedObject private var localSendService: LocalSendService
+    @ObservedObject private var shelfState: ShelfStateViewModel
+
+    private let onPlaybackChange: (Bool) -> Void
+    private let onIdleChange: (Bool) -> Void
+    private let content: () -> Content
+
+    init(
+        musicManager: MusicManager,
+        timerManager: TimerManager,
+        reminderManager: ReminderLiveActivityManager,
+        recordingManager: ScreenRecordingManager,
+        doNotDisturbManager: DoNotDisturbManager,
+        capsLockManager: CapsLockManager,
+        localSendService: LocalSendService,
+        shelfState: ShelfStateViewModel,
+        onPlaybackChange: @escaping (Bool) -> Void = { _ in },
+        onIdleChange: @escaping (Bool) -> Void = { _ in },
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        _musicManager = ObservedObject(wrappedValue: musicManager)
+        _timerManager = ObservedObject(wrappedValue: timerManager)
+        _reminderManager = ObservedObject(wrappedValue: reminderManager)
+        _recordingManager = ObservedObject(wrappedValue: recordingManager)
+        _doNotDisturbManager = ObservedObject(wrappedValue: doNotDisturbManager)
+        _capsLockManager = ObservedObject(wrappedValue: capsLockManager)
+        _localSendService = ObservedObject(wrappedValue: localSendService)
+        _shelfState = ObservedObject(wrappedValue: shelfState)
+        self.onPlaybackChange = onPlaybackChange
+        self.onIdleChange = onIdleChange
+        self.content = content
+    }
+
+    var body: some View {
+        content()
+            .onChange(of: musicManager.isPlaying) { _, isPlaying in
+                onPlaybackChange(isPlaying)
+            }
+            .onChange(of: musicManager.isPlayerIdle) { _, isIdle in
+                onIdleChange(isIdle)
+            }
+    }
+}
+
+private struct StatsNotchSection<Content: View>: View {
+    @ObservedObject private var statsManager: StatsManager
+    private let content: () -> Content
+
+    init(statsManager: StatsManager, @ViewBuilder content: @escaping () -> Content) {
+        _statsManager = ObservedObject(wrappedValue: statsManager)
+        self.content = content
+    }
+
+    var body: some View {
+        content()
+    }
+}
+
+private struct ClipboardNotchSection<Content: View>: View {
+    @ObservedObject private var clipboardManager = ClipboardManager.shared
+    private let content: () -> Content
+
+    init(@ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+    }
+
+    var body: some View {
+        content()
+    }
+}
+
 private enum MusicSecondaryLiveActivity: Equatable {
     case timer
     case reminder(ReminderLiveActivityManager.ReminderEntry)
@@ -3042,7 +3161,7 @@ struct AgentDetailsHUDView: View {
     
     @State private var isPulse = false
     @State private var elapsed: TimeInterval = 0
-    let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+    @State private var timerSubscription: AnyCancellable?
     
     var body: some View {
         VStack(spacing: 12) {
@@ -3270,11 +3389,17 @@ struct AgentDetailsHUDView: View {
             if let first = manager.activeActivities.first {
                 elapsed = Date().timeIntervalSince(first.receivedAt)
             }
+            timerSubscription = Timer.publish(every: 0.5, on: .main, in: .common)
+                .autoconnect()
+                .sink { _ in
+                    if let first = manager.activeActivities.first {
+                        elapsed = Date().timeIntervalSince(first.receivedAt)
+                    }
+                }
         }
-        .onReceive(timer) { _ in
-            if let first = manager.activeActivities.first {
-                elapsed = Date().timeIntervalSince(first.receivedAt)
-            }
+        .onDisappear {
+            timerSubscription?.cancel()
+            timerSubscription = nil
         }
     }
     
@@ -3283,6 +3408,8 @@ struct AgentDetailsHUDView: View {
         if name.contains("codex") { return "Codex" }
         if name.contains("nerv") { return "NERV Brain" }
         if name.contains("claude") { return "Claude" }
+        if name.contains("copilot") { return "Copilot" }
+        if name.contains("kilo") { return "Kilo" }
         return name.capitalized
     }
     // agentColor(for:) moved to file-scope to resolve ContentView scope issues
@@ -3493,9 +3620,11 @@ extension Color {
 
 func agentColor(for name: String) -> Color {
     if name.contains("antigravity") { return .blue }
-    if name.contains("codex") { return .gray }
+    if name.contains("codex") { return .white }
     if name.contains("nerv") { return .orange }
-    if name.contains("claude") { return Color(red: 0.85, green: 0.44, blue: 0.28) }
+    if name.contains("claude") { return Color(red: 0.96, green: 0.55, blue: 0.14) }
+    if name.contains("copilot") { return .green }
+    if name.contains("kilo") { return .yellow }
     return .purple
 }
 

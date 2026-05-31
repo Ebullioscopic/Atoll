@@ -38,6 +38,7 @@ final class ExtensionRPCServer {
     private let queue = DispatchQueue(label: "com.ebullioscopic.Atoll.rpc.server", qos: .userInitiated)
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
+    private var disconnectGraceTasks: [String: Task<Void, Never>] = [:]
 
     private init() {}
 
@@ -83,6 +84,8 @@ final class ExtensionRPCServer {
             conn.connection.cancel()
         }
         connections.removeAll()
+        disconnectGraceTasks.values.forEach { $0.cancel() }
+        disconnectGraceTasks.removeAll()
         shelfSubscribers.removeAll()
         logDiagnostics("RPC server stopped")
     }
@@ -199,8 +202,7 @@ final class ExtensionRPCServer {
     private func handleConnectionState(connID: UUID, state: NWConnection.State) {
         switch state {
         case .failed, .cancelled:
-            connections.removeValue(forKey: connID)
-            logDiagnostics("RPC client disconnected (id: \(connID.uuidString.prefix(8)))")
+            cleanupDisconnectedClient(connID: connID)
         default:
             break
         }
@@ -216,7 +218,7 @@ final class ExtensionRPCServer {
             if let error {
                 Task { @MainActor in
                     self.logDiagnostics("RPC receive error for \(connID.uuidString.prefix(8)): \(error.localizedDescription)")
-                    self.connections.removeValue(forKey: connID)
+                    self.cleanupDisconnectedClient(connID: connID)
                 }
                 return
             }
@@ -231,6 +233,31 @@ final class ExtensionRPCServer {
             Task { @MainActor in
                 self.receiveMessage(connID: connID)
             }
+        }
+    }
+
+    private func cleanupDisconnectedClient(connID: UUID) {
+        guard let clientConn = connections.removeValue(forKey: connID) else { return }
+        logDiagnostics("RPC client disconnected (id: \(connID.uuidString.prefix(8)))")
+
+        guard let bundleID = clientConn.bundleIdentifier else { return }
+
+        // If another connection from the same bundle is still alive, no cleanup needed
+        let otherConnectionsExist = connections.values.contains { $0.bundleIdentifier == bundleID }
+        if otherConnectionsExist { return }
+
+        // Grace period: wait 15s before dismissing activities (client may reconnect)
+        disconnectGraceTasks[bundleID]?.cancel()
+        disconnectGraceTasks[bundleID] = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(15))
+            guard !Task.isCancelled else { return }
+            // Re-check: did the client reconnect during grace period?
+            let reconnected = self.connections.values.contains { $0.bundleIdentifier == bundleID }
+            if !reconnected {
+                ExtensionLiveActivityManager.shared.dismissAll(for: bundleID)
+                self.logDiagnostics("Dismissed orphaned activities for \(bundleID) after 15s grace period")
+            }
+            self.disconnectGraceTasks.removeValue(forKey: bundleID)
         }
     }
 
@@ -253,6 +280,9 @@ final class ExtensionRPCServer {
            let bi = params["bundleIdentifier"]?.stringValue {
             clientConn.bundleIdentifier = bi
             connections[connID] = clientConn
+            // Cancel any pending grace-period dismissal — client reconnected
+            disconnectGraceTasks[bi]?.cancel()
+            disconnectGraceTasks.removeValue(forKey: bi)
         }
 
         let service = ExtensionRPCService(

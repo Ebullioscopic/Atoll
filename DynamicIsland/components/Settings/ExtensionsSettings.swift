@@ -126,6 +126,8 @@ struct ExtensionsSettingsView: View {
         Section {
             Defaults.Toggle(String(localized:"Neon Aura breathing glow"), key: .enableAgentBreathingGlow)
                 .tint(.purple)
+            Defaults.Toggle(String(localized:"Pause breathing glow while collapsed"), key: .pauseAgentBreathingGlowWhenCollapsed)
+                .tint(.purple)
             Defaults.Toggle(String(localized:"Fluid shimmer progress wave"), key: .enableAgentFluidProgress)
                 .tint(.purple)
             Defaults.Toggle(String(localized:"Double-click to expand rich details HUD"), key: .enableAgentDoubleClickDetails)

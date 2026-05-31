@@ -899,10 +899,13 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .clipboard, title: "Show Clipboard Icon", keywords: ["icon", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Show Clipboard Icon")),
             SettingsSearchEntry(tab: .clipboard, title: "Display Mode", keywords: ["list", "grid", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Display Mode")),
             SettingsSearchEntry(tab: .clipboard, title: "History Size", keywords: ["history", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "History Size")),
+            SettingsSearchEntry(tab: .clipboard, title: "Load image files asynchronously", keywords: ["clipboard", "image", "async", "performance"], highlightID: SettingsTab.clipboard.highlightID(for: "Load image files asynchronously")),
+            SettingsSearchEntry(tab: .clipboard, title: "Debounce clipboard persistence", keywords: ["clipboard", "debounce", "persistence", "history"], highlightID: SettingsTab.clipboard.highlightID(for: "Debounce clipboard persistence")),
 
             // Screen Assistant
             SettingsSearchEntry(tab: .screenAssistant, title: "Enable Screen Assistant", keywords: ["screen assistant", "ai"], highlightID: SettingsTab.screenAssistant.highlightID(for: "Enable Screen Assistant")),
             SettingsSearchEntry(tab: .screenAssistant, title: "Display Mode", keywords: ["screen assistant", "mode"], highlightID: SettingsTab.screenAssistant.highlightID(for: "Display Mode")),
+            SettingsSearchEntry(tab: .screenAssistant, title: "High-Frequency Recording Duration Updates", keywords: ["screen assistant", "recording", "timer", "duration"], highlightID: SettingsTab.screenAssistant.highlightID(for: "High-Frequency Recording Duration Updates")),
 
             // Color Picker
             SettingsSearchEntry(tab: .colorPicker, title: "Enable Color Picker", keywords: ["color picker", "eyedropper"], highlightID: SettingsTab.colorPicker.highlightID(for: "Enable Color Picker")),
@@ -7303,6 +7306,8 @@ struct ClipboardSettings: View {
     @Default(.clipboardHistorySize) var clipboardHistorySize
     @Default(.showClipboardIcon) var showClipboardIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
+    @Default(.clipboardAsyncFileLoadingEnabled) var clipboardAsyncFileLoadingEnabled
+    @Default(.clipboardDebouncedPersistenceEnabled) var clipboardDebouncedPersistenceEnabled
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.clipboard.highlightID(for: title)
@@ -7362,6 +7367,16 @@ struct ClipboardSettings: View {
                     }
                     .settingsHighlight(id: highlightID("History Size"))
 
+                    Defaults.Toggle(key: .clipboardAsyncFileLoadingEnabled) {
+                        Text("Load image files asynchronously")
+                    }
+                    .settingsHighlight(id: highlightID("Load image files asynchronously"))
+
+                    Defaults.Toggle(key: .clipboardDebouncedPersistenceEnabled) {
+                        Text("Debounce clipboard persistence")
+                    }
+                    .settingsHighlight(id: highlightID("Debounce clipboard persistence"))
+
                     HStack {
                         Text("Current Items")
                         Spacer()
@@ -7392,6 +7407,14 @@ struct ClipboardSettings: View {
                         Text("Panel mode shows clipboard in a floating window near the notch.")
                     case .separateTab:
                         Text("Separate Tab mode integrates Copied Items and Notes into a single view. If both are enabled, Notes appear on the right and Clipboard on the left.")
+                    }
+
+                    if !clipboardAsyncFileLoadingEnabled {
+                        Text("Image-file loading now uses the legacy synchronous path. Re-enable async loading if clipboard image reads feel slow.")
+                    }
+
+                    if !clipboardDebouncedPersistenceEnabled {
+                        Text("Clipboard history is being written immediately on every change. Re-enable debounced persistence to reduce UserDefaults churn.")
                     }
                 }
 
@@ -7473,6 +7496,7 @@ struct ScreenAssistantSettings: View {
     @ObservedObject var screenAssistantManager = ScreenAssistantManager.shared
     @Default(.enableScreenAssistant) var enableScreenAssistant
     @Default(.screenAssistantDisplayMode) var screenAssistantDisplayMode
+    @Default(.screenAssistantHighFrequencyRecordingDurationUpdates) var screenAssistantHighFrequencyRecordingDurationUpdates
     @Default(.geminiApiKey) var geminiApiKey
     @State private var apiKeyText = ""
     @State private var showingApiKey = false
@@ -7574,14 +7598,23 @@ struct ScreenAssistantSettings: View {
                         Text(screenAssistantManager.isRecording ? "Recording" : "Ready")
                             .foregroundColor(screenAssistantManager.isRecording ? .red : .secondary)
                     }
+
+                    Defaults.Toggle(key: .screenAssistantHighFrequencyRecordingDurationUpdates) {
+                        Text("High-Frequency Recording Duration Updates")
+                    }
+                    .settingsHighlight(id: highlightID("High-Frequency Recording Duration Updates"))
                 } header: {
                     Text("Configuration")
                 } footer: {
-                    switch screenAssistantDisplayMode {
-                    case .popover:
-                        Text("Popover mode shows the assistant as a dropdown attached to the AI button. Panel mode shows the assistant in a floating window near the notch.")
-                    case .panel:
-                        Text("Panel mode shows the assistant in a floating window near the notch. Popover mode shows the assistant as a dropdown attached to the AI button.")
+                    VStack(alignment: .leading, spacing: 6) {
+                        switch screenAssistantDisplayMode {
+                        case .popover:
+                            Text("Popover mode shows the assistant as a dropdown attached to the AI button. Panel mode shows the assistant in a floating window near the notch.")
+                        case .panel:
+                            Text("Panel mode shows the assistant in a floating window near the notch. Popover mode shows the assistant as a dropdown attached to the AI button.")
+                        }
+
+                        Text(screenAssistantHighFrequencyRecordingDurationUpdates ? "Recording duration updates every 0.1 seconds." : "Recording duration updates every 1 second by default; enable this only if you want the legacy 0.1-second updates.")
                     }
                 }
 

@@ -59,6 +59,7 @@ struct CPUStatsDetailView: View {
             topProcesses = Array(processes.prefix(8))
         }
         .onAppear {
+            statsManager.refreshProcessStatsNow()
             topProcesses = Array(statsManager.topCPUProcesses.prefix(8))
         }
     }

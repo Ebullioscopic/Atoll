@@ -53,8 +53,8 @@ struct GPUStatsDetailView: View {
             .padding(16)
         }
         .frame(minWidth: 360, minHeight: 380)
-        .onAppear(perform: refreshProcesses)
-        .onReceive(statsManager.$lastUpdated) { _ in
+        .onAppear(perform: refreshProcessesOnAppear)
+        .onReceive(statsManager.objectWillChange) { _ in
             refreshProcesses()
         }
     }
@@ -62,6 +62,11 @@ struct GPUStatsDetailView: View {
     private func refreshProcesses() {
         let processes = statsManager.getProcessesRankedByGPU()
         topProcesses = Array(processes.prefix(processDisplayLimit))
+    }
+    
+    private func refreshProcessesOnAppear() {
+        statsManager.refreshProcessStatsNow()
+        refreshProcesses()
     }
 }
 

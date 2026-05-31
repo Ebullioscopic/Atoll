@@ -90,6 +90,9 @@ struct TabSelectionView: View {
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
+        if Defaults[.enableAgentBusTab] {
+            tabsArray.append(TabModel(label: "Agent", icon: "antenna.radiowaves.left.and.right", view: .agentBus))
+        }
         
         if extensionTabsEnabled {
             for payload in extensionTabPayloads {

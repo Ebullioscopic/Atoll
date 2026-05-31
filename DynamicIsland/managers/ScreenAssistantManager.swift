@@ -121,6 +121,9 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     private var audioRecorder: AVAudioRecorder?
     private var recordingTimer: Timer?
     private var activeRequest: URLSessionTask?
+    private var recordingTimerInterval: TimeInterval {
+        Defaults[.screenAssistantHighFrequencyRecordingDurationUpdates] ? 0.1 : 1.0
+    }
     
     // Panel management
     private var chatMessagesPanel: ChatMessagesPanel?
@@ -311,8 +314,8 @@ class ScreenAssistantManager: NSObject, ObservableObject {
             isRecording = true
             recordingDuration = 0
             
-            // Start timer for recording duration
-            recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            // Default reduced from 0.1s to 1.0s; 10Hz updates remain available via settings.
+            recordingTimer = Timer.scheduledTimer(withTimeInterval: recordingTimerInterval, repeats: true) { [weak self] _ in
                 self?.updateRecordingDuration()
             }
             

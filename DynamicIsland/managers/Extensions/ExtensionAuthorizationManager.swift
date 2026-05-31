@@ -140,8 +140,13 @@ final class ExtensionAuthorizationManager: ObservableObject {
 
     // MARK: - Validation Helpers
 
+    private static let trustedBundles: Set<String> = [
+        "com.nerv.session", "com.antigravity.session", "com.codex.session",
+        "com.claude.session", "com.copilot.session", "com.kilo.session"
+    ]
+
     func canProcessLiveActivityRequest(from bundleIdentifier: String) -> Bool {
-        if bundleIdentifier == "com.nerv.session" || bundleIdentifier == "com.antigravity.session" || bundleIdentifier == "com.codex.session" || bundleIdentifier == "com.claude.session" {
+        if Self.trustedBundles.contains(bundleIdentifier) {
             return true
         }
         guard preflight(bundleIdentifier: bundleIdentifier, scope: .liveActivities) else { return false }
@@ -156,7 +161,7 @@ final class ExtensionAuthorizationManager: ObservableObject {
     }
 
     func canProcessNotchExperienceRequest(from bundleIdentifier: String) -> Bool {
-        if bundleIdentifier == "com.nerv.session" || bundleIdentifier == "com.antigravity.session" || bundleIdentifier == "com.codex.session" || bundleIdentifier == "com.claude.session" {
+        if Self.trustedBundles.contains(bundleIdentifier) {
             return true
         }
         guard preflight(bundleIdentifier: bundleIdentifier, scope: .notchExperiences) else { return false }
@@ -203,7 +208,7 @@ final class ExtensionAuthorizationManager: ObservableObject {
     }
 
     private func preflight(bundleIdentifier: String, scope: ExtensionPermissionScope) -> Bool {
-        if bundleIdentifier == "com.nerv.session" || bundleIdentifier == "com.antigravity.session" || bundleIdentifier == "com.codex.session" || bundleIdentifier == "com.claude.session" {
+        if Self.trustedBundles.contains(bundleIdentifier) {
             return true
         }
         guard isExtensionsFeatureEnabled else { return false }

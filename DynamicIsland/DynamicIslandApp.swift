@@ -34,10 +34,15 @@ struct DynamicNotchApp: App {
 
     init() {
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+            startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
 
         // Initialize the settings window controller with the updater controller
         SettingsWindowController.shared.setUpdaterController(updaterController)
+
+        // Defer update check to avoid blocking app launch
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak updaterController] in
+            try? updaterController?.updater.start()
+        }
     }
 
     var body: some Scene {
@@ -101,17 +106,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     var whatsNewWindow: NSWindow?
     var timer: Timer?
-    let calendarManager = CalendarManager.shared
-    let webcamManager = WebcamManager.shared
-    let dndManager = DoNotDisturbManager.shared  // NEW: DND detection
-    let bluetoothAudioManager = BluetoothAudioManager.shared  // NEW: Bluetooth audio detection
-    let idleAnimationManager = IdleAnimationManager.shared  // NEW: Custom idle animations
-    let downloadManager = DownloadManager.shared  // NEW: Chromium downloads detection
-    let lockScreenPanelManager = LockScreenPanelManager.shared  // NEW: Lock screen music panel
-    let mediaControlsStateCoordinator = MediaControlsStateCoordinator.shared
-    let systemTimerBridge = SystemTimerBridge.shared
+    // Essential managers (needed immediately for status indicators)
+    let dndManager = DoNotDisturbManager.shared
     let extensionXPCServiceHost = ExtensionXPCServiceHost.shared
     let extensionRPCServer = ExtensionRPCServer.shared
+    let mediaControlsStateCoordinator = MediaControlsStateCoordinator.shared
+
+    // Deferred managers (initialized on first access, not at launch)
+    lazy var calendarManager = CalendarManager.shared
+    lazy var webcamManager = WebcamManager.shared
+    lazy var bluetoothAudioManager = BluetoothAudioManager.shared
+    lazy var idleAnimationManager = IdleAnimationManager.shared
+    lazy var downloadManager = DownloadManager.shared
+    lazy var lockScreenPanelManager = LockScreenPanelManager.shared
+    lazy var systemTimerBridge = SystemTimerBridge.shared
     var closeNotchWorkItem: DispatchWorkItem?
     private var previousScreens: [NSScreen]?
     private var onboardingWindowController: NSWindowController?
@@ -123,15 +131,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
-//    let calendarManager = CalendarManager.shared
-//    let webcamManager = WebcamManager.shared
-//    var closeNotchWorkItem: DispatchWorkItem?
-//    private var previousScreens: [NSScreen]?
-//    private var onboardingWindowController: NSWindowController?
-//    private var cancellables = Set<AnyCancellable>()
-//    
-//    // Debouncing mechanism for window size updates
-//    private var windowSizeUpdateWorkItem: DispatchWorkItem?
     
     private func debouncedUpdateWindowSize() {
         // Cancel any existing work item

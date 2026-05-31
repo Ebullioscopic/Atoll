@@ -1095,10 +1095,13 @@ extension Defaults.Keys {
     static let clipboardHistorySize = Key<Int>("clipboardHistorySize", default: 3)
     static let showClipboardIcon = Key<Bool>("showClipboardIcon", default: true)
     static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .panel)
+    static let clipboardAsyncFileLoadingEnabled = Key<Bool>("clipboardAsyncFileLoadingEnabled", default: true)
+    static let clipboardDebouncedPersistenceEnabled = Key<Bool>("clipboardDebouncedPersistenceEnabled", default: true)
     
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)
     static let screenAssistantDisplayMode = Key<ScreenAssistantDisplayMode>("screenAssistantDisplayMode", default: .panel)
+    static let screenAssistantHighFrequencyRecordingDurationUpdates = Key<Bool>("screenAssistantHighFrequencyRecordingDurationUpdates", default: false)
     static let geminiApiKey = Key<String>("geminiApiKey", default: "")
     static let openaiApiKey = Key<String>("openaiApiKey", default: "")
     static let claudeApiKey = Key<String>("claudeApiKey", default: "")
@@ -1131,11 +1134,13 @@ extension Defaults.Keys {
     static let enableAgentConnectionMonitor = Key<Bool>("enableAgentConnectionMonitor", default: true)
     static let enableAgentHistoryShelf = Key<Bool>("enableAgentHistoryShelf", default: true)
     static let enableAgentBreathingGlow = Key<Bool>("enableAgentBreathingGlow", default: true)
+    static let pauseAgentBreathingGlowWhenCollapsed = Key<Bool>("pauseAgentBreathingGlowWhenCollapsed", default: true)
     static let enableAgentFluidProgress = Key<Bool>("enableAgentFluidProgress", default: true)
-    static let enableAgentDoubleClickDetails = Key<Bool>("enableAgentDoubleClickDetails", default: true)
+    static let enableAgentDoubleClickDetails = Key<Bool>("enableAgentDoubleClickDetails", default: false)
     static let enableAgentCustomAvatars = Key<Bool>("enableAgentCustomAvatars", default: true)
     static let enableAgentSwipeDismiss = Key<Bool>("enableAgentSwipeDismiss", default: true)
-    static let enableAgentHoverDetails = Key<Bool>("enableAgentHoverDetails", default: true)
+    static let enableAgentHoverDetails = Key<Bool>("enableAgentHoverDetails", default: false)
+    static let enableAgentBusTab = Key<Bool>("enableAgentBusTab", default: true)
     static let enableFolderAccessChecking = Key<Bool>("enableFolderAccessChecking", default: false)
     
     // MARK: Keyboard Shortcuts
@@ -1143,6 +1148,7 @@ extension Defaults.Keys {
     
     // MARK: System HUD Feature
     static let enableSystemHUD = Key<Bool>("enableSystemHUD", default: true)
+    static let systemOSDSuppressionWatcherIdlePollingInterval = Key<TimeInterval>("systemOSDSuppressionWatcherIdlePollingInterval", default: 2.0) // Set to 0.15 to restore the legacy 150ms cadence.
     static let enableVolumeHUD = Key<Bool>("enableVolumeHUD", default: true)
     static let enableBrightnessHUD = Key<Bool>("enableBrightnessHUD", default: true)
     static let enableKeyboardBacklightHUD = Key<Bool>("enableKeyboardBacklightHUD", default: true)

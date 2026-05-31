@@ -216,6 +216,7 @@ struct AlbumArtView: View {
                 x: 0,
                 y: 0
             )
+            .drawingGroup()
     }
 
     private var albumArtButton: some View {
