@@ -26,6 +26,75 @@ class IdleAnimationManager {
     // Storage directory for user-imported animations
     private let storageDirectory: URL
     
+    // MARK: - Lazy Loading Cache
+    
+    /// Cached animation data with last access timestamp for eviction
+    private var loadedAnimations: [String: (data: Data, lastAccess: Date)] = [:]
+    
+    /// Timer that periodically checks for stale cached animations
+    private var evictionTimer: Timer?
+    
+    /// Returns cached animation data for the given animation, loading from disk on demand.
+    /// Evicts entries after 60 seconds of non-use.
+    func animationData(for animation: CustomIdleAnimation) -> Data? {
+        let key = animation.id.uuidString
+        
+        if let entry = loadedAnimations[key] {
+            loadedAnimations[key] = (data: entry.data, lastAccess: Date())
+            return entry.data
+        }
+        
+        // Load from disk on demand
+        guard let data = loadAnimationDataFromDisk(animation) else { return nil }
+        loadedAnimations[key] = (data: data, lastAccess: Date())
+        startEvictionTimerIfNeeded()
+        print("💤 [IdleAnimationManager] Lazy-loaded animation data: \(animation.name)")
+        return data
+    }
+    
+    /// Load raw JSON data from disk for a given animation
+    private func loadAnimationDataFromDisk(_ animation: CustomIdleAnimation) -> Data? {
+        switch animation.source {
+        case .lottieFile(let url):
+            return try? Data(contentsOf: url)
+        case .lottieURL(let url):
+            // For remote URLs, attempt synchronous load (caller should prefer async in practice)
+            return try? Data(contentsOf: url)
+        }
+    }
+    
+    /// Starts the eviction timer if not already running
+    private func startEvictionTimerIfNeeded() {
+        guard evictionTimer == nil else { return }
+        evictionTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+            self?.evictStaleAnimations()
+        }
+    }
+    
+    /// Evicts cached animation data that hasn't been accessed in 60 seconds
+    private func evictStaleAnimations() {
+        let threshold: TimeInterval = 60
+        let now = Date()
+        let before = loadedAnimations.count
+        loadedAnimations = loadedAnimations.filter { now.timeIntervalSince($0.value.lastAccess) < threshold }
+        let evicted = before - loadedAnimations.count
+        if evicted > 0 {
+            print("🧹 [IdleAnimationManager] Evicted \(evicted) stale animation(s) from cache")
+        }
+        if loadedAnimations.isEmpty {
+            evictionTimer?.invalidate()
+            evictionTimer = nil
+        }
+    }
+    
+    /// Manually evict all cached data (e.g. on memory pressure)
+    func evictAllCachedAnimations() {
+        loadedAnimations.removeAll()
+        evictionTimer?.invalidate()
+        evictionTimer = nil
+        print("🧹 [IdleAnimationManager] Evicted all cached animations (memory pressure)")
+    }
+    
     private init() {
         // Create storage directory in Application Support
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!

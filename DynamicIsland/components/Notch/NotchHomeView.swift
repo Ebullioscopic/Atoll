@@ -42,7 +42,8 @@ private final class DynamicIslandArtworkLoopController {
             player.play()
         }
 
-        playbackStateCancellable = MusicManager.shared.$isPlaying
+        playbackStateCancellable = MusicManager.shared.$musicState
+            .map(\.isPlaying)
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isPlaying in

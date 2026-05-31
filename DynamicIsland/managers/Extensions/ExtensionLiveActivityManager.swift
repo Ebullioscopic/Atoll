@@ -50,7 +50,7 @@ final class ExtensionLiveActivityManager: ObservableObject {
         liveActivityObserver = eventBridge.observeLiveActivitySnapshots { [weak self] payloads, sourcePID in
             self?.applySnapshot(payloads, sourcePID: sourcePID)
         }
-        startMetricsTimer()
+        // Metrics timer is started on-demand when activities are present
     }
 
     deinit {
@@ -78,6 +78,7 @@ final class ExtensionLiveActivityManager: ObservableObject {
             )
             activeActivities[index] = payload
             sortActivities()
+            startMetricsTimer()
             authorizationManager.recordActivity(for: bundleIdentifier, scope: .liveActivities)
             Logger.log("Replaced extension live activity \(descriptor.id) for \(bundleIdentifier)", category: .extensions)
             isUpdate = true
@@ -94,6 +95,7 @@ final class ExtensionLiveActivityManager: ObservableObject {
             )
             activeActivities.append(payload)
             sortActivities()
+            startMetricsTimer()
             authorizationManager.recordActivity(for: bundleIdentifier, scope: .liveActivities)
             logDiagnostics("Queued live activity \(descriptor.id) for \(bundleIdentifier); total activities: \(activeActivities.count)")
             isUpdate = false
@@ -148,6 +150,9 @@ final class ExtensionLiveActivityManager: ObservableObject {
             ExtensionRPCServer.shared.notifyActivityDismiss(bundleIdentifier: bundleIdentifier, activityID: activityID)
             logDiagnostics("Removed live activity \(activityID) for \(bundleIdentifier); remaining: \(activeActivities.count)")
             broadcastSnapshot()
+            if activeActivities.isEmpty {
+                stopMetricsTimer()
+            }
         }
     }
 
@@ -165,6 +170,9 @@ final class ExtensionLiveActivityManager: ObservableObject {
         if !ids.isEmpty {
             logDiagnostics("Removed all live activities for \(bundleIdentifier); ids: \(ids.joined(separator: ", "))")
             broadcastSnapshot()
+            if activeActivities.isEmpty {
+                stopMetricsTimer()
+            }
         }
     }
 
@@ -239,6 +247,8 @@ final class ExtensionLiveActivityManager: ObservableObject {
 
     private func startMetricsTimer() {
         guard metricsTimer == nil else { return }
+        guard Defaults[.enableAgentSpeedometer] else { return }
+        guard !activeActivities.isEmpty else { return }
         metricsTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.updateMetrics()
@@ -265,6 +275,10 @@ final class ExtensionLiveActivityManager: ObservableObject {
             currentCost += Double.random(in: 0.0008...0.0019)
         } else {
             currentSpeed = 0.0
+            // Stop timer when no active activities need metrics
+            if activeActivities.isEmpty {
+                stopMetricsTimer()
+            }
         }
     }
     
