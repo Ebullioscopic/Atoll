@@ -31,17 +31,51 @@ final class SystemKeyboardBacklightController {
     private let notificationCenter = NotificationCenter.default
     private var isRunning = false
 
+    /// Polling timer to detect external brightness changes (e.g. rebound keys via Karabiner)
+    private var pollTimer: DispatchSourceTimer?
+    private var lastPolledLevel: Float = -1
+    private static let pollInterval: TimeInterval = 0.25
+    private static let changeTolerance: Float = 0.005
+
     private init() {}
 
     func start() {
         guard !isRunning else { return }
         isRunning = true
+        lastPolledLevel = (try? KeyboardBrightnessSensor.currentLevel()) ?? 0
         notifyCurrentLevel()
+        startPolling()
     }
 
     func stop() {
         guard isRunning else { return }
         isRunning = false
+        stopPolling()
+    }
+
+    private func startPolling() {
+        let timer = DispatchSource.makeTimerSource(queue: workerQueue)
+        timer.schedule(deadline: .now() + Self.pollInterval, repeating: Self.pollInterval)
+        timer.setEventHandler { [weak self] in
+            self?.pollForExternalChanges()
+        }
+        timer.resume()
+        pollTimer = timer
+    }
+
+    private func stopPolling() {
+        pollTimer?.cancel()
+        pollTimer = nil
+    }
+
+    private func pollForExternalChanges() {
+        guard isRunning else { return }
+        guard let level = try? KeyboardBrightnessSensor.currentLevel() else { return }
+        let delta = abs(level - lastPolledLevel)
+        if delta > Self.changeTolerance {
+            lastPolledLevel = level
+            emitChange(level: level)
+        }
     }
 
     func adjust(by delta: Float) {
@@ -55,6 +89,7 @@ final class SystemKeyboardBacklightController {
             do {
                 try KeyboardBrightnessSensor.setLevel(clamped)
                 let level = (try? KeyboardBrightnessSensor.currentLevel()) ?? clamped
+                self.lastPolledLevel = level
                 self.emitChange(level: level)
             } catch {
                 NSLog("⚠️ Failed to set keyboard backlight: \(error)")

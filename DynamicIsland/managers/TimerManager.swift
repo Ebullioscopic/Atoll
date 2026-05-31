@@ -125,15 +125,38 @@ class TimerManager: ObservableObject {
     private var timerInstance: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var soundPlayer: AVAudioPlayer?
+    
+    /// The absolute date when the timer should reach zero (used for accurate time tracking through sleep/background)
+    private var fireDate: Date?
+    /// The absolute date when the timer entered overtime (hit zero)
+    private var overtimeStartDate: Date?
+    /// Accumulated elapsed time before the last pause (for pause/resume accuracy)
+    private var accumulatedBeforePause: TimeInterval = 0
+    /// The date when the timer was last resumed (or started)
+    private var lastResumeDate: Date?
+    
     // MARK: - Initialization
     private init() {
-        // Simple initialization
+        // Observe system wake notifications to immediately recalculate timer
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(systemDidWake),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
     }
     
     deinit {
         timerInstance?.invalidate()
         soundPlayer?.stop()
         cancellables.removeAll()
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+    
+    @objc private func systemDidWake() {
+        // On wake from sleep, immediately recalculate timer state from absolute dates
+        guard isTimerActive, !isPaused, activeSource == .manual else { return }
+        recalculateFromAbsoluteTime()
     }
     
     // MARK: - Timer Methods
@@ -161,29 +184,20 @@ class TimerManager: ObservableObject {
 
         activePresetId = preset?.id
         
-        // Start countdown timer
+        // Store absolute reference points
+        let now = Date()
+        fireDate = now.addingTimeInterval(duration)
+        overtimeStartDate = nil
+        accumulatedBeforePause = 0
+        lastResumeDate = now
+        
+        // Start countdown timer - uses absolute time comparison each tick
         timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             
             Task { @MainActor in
                 if !self.isPaused {
-                    if self.remainingTime > 0 {
-                        // Normal countdown
-                        self.remainingTime -= 1
-                        self.elapsedTime = self.totalDuration - self.remainingTime
-                        self.lastUpdated = Date()
-                    } else if self.remainingTime == 0 {
-                        // Timer just finished - play sound and start overtime
-                        self.isFinished = true
-                        self.isOvertime = true
-                        self.playTimerSound()
-                        self.remainingTime = -1
-                        self.lastUpdated = Date()
-                    } else {
-                        // Overtime - count negative
-                        self.remainingTime -= 1
-                        self.lastUpdated = Date()
-                    }
+                    self.recalculateFromAbsoluteTime()
                 }
             }
         }
@@ -231,6 +245,13 @@ class TimerManager: ObservableObject {
         guard activeSource == .manual else { return }
         guard isTimerActive && !isPaused else { return }
         isPaused = true
+        
+        // Accumulate elapsed time up to this pause point
+        if let resumeDate = lastResumeDate {
+            accumulatedBeforePause += Date().timeIntervalSince(resumeDate)
+        }
+        lastResumeDate = nil
+        
         timerInstance?.invalidate()
         timerInstance = nil
     }
@@ -239,31 +260,24 @@ class TimerManager: ObservableObject {
         guard activeSource == .manual else { return }
         guard isTimerActive && isPaused else { return }
         isPaused = false
-        lastUpdated = Date()
         
-        // Resume countdown timer with same logic as start timer
+        // Recalculate fireDate based on current remaining time
+        let now = Date()
+        lastResumeDate = now
+        fireDate = now.addingTimeInterval(remainingTime > 0 ? remainingTime : 0)
+        if isOvertime {
+            // Keep overtimeStartDate adjusted: overtime elapsed = abs(remainingTime)
+            overtimeStartDate = now.addingTimeInterval(remainingTime) // remainingTime is negative
+        }
+        lastUpdated = now
+        
+        // Resume countdown timer using absolute time comparison
         timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             
             Task { @MainActor in
                 if !self.isPaused {
-                    if self.remainingTime > 0 {
-                        // Normal countdown
-                        self.remainingTime -= 1
-                        self.elapsedTime = self.totalDuration - self.remainingTime
-                        self.lastUpdated = Date()
-                    } else if self.remainingTime == 0 {
-                        // Timer just finished - play sound and start overtime
-                        self.isFinished = true
-                        self.isOvertime = true
-                        self.playTimerSound()
-                        self.remainingTime = -1
-                        self.lastUpdated = Date()
-                    } else {
-                        // Overtime - count negative
-                        self.remainingTime -= 1
-                        self.lastUpdated = Date()
-                    }
+                    self.recalculateFromAbsoluteTime()
                 }
             }
         }
@@ -354,6 +368,45 @@ class TimerManager: ObservableObject {
         isOvertime = false
         activePresetId = nil
         activeSource = .none
+        fireDate = nil
+        overtimeStartDate = nil
+        accumulatedBeforePause = 0
+        lastResumeDate = nil
+    }
+    
+    /// Recalculates remaining/elapsed time from absolute Date references.
+    /// This ensures accuracy even after system sleep or Timer coalescing delays.
+    private func recalculateFromAbsoluteTime() {
+        guard let fireDate = fireDate else { return }
+        
+        let now = Date()
+        let timeUntilFire = fireDate.timeIntervalSince(now)
+        
+        if timeUntilFire > 0 {
+            // Normal countdown - still has time remaining
+            let newRemaining = ceil(timeUntilFire) // Round up to avoid showing 0 prematurely
+            remainingTime = newRemaining
+            elapsedTime = totalDuration - newRemaining
+            lastUpdated = now
+        } else if !isOvertime {
+            // Timer just reached zero (or passed it during sleep)
+            isFinished = true
+            isOvertime = true
+            overtimeStartDate = fireDate // Overtime started exactly at fire date
+            remainingTime = timeUntilFire // Negative value = overtime amount
+            elapsedTime = totalDuration
+            lastUpdated = now
+            playTimerSound()
+        } else {
+            // Already in overtime - calculate how long past zero
+            if let otStart = overtimeStartDate {
+                let overtimeElapsed = now.timeIntervalSince(otStart)
+                remainingTime = -overtimeElapsed
+            } else {
+                remainingTime = timeUntilFire // Already negative
+            }
+            lastUpdated = now
+        }
     }
 
     // MARK: - Derived State
