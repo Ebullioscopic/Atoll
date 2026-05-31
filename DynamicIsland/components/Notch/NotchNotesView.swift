@@ -589,6 +589,8 @@ struct NoteListView: View {
     @Default(.enableNoteColorFiltering) var enableNoteColorFiltering
     @Default(.enableCreateFromClipboard) var enableCreateFromClipboard
     
+    @StateObject private var appleNotesSync = AppleNotesSyncManager.shared
+    @State private var showAppleNotesSheet = false
     @State private var searchText = ""
     @State private var selectedColorFilter: Int? = nil
     @State private var isSearchExpanded = false
@@ -657,6 +659,23 @@ struct NoteListView: View {
                     .help("Create from Clipboard")
                 }
                 
+                Button(action: {
+                    showAppleNotesSheet = true
+                    Task { await appleNotesSync.fetchAppleNotes() }
+                }) {
+                    Image(systemName: appleNotesSync.isSyncing ? "arrow.triangle.2.circlepath" : "arrow.triangle.2.circlepath.icloud")
+                        .font(.system(size: 13))
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(.orange.opacity(0.9))
+                        .padding(5)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Circle())
+                        .rotationEffect(.degrees(appleNotesSync.isSyncing ? 360 : 0))
+                        .animation(appleNotesSync.isSyncing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: appleNotesSync.isSyncing)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help("Sync from Apple Notes")
+
                 if !notes.isEmpty {
                     Button(action: { showClearNotesAlert = true }) {
                         Image(systemName: "trash")
@@ -816,12 +835,160 @@ struct NoteListView: View {
         .onChange(of: showClearNotesAlert) { _, isShowing in
             vm.setAutoCloseSuppression(isShowing, token: autoCloseToken)
         }
+        .sheet(isPresented: $showAppleNotesSheet) {
+            AppleNotesImportView(syncManager: appleNotesSync)
+        }
     }
 
     private func updateSuppression(for hovering: Bool) {
         guard hovering != isSuppressing else { return }
         isSuppressing = hovering
         vm.setScrollGestureSuppression(hovering, token: suppressionToken)
+    }
+}
+
+// MARK: - Apple Notes Import View
+
+struct AppleNotesImportView: View {
+    @ObservedObject var syncManager: AppleNotesSyncManager
+    @Environment(\.dismiss) var dismiss
+    @State private var selectedNotes: Set<String> = []
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Apple Notes")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                if syncManager.isSyncing {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .tint(.white)
+                }
+                
+                Button("Import Selected") {
+                    let toImport = syncManager.appleNotes.filter { selectedNotes.contains($0.id) }
+                    syncManager.importToAtoll(notes: toImport)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                .disabled(selectedNotes.isEmpty)
+                
+                Button("Import All") {
+                    syncManager.importAllToAtoll()
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+                .disabled(syncManager.appleNotes.isEmpty)
+                
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .padding()
+            
+            Divider()
+            
+            if let error = syncManager.lastError {
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.yellow)
+                    Text("Error fetching Apple Notes")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Text("Make sure Notes.app access is allowed in System Settings > Privacy & Security > Automation")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 4)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if syncManager.appleNotes.isEmpty && !syncManager.isSyncing {
+                VStack(spacing: 8) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.secondary.opacity(0.3))
+                    Text("No notes found")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 4) {
+                        ForEach(syncManager.appleNotes) { note in
+                            AppleNoteRow(note: note, isSelected: selectedNotes.contains(note.id))
+                                .onTapGesture {
+                                    if selectedNotes.contains(note.id) {
+                                        selectedNotes.remove(note.id)
+                                    } else {
+                                        selectedNotes.insert(note.id)
+                                    }
+                                }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+        .frame(width: 500, height: 400)
+        .background(Color.black.opacity(0.9))
+    }
+}
+
+struct AppleNoteRow: View {
+    let note: AppleNote
+    let isSelected: Bool
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(isSelected ? .orange : .secondary)
+                .font(.system(size: 16))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(note.title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                
+                Text(note.content.prefix(80) + (note.content.count > 80 ? "..." : ""))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(note.folderName)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.orange.opacity(0.7))
+                
+                Text(note.modificationDate, style: .relative)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary.opacity(0.6))
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(isSelected ? Color.orange.opacity(0.1) : Color.white.opacity(0.03))
+        .cornerRadius(8)
     }
 }
 

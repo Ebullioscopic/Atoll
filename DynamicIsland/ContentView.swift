@@ -1246,6 +1246,8 @@ struct ContentView: View {
                                 MessageNotificationView()
                             case .weather:
                                 WeatherView()
+                            case .launcher:
+                                LauncherView()
                           }
                       }
                       .id(coordinator.currentView)
