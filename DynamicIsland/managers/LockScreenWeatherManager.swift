@@ -152,6 +152,7 @@ final class LockScreenWeatherManager: ObservableObject {
                 showsLocation: snapshot?.showsLocation ?? false,
                 airQuality: (providerSource.supportsAirQuality && Defaults[.lockScreenWeatherShowsAQI]) ? snapshot?.airQuality : nil,
                 widgetStyle: widgetStyle,
+                batteryWidgetStyle: Defaults[.lockScreenBatteryWidgetStyle],
                 showsChargingPercentage: Defaults[.lockScreenBatteryShowsChargingPercentage],
                 temperatureInfo: snapshot?.temperatureInfo,
                 usesGaugeTint: Defaults[.lockScreenWeatherUsesGaugeTint],
@@ -231,6 +232,8 @@ final class LockScreenWeatherManager: ObservableObject {
             Defaults.publisher(.lockScreenWeatherShowsSunrise, options: [])
                 .map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.lockScreenWeatherWidgetStyle, options: [])
+                .map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.lockScreenBatteryWidgetStyle, options: [])
                 .map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.lockScreenWeatherTemperatureUnit, options: [])
                 .map { _ in () }.eraseToAnyPublisher(),
@@ -346,6 +349,7 @@ final class LockScreenWeatherManager: ObservableObject {
             showsLocation: shouldShowLocation,
             airQuality: airQualityInfo,
             widgetStyle: widgetStyle,
+            batteryWidgetStyle: Defaults[.lockScreenBatteryWidgetStyle],
             showsChargingPercentage: showsChargingPercentage,
             temperatureInfo: payload.temperatureInfo,
             usesGaugeTint: usesGaugeTint,
@@ -531,6 +535,7 @@ struct LockScreenWeatherSnapshot: Equatable {
     let showsLocation: Bool
     let airQuality: AirQualityInfo?
     let widgetStyle: LockScreenWeatherWidgetStyle
+    let batteryWidgetStyle: LockScreenWeatherWidgetStyle
     let showsChargingPercentage: Bool
     let temperatureInfo: TemperatureInfo?
     let usesGaugeTint: Bool
@@ -695,6 +700,7 @@ private actor LockScreenWeatherProvider {
             showsLocation: true,
             airQuality: airQualityInfo,
             widgetStyle: .inline,
+            batteryWidgetStyle: .inline,
             showsChargingPercentage: true,
             temperatureInfo: temperatureInfo,
             usesGaugeTint: true,
@@ -786,6 +792,7 @@ private actor LockScreenWeatherProvider {
             showsLocation: true,
             airQuality: airQualityInfo,
             widgetStyle: .inline,
+            batteryWidgetStyle: .inline,
             showsChargingPercentage: true,
             temperatureInfo: temperatureInfo,
             usesGaugeTint: true,
