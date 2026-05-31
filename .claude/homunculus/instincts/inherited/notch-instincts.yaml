@@ -1,0 +1,530 @@
+# Instincts generated from https://github.com/arbitraged-life/notch
+# Generated: 2026-05-30T00:26:42.098Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: notch-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/arbitraged-life/notch
+---
+
+# Notch Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: fix, feat, perf, build
+
+## Evidence
+
+- 12 commits analyzed
+- Detected conventional commit pattern
+- Examples: perf: 10 togglable performance and UX improvements, build: apply Xcode 26.2 recommended project settings
+
+---
+id: notch-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/arbitraged-life/notch
+---
+
+# Notch Commit Length
+
+## Action
+
+Write moderate-length commit messages (~58 characters)
+
+## Evidence
+
+- Average commit message length: 58 chars
+- Based on 12 commits
+
+---
+id: notch-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/arbitraged-life/notch
+---
+
+# Notch Naming Files
+
+## Action
+
+Use PascalCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: PascalCase
+
+---
+id: notch-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/arbitraged-life/notch
+---
+
+# Notch Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: notch-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/arbitraged-life/notch
+---
+
+# Notch Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: notch-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/arbitraged-life/notch
+---
+
+# Notch Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: notch-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/arbitraged-life/notch
+---
+
+# Notch Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~15x per month
+- Files: dynamicisland/components/notch/*, dynamicisland/components/tabs/*
+
+---
+id: notch-workflow-feature-development-with-settings-toggle
+trigger: "when doing feature development with settings toggle"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/arbitraged-life/notch
+---
+
+# Notch Workflow Feature Development With Settings Toggle
+
+## Action
+
+Follow the feature-development-with-settings-toggle workflow:
+1. Implement core feature logic in relevant manager/component files.
+2. Add new setting(s) to models/Constants.swift and/or SettingsView.
+3. Wire up toggles in Settings UI (components/Settings/SettingsView.swift or similar).
+4. Gate new logic behind Defaults keys and settings checks.
+5. Update ContentView.swift and other root views to respect the new toggles.
+6. Update or create subviews/components as needed.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: DynamicIsland/ContentView.swift, DynamicIsland/components/Settings/SettingsView.swift, DynamicIsland/models/Constants.swift
+
+---
+id: notch-workflow-feature-development-new-tab-or-view
+trigger: "when doing feature development new tab or view"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/arbitraged-life/notch
+---
+
+# Notch Workflow Feature Development New Tab Or View
+
+## Action
+
+Follow the feature-development-new-tab-or-view workflow:
+1. Create new SwiftUI view file for the tab (components/Notch/ or similar).
+2. Add new case to enums/generic.swift or similar enum for tab selection.
+3. Register the new tab in TabSelectionView.swift.
+4. Wire up tab logic in ContentView.swift (switch/case or navigation).
+5. Add any required settings toggle or enable/disable logic.
+6. Update models/Constants.swift if needed for tab configuration.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: DynamicIsland/ContentView.swift, DynamicIsland/components/Notch/*.swift, DynamicIsland/components/Tabs/TabSelectionView.swift
+
+---
+id: notch-workflow-bugfix-following-feature-refactor
+trigger: "when doing bugfix following feature refactor"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/arbitraged-life/notch
+---
+
+# Notch Workflow Bugfix Following Feature Refactor
+
+## Action
+
+Follow the bugfix-following-feature-refactor workflow:
+1. Identify the root cause of the bug (e.g., tuple label mismatch, binding error).
+2. Update affected files to resolve the issue (e.g., fix tuple labels, change binding patterns).
+3. Test to ensure the fix resolves the regression.
+4. Commit with a 'fix:' prefix and reference to the refactor or feature.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: DynamicIsland/ContentView.swift, DynamicIsland/managers/*.swift, DynamicIsland/components/**/*.swift
+
+---
+id: notch-workflow-extension-connection-lifecycle-cleanup
+trigger: "when doing extension connection lifecycle cleanup"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/arbitraged-life/notch
+---
+
+# Notch Workflow Extension Connection Lifecycle Cleanup
+
+## Action
+
+Follow the extension-connection-lifecycle-cleanup workflow:
+1. Implement or update cleanup logic in ExtensionRPCServer.swift to handle disconnects.
+2. Add or adjust grace period timers for delayed cleanup.
+3. Ensure live activities are dismissed only when appropriate (e.g., after grace period, or when no other connections exist).
+4. Cancel or reset grace tasks as needed on reconnect or server stop.
+5. Update related UI (e.g., NotchAgentBusView) to reflect connection state.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: DynamicIsland/services/Extensions/ExtensionRPCServer.swift, DynamicIsland/components/Notch/NotchAgentBusView.swift
+
+---
+id: notch-instinct-file-naming
+trigger: "When creating a new Swift file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct File Naming
+
+## Action
+
+Name the file using PascalCase
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.files
+- All files in DynamicIsland/components/ use PascalCase
+
+---
+id: notch-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Function Naming
+
+## Action
+
+Use camelCase for the function name
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.functions
+
+---
+id: notch-instinct-class-naming
+trigger: "When defining a new class or struct"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Class Naming
+
+## Action
+
+Use PascalCase for the class or struct name
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.classes
+
+---
+id: notch-instinct-constant-naming
+trigger: "When declaring a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Constant Naming
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for constant names
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.constants
+- models/Constants.swift
+
+---
+id: notch-instinct-import-style
+trigger: "When importing modules or files"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Import Style
+
+## Action
+
+Use relative imports
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: notch-instinct-export-style
+trigger: "When exporting modules or symbols"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: notch-instinct-test-location
+trigger: "When writing tests for a feature"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Test Location
+
+## Action
+
+Place tests in a separate test folder, not alongside source files
+
+## Evidence
+
+- architecture.folderStructure.testLocation is 'separate'
+
+---
+id: notch-instinct-test-after-feature
+trigger: "When implementing a new feature"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Test After Feature
+
+## Action
+
+Add corresponding tests after feature implementation
+
+## Evidence
+
+- feature-development workflow commitSequence includes 'Add tests for feature' after implementation
+
+---
+id: notch-instinct-conventional-commits
+trigger: "When writing a git commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Conventional Commits
+
+## Action
+
+Use conventional commit prefixes: fix, feat, perf, build
+
+## Evidence
+
+- commits.type is 'conventional'
+- commits.prefixes
+- Examples: 'fix: ...', 'feat: ...'
+
+---
+id: notch-instinct-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Commit Length
+
+## Action
+
+Keep the commit message concise, averaging around 58 characters
+
+## Evidence
+
+- commits.averageLength is 58
+
+---
+id: notch-instinct-feature-toggle-workflow
+trigger: "When adding a new feature or major UI/UX improvement that should be optional"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Feature Toggle Workflow
+
+## Action
+
+Implement the feature behind a user-configurable settings toggle, updating models/Constants.swift, SettingsView.swift, and gating logic with Defaults keys
+
+## Evidence
+
+- feature-development-with-settings-toggle workflow
+- commits and files in workflow example
+
+---
+id: notch-instinct-new-tab-workflow
+trigger: "When adding a new top-level UI section or tab"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct New Tab Workflow
+
+## Action
+
+Create a new SwiftUI view, register it in TabSelectionView.swift, add a case to enums/generic.swift, and wire it in ContentView.swift
+
+## Evidence
+
+- feature-development-new-tab-or-view workflow
+- commits and files in workflow example
+
+---
+id: notch-instinct-bugfix-after-refactor
+trigger: "When a recent refactor or feature causes build errors or runtime bugs"
+confidence: 0.88
+domain: workflow
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Bugfix After Refactor
+
+## Action
+
+Identify and fix the root cause, test the fix, and commit with a 'fix:' prefix referencing the refactor or feature
+
+## Evidence
+
+- bugfix-following-feature-refactor workflow
+- commits and files in workflow example
+
+---
+id: notch-instinct-extension-cleanup
+trigger: "When managing the lifecycle of extension connections and their associated UI state"
+confidence: 0.86
+domain: workflow
+source: repo-analysis
+source_repo: arbitraged-life/notch
+---
+
+# Notch Instinct Extension Cleanup
+
+## Action
+
+Update ExtensionRPCServer.swift to handle disconnects, manage grace periods, and update NotchAgentBusView.swift to reflect connection state
+
+## Evidence
+
+- extension-connection-lifecycle-cleanup workflow
+- commits and files in workflow example
+
