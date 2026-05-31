@@ -836,7 +836,7 @@ extension Defaults.Keys {
     static let selectedCameraID = Key<String>("selectedCameraID", default: "")
     static let settingsIconInNotch = Key<Bool>("settingsIconInNotch", default: true)
     static let lightingEffect = Key<Bool>("lightingEffect", default: true)
-    static let accentColor = Key<Color>("accentColor", default: Color.blue)
+    static let accentColor = Key<Color>("accentColor", default: Color(NSColor.controlAccentColor))
     static let enableShadow = Key<Bool>("enableShadow", default: true)
     static let notchGlassEnabled = Key<Bool>("notchGlassEnabled", default: false)
     static let notchLiquidGlassVariant = Key<LiquidGlassVariant>("notchLiquidGlassVariant", default: .defaultVariant)
@@ -1277,6 +1277,7 @@ extension Defaults.Keys {
     
     // MARK: Lyrics Feature
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
+    static let alwaysShowLyrics = Key<Bool>("alwaysShowLyrics", default: false)
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)
     
     // MARK: Weather Tab

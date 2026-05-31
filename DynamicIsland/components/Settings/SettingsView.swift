@@ -2911,6 +2911,11 @@ struct Media: View {
                     Text("Enable lyrics")
                 }
                 .settingsHighlight(id: highlightID("Enable lyrics"))
+                Defaults.Toggle(key: .alwaysShowLyrics) {
+                    Text("Always show lyrics")
+                }
+                .disabled(!Defaults[.enableLyrics])
+                .help("Keep lyrics visible without hovering over the notch.")
                 Defaults.Toggle(key: .showLiveCanvasInDynamicIsland) {
                     Text("Show live canvas in Dynamic Island")
                 }

@@ -247,7 +247,7 @@ struct VerticalHUDView: View {
             }
         }
         
-        return AnyShapeStyle(useAccentColor ? Color.accentColor : Color.white)
+        return AnyShapeStyle(useAccentColor ? Color(NSColor.controlAccentColor) : Color.white)
     }
 
     private var valueLabelColor: Color {
