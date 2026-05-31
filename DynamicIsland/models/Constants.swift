@@ -271,6 +271,8 @@ enum FantasticalViewStyle: String, CaseIterable, Codable, Defaults.Serializable 
 enum ThirdPartyCalendarApp: String, CaseIterable, Codable, Defaults.Serializable, Identifiable {
     case fantastical = "fantastical"
     case notionCalendar = "notionCalendar"
+    case busyCal = "busyCal"
+    case custom = "custom"
     
     var id: String { rawValue }
     
@@ -278,6 +280,8 @@ enum ThirdPartyCalendarApp: String, CaseIterable, Codable, Defaults.Serializable
         switch self {
         case .fantastical: return "Fantastical"
         case .notionCalendar: return "Notion Calendar"
+        case .busyCal: return "BusyCal"
+        case .custom: return "Custom App"
         }
     }
     
@@ -286,6 +290,8 @@ enum ThirdPartyCalendarApp: String, CaseIterable, Codable, Defaults.Serializable
         switch self {
         case .fantastical: return ["com.flexibits.fantastical2.mac", "com.flexibits.fantastical"]
         case .notionCalendar: return ["com.cron.electron"]
+        case .busyCal: return ["com.busymac.busycal3", "com.busymac.busycal"]
+        case .custom: return []
         }
     }
     
@@ -293,6 +299,8 @@ enum ThirdPartyCalendarApp: String, CaseIterable, Codable, Defaults.Serializable
         switch self {
         case .fantastical: return "calendar.badge.clock"
         case .notionCalendar: return "calendar.badge.plus"
+        case .busyCal: return "calendar"
+        case .custom: return "app.dashed"
         }
     }
     
@@ -300,6 +308,8 @@ enum ThirdPartyCalendarApp: String, CaseIterable, Codable, Defaults.Serializable
         switch self {
         case .fantastical: return .red
         case .notionCalendar: return .blue
+        case .busyCal: return .green
+        case .custom: return .gray
         }
     }
 }
@@ -959,6 +969,7 @@ extension Defaults.Keys {
     // MARK: Third-party Calendar Integration
     static let enableThirdPartyCalendarApp = Key<Bool>("enableThirdPartyCalendarApp", default: false)
     static let selectedCalendarApp = Key<ThirdPartyCalendarApp>("selectedCalendarApp", default: .fantastical)
+    static let customCalendarAppBundleID = Key<String>("customCalendarAppBundleID", default: "")
     static let fantasticalDefaultView = Key<FantasticalViewStyle>("fantasticalDefaultView", default: .mini)
     
         // MARK: Battery
@@ -1092,6 +1103,10 @@ extension Defaults.Keys {
     static let reminderLeadTime = Key<Int>("reminderLeadTime", default: 5)
     static let reminderSneakPeekDuration = Key<Double>("reminderSneakPeekDuration", default: 5)
     static let timerControlWindowEnabled = Key<Bool>("timerControlWindowEnabled", default: true)
+    
+    // MARK: Alarm/Reminder Feature
+    static let alarms = Key<[Alarm]>("alarms", default: [])
+    static let enableAlarmFeature = Key<Bool>("enableAlarmFeature", default: true)
     
     // MARK: ColorPicker Feature
     static let enableColorPickerFeature = Key<Bool>("enableColorPickerFeature", default: true)

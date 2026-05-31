@@ -106,6 +106,10 @@ extension EventModel {
                 return fantasticalURL()
             case .notionCalendar:
                 return notionCalendarURL()
+            case .busyCal:
+                return busyCalURL()
+            case .custom:
+                return customCalendarAppURL()
             }
         }
         return appleCalendarURL()
@@ -207,6 +211,46 @@ extension EventModel {
                 }
             }
         }
+    }
+    
+    /// Returns URL to open event in BusyCal
+    private func busyCalURL() -> URL? {
+        // Reminders still use Apple's Reminders app
+        guard !type.isReminder else {
+            return URL(string: "x-apple-reminderkit://remcdreminder/\(id)")
+        }
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: start)
+        
+        // busycal:// URL scheme to show a specific date
+        return URL(string: "busycal://show/\(dateString)")
+    }
+    
+    /// Returns URL to open event in a custom calendar app via its bundle identifier
+    private func customCalendarAppURL() -> URL? {
+        // Reminders still use Apple's Reminders app
+        guard !type.isReminder else {
+            return URL(string: "x-apple-reminderkit://remcdreminder/\(id)")
+        }
+        
+        let bundleID = Defaults[.customCalendarAppBundleID]
+        guard !bundleID.isEmpty else {
+            // No custom app configured, fall back to Apple Calendar
+            return appleCalendarURL()
+        }
+        
+        // Launch the custom app by bundle identifier
+        if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            let config = NSWorkspace.OpenConfiguration()
+            NSWorkspace.shared.openApplication(at: appURL, configuration: config) { _, error in
+                if let error = error {
+                    print("Error launching custom calendar app (\(bundleID)): \(error.localizedDescription)")
+                }
+            }
+        }
+        return nil
     }
 }
 
