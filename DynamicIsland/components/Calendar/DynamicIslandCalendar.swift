@@ -106,7 +106,48 @@ struct WheelPicker: View {
             .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())
+        .onTapGesture(count: 2) {
+            openCalendarApp(at: date)
+        }
         .id(id)
+    }
+
+    /// Opens the preferred calendar app at the specified date.
+    private func openCalendarApp(at date: Date) {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: date)
+
+        let url: URL?
+        if Defaults[.enableThirdPartyCalendarApp] {
+            switch Defaults[.selectedCalendarApp] {
+            case .fantastical:
+                let viewStyle = Defaults[.fantasticalDefaultView]
+                url = URL(string: "x-fantastical3://show/\(viewStyle.rawValue)/\(dateString)")
+            case .notionCalendar:
+                url = URL(string: "cron://date/\(dateString)")
+            case .busyCal:
+                url = URL(string: "busycalevent://date/\(dateString)")
+            case .custom:
+                let bundleID = Defaults[.customCalendarAppBundleID]
+                if !bundleID.isEmpty {
+                    // Open the custom app; we can't deep-link to a date generically
+                    if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+                        NSWorkspace.shared.openApplication(at: appURL, configuration: NSWorkspace.OpenConfiguration())
+                    }
+                    return
+                }
+                url = nil
+            }
+        } else {
+            // Apple Calendar: open at specific date
+            let timeInterval = Int(date.timeIntervalSinceReferenceDate)
+            url = URL(string: "ical://\(timeInterval)")
+        }
+
+        if let url {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func dayText(date: String, isToday: Bool, isSelected: Bool) -> some View {
