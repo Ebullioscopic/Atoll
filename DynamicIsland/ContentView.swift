@@ -2225,7 +2225,14 @@ struct ContentView: View {
             }
         } else {
             hoverTask = Task {
-                try? await Task.sleep(for: .milliseconds(300))
+                // Tiered close delay: stats gets longer to prevent accidental close
+                let closeDelay: Int = {
+                    switch coordinator.currentView {
+                    case .stats: return 1000
+                    default: return 300
+                    }
+                }()
+                try? await Task.sleep(for: .milliseconds(closeDelay))
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
