@@ -110,10 +110,13 @@ struct ContentView: View {
         // When inline sneak peek is active in closed notch, use the wider inline width
         // so the outer maxWidth frame doesn't clip the expanded content
         let inlineSneakPeekActive = vm.notchState == .closed
-            && coordinator.expandingView.show
-            && (coordinator.expandingView.type == .music || coordinator.expandingView.type == .timer)
-            && Defaults[.enableSneakPeek]
-            && Defaults[.sneakPeekStyles] == .inline
+            && (
+                (coordinator.expandingView.show
+                && (coordinator.expandingView.type == .music || coordinator.expandingView.type == .timer)
+                && Defaults[.enableSneakPeek]
+                && Defaults[.sneakPeekStyles] == .inline)
+                || (Defaults[.enableAgentStatus] && AgentStatusManager.shared.isActive)
+            )
         if inlineSneakPeekActive {
             let inlineWidth: CGFloat = 460
             return CGSize(width: max(baseSize.width, inlineWidth), height: baseSize.height)
@@ -1114,6 +1117,9 @@ struct ContentView: View {
                       } else if vm.notchState == .open {
                           DynamicIslandHeader()
                               .frame(height: max(24, vm.effectiveClosedNotchHeight))
+                       } else if Defaults[.enableAgentStatus] && AgentStatusManager.shared.isActive {
+                           AgentNotchTicker(frameWidth: max(0, vm.closedNotchSize.width + 200))
+                               .frame(height: vm.effectiveClosedNotchHeight)
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
@@ -1336,10 +1342,11 @@ struct ContentView: View {
         let rawCenterBaseWidth = vm.closedNotchSize.width + (isHovering ? 8 : 0)
         let centerBaseWidth = max(rawCenterBaseWidth, 96)
         let inlineSneakPeekActive = (
-            coordinator.expandingView.show &&
+            (coordinator.expandingView.show &&
             (coordinator.expandingView.type == .music || coordinator.expandingView.type == .timer) &&
             Defaults[.enableSneakPeek] &&
-            Defaults[.sneakPeekStyles] == .inline
+            Defaults[.sneakPeekStyles] == .inline)
+            || (Defaults[.enableAgentStatus] && AgentStatusManager.shared.isActive)
         )
         let rightWingWidth = resolvedRightWingWidth(
             for: secondary,
@@ -1412,6 +1419,9 @@ struct ContentView: View {
                                 .foregroundStyle(timerManager.timerColor)
                                 .padding(.trailing, 8)
                                 .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .timer && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
+                        } else if Defaults[.enableAgentStatus] && AgentStatusManager.shared.isActive {
+                            AgentNotchTicker(frameWidth: max(0, effectiveCenterWidth - 16))
+                                .padding(.horizontal, 8)
                         } else if Defaults[.showSongMetadataInClosedNotch] && isNonNotchScreen && !musicManager.songTitle.isEmpty {
                             MarqueeText(
                                 .constant("\(musicManager.songTitle) • \(musicManager.artistName)"),
