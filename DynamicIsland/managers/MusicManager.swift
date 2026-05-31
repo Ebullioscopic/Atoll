@@ -421,6 +421,7 @@ class MusicManager: ObservableObject {
         var isLiveStream: Bool = false
         var usingAppIconForArtwork: Bool = false
         var skipGesturePulse: SkipGesturePulse? = nil
+        var isSpotifyLiked: Bool = false
         var videoArtworkURL: URL? = nil
         var avgColor: NSColor = .white
         var animations: DynamicIslandAnimations = .init()
@@ -614,6 +615,10 @@ class MusicManager: ObservableObject {
     var skipGesturePulse: SkipGesturePulse? {
         get { musicState.skipGesturePulse }
         set { musicState.skipGesturePulse = newValue }
+    }
+    var isSpotifyLiked: Bool {
+        get { musicState.isSpotifyLiked }
+        set { musicState.isSpotifyLiked = newValue }
     }
 
     // MARK: - Lyrics Properties
@@ -947,6 +952,8 @@ class MusicManager: ObservableObject {
             }
 
             self.refreshExplicitFlag(for: state)
+
+            self.checkSpotifyLikedState()
 
 
             // Only update sneak peek if there's actual content and something changed
@@ -1342,6 +1349,50 @@ class MusicManager: ObservableObject {
     func toggleRepeat() {
         Task {
             await activeController?.toggleRepeat()
+        }
+    }
+
+    var isSpotifyActive: Bool {
+        bundleIdentifier == SpotifyController.bundleIdentifier
+    }
+
+    /// Extract the Spotify track ID from the current content identifier (e.g. "spotify:track:ABC123" → "ABC123").
+    private var currentSpotifyTrackID: String? {
+        guard isSpotifyActive else { return nil }
+        guard let identifier = lastArtworkContentIdentifier else { return nil }
+        let trimmed = identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("spotify:track:") {
+            return String(trimmed.dropFirst("spotify:track:".count))
+        }
+        // Might already be a raw 22-char ID
+        if trimmed.count == 22, trimmed.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) }) {
+            return trimmed
+        }
+        return nil
+    }
+
+    func toggleSpotifyLike() {
+        guard let spotifyController = activeController as? SpotifyController,
+              let trackID = currentSpotifyTrackID else { return }
+        let newLiked = !isSpotifyLiked
+        isSpotifyLiked = newLiked // optimistic update
+        Task {
+            let success = await spotifyController.setTrackLiked(trackID: trackID, liked: newLiked)
+            if !success {
+                await MainActor.run { self.isSpotifyLiked = !newLiked }
+            }
+        }
+    }
+
+    func checkSpotifyLikedState() {
+        guard let spotifyController = activeController as? SpotifyController,
+              let trackID = currentSpotifyTrackID else {
+            isSpotifyLiked = false
+            return
+        }
+        Task {
+            let liked = await spotifyController.isTrackLiked(trackID: trackID)
+            await MainActor.run { self.isSpotifyLiked = liked }
         }
     }
     

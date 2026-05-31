@@ -33,6 +33,7 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
     case lyrics
     case seekBackward
     case seekForward
+    case spotifyLike
     case none
 
     static let slotCount = 5
@@ -62,6 +63,7 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
         .shuffle,
         .repeatMode,
         .lyrics,
+        .spotifyLike,
         .mediaOutput,
         .airPlay
     ]
@@ -69,6 +71,11 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
     /// Controls that are only available when Apple Music is the active media source.
     var isAppleMusicExclusive: Bool {
         self == .airPlay
+    }
+
+    /// Controls that are only available when Spotify is the active media source.
+    var isSpotifyExclusive: Bool {
+        self == .spotifyLike
     }
 
     var id: String { rawValue }
@@ -95,6 +102,8 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
             return String(localized: "Rewind 10s")
         case .seekForward:
             return String(localized: "Forward 10s")
+        case .spotifyLike:
+            return String(localized: "Like (Spotify)")
         case .none:
             return String(localized: "Empty Slot")
         }
@@ -122,6 +131,8 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
             return "gobackward.10"
         case .seekForward:
             return "goforward.10"
+        case .spotifyLike:
+            return "heart"
         case .none:
             return ""
         }
@@ -133,10 +144,11 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
 }
 
 extension Array where Element == MusicControlButton {
-    func normalized(allowingMediaOutput: Bool, isAppleMusicActive: Bool = true) -> [MusicControlButton] {
+    func normalized(allowingMediaOutput: Bool, isAppleMusicActive: Bool = true, isSpotifyActive: Bool = false) -> [MusicControlButton] {
         var sanitized = map { button -> MusicControlButton in
             if button == .mediaOutput && !allowingMediaOutput { return .none }
             if button.isAppleMusicExclusive && !isAppleMusicActive { return .none }
+            if button.isSpotifyExclusive && !isSpotifyActive { return .none }
             return button
         }
 

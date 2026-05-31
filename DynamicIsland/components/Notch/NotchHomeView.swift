@@ -637,6 +637,14 @@ struct MusicControlsView: View {
             ) {
                 enableLyrics.toggle()
             }
+        case .spotifyLike:
+            HoverButton(
+                icon: musicManager.isSpotifyLiked ? "heart.fill" : "heart",
+                iconColor: musicManager.isSpotifyLiked ? .green : .white,
+                scale: .medium
+            ) {
+                MusicManager.shared.toggleSpotifyLike()
+            }
         }
     }
 

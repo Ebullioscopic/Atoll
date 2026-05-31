@@ -488,6 +488,10 @@ struct LockScreenWeatherWidget: View {
 		Color.white.opacity(0.9)
 	}
 
+	private func inlineIconTint(for tintColor: Color) -> Color {
+		snapshot.usesGaugeTint ? tintColor : Color.white.opacity(0.9)
+	}
+
 	var body: some View {
 		VStack(alignment: .leading, spacing: focusWidgetSpacing) {
 			ForEach(Array(enabledRowKinds.enumerated()), id: \.offset) { index, kind in
@@ -881,6 +885,7 @@ struct LockScreenWeatherWidget: View {
 			Image(systemName: snapshot.symbolName)
 				.font(.system(size: 26, weight: .medium))
 				.symbolRenderingMode(.hierarchical)
+				.foregroundStyle(inlineIconTint(for: snapshot.temperatureInfo.map { temperatureTint(for: $0) } ?? Color.white.opacity(0.9)))
 			Text(snapshot.temperatureText)
 				.font(inlinePrimaryFont)
 				.kerning(-0.3)
@@ -925,6 +930,7 @@ struct LockScreenWeatherWidget: View {
 				Image(systemName: iconName)
 					.font(.system(size: 20, weight: .semibold))
 					.symbolRenderingMode(.hierarchical)
+					.foregroundStyle(inlineIconTint(for: batteryTint(for: info.batteryLevel.map(clampedBatteryLevel) ?? 50)))
 			}
 			Text(inlineChargingLabel(for: info))
 				.font(inlinePrimaryFont)
@@ -1010,6 +1016,7 @@ struct LockScreenWeatherWidget: View {
 			Image(systemName: info.iconName)
 				.font(.system(size: 20, weight: .semibold))
 				.symbolRenderingMode(.hierarchical)
+				.foregroundStyle(inlineIconTint(for: bluetoothTint(for: info.batteryLevel)))
 			Text(bluetoothPercentageText(for: info.batteryLevel))
 				.font(inlinePrimaryFont)
 				.lineLimit(1)
@@ -1022,12 +1029,10 @@ struct LockScreenWeatherWidget: View {
         let level = clampedBatteryLevel(info.batteryLevel)
 
         return HStack(alignment: .firstTextBaseline, spacing: 6) {
-            // Optional icon (laptop vs battery glyph)
             Image(systemName: info.usesLaptopSymbol ? "laptopcomputer" : batteryIconName(for: level))
                 .font(.system(size: 20, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
-
-            // ✅ The actual percentage text you want in inline style
+                .foregroundStyle(inlineIconTint(for: batteryTint(for: level)))
             Text("\(level)%")
                 .font(inlinePrimaryFont)
                 .lineLimit(1)
@@ -1077,6 +1082,7 @@ struct LockScreenWeatherWidget: View {
 			Image(systemName: "wind")
 				.font(.system(size: 18, weight: .semibold))
 				.symbolRenderingMode(.hierarchical)
+				.foregroundStyle(inlineIconTint(for: aqiTint(for: info)))
 			inlineComposite(primary: "\(info.scale.compactLabel) \(info.index)", secondary: info.category.displayName)
 				.lineLimit(1)
 				.minimumScaleFactor(0.85)

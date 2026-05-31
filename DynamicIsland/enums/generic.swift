@@ -82,6 +82,7 @@ public enum NotchViews {
     case agentBus
     case extensionExperience
     case messages
+    case weather
 }
 
 enum NotesLayoutState: Equatable {

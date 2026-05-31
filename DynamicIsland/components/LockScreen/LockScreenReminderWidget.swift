@@ -29,7 +29,7 @@ struct LockScreenReminderWidget: View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: snapshot.iconName)
                 .font(.system(size: iconSize, weight: .semibold))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(accentColor)
 
             RoundedRectangle(cornerRadius: 2)
                 .fill(chipColor)
