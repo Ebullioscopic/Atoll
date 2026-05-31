@@ -213,15 +213,45 @@ class TerminalManager: ObservableObject {
 
     // MARK: - Font Resolution
 
+    /// Preferred Nerd Font-compatible families tried in order when the user
+    /// hasn't configured a specific `terminalFontFamily`.  These are the most
+    /// commonly installed Nerd Font patched variants.
+    private static let nerdFontCandidates: [String] = [
+        "MesloLGS Nerd Font Mono",
+        "MesloLGS NF",
+        "Hack Nerd Font Mono",
+        "FiraCode Nerd Font Mono",
+        "JetBrainsMono Nerd Font Mono",
+        "SauceCodePro Nerd Font Mono",
+    ]
+
     /// Resolves the terminal font from the user's chosen family and size.
     ///
-    /// - If `family` is empty, returns the system monospaced font.
-    /// - Otherwise tries `NSFont(name:size:)` and falls back to system monospaced
-    ///   when the name is invalid or the font is not installed.
+    /// Resolution order:
+    /// 1. If `family` is non-empty, try `NSFont(name:size:)` for the exact name.
+    /// 2. If `family` is empty (default), probe common Nerd Font families so
+    ///    Powerlevel10k / Nerd Font symbols render out-of-the-box.
+    /// 3. Fall back to "SF Mono" (ships with macOS).
+    /// 4. Ultimate fallback: system monospaced font.
     private func resolveFont(family: String, size: CGFloat) -> NSFont {
+        // Explicit user preference
         if !family.isEmpty, let custom = NSFont(name: family, size: size) {
             return custom
         }
+
+        // Auto-detect installed Nerd Font when no preference is set
+        if family.isEmpty {
+            for candidate in Self.nerdFontCandidates {
+                if let nf = NSFont(name: candidate, size: size) {
+                    return nf
+                }
+            }
+            // Prefer SF Mono over generic system monospace for consistent metrics
+            if let sfMono = NSFont(name: "SF Mono", size: size) {
+                return sfMono
+            }
+        }
+
         return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
     }
 
