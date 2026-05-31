@@ -42,11 +42,11 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     /// Used to elevate window level so live activities appear above fullscreen windows.
     @Published var fullscreenActive: Bool = false
 
-    /// Whether live activities should be allowed to show even in fullscreen mode.
-    /// Returns true when the notch would otherwise be hidden but fullscreen is active
-    /// (i.e., live activities should still appear above the fullscreen app).
+    /// Whether live activities should be allowed to show even when the notch is hidden.
+    /// Returns true so that live activities (music, timer, recording, etc.) remain visible
+    /// in the minimized notch regardless of the hide option or fullscreen state.
     var allowLiveActivityInFullscreen: Bool {
-        return fullscreenActive
+        return true
     }
     @Published var isHoveringCalendar: Bool = false
     @Published var isBatteryPopoverActive: Bool = false
