@@ -98,6 +98,7 @@ final class LockScreenWidgetPreviewManager: ObservableObject {
         observeKey(.enableLockScreenWeatherWidget)
         observeKey(.enableLockScreenTimerWidget)
         observeKey(.lockScreenWeatherWidgetStyle)
+        observeKey(.lockScreenBatteryWidgetStyle)
         observeKey(.lockScreenWeatherProviderSource)
         observeKey(.lockScreenWeatherTemperatureUnit)
         observeKey(.lockScreenWeatherShowsLocation)
@@ -188,6 +189,7 @@ final class LockScreenWidgetPreviewManager: ObservableObject {
             showsLocation: showLocation,
             airQuality: airQuality,
             widgetStyle: widgetStyle,
+            batteryWidgetStyle: Defaults[.lockScreenBatteryWidgetStyle],
             showsChargingPercentage: Defaults[.lockScreenBatteryShowsChargingPercentage],
             temperatureInfo: temperatureInfo,
             usesGaugeTint: Defaults[.lockScreenWeatherUsesGaugeTint],

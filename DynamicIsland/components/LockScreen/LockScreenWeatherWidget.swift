@@ -906,7 +906,7 @@ struct LockScreenWeatherWidget: View {
 
 	@ViewBuilder
 	private func chargingSegment(for info: LockScreenWeatherSnapshot.ChargingInfo) -> some View {
-		switch snapshot.widgetStyle {
+		switch snapshot.batteryWidgetStyle {
 		case .inline:
 			inlineChargingSegment(for: info)
 		case .circular:
@@ -916,7 +916,7 @@ struct LockScreenWeatherWidget: View {
 
 	@ViewBuilder
 	private func batterySegment(for info: LockScreenWeatherSnapshot.BatteryInfo) -> some View {
-		switch snapshot.widgetStyle {
+		switch snapshot.batteryWidgetStyle {
 		case .inline:
             inlineBatterySegment(for: info)
 		case .circular:
@@ -1003,7 +1003,7 @@ struct LockScreenWeatherWidget: View {
 
 	@ViewBuilder
 	private func bluetoothSegment(for info: LockScreenWeatherSnapshot.BluetoothInfo) -> some View {
-		switch snapshot.widgetStyle {
+		switch snapshot.batteryWidgetStyle {
 		case .inline:
 			inlineBluetoothSegment(for: info)
 		case .circular:

@@ -895,6 +895,7 @@ extension Defaults.Keys {
     static let showProfilePictures = Key<Bool>("showProfilePictures", default: true)
     static let enableQuickReply = Key<Bool>("enableQuickReply", default: true)
     static let autoExpandNotifications = Key<Bool>("autoExpandNotifications", default: true)
+    static let enableNotificationFeed = Key<Bool>("enableNotificationFeed", default: true)
 
     static let cachedMusicLiveActivityPreference = Key<Bool?>("cachedMusicLiveActivityPreference", default: nil)
     static let cachedLockScreenMediaWidgetPreference = Key<Bool?>("cachedLockScreenMediaWidgetPreference", default: nil)
@@ -905,10 +906,14 @@ extension Defaults.Keys {
     static let enableLockScreenFocusWidget = Key<Bool>("enableLockScreenFocusWidget", default: true)
     static let enableLockScreenReminderWidget = Key<Bool>("enableLockScreenReminderWidget", default: true)
     static let enableLockScreenTimerWidget = Key<Bool>("enableLockScreenTimerWidget", default: true)
+    static let enableLockScreenCopilotBudgetWidget = Key<Bool>("enableLockScreenCopilotBudgetWidget", default: false)
+    static let enableLockScreenDockerHealthWidget = Key<Bool>("enableLockScreenDockerHealthWidget", default: false)
+    static let enableLockScreenBuildStatusWidget = Key<Bool>("enableLockScreenBuildStatusWidget", default: false)
     static let lockScreenWeatherRefreshInterval = Key<TimeInterval>("lockScreenWeatherRefreshInterval", default: 30 * 60)
     static let lockScreenWeatherShowsLocation = Key<Bool>("lockScreenWeatherShowsLocation", default: true)
     static let lockScreenWeatherShowsSunrise = Key<Bool>("lockScreenWeatherShowsSunrise", default: true)
     static let lockScreenWeatherWidgetStyle = Key<LockScreenWeatherWidgetStyle>("lockScreenWeatherWidgetStyle", default: .inline)
+    static let lockScreenBatteryWidgetStyle = Key<LockScreenWeatherWidgetStyle>("lockScreenBatteryWidgetStyle", default: .inline)
     static let lockScreenWeatherTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("lockScreenWeatherTemperatureUnit", default: .celsius)
     static let lockScreenWeatherShowsAQI = Key<Bool>("lockScreenWeatherShowsAQI", default: true)
     static let lockScreenWeatherAQIScale = Key<LockScreenWeatherAirQualityScale>("lockScreenWeatherAQIScale", default: .us)
@@ -1390,4 +1395,7 @@ extension Defaults.Keys {
         Defaults[.musicAuxRightControl] = fallback
     }
     static let showSongMetadataInClosedNotch = Key<Bool>("showSongMetadataInClosedNotch", default: false)
+
+        // MARK: Agent Status
+    static let enableAgentStatus = Key<Bool>("enableAgentStatus", default: true)
 }
