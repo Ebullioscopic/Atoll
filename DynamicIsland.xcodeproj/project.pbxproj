@@ -7,7 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0093407D81A6FE6087DDD3C5 /* BuildStatusManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB97400784C7EFA041EFFBFE /* BuildStatusManager.swift */; };
 		11E0444CAE34247C721C567B /* PanelsVisualEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE374CE38B46A93712B83CFD /* PanelsVisualEffect.swift */; };
+		4EB94B3FAE8C7680A5A06B4F /* DockerHealthWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24234ABB881E82D5BF5737AE /* DockerHealthWidget.swift */; };
+		54654841B84E5ECF8C424C62 /* DockerHealthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14824BC2B8B1BA140106420F /* DockerHealthManager.swift */; };
+		5E544712A0B08547FCEC8D0C /* CopilotBudgetWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26DD408B80DE9D5F378BE379 /* CopilotBudgetWidget.swift */; };
+		5F1D47109037CB538A09CBCB /* CallIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531B464FAB4F2933FABF3967 /* CallIndicatorView.swift */; };
+		6122456CADD70949B5E91DE9 /* BuildStatusWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD246459DB34815EB6780C2 /* BuildStatusWidget.swift */; };
+		67544D8598F104B961B0EB03 /* NotificationFeedManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DFA447B993C6339986ECF28 /* NotificationFeedManager.swift */; };
 		6DF34A4F8CD43786E761B59E /* ChatMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56FB4147B8B14C679081490E /* ChatMessages.swift */; };
 		7E1ADF1D2EA209B1001DA867 /* SkyLightWindow in Frameworks */ = {isa = PBXBuildFile; productRef = 7E61181E2E24071E0050006C /* SkyLightWindow */; };
 		7E288D122F1659EF0020C117 /* AtollExtensionKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7E288D112F1659EF0020C117 /* AtollExtensionKit */; };
@@ -31,9 +38,15 @@
 		7EF10C122F817ECF004229A0 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EF10C112F817ECF004229A0 /* Accelerate.framework */; };
 		7EF19C172F577040005B9929 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 7EF19C162F577040005B9929 /* SwiftTerm */; };
 		95444CB4A9E599287A28E204 /* MessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA804881AFDA65CA8BE25B38 /* MessageBubble.swift */; };
+		A6AC48BE90434970FB2B691A /* TerminalFloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C444644A92545A04044BD05 /* TerminalFloatingPanel.swift */; };
+		B1284A838792F38415E3AD9A /* CallDetectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC3B4878981C91E4A53F8427 /* CallDetectionManager.swift */; };
 		B3ED415BB5C107E7843BE281 /* ScreenshotOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB1A441BAD1DCAE1AA7A4555 /* ScreenshotOptions.swift */; };
 		BF1742EC95B57ED03E128C37 /* PopoverBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C72472DAAFF908FD9092EE5 /* PopoverBackground.swift */; };
+		C96747F78E9CE44BF5DD85CA /* AgentStatusPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7EB49D5A2E8E5BE6B074B5C /* AgentStatusPill.swift */; };
 		C9B64B698841C0293E557EC7 /* ChatInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045D44C983370CAC30C5B75E /* ChatInput.swift */; };
+		DEFC4A6DBA7E057CC250051D /* NotificationFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DD549FE835934856A46F9AB /* NotificationFeedView.swift */; };
+		DFA74FDEAEE339648BD6A210 /* AgentStatusManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E44133B2B2D990445CD527 /* AgentStatusManager.swift */; };
+		E5DA4C9F8AE667FEF4AC74A7 /* CopilotBudgetManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E249A199E4C8D023018FA7 /* CopilotBudgetManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -50,8 +63,17 @@
 
 /* Begin PBXFileReference section */
 		045D44C983370CAC30C5B75E /* ChatInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ChatInput.swift; path = DynamicIsland/components/ScreenAssistant/Views/ChatInput.swift; sourceTree = SOURCE_ROOT; };
+		14824BC2B8B1BA140106420F /* DockerHealthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DockerHealthManager.swift; path = DynamicIsland/managers/DockerHealthManager.swift; sourceTree = SOURCE_ROOT; };
+		1BD246459DB34815EB6780C2 /* BuildStatusWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BuildStatusWidget.swift; path = DynamicIsland/components/LockScreen/BuildStatusWidget.swift; sourceTree = SOURCE_ROOT; };
+		24234ABB881E82D5BF5737AE /* DockerHealthWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DockerHealthWidget.swift; path = DynamicIsland/components/LockScreen/DockerHealthWidget.swift; sourceTree = SOURCE_ROOT; };
+		26DD408B80DE9D5F378BE379 /* CopilotBudgetWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CopilotBudgetWidget.swift; path = DynamicIsland/components/LockScreen/CopilotBudgetWidget.swift; sourceTree = SOURCE_ROOT; };
 		3C72472DAAFF908FD9092EE5 /* PopoverBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PopoverBackground.swift; path = DynamicIsland/components/ScreenAssistant/Views/PopoverBackground.swift; sourceTree = SOURCE_ROOT; };
+		3DFA447B993C6339986ECF28 /* NotificationFeedManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NotificationFeedManager.swift; path = DynamicIsland/managers/NotificationFeedManager.swift; sourceTree = SOURCE_ROOT; };
+		45E249A199E4C8D023018FA7 /* CopilotBudgetManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CopilotBudgetManager.swift; path = DynamicIsland/managers/CopilotBudgetManager.swift; sourceTree = SOURCE_ROOT; };
+		531B464FAB4F2933FABF3967 /* CallIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CallIndicatorView.swift; path = DynamicIsland/components/Call/CallIndicatorView.swift; sourceTree = SOURCE_ROOT; };
+		56E44133B2B2D990445CD527 /* AgentStatusManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AgentStatusManager.swift; path = DynamicIsland/managers/AgentStatusManager.swift; sourceTree = SOURCE_ROOT; };
 		56FB4147B8B14C679081490E /* ChatMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ChatMessages.swift; path = DynamicIsland/components/ScreenAssistant/Views/ChatMessages.swift; sourceTree = SOURCE_ROOT; };
+		5C444644A92545A04044BD05 /* TerminalFloatingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TerminalFloatingPanel.swift; path = DynamicIsland/components/Notch/TerminalFloatingPanel.swift; sourceTree = SOURCE_ROOT; };
 		7E25ECA02E6C6C3800700E72 /* CoreBrightness.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBrightness.framework; path = /System/Library/PrivateFrameworks/CoreBrightness.framework; sourceTree = "<absolute>"; };
 		7E25ECA22E6C6E2600700E72 /* OSD.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OSD.framework; path = /System/Library/PrivateFrameworks/OSD.framework; sourceTree = "<absolute>"; };
 		7E25ECA42E6C6E7800700E72 /* DisplayServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DisplayServices.framework; path = /System/Library/PrivateFrameworks/DisplayServices.framework; sourceTree = "<absolute>"; };
@@ -64,7 +86,11 @@
 		7EE1D73C2E6B1E0B00997219 /* ApplicationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ApplicationServices.framework; path = System/Library/Frameworks/ApplicationServices.framework; sourceTree = SDKROOT; };
 		7EE1D73E2E6B1E1200997219 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		7EF10C112F817ECF004229A0 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		8DD549FE835934856A46F9AB /* NotificationFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NotificationFeedView.swift; path = DynamicIsland/components/Notifications/NotificationFeedView.swift; sourceTree = SOURCE_ROOT; };
+		AC3B4878981C91E4A53F8427 /* CallDetectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CallDetectionManager.swift; path = DynamicIsland/managers/CallDetectionManager.swift; sourceTree = SOURCE_ROOT; };
+		E7EB49D5A2E8E5BE6B074B5C /* AgentStatusPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AgentStatusPill.swift; path = DynamicIsland/components/AgentStatusPill.swift; sourceTree = SOURCE_ROOT; };
 		EB1A441BAD1DCAE1AA7A4555 /* ScreenshotOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ScreenshotOptions.swift; path = DynamicIsland/components/ScreenAssistant/Views/ScreenshotOptions.swift; sourceTree = SOURCE_ROOT; };
+		EB97400784C7EFA041EFFBFE /* BuildStatusManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BuildStatusManager.swift; path = DynamicIsland/managers/BuildStatusManager.swift; sourceTree = SOURCE_ROOT; };
 		F4C1DD09EC134302938E84F6 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = Frameworks/MediaRemoteAdapter.framework; sourceTree = SOURCE_ROOT; };
 		F54406E72CD4987A00C7AFD9 /* Atoll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atoll.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA804881AFDA65CA8BE25B38 /* MessageBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MessageBubble.swift; path = DynamicIsland/components/ScreenAssistant/Views/MessageBubble.swift; sourceTree = SOURCE_ROOT; };
@@ -182,6 +208,19 @@
 				EB1A441BAD1DCAE1AA7A4555 /* ScreenshotOptions.swift */,
 				FE374CE38B46A93712B83CFD /* PanelsVisualEffect.swift */,
 				3C72472DAAFF908FD9092EE5 /* PopoverBackground.swift */,
+				56E44133B2B2D990445CD527 /* AgentStatusManager.swift */,
+				3DFA447B993C6339986ECF28 /* NotificationFeedManager.swift */,
+				45E249A199E4C8D023018FA7 /* CopilotBudgetManager.swift */,
+				14824BC2B8B1BA140106420F /* DockerHealthManager.swift */,
+				EB97400784C7EFA041EFFBFE /* BuildStatusManager.swift */,
+				E7EB49D5A2E8E5BE6B074B5C /* AgentStatusPill.swift */,
+				8DD549FE835934856A46F9AB /* NotificationFeedView.swift */,
+				26DD408B80DE9D5F378BE379 /* CopilotBudgetWidget.swift */,
+				24234ABB881E82D5BF5737AE /* DockerHealthWidget.swift */,
+				1BD246459DB34815EB6780C2 /* BuildStatusWidget.swift */,
+				5C444644A92545A04044BD05 /* TerminalFloatingPanel.swift */,
+				531B464FAB4F2933FABF3967 /* CallIndicatorView.swift */,
+				AC3B4878981C91E4A53F8427 /* CallDetectionManager.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -319,7 +358,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"$CONFIGURATION\" != \"Release\" ] || [ \"$ACTION\" != \"install\" ]; then\n\texit 0\nfi\n\nAPP=\"$CODESIGNING_FOLDER_PATH\"\nSPARKLE=\"$APP/Contents/Frameworks/Sparkle.framework\"\nXPC_DIR=\"$SPARKLE/Versions/Current/XPCServices\"\n\nif [ ! -d \"$XPC_DIR\" ]; then\n\texit 0\nfi\n\nfor xpc in \"$XPC_DIR\"/*.xpc; do\n\t/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$xpc\"\ndone\n\n/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$SPARKLE\"\n";
+			shellScript = "if [ \"$CONFIGURATION\" != \"Release\" ] || [ \"$ACTION\" != \"install\" ]; then\n\	exit 0\nfi\n\nAPP=\"$CODESIGNING_FOLDER_PATH\"\nSPARKLE=\"$APP/Contents/Frameworks/Sparkle.framework\"\nXPC_DIR=\"$SPARKLE/Versions/Current/XPCServices\"\n\nif [ ! -d \"$XPC_DIR\" ]; then\n\	exit 0\nfi\n\nfor xpc in \"$XPC_DIR\"/*.xpc; do\n\	/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$xpc\"\ndone\n\n/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$SPARKLE\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -334,6 +373,19 @@
 				B3ED415BB5C107E7843BE281 /* ScreenshotOptions.swift in Sources */,
 				11E0444CAE34247C721C567B /* PanelsVisualEffect.swift in Sources */,
 				BF1742EC95B57ED03E128C37 /* PopoverBackground.swift in Sources */,
+				DFA74FDEAEE339648BD6A210 /* AgentStatusManager.swift in Sources */,
+				67544D8598F104B961B0EB03 /* NotificationFeedManager.swift in Sources */,
+				E5DA4C9F8AE667FEF4AC74A7 /* CopilotBudgetManager.swift in Sources */,
+				54654841B84E5ECF8C424C62 /* DockerHealthManager.swift in Sources */,
+				0093407D81A6FE6087DDD3C5 /* BuildStatusManager.swift in Sources */,
+				C96747F78E9CE44BF5DD85CA /* AgentStatusPill.swift in Sources */,
+				DEFC4A6DBA7E057CC250051D /* NotificationFeedView.swift in Sources */,
+				5E544712A0B08547FCEC8D0C /* CopilotBudgetWidget.swift in Sources */,
+				4EB94B3FAE8C7680A5A06B4F /* DockerHealthWidget.swift in Sources */,
+				6122456CADD70949B5E91DE9 /* BuildStatusWidget.swift in Sources */,
+				A6AC48BE90434970FB2B691A /* TerminalFloatingPanel.swift in Sources */,
+				5F1D47109037CB538A09CBCB /* CallIndicatorView.swift in Sources */,
+				B1284A838792F38415E3AD9A /* CallDetectionManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
