@@ -200,6 +200,7 @@ struct ContentView: View {
 
     @State private var hoverTask: Task<Void, Never>?
     @State private var lastHoverOpenedAt: Date?
+    @State private var lastHoverEntryAt: Date?
     @State private var isHovering: Bool = false
     @State private var lastHapticTime: Date = Date()
     @State private var hoverClickMonitor: Any?
@@ -2173,6 +2174,10 @@ struct ContentView: View {
         hoverTask?.cancel()
 
         if hovering {
+            // Debounce: ignore re-entry if already hovering or triggered within 200ms (#326)
+            if isHovering { return }
+            if let lastEntry = lastHoverEntryAt, Date().timeIntervalSince(lastEntry) < 0.2 { return }
+            lastHoverEntryAt = Date()
             startHoverClickMonitor()
             removeStickyTerminalClickMonitor()
             if Defaults[.enableAgentHoverDetails] && !extensionLiveActivityManager.activeActivities.isEmpty {
