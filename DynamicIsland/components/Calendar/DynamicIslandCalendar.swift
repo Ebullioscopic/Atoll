@@ -260,7 +260,7 @@ struct StandaloneCalendarView: View {
     @Default(.hideAllDayEvents) private var hideAllDayEvents
     @Default(.hideCompletedReminders) private var hideCompletedReminders
 
-    private let calendar = Calendar.current
+    private var calendar: Calendar { Calendar.current }
 
     private var weekdaySymbols: [String] {
         let symbols = calendar.veryShortStandaloneWeekdaySymbols
