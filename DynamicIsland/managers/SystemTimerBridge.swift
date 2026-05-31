@@ -227,7 +227,7 @@ final class SystemTimerBridge {
             "--predicate",
             predicate,
             "--level",
-            "debug"
+            "info"
         ]
 
         let outputPipe = Pipe()

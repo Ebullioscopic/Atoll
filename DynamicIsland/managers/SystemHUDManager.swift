@@ -17,6 +17,7 @@
  */
 
 import Foundation
+import AppKit
 import Defaults
 import Combine
 
@@ -202,6 +203,19 @@ class SystemHUDManager {
                 await self.startSystemObserver()
             }
         }.store(in: &cancellables)
+
+        // Re-initialize observer when displays connect/disconnect so DDC
+        // providers (Lunar, BetterDisplay) re-discover available screens.
+        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .debounce(for: .seconds(1.5), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self = self, self.isSetupComplete else { return }
+                guard Defaults[.enableThirdPartyDDCIntegration] else { return }
+                Task { @MainActor in
+                    NSLog("🖥️ Screen parameters changed — restarting system observer for DDC re-discovery")
+                    await self.startSystemObserver()
+                }
+            }.store(in: &cancellables)
     }
     
     private var cancellables = Set<AnyCancellable>()

@@ -109,7 +109,10 @@ class SystemOSDManager {
             let kickstart = Process()
             kickstart.executableURL = URL(fileURLWithPath: "/bin/launchctl")
             // When macOS boots, OSDUIHelper does not start until a volume button is pressed. We can workaround this by kickstarting it.
-            kickstart.arguments = ["kickstart", "gui/\(getuid())/com.apple.OSDUIHelper"]
+            // -k forces launchd to kill any existing instance and respawn cleanly, preventing
+            // SIGSTOP from landing on a stale instance that macOS then replaces — causing
+            // duplicate native HUD on first launch.
+            kickstart.arguments = ["kickstart", "-k", "gui/\(getuid())/com.apple.OSDUIHelper"]
             try kickstart.run()
             kickstart.waitUntilExit()
 

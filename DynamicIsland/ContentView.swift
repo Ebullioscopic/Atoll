@@ -198,6 +198,7 @@ struct ContentView: View {
     
 
     @State private var hoverTask: Task<Void, Never>?
+    @State private var lastHoverOpenedAt: Date?
     @State private var isHovering: Bool = false
     @State private var lastHapticTime: Date = Date()
     @State private var hoverClickMonitor: Any?
@@ -2204,17 +2205,24 @@ struct ContentView: View {
                     if shouldFocusTimerTab {
                         self.coordinator.currentView = .timer
                     }
+                    self.lastHoverOpenedAt = Date()
                     self.openNotch()
                 }
             }
         } else {
             hoverTask = Task {
-                try? await Task.sleep(for: .milliseconds(100))
+                try? await Task.sleep(for: .milliseconds(300))
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
                     withAnimation(.bouncy.speed(1.2)) {
                         self.isHovering = false
+                    }
+
+                    // Prevent closing if the notch just opened (animation lock)
+                    if let opened = self.lastHoverOpenedAt,
+                       Date().timeIntervalSince(opened) < 0.4 {
+                        return
                     }
 
                     if self.vm.notchState == .open && !self.shouldPreventAutoClose() {
