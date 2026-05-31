@@ -38,6 +38,16 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     var cancellables: Set<AnyCancellable> = []
     
     @Published var hideOnClosed: Bool = true
+    /// Whether the current screen has a fullscreen app active (regardless of hideOnClosed).
+    /// Used to elevate window level so live activities appear above fullscreen windows.
+    @Published var fullscreenActive: Bool = false
+
+    /// Whether live activities should be allowed to show even in fullscreen mode.
+    /// Returns true when the notch would otherwise be hidden but fullscreen is active
+    /// (i.e., live activities should still appear above the fullscreen app).
+    var allowLiveActivityInFullscreen: Bool {
+        return fullscreenActive
+    }
     @Published var isHoveringCalendar: Bool = false
     @Published var isBatteryPopoverActive: Bool = false
     @Published var isClipboardPopoverActive: Bool = false
@@ -291,7 +301,16 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             }
             .switchToLatest()
 
-        // 3) Combine enabled & status, animate only on changes
+        // 3) Track raw fullscreen state for window level elevation
+        statusPublisher
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isFullscreen in
+                self?.fullscreenActive = isFullscreen
+            }
+            .store(in: &cancellables)
+
+        // 4) Combine enabled & status, animate only on changes
         Publishers.CombineLatest(statusPublisher, enabledPublisher)
             .map { status, enabled in enabled && status }
             .removeDuplicates()

@@ -31,7 +31,7 @@ class SystemOSDManager {
         var lastSuspendedPID: Int32 = -1
     }
     private static let suppressionState = OSAllocatedUnfairLock(initialState: SuppressionState())
-    private static let legacySuppressionWatcherIdlePollingInterval: TimeInterval = 0.15
+    private static let legacySuppressionWatcherIdlePollingInterval: TimeInterval = 0.05
 
     private static var suppressionWatcherIdlePollingInterval: TimeInterval {
         max(Defaults[.systemOSDSuppressionWatcherIdlePollingInterval], legacySuppressionWatcherIdlePollingInterval)

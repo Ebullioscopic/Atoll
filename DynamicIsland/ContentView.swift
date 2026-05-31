@@ -330,7 +330,7 @@ struct ContentView: View {
             && hasActiveMusicSnapshot
             && coordinator.musicLiveActivityEnabled
             && closedMusicContentEnabled
-            && !vm.hideOnClosed
+            && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen)
             && !lockScreenManager.isLocked
             && !isMusicHUDDeferredAfterUnlock
     }
@@ -1073,25 +1073,25 @@ struct ContentView: View {
                           MusicLiveActivity(secondary: musicSecondary)
                               .id("closed-music-live-activity")
                               .transition(closedLiveActivitySwapTransition)
-                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .timer) && vm.notchState == .closed && timerManager.isTimerActive && coordinator.timerLiveActivityEnabled && !vm.hideOnClosed {
+                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .timer) && vm.notchState == .closed && timerManager.isTimerActive && coordinator.timerLiveActivityEnabled && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                           TimerLiveActivity()
-                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .reminder) && vm.notchState == .closed && reminderManager.isActive && enableReminderLiveActivity && !vm.hideOnClosed {
+                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .reminder) && vm.notchState == .closed && reminderManager.isActive && enableReminderLiveActivity && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                           ReminderLiveActivity()
-                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording) && vm.notchState == .closed && (recordingManager.isRecording || !recordingManager.isRecorderIdle) && Defaults[.enableScreenRecordingDetection] && !vm.hideOnClosed && !musicPairingEligible {
+                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording) && vm.notchState == .closed && (recordingManager.isRecording || !recordingManager.isRecorderIdle) && Defaults[.enableScreenRecordingDetection] && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) && !musicPairingEligible {
                           RecordingLiveActivity()
-                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .download) && vm.notchState == .closed && downloadManager.isDownloading && Defaults[.enableDownloadListener] && !vm.hideOnClosed {
+                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .download) && vm.notchState == .closed && downloadManager.isDownloading && Defaults[.enableDownloadListener] && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                           DownloadLiveActivity()
                               .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
-                      } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && localSendLiveActivityActive && !vm.hideOnClosed {
+                      } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && localSendLiveActivityActive && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                           LocalSendLiveActivity()
                               .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
-                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .doNotDisturb) && vm.notchState == .closed && Defaults[.enableDoNotDisturbDetection] && Defaults[.showDoNotDisturbIndicator] && (doNotDisturbManager.isDoNotDisturbActive || doNotDisturbManager.isFocusToastDismissing) && !vm.hideOnClosed && !lockScreenManager.isLocked {
+                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .doNotDisturb) && vm.notchState == .closed && Defaults[.enableDoNotDisturbDetection] && Defaults[.showDoNotDisturbIndicator] && (doNotDisturbManager.isDoNotDisturbActive || doNotDisturbManager.isFocusToastDismissing) && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) && !lockScreenManager.isLocked {
                           DoNotDisturbLiveActivity()
-                    } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .lockScreen) && vm.notchState == .closed && (lockScreenManager.isLocked || !lockScreenManager.isLockIdle) && Defaults[.enableLockScreenLiveActivity] && !vm.hideOnClosed {
+                    } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .lockScreen) && vm.notchState == .closed && (lockScreenManager.isLocked || !lockScreenManager.isLockIdle) && Defaults[.enableLockScreenLiveActivity] && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                         LockScreenLiveActivity()
                             .id("lock-screen-live-activity")
                             .transition(closedLiveActivitySwapTransition)
-                    } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .privacy) && vm.notchState == .closed && privacyManager.hasAnyIndicator && (Defaults[.enableCameraDetection] || Defaults[.enableMicrophoneDetection]) && !vm.hideOnClosed {
+                    } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .privacy) && vm.notchState == .closed && privacyManager.hasAnyIndicator && (Defaults[.enableCameraDetection] || Defaults[.enableMicrophoneDetection]) && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                         PrivacyLiveActivity()
                       } else if let extensionPayload = extensionStandalonePayload {
                           let layout = extensionStandaloneLayout(
