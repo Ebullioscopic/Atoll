@@ -134,6 +134,8 @@ class TimerManager: ObservableObject {
     private var accumulatedBeforePause: TimeInterval = 0
     /// The date when the timer was last resumed (or started)
     private var lastResumeDate: Date?
+    /// The date when the current session was started (for session logging)
+    private var sessionStartDate: Date?
     
     // MARK: - Initialization
     private init() {
@@ -183,6 +185,7 @@ class TimerManager: ObservableObject {
         lastUpdated = Date()
 
         activePresetId = preset?.id
+        sessionStartDate = Date()
         
         // Store absolute reference points
         let now = Date()
@@ -217,6 +220,9 @@ class TimerManager: ObservableObject {
         timerInstance = nil
         soundPlayer?.stop()
         
+        // Log the session
+        logCurrentSession(completedFully: isFinished || isOvertime)
+        
         // Smooth close animation for live activity
         if isTimerActive {
             scheduleSmoothClose()
@@ -235,6 +241,10 @@ class TimerManager: ObservableObject {
         timerInstance?.invalidate()
         timerInstance = nil
         soundPlayer?.stop()
+        
+        // Log the session
+        logCurrentSession(completedFully: isFinished || isOvertime)
+        
         withAnimation(.smooth) {
             isTimerActive = false
         }
@@ -372,6 +382,25 @@ class TimerManager: ObservableObject {
         overtimeStartDate = nil
         accumulatedBeforePause = 0
         lastResumeDate = nil
+        sessionStartDate = nil
+    }
+
+    /// Logs the current timer session to TimerSessionLogger
+    private func logCurrentSession(completedFully: Bool) {
+        guard let startDate = sessionStartDate, isTimerActive else { return }
+        // Only log sessions with meaningful duration (>5 seconds)
+        let focusDuration = elapsedTime
+        guard focusDuration > 5 else { return }
+
+        let session = TimerSessionLog(
+            label: timerName,
+            startDate: startDate,
+            endDate: Date(),
+            duration: focusDuration,
+            totalDuration: totalDuration,
+            completedFully: completedFully
+        )
+        TimerSessionLogger.shared.logSession(session)
     }
     
     /// Recalculates remaining/elapsed time from absolute Date references.

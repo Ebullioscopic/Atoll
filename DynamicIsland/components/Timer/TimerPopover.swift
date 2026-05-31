@@ -57,6 +57,11 @@ struct TimerPopover: View {
             PresetList(presets: timerPresets, activePresetId: timerManager.activePresetId, startAction: startPreset)
                 .animation(.smooth, value: timerManager.activePresetId)
                 .frame(maxHeight: 200)
+            
+            Divider()
+                .padding(.horizontal, -8)
+            
+            AlarmSettingsView()
         }
         .padding(16)
         .frame(width: 300)
