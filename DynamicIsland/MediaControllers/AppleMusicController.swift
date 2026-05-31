@@ -57,6 +57,11 @@ class AppleMusicController: MediaControllerProtocol {
     private var lastCatalogArtworkKey: String?
     private var cachedCatalogArtwork: Data?
 
+    /// Tracks the current track identity to prevent stale artwork from being applied
+    /// when artwork fetches complete after a track change (issue #404).
+    private var currentTrackID: String = ""
+    private var artworkFetchTask: Task<Void, Never>?
+
     // MARK: - Initialization
     init() {
         setupPlaybackStateChangeObserver()
@@ -149,16 +154,49 @@ class AppleMusicController: MediaControllerProtocol {
         let repeatModeValue = descriptor.atIndex(8)?.int32Value ?? 0
         updatedState.repeatMode = RepeatMode(rawValue: Int(repeatModeValue)) ?? .off
 
+        // Track ID for detecting track changes (issue #404)
+        let trackID = "\(updatedState.title)|\(updatedState.artist)|\(updatedState.album)"
+        let trackChanged = trackID != currentTrackID
+
+        // Clear stale artwork immediately on track change to prevent showing
+        // the previous track's art while new artwork loads.
+        if trackChanged {
+            artworkFetchTask?.cancel()
+            currentTrackID = trackID
+            updatedState.artwork = nil
+        }
+
         // AppleScript returns artwork data for library tracks. For streamed
         // content not in the library it returns an empty descriptor, so we
         // fall back to the iTunes Search API to fetch artwork by metadata.
         if let artworkData = descriptor.atIndex(9)?.data as Data?,
            artworkData.count > Self.minimumArtworkSize {
             updatedState.artwork = artworkData
+        } else if trackChanged {
+            // Publish state without artwork first so UI clears stale art
+            updatedState.lastUpdated = Date()
+            self.playbackState = updatedState
+
+            // Short delay to let the system settle before fetching (issue #404)
+            let fetchTrackID = trackID
+            artworkFetchTask = Task {
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled, self.currentTrackID == fetchTrackID else { return }
+
+                let artwork = await self.fetchArtworkFromCatalog(
+                    title: updatedState.title, artist: updatedState.artist, album: updatedState.album
+                )
+
+                // Validate track hasn't changed during fetch
+                guard self.currentTrackID == fetchTrackID else { return }
+                var finalState = self.playbackState
+                finalState.artwork = artwork
+                self.playbackState = finalState
+            }
+            return
         } else {
-            updatedState.artwork = await fetchArtworkFromCatalog(
-                title: updatedState.title, artist: updatedState.artist, album: updatedState.album
-            )
+            // Same track, no artwork from AppleScript — keep existing artwork
+            updatedState.artwork = self.playbackState.artwork
         }
 
         updatedState.lastUpdated = Date()

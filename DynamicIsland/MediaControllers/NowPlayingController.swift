@@ -43,6 +43,9 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     private var lastMusicItem:
         (title: String, artist: String, album: String, duration: TimeInterval, artworkData: Data?)?
 
+    /// Tracks the current track identity to prevent stale artwork (issue #404).
+    private var currentTrackID: String = ""
+
     // MARK: - Cider Artwork Fallback
     private static let ciderBundleIDs: Set<String> = ["sh.cider.classic", "sh.cider.cider"]
     private var lastCiderArtworkKey: String?
@@ -292,6 +295,20 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             )
         } else if !diff {
             newPlaybackState.artwork = nil
+        }
+
+        // Track change detection: clear artwork if track identity changed
+        // but no new artwork was provided in this update (issue #404).
+        let trackID = "\(newPlaybackState.title)|\(newPlaybackState.artist)|\(newPlaybackState.album)"
+        if trackID != currentTrackID {
+            currentTrackID = trackID
+            // If this update didn't include artwork data, clear stale artwork
+            if payload.artworkData == nil {
+                newPlaybackState.artwork = nil
+            }
+        } else if payload.artworkData == nil && diff {
+            // Same track, diff update without artwork — preserve existing
+            newPlaybackState.artwork = self.playbackState.artwork
         }
 
         if let dateString = payload.timestamp,
