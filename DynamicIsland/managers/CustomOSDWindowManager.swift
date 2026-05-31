@@ -68,7 +68,15 @@ final class CustomOSDWindowManager {
     // MARK: - Private Implementation
     
     private func show(type: SneakContentType, value: CGFloat, icon: String, onScreen targetScreen: NSScreen? = nil) {
-        let screens = targetScreen.map { [$0] } ?? NSScreen.screens
+        let screens: [NSScreen]
+        if let targetScreen {
+            screens = [targetScreen]
+        } else {
+            // Use the screen containing the mouse pointer (active screen)
+            let mouseLocation = NSEvent.mouseLocation
+            let activeScreen = NSScreen.screens.first { $0.frame.contains(mouseLocation) } ?? NSScreen.main ?? NSScreen.screens.first
+            screens = activeScreen.map { [$0] } ?? []
+        }
         guard !screens.isEmpty else { return }
         
         // Close other windows first
