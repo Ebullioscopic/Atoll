@@ -844,7 +844,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .lockScreen, title: "Timer liquid mode", keywords: ["timer", "standard", "custom"], highlightID: SettingsTab.lockScreen.highlightID(for: "Timer liquid mode")),
             SettingsSearchEntry(tab: .lockScreen, title: "Timer widget variant", keywords: ["timer variant", "liquid"], highlightID: SettingsTab.lockScreen.highlightID(for: "Timer widget variant")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen weather", keywords: ["weather widget"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen weather")),
-            SettingsSearchEntry(tab: .lockScreen, title: "Layout", keywords: ["inline", "circular", "weather layout"], highlightID: SettingsTab.lockScreen.highlightID(for: "Layout")),
+            SettingsSearchEntry(tab: .lockScreen, title: "Layout", keywords: ["inline", "circular", "weather layout", "battery layout"], highlightID: SettingsTab.lockScreen.highlightID(for: "Layout")),
             SettingsSearchEntry(tab: .lockScreen, title: "Weather data provider", keywords: ["wttr", "open meteo"], highlightID: SettingsTab.lockScreen.highlightID(for: "Weather data provider")),
             SettingsSearchEntry(tab: .lockScreen, title: "Temperature unit", keywords: ["celsius", "fahrenheit"], highlightID: SettingsTab.lockScreen.highlightID(for: "Temperature unit")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show location label", keywords: ["location", "weather"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show location label")),
@@ -4928,6 +4928,7 @@ struct LockScreenSettings: View {
     @Default(.enableLockScreenWeatherWidget) private var enableLockScreenWeatherWidget
     @Default(.enableLockScreenFocusWidget) private var enableLockScreenFocusWidget
     @Default(.lockScreenWeatherWidgetStyle) private var lockScreenWeatherWidgetStyle
+    @Default(.lockScreenBatteryWidgetStyle) private var lockScreenBatteryWidgetStyle
     @Default(.lockScreenWeatherProviderSource) private var lockScreenWeatherProviderSource
     @Default(.lockScreenWeatherTemperatureUnit) private var lockScreenWeatherTemperatureUnit
     @Default(.lockScreenBatteryShowsCharging) private var lockScreenWeatherShowsCharging
@@ -5384,6 +5385,14 @@ struct LockScreenSettings: View {
                     .settingsHighlight(id: highlightID("Show battery indicator"))
 
                     if lockScreenWeatherShowsBatteryGauge {
+                        Picker("Battery layout", selection: $lockScreenBatteryWidgetStyle) {
+                            ForEach(LockScreenWeatherWidgetStyle.allCases) { style in
+                                Text(style.localizedName).tag(style)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .settingsHighlight(id: highlightID("Battery layout"))
+
                         Defaults.Toggle(key: .lockScreenBatteryUsesLaptopSymbol) {
                             Text("Use MacBook icon when on battery")
                         }

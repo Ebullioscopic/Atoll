@@ -173,6 +173,10 @@ class NotificationManager: ObservableObject {
 
             currentNotification = newNotifications.first
             shouldOpenNotch = Defaults[.autoExpandNotifications]
+
+            for notification in newNotifications {
+                NotificationFeedManager.shared.appendNotification(notification)
+            }
         }
     }
 

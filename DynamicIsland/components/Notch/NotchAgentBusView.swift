@@ -191,17 +191,29 @@ struct NotchAgentBusView: View {
                     }
                 }
             } else {
-                VStack(spacing: 10) {
-                    Text("📡")
-                        .font(.system(size: 36))
-                    Text("No active agents")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.secondary)
-                    Text("Waiting for connections…")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.tertiary)
+                // Fallback: show SQLite-backed agent status if available
+                if Defaults[.enableAgentStatus], let session = AgentStatusManager.shared.activeSessions.first {
+                    AgentStatusExpandedView()
+                } else {
+                    VStack(spacing: 10) {
+                        Text("📡")
+                            .font(.system(size: 36))
+                        Text("No active agents")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.secondary)
+                        Text("Waiting for connections…")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 100)
                 }
-                .frame(maxWidth: .infinity, minHeight: 100)
+            }
+
+            // Notification Feed
+            if Defaults[.enableNotificationFeed] && !NotificationFeedManager.shared.feedItems.isEmpty {
+                Divider().opacity(0.3)
+                NotificationFeedView()
+                    .frame(maxHeight: 140)
             }
 
             // Session history
