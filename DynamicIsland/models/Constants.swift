@@ -1083,6 +1083,9 @@ extension Defaults.Keys {
     static let terminalForegroundColor = Key<Color>("terminalForegroundColor", default: .white)
     static let terminalCursorColor = Key<Color>("terminalCursorColor", default: Color(.selectedControlColor))
     static let terminalStickyMode = Key<Bool>("terminalStickyMode", default: false)
+    static let terminalAutoFocus = Key<Bool>("terminalAutoFocus", default: true)
+    static let terminalFloatingMode = Key<Bool>("terminalFloatingMode", default: false)
+    static let terminalCustomWidth = Key<Double>("terminalCustomWidth", default: 600.0)
     
     // MARK: Timer Feature
     static let enableTimerFeature = Key<Bool>("enableTimerFeature", default: true)
@@ -1278,6 +1281,9 @@ extension Defaults.Keys {
     // MARK: Lyrics Feature
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
     static let alwaysShowLyrics = Key<Bool>("alwaysShowLyrics", default: false)
+    
+    // MARK: Call Detection (#248)
+    static let enableCallDetection = Key<Bool>("enableCallDetection", default: true)
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)
     
     // MARK: Weather Tab
