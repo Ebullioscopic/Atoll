@@ -135,6 +135,8 @@ struct ControllerOptionView: View {
 extension MediaControllerType {
     var description: String {
         switch self {
+        case .all:
+            return String(localized: "Detects all playing media apps and lets you switch between them.")
         case .nowPlaying:
             return String(localized: "Works with most media apps, including browsers, to detect what's playing. Note: This may be removed in a future macOS version.")
         case .spotify:

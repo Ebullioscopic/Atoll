@@ -469,6 +469,44 @@ class MusicManager: ObservableObject {
     private static let pearDesktopBundleID = YouTubeMusicConfiguration.default.bundleIdentifier
     private var isPearDesktopAutoSwitched: Bool = false
 
+    // MARK: - Multi-Source (All Music Mode)
+    @Published var secondarySources: [MediaSource] = []
+    @Published var isMultiSourceListExpanded: Bool = false
+
+    var isAllMusicMode: Bool {
+        Defaults[.mediaController] == .all
+    }
+
+    /// Rebuilds the secondary sources list by filtering out the current primary bundleID.
+    func rebuildSecondarySources() {
+        guard isAllMusicMode else {
+            secondarySources = []
+            return
+        }
+        let primaryBundle = musicState.bundleIdentifier ?? ""
+        secondarySources = allKnownSources.values
+            .filter { $0.id != primaryBundle }
+            .sorted { $0.lastUpdated > $1.lastUpdated }
+    }
+
+    /// Promotes a secondary source to the primary display.
+    func promoteSource(_ source: MediaSource) {
+        guard isAllMusicMode else { return }
+        updateState { state in
+            state.songTitle = source.title
+            state.artistName = source.artistName
+            if let art = source.albumArt {
+                state.albumArt = art
+            }
+            state.isPlaying = source.isPlaying
+            state.bundleIdentifier = source.bundleIdentifier
+        }
+        rebuildSecondarySources()
+    }
+
+    /// All known media sources tracked by NowPlayingController (populated externally).
+    var allKnownSources: [String: MediaSource] = [:]
+
     // MARK: - Consolidated State
     @Published private(set) var musicState = MusicStateSnapshot()
 
@@ -750,7 +788,7 @@ class MusicManager: ObservableObject {
         let newController: (any MediaControllerProtocol)?
 
         switch type {
-        case .nowPlaying:
+        case .all, .nowPlaying:
             // Only create NowPlayingController if not deprecated on this macOS version
             if !self.isNowPlayingDeprecated {
                 newController = NowPlayingController()
@@ -1829,7 +1867,7 @@ extension MusicManager {
             return spotifyGreen
         case .amazonMusic:
             return amazonOrange
-        case .nowPlaying:
+        case .all, .nowPlaying:
             if let bundleIdentifier,
                let bundleColor = brandAccentColor(forBundleIdentifier: bundleIdentifier) {
                 return bundleColor
