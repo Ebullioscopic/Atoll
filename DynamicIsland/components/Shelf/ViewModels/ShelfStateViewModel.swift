@@ -22,6 +22,7 @@
 
 import Foundation
 import AppKit
+import Defaults
 
 @MainActor
 final class ShelfStateViewModel: ObservableObject {
@@ -43,6 +44,10 @@ final class ShelfStateViewModel: ObservableObject {
     private var updateTask: Task<Void, Never>?
 
     private init() {
+        guard Defaults[.dynamicShelf] else {
+            items = []
+            return
+        }
         items = ShelfPersistenceService.shared.load()
     }
 
