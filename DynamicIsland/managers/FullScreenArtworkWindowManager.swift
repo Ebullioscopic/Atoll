@@ -409,7 +409,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     // MARK: - Artwork Pre-Cache
 
     private func observeArtworkChanges() {
-        artworkCacheCancellable = MusicManager.shared.$albumArt
+        artworkCacheCancellable = MusicManager.shared.$musicState.map(\.albumArt)
             .debounce(for: .milliseconds(180), scheduler: DispatchQueue.main)
             .sink { [weak self] newArt in
                 guard let self else { return }
@@ -431,7 +431,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     }
 
     private func observeVideoArtworkChanges() {
-        videoArtworkCancellable = MusicManager.shared.$videoArtworkURL
+        videoArtworkCancellable = MusicManager.shared.$musicState.map(\.videoArtworkURL)
             .debounce(for: .milliseconds(120), scheduler: DispatchQueue.main)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -441,7 +441,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     }
 
     private func observePlaybackStateChanges() {
-        playbackStateCancellable = MusicManager.shared.$isPlaying
+        playbackStateCancellable = MusicManager.shared.$musicState.map(\.isPlaying)
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isPlaying in
@@ -655,7 +655,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     }
 
     private func observeLyricsChanges() {
-        lyricsTextCancellable = MusicManager.shared.$currentLyrics
+        lyricsTextCancellable = MusicManager.shared.$musicState.map(\.currentLyrics)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self, self.isShowing else { return }
@@ -1772,8 +1772,8 @@ final class FullScreenArtworkWindowManager: ObservableObject {
 
     private func observeTrackChanges() {
         trackChangeCancellable?.cancel()
-        trackChangeCancellable = MusicManager.shared.$songTitle
-            .combineLatest(MusicManager.shared.$artistName)
+        trackChangeCancellable = MusicManager.shared.$musicState.map(\.songTitle)
+            .combineLatest(MusicManager.shared.$musicState.map(\.artistName))
             .dropFirst()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .receive(on: DispatchQueue.main)

@@ -161,7 +161,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         let enableLyricsPublisher = Defaults.publisher(.enableLyrics).map { $0.newValue }
 
         enableLyricsPublisher
-            .combineLatest(MusicManager.shared.$currentLyrics)
+            .combineLatest(MusicManager.shared.$musicState.map(\.currentLyrics))
             .removeDuplicates { $0.0 == $1.0 && $0.1 == $1.1 }
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
