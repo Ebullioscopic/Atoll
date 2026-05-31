@@ -1837,19 +1837,20 @@ private struct HUDAndOSDSettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 20) {
-            HStack(spacing: 16) {
-                HUDSelectionCard(
-                    title: String(localized: "Dynamic Island"),
-                    isSelected: selectedTab == .hud,
-                    action: {
-                        selectedTab = .hud
-                        enableSystemHUD = true
-                        enableCustomOSD = false
-                        enableVerticalHUD = false
-                        enableCircularHUD = false
-                    }
-                ) {
+        Form {
+            Section {
+                HStack(spacing: 16) {
+                    HUDSelectionCard(
+                        title: String(localized: "Dynamic Island"),
+                        isSelected: selectedTab == .hud,
+                        action: {
+                            selectedTab = .hud
+                            enableSystemHUD = true
+                            enableCustomOSD = false
+                            enableVerticalHUD = false
+                            enableCircularHUD = false
+                        }
+                    ) {
                     VStack {
                         Capsule()
                             .fill(Color.black)
@@ -1993,10 +1994,11 @@ private struct HUDAndOSDSettingsView: View {
                 }
             }
             .padding(.top, 8)
+            } // end Section (HUD selection cards)
 
             switch selectedTab {
             case .hud:
-                HUD()
+                HUDInlineSettings()
             case .osd:
                 if #available(macOS 15.0, *) {
                     CustomOSDSettings()
@@ -2018,7 +2020,7 @@ private struct HUDAndOSDSettingsView: View {
                     .padding()
                 }
             case .vertical:
-                Form {
+                Group {
                     if !accessibilityPermission.isAuthorized && !enableThirdPartyDDCIntegration {
                         Section {
                             SettingsPermissionCallout(
@@ -2139,7 +2141,7 @@ private struct HUDAndOSDSettingsView: View {
                 }
 
             case .circular:
-                Form {
+                Group {
                     if !accessibilityPermission.isAuthorized && !enableThirdPartyDDCIntegration {
                         Section {
                             SettingsPermissionCallout(
@@ -2578,7 +2580,7 @@ private struct DevicesSettingsView: View {
     }
 }
 
-struct HUD: View {
+struct HUDInlineSettings: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @Default(.inlineHUD) var inlineHUD
     @Default(.progressBarStyle) var progressBarStyle
@@ -2604,7 +2606,7 @@ struct HUD: View {
     }
 
     var body: some View {
-        Form {
+        Group {
             if !hasAccessibilityPermission && !enableThirdPartyDDCIntegration {
                 Section {
                     SettingsPermissionCallout(
@@ -2724,7 +2726,6 @@ struct HUD: View {
                 }
             }
         }
-        .navigationTitle("Controls")
         .onAppear {
             accessibilityPermission.refreshStatus()
         }
@@ -8081,7 +8082,7 @@ struct SettingsPermissionCallout: View {
 }
 
 #Preview {
-    HUD()
+    HUDInlineSettings()
 }
 
 struct NotesSettingsView: View {
