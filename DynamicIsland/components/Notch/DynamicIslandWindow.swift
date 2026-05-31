@@ -36,6 +36,10 @@ class DynamicIslandWindow: NSPanel {
             defer: flag
         )
         
+        // Ensure fullSizeContentView is in the style mask so the title bar
+        // does not persist when the system enters fullscreen (fixes #386)
+        self.styleMask.insert(.fullSizeContentView)
+        
         isFloatingPanel = true
         isOpaque = false
         titleVisibility = .hidden

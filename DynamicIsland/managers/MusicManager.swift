@@ -1321,20 +1321,74 @@ class MusicManager: ObservableObject {
         }
     }
 
+    // MARK: - Browser Media Fallback (Issue #382)
+    /// Bundle identifiers for browsers that cannot be controlled via AppleScript.
+    private static let browserBundleIDs: Set<String> = [
+        "com.google.Chrome",
+        "com.google.Chrome.canary",
+        "org.chromium.Chromium",
+        "com.brave.Browser",
+        "com.microsoft.edgemac",
+        "com.operasoftware.Opera",
+        "com.vivaldi.Vivaldi",
+        "org.mozilla.firefox",
+        "org.mozilla.nightly",
+        "com.apple.Safari",
+        "company.thebrowser.Browser",  // Arc
+    ]
+
+    /// Whether the current media source is a browser that requires MRMediaRemote commands.
+    private var currentSourceIsBrowser: Bool {
+        guard let id = bundleIdentifier else { return false }
+        return Self.browserBundleIDs.contains(id)
+    }
+
+    /// Whether the active controller uses AppleScript (not MRMediaRemote) for commands.
+    private var activeControllerUsesAppleScript: Bool {
+        return activeController is SpotifyController
+            || activeController is AppleMusicController
+            || activeController is YouTubeMusicController
+            || activeController is AmazonMusicController
+    }
+
+    /// Sends a system-level MRMediaRemote command as fallback for browser media.
+    /// Returns true if a fallback command was sent (caller should skip normal dispatch).
+    private func sendMRMediaRemoteFallbackIfNeeded(command: Int) -> Bool {
+        guard currentSourceIsBrowser, activeControllerUsesAppleScript else { return false }
+        // Use NowPlayingController's sendCommand if available, otherwise load MediaRemote directly
+        if let nowPlaying = createMediaRemoteSender() {
+            nowPlaying(command, nil)
+        }
+        return true
+    }
+
+    /// Loads the MRMediaRemoteSendCommand function pointer for fallback use.
+    private func createMediaRemoteSender() -> ((@convention(c) (Int, AnyObject?) -> Void))? {
+        guard let bundle = CFBundleCreate(
+            kCFAllocatorDefault,
+            NSURL(fileURLWithPath: "/System/Library/PrivateFrameworks/MediaRemote.framework")),
+              let ptr = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteSendCommand" as CFString)
+        else { return nil }
+        return unsafeBitCast(ptr, to: (@convention(c) (Int, AnyObject?) -> Void).self)
+    }
+
     // MARK: - Public Methods for controlling playback
     func playPause() {
+        if sendMRMediaRemoteFallbackIfNeeded(command: 2) { return }
         Task {
             await activeController?.togglePlay()
         }
     }
 
     func play() {
+        if sendMRMediaRemoteFallbackIfNeeded(command: 0) { return }
         Task {
             await activeController?.play()
         }
     }
 
     func pause() {
+        if sendMRMediaRemoteFallbackIfNeeded(command: 1) { return }
         Task {
             await activeController?.pause()
         }
@@ -1397,8 +1451,18 @@ class MusicManager: ObservableObject {
     }
     
     func togglePlay() {
-        guard let controller = activeController else { return }
         let targetState = !isPlaying
+
+        // Browser fallback: use MRMediaRemote toggle (command 2)
+        if sendMRMediaRemoteFallbackIfNeeded(command: targetState ? 0 : 1) {
+            Task { @MainActor in
+                pendingOptimisticPlayState = targetState
+                applyPlayState(targetState, animation: .smooth(duration: 0.18))
+            }
+            return
+        }
+
+        guard let controller = activeController else { return }
 
         Task {
             await MainActor.run {
@@ -1415,12 +1479,14 @@ class MusicManager: ObservableObject {
     }
 
     func nextTrack() {
+        if sendMRMediaRemoteFallbackIfNeeded(command: 4) { return }
         Task {
             await activeController?.nextTrack()
         }
     }
 
     func previousTrack() {
+        if sendMRMediaRemoteFallbackIfNeeded(command: 5) { return }
         Task {
             await activeController?.previousTrack()
         }
