@@ -1,65 +1,4 @@
-# xcede
-.xcede/
-.xcrc
-buildServer.json
-
-.DS_Store
-# Xcode
-*.xcuserstate
-*.xcuserdata
-*.xcuserdatad
-*.pbxuser
-*.xccheckout
-*.xcplayground
-*.xcuserdatad
-*.xctest
-*.xcuserdata
-*.xcodeproj/xcshareddata/WorkspaceSettings.xcsettings
-*.xcsettings
-# CocoaPods
-Pods/
-podfile.lock
-
-# Carthage
-Carthage/Build/
-/temp/
-# Swift Package Manager
-.swiftpm/
-.build/
-
-# Derived data
-DerivedData/
-
-# Build output
-build/
-*.app
-*.dSYM
-*.dmg
-
-# Temporary files
-*.swp
-*.swo
-*.tmp
-*.log
-
-# Other
-*.DS_Store
-*.vscode/
-*.idea/
-
-# User-specific files
-*.xcuserdatad/
-*.xcodeproj/xcuserdata
-*.xcodeproj/project.xcuserdata
-
-# Build artifacts
-*.ipa
-*.xcarchive
-*.dSYM
-
-
-# Xcode
-#
+# === Xcode ===
 build/
 DerivedData/
 *.pbxuser
@@ -71,77 +10,88 @@ DerivedData/
 *.perspectivev3
 !default.perspectivev3
 xcuserdata/
+*.xcuserstate
+*.xcuserdatad
+*.xccheckout
 *.xcscmblueprint
+*.xcodeproj/xcuserdata/
+*.xcodeproj/xcshareddata/WorkspaceSettings.xcsettings
 
-# SwiftPM
-#
+# === Swift Package Manager ===
+.swiftpm/
 .build/
 Package.resolved
 
-# CocoaPods
-#
+# === CocoaPods ===
 Pods/
 Podfile.lock
 
-# Carthage
-#
+# === Carthage ===
 Carthage/Build/
 
-# Fastlane
-#
+# === Build artifacts ===
+*.app
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.xcarchive
+*.dmg
+
+# === macOS ===
+.DS_Store
+*.DS_Store
+
+# === Editors/IDEs ===
+.vscode/
+.idea/
+
+# === Temporary files ===
+*.swp
+*.swo
+*.tmp
+*.log
+
+# === Fastlane ===
 fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots
 fastlane/test_output
 
-# Archives
-#
-*.xcarchive
-
-# App data
-#
-*.ipa
-*.dSYM.zip
-*.dSYM
-
-# Playgrounds
-#
+# === Xcode Playgrounds ===
 timeline.xctimeline
 playground.xcworkspace
 
-# Xcode Server
-#
+# === Xcode Server ===
 integration.json
 
-# Other
-#
+# === Other ===
 *.moved-aside
-*.xcuserstate
+*.xctest
+*.xcplayground
 
-# GitHub instructions and agent files
-#
-.github/instructions/
-.github/assets/
+# === xcede ===
+.xcede/
+.xcrc
+buildServer.json
+
+# === Project-specific ignores ===
+/temp/
+/stats/
+/builds/
+/References/
+/appdmg.json
+PrivateWorks/
+borrowing/
+MoveToSky.xcodeproj
+/MoveToSky/
+mew-notch/
+Contents/Helpers/NowPlayingTestClient
+
+# Project notes/docs (not shipped)
 rough_note.md
-Solid
 SettingsView.swift.md
 logic.md
-TheBoringWorker-HUD
-boringnotch + meteo +  airpods + traduzione modificabile
-segmentedhud.swift.ref
 gemini-apireference.md
-
-ScreenshotApp-main
-/stats/
-boring.notch
-referenceimages
-
-PrivateWorks
-
-*.py
-*.sh
-comparison_report.json
-*.txt
 ANIMATION_DEBUG_GUIDE.md
 MIGRATION_SUMMARY.md
 ONBOARDING_ENHANCEMENT.md
@@ -150,12 +100,22 @@ lock_mode_reference.md
 liquid_glass.md
 huds.md
 borrow_migrations.md
-borrowing/
-MoveToSky.xcodeproj
-/MoveToSky/
-mew-notch/
-
-/References/
-/builds/
-/appdmg.json
 COMPREHENSIVE_DOCUMENTATION.md
+comparison_report.json
+
+# Legacy/reference dirs
+TheBoringWorker-HUD
+boringnotch + meteo +  airpods + traduzione modificabile
+segmentedhud.swift.ref
+Solid
+ScreenshotApp-main
+boring.notch
+referenceimages
+
+# Scripts and tools
+*.py
+*.sh
+*.txt
+
+# GitHub instructions
+.github/instructions/
