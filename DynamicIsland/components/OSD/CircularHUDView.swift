@@ -115,7 +115,7 @@ struct CircularHUDView: View {
         }
         
         if useAccentColor {
-            return AnyShapeStyle(Color.accentColor)
+            return AnyShapeStyle(Color(NSColor.controlAccentColor))
         }
         
         // Default to the approved solid dark gray to match reference when not colored

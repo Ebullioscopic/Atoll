@@ -25,6 +25,7 @@ struct MinimalisticMusicView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var musicManager = MusicManager.shared
     @Default(.enableLyrics) var enableLyrics
+    @Default(.alwaysShowLyrics) var alwaysShowLyrics
     @State private var isHovering: Bool = false
     
     var body: some View {
@@ -81,7 +82,7 @@ struct MinimalisticMusicView: View {
             // (lyrics are displayed inline under the artist name)
         }
         // reserve extra height when lyrics are enabled
-        .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
+        .frame(height: vm.effectiveClosedNotchHeight + ((isHovering || (enableLyrics && alwaysShowLyrics)) ? 8 : 0), alignment: .center)
         .onHover { hovering in
             isHovering = hovering
         }
@@ -104,7 +105,11 @@ struct MinimalisticMusicView: View {
                 .albumArtFlip(angle: musicManager.flipAngle)
                 .frame(width: max(0, vm.effectiveClosedNotchHeight - 12), height: max(0, vm.effectiveClosedNotchHeight - 12))
         }
-        .frame(width: max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)), height: max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)))
+        .frame(width: max(0, vm.effectiveClosedNotchHeight - (effectivelyExpanded ? 0 : 12)), height: max(0, vm.effectiveClosedNotchHeight - (effectivelyExpanded ? 0 : 12)))
+    }
+    
+    private var effectivelyExpanded: Bool {
+        isHovering || (enableLyrics && alwaysShowLyrics)
     }
     
     // MARK: - Visualizer
@@ -118,11 +123,11 @@ struct MinimalisticMusicView: View {
                     AudioVisualizerView(isPlaying: $musicManager.isPlaying)
                         .frame(width: 16, height: 12)
                 }
-                .frame(width: max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)),
-                       height: max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)), alignment: .center)
+                .frame(width: max(0, vm.effectiveClosedNotchHeight - (effectivelyExpanded ? 0 : 12)),
+                       height: max(0, vm.effectiveClosedNotchHeight - (effectivelyExpanded ? 0 : 12)), alignment: .center)
         }
-        .frame(width: max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)),
-               height: max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)), alignment: .center)
+        .frame(width: max(0, vm.effectiveClosedNotchHeight - (effectivelyExpanded ? 0 : 12)),
+               height: max(0, vm.effectiveClosedNotchHeight - (effectivelyExpanded ? 0 : 12)), alignment: .center)
     }
 }
 
