@@ -401,6 +401,7 @@ extension Notification.Name {
 
 // Media controller types for selection in settings
 enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case all = "All Music"
     case nowPlaying = "Now Playing"
     case appleMusic = "Apple Music"
     case spotify = "Spotify"
@@ -411,6 +412,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     
     var localizedName: String {
         switch self {
+        case .all: return String(localized: "All Music")
         case .nowPlaying: return String(localized: "Now Playing")
         case .appleMusic: return String(localized: "Apple Music")
         case .spotify: return String(localized: "Spotify")

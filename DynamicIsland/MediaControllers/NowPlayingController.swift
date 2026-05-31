@@ -82,6 +82,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             MRMediaRemoteSetRepeatModePointer, to: (@convention(c) (Int) -> Void).self)
 
         Task { await setupNowPlayingObserver() }
+        startSourceCleanupTimer()
     }
 
     deinit {
@@ -101,6 +102,52 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
         self.process = nil
         self.pipeHandler = nil
+    }
+
+    // MARK: - Multi-Source Detection (All Music Mode)
+    /// Tracks all detected media apps by bundle identifier.
+    var knownSources: [String: MediaSource] = [:]
+    private var sourceCleanupTimer: Timer?
+
+    /// Sends a MediaRemote command, optionally targeting a specific PID.
+    func sendCommand(_ command: Int, options: NSDictionary? = nil) {
+        MRMediaRemoteSendCommandFunction(command, options)
+    }
+
+    private func updateKnownSources(from state: PlaybackState) {
+        let bundleID = state.bundleIdentifier
+        guard !bundleID.isEmpty else { return }
+
+        let artwork: NSImage? = state.artwork.flatMap { NSImage(data: $0) }
+
+        knownSources[bundleID] = MediaSource(
+            id: bundleID,
+            bundleIdentifier: bundleID,
+            title: state.title,
+            artistName: state.artist,
+            albumArt: artwork,
+            isPlaying: state.isPlaying,
+            lastUpdated: Date()
+        )
+
+        // Push to MusicManager
+        MusicManager.shared.allKnownSources = knownSources
+        MusicManager.shared.rebuildSecondarySources()
+    }
+
+    private func cleanupStaleSources() {
+        let threshold = Date().addingTimeInterval(-30)
+        knownSources = knownSources.filter { _, source in
+            source.isPlaying || source.lastUpdated > threshold
+        }
+        MusicManager.shared.allKnownSources = knownSources
+        MusicManager.shared.rebuildSecondarySources()
+    }
+
+    private func startSourceCleanupTimer() {
+        sourceCleanupTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+            self?.cleanupStaleSources()
+        }
     }
 
     // MARK: - Protocol Implementation
@@ -260,6 +307,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         )
         
         self.playbackState = newPlaybackState
+        self.updateKnownSources(from: newPlaybackState)
     }
 }
 
