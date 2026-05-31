@@ -30,12 +30,16 @@ final class AccessibilityPermissionStore: ObservableObject {
 
     @Published private(set) var isAuthorized: Bool = AccessibilityPermissionStore.isAccessibilityAuthorized()
 
-    private var pollingTask: Task<Void, Never>?
+    private var pollingTimer: Timer?
 
-    private init() {}
+    private init() {
+        // On macOS Tahoe (26.x), AXIsProcessTrusted() can return stale results
+        // after the user toggles the permission. Start continuous polling to detect changes.
+        startContinuousPolling()
+    }
 
     deinit {
-        pollingTask?.cancel()
+        pollingTimer?.invalidate()
     }
 
     func refreshStatus() {
@@ -48,7 +52,6 @@ final class AccessibilityPermissionStore: ObservableObject {
         let options: CFDictionary = [promptKey: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
 #endif
-        beginPollingForStatusChanges()
     }
 
     func openSystemSettings() {
@@ -59,18 +62,14 @@ final class AccessibilityPermissionStore: ObservableObject {
 #endif
     }
 
-    private func beginPollingForStatusChanges() {
-        pollingTask?.cancel()
-        pollingTask = Task { [weak self] in
-            for _ in 0..<30 {
-                try? await Task.sleep(nanoseconds: 500_000_000)
+    private func startContinuousPolling() {
+        pollingTimer?.invalidate()
+        pollingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
                 let status = Self.isAccessibilityAuthorized()
-                await MainActor.run {
-                    guard let self else { return }
-                    self.updateAuthorizationStatus(to: status)
-                }
-                if status {
-                    break
+                if status != self.isAuthorized {
+                    self.isAuthorized = status
                 }
             }
         }
@@ -79,9 +78,6 @@ final class AccessibilityPermissionStore: ObservableObject {
     private func updateAuthorizationStatus(to newValue: Bool) {
         guard newValue != isAuthorized else { return }
         isAuthorized = newValue
-        if !newValue {
-            beginPollingForStatusChanges()
-        }
     }
 
     private static func isAccessibilityAuthorized() -> Bool {

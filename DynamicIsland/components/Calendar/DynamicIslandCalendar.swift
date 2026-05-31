@@ -765,9 +765,8 @@ struct EventListView: View {
         guard autoScrollToNextEvent else { return }
         let now = Date()
         let nonAllDayUpcoming = filteredEvents.first(where: { !$0.isAllDay && $0.end > now })
-        let firstAllDay = filteredEvents.first(where: { $0.isAllDay })
-        let lastEvent = filteredEvents.last
-        guard let target = nonAllDayUpcoming ?? firstAllDay ?? lastEvent else { return }
+        let lastTimedEvent = filteredEvents.last(where: { !$0.isAllDay })
+        guard let target = nonAllDayUpcoming ?? lastTimedEvent else { return }
 
         Task { @MainActor in
             withTransaction(Transaction(animation: nil)) {
