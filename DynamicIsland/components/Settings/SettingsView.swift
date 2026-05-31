@@ -3111,6 +3111,7 @@ struct CalendarSettings: View {
     @Default(.enableThirdPartyCalendarApp) private var enableThirdPartyCalendarApp
     @Default(.selectedCalendarApp) private var selectedCalendarApp
     @Default(.fantasticalDefaultView) private var fantasticalDefaultView
+    @Default(.customCalendarAppBundleID) private var customCalendarAppBundleID
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.calendar.highlightID(for: title)
@@ -3440,6 +3441,12 @@ struct CalendarSettings: View {
                                 }
                             }
                             .settingsHighlight(id: highlightID("Fantastical Default View"))
+                        }
+                        
+                        if selectedCalendarApp == .custom {
+                            TextField("Bundle Identifier (e.g. com.example.calendar)", text: $customCalendarAppBundleID)
+                                .textFieldStyle(.roundedBorder)
+                                .settingsHighlight(id: highlightID("Custom Calendar Bundle ID"))
                         }
                     }
                 } header: {
