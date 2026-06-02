@@ -156,6 +156,26 @@ struct ExtensionsSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+
+        Section {
+            Button {
+                ManagerRegistry.shared.activateBeaconMode()
+            } label: {
+                Label("Beacon Mode", systemImage: "antenna.radiowaves.left.and.right")
+            }
+
+            Button {
+                ManagerRegistry.shared.restoreDefaults()
+            } label: {
+                Label("Restore Defaults", systemImage: "arrow.counterclockwise")
+            }
+        } header: {
+            Text("Presets")
+        } footer: {
+            Text("Beacon Mode disables all features except agent status and extension RPC.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
     
     private var authorizedAppsSection: some View {
