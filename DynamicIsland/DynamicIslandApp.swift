@@ -107,10 +107,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var whatsNewWindow: NSWindow?
     var timer: Timer?
     // Essential managers (needed immediately for status indicators)
-    let dndManager = DoNotDisturbManager.shared
+    lazy var dndManager = DoNotDisturbManager.shared
     let extensionXPCServiceHost = ExtensionXPCServiceHost.shared
     let extensionRPCServer = ExtensionRPCServer.shared
-    let mediaControlsStateCoordinator = MediaControlsStateCoordinator.shared
+    lazy var mediaControlsStateCoordinator = MediaControlsStateCoordinator.shared
 
     // Deferred managers (initialized on first access, not at launch)
     lazy var webcamManager = WebcamManager.shared
@@ -127,6 +127,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var optionalShortcutHandlersRegistered = false
     private weak var focusWithoutDevToolsMenuItem: NSMenuItem?
     private weak var focusUseDevToolsMenuItem: NSMenuItem?
+    private var audioTapLaunchObserver: NSObjectProtocol?
+    private var audioTapTerminateObserver: NSObjectProtocol?
     
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
@@ -179,6 +181,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Setup observers for music player state changes to restart AudioTap capture
     private func setupAudioTapMusicObservers() {
+        // Remove existing observers to prevent leaks on re-entry
+        if let existing = audioTapLaunchObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(existing)
+        }
+        if let existing = audioTapTerminateObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(existing)
+        }
+
         // Listen for app launches to restart capture when music apps are opened
         let targetBundleIDs = [
             "com.apple.Music",
@@ -195,7 +205,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
              "sh.cider.cider",
             ]
         
-        NSWorkspace.shared.notificationCenter.addObserver(
+        audioTapLaunchObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification,
             object: nil,
             queue: .main
@@ -215,7 +225,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Also observe app terminations to restart capture
-        NSWorkspace.shared.notificationCenter.addObserver(
+        audioTapTerminateObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification,
             object: nil,
             queue: .main
@@ -569,8 +579,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
         
         // Defer idle animation loading to avoid blocking launch
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.idleAnimationManager.initializeDefaultAnimations()
+        if Defaults[.enableIdleAnimations] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.idleAnimationManager.initializeDefaultAnimations()
+            }
         }
 
         applySelectedAppIcon()
@@ -649,25 +661,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
         
-        Defaults.publisher(.showCpuGraph, options: []).sink { [weak self] _ in
-            self?.debouncedUpdateWindowSize()
-        }.store(in: &cancellables)
-        
-        Defaults.publisher(.showMemoryGraph, options: []).sink { [weak self] _ in
-            self?.debouncedUpdateWindowSize()
-        }.store(in: &cancellables)
-        
-        Defaults.publisher(.showGpuGraph, options: []).sink { [weak self] _ in
-            self?.debouncedUpdateWindowSize()
-        }.store(in: &cancellables)
-        
-        Defaults.publisher(.showNetworkGraph, options: []).sink { [weak self] _ in
-            self?.debouncedUpdateWindowSize()
-        }.store(in: &cancellables)
-        
-        Defaults.publisher(.showDiskGraph, options: []).sink { [weak self] _ in
-            self?.debouncedUpdateWindowSize()
-        }.store(in: &cancellables)
+        if Defaults[.enableStatsFeature] {
+            Defaults.publisher(.showCpuGraph, options: []).sink { [weak self] _ in
+                self?.debouncedUpdateWindowSize()
+            }.store(in: &cancellables)
+            
+            Defaults.publisher(.showMemoryGraph, options: []).sink { [weak self] _ in
+                self?.debouncedUpdateWindowSize()
+            }.store(in: &cancellables)
+            
+            Defaults.publisher(.showGpuGraph, options: []).sink { [weak self] _ in
+                self?.debouncedUpdateWindowSize()
+            }.store(in: &cancellables)
+            
+            Defaults.publisher(.showNetworkGraph, options: []).sink { [weak self] _ in
+                self?.debouncedUpdateWindowSize()
+            }.store(in: &cancellables)
+            
+            Defaults.publisher(.showDiskGraph, options: []).sink { [weak self] _ in
+                self?.debouncedUpdateWindowSize()
+            }.store(in: &cancellables)
+        }
 
         Defaults.publisher(.openNotchWidth, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
@@ -678,9 +692,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
-        Defaults.publisher(.terminalMaxHeightFraction, options: []).sink { [weak self] _ in
-            self?.debouncedUpdateWindowSize()
-        }.store(in: &cancellables)
+        if Defaults[.enableTerminalFeature] {
+            Defaults.publisher(.terminalMaxHeightFraction, options: []).sink { [weak self] _ in
+                self?.debouncedUpdateWindowSize()
+            }.store(in: &cancellables)
+        }
 
         // Only start memory monitoring if stats feature is enabled
         if Defaults[.enableStatsFeature] {
