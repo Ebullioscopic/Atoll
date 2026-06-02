@@ -538,11 +538,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             deliverImmediately: true
         )
 
-        LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
-        LockScreenManager.shared.configure(viewModel: vm)
-        _ = LauncherIntegrationManager.shared
+        // Core services — always needed
         extensionXPCServiceHost.start()
         extensionRPCServer.start()
+        _ = LauncherIntegrationManager.shared
+
+        // Lock screen managers — only if either lock screen widget is enabled
+        if Defaults[.enableLockScreenMediaWidget] || Defaults[.enableLockScreenWeatherWidget] {
+            LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
+            LockScreenManager.shared.configure(viewModel: vm)
+        }
         
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()
@@ -563,8 +568,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
         
-        // Initialize idle animations (load bundled + built-in face)
-        idleAnimationManager.initializeDefaultAnimations()
+        // Defer idle animation loading to avoid blocking launch
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.idleAnimationManager.initializeDefaultAnimations()
+        }
 
         applySelectedAppIcon()
         installTopMenuItemsIfNeeded()
@@ -578,11 +585,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup SystemHUD Manager
         SystemHUDManager.shared.setup(coordinator: coordinator)
 
-        // Setup BetterDisplay integration
-        BetterDisplayManager.shared.configure(coordinator: coordinator)
-
-        // Setup Lunar integration
-        LunarManager.shared.configure(coordinator: coordinator)
+        // Setup BetterDisplay integration (only if DDC integration enabled)
+        if Defaults[.enableThirdPartyDDCIntegration] {
+            BetterDisplayManager.shared.configure(coordinator: coordinator)
+            LunarManager.shared.configure(coordinator: coordinator)
+        }
         
         // Setup ScreenRecording Manager
         if Defaults[.enableScreenRecordingDetection] {
@@ -594,8 +601,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             dndManager.startMonitoring()
         }
 
-        // Setup Privacy Indicator Manager (camera and microphone monitoring)
-        PrivacyIndicatorManager.shared.startMonitoring()
+        // Defer privacy indicator monitoring — not critical for initial render
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            PrivacyIndicatorManager.shared.startMonitoring()
+        }
         
         // Setup Real-time Audio Waveform capture if enabled
         if Defaults[.enableRealTimeWaveform] {
@@ -673,15 +682,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
-        MemoryUsageMonitor.shared.startMonitoring()
+        // Only start memory monitoring if stats feature is enabled
+        if Defaults[.enableStatsFeature] {
+            MemoryUsageMonitor.shared.startMonitoring()
+        }
 
-        TimerManager.shared.$activeSource
-            .combineLatest(TimerManager.shared.$isTimerActive)
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.debouncedUpdateWindowSize()
-            }
-            .store(in: &cancellables)
+        // Only subscribe to timer state if timer feature is enabled
+        if Defaults[.enableTimerFeature] {
+            TimerManager.shared.$activeSource
+                .combineLatest(TimerManager.shared.$isTimerActive)
+                .receive(on: RunLoop.main)
+                .sink { [weak self] _ in
+                    self?.debouncedUpdateWindowSize()
+                }
+                .store(in: &cancellables)
+        }
 
         Defaults.publisher(.enableShortcuts, options: []).sink { [weak self] change in
             Task { @MainActor [weak self] in
@@ -878,10 +893,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Warm up the lock screen timer widget manager so it can observe timer/default
-        // changes immediately instead of waiting for the first lock event.
-        let timerWidgetManager = LockScreenTimerWidgetManager.shared
-        timerWidgetManager.handleLockStateChange(isLocked: LockScreenManager.shared.currentLockStatus)
+        // Warm up the lock screen timer widget only if both timer and lock screen are enabled
+        if Defaults[.enableTimerFeature] && (Defaults[.enableLockScreenMediaWidget] || Defaults[.enableLockScreenWeatherWidget]) {
+            let timerWidgetManager = LockScreenTimerWidgetManager.shared
+            timerWidgetManager.handleLockStateChange(isLocked: LockScreenManager.shared.currentLockStatus)
+        }
 
     }
 
