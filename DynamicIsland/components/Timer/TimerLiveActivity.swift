@@ -343,7 +343,7 @@ struct TimerLiveActivity: View {
     @ViewBuilder
     private func middleSectionView() -> some View {
         Rectangle()
-            .fill(.black)
+            .fill(.clear)
             .frame(width: middleSectionWidth, height: notchContentHeight)
     }
 
@@ -403,7 +403,7 @@ struct TimerLiveActivity: View {
         let barWidth = shouldDisplayLabel ? resolvedTextWidth : availableWidth
 
         return Rectangle()
-            .fill(.black)
+            .fill(.clear)
             .frame(width: infoWidth, height: notchContentHeight)
             .overlay(alignment: .leading) {
                 VStack(alignment: .leading, spacing: showsBarHere ? 4 : 0) {

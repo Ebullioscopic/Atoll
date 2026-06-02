@@ -96,6 +96,7 @@ struct ContentView: View {
 
     // Notch glass settings
     @Default(.notchGlassEnabled) var notchGlassEnabled
+    @Default(.blendBlackTopIntoLiquidGlass) var blendBlackTopIntoLiquidGlass
     @Default(.notchGlassCustomizationMode) var notchGlassCustomizationMode
     @Default(.notchLiquidGlassVariant) var notchLiquidGlassVariant
     @Default(.notchGlassShowsBorder) var notchGlassShowsBorder
@@ -300,10 +301,20 @@ struct ContentView: View {
         guard vm.notchState == .open else {
             return activeCornerRadiusInsets.closed.bottom
         }
+        if enableMinimalisticUI && isIslandMode {
+            return minimalisticFloatingIslandShellHorizontalInset
+        }
         if Defaults[.cornerRadiusScaling] {
             return activeCornerRadiusInsets.opened.top - 5
         }
         return activeCornerRadiusInsets.opened.bottom - 5
+    }
+
+    private var notchOpenHorizontalPadding: CGFloat {
+        if enableMinimalisticUI && isIslandMode {
+            return minimalisticFloatingIslandContentHorizontalInset
+        }
+        return 12
     }
 
     private var bodyHoverAreaPadding: CGFloat {
@@ -378,17 +389,44 @@ struct ContentView: View {
     @ViewBuilder
     private var notchBackgroundLayer: some View {
         if notchUsesCustomLiquidGlass {
-            LiquidGlassBackground(
-                variant: notchLiquidGlassVariant,
-                cornerRadius: vm.notchState == .open
-                    ? activeCornerRadiusInsets.opened.bottom
-                    : activeCornerRadiusInsets.closed.bottom
-            ) {
-                Color.clear
+            ZStack {
+                LiquidGlassBackground(
+                    variant: notchLiquidGlassVariant,
+                    cornerRadius: vm.notchState == .open
+                        ? activeCornerRadiusInsets.opened.bottom
+                        : activeCornerRadiusInsets.closed.bottom
+                ) {
+                    Color.clear
+                }
+                
+                if blendBlackTopIntoLiquidGlass && enableMinimalisticUI {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0.0),
+                            .init(color: .black, location: vm.notchState == .closed ? 1.0 : 0.45),
+                            .init(color: .clear, location: vm.notchState == .closed ? 1.0 : 0.85)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
             }
         } else if notchUsesStandardLiquidGlass {
             if #available(macOS 26.0, *) {
-                notchStandardGlassSurface
+                ZStack {
+                    notchStandardGlassSurface
+                    if blendBlackTopIntoLiquidGlass && enableMinimalisticUI {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black, location: 0.0),
+                                .init(color: .black, location: vm.notchState == .closed ? 1.0 : 0.45),
+                                .init(color: .clear, location: vm.notchState == .closed ? 1.0 : 0.85)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                }
             } else {
                 Color.black
             }
@@ -572,7 +610,7 @@ struct ContentView: View {
         NotchLayout()
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
-            .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
+            .padding([.horizontal, .bottom], vm.notchState == .open ? notchOpenHorizontalPadding : 0)
             .background(notchBackgroundLayer)
             .clipShape(resolvedClipShape)
             .compositingGroup()
@@ -766,12 +804,26 @@ struct ContentView: View {
             }
     }
 
+    /// Outer layout width: matches notch-attached content width, with extra
+    /// horizontal room on floating islands only for the drop shadow outside the clip.
+    private var rootLayoutMaxWidth: CGFloat {
+        let contentWidth = dynamicNotchSize.width
+        guard vm.notchState == .open, isDynamicIslandMode else {
+            return contentWidth
+        }
+        return contentWidth + dynamicIslandShadowInset * 2
+    }
+
     private var rootBodyView: some View {
         ZStack(alignment: .top) {
             configuredMainLayout
+                .frame(
+                    width: vm.notchState == .open ? dynamicNotchSize.width : nil,
+                    alignment: .top
+                )
         }
         .frame(
-            maxWidth: dynamicNotchSize.width + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0),
+            maxWidth: rootLayoutMaxWidth,
             maxHeight: dynamicNotchSize.height + currentShadowPadding + (isDynamicIslandMode ? dynamicIslandTopOffset : 0),
             alignment: .top
         )
@@ -1228,7 +1280,7 @@ struct ContentView: View {
                     .fill(.clear)
                     .frame(width: sideSize, height: sideSize)
                 Rectangle()
-                    .fill(.black)
+                    .fill(.clear)
                     .frame(width: vm.closedNotchSize.width - 20)
                 IdleAnimationView()
                     .frame(width: sideSize, height: sideSize)
@@ -1282,7 +1334,7 @@ struct ContentView: View {
             .frame(width: wingBaseWidth, height: notchContentHeight)
 
             Rectangle()
-                .fill(.black)
+                .fill(.clear)
                 .frame(width: effectiveCenterWidth, height: notchContentHeight)
                 .overlay(
                     HStack(alignment: .top) {

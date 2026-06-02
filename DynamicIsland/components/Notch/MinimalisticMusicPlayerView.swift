@@ -65,7 +65,7 @@ struct MinimalisticMusicPlayerView: View {
 
                 reminderList
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, minimalisticHorizontalPadding)
             .frame(maxWidth: .infinity)
             .frame(height: calculateDynamicHeight())
             .animation(.smooth(duration: 0.3), value: dynamicHeightSignature)
@@ -110,7 +110,6 @@ struct MinimalisticMusicPlayerView: View {
                 }
                 .frame(height: 50)
                 
-                // Compact progress bar
                 progressBar
                     .padding(.top, 6)
                     .clipped()
@@ -133,13 +132,19 @@ struct MinimalisticMusicPlayerView: View {
 
                 reminderList
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, minimalisticHorizontalPadding)
             .padding(.top, 6)
             .padding(.bottom, ReminderLiveActivityManager.baselineMinimalisticBottomPadding)
             .frame(maxWidth: .infinity)
             .frame(height: calculateDynamicHeight(), alignment: .top)
             .animation(.smooth(duration: 0.3), value: dynamicHeightSignature)
         }
+    }
+
+    private var minimalisticHorizontalPadding: CGFloat {
+        shouldUseDynamicIslandMode(for: vm.screen)
+            ? minimalisticFloatingIslandContentHorizontalInset
+            : 12
     }
 
     // MARK: - TypingLyricView

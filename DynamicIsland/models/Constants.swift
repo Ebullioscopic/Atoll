@@ -928,6 +928,7 @@ extension Defaults.Keys {
 
     // MARK: Notch Glass
     static let notchGlassEnabled = Key<Bool>("notchGlassEnabled", default: false)
+    static let blendBlackTopIntoLiquidGlass = Key<Bool>("blendBlackTopIntoLiquidGlass", default: false)
     static let notchGlassCustomizationMode = Key<LockScreenGlassCustomizationMode>(
         "notchGlassCustomizationMode",
         default: .standard

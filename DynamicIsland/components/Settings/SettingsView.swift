@@ -821,6 +821,8 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .appearance, title: "Corner radius scaling", keywords: ["corner radius", "shape"], highlightID: SettingsTab.appearance.highlightID(for: "Corner radius scaling")),
             SettingsSearchEntry(tab: .appearance, title: "Use simpler close animation", keywords: ["close animation", "notch"], highlightID: SettingsTab.appearance.highlightID(for: "Use simpler close animation")),
             SettingsSearchEntry(tab: .appearance, title: "Notch Width", keywords: ["expanded notch", "width", "resize"], highlightID: SettingsTab.appearance.highlightID(for: "Expanded notch width")),
+            SettingsSearchEntry(tab: .appearance, title: "Enable Liquid Glass", keywords: ["notch glass", "liquid glass", "material"], highlightID: SettingsTab.appearance.highlightID(for: "Notch Liquid Glass")),
+            SettingsSearchEntry(tab: .appearance, title: "Blend black top into Liquid Glass", keywords: ["blend", "black top", "liquid glass", "gradient"], highlightID: SettingsTab.appearance.highlightID(for: "Blend black top into Liquid Glass")),
             SettingsSearchEntry(tab: .appearance, title: "Enable colored spectrograms", keywords: ["spectrogram", "audio"], highlightID: SettingsTab.appearance.highlightID(for: "Enable colored spectrograms")),
             SettingsSearchEntry(tab: .appearance, title: "Enable blur effect behind album art", keywords: ["blur", "album art"], highlightID: SettingsTab.appearance.highlightID(for: "Enable blur effect behind album art")),
             SettingsSearchEntry(tab: .appearance, title: "Slider color", keywords: ["slider", "accent"], highlightID: SettingsTab.appearance.highlightID(for: "Slider color")),
@@ -1315,6 +1317,7 @@ struct GeneralSettings: View {
             Text(externalDisplayStyle.description)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
             Defaults.Toggle(key: .hideNonNotchUntilHover) {
                 Text("Hide until hovered on non-notch displays")
             }
@@ -4403,6 +4406,17 @@ struct Appearance: View {
                     .settingsHighlight(id: highlightID("Notch Liquid Glass"))
 
                     if notchGlassEnabled {
+                        if enableMinimalisticUI {
+                            Defaults.Toggle(key: .blendBlackTopIntoLiquidGlass) {
+                                Text("Blend black top into Liquid Glass")
+                            }
+                            .settingsHighlight(id: highlightID("Blend black top into Liquid Glass"))
+                            
+                            Text("Replace the notch's black background with Liquid Glass. Black-top blend keeps the top area dark and fades smoothly into liquid glass, both on notch screens and external-display Dynamic Island mode.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
                         Picker("Glass mode", selection: $notchGlassCustomizationMode) {
                             ForEach(LockScreenGlassCustomizationMode.allCases) { mode in
                                 Text(mode.rawValue).tag(mode)

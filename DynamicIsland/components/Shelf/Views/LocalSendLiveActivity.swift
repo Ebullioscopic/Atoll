@@ -78,7 +78,7 @@ struct LocalSendLiveActivity: View {
             
             // Center: closed notch body (slightly wider during transfers)
             Rectangle()
-                .fill(.black)
+                .fill(.clear)
                 .frame(
                     width: vm.closedNotchSize.width
                         + (isHovering ? 8 : 0)

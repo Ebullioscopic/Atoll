@@ -35,6 +35,12 @@ var openNotchSize: CGSize {
     return .init(width: width, height: 200)
 }
 
+@MainActor
+func currentOpenNotchSize(for screen: String? = nil) -> CGSize {
+    _ = screen
+    return openNotchSize
+}
+
 /// Maximum notch width based on the current screen's point width.
 /// Prevents the notch from extending beyond the screen on scaled displays.
 func maxAllowedNotchWidth(for screenName: String? = nil) -> CGFloat {
@@ -150,6 +156,12 @@ var minimalisticOpenNotchSize: CGSize {
     }
 
     return size
+}
+
+@MainActor
+func currentMinimalisticOpenNotchSize(for screen: String? = nil) -> CGSize {
+    _ = screen
+    return minimalisticOpenNotchSize
 }
 let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 19, bottom: 24), closed: (top: 6, bottom: 14))
 let minimalisticCornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 35, bottom: 35), closed: cornerRadiusInsets.closed)
@@ -278,6 +290,12 @@ let dynamicIslandTopOffset: CGFloat = 6
 /// Island mode so the drop shadow has room to render without being clipped
 /// by the outer frame constraint.
 let dynamicIslandShadowInset: CGFloat = 14
+
+/// Horizontal insets for minimalistic UI on a floating Dynamic Island pill.
+/// Tighter than the notch-attached layout because the pill does not need a
+/// wide corner gutter or a physical notch cutout column in the header.
+let minimalisticFloatingIslandShellHorizontalInset: CGFloat = 14
+let minimalisticFloatingIslandContentHorizontalInset: CGFloat = 6
 
 enum MusicPlayerImageSizes {
     static let cornerRadiusInset: (opened: CGFloat, closed: CGFloat) = (opened: 13.0, closed: 4.0)

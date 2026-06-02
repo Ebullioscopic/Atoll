@@ -55,14 +55,13 @@ struct DynamicIslandHeader: View {
             .blur(radius: vm.notchState == .closed ? 20 : 0)
             .animation(.smooth.delay(0.1), value: vm.notchState)
             .zIndex(2)
-            .padding(8)
+            .padding(minimalisticHeaderEdgePadding)
 
-            if vm.notchState == .open {
-                let spacerWidth = min(vm.closedNotchSize.width, 300)
+            if vm.notchState == .open, openHeaderCenterSpacerWidth > 0 {
                 Rectangle()
                     .fill(enableMinimalisticUI ? .clear : (NSScreen.screens
                         .first(where: { $0.localizedName == coordinator.selectedScreen })?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear))
-                    .frame(width: spacerWidth)
+                    .frame(width: openHeaderCenterSpacerWidth)
                     .mask {
                         NotchShape()
                     }
@@ -243,7 +242,7 @@ struct DynamicIslandHeader: View {
                             isForNotification: false,
                             showPercentInside: showBatteryPercentInside
                         )
-                        .padding(.trailing, 4)
+                        .padding(.trailing, minimalisticHeaderEdgePadding)
                     } else {
                         DynamicIslandBatteryView(
                             batteryWidth: 30,
@@ -306,6 +305,24 @@ struct DynamicIslandHeader: View {
 }
 
 private extension DynamicIslandHeader {
+    var usesFloatingMinimalisticIsland: Bool {
+        enableMinimalisticUI && shouldUseDynamicIslandMode(for: coordinator.selectedScreen)
+    }
+
+    var minimalisticHeaderEdgePadding: CGFloat {
+        usesFloatingMinimalisticIsland
+            ? minimalisticFloatingIslandContentHorizontalInset
+            : 8
+    }
+
+    var openHeaderCenterSpacerWidth: CGFloat {
+        guard vm.notchState == .open else { return 0 }
+        if usesFloatingMinimalisticIsland {
+            return 0
+        }
+        return min(vm.closedNotchSize.width, 300)
+    }
+
     var shouldSuppressStatusIndicators: Bool {
         Defaults[.settingsIconInNotch]
             && Defaults[.enableClipboardManager]
