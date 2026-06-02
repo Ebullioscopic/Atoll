@@ -33,8 +33,6 @@ enum OnboardingStep {
     case finished
 }
 
-private let calendarService = CalendarService()
-
 struct OnboardingView: View {
     @State private var step: OnboardingStep = .welcome
     @State private var showFocusMonitoringChoice = false
@@ -83,7 +81,6 @@ struct OnboardingView: View {
                     privacyNote: String(localized: "Your calendar data is only used to show your events and is never shared."),
                     onAllow: {
                         Task {
-                            await requestCalendarPermission()
                             withAnimation(.easeInOut(duration: 0.6)) {
                                 step = .musicPermission
                             }
@@ -153,8 +150,6 @@ struct OnboardingView: View {
         await AVCaptureDevice.requestAccess(for: .video)
     }
 
-    func requestCalendarPermission() async {
-        await calendarService.requestAccess()
-    }
+
 }
 

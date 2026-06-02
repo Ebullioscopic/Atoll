@@ -113,7 +113,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let mediaControlsStateCoordinator = MediaControlsStateCoordinator.shared
 
     // Deferred managers (initialized on first access, not at launch)
-    lazy var calendarManager = CalendarManager.shared
     lazy var webcamManager = WebcamManager.shared
     lazy var bluetoothAudioManager = BluetoothAudioManager.shared
     lazy var idleAnimationManager = IdleAnimationManager.shared
@@ -522,7 +521,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func shouldAnimateResize(for newSize: CGSize) -> Bool {
-        if Defaults[.enableMinimalisticUI] && !ReminderLiveActivityManager.shared.activeWindowReminders.isEmpty {
+        if Defaults[.enableMinimalisticUI] {
             return false
         }
         return true
@@ -675,13 +674,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }.store(in: &cancellables)
 
         MemoryUsageMonitor.shared.startMonitoring()
-
-        ReminderLiveActivityManager.shared.$activeWindowReminders
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.debouncedUpdateWindowSize()
-            }
-            .store(in: &cancellables)
 
         TimerManager.shared.$activeSource
             .combineLatest(TimerManager.shared.$isTimerActive)

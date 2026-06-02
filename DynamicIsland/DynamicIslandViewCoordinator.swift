@@ -230,7 +230,6 @@ class DynamicIslandViewCoordinator: ObservableObject {
         // Observe all tab-affecting settings to enforce minimum notch width
         Publishers.MergeMany(
             Defaults.publisher(.showStandardMediaControls).map { _ in () }.eraseToAnyPublisher(),
-            Defaults.publisher(.showCalendar).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.showMirror).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.dynamicShelf).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableTimerFeature).map { _ in () }.eraseToAnyPublisher(),
@@ -345,15 +344,13 @@ class DynamicIslandViewCoordinator: ObservableObject {
         switch type {
         case .timer:
             resolvedDuration = 10
-        case .reminder:
-            resolvedDuration = Defaults[.reminderSneakPeekDuration]
         case .extensionLiveActivity:
             resolvedDuration = duration
         default:
             resolvedDuration = duration
         }
         sneakPeekDuration = resolvedDuration
-        let bypassedTypes: [SneakContentType] = [.music, .timer, .reminder, .bluetoothAudio]
+        let bypassedTypes: [SneakContentType] = [.music, .timer, .bluetoothAudio]
         
         // Check if it's an extension type
         let isExtensionType: Bool

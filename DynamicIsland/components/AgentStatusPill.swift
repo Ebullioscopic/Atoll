@@ -22,9 +22,8 @@ struct AgentStatusPill: View {
     var body: some View {
         if Defaults[.enableAgentStatus], let session = manager.primarySession {
             HStack(spacing: 6) {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 6, height: 6)
+                                Text(session.sourceEmoji)
+                    .font(.system(size: 10))
                 
                 Text(session.agentName)
                     .font(.system(size: 10, weight: .medium))
@@ -91,9 +90,8 @@ struct AgentStatusExpandedView: View {
     private func sessionRow(_ session: AgentSession) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 8, height: 8)
+                Text(session.sourceEmoji)
+                    .font(.system(size: 14))
                 
                 Text(session.agentName)
                     .font(.system(size: 12, weight: .semibold))

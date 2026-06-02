@@ -157,7 +157,6 @@ final class LockScreenTimerWidgetPanelManager {
         hideTask = nil
         animator.isPresented = true
         LockScreenPanelManager.shared.notifyTimerWidgetFrameChanged(animated: false)
-        LockScreenReminderWidgetPanelManager.shared.refreshPosition(animated: true)
     }
 
     func hide(animated: Bool = true) {
@@ -171,7 +170,6 @@ final class LockScreenTimerWidgetPanelManager {
             hideTask = nil
             latestFrame = nil
             LockScreenPanelManager.shared.notifyTimerWidgetFrameChanged(animated: true)
-            LockScreenReminderWidgetPanelManager.shared.refreshPosition(animated: true)
             return
         }
 
@@ -182,7 +180,6 @@ final class LockScreenTimerWidgetPanelManager {
                 self?.hideTask = nil
                 self?.latestFrame = nil
                 LockScreenPanelManager.shared.notifyTimerWidgetFrameChanged(animated: true)
-                LockScreenReminderWidgetPanelManager.shared.refreshPosition(animated: true)
             }
         }
     }
@@ -202,7 +199,6 @@ final class LockScreenTimerWidgetPanelManager {
         }
         updateHostingViewSize(for: window, size: frame.size)
         latestFrame = frame
-        LockScreenReminderWidgetPanelManager.shared.refreshPosition(animated: animated)
     }
 
     func refreshRelativeToMusicPanel(animated: Bool) {

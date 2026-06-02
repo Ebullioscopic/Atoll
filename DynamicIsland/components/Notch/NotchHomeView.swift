@@ -727,26 +727,10 @@ struct NotchHomeView: View {
                     MinimalisticMusicPlayerView(albumArtNamespace: albumArtNamespace)
                 }
             } else {
-                // Normal mode: Show full music player with optional calendar and webcam
+                // Normal mode: Show full music player with optional webcam
                 if shouldShowMusicPlayer {
                     MusicPlayerView(albumArtNamespace: albumArtNamespace)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                
-                if Defaults[.showCalendar] {
-                    Group {
-                        if shouldShowMusicPlayer {
-                            CalendarView()
-                        } else {
-                            StandaloneCalendarView()
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.trailing, Defaults[.showMirror] ? 8 : 0)
-                    .onHover { isHovering in
-                        vm.isHoveringCalendar = isHovering
-                    }
-                    .environmentObject(vm)
                 }
                 
                 if Defaults[.showMirror],
