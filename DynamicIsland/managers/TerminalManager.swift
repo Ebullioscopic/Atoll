@@ -41,15 +41,54 @@ import Defaults
 /// (recorded during the transient removal) but the child kept its previous
 /// large frame.
 final class StableTerminalContainerView: NSView {
+    /// Identifies the gutter tint view so `resizeSubviews` can keep its ring mask in sync.
+    static let gutterTintIdentifier = NSUserInterfaceItemIdentifier("terminalGutterTint")
+    /// Identifies the custom scroll knob overlay so `resizeSubviews` leaves its frame
+    /// alone (it's positioned from the scroll state, not stretched to fill the bounds).
+    static let scrollKnobIdentifier = NSUserInterfaceItemIdentifier("terminalScrollKnob")
+
     override func resizeSubviews(withOldSize oldSize: NSSize) {
         let size = bounds.size
         // Block degenerate sizes — the terminal would collapse to 2×1
         guard size.width >= 10, size.height >= 10 else { return }
         // Manually fill children to bounds — bypasses autoresizing math
         // that breaks when oldSize was zero but child kept its old frame.
+        // The terminal view gets an inner inset so glyphs don't hug the edge;
+        // the frosted blur underlay and the gutter tint stay full-bleed to the
+        // rounded clip (the tint is masked to the ring so it only fills the inset
+        // gutter, matching the terminal background without doubling over it).
+        let inset = notchTerminalInnerTextInset
+        let terminalFrame = bounds.insetBy(dx: inset, dy: inset)
         for child in subviews {
-            child.frame = bounds
+            if child is LocalProcessTerminalView {
+                child.frame = terminalFrame
+            } else if child.identifier == Self.scrollKnobIdentifier {
+                // Positioned from scroll state in `updateScrollKnob`; don't stretch it.
+                continue
+            } else {
+                child.frame = bounds
+                if child.identifier == Self.gutterTintIdentifier {
+                    Self.applyGutterMask(to: child, bounds: bounds, hole: terminalFrame)
+                }
+            }
         }
+        MainActor.assumeIsolated {
+            TerminalManager.shared.refreshScrollKnobLayout()
+        }
+    }
+
+    /// Masks `view` to the gutter ring: the full bounds minus the inset `hole`
+    /// where the terminal sits, using the even-odd fill rule.
+    static func applyGutterMask(to view: NSView, bounds: CGRect, hole: CGRect) {
+        let localBounds = CGRect(origin: .zero, size: bounds.size)
+        let mask = (view.layer?.mask as? CAShapeLayer) ?? CAShapeLayer()
+        mask.fillRule = .evenOdd
+        let path = CGMutablePath()
+        path.addRect(localBounds)
+        path.addRect(CGRect(x: hole.minX, y: hole.minY, width: hole.width, height: hole.height))
+        mask.path = path
+        mask.frame = localBounds
+        view.layer?.mask = mask
     }
 
     override func viewDidMoveToWindow() {
@@ -64,6 +103,21 @@ final class StableTerminalContainerView: NSView {
             TerminalManager.shared.refreshTerminalAppearanceIfNeeded()
         }
     }
+}
+
+// MARK: - Scroll Knob Overlay
+
+/// Layer-backed rounded knob drawn on top of the terminal as a custom scrollbar.
+///
+/// SwiftTerm's built-in `NSScroller` is layer-backed and renders its knob via CoreUI,
+/// which ignores `drawKnob`/`drawKnobSlot` overrides — so we can't restyle it directly.
+/// Instead we hide that scroller and render this view ourselves, driven by the
+/// scroller's live values (`doubleValue`, `knobProportion`, `isEnabled`) via KVO.
+///
+/// `hitTest` returns nil so clicks and scroll-wheel events pass straight through to
+/// the terminal underneath.
+final class TerminalScrollKnobView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 // MARK: - Terminal Manager
@@ -100,6 +154,27 @@ class TerminalManager: ObservableObject {
     /// The actual terminal view (child of `containerView`).
     private(set) var terminalView: LocalProcessTerminalView?
 
+    /// SwiftTerm's built-in scroller (kept as the data source for our custom knob).
+    private weak var terminalScroller: NSScroller?
+
+    /// KVO of the scroller's value/proportion/enabled state that drives the knob.
+    private var scrollerObservations: [NSKeyValueObservation] = []
+
+    /// Custom rounded scrollbar knob rendered on top of the terminal.
+    private lazy var scrollKnobView: TerminalScrollKnobView = {
+        let v = TerminalScrollKnobView()
+        v.identifier = StableTerminalContainerView.scrollKnobIdentifier
+        v.wantsLayer = true
+        v.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.45).cgColor
+        v.alphaValue = 0
+        return v
+    }()
+
+    /// Thickness of the custom scroll knob, and its margins inside the terminal.
+    private let scrollKnobThickness: CGFloat = 6
+    private let scrollKnobEndInset: CGFloat = 3
+    private let scrollKnobRightMargin: CGFloat = 2
+
     /// Frosted blur of desktop/content behind the terminal; always below `terminalView`.
     private lazy var terminalBackgroundEffectView: NSVisualEffectView = {
         let v = NSVisualEffectView()
@@ -107,6 +182,19 @@ class TerminalManager: ObservableObject {
         v.material = .underWindowBackground
         v.blendingMode = .behindWindow
         v.state = .active
+        v.autoresizingMask = [.width, .height]
+        return v
+    }()
+
+    /// Tinted ring that fills the inset gutter with the terminal's background color
+    /// so the inset text isn't surrounded by a bare-blur "ring".  Sits above the
+    /// blur and below `terminalView`; masked to the gutter so it never doubles the
+    /// translucent background over the terminal's own cells.
+    private lazy var terminalGutterTintView: NSView = {
+        let v = NSView()
+        v.identifier = StableTerminalContainerView.gutterTintIdentifier
+        v.wantsLayer = true
+        v.layer?.backgroundColor = NSColor.clear.cgColor
         v.autoresizingMask = [.width, .height]
         return v
     }()
@@ -148,14 +236,42 @@ class TerminalManager: ObservableObject {
         if terminalBackgroundEffectView.superview == nil {
             containerView.addSubview(terminalBackgroundEffectView)
         }
+        if terminalGutterTintView.superview == nil {
+            containerView.addSubview(
+                terminalGutterTintView,
+                positioned: .above,
+                relativeTo: terminalBackgroundEffectView
+            )
+        }
+        updateGutterTintColor()
         containerView.addSubview(view)
         terminalView = view
 
-        // If the container already has a valid size, snap the child to it.
+        // Keep the custom scroll knob above the terminal (re-add to bring to front).
+        scrollKnobView.removeFromSuperview()
+        containerView.addSubview(scrollKnobView)
+        if let scroller = terminalScroller {
+            updateScrollKnob(from: scroller)
+        }
+
+        // If the container already has a valid size, snap the children to it.
+        // Blur + gutter tint fill the full bounds; the terminal is inset so its
+        // glyphs don't hug the edge, and the gutter tint is masked to the ring.
         let containerSize = containerView.bounds.size
         if containerSize.width >= 10, containerSize.height >= 10 {
-            terminalBackgroundEffectView.frame = containerView.bounds
-            view.frame = containerView.bounds
+            let bounds = containerView.bounds
+            let terminalFrame = bounds.insetBy(
+                dx: notchTerminalInnerTextInset,
+                dy: notchTerminalInnerTextInset
+            )
+            terminalBackgroundEffectView.frame = bounds
+            terminalGutterTintView.frame = bounds
+            StableTerminalContainerView.applyGutterMask(
+                to: terminalGutterTintView,
+                bounds: bounds,
+                hole: terminalFrame
+            )
+            view.frame = terminalFrame
         }
 
         // Apply translucency immediately and again on the next run loop tick.
@@ -263,6 +379,13 @@ class TerminalManager: ObservableObject {
     private func refreshTerminalOpacityAndTranslucency(for view: LocalProcessTerminalView) {
         applyTerminalBackgroundAppearance(to: view)
         synchronizeTerminalTranslucencyPresentation(to: view)
+        updateGutterTintColor()
+    }
+
+    /// Keeps the gutter tint ring matching the terminal's resolved (translucent)
+    /// background color so the inset gutter blends seamlessly with the cells.
+    private func updateGutterTintColor() {
+        terminalGutterTintView.layer?.backgroundColor = resolvedTerminalBackgroundNSColor().cgColor
     }
 
     // MARK: - Settings Application
@@ -301,6 +424,75 @@ class TerminalManager: ObservableObject {
         view.useBrightColors = Defaults[.terminalBoldAsBright]
 
         refreshTerminalOpacityAndTranslucency(for: view)
+        styleTerminalScroller(for: view)
+    }
+
+    /// Hides SwiftTerm's built-in scroller and wires KVO so its live scroll state
+    /// drives our custom `scrollKnobView` (see `TerminalScrollKnobView`).
+    private func styleTerminalScroller(for view: LocalProcessTerminalView) {
+        guard let scroller = view.subviews.compactMap({ $0 as? NSScroller }).first else { return }
+        terminalScroller = scroller
+        // Hide SwiftTerm's own scroller drawing; it stays alive as our data source.
+        scroller.alphaValue = 0
+
+        scrollerObservations.forEach { $0.invalidate() }
+        scrollerObservations = []
+        let onChange: (NSScroller) -> Void = { scroller in
+            MainActor.assumeIsolated {
+                TerminalManager.shared.updateScrollKnob(from: scroller)
+            }
+        }
+        scrollerObservations = [
+            scroller.observe(\.doubleValue, options: [.new]) { s, _ in onChange(s) },
+            scroller.observe(\.knobProportion, options: [.new]) { s, _ in onChange(s) },
+            scroller.observe(\.isEnabled, options: [.new]) { s, _ in onChange(s) }
+        ]
+        updateScrollKnob(from: scroller)
+    }
+
+    /// Re-runs the knob layout using the current scroller state (e.g. after a resize).
+    func refreshScrollKnobLayout() {
+        guard let scroller = terminalScroller else { return }
+        updateScrollKnob(from: scroller)
+    }
+
+    /// Positions and shows/hides the custom scroll knob from the scroller's state.
+    private func updateScrollKnob(from scroller: NSScroller) {
+        guard scrollKnobView.superview === containerView else { return }
+
+        guard scroller.isEnabled else {
+            scrollKnobView.animator().alphaValue = 0
+            return
+        }
+
+        let bounds = containerView.bounds
+        guard bounds.width >= 10, bounds.height >= 10 else { return }
+
+        // Track lives inside the inset terminal area, along its right edge.
+        let terminalFrame = bounds.insetBy(
+            dx: notchTerminalInnerTextInset,
+            dy: notchTerminalInnerTextInset
+        )
+        let thickness = scrollKnobThickness
+        let trackTopY = terminalFrame.maxY - scrollKnobEndInset      // visual top (non-flipped)
+        let trackBottomY = terminalFrame.minY + scrollKnobEndInset
+        let trackHeight = max(0, trackTopY - trackBottomY)
+        guard trackHeight > thickness else {
+            scrollKnobView.animator().alphaValue = 0
+            return
+        }
+
+        let proportion = max(0.04, min(1.0, CGFloat(scroller.knobProportion)))
+        let knobHeight = max(thickness * 2, proportion * trackHeight)
+        let travel = max(0, trackHeight - knobHeight)
+        // doubleValue: 0 = top of scrollback, 1 = bottom (current); y grows upward.
+        let value = max(0, min(1, CGFloat(scroller.doubleValue)))
+        let knobMinY = trackBottomY + (1 - value) * travel
+        let x = terminalFrame.maxX - thickness - scrollKnobRightMargin
+
+        scrollKnobView.frame = NSRect(x: x, y: knobMinY, width: thickness, height: knobHeight)
+        scrollKnobView.layer?.cornerRadius = thickness / 2
+        scrollKnobView.animator().alphaValue = 1
     }
 
     /// Updates font size on the live terminal view.

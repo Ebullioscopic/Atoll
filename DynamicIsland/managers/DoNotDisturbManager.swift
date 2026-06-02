@@ -685,7 +685,7 @@ enum FocusModeType: String, CaseIterable {
     
     var displayName: String {
         switch self {
-    case .doNotDisturb: return "Do Not Disturb"
+    case .doNotDisturb: return String(localized: "Do Not Disturb")
         case .work: return "Work"
         case .personal: return "Personal"
         case .sleep: return "Sleep"

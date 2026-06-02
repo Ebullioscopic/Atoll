@@ -821,8 +821,8 @@ struct LockScreenWeatherWidget: View {
 		let now = currentTime
 
 		if event.isAllDay {
-			return "All day • \(event.title)"
-		}
+            return "\(String(format: String(localized: "All-day"))) • \(event.title)"
+        }
 
 		let timeString = event.start.formatted(date: .omitted, time: .shortened)
 
@@ -832,8 +832,8 @@ struct LockScreenWeatherWidget: View {
 			if lockScreenShowCalendarTimeRemaining {
 				let secondsLeft = event.end.timeIntervalSince(now)
 				let minutesLeft = max(0, Int(ceil(secondsLeft / 60.0)))
-				suffix = " • \(countdownText(fromMinutes: minutesLeft)) left"
-			} else {
+                suffix = " • \(String(format: String(localized: "%@ left"), countdownText(fromMinutes: minutesLeft)))"
+            } else {
 				suffix = ""
 			}
 			return "\(leading)\(event.title)\(suffix)"
@@ -845,7 +845,7 @@ struct LockScreenWeatherWidget: View {
 
 		let secondsUntilStart = event.start.timeIntervalSince(now)
 		let totalMinutes = max(0, Int(ceil(secondsUntilStart / 60.0)))
-		return "\(timeString) • \(event.title) • in \(countdownText(fromMinutes: totalMinutes))"
+        return "\(timeString) • \(event.title) • \(String(format: String(localized: "in %@"), (countdownText(fromMinutes: totalMinutes))))"
 	}
 
 	private func countdownText(fromMinutes minutes: Int) -> String {
@@ -853,12 +853,13 @@ struct LockScreenWeatherWidget: View {
 			return "\(minutes)m"
 		}
 
-		let hours = minutes / 60
+        let hours = String(format: String(localized: "%lldh"), minutes / 60)
 		let mins = minutes % 60
+        let minStr = String(format: String(localized: "%lldm"), minutes % 60)
 		if mins == 0 {
-			return "\(hours)h"
+			return "\(hours)"
 		}
-		return "\(hours)h \(mins)m"
+		return "\(hours) \(minStr)"
 	}
 
 	private var sunriseTimeText: String? {

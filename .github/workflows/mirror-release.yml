@@ -1,0 +1,125 @@
+name: Mirror Release To Organization
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      ####################################################################
+      # Sync Git repository
+      ####################################################################
+
+      - name: Configure mirror remote
+        run: |
+          git remote add org \
+            https://x-access-token:${{ secrets.ORG_REPO_TOKEN }}@github.com/Atoll-Labs/Atoll.git
+
+      - name: Push branches
+        run: |
+          git push org --all
+
+      - name: Push tags
+        run: |
+          git push org --tags
+
+      ####################################################################
+      # Install GitHub CLI
+      ####################################################################
+
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install gh -y
+
+      ####################################################################
+      # Download release assets
+      ####################################################################
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p release-assets
+
+          gh release download \
+            "${{ github.event.release.tag_name }}" \
+            --repo "${{ github.repository }}" \
+            --dir release-assets
+
+      ####################################################################
+      # Save release notes
+      ####################################################################
+
+      - name: Save release notes
+        run: |
+          cat > release_notes.md <<'EOF'
+          ${{ github.event.release.body }}
+          EOF
+
+      ####################################################################
+      # Create or update release
+      ####################################################################
+
+      - name: Create release if missing
+        env:
+          GH_TOKEN: ${{ secrets.ORG_REPO_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+
+          if gh release view "$TAG" \
+              --repo Atoll-Labs/Atoll >/dev/null 2>&1; then
+
+            echo "Release already exists."
+
+          else
+
+            gh release create "$TAG" \
+              --repo Atoll-Labs/Atoll \
+              --title "${{ github.event.release.name }}" \
+              --notes-file release_notes.md
+
+          fi
+
+      - name: Update release metadata
+        env:
+          GH_TOKEN: ${{ secrets.ORG_REPO_TOKEN }}
+        run: |
+          gh release edit \
+            "${{ github.event.release.tag_name }}" \
+            --repo Atoll-Labs/Atoll \
+            --title "${{ github.event.release.name }}" \
+            --notes-file release_notes.md
+
+      ####################################################################
+      # Upload assets
+      ####################################################################
+
+      - name: Upload assets
+        env:
+          GH_TOKEN: ${{ secrets.ORG_REPO_TOKEN }}
+        run: |
+          shopt -s nullglob
+
+          files=(release-assets/*)
+
+          if [ ${#files[@]} -gt 0 ]; then
+            gh release upload \
+              "${{ github.event.release.tag_name }}" \
+              release-assets/* \
+              --repo Atoll-Labs/Atoll \
+              --clobber
+          else
+            echo "No release assets found."
+          fi

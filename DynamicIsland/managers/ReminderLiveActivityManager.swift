@@ -608,17 +608,17 @@ final class ReminderLiveActivityManager: ObservableObject {
     private func lockScreenRelativeDescription(for entry: ReminderEntry, now: Date) -> String? {
         let remaining = entry.event.start.timeIntervalSince(now)
         if remaining <= 0 {
-            return "now"
+            return String(format: String(localized: "now"))
         }
 
         let minutes = Int(ceil(remaining / 60))
         switch minutes {
         case ..<1:
-            return "now"
+            return String(format: String(localized: "now"))
         case 1:
-            return "in 1 min"
+            return String(format: String(localized: "in %@"), String(localized: "1 min"))
         default:
-            return "in \(minutes) min"
+            return "\(String(format: String(localized: "in \(minutes)"))) \(String(format: String(localized: "min")))"
         }
     }
 

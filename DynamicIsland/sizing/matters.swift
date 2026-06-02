@@ -163,6 +163,10 @@ let minimalisticCornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), cl
 /// Padding on the terminal block inside the notch. Inner corner radius = outer shell radius on that edge, minus the matching edge padding.
 let notchTerminalContentEdgePadding: (top: CGFloat, horizontal: CGFloat, bottom: CGFloat) = (4, 8, 8)
 
+/// Inner margin (all edges) between the SwiftTerm view's glyphs and the terminal block edge.
+/// Applied to the LocalProcessTerminalView frame only; the frosted blur underlay stays full-bleed.
+let notchTerminalInnerTextInset: CGFloat = 6
+
 /// Bottom radii for the shell (outer) and the terminal ``clipShape`` (inner), per design: inner = outer shell bottom radius − `notchTerminalContentEdgePadding.bottom`.
 func notchTerminalBottomCornerRadii(
     isDynamicIslandMode: Bool,

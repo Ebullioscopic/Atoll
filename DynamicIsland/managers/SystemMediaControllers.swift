@@ -483,14 +483,37 @@ final class SystemBrightnessController {
     private var displayServicesFailedAt: Date?
     private let displayServicesBackoff: TimeInterval = 30
 
+    // MARK: - User-initiated brightness gate
+    // When true, brightness changes detected via polling / notifications will
+    // trigger the HUD. Auto-resets after `userInitiatedWindow` seconds.
+    private var userInitiatedBrightnessChange = false
+    private var userInitiatedResetTimer: Timer?
+    private let userInitiatedWindow: TimeInterval = 1.5
+    private var didLogPollingFallback = false
+
+    // MARK: - Emission throttling
+    // Prevent notification storms when the animation timer fires rapidly.
+    private var lastEmissionDate: Date = .distantPast
+    private let minimumEmissionInterval: TimeInterval = 0.04  // ~25 fps max
+
     private init() {
         registerExternalNotifications()
         lastEmittedBrightness = currentBrightness
     }
 
     func start() {
+        if coreBrightnessClient.isAvailable {
+            NSLog("✅ SystemBrightnessController: CoreBrightnessDisplayClient is available — using notification-driven detection")
+        } else {
+            NSLog("⚠️ SystemBrightnessController: CoreBrightnessDisplayClient unavailable; will rely on DisplayServices / IODisplay + polling fallback")
+        }
         notifyCurrentBrightness()
-        startPollingIfNeeded()
+        // Only start polling as a fallback when CoreBrightness notifications
+        // are unavailable.  When CoreBrightness IS available the distributed
+        // notifications (registerExternalNotifications) handle detection.
+        if !coreBrightnessClient.isAvailable {
+            startPolling()
+        }
     }
 
     func stop() {
@@ -499,18 +522,38 @@ final class SystemBrightnessController {
         brightnessAnimationTimer = nil
         pollTimer?.invalidate()
         pollTimer = nil
+        userInitiatedResetTimer?.invalidate()
+        userInitiatedResetTimer = nil
+        userInitiatedBrightnessChange = false
     }
 
     func adjust(by delta: Float) {
         // Refresh baseline to avoid jumping if auto-brightness changed the level.
         syncWithSystemBrightnessIfNeeded()
-        setBrightness(lastEmittedBrightness + delta)
+        markUserInitiated()
+        let target = max(0, min(1, lastEmittedBrightness + delta))
+        DispatchQueue.main.async { [weak self] in
+            self?.beginBrightnessAnimation(to: target)
+        }
     }
 
     func setBrightness(_ value: Float) {
         let clamped = max(0, min(1, value))
-        DispatchQueue.main.async {
-            self.beginBrightnessAnimation(to: clamped)
+        markUserInitiated()
+        DispatchQueue.main.async { [weak self] in
+            self?.beginBrightnessAnimation(to: clamped)
+        }
+    }
+
+    // MARK: - User-initiated helpers
+
+    /// Marks the current brightness change as user-initiated (key press).
+    /// Automatically resets after `userInitiatedWindow` seconds.
+    private func markUserInitiated() {
+        userInitiatedBrightnessChange = true
+        userInitiatedResetTimer?.invalidate()
+        userInitiatedResetTimer = Timer.scheduledTimer(withTimeInterval: userInitiatedWindow, repeats: false) { [weak self] _ in
+            self?.userInitiatedBrightnessChange = false
         }
     }
 
@@ -542,7 +585,8 @@ final class SystemBrightnessController {
         // auto-brightness has changed the level behind our back).
         let systemLevel = currentBrightness
         if abs(systemLevel - lastEmittedBrightness) > 0.001 {
-            emitBrightnessChange(value: systemLevel)
+            // Only update the baseline — don't emit to avoid spurious HUD flashes.
+            lastEmittedBrightness = systemLevel
         }
     }
 
@@ -566,7 +610,10 @@ final class SystemBrightnessController {
 
         let interval = currentBrightnessAnimationDuration / Double(brightnessAnimationSteps)
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] timer in
-            guard let self else { return }
+            guard let self else {
+                timer.invalidate()
+                return
+            }
             guard let startDate = self.brightnessAnimationStartDate else {
                 timer.invalidate()
                 self.brightnessAnimationTimer = nil
@@ -577,10 +624,14 @@ final class SystemBrightnessController {
             let eased = self.ease(progress)
             let value = self.brightnessAnimationStart + (self.brightnessAnimationTarget - self.brightnessAnimationStart) * Float(eased)
             self.applyBrightness(value)
-            self.emitBrightnessChange(value: value)
             if progress >= 1 {
+                // Final value — force-emit to guarantee the UI reaches the target.
+                self.emitBrightnessChange(value: value, force: true)
                 timer.invalidate()
                 self.brightnessAnimationTimer = nil
+            } else {
+                // Intermediate step — throttled emission.
+                self.emitBrightnessChange(value: value)
             }
         }
         brightnessAnimationTimer = timer
@@ -609,10 +660,20 @@ final class SystemBrightnessController {
         }
     }
 
-    private func emitBrightnessChange(value: Float) {
+    private func emitBrightnessChange(value: Float, force: Bool = false) {
         let clamped = max(0, min(1, value))
         lastEmittedBrightness = clamped
-        let dispatchBlock = {
+
+        // Throttle rapid emissions to avoid notification storms when the
+        // animation timer fires ~10 times per step during key-spam.
+        if !force {
+            let now = Date()
+            guard now.timeIntervalSince(lastEmissionDate) >= minimumEmissionInterval else { return }
+            lastEmissionDate = now
+        }
+
+        let dispatchBlock = { [weak self] in
+            guard let self else { return }
             self.onBrightnessChange?(clamped)
             self.notificationCenter.post(name: .systemBrightnessDidChange, object: nil, userInfo: ["value": clamped])
         }
@@ -703,13 +764,27 @@ final class SystemBrightnessController {
         notificationsInstalled = true
     }
 
-    private func startPollingIfNeeded() {
+    private func startPolling() {
         guard pollTimer == nil else { return }
+        NSLog("ℹ️ SystemBrightnessController: Starting polling-driven brightness detection as fallback (interval: %.2fs)", pollInterval)
         pollTimer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
             guard let self else { return }
+            // Skip polling while an animation is actively running — the
+            // animation timer already handles emission during key presses.
+            guard self.brightnessAnimationTimer == nil else { return }
             let system = self.currentBrightness
-            if abs(system - self.lastEmittedBrightness) > self.pollChangeThreshold {
+            guard abs(system - self.lastEmittedBrightness) > self.pollChangeThreshold else { return }
+
+            if self.userInitiatedBrightnessChange {
+                // User recently pressed a brightness key — show the HUD.
+                if !self.didLogPollingFallback {
+                    NSLog("ℹ️ SystemBrightnessController: Brightness change detected via polling fallback (value: %.3f)", system)
+                    self.didLogPollingFallback = true
+                }
                 self.emitBrightnessChange(value: system)
+            } else {
+                // Auto-brightness or external change — absorb silently.
+                self.lastEmittedBrightness = max(0, min(1, system))
             }
         }
     }
@@ -717,6 +792,7 @@ final class SystemBrightnessController {
     deinit {
         brightnessAnimationTimer?.invalidate()
         pollTimer?.invalidate()
+        userInitiatedResetTimer?.invalidate()
         observers.forEach { DistributedNotificationCenter.default().removeObserver($0) }
     }
 }
