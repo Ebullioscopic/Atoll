@@ -79,13 +79,13 @@ struct TimerPopover: View {
     
     private var statusText: String {
         if timerManager.isOvertime {
-            return "Overtime"
+            return String(localized: "Overtime")
         } else if timerManager.isPaused {
-            return "Paused"
+            return String(localized: "Paused")
         } else if timerManager.isTimerActive {
-            return "Running"
+            return String(localized: "Running")
         } else {
-            return "Ready"
+            return String(localized: "Ready")
         }
     }
     
@@ -127,7 +127,7 @@ private struct HeaderView: View {
                 .frame(width: 32, height: 32)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text("Timer")
+                Text(String(localized: "Timer"))
                     .font(.system(size: 14, weight: .semibold))
                 Text(statusText)
                     .font(.system(size: 11, weight: .medium))
@@ -170,7 +170,7 @@ private struct ActiveTimerSection: View {
             HStack(spacing: 8) {
                 if !timerManager.isOvertime {
                     Button(action: togglePause) {
-                        Label(timerManager.isPaused ? "Resume" : "Pause", systemImage: timerManager.isPaused ? "play.fill" : "pause.fill")
+                        Label(timerManager.isPaused ? String(localized: "Resume") : String(localized: "Pause"), systemImage: timerManager.isPaused ? "play.fill" : "pause.fill")
                             .font(.system(size: 12, weight: .medium))
                             .labelStyle(.titleAndIcon)
                     }
@@ -179,7 +179,7 @@ private struct ActiveTimerSection: View {
                 }
 
                 Button(role: .destructive, action: stopTimer) {
-                    Label("Stop", systemImage: "stop.fill")
+                    Label(String(localized: "Stop"), systemImage: "stop.fill")
                         .font(.system(size: 12, weight: .medium))
                         .labelStyle(.titleAndIcon)
                 }
@@ -242,14 +242,14 @@ private struct CustomTimerSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Custom Timer")
+            Text(String(localized: "Custom Timer"))
                 .font(.system(size: 14, weight: .semibold))
             
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+            Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 8) {
                 GridRow {
-                    DurationStepper(title: "Hours", value: $hours, range: 0...23)
-                    DurationStepper(title: "Minutes", value: $minutes, range: 0...59)
-                    DurationStepper(title: "Seconds", value: $seconds, range: 0...59)
+                    DurationStepper(title: String(localized: "Hours"), value: $hours, range: 0...23)
+                    DurationStepper(title: String(localized: "Minutes"), value: $minutes, range: 0...59)
+                    DurationStepper(title: String(localized: "Seconds"), value: $seconds, range: 0...59)
                 }
             }
             
@@ -287,7 +287,7 @@ private struct DurationStepper: View {
         Stepper(value: $value, in: range) {
             HStack {
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 8.5, weight: .medium))
                 Spacer()
                 Text("\(value)")
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
@@ -304,7 +304,7 @@ private struct PresetList: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Presets")
+            Text(String(localized: "Presets"))
                 .font(.system(size: 13, weight: .semibold))
                 .padding(.leading, 4)
             

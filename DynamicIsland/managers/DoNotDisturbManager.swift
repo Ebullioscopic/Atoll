@@ -752,18 +752,18 @@ enum FocusModeType: String, CaseIterable {
     
     var displayName: String {
         switch self {
-    case .doNotDisturb: return "Do Not Disturb"
-        case .work: return "Work"
-        case .personal: return "Personal"
-        case .sleep: return "Sleep"
-        case .driving: return "Driving"
-        case .fitness: return "Fitness"
-        case .gaming: return "Gaming"
-        case .mindfulness: return "Mindfulness"
-        case .reading: return "Reading"
-        case .reduceInterruptions: return "Reduce Interr."
-        case .custom: return "Focus"
-        case .unknown: return "Focus Mode"
+    case .doNotDisturb: return String(localized: "Do Not Disturb")
+        case .work: return String(localized: "Work")
+        case .personal: return String(localized: "Personal")
+        case .sleep: return String(localized: "Sleep")
+        case .driving: return String(localized: "Driving")
+        case .fitness: return String(localized: "Fitness")
+        case .gaming: return String(localized: "Gaming")
+        case .mindfulness: return String(localized: "Mindfulness")
+        case .reading: return String(localized: "Reading")
+        case .reduceInterruptions: return String(localized: "Reduce Interr.")
+        case .custom: return String(localized: "Focus")
+        case .unknown: return String(localized: "Focus Mode")
         }
     }
     

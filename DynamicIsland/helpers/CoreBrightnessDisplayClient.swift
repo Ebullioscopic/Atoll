@@ -32,7 +32,18 @@ final class CoreBrightnessDisplayClient {
     var onBrightnessChange: ((Float) -> Void)?
     private var available = false
 
+    /// Known class names Apple has used across macOS versions for the
+    /// CoreBrightness display-brightness client. Ordered newest-first so
+    /// we resolve the current name quickly.
+    private static let candidateClassNames: [String] = [
+        "CBBrightnessProxy",
+        "CBDisplayBrightnessClient",
+        "BrightnessSystemClient",
+        "DisplayBrightnessClient"
+    ]
+
     private init() {
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
         var loaded = false
         let bundlePaths = [
             "/System/Library/PrivateFrameworks/CoreBrightness.framework",
@@ -43,8 +54,23 @@ final class CoreBrightnessDisplayClient {
                 loaded = bundle.load()
             }
         }
-        guard loaded, let cls = NSClassFromString("DisplayBrightnessClient") as? NSObject.Type else {
-            NSLog("⚠️ CoreBrightnessDisplayClient: DisplayBrightnessClient class not found")
+        guard loaded else {
+            NSLog("⚠️ CoreBrightnessDisplayClient: CoreBrightness.framework could not be loaded (macOS %@)", osVersion)
+            return
+        }
+
+        var resolvedClass: NSObject.Type?
+        for name in Self.candidateClassNames {
+            if let cls = NSClassFromString(name) as? NSObject.Type {
+                resolvedClass = cls
+                NSLog("✅ CoreBrightnessDisplayClient: Resolved class '%@' (macOS %@)", name, osVersion)
+                break
+            }
+        }
+
+        guard let cls = resolvedClass else {
+            NSLog("⚠️ CoreBrightnessDisplayClient: None of the known class names found: %@ (macOS %@)",
+                  Self.candidateClassNames.joined(separator: ", "), osVersion)
             return
         }
         clientInstance = cls.init()
