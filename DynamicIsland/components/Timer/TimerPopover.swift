@@ -85,7 +85,7 @@ struct TimerPopover: View {
         } else if timerManager.isTimerActive {
             return String(localized: "Running")
         } else {
-            return "Ready"
+            return String(localized: "Ready")
         }
     }
     

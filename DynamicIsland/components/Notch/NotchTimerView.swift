@@ -405,7 +405,7 @@ struct NotchTimerView: View {
         } else if timerManager.isPaused {
             return String(localized: "Paused")
         } else if timerManager.isFinished {
-            return "Completed"
+            return String(localized: "Completed")
         }
         return nil
     }

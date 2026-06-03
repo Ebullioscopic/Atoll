@@ -63,10 +63,10 @@ jobs:
       ####################################################################
 
       - name: Save release notes
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
         run: |
-          cat > release_notes.md <<'EOF'
-          ${{ github.event.release.body }}
-          EOF
+          printf '%s' "$RELEASE_BODY" > release_notes.md
 
       ####################################################################
       # Create or update release
