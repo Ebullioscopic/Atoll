@@ -2,7 +2,9 @@ name: Auto Approve Dependabot
 
 # Auto-approves Dependabot PRs only. No external token required
 # (uses the built-in github-actions bot). Scoped tightly via the
-# actor guard so it can never approve human PRs.
+# pull_request.user.login guard (immutable PR author) rather than
+# github.actor, which is mutable via "@dependabot recreate" and
+# vulnerable to confused-deputy / pwn-request attacks.
 
 on: pull_request_target
 
@@ -12,8 +14,10 @@ permissions:
 jobs:
   auto-approve:
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
-      - uses: hmarr/auto-approve-action@v4
+      - name: Fetch Dependabot metadata
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2
+      - uses: hmarr/auto-approve-action@8f929096a962e83ccdfa8afcf855f39f12d4dac7 # v4
         with:
           review-message: "Auto-approved Dependabot dependency update."
