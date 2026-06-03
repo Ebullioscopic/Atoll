@@ -1,0 +1,27 @@
+name: CI Optimizer
+
+# Cancels outdated in-progress runs and skips duplicate work to save
+# Actions minutes. No tokens or external services required.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  optimize:
+    name: Skip duplicate / cancel outdated runs
+    runs-on: ubuntu-latest
+    steps:
+      - id: skip
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          cancel_others: 'true'
+          concurrent_skipping: 'outdated_runs'
+          paths_ignore: '["**/*.md", "**/docs/**", "**/LICENSE"]'
+    outputs:
+      should_skip: ${{ steps.skip.outputs.should_skip }}

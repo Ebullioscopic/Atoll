@@ -1,0 +1,17 @@
+# Project jargon / proper nouns — not typos.
+[default.extend-words]
+NERV = "NERV"
+AgentGateway = "AgentGateway"
+Authelia = "Authelia"
+vaultwarden = "vaultwarden"
+karakeep = "karakeep"
+beszel = "beszel"
+Caddy = "Caddy"
+Frogbot = "Frogbot"
+Atoll = "Atoll"
+meetily = "meetily"
+parakeet = "parakeet"
+Obsidian = "Obsidian"
+
+[files]
+extend-exclude = ["*.lock", "*.svg", "node_modules/", "vendor/", "Frameworks/"]

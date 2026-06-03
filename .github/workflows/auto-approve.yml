@@ -1,0 +1,19 @@
+name: Auto Approve Dependabot
+
+# Auto-approves Dependabot PRs only. No external token required
+# (uses the built-in github-actions bot). Scoped tightly via the
+# actor guard so it can never approve human PRs.
+
+on: pull_request_target
+
+permissions:
+  pull-requests: write
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - uses: hmarr/auto-approve-action@v4
+        with:
+          review-message: "Auto-approved Dependabot dependency update."

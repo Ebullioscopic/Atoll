@@ -1,0 +1,26 @@
+name: Pipelock Agent Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pipelock:
+    name: Agent egress / secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Pipelock scan
+        uses: luckyPipewrench/pipelock@6d8aaf4a6e8b64d800a3b7d444c924049a9f21d0 # v1.3.0
+        with:
+          scan-diff: true
+          fail-on-findings: false

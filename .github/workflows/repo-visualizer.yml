@@ -1,0 +1,23 @@
+name: Repo Visualizer
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diagram:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update repo diagram
+        uses: githubocto/repo-visualizer@a999615bdab757559bf94bda1fe6eef232765f85 # v0.9.1
+        with:
+          output_file: images/diagram.svg
+          excluded_paths: 'node_modules,dist,build,.next,vendor,Pods'
+          should_push: true
+          commit_message: 'chore: update repo diagram [skip ci]'
