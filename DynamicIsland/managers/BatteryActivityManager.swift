@@ -126,7 +126,7 @@ class BatteryActivityManager {
         
         // Check for changes
         if let previousInfo = previousBatteryInfo {
-            // Usar la función auxiliar para cada propiedad
+            // Use the auxiliary helper for each property
             checkAndNotify(
                 previous: previousInfo.isPluggedIn,
                 current: batteryInfo.isPluggedIn,
@@ -327,7 +327,7 @@ class BatteryActivityManager {
     }
     
     /// Determines if the device has a battery
-    /// - Returns: True if the computer has a battery, false otherwhise
+    /// - Returns: True if the computer has a battery, false otherwise
     func hasBattery() -> Bool {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue() else { return false }
         guard let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef] else { return false }

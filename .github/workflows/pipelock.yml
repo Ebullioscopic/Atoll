@@ -1,0 +1,31 @@
+name: Pipelock Agent Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pipelock:
+    name: Agent egress / secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - name: Run Pipelock scan
+        uses: luckyPipewrench/pipelock@6d8aaf4a6e8b64d800a3b7d444c924049a9f21d0 # v1.3.0
+        with:
+          scan-diff: true
+          fail-on-findings: false
+          # The action's built-in 30-vector self-test (run with --fail-on-gap)
+          # has a known false failure in v1.3.0 (high-entropy path segment +
+          # MCP-scan gaps) that is unrelated to this repo's contents. The real
+          # secret/egress diff scan above still runs; only the self-test gate
+          # is disabled.
+          test-vectors: false

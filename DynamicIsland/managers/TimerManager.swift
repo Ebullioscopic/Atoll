@@ -433,8 +433,8 @@ class TimerManager: ObservableObject {
             playTimerSound()
         } else {
             // Already in overtime - calculate how long past zero
-            if let otStart = overtimeStartDate {
-                let overtimeElapsed = now.timeIntervalSince(otStart)
+            if let overtimeStart = overtimeStartDate {
+                let overtimeElapsed = now.timeIntervalSince(overtimeStart)
                 remainingTime = -overtimeElapsed
             } else {
                 remainingTime = timeUntilFire // Already negative

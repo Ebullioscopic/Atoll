@@ -39,7 +39,7 @@ class TrayDrop: ObservableObject {
 
         guard let urls = providers.interfaceConvert() else {
             DispatchQueue.main.asyncAndWait { isLoading -= 1 }
-            print("Faield to load items")
+            print("Failed to load items")
             return
         }
         let dropItems = urls.map { url in

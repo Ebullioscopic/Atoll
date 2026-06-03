@@ -1,0 +1,36 @@
+# Project jargon / proper nouns — not typos.
+[default.extend-words]
+NERV = "NERV"
+AgentGateway = "AgentGateway"
+Authelia = "Authelia"
+vaultwarden = "vaultwarden"
+karakeep = "karakeep"
+beszel = "beszel"
+Caddy = "Caddy"
+Frogbot = "Frogbot"
+Atoll = "Atoll"
+meetily = "meetily"
+parakeet = "parakeet"
+Obsidian = "Obsidian"
+# Code identifiers / acronyms (false positives in Swift source)
+ANC = "ANC"
+otStart = "otStart"
+
+[files]
+# Exclude generated, binary, vendored, and translation/asset data.
+# Localization files (.xcstrings/.strings/.lproj) contain intentional
+# non-English text; the Xcode project file and Lottie/asset JSON are
+# machine-generated data, not prose.
+extend-exclude = [
+    "*.lock",
+    "*.svg",
+    "node_modules/",
+    "vendor/",
+    "Frameworks/",
+    "*.xcstrings",
+    "*.strings",
+    "*.lproj/",
+    "*.pbxproj",
+    "LottieAnimations/",
+    "*.xcassets/",
+]

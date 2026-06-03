@@ -1549,7 +1549,7 @@ struct Charge: View {
                     VStack(spacing: 16) {
                         Image("battery.100percent.slash")
                             .font(.title)
-                        Text("Battery settings and informations are only available on MacBooks")
+                        Text("Battery settings and information are only available on MacBooks")
                             .font(.title3)
                     }
                 }
@@ -3077,7 +3077,7 @@ struct About: View {
                             Text("(\(Bundle.main.buildVersionNumber ?? ""))")
                                 .foregroundStyle(.secondary)
                         }
-                        Text(Bundle.main.releaseVersionNumber ?? "unkown")
+                        Text(Bundle.main.releaseVersionNumber ?? "unknown")
                             .foregroundStyle(.secondary)
                     }
                     .onTapGesture {
