@@ -222,7 +222,7 @@ class TerminalManager: ObservableObject {
         "Hack Nerd Font Mono",
         "FiraCode Nerd Font Mono",
         "JetBrainsMono Nerd Font Mono",
-        "SauceCodePro Nerd Font Mono",
+        "SauceCodePro Nerd Font Mono"
     ]
 
     /// Resolves the terminal font from the user's chosen family and size.

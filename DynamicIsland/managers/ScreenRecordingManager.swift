@@ -87,9 +87,9 @@ class ScreenRecordingManager: ObservableObject {
     
     /// Start monitoring for screen recording activity
     func startMonitoring() {
-        guard !isMonitoring else { 
+        guard !isMonitoring else {
             print("ScreenRecordingManager: Already monitoring, skipping start")
-            return 
+            return
         }
         
         isMonitoring = true
@@ -107,9 +107,9 @@ class ScreenRecordingManager: ObservableObject {
     
     /// Stop monitoring for screen recording activity
     func stopMonitoring() {
-        guard isMonitoring else { 
+        guard isMonitoring else {
             print("ScreenRecordingManager: Not monitoring, skipping stop")
-            return 
+            return
         }
         
         print("ScreenRecordingManager: 🛑 Stopping monitoring...")

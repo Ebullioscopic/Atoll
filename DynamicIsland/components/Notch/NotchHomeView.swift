@@ -225,7 +225,7 @@ struct AlbumArtView: View {
             Button {
                 musicManager.openMusicApp()
             } label: {
-                ZStack(alignment:.bottomTrailing) {
+                ZStack(alignment: .bottomTrailing) {
                     albumArtImage
                     appIconOverlay
                 }
@@ -747,7 +747,7 @@ struct NotchHomeView: View {
             .combined(with: .blurReplace.animation(.smooth.speed(0.9)))
             .combined(with: .move(edge: .top)))
         .blur(radius: vm.notchState == .closed ? 30 : 0)
-        .padding(Defaults[.enableMinimalisticUI] ? 0 : 8) //Putting the main padding for home view here for consistency
+        .padding(Defaults[.enableMinimalisticUI] ? 0 : 8) // Putting the main padding for home view here for consistency
     }
 
     private var minimalisticOverridePayload: ExtensionNotchExperiencePayload? {
@@ -949,7 +949,6 @@ struct MusicSliderView: View {
     }
 
 }
-
 
 struct CustomSlider: View {
     @Binding var value: Double

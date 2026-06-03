@@ -133,7 +133,7 @@ struct DynamicIslandHeader: View {
                     }
                     
                     // ColorPicker button
-                    if Defaults[.enableColorPickerFeature] && showColorPickerIcon{
+                    if Defaults[.enableColorPickerFeature] && showColorPickerIcon {
                         Button(action: {
                             switch Defaults[.colorPickerDisplayMode] {
                             case .panel:

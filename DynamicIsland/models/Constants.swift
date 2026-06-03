@@ -388,7 +388,7 @@ enum SneakPeekStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
     
     var id: String { self.rawValue }
     
-    var LocalizedName : String {
+    var LocalizedName: String {
         switch self {
         case .standard: return String(localized: "Default")
         case .inline: return String(localized: "Inline")
@@ -529,8 +529,8 @@ enum TimerIconColorMode: String, CaseIterable, Identifiable, Defaults.Serializab
     
     var displayName: String {
         switch self {
-        case .adaptive: return String(localized:"Adaptive gradient")
-        case .solid: return String(localized:"Solid colour")
+        case .adaptive: return String(localized: "Adaptive gradient")
+        case .solid: return String(localized: "Solid colour")
         }
     }
 }
@@ -543,8 +543,8 @@ enum TimerProgressStyle: String, CaseIterable, Identifiable, Defaults.Serializab
     
     var localizedName: String {
         switch self {
-        case .bar: return String(localized:"Bar")
-        case .ring: return String(localized:"Ring")
+        case .bar: return String(localized: "Bar")
+        case .ring: return String(localized: "Ring")
         }
     }
 }
@@ -654,7 +654,7 @@ struct NoteItem: Codable, Identifiable, Defaults.Serializable, Hashable {
     var creationDate: Date
     var colorIndex: Int // 0: Yellow, 1: Blue, 2: Red, 3: Green
     var isPinned: Bool = false
-    var imageFileName: String? = nil // Store filename instead of raw data
+    var imageFileName: String? // Store filename instead of raw data
     
     // Internal property for migration
     private enum CodingKeys: String, CodingKey {
@@ -756,11 +756,11 @@ extension Defaults.Keys {
     static let nonNotchHeight = Key<CGFloat>("nonNotchHeight", default: 32)
     static let notchHeight = Key<CGFloat>("notchHeight", default: 32)
     static let openNotchWidth = Key<CGFloat>("openNotchWidth", default: 640)
-        //static let openLastTabByDefault = Key<Bool>("openLastTabByDefault", default: false)
+        // static let openLastTabByDefault = Key<Bool>("openLastTabByDefault", default: false)
     
         // MARK: Appearance
     static let showEmojis = Key<Bool>("showEmojis", default: false)
-        //static let alwaysShowTabs = Key<Bool>("alwaysShowTabs", default: true)
+        // static let alwaysShowTabs = Key<Bool>("alwaysShowTabs", default: true)
     static let showMirror = Key<Bool>("showMirror", default: false)
     static let mirrorShape = Key<MirrorShapeEnum>("mirrorShape", default: MirrorShapeEnum.rectangle)
     static let selectedCameraID = Key<String>("selectedCameraID", default: "")

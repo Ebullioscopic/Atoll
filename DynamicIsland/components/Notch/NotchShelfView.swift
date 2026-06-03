@@ -26,4 +26,3 @@ struct NotchShelfView: View {
             .environmentObject(vm)
     }
 }
-

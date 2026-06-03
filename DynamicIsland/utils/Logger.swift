@@ -136,4 +136,4 @@ struct ViewLifecycleTracker: ViewModifier {
                 Logger.trackMemory()
             }
     }
-} 
+}

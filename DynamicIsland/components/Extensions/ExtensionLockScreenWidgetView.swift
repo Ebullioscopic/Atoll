@@ -372,7 +372,7 @@ struct ExtensionWebContentView: NSViewRepresentable {
             if scheme == "about" || scheme == "data" {
                 return true
             }
-            if (scheme == "http" || scheme == "https") {
+            if scheme == "http" || scheme == "https" {
                 if allowsRemoteRequests() {
                     return true
                 }

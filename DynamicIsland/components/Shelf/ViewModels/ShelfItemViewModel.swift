@@ -370,7 +370,7 @@ final class ShelfItemViewModel: ObservableObject {
             menu.addItem(compressItem)
         }
 
-        if selectedItems.count == 1, case .file(_) = item.kind { addMenuItem(title: "Rename") }
+        if selectedItems.count == 1, case .file = item.kind { addMenuItem(title: "Rename") }
 
         // Always show "Copy" for all item types
         addMenuItem(title: "Copy")

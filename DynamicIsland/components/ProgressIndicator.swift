@@ -54,7 +54,6 @@ enum ProgressIndicatorType {
     case text
 }
 
-
     // based on type .circle or .text
 struct ProgressIndicator: View {
     var type: ProgressIndicatorType

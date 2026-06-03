@@ -87,8 +87,8 @@ struct sneakPeek {
     var title: String = ""
     var subtitle: String = ""
     var accentColor: Color?
-    var styleOverride: SneakPeekStyle? = nil
-    var targetScreenName: String? = nil
+    var styleOverride: SneakPeekStyle?
+    var targetScreenName: String?
 }
 
 enum BrowserType {
@@ -101,7 +101,7 @@ struct ExpandedItem {
     var type: SneakContentType = .battery
     var value: CGFloat = 0
     var browser: BrowserType = .chromium
-    var autoHideDuration: TimeInterval? = nil
+    var autoHideDuration: TimeInterval?
 }
 
 class DynamicIslandViewCoordinator: ObservableObject {
@@ -131,7 +131,6 @@ class DynamicIslandViewCoordinator: ObservableObject {
     @Published var statsSecondRowExpansion: CGFloat = 1
     @Published var notesLayoutState: NotesLayoutState = .list
     @Published var selectedExtensionExperienceID: String?
-    
     
     @AppStorage("firstLaunch") var firstLaunch: Bool = true
     @AppStorage("showWhatsNew") var showWhatsNew: Bool = true
@@ -450,7 +449,6 @@ class DynamicIslandViewCoordinator: ObservableObject {
         }
     }
 
-    
     func showEmpty() {
         currentView = .home
     }

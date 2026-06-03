@@ -76,27 +76,38 @@ final class DockerHealthManager: ObservableObject {
             return
         }
 
-        do {
-            try process.run()
-            process.waitUntilExit()
+        // Fix #3: run Process off the main thread, publish results back on MainActor
+        Task.detached { [weak self] in
+            var parsedContainers: [DockerContainer] = []
+            var errorMessage: String?
 
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let output = String(data: data, encoding: .utf8) else { return }
+            do {
+                try process.run()
+                process.waitUntilExit()
 
-            var parsed: [DockerContainer] = []
-            for line in output.components(separatedBy: "\n") where !line.isEmpty {
-                if let jsonData = line.data(using: .utf8),
-                   let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                   let id = json["ID"] as? String,
-                   let name = json["Names"] as? String,
-                   let status = json["Status"] as? String {
-                    parsed.append(DockerContainer(id: id, name: name, status: status))
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                guard let output = String(data: data, encoding: .utf8) else {
+                    await MainActor.run { [weak self] in self?.lastError = "Could not decode docker output" }
+                    return
                 }
+
+                for line in output.components(separatedBy: "\n") where !line.isEmpty {
+                    if let jsonData = line.data(using: .utf8),
+                       let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                       let containerID = json["ID"] as? String,
+                       let name = json["Names"] as? String,
+                       let status = json["Status"] as? String {
+                        parsedContainers.append(DockerContainer(id: containerID, name: name, status: status))
+                    }
+                }
+            } catch {
+                errorMessage = error.localizedDescription
             }
-            containers = parsed
-            lastError = nil
-        } catch {
-            lastError = error.localizedDescription
+
+            await MainActor.run { [weak self] in
+                self?.containers = parsedContainers
+                self?.lastError = errorMessage
+            }
         }
     }
 }

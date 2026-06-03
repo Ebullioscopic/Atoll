@@ -84,7 +84,7 @@ final class AccessibilityPermissionStore: ObservableObject {
 #if canImport(ApplicationServices)
         return AXIsProcessTrusted()
 #else
-        return true
+        return false
 #endif
     }
 }

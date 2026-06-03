@@ -130,7 +130,6 @@ extension View {
     }
 }
 
-
 final class QuickLookDataSource: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
     private let urls: [URL]
 

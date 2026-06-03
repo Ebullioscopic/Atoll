@@ -149,7 +149,7 @@ struct IdleAnimationsSettingsSection: View {
         }
         .sheet(item: Binding(
             get: { showingEditor ? EditorState(url: editorSourceURL, isRemote: editorIsRemote, existingAnimation: editingExistingAnimation) : nil },
-            set: { newValue in 
+            set: { newValue in
                 showingEditor = (newValue != nil)
                 if newValue == nil {
                     // Clean up when sheet dismisses
@@ -165,7 +165,7 @@ struct IdleAnimationsSettingsSection: View {
                 existingAnimation: state.existingAnimation
             )
             .interactiveDismissDisabled(false)
-            .onChange(of: editedAnimation) { oldValue, newValue in
+            .onChange(of: editedAnimation) { _, newValue in
                 if let animation = newValue {
                     // Animation was successfully imported/edited via editor
                     if let existingAnim = editingExistingAnimation {

@@ -26,10 +26,10 @@ struct HoverButton: View {
     var icon: String
     var iconColor: Color = .white
     var scale: Image.Scale = .medium
-    var pressEffect: PressEffect? = nil
+    var pressEffect: PressEffect?
     var contentTransition: ContentTransition = .symbolEffect
-    var externalTriggerToken: Int? = nil
-    var externalTriggerEffect: PressEffect? = nil
+    var externalTriggerToken: Int?
+    var externalTriggerEffect: PressEffect?
     var action: () -> Void
     
     @State private var isHovering = false

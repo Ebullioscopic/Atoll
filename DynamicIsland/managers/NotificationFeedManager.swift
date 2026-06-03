@@ -158,7 +158,8 @@ class NotificationFeedManager: ObservableObject {
         }
 
         if !newItems.isEmpty {
-            lastHermesCheck = Date()
+            let maxTimestamp = newItems.map { $0.timestamp }.max() ?? Date()
+            lastHermesCheck = maxTimestamp
             for item in newItems.reversed() {
                 feedItems.insert(item, at: 0)
             }

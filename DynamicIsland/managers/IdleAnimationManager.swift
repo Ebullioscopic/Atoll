@@ -31,6 +31,9 @@ class IdleAnimationManager {
     /// Cached animation data with last access timestamp for eviction
     private var loadedAnimations: [String: (data: Data, lastAccess: Date)] = [:]
     
+    /// Serial queue serializing all reads and writes to loadedAnimations (fix #8)
+    private let animationsQueue = DispatchQueue(label: "com.atoll.idleAnimationManager.animations")
+
     /// Timer that periodically checks for stale cached animations
     private var evictionTimer: Timer?
     
@@ -39,14 +42,22 @@ class IdleAnimationManager {
     func animationData(for animation: CustomIdleAnimation) -> Data? {
         let key = animation.id.uuidString
         
-        if let entry = loadedAnimations[key] {
-            loadedAnimations[key] = (data: entry.data, lastAccess: Date())
+        // Fix #8: serialize loadedAnimations access via animationsQueue
+        if let entry = animationsQueue.sync(execute: { loadedAnimations[key] }) {
+            animationsQueue.async { [weak self] in
+                self?.loadedAnimations[key] = (data: entry.data, lastAccess: Date())
+            }
             return entry.data
         }
         
-        // Load from disk on demand
+        // Fix #7: this is a synchronous accessor. Read directly on the caller's
+        // thread — the previous `global(...).sync` hop blocked the caller anyway
+        // (no async benefit) while a comment falsely claimed it never blocks main.
+        // Callers that must not block main should invoke this off the main thread.
         guard let data = loadAnimationDataFromDisk(animation) else { return nil }
-        loadedAnimations[key] = (data: data, lastAccess: Date())
+        animationsQueue.async { [weak self] in
+            self?.loadedAnimations[key] = (data: data, lastAccess: Date())
+        }
         startEvictionTimerIfNeeded()
         print("💤 [IdleAnimationManager] Lazy-loaded animation data: \(animation.name)")
         return data
@@ -75,21 +86,32 @@ class IdleAnimationManager {
     private func evictStaleAnimations() {
         let threshold: TimeInterval = 60
         let now = Date()
-        let before = loadedAnimations.count
-        loadedAnimations = loadedAnimations.filter { now.timeIntervalSince($0.value.lastAccess) < threshold }
-        let evicted = before - loadedAnimations.count
-        if evicted > 0 {
-            print("🧹 [IdleAnimationManager] Evicted \(evicted) stale animation(s) from cache")
-        }
-        if loadedAnimations.isEmpty {
-            evictionTimer?.invalidate()
-            evictionTimer = nil
+        // Fix #8: serialize loadedAnimations mutation via animationsQueue
+        animationsQueue.async { [weak self] in
+            guard let self else { return }
+            let before = self.loadedAnimations.count
+            self.loadedAnimations = self.loadedAnimations.filter {
+                now.timeIntervalSince($0.value.lastAccess) < threshold
+            }
+            let evicted = before - self.loadedAnimations.count
+            if evicted > 0 {
+                print("🧹 [IdleAnimationManager] Evicted \(evicted) stale animation(s) from cache")
+            }
+            if self.loadedAnimations.isEmpty {
+                DispatchQueue.main.async { [weak self] in
+                    self?.evictionTimer?.invalidate()
+                    self?.evictionTimer = nil
+                }
+            }
         }
     }
     
     /// Manually evict all cached data (e.g. on memory pressure)
     func evictAllCachedAnimations() {
-        loadedAnimations.removeAll()
+        // Fix #8: serialize loadedAnimations mutation via animationsQueue
+        animationsQueue.async { [weak self] in
+            self?.loadedAnimations.removeAll()
+        }
         evictionTimer?.invalidate()
         evictionTimer = nil
         print("🧹 [IdleAnimationManager] Evicted all cached animations (memory pressure)")

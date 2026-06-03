@@ -617,7 +617,7 @@ final class ExtensionRPCService {
                 // Arrays like "content", "elements", "sections"
                 result[key] = arr.map { item in
                     if let typeName = item["type"] as? String,
-                       (key == "content" || key == "elements") {
+                       key == "content" || key == "elements" {
                         return transformEnumValue(item, typeName: typeName)
                     }
                     return transformObject(item)
@@ -643,7 +643,7 @@ final class ExtensionRPCService {
         for (k, v) in dict where k != "type" {
             if let nestedDict = v as? [String: Any] {
                 // Check if this nested dict is an enum-typed field
-                if (enumKeys.contains(k) || k == "indicator"),
+                if enumKeys.contains(k) || k == "indicator",
                    let nestedType = nestedDict["type"] as? String {
                     inner[k] = transformEnumValue(nestedDict, typeName: nestedType)
                 } else {

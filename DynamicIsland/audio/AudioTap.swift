@@ -33,7 +33,7 @@ private var callbackCount: Int = 0
 
 // CoreAudio fires this on a high-priority background real-time thread.
 let audioIOProc: AudioDeviceIOProc = {
-    inDevice, inNow, inInputData, inInputTime, outOutputData, inOutputTime, clientData in
+    _, _, inInputData, _, _, _, clientData in
 
     guard let clientData = clientData else { return noErr }
     let scanner = Unmanaged<AudioTap>.fromOpaque(clientData).takeUnretainedValue()
@@ -114,7 +114,7 @@ class AudioTap: NSObject {
     // CoreAudio stuff
     private var tapID: AudioObjectID = kAudioObjectUnknown
     private var aggregateDeviceID: AudioObjectID = kAudioObjectUnknown
-    private var ioProcID: AudioDeviceIOProcID? = nil
+    private var ioProcID: AudioDeviceIOProcID?
     private var captureIsRunning = false
     
     // Serial queue to prevent race conditions
@@ -135,7 +135,7 @@ class AudioTap: NSObject {
         "com.vox.vox",
         "com.coppertino.Vox",
         "sh.cider.classic",
-        "sh.cider.cider",
+        "sh.cider.cider"
     ]
 
     private override init() {
@@ -228,7 +228,7 @@ class AudioTap: NSObject {
             kAudioAggregateDeviceNameKey: "Atoll_Virtual_Tap",
             kAudioAggregateDeviceUIDKey: UUID().uuidString,
             kAudioAggregateDeviceIsPrivateKey: true,  // Hides it from the user's sound settings
-            kAudioAggregateDeviceTapListKey: tapList,
+            kAudioAggregateDeviceTapListKey: tapList
         ]
 
         aggregateDeviceID = AudioObjectID(kAudioObjectUnknown)

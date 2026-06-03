@@ -82,8 +82,8 @@ struct LockScreenLiveActivityOverlay: View {
 		)
 		.padding(.top, topOffset)
 		.frame(width: totalWidth, height: notchSize.height + topOffset)
-		.scaleEffect(x: max(model.scale, collapsedScale) * (isHovering ? 1.03 : 1.0), 
-                     y: 1 * (isHovering ? 1.03 : 1.0), 
+		.scaleEffect(x: max(model.scale, collapsedScale) * (isHovering ? 1.03 : 1.0),
+                     y: 1 * (isHovering ? 1.03 : 1.0),
                      anchor: .center)
 		.opacity(model.opacity)
         .onHover { hovering in

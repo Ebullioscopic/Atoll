@@ -198,7 +198,7 @@ struct VerticalHUDView: View {
                     }
             )
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity) 
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .edgesIgnoringSafeArea(.all)
     }
     
@@ -220,10 +220,7 @@ struct VerticalHUDView: View {
         
         switch state.type {
         case .volume:
-            if state.value < 0.01 { return "speaker.slash.fill" }
-            else if state.value < 0.33 { return "speaker.wave.1.fill" }
-            else if state.value < 0.66 { return "speaker.wave.2.fill" }
-            else { return "speaker.wave.3.fill" }
+            if state.value < 0.01 { return "speaker.slash.fill" } else if state.value < 0.33 { return "speaker.wave.1.fill" } else if state.value < 0.66 { return "speaker.wave.2.fill" } else { return "speaker.wave.3.fill" }
         case .brightness:
             return "sun.max.fill"
         case .backlight:

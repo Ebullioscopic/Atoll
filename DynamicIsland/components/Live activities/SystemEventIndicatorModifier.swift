@@ -41,7 +41,7 @@ struct SystemEventIndicatorModifier: View {
     
     var body: some View {
         HStack(spacing: 14) {
-            switch (eventType) {
+            switch eventType {
                 case .volume:
                     if icon.isEmpty {
                         Image(systemName: SpeakerSymbol(value))
@@ -106,7 +106,7 @@ struct SystemEventIndicatorModifier: View {
     }
     
     func SpeakerSymbol(_ value: CGFloat) -> String {
-        switch(value) {
+        switch value {
             case 0:
                 return "speaker.slash"
             case 0...0.3:
@@ -128,7 +128,7 @@ struct SystemEventIndicatorModifier: View {
 struct ProgressSection: View {
     @Binding var value: CGFloat
     var showPercentages: Bool
-    var colorMode: ProgressColorMode? = nil
+    var colorMode: ProgressColorMode?
     
     var body: some View {
         HStack(spacing: 8) {
@@ -209,7 +209,7 @@ private extension ProgressColorMode {
 struct DraggableProgressBar: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @Binding var value: CGFloat
-    var colorMode: ProgressColorMode? = nil
+    var colorMode: ProgressColorMode?
     
     @State private var isDragging = false
     @Default(.progressBarStyle) private var progressBarStyle
@@ -322,7 +322,7 @@ struct SegmentedProgressContent: View {
     let geometry: GeometryProxy
     
     private let segmentCount = 16
-    @State private var glowIndex: Int? = nil
+    @State private var glowIndex: Int?
     @State private var lastValue: CGFloat = 0
     
     var body: some View {

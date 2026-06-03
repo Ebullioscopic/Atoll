@@ -117,8 +117,8 @@ struct ContentView: View {
         }
         
         // Handle battery HUD expansion sizing
-        if vm.notchState == .closed && 
-           coordinator.expandingView.show && 
+        if vm.notchState == .closed &&
+           coordinator.expandingView.show &&
            coordinator.expandingView.type == .battery &&
            isBatteryHUDVisibleOnCurrentScreen {
             
@@ -194,7 +194,6 @@ struct ContentView: View {
         return CGSize(width: baseSize.width, height: baseSize.height + extraHeight)
     }
     
-
     @State private var hoverTask: Task<Void, Never>?
     @State private var lastHoverOpenedAt: Date?
     @State private var lastHoverEntryAt: Date?
@@ -408,7 +407,7 @@ struct ContentView: View {
     
     /// Whether the LocalSend live activity should be shown
     private var localSendLiveActivityActive: Bool {
-        localSendService.isSending || 
+        localSendService.isSending ||
         localSendService.transferState == .completed ||
         isLocalSendFailedOrRejected
     }
@@ -464,7 +463,6 @@ struct ContentView: View {
         batteryModel.activeTemporaryHUDLowPowerModeOverride ?? batteryModel.isInLowPowerMode
     }
 
-
     private var activeClosedBatterySurfaceShape: AnyShape? {
         guard vm.notchState == .closed else { return nil }
         guard isBatteryHUDVisibleOnCurrentScreen else { return nil }
@@ -497,7 +495,6 @@ struct ContentView: View {
             return fullBatteryHUDStyle
         }
     }
-
 
     /// Resolves the clip/content shape per-screen: pill on non-notch screens
     /// when dynamic island mode is active, standard notch shape otherwise.
@@ -1070,7 +1067,12 @@ struct ContentView: View {
                               .transition(closedLiveActivitySwapTransition)
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .timer) && vm.notchState == .closed && timerManager.isTimerActive && coordinator.timerLiveActivityEnabled && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                           TimerLiveActivity()
-                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording) && vm.notchState == .closed && (recordingManager.isRecording || !recordingManager.isRecorderIdle) && Defaults[.enableScreenRecordingDetection] && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) && !musicPairingEligible {
+                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording)
+                                  && vm.notchState == .closed
+                                  && (recordingManager.isRecording || !recordingManager.isRecorderIdle)
+                                  && Defaults[.enableScreenRecordingDetection]
+                                  && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen)
+                                  && !musicPairingEligible {
                           RecordingLiveActivity()
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .download) && vm.notchState == .closed && downloadManager.isDownloading && Defaults[.enableDownloadListener] && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                           DownloadLiveActivity()
@@ -1100,8 +1102,8 @@ struct ContentView: View {
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && !shelfState.isEmpty && !vm.hideOnClosed && !lockScreenManager.isLocked && !enableMinimalisticUI {
                           ShelfInlineLiveActivity()
                               .transition(.opacity.animation(.smooth(duration: 0.25)))
-                      } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
-                      } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
+                      } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed {
+                      } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed {
                           DynamicIslandFaceAnimation().animation(.interactiveSpring, value: musicManager.isPlayerIdle)
                       } else if vm.notchState == .open {
                           DynamicIslandHeader()
@@ -1319,7 +1321,7 @@ struct ContentView: View {
                 .frame(width: effectiveCenterWidth, height: notchContentHeight)
                 .overlay(
                     HStack(alignment: .top) {
-                        if(coordinator.expandingView.show && coordinator.expandingView.type == .music) {
+                        if coordinator.expandingView.show && coordinator.expandingView.type == .music {
                             MusicTitleMarqueeView(
                                 text: musicManager.songTitle,
                                 isExplicit: musicManager.isCurrentTrackExplicit,
@@ -1337,7 +1339,7 @@ struct ContentView: View {
                                 .foregroundStyle(Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray)
                                 .padding(.trailing, 8)
                                 .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .music && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
-                        } else if(coordinator.expandingView.show && coordinator.expandingView.type == .timer) {
+                        } else if coordinator.expandingView.show && coordinator.expandingView.type == .timer {
                             MarqueeText(
                                 .constant(timerManager.timerName),
                                 textColor: timerManager.timerColor,
@@ -2110,7 +2112,7 @@ struct ContentView: View {
 
             guard vm.notchState == .closed,
                 !isSneakPeekVisibleOnCurrentScreen,
-                (Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
+                Defaults[.openNotchOnHover] || shouldFocusTimerTab else { return }
 
             hoverTask = Task {
                 try? await Task.sleep(for: .seconds(Defaults[.minimumHoverDuration]))
@@ -2181,9 +2183,9 @@ struct ContentView: View {
     
     // Helper function to check if any popovers are active
     private func hasAnyActivePopovers() -> Bool {
-     return vm.isBatteryPopoverActive || 
-         vm.isClipboardPopoverActive || 
-         vm.isColorPickerPopoverActive || 
+     return vm.isBatteryPopoverActive ||
+         vm.isClipboardPopoverActive ||
+         vm.isColorPickerPopoverActive ||
          vm.isStatsPopoverActive ||
          vm.isTimerPopoverActive ||
          vm.isMediaOutputPopoverActive
@@ -2945,8 +2947,6 @@ private func musicMeasureText(_ text: String, font: MusicSupplementFont) -> CGFl
     return CGFloat(ceil(NSAttributedString(string: text, attributes: attributes).size().width))
 }
 
-
-
 // Swift Color Hex Initializer helper
 extension Color {
     init(hex: String) {
@@ -2983,4 +2983,3 @@ func agentColor(for name: String) -> Color {
     if name.contains("kilo") { return .yellow }
     return .purple
 }
-

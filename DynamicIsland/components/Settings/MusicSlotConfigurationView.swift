@@ -28,8 +28,8 @@ struct MusicSlotConfigurationView: View {
     @Default(.musicControlSlots) private var musicControlSlots
     @Default(.showMediaOutputControl) private var showMediaOutputControl
     @ObservedObject private var musicManager = MusicManager.shared
-    @State private var hoveredSlotIndex: Int? = nil
-    @State private var targetedSlotIndex: Int? = nil
+    @State private var hoveredSlotIndex: Int?
+    @State private var targetedSlotIndex: Int?
     @State private var trashDropIsTargeted: Bool = false
 
     private let slotCount = MusicControlButton.slotCount

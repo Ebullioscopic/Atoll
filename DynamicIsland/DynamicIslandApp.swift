@@ -57,8 +57,7 @@ struct DynamicNotchApp: App {
 
                 let workspace = NSWorkspace.shared
 
-                if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleIdentifier)
-                {
+                if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleIdentifier) {
 
                     let configuration = NSWorkspace.OpenConfiguration()
                     configuration.createsNewApplicationInstance = true
@@ -202,7 +201,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "com.vox.vox",
             "com.coppertino.Vox",
              "sh.cider.classic",
-             "sh.cider.cider",
+             "sh.cider.cider"
             ]
         
         audioTapLaunchObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -326,8 +325,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func createDynamicIslandWindow(for screen: NSScreen, with viewModel: DynamicIslandViewModel)
-        -> NSWindow
-    {
+        -> NSWindow {
         // Use the current required size instead of always using openNotchSize
         let baseSize = calculateRequiredNotchSize()
         let requiredSize = adjustedSizeForScreen(baseSize, screen: screen)
@@ -346,17 +344,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             rootView: ContentView()
                 .environmentObject(viewModel)
                 .environmentObject(webcamManager)
-                //.moveToSky()
+                // .moveToSky()
         )
         
         window.orderFrontRegardless()
         NotchSpaceManager.shared.notchSpace.windows.insert(window)
-        //SkyLightOperator.shared.delegateWindow(window)
+        // SkyLightOperator.shared.delegateWindow(window)
         return window
     }
 
-    private func positionWindow(_ window: NSWindow, on screen: NSScreen, changeAlpha: Bool = false)
-    {
+    private func positionWindow(_ window: NSWindow, on screen: NSScreen, changeAlpha: Bool = false) {
         if changeAlpha {
             window.alphaValue = 0
         }
@@ -401,10 +398,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Check if inline sneak peek is showing and notch is closed
-        let isInlineSneakPeekActive = vm.notchState == .closed && 
-                                      coordinator.expandingView.show && 
-                                      (coordinator.expandingView.type == .music || coordinator.expandingView.type == .timer) && 
-                                      Defaults[.enableSneakPeek] && 
+        let isInlineSneakPeekActive = vm.notchState == .closed &&
+                                      coordinator.expandingView.show &&
+                                      (coordinator.expandingView.type == .music || coordinator.expandingView.type == .timer) &&
+                                      Defaults[.enableSneakPeek] &&
                                       Defaults[.sneakPeekStyles] == .inline
         
         // If inline sneak peek is active, use a wider width to accommodate the expanded content
@@ -416,8 +413,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Check for battery HUD expansion
-        if vm.notchState == .closed && 
-           coordinator.expandingView.show && 
+        if vm.notchState == .closed &&
+           coordinator.expandingView.show &&
            coordinator.expandingView.type == .battery &&
            Defaults[.showPowerStatusNotifications] {
             
@@ -1346,8 +1343,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(nil)
     }
 
-    
-    
     private func showOnboardingWindow() {
         if onboardingWindowController == nil {
             let window = NSWindow(

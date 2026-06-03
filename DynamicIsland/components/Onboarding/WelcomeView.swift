@@ -24,7 +24,7 @@ import SwiftUI
 import SwiftUIIntrospect
 
 struct WelcomeView: View {
-    var onGetStarted: (() -> Void)? = nil
+    var onGetStarted: (() -> Void)?
     var body: some View {
         ZStack(alignment: .top) {
             ZStack {
@@ -63,7 +63,6 @@ struct WelcomeView: View {
                             )
                             .padding(.bottom, 30)
                     }
-
 
                     Button {
                         onGetStarted?()

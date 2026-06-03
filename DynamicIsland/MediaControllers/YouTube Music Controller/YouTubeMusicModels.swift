@@ -116,7 +116,7 @@ extension PlaybackResponse {
         let imageSrc = (songData?["imageSrc"] as? String) ?? (websocketData["imageSrc"] as? String)
         let isShuffled = (websocketData["shuffle"] as? Bool) ?? (songData?["isShuffled"] as? Bool)
 
-        var repeatModeInt: Int? = nil
+        var repeatModeInt: Int?
         if let repeatVal = websocketData["repeat"] as? String {
             switch repeatVal.uppercased() {
             case "NONE": repeatModeInt = 0

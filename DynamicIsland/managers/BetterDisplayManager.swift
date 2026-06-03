@@ -66,12 +66,12 @@ enum BetterDisplayControlCategory {
 private let brightnessControlTargets: Set<String> = [
     "combinedBrightness",
     "hardwareBrightness",
-    "softwareBrightness",
+    "softwareBrightness"
 ]
 
 private let volumeControlTargets: Set<String> = [
     "volume",
-    "mute",
+    "mute"
 ]
 
 // MARK: - BetterDisplay Manager

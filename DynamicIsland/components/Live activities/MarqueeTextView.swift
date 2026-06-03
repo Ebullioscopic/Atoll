@@ -147,10 +147,10 @@ struct MusicExplicitBadge: View {
     var fontSize: CGFloat = 9
     var height: CGFloat = 14
     var horizontalPadding: CGFloat = 4
-    var minWidth: CGFloat? = nil
+    var minWidth: CGFloat?
     var foregroundColor: Color = .white.opacity(0.92)
     var backgroundColor: Color = .white.opacity(0.18)
-    var cornerRadius: CGFloat? = nil
+    var cornerRadius: CGFloat?
     var body: some View {
         Text(label)
             .font(.system(size: fontSize, weight: .bold, design: .rounded))

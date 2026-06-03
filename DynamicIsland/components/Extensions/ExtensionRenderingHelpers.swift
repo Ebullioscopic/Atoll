@@ -634,9 +634,9 @@ enum ExtensionLayoutMetrics {
             return diameter + 20
         case let .bar(width, _, _, _):
             return (width ?? 72) + 12
-        case .percentage(_, _):
+        case .percentage:
             return 60
-        case .countdown(_, _):
+        case .countdown:
             return 74
         case let .lottie(_, size):
             return size.width + 16

@@ -580,7 +580,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
                     "threshold": "BLOCK_MEDIUM_AND_ABOVE"
                 ],
                 [
-                    "category": "HARM_CATEGORY_HATE_SPEECH", 
+                    "category": "HARM_CATEGORY_HATE_SPEECH",
                     "threshold": "BLOCK_MEDIUM_AND_ABOVE"
                 ],
                 [

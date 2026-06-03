@@ -126,7 +126,10 @@ class SpotifyController: MediaControllerProtocol {
         guard !trackID.isEmpty,
               let accessToken = await SpotifyAuthManager.shared.validAccessToken() else { return false }
 
-        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me/tracks/contains?ids=\(trackID)")!)
+        guard let containsURL = URL(
+            string: "https://api.spotify.com/v1/me/tracks/contains?ids=\(trackID)"
+        ) else { return false }
+        var request = URLRequest(url: containsURL)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
         do {
@@ -146,7 +149,8 @@ class SpotifyController: MediaControllerProtocol {
         guard !trackID.isEmpty,
               let accessToken = await SpotifyAuthManager.shared.validAccessToken() else { return false }
 
-        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me/tracks?ids=\(trackID)")!)
+        guard let tracksURL = URL(string: "https://api.spotify.com/v1/me/tracks?ids=\(trackID)") else { return false }
+        var request = URLRequest(url: tracksURL)
         request.httpMethod = liked ? "PUT" : "DELETE"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -261,8 +265,7 @@ class SpotifyController: MediaControllerProtocol {
         guard canvasFetchTask == nil else { return }
 
         if lastCanvasRequestTrackURI == trackURI,
-           Date().timeIntervalSince(lastCanvasRequestDate) < 5
-        {
+           Date().timeIntervalSince(lastCanvasRequestDate) < 5 {
             return
         }
 
@@ -450,8 +453,7 @@ private enum SpotifyCanvasProtobuf {
                     let canvasData = try reader.readLengthDelimited()
                     if let record = try parseCanvasRecord(from: canvasData),
                        record.trackURI == trackURI,
-                       let canvasURL = record.canvasURL
-                    {
+                       let canvasURL = record.canvasURL {
                         matchingURLs.append(canvasURL)
                     }
                 default:

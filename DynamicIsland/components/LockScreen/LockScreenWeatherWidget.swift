@@ -21,7 +21,6 @@ import Defaults
 import AppKit
 import CoreGraphics
 
-
 struct LockScreenWeatherWidget: View {
 	let snapshot: LockScreenWeatherSnapshot
 	@ObservedObject private var focusManager = DoNotDisturbManager.shared

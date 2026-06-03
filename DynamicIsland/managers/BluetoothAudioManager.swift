@@ -658,7 +658,7 @@ class BluetoothAudioManager: ObservableObject {
             return .beatssolo
         } else if lowercaseName.contains("speaker") || lowercaseName.contains("boombox") {
             return .speaker
-        } else if lowercaseName.contains("headphone") || lowercaseName.contains("headset") || 
+        } else if lowercaseName.contains("headphone") || lowercaseName.contains("headset") ||
                   lowercaseName.contains("buds") || lowercaseName.contains("earbuds") {
             return .headphones
         }

@@ -25,7 +25,7 @@ struct HUDNumericLabel: View {
     var font: Font
     var color: Color
     var alignment: Alignment = .center
-    var width: CGFloat? = nil
+    var width: CGFloat?
     var minimumDigits: Int = 3
     var animation: Animation = .interactiveSpring(response: 0.35, dampingFraction: 0.75, blendDuration: 0.15)
     

@@ -24,7 +24,6 @@ import KeyboardShortcuts
 import SwiftUI
 import Carbon
 
-
 extension View {
     
     public func keyboardShortcut(_ shortcut: KeyboardShortcuts.Name) -> some View {
@@ -44,7 +43,7 @@ extension KeyboardShortcuts.Shortcut {
     func toKeyEquivalent() -> KeyEquivalent? {
         let carbonKeyCode = UInt16(self.carbonKeyCode)
         let maxNameLength = 4
-        var nameBuffer = [UniChar](repeating: 0, count : maxNameLength)
+        var nameBuffer = [UniChar](repeating: 0, count: maxNameLength)
         var nameLength = 0
         
         let modifierKeys = UInt32(alphaLock >> 8) & 0xFF // Caps Lock
@@ -63,7 +62,7 @@ extension KeyboardShortcuts.Shortcut {
                            &deadKeys, maxNameLength, &nameLength, &nameBuffer)
         }
         guard osStatus == noErr else {
-            NSLog("Code: 0x%04X  Status: %+i", carbonKeyCode, osStatus);
+            NSLog("Code: 0x%04X  Status: %+i", carbonKeyCode, osStatus)
             return nil
         }
         

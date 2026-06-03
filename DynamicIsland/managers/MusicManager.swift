@@ -411,7 +411,7 @@ class MusicManager: ObservableObject {
         var album: String = "Self Love"
         var isPlayerIdle: Bool = true
         var isCurrentTrackExplicit: Bool = false
-        var bundleIdentifier: String? = nil
+        var bundleIdentifier: String?
         var songDuration: TimeInterval = 0
         var elapsedTime: TimeInterval = 0
         var timestampDate: Date = .init()
@@ -420,9 +420,9 @@ class MusicManager: ObservableObject {
         var repeatMode: RepeatMode = .off
         var isLiveStream: Bool = false
         var usingAppIconForArtwork: Bool = false
-        var skipGesturePulse: SkipGesturePulse? = nil
+        var skipGesturePulse: SkipGesturePulse?
         var isSpotifyLiked: Bool = false
-        var videoArtworkURL: URL? = nil
+        var videoArtworkURL: URL?
         var avgColor: NSColor = .white
         var animations: DynamicIslandAnimations = .init()
         var flipAngle: Double = 0
@@ -648,7 +648,7 @@ class MusicManager: ObservableObject {
     private var explicitLookupTask: Task<Void, Never>?
     private var explicitLookupKey: String?
 
-    private(set) var artworkData: Data? = nil
+    private(set) var artworkData: Data?
 
     var videoArtworkURL: URL? {
         get { musicState.videoArtworkURL }
@@ -664,9 +664,9 @@ class MusicManager: ObservableObject {
     private var lastArtworkTitle: String = "I'm Handsome"
     private var lastArtworkArtist: String = "Me"
     private var lastArtworkAlbum: String = "Self Love"
-    private var lastArtworkBundleIdentifier: String? = nil
-    private var lastArtworkContentIdentifier: String? = nil
-    private var lastArtworkContentURL: String? = nil
+    private var lastArtworkBundleIdentifier: String?
+    private var lastArtworkContentIdentifier: String?
+    private var lastArtworkContentURL: String?
 
     var flipAngle: Double {
         get { musicState.flipAngle }
@@ -955,7 +955,6 @@ class MusicManager: ObservableObject {
 
             self.checkSpotifyLikedState()
 
-
             // Only update sneak peek if there's actual content and something changed
             if shouldAutoPeekOnTrackChange && !state.title.isEmpty && !state.artist.isEmpty && state.isPlaying {
                 self.updateSneakPeek()
@@ -1221,10 +1220,12 @@ class MusicManager: ObservableObject {
     }
 
     private func updateArtwork(_ artworkData: Data) {
+        let title = songTitle
+        let artist = artistName
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
 
-            let cacheKey = "\(self.songTitle)-\(self.artistName)" as NSString
+            let cacheKey = "\(title)-\(artist)" as NSString
             if let cached = MusicManager.albumArtCache.object(forKey: cacheKey) {
                 DispatchQueue.main.async { [weak self] in
                     self?.usingAppIconForArtwork = false
@@ -1261,7 +1262,7 @@ class MusicManager: ObservableObject {
 
     func updateAlbumArt(newAlbumArt: NSImage) {
         workItem?.cancel()
-        workItem = DispatchWorkItem { [weak self] in
+        let newWorkItem = DispatchWorkItem { [weak self] in
             withAnimation(.smooth) {
                 self?.albumArt = self?.downscaledImage(newAlbumArt) ?? newAlbumArt
                 if Defaults[.coloredSpectrogram] {
@@ -1269,7 +1270,8 @@ class MusicManager: ObservableObject {
                 }
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: workItem!)
+        workItem = newWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: newWorkItem)
     }
 
     private func downscaledImage(_ image: NSImage, maxDimension: CGFloat = 200) -> NSImage {
@@ -1334,7 +1336,7 @@ class MusicManager: ObservableObject {
         "org.mozilla.firefox",
         "org.mozilla.nightly",
         "com.apple.Safari",
-        "company.thebrowser.Browser",  // Arc
+        "company.thebrowser.Browser"  // Arc
     ]
 
     /// Whether the current media source is a browser that requires MRMediaRemote commands.
@@ -1559,7 +1561,7 @@ class MusicManager: ObservableObject {
         let workspace = NSWorkspace.shared
         if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID) {
             let configuration = NSWorkspace.OpenConfiguration()
-            workspace.openApplication(at: appURL, configuration: configuration) { (app, error) in
+            workspace.openApplication(at: appURL, configuration: configuration) { (_, error) in
                 if let error = error {
                     print("Failed to launch app with bundle ID: \(bundleID), error: \(error)")
                 } else {
@@ -1718,15 +1720,14 @@ class MusicManager: ObservableObject {
                 if let lrcString = String(data: data, encoding: .utf8) {
                     let trimmed = lrcString.trimmingCharacters(in: .whitespacesAndNewlines)
 
-                    if trimmed.isEmpty  {
+                    if trimmed.isEmpty {
                         return []
                     }
 
                     // If it contains a syncedLyrics key in an object, try that
                     if let json = try? JSONSerialization.jsonObject(with: data, options: []) {
                         if let dict = json as? [String: Any],
-                            let synced = dict["syncedLyrics"] as? String
-                        {
+                            let synced = dict["syncedLyrics"] as? String {
                             return parseLRC(synced)
                         }
                         if let array = json as? [Any], array.isEmpty {
@@ -1803,15 +1804,12 @@ class MusicManager: ObservableObject {
 
         var score = 0
 
-        if resultTitle == title { score += 8 }
-        else if resultTitle.contains(title) || title.contains(resultTitle) { score += 4 }
+        if resultTitle == title { score += 8 } else if resultTitle.contains(title) || title.contains(resultTitle) { score += 4 }
 
-        if resultArtist == artist { score += 8 }
-        else if resultArtist.contains(artist) || artist.contains(resultArtist) { score += 4 }
+        if resultArtist == artist { score += 8 } else if resultArtist.contains(artist) || artist.contains(resultArtist) { score += 4 }
 
         if !album.isEmpty {
-            if resultAlbum == album { score += 4 }
-            else if resultAlbum.contains(album) || album.contains(resultAlbum) { score += 2 }
+            if resultAlbum == album { score += 4 } else if resultAlbum.contains(album) || album.contains(resultAlbum) { score += 2 }
         }
 
         if !(result["syncedLyrics"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

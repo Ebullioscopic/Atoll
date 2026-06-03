@@ -40,4 +40,3 @@ struct ListItemPopover<Content: View>: View {
         })
     }
 }
-

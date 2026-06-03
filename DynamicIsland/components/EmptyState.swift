@@ -33,7 +33,7 @@ struct EmptyStateView: View {
                 .foregroundColor(.gray)
                 .frame(width: 80, height: 70)
             Text(message)
-                .font(.system(size:14))
+                .font(.system(size: 14))
                 .foregroundColor(.gray)
         }.transition(.blurReplace.animation(.spring(.bouncy(duration: 0.3)))) // Smooth animation
     }

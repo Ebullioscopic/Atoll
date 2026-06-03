@@ -23,7 +23,7 @@
 import Foundation
 
 @MainActor
-final class MediaChecker: Sendable {
+final class MediaChecker {
     enum MediaCheckerError: Error {
         case missingResources
         case processExecutionFailed

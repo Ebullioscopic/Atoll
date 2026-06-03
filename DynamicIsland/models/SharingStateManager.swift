@@ -169,4 +169,3 @@ final class SharingLifecycleDelegate: NSObject, NSSharingServiceDelegate, NSShar
 		finishIfNeeded()
 	}
 }
-

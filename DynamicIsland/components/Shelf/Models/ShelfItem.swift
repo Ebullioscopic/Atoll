@@ -64,7 +64,7 @@ enum ShelfItemKind: Codable, Equatable, Sendable {
 }
 
 @MainActor
-struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
+struct ShelfItem: Identifiable, Codable, Equatable {
     let id: UUID
     var kind: ShelfItemKind
     var isTemporary: Bool
@@ -139,9 +139,7 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
     }
     
     var URL: URL? {
-        if case let .file(bookmark) = kind { return resolvedContext(for: bookmark)?.url }
-        else if case let .link(url) = kind { return url }
-        else { return nil }
+        if case let .file(bookmark) = kind { return resolvedContext(for: bookmark)?.url } else if case let .link(url) = kind { return url } else { return nil }
     }
     
     var icon: NSImage {
@@ -154,7 +152,6 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
         return NSImage()
     }
     
-
     func cleanupStoredData() {
         guard case let .file(bookmark) = kind,
               let context = resolvedContext(for: bookmark) else { return }
@@ -172,7 +169,7 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
 private extension ShelfItem {
    static func thumbnailSymbolImage(
         systemName: String,
-    size: CGSize = CGSize(width: 64, height: 80), 
+    size: CGSize = CGSize(width: 64, height: 80),
     symbolPointSize: CGFloat = 38,
     backgroundColor: NSColor = NSColor.white,
     symbolColor: NSColor = NSColor.labelColor

@@ -23,7 +23,6 @@
 import Foundation
 import SwiftUI
 
-
 public class DynamicIslandAnimations {
     @Published var notchStyle: Style = .notch
     

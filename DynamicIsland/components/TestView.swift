@@ -74,7 +74,7 @@ struct FluidSlider: View {
                     .onChanged({ value in
                         self.offset = min(max(self.previousOffset + value.translation.width, 0), rectSize2.width - circleSize)
                     })
-                    .onEnded({ value in
+                    .onEnded({ _ in
                         self.previousOffset = self.offset
                     })
             )
@@ -91,7 +91,6 @@ struct FluidSlider: View {
                 .allowsHitTesting(false)
         }
     }
-    
     
     private var animation: Animation {
         .spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.5)

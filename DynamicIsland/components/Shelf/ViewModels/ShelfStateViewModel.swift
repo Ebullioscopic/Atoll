@@ -51,7 +51,6 @@ final class ShelfStateViewModel: ObservableObject {
         items = ShelfPersistenceService.shared.load()
     }
 
-
     func add(_ newItems: [ShelfItem]) {
         guard !newItems.isEmpty else { return }
         var merged = items
@@ -106,7 +105,6 @@ final class ShelfStateViewModel: ObservableObject {
         }
     }
 
-
     func load(_ providers: [NSItemProvider]) {
         guard !providers.isEmpty else { return }
         isLoading = true
@@ -139,7 +137,6 @@ final class ShelfStateViewModel: ObservableObject {
             await MainActor.run { self.items = keep }
         }
     }
-
 
     func resolveFileURL(for item: ShelfItem) -> URL? {
         guard case .file(let bookmarkData) = item.kind else { return nil }

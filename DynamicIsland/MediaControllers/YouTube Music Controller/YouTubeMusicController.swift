@@ -222,7 +222,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
         case .positionChanged:
             guard let data = message.extractData() else { return }
 
-            var position: Double? = nil
+            var position: Double?
             if let pos = data["position"] as? Double {
                 position = pos
             } else if let elapsed = data["elapsedSeconds"] as? Double {
@@ -253,8 +253,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
         case .shuffleChanged:
             guard let data = message.extractData() else { return }
             var copy = playbackState
-            if let shuffle = data["shuffle"] as? Bool { copy.isShuffled = shuffle }
-            else if let shuffle = data["isShuffled"] as? Bool { copy.isShuffled = shuffle }
+            if let shuffle = data["shuffle"] as? Bool { copy.isShuffled = shuffle } else if let shuffle = data["isShuffled"] as? Bool { copy.isShuffled = shuffle }
             copy.lastUpdated = Date()
             playbackState = copy
 
@@ -331,7 +330,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                     if let mode = json["mode"] as? String { updateRepeatMode(mode) }
                 }
-            }  else if endpoint == "/switch-repeat" {
+            } else if endpoint == "/switch-repeat" {
                 // Find next repeat mode
                 let nextMode: RepeatMode
                 switch playbackState.repeatMode {
@@ -425,7 +424,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
     }
 
      private func updateRepeatMode(_ mode: String) {
-        var target: RepeatMode? = nil
+        var target: RepeatMode?
         switch mode {
             case "NONE": target = .off
             case "ALL": target = .all

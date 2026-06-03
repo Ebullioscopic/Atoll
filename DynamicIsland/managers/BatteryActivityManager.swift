@@ -110,8 +110,8 @@ class BatteryActivityManager {
 
     /// Checks for changes in a property and notifies observers
     private func checkAndNotify<T: Equatable>(
-        previous: T, 
-        current: T, 
+        previous: T,
+        current: T,
         eventGenerator: (T) -> BatteryEvent
     ) {
         if previous != current {

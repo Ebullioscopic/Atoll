@@ -87,8 +87,8 @@ actor ThumbnailService {
                         NSLog("🔍 ThumbnailService: generated thumbnail for \(scopedURL.path)")
                         continuation.resume(returning: rep.nsImage)
                     } else {
-                        if let err = error { 
-                            NSLog("⚠️ ThumbnailService: thumbnail error for \(scopedURL.path): \(err.localizedDescription)") 
+                        if let err = error {
+                            NSLog("⚠️ ThumbnailService: thumbnail error for \(scopedURL.path): \(err.localizedDescription)")
                         }
                         continuation.resume(returning: nil)
                     }

@@ -88,7 +88,7 @@ final class LocalSendDevicePickerWindowManager {
         newWindow.level = .floating
         newWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         
-        let hostingView = NSHostingView(rootView: 
+        let hostingView = NSHostingView(rootView:
             pickerView
                 .background(Color.clear)
         )

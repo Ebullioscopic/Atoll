@@ -1,0 +1,62 @@
+# SwiftLint configuration for Atoll
+# Governs the hound[bot] review class so style findings never recur.
+# Run: swiftlint --fix && swiftlint
+
+included:
+  - DynamicIsland
+
+excluded:
+  - DynamicIsland/Localizable.xcstrings
+  - .build
+  - DerivedData
+
+# --- Rule tuning ---------------------------------------------------------
+line_length:
+  warning: 200
+  error: 300
+  ignores_comments: true
+  ignores_urls: true
+  ignores_function_declarations: true
+  ignores_interpolated_strings: true
+
+trailing_whitespace:
+  ignores_empty_lines: true
+
+identifier_name:
+  min_length:
+    warning: 1   # short loop/closure vars (i, x, vm) are idiomatic here
+  excluded:
+    - id
+    - vm
+    - x
+    - y
+    - i
+
+type_body_length:
+  warning: 600
+  error: 1000
+
+file_length:
+  warning: 1500
+  error: 3000
+  ignore_comment_only_lines: true
+
+function_body_length:
+  warning: 120
+  error: 250
+
+# Opt-in: surface corgea's crash class (force-unwrap) as lint too.
+opt_in_rules:
+  - force_unwrapping
+
+# UI state-machine views (ContentView etc.) legitimately trip these.
+disabled_rules:
+  - cyclomatic_complexity
+  - todo
+  - large_tuple
+  - function_parameter_count
+
+force_unwrapping:
+  severity: warning
+
+reporter: "xcode"

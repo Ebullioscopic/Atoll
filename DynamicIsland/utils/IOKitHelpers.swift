@@ -21,7 +21,7 @@ import IOKit
 import Darwin
 
 func di_getIOProperties(_ entry: io_registry_entry_t) -> NSDictionary? {
-    var properties: Unmanaged<CFMutableDictionary>? = nil
+    var properties: Unmanaged<CFMutableDictionary>?
     guard IORegistryEntryCreateCFProperties(entry, &properties, kCFAllocatorDefault, 0) == kIOReturnSuccess else {
         return nil
     }

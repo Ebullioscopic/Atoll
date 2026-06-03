@@ -358,7 +358,7 @@ struct ColorPickerPanelView: View {
                                 color: color,
                                 isSelected: selectedColor?.id == color.id,
                                 onSelect: { selectedColor = color },
-                                onDelete: { 
+                                onDelete: {
                                     colorToDelete = color
                                     showingDeleteAlert = true
                                 }

@@ -116,8 +116,11 @@ class LauncherIntegrationManager: ObservableObject {
         }
 
         // Small delay to avoid flickering during launcher transitions
+        let deactivatingBundleID = bundleID
         let workItem = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
+            // Only clear if the same launcher is still active (guard against quick switches)
+            guard self.activeLauncher?.rawValue == deactivatingBundleID else { return }
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 self.isLauncherActive = false
                 self.activeLauncher = nil

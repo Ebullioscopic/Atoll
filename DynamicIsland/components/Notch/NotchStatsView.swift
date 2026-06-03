@@ -382,19 +382,19 @@ struct NotchStatsView: View {
         }
         .animation(.easeInOut(duration: 0.4), value: enableStatsFeature)
         .animation(.easeInOut(duration: 0.4), value: availableGraphs.count)
-        .onChange(of: showingCPUPopover) { _, newValue in
+        .onChange(of: showingCPUPopover) { _, _ in
             updateStatsPopoverState()
         }
-        .onChange(of: showingMemoryPopover) { _, newValue in
+        .onChange(of: showingMemoryPopover) { _, _ in
             updateStatsPopoverState()
         }
-        .onChange(of: showingGPUPopover) { _, newValue in
+        .onChange(of: showingGPUPopover) { _, _ in
             updateStatsPopoverState()
         }
-        .onChange(of: showingNetworkPopover) { _, newValue in
+        .onChange(of: showingNetworkPopover) { _, _ in
             updateStatsPopoverState()
         }
-        .onChange(of: showingDiskPopover) { _, newValue in
+        .onChange(of: showingDiskPopover) { _, _ in
             updateStatsPopoverState()
         }
         .onChange(of: isHoveringCPUPopover) { _, _ in
@@ -575,8 +575,6 @@ struct MiniGraph: View {
         }
     }
 }
-
-
 
 struct DualQuadrantGraph: View {
     let positiveData: [Double]
