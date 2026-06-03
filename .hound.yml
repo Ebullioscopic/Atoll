@@ -1,0 +1,23 @@
+# Hound configuration — atoll
+#
+# WHY THIS EXISTS:
+# Adding .swiftlint.yml caused hound to lint the ENTIRE 140-file codebase and
+# post 99+ inline comments per PR for PRE-EXISTING line_length / formatting
+# violations on files the PR never touched (often triplicated). Pure noise.
+#
+# Hound's style class is fully redundant with the .swiftlint.yml gate already
+# run in CI. We silence hound's PR commenting here. Style is enforced by
+# `swiftlint --fix && swiftlint` locally + CI, not by inline PR spam.
+#
+# NOTE: The durable fix is to UNINSTALL the hound GitHub App (repo Settings →
+# Integrations / GitHub Apps). That requires admin and must be done via the
+# GUI by the repo owner (arbitraged-life). See docs/BACKLOG.md.
+
+# Disable hound review entirely — defer all style enforcement to swiftlint/CI.
+fail_on_violations: false
+
+swiftlint:
+  enabled: false
+
+# Never comment on unchanged lines (belt-and-suspenders if re-enabled later).
+review_anchor_only: true
