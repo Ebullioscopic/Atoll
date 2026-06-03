@@ -1,0 +1,30 @@
+name: Logic Tests
+
+# Runs the standalone Atoll decision-logic test package (Tests/AtollLogic).
+# These are pure-logic parity tests with no Xcode app build or hardware deps,
+# so they run fast on a stock macOS runner. Added in response to Codacy's
+# "missing tests" review on PR #3.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Tests/AtollLogic/**'
+      - '.github/workflows/logic-tests.yml'
+  pull_request:
+    paths:
+      - 'Tests/AtollLogic/**'
+      - '.github/workflows/logic-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run AtollLogic test suite
+        working-directory: Tests/AtollLogic
+        run: swift test
