@@ -33,7 +33,7 @@ class IdleAnimationManager {
     
     /// Serial queue serializing all reads and writes to loadedAnimations (fix #8)
     private let animationsQueue = DispatchQueue(label: "com.atoll.idleAnimationManager.animations")
-    
+
     /// Timer that periodically checks for stale cached animations
     private var evictionTimer: Timer?
     
@@ -50,14 +50,11 @@ class IdleAnimationManager {
             return entry.data
         }
         
-        // Fix #7: load from disk on a background thread, never blocking main
-        // This call returns nil immediately; callers should prefer the async variant if needed.
-        // For callers that can tolerate a background dispatch we do a sync on a global queue
-        // (not on animationsQueue which is serial and would deadlock on recursive access).
-        let data: Data? = DispatchQueue.global(qos: .userInitiated).sync {
-            loadAnimationDataFromDisk(animation)
-        }
-        guard let data = data else { return nil }
+        // Fix #7: this is a synchronous accessor. Read directly on the caller's
+        // thread — the previous `global(...).sync` hop blocked the caller anyway
+        // (no async benefit) while a comment falsely claimed it never blocks main.
+        // Callers that must not block main should invoke this off the main thread.
+        guard let data = loadAnimationDataFromDisk(animation) else { return nil }
         animationsQueue.async { [weak self] in
             self?.loadedAnimations[key] = (data: data, lastAccess: Date())
         }
@@ -93,7 +90,9 @@ class IdleAnimationManager {
         animationsQueue.async { [weak self] in
             guard let self else { return }
             let before = self.loadedAnimations.count
-            self.loadedAnimations = self.loadedAnimations.filter { now.timeIntervalSince($0.value.lastAccess) < threshold }
+            self.loadedAnimations = self.loadedAnimations.filter {
+                now.timeIntervalSince($0.value.lastAccess) < threshold
+            }
             let evicted = before - self.loadedAnimations.count
             if evicted > 0 {
                 print("🧹 [IdleAnimationManager] Evicted \(evicted) stale animation(s) from cache")

@@ -418,7 +418,12 @@ class TimerManager: ObservableObject {
             elapsedTime = totalDuration - newRemaining
             lastUpdated = now
         } else if !isOvertime {
-            // Timer just reached zero (or passed it during sleep)
+            // Timer just reached zero (or passed it during sleep): enter overtime.
+            // isFinished and isOvertime are intentionally mutually exclusive (matches
+            // updateExternalTimer's `isFinished = remaining <= 0 && !isOvertime` and
+            // timerStatusText, which shows "Overtime" — not "Completed" — in this phase).
+            // Completion at the transition is still observable via isOvertime (consumers
+            // treat `isFinished || isOvertime` as "completed"; see logCurrentSession).
             isFinished = false
             isOvertime = true
             overtimeStartDate = fireDate // Overtime started exactly at fire date

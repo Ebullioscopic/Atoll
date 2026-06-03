@@ -126,7 +126,9 @@ class SpotifyController: MediaControllerProtocol {
         guard !trackID.isEmpty,
               let accessToken = await SpotifyAuthManager.shared.validAccessToken() else { return false }
 
-        guard let containsURL = URL(string: "https://api.spotify.com/v1/me/tracks/contains?ids=\(trackID)") else { return false }
+        guard let containsURL = URL(
+            string: "https://api.spotify.com/v1/me/tracks/contains?ids=\(trackID)"
+        ) else { return false }
         var request = URLRequest(url: containsURL)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 

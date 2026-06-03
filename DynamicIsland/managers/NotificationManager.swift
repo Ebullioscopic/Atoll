@@ -149,7 +149,7 @@ class NotificationManager: ObservableObject {
         sqlite3_bind_double(stmt, 1, cutoff)
 
         var newNotifications: [MessageNotification] = []
-        var maxDeliveredDate: Date? = nil
+        var maxDeliveredDate: Date?
 
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let dataBlob = sqlite3_column_blob(stmt, 0) else { continue }
@@ -157,12 +157,16 @@ class NotificationManager: ObservableObject {
             let data = Data(bytes: dataBlob, count: dataLength)
 
             let deliveredDate = Date(timeIntervalSinceReferenceDate: sqlite3_column_double(stmt, 1))
-            if maxDeliveredDate == nil || deliveredDate > maxDeliveredDate! {
-                maxDeliveredDate = deliveredDate
-            }
 
+            // Only advance the cursor from rows we could actually parse, so a batch
+            // of malformed/unsupported rows doesn't move lastCheckDate past unread items.
             if let notification = parseNotificationData(data) {
                 newNotifications.append(notification)
+                if let current = maxDeliveredDate {
+                    maxDeliveredDate = max(current, deliveredDate)
+                } else {
+                    maxDeliveredDate = deliveredDate
+                }
             }
         }
 

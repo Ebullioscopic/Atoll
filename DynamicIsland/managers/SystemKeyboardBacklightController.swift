@@ -116,6 +116,9 @@ final class SystemKeyboardBacklightController {
         guard isRunning else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            // Re-check on main: stop() may have flipped isRunning (on workerQueue)
+            // after this block was enqueued, so suppress stale callbacks post-stop.
+            guard self.isRunning else { return }
             self.onBacklightChange?(level)
             self.notificationCenter.post(name: .keyboardBacklightDidChange, object: nil, userInfo: ["value": level])
         }

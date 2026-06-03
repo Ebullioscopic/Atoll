@@ -20,7 +20,11 @@ import AppKit
 import Foundation
 
 struct MessageNotification: Identifiable, Equatable, Hashable {
-    let id = UUID()
+    // Stable, field-derived identity so Identifiable agrees with Equatable/Hashable:
+    // two notifications that are `==` (same sender/content/app/timestamp) now share an
+    // `id`, preventing SwiftUI diffing glitches and Set/Dictionary inconsistencies that
+    // a random UUID() id caused (the custom == / hash deliberately key on content).
+    var id: String { "\(sender)\u{1f}\(content)\u{1f}\(appBundleId)\u{1f}\(timestamp.timeIntervalSinceReferenceDate)" }
     let sender: String
     let content: String
     let profilePicture: NSImage?

@@ -79,7 +79,7 @@ final class DockerHealthManager: ObservableObject {
         // Fix #3: run Process off the main thread, publish results back on MainActor
         Task.detached { [weak self] in
             var parsedContainers: [DockerContainer] = []
-            var errorMessage: String? = nil
+            var errorMessage: String?
 
             do {
                 try process.run()
@@ -94,10 +94,10 @@ final class DockerHealthManager: ObservableObject {
                 for line in output.components(separatedBy: "\n") where !line.isEmpty {
                     if let jsonData = line.data(using: .utf8),
                        let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                       let id = json["ID"] as? String,
+                       let containerID = json["ID"] as? String,
                        let name = json["Names"] as? String,
                        let status = json["Status"] as? String {
-                        parsedContainers.append(DockerContainer(id: id, name: name, status: status))
+                        parsedContainers.append(DockerContainer(id: containerID, name: name, status: status))
                     }
                 }
             } catch {

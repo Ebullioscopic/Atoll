@@ -143,7 +143,7 @@ class CallDetectionManager: ObservableObject {
             DispatchQueue.global(qos: .utility).async {
                 // Use `pgrep` to check for active call audio processes
                 let task = Process()
-                task.launchPath = "/usr/bin/pgrep"
+                task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
                 task.arguments = ["-x", "avconferenced"]
                 let pipe = Pipe()
                 task.standardOutput = pipe

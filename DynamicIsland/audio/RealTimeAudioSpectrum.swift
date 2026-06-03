@@ -105,6 +105,8 @@ class RealTimeAudioSpectrum: NSView {
         
         // Update each bar with its corresponding band magnitude
         for (index, barLayer) in barLayers.enumerated() {
+            // getSmoothedMagnitudes() returns a simd_float4 (exactly 4 lanes),
+            // so cap at 4 bands to avoid out-of-bounds access when barLayers.count > 4.
             guard index < 4 else { continue }
             let magnitude = magnitudes[index]
             // Map magnitude (0-1) to scale (0.2 - 1.0) for visual appeal
