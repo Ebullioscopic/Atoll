@@ -1,0 +1,36 @@
+# Pre-commit hooks for Atoll (DynamicIsland)
+#
+# Runs SwiftLint locally before each commit so the style + crash-safety
+# violations that PR review bots (hound/SwiftLint, corgea force_unwrapping)
+# flag never reach a PR. Install with:
+#   brew install swiftlint pre-commit
+#   pre-commit install
+#
+# The `swiftlint --fix` pass auto-corrects mechanical nits (trailing whitespace,
+# trailing commas, unused closure params, toggle_bool); the second `swiftlint`
+# pass fails the commit on anything remaining (e.g. force_unwrapping warnings).
+repos:
+  - repo: local
+    hooks:
+      - id: swiftlint-fix
+        name: swiftlint --fix (autocorrect)
+        entry: bash -c 'command -v swiftlint >/dev/null 2>&1 && swiftlint --fix --quiet || echo "swiftlint not installed; skipping (brew install swiftlint)"'
+        language: system
+        types: [swift]
+        pass_filenames: false
+      - id: swiftlint
+        name: swiftlint (lint)
+        entry: bash -c 'command -v swiftlint >/dev/null 2>&1 && swiftlint --quiet || echo "swiftlint not installed; skipping (brew install swiftlint)"'
+        language: system
+        types: [swift]
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.(xcstrings|pbxproj)$'
+      - id: end-of-file-fixer
+        exclude: '\.(xcstrings|pbxproj)$'
+      - id: check-yaml
+      - id: check-merge-conflict

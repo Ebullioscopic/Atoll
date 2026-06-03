@@ -44,11 +44,7 @@ private struct AnimationContentView: View {
     
     var body: some View {
         let config = animation.getTransformConfig()
-        
-        // Debug logging
-        _ = print("🎨 [IdleAnimationView] Rendering animation: \(animation.name)")
-        _ = print("🎨 [IdleAnimationView] Config: scale=\(config.scale), offset=(\(config.offsetX), \(config.offsetY)), opacity=\(config.opacity)")
-        
+
         switch animation.source {
         case .lottieFile(let url):
             LottieView(state: LUStateData(

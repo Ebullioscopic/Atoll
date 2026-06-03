@@ -10,6 +10,22 @@ findings are resolved at the source and don't recur.
 | **corgea[bot]** | Crash-safety, concurrency, logic correctness | Force-unwraps, main-thread blocking, data races, observer leaks, stale state |
 | **hound[bot]** | Style | Line length, formatting → governed by `.swiftlint.yml` |
 
+## Trust calibration
+
+Many automated PR reviewers are installed. They are noisy and overlap. How much
+to trust each:
+
+| Bot | Trust | Notes |
+|-----|-------|-------|
+| **corgea** | HIGH | Finds real defects (concurrency, force-unwrap, data races, logic bugs). Read every comment. |
+| **cubic** | HIGH (security) | Strong on injection / shell-eval. Numbered, locationed findings. |
+| **amazon-q-developer** | MEDIUM-HIGH | Good on security (flagged the workflow injection). |
+| **codacy-production** | MEDIUM | SwiftLint-class style + some logic. Mostly absorbed by `.swiftlint.yml`. |
+| **sourcery-ai** | MEDIUM | Decent on localization/format-string smells; some over-engineering advice. |
+| **gemini-code-assist** | MEDIUM | Being sunset (review ceases 2026-07-17). |
+| **hound** | LOW | Mechanical SwiftLint only — superseded by local `.swiftlint.yml` + `.hound.yml`. |
+| **coderabbit / codeant / qodo / semanticdiff / ecc-tools / codacy AI** | LOW / INFO | Summaries, share-bait, or paused. Skim, don't action individually. |
+
 ## Fix classes (resolved in PR #4)
 
 1. **Force-unwrap → guard/else** — `URL(string:)!`, `calendar.date(...)!`, `workItem!`.
@@ -26,6 +42,44 @@ findings are resolved at the source and don't recur.
 6. **Fail-closed permissions** — unknown/unsupported branch returns `false`, never `true`.
 7. **Bounds checks** — guard index against the real container size (note: `simd_floatN`
    is fixed-width N, has no `.count`).
+
+## Bake-in workflow
+
+When a valid finding recurs across PRs, encode it once so bots stop raising it:
+
+1. **Style / mechanical** → add/tune a rule in `.swiftlint.yml`.
+2. **Correctness pattern** (concurrency, force-unwrap, localization keys, CI
+   injection) → add a MUST/SHOULD rule to `AGENTS.md` and fix all current sites.
+3. **One-off bug** → just fix it in code.
+
+Then resolve the bot threads rather than replying per-comment.
+
+### Already baked in (PR #8)
+
+- **CI shell injection** (P1, cubic/amazon-q): `mirror-release.yml` now routes all
+  `github.event.release.*` through `env:` vars. Rule in `AGENTS.md` → CI section.
+- **Dynamic localization keys** (P1, cubic/sourcery): fixed in
+  `ReminderLiveActivityManager`, `ContentView`. Rule in `AGENTS.md` → Localization.
+- **Redundant `String(format: String(localized:))`** (P2): fixed in
+  `LockScreenWeatherWidget`. Rule in `AGENTS.md` → Localization.
+- **Inconsistent un-localized strings** (`Completed`/`Ready`/`Start Custom Timer`/
+  `\(minutes)m`): fixed. Rule in `AGENTS.md` → Localization.
+- **TerminalManager inset guard off-by** (cubic P2): guard now `>= 2*inset + 10`.
+  Rule in `AGENTS.md` → Logic correctness (geometry/insets).
+- **SystemMediaControllers timer run-loop mode** (cubic P2): now `.common`. Rule in
+  `AGENTS.md` → Concurrency.
+- **CoreBrightness selector validation** (cubic P2): now `responds(to:)`-checks the
+  resolved class. Rule in `AGENTS.md` → Safety.
+- **Force-unwrap / data-race / main-thread-blocking classes** (corgea): captured as
+  MUST rules in `AGENTS.md` and enforced by `force_unwrapping` in `.swiftlint.yml`.
+
+### Not actioned (intentionally)
+
+- "Add unit tests for X" suggestions (codacy): no test target wired for these UI/
+  manager paths; out of scope for an upstream-sync PR.
+- "Extract method / SRP" refactors (codacy MEDIUM on TerminalManager): cosmetic,
+  upstream code; deferred to avoid diverging further from upstream.
+- Share-bait / paused-review / summary comments: ignored.
 
 ## Noise control (decided in PR #11)
 
