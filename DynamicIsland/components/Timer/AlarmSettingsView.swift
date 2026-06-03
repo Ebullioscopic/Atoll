@@ -189,7 +189,11 @@ private struct AlarmRow: View {
             Spacer()
             Toggle("", isOn: Binding(
                 get: { alarm.isEnabled },
-                set: { _ in alarmManager.toggleAlarm(id: alarm.id) }
+                set: { newValue in
+                    if newValue != alarm.isEnabled {
+                        alarmManager.toggleAlarm(id: alarm.id)
+                    }
+                }
             ))
             .toggleStyle(.switch)
             .controlSize(.small)

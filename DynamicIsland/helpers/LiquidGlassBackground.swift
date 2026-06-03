@@ -26,6 +26,7 @@ private final class LiquidGlassContainerView: NSView {
 
     private var observedBackdropLayers: [CALayer] = []
     private var hasScheduledBackdropSetup = false
+    private var didRegisterBackdropObservers = false
     private let windowServerAwareKeyPath = "windowServerAware"
     private let scaleKeyPath = "scale"
 
@@ -74,6 +75,7 @@ private final class LiquidGlassContainerView: NSView {
             backdrop.addObserver(self, forKeyPath: windowServerAwareKeyPath, options: [.old, .new], context: nil)
             backdrop.addObserver(self, forKeyPath: scaleKeyPath, options: [.old, .new], context: nil)
         }
+        didRegisterBackdropObservers = !observedBackdropLayers.isEmpty
     }
 
     private func setBackdropProperties(in layer: CALayer) {
@@ -120,11 +122,13 @@ private final class LiquidGlassContainerView: NSView {
     }
 
     private func removeBackdropObservers() {
+        guard didRegisterBackdropObservers else { return }
         for layer in observedBackdropLayers {
             layer.removeObserver(self, forKeyPath: windowServerAwareKeyPath)
             layer.removeObserver(self, forKeyPath: scaleKeyPath)
         }
         observedBackdropLayers.removeAll()
+        didRegisterBackdropObservers = false
     }
 }
 

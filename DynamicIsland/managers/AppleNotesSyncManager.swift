@@ -62,11 +62,32 @@ class AppleNotesSyncManager: ObservableObject {
         """
         
         let result = await runAppleScript(script)
-        
+
+        // Fix #5: run fetchNotesIndividually off-main before hopping back to MainActor
+        var parsed: [AppleNote] = []
+        switch result {
+        case .success(let output):
+            if output.isEmpty {
+                // Bulk script returned empty; fetch individually off-main
+                parsed = await Task.detached { [weak self] () -> [AppleNote] in
+                    self?.fetchNotesIndividually() ?? []
+                }.value
+            } else {
+                // parseAppleScriptOutput itself calls fetchNotesIndividually synchronously;
+                // run it off-main to keep the main thread free.
+                parsed = await Task.detached { [weak self] () -> [AppleNote] in
+                    guard let self else { return [] }
+                    return self.parseAppleScriptOutput(output)
+                }.value
+            }
+        case .failure:
+            break
+        }
+
         await MainActor.run {
             switch result {
-            case .success(let output):
-                self.appleNotes = parseAppleScriptOutput(output)
+            case .success:
+                self.appleNotes = parsed
                 self.lastSyncDate = Date()
             case .failure(let error):
                 self.lastError = error.localizedDescription
@@ -152,6 +173,12 @@ class AppleNotesSyncManager: ObservableObject {
         
         var error: NSDictionary?
         let countResult = NSAppleScript(source: countScript)?.executeAndReturnError(&error)
+        // Fix #6: check for AppleScript errors rather than silently proceeding
+        if let error = error {
+            let msg = error[NSAppleScript.errorMessage] as? String ?? "Unknown error"
+            print("❌ [AppleNotesSyncManager] countScript error: \(msg)")
+            return []
+        }
         let count = min(Int(countResult?.int32Value ?? 0), 50)
         
         guard count > 0 else { return [] }
@@ -175,6 +202,12 @@ class AppleNotesSyncManager: ObservableObject {
         
         var batchError: NSDictionary?
         let batchResult = NSAppleScript(source: batchScript)?.executeAndReturnError(&batchError)
+        // Fix #6: check for AppleScript batch errors rather than silently proceeding
+        if let batchError = batchError {
+            let msg = batchError[NSAppleScript.errorMessage] as? String ?? "Unknown error"
+            print("❌ [AppleNotesSyncManager] batchScript error: \(msg)")
+            return []
+        }
         
         guard let outputStr = batchResult?.stringValue, !outputStr.isEmpty else { return [] }
         

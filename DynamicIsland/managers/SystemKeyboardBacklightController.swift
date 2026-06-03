@@ -40,17 +40,21 @@ final class SystemKeyboardBacklightController {
     private init() {}
 
     func start() {
-        guard !isRunning else { return }
-        isRunning = true
-        lastPolledLevel = (try? KeyboardBrightnessSensor.currentLevel()) ?? 0
-        notifyCurrentLevel()
-        startPolling()
+        workerQueue.async {
+            guard !self.isRunning else { return }
+            self.isRunning = true
+            self.lastPolledLevel = (try? KeyboardBrightnessSensor.currentLevel()) ?? 0
+            self.notifyCurrentLevel()
+            self.startPolling()
+        }
     }
 
     func stop() {
-        guard isRunning else { return }
-        isRunning = false
-        stopPolling()
+        workerQueue.async {
+            guard self.isRunning else { return }
+            self.isRunning = false
+            self.stopPolling()
+        }
     }
 
     private func startPolling() {
@@ -111,7 +115,7 @@ final class SystemKeyboardBacklightController {
     private func emitChange(level: Float) {
         guard isRunning else { return }
         DispatchQueue.main.async { [weak self] in
-            guard let self, self.isRunning else { return }
+            guard let self else { return }
             self.onBacklightChange?(level)
             self.notificationCenter.post(name: .keyboardBacklightDidChange, object: nil, userInfo: ["value": level])
         }

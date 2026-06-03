@@ -161,7 +161,10 @@ class AlarmManager: ObservableObject {
         content.body = alarm.label.isEmpty ? "Time's up!" : alarm.label
         content.sound = .default
 
-        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: alarm.fireDate)
+        let componentSet: Set<Calendar.Component> = alarm.repeatDaily
+            ? [.hour, .minute]
+            : [.year, .month, .day, .hour, .minute, .second]
+        let components = Calendar.current.dateComponents(componentSet, from: alarm.fireDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: alarm.repeatDaily)
 
         let request = UNNotificationRequest(identifier: alarm.id.uuidString, content: content, trigger: trigger)

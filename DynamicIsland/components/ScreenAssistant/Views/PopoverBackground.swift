@@ -21,11 +21,20 @@ import SwiftUI
 
 // MARK: - Screenshot Popover Background (Hidden from Screen Recording)
 struct ScreenshotPopoverBackground: NSViewRepresentable {
+    // Coordinator retains the NSWindow reference used for registration so
+    // that dismantleNSView can unregister even if nsView.window is nil.
+    class Coordinator {
+        weak var registeredWindow: NSWindow?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         
         DispatchQueue.main.async {
             guard let window = view.window else { return }
+            context.coordinator.registeredWindow = window
             ScreenCaptureVisibilityManager.shared.register(window, scope: .panelsOnly)
         }
         
@@ -34,13 +43,18 @@ struct ScreenshotPopoverBackground: NSViewRepresentable {
     
     func updateNSView(_ nsView: NSView, context: Context) {
         if let window = nsView.window {
+            context.coordinator.registeredWindow = window
             ScreenCaptureVisibilityManager.shared.register(window, scope: .panelsOnly)
         }
     }
     
-    static func dismantleNSView(_ nsView: NSView, coordinator: ()) {
-        if let window = nsView.window {
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        // Prefer the coordinator's retained window reference; fall back to
+        // nsView.window in case the view is still attached.
+        let window = coordinator.registeredWindow ?? nsView.window
+        if let window = window {
             ScreenCaptureVisibilityManager.shared.unregister(window)
         }
+        coordinator.registeredWindow = nil
     }
 }

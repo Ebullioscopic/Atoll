@@ -106,7 +106,7 @@ class TimerSessionLogger: ObservableObject {
         var checkDate = calendar.startOfDay(for: Date())
 
         while true {
-            let dayEnd = calendar.date(byAdding: .day, value: 1, to: checkDate)!
+            guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: checkDate) else { break }
             let hasSession = sessions.contains { $0.endDate >= checkDate && $0.endDate < dayEnd }
             if hasSession {
                 streak += 1

@@ -419,7 +419,7 @@ class TimerManager: ObservableObject {
             lastUpdated = now
         } else if !isOvertime {
             // Timer just reached zero (or passed it during sleep)
-            isFinished = true
+            isFinished = false
             isOvertime = true
             overtimeStartDate = fireDate // Overtime started exactly at fire date
             remainingTime = timeUntilFire // Negative value = overtime amount

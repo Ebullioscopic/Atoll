@@ -105,6 +105,7 @@ class RealTimeAudioSpectrum: NSView {
         
         // Update each bar with its corresponding band magnitude
         for (index, barLayer) in barLayers.enumerated() {
+            guard index < 4 else { continue }
             let magnitude = magnitudes[index]
             // Map magnitude (0-1) to scale (0.2 - 1.0) for visual appeal
             let scale = max(0.2, min(1.0, CGFloat(magnitude) * 1.5 + 0.2))

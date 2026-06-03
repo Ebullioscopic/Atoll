@@ -19,7 +19,7 @@
 import AppKit
 import Foundation
 
-struct MessageNotification: Identifiable, Equatable {
+struct MessageNotification: Identifiable, Equatable, Hashable {
     let id = UUID()
     let sender: String
     let content: String
@@ -33,6 +33,16 @@ struct MessageNotification: Identifiable, Equatable {
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.id == rhs.id
+        lhs.sender == rhs.sender &&
+        lhs.content == rhs.content &&
+        lhs.appBundleId == rhs.appBundleId &&
+        lhs.timestamp == rhs.timestamp
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(sender)
+        hasher.combine(content)
+        hasher.combine(appBundleId)
+        hasher.combine(timestamp)
     }
 }

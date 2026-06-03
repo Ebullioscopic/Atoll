@@ -155,6 +155,8 @@ class AgentStatusManager: ObservableObject {
         var stmt: OpaquePointer?
         
         guard sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK else {
+            activeSessions = []
+            isActive = false
             return
         }
         defer { sqlite3_finalize(stmt) }

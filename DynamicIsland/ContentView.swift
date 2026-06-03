@@ -1070,7 +1070,12 @@ struct ContentView: View {
                               .transition(closedLiveActivitySwapTransition)
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .timer) && vm.notchState == .closed && timerManager.isTimerActive && coordinator.timerLiveActivityEnabled && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                           TimerLiveActivity()
-                     } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording) && vm.notchState == .closed && (recordingManager.isRecording || !recordingManager.isRecorderIdle) && Defaults[.enableScreenRecordingDetection] && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) && !musicPairingEligible {
+                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording)
+                                  && vm.notchState == .closed
+                                  && (recordingManager.isRecording || !recordingManager.isRecorderIdle)
+                                  && Defaults[.enableScreenRecordingDetection]
+                                  && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen)
+                                  && !musicPairingEligible {
                           RecordingLiveActivity()
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .download) && vm.notchState == .closed && downloadManager.isDownloading && Defaults[.enableDownloadListener] && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                           DownloadLiveActivity()

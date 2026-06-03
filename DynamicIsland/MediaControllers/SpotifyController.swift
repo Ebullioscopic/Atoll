@@ -126,7 +126,8 @@ class SpotifyController: MediaControllerProtocol {
         guard !trackID.isEmpty,
               let accessToken = await SpotifyAuthManager.shared.validAccessToken() else { return false }
 
-        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me/tracks/contains?ids=\(trackID)")!)
+        guard let containsURL = URL(string: "https://api.spotify.com/v1/me/tracks/contains?ids=\(trackID)") else { return false }
+        var request = URLRequest(url: containsURL)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
         do {
@@ -146,7 +147,8 @@ class SpotifyController: MediaControllerProtocol {
         guard !trackID.isEmpty,
               let accessToken = await SpotifyAuthManager.shared.validAccessToken() else { return false }
 
-        var request = URLRequest(url: URL(string: "https://api.spotify.com/v1/me/tracks?ids=\(trackID)")!)
+        guard let tracksURL = URL(string: "https://api.spotify.com/v1/me/tracks?ids=\(trackID)") else { return false }
+        var request = URLRequest(url: tracksURL)
         request.httpMethod = liked ? "PUT" : "DELETE"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

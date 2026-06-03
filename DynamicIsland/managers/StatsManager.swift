@@ -669,8 +669,9 @@ class StatsManager: ObservableObject {
 
         monitoringTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             guard let self = self else { return }
+            let snapshot = self.publishedStats
             self.statsCollectionQueue.async {
-                self.collectStatsOffMain()
+                self.collectStatsOffMain(snapshot: snapshot)
             }
         }
     }
@@ -827,12 +828,11 @@ class StatsManager: ObservableObject {
     
     /// Runs on statsCollectionQueue – does heavy IOKit/sysctl work off main thread,
     /// then publishes results on MainActor.
-    private func collectStatsOffMain() {
+    private func collectStatsOffMain(snapshot currentSnapshot: PublishedStatsSnapshot) {
         // isStatsCollectionInFlight is only read/written on statsCollectionQueue
         guard !isStatsCollectionInFlight else { return }
         isStatsCollectionInFlight = true
         
-        let currentSnapshot = publishedStats
         let result = collectSystemStatsSnapshot(from: currentSnapshot)
         
         Task { @MainActor [weak self] in

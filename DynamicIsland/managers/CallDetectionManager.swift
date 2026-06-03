@@ -110,7 +110,8 @@ class CallDetectionManager: ObservableObject {
 
         // Strategy 2: Check for call-related audio daemon processes
         // avconferenced is the key indicator — it runs when FaceTime/phone calls are active
-        let hasCallAudioProcess = checkForCallAudioProcesses()
+        // Fix #4: await async version so Process runs off-main
+        let hasCallAudioProcess = await checkForCallAudioProcesses()
 
         // A call is active if call audio daemons are using the microphone
         if hasCallAudioProcess {
@@ -136,22 +137,27 @@ class CallDetectionManager: ObservableObject {
         return false
     }
 
-    private func checkForCallAudioProcesses() -> Bool {
-        // Use `pgrep` to check for active call audio processes
-        let task = Process()
-        task.launchPath = "/usr/bin/pgrep"
-        task.arguments = ["-x", "avconferenced"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = FileHandle.nullDevice
+    // Fix #4: made async so the blocking Process runs off the main actor
+    private func checkForCallAudioProcesses() async -> Bool {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                // Use `pgrep` to check for active call audio processes
+                let task = Process()
+                task.launchPath = "/usr/bin/pgrep"
+                task.arguments = ["-x", "avconferenced"]
+                let pipe = Pipe()
+                task.standardOutput = pipe
+                task.standardError = FileHandle.nullDevice
 
-        do {
-            try task.run()
-            task.waitUntilExit()
-            // Exit status 0 means process found
-            return task.terminationStatus == 0
-        } catch {
-            return false
+                do {
+                    try task.run()
+                    task.waitUntilExit()
+                    // Exit status 0 means process found
+                    continuation.resume(returning: task.terminationStatus == 0)
+                } catch {
+                    continuation.resume(returning: false)
+                }
+            }
         }
     }
 

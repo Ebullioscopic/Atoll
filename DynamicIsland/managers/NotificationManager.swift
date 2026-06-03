@@ -149,20 +149,28 @@ class NotificationManager: ObservableObject {
         sqlite3_bind_double(stmt, 1, cutoff)
 
         var newNotifications: [MessageNotification] = []
+        var maxDeliveredDate: Date? = nil
 
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let dataBlob = sqlite3_column_blob(stmt, 0) else { continue }
             let dataLength = Int(sqlite3_column_bytes(stmt, 0))
             let data = Data(bytes: dataBlob, count: dataLength)
 
+            let deliveredDate = Date(timeIntervalSinceReferenceDate: sqlite3_column_double(stmt, 1))
+            if maxDeliveredDate == nil || deliveredDate > maxDeliveredDate! {
+                maxDeliveredDate = deliveredDate
+            }
+
             if let notification = parseNotificationData(data) {
                 newNotifications.append(notification)
             }
         }
 
-        if !newNotifications.isEmpty {
-            lastCheckDate = Date()
+        if let maxDate = maxDeliveredDate {
+            lastCheckDate = maxDate
+        }
 
+        if !newNotifications.isEmpty {
             for notification in newNotifications.reversed() {
                 notifications.insert(notification, at: 0)
             }

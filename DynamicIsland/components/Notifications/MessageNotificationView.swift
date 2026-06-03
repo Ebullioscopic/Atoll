@@ -28,10 +28,9 @@ struct MessageNotificationView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(notificationManager.notifications.indices, id: \.self) { index in
-                    let notification = notificationManager.notifications[index]
+                ForEach(notificationManager.notifications, id: \.id) { notification in
                     notificationRow(notification)
-                    if index < notificationManager.notifications.count - 1 {
+                    if notificationManager.notifications.last?.id != notification.id {
                         Divider().opacity(0.3)
                     }
                 }

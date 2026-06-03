@@ -1221,10 +1221,12 @@ class MusicManager: ObservableObject {
     }
 
     private func updateArtwork(_ artworkData: Data) {
+        let title = songTitle
+        let artist = artistName
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
 
-            let cacheKey = "\(self.songTitle)-\(self.artistName)" as NSString
+            let cacheKey = "\(title)-\(artist)" as NSString
             if let cached = MusicManager.albumArtCache.object(forKey: cacheKey) {
                 DispatchQueue.main.async { [weak self] in
                     self?.usingAppIconForArtwork = false
@@ -1261,7 +1263,7 @@ class MusicManager: ObservableObject {
 
     func updateAlbumArt(newAlbumArt: NSImage) {
         workItem?.cancel()
-        workItem = DispatchWorkItem { [weak self] in
+        let newWorkItem = DispatchWorkItem { [weak self] in
             withAnimation(.smooth) {
                 self?.albumArt = self?.downscaledImage(newAlbumArt) ?? newAlbumArt
                 if Defaults[.coloredSpectrogram] {
@@ -1269,7 +1271,8 @@ class MusicManager: ObservableObject {
                 }
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: workItem!)
+        workItem = newWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: newWorkItem)
     }
 
     private func downscaledImage(_ image: NSImage, maxDimension: CGFloat = 200) -> NSImage {
