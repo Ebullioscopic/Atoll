@@ -558,8 +558,7 @@
 				INFOPLIST_KEY_MetalCaptureEnabled = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Atoll uses AppleScripts to control Spotify and Apple Music";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Atoll needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show calender events inside the notch";
-				INFOPLIST_KEY_NSCalendarsUsageDescription = "Need for Calendar Mode";
+
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need your camera for Mirror mode";
 				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Atoll needs access to save screenshots to your desktop.";
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Atoll needs access to save and read shelf dragged files.";
@@ -567,7 +566,6 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -632,8 +630,7 @@
 				INFOPLIST_KEY_MetalCaptureEnabled = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Atoll uses AppleScripts to control Spotify and Apple Music";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Atoll needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show calender events inside the notch";
-				INFOPLIST_KEY_NSCalendarsUsageDescription = "Need for Calendar Mode";
+
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need your camera for Mirror mode";
 				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Atoll needs access to save screenshots to your desktop.";
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Atoll needs access to save and read shelf dragged files.";
@@ -641,7 +638,6 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

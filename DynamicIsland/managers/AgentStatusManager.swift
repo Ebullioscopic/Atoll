@@ -36,10 +36,36 @@ struct AgentSession: Identifiable, Equatable {
     }
     
     var agentName: String {
-        if source.lowercased().contains("copilot") {
-            return "Copilot"
+        switch sourceType {
+        case .terminal: return "Terminal"
+        case .ide: return "IDE"
+        case .hermes: return "Hermes"
+        case .openclaw: return "OpenClaw"
+        case .copilot: return "Copilot"
         }
-        return "Hermes"
+    }
+    
+    var sourceEmoji: String {
+        switch sourceType {
+        case .terminal: return "🖥️"
+        case .ide: return "💻"
+        case .hermes: return "🪬"
+        case .openclaw: return "🐙"
+        case .copilot: return "✨"
+        }
+    }
+    
+    enum SourceType {
+        case terminal, ide, hermes, openclaw, copilot
+    }
+    
+    var sourceType: SourceType {
+        let s = source.lowercased()
+        if s.contains("openclaw") || s.contains("claw") { return .openclaw }
+        if s.contains("ide") || s.contains("vscode") || s.contains("cursor") { return .ide }
+        if s.contains("copilot") { return .copilot }
+        if s.contains("terminal") || s.contains("cli") { return .terminal }
+        return .hermes
     }
     
     var estimatedCost: String {

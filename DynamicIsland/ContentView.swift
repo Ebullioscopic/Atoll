@@ -42,7 +42,6 @@ struct ContentView: View {
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     private let musicManager = MusicManager.shared
     private let timerManager = TimerManager.shared
-    private let reminderManager = ReminderLiveActivityManager.shared
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     private let statsManager = StatsManager.shared
     private let recordingManager = ScreenRecordingManager.shared
@@ -64,11 +63,9 @@ struct ContentView: View {
     @Default(.showGpuGraph) var showGpuGraph
     @Default(.showNetworkGraph) var showNetworkGraph
     @Default(.showDiskGraph) var showDiskGraph
-    @Default(.enableReminderLiveActivity) var enableReminderLiveActivity
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.enableHorizontalMusicGestures) var enableHorizontalMusicGestures
-    @Default(.reminderPresentationStyle) var reminderPresentationStyle
     @Default(.timerShowsCountdown) var timerShowsCountdown
     @Default(.timerShowsProgress) var timerShowsProgress
     @Default(.timerProgressStyle) var timerProgressStyle
@@ -992,7 +989,6 @@ struct ContentView: View {
               MediaNotchSection(
                   musicManager: musicManager,
                   timerManager: timerManager,
-                  reminderManager: reminderManager,
                   recordingManager: recordingManager,
                   doNotDisturbManager: doNotDisturbManager,
                   capsLockManager: capsLockManager,
@@ -1026,8 +1022,6 @@ struct ContentView: View {
                           switch musicSecondary {
                           case .timer:
                               return currentScreenExpansionType == .timer
-                          case .reminder:
-                              return currentScreenExpansionType == .reminder
                           case .recording:
                               return currentScreenExpansionType == .recording
                           case .focus:
@@ -1060,7 +1054,7 @@ struct ContentView: View {
                             styleOverride: batteryModel.activeTemporaryHUDKind.map { resolvedBatteryNotificationStyle(for: $0) }
                         )
                         .id(batteryModel.activeTemporaryHUDToken)
-                      } else if isSneakPeekVisibleOnCurrentScreen && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && !coordinator.sneakPeek.type.isExtensionPayload && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
+                      } else if isSneakPeekVisibleOnCurrentScreen && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && !coordinator.sneakPeek.type.isExtensionPayload && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(
                                   coordinator.sneakPeek.type == .capsLock
@@ -1076,9 +1070,7 @@ struct ContentView: View {
                               .transition(closedLiveActivitySwapTransition)
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .timer) && vm.notchState == .closed && timerManager.isTimerActive && coordinator.timerLiveActivityEnabled && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                           TimerLiveActivity()
-                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .reminder) && vm.notchState == .closed && reminderManager.isActive && enableReminderLiveActivity && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
-                          ReminderLiveActivity()
-                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording) && vm.notchState == .closed && (recordingManager.isRecording || !recordingManager.isRecorderIdle) && Defaults[.enableScreenRecordingDetection] && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) && !musicPairingEligible {
+                     } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording) && vm.notchState == .closed && (recordingManager.isRecording || !recordingManager.isRecorderIdle) && Defaults[.enableScreenRecordingDetection] && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) && !musicPairingEligible {
                           RecordingLiveActivity()
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .download) && vm.notchState == .closed && downloadManager.isDownloading && Defaults[.enableDownloadListener] && (!vm.hideOnClosed || vm.allowLiveActivityInFullscreen) {
                           DownloadLiveActivity()
@@ -1122,7 +1114,7 @@ struct ContentView: View {
                        }
                       
                       if isSneakPeekVisibleOnCurrentScreen {
-                          if (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && (coordinator.sneakPeek.type != .capsLock) && !coordinator.sneakPeek.type.isExtensionPayload && !Defaults[.inlineHUD] && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
+                          if (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .capsLock) && !coordinator.sneakPeek.type.isExtensionPayload && !Defaults[.inlineHUD] && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
                               SystemEventIndicatorModifier(eventType: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, sendEventBack: { _ in
                                   //
                               })
@@ -1153,25 +1145,6 @@ struct ContentView: View {
                                       }
                                   }
                                   .foregroundStyle(timerManager.timerColor)
-                                  .padding(.bottom, 10)
-                              }
-                          }
-                          else if coordinator.sneakPeek.type == .reminder {
-                              if !vm.hideOnClosed && activeSneakPeekStyle == .standard, let reminder = reminderManager.activeReminder {
-                                  GeometryReader { geo in
-                                      let chipColor = Color(nsColor: reminder.event.calendar.color).ensureMinimumBrightness(factor: 0.7)
-                                      HStack(spacing: 6) {
-                                          RoundedRectangle(cornerRadius: 2)
-                                              .fill(chipColor)
-                                              .frame(width: 8, height: 12)
-                                          MarqueeText(
-                                              .constant(reminderSneakPeekText(for: reminder, now: reminderManager.currentDate)),
-                                              textColor: reminderColor(for: reminder, now: reminderManager.currentDate),
-                                              minDuration: 1,
-                                              frameWidth: max(0, geo.size.width - 14)
-                                          )
-                                      }
-                                  }
                                   .padding(.bottom, 10)
                               }
                           }
@@ -1266,34 +1239,6 @@ struct ContentView: View {
           }
       }
 
-    private func reminderColor(for reminder: ReminderLiveActivityManager.ReminderEntry, now: Date) -> Color {
-        if isReminderCritical(reminder, now: now) {
-            return .red
-        }
-        return Color(nsColor: reminder.event.calendar.color).ensureMinimumBrightness(factor: 0.7)
-    }
-
-    private func reminderSneakPeekText(for entry: ReminderLiveActivityManager.ReminderEntry, now: Date) -> String {
-        let title = entry.event.title.isEmpty ? "Upcoming Reminder" : entry.event.title
-        let remaining = max(entry.event.start.timeIntervalSince(now), 0)
-        let window = TimeInterval(Defaults[.reminderSneakPeekDuration])
-
-        if window > 0 && remaining <= window {
-            return "\(title) • now"
-        }
-
-        let minutes = Int(ceil(remaining / 60))
-        let timeString = reminderTimeFormatter.string(from: entry.event.start)
-
-        if minutes <= 0 {
-            return "\(title) • now • \(timeString)"
-        } else if minutes == 1 {
-            return "\(title) • in 1 min • \(timeString)"
-        } else {
-            return "\(title) • in \(minutes) min • \(timeString)"
-        }
-    }
-
     private func extensionSneakPeekText(preferredTitle: String, preferredSubtitle: String?, descriptor: AtollLiveActivityDescriptor?) -> String {
         let trimmedPreferredTitle = preferredTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let descriptorTitle = descriptor?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Extension"
@@ -1306,13 +1251,6 @@ struct ContentView: View {
         guard !subtitle.isEmpty else { return title }
         return "\(title) • \(subtitle)"
     }
-
-    private let reminderTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
-        return formatter
-    }()
 
     @ViewBuilder
     func DynamicIslandFaceAnimation() -> some View {
@@ -1455,10 +1393,6 @@ struct ContentView: View {
             return .timer
         }
 
-        if enableReminderLiveActivity, reminderManager.isActive, let reminder = reminderManager.activeReminder {
-            return .reminder(reminder)
-        }
-
         if enableScreenRecordingDetection && (recordingManager.isRecording || !recordingManager.isRecorderIdle) {
             return .recording
         }
@@ -1490,8 +1424,6 @@ struct ContentView: View {
         switch secondary {
         case .timer:
             return timerRightWingWidth(baseWidth: baseWidth, centerBaseWidth: centerBaseWidth)
-        case .reminder(let entry):
-            return reminderRightWingWidth(for: entry, baseWidth: baseWidth, notchHeight: notchHeight, now: reminderManager.currentDate)
         case .capsLock(let showLabel):
             return showLabel ? scaledWingWidth(baseWidth: baseWidth, centerBaseWidth: centerBaseWidth, factor: 0.4, extra: 12) : baseWidth
         case .focus:
@@ -1533,23 +1465,6 @@ struct ContentView: View {
         return max(baseWidth, padding + ringWidth + spacing + countdownWidth)
     }
 
-    private func reminderRightWingWidth(for entry: ReminderLiveActivityManager.ReminderEntry, baseWidth: CGFloat, notchHeight: CGFloat, now: Date) -> CGFloat {
-        let padding: CGFloat = 16
-        switch reminderPresentationStyle {
-        case .ringCountdown:
-            let diameter = ReminderSupplementMetrics.ringDiameter(for: notchHeight)
-            return max(baseWidth, padding + diameter)
-        case .digital:
-            let countdownText = ReminderSupplementMetrics.digitalCountdownText(for: entry, now: now)
-            let width = ReminderSupplementMetrics.digitalFrameWidth(for: countdownText)
-            return max(baseWidth, padding + width)
-        case .minutes:
-            let minutesText = ReminderSupplementMetrics.minutesCountdownText(for: entry, now: now)
-            let width = ReminderSupplementMetrics.minutesFrameWidth(for: minutesText)
-            return max(baseWidth, padding + width)
-        }
-    }
-
     private func focusRightWingWidth(baseWidth: CGFloat) -> CGFloat {
         // Focus pairings now mirror the default music spectrum width to keep the notch compact.
         return baseWidth
@@ -1580,11 +1495,6 @@ struct ContentView: View {
                     Image(systemName: "timer")
                         .font(.system(size: badgeSize * 0.55, weight: .semibold))
                         .foregroundStyle(timerAccentColor)
-                case .reminder(let entry):
-                    let accent = reminderColor(for: entry, now: reminderManager.currentDate)
-                    Image(systemName: "clock")
-                        .font(.system(size: badgeSize * 0.55, weight: .semibold))
-                        .foregroundStyle(accent)
                 case .focus(let mode):
                     mode.resolvedActiveIcon(usePrivateSymbol: true)
                         .renderingMode(.template)
@@ -1645,14 +1555,6 @@ struct ContentView: View {
                 showsCountdown: timerShowsCountdown,
                 showsProgress: timerShowsProgress,
                 progressStyle: timerProgressStyle,
-                notchHeight: notchHeight
-            )
-        case .reminder(let entry):
-            MusicReminderSupplementView(
-                entry: entry,
-                now: reminderManager.currentDate,
-                style: reminderPresentationStyle,
-                accent: reminderColor(for: entry, now: reminderManager.currentDate),
                 notchHeight: notchHeight
             )
         case .capsLock(let showLabel):
@@ -1736,17 +1638,6 @@ struct ContentView: View {
         case .solid:
             return timerSolidColor
         }
-    }
-
-    private func reminderIconName(for reminder: ReminderLiveActivityManager.ReminderEntry, now: Date) -> String {
-        isReminderCritical(reminder, now: now) ? ReminderLiveActivityManager.criticalIconName : ReminderLiveActivityManager.standardIconName
-    }
-
-    private func isReminderCritical(_ reminder: ReminderLiveActivityManager.ReminderEntry, now: Date) -> Bool {
-        let window = TimeInterval(Defaults[.reminderSneakPeekDuration])
-        guard window > 0 else { return false }
-        let remaining = reminder.event.start.timeIntervalSince(now)
-        return remaining > 0 && remaining <= window
     }
 
     private func extensionSecondaryPayloadID(for secondary: MusicSecondaryLiveActivity?) -> String? {
@@ -2295,8 +2186,7 @@ struct ContentView: View {
          vm.isColorPickerPopoverActive || 
          vm.isStatsPopoverActive ||
          vm.isTimerPopoverActive ||
-         vm.isMediaOutputPopoverActive ||
-         vm.isReminderPopoverActive
+         vm.isMediaOutputPopoverActive
     }
 
     private func shouldPreventAutoClose() -> Bool {
@@ -2442,7 +2332,7 @@ struct ContentView: View {
     }
 
     private func handleCloseScrollGesture(translation: CGFloat, phase: NSEvent.Phase) {
-        guard vm.notchState == .open, !vm.isHoveringCalendar, !vm.isScrollGestureActive else { return }
+        guard vm.notchState == .open, !vm.isScrollGestureActive else { return }
 
         withAnimation(.smooth) {
             gestureProgress = (translation / Defaults[.gestureSensitivity]) * -20
@@ -2504,7 +2394,6 @@ struct ContentView: View {
             && (!musicManager.isPlayerIdle || musicManager.bundleIdentifier != nil)
             && !lockScreenManager.isLocked
             && !hasAnyActivePopovers()
-            && !vm.isHoveringCalendar
             && !vm.isScrollGestureActive
     }
 
@@ -2786,10 +2675,9 @@ struct ContentView: View {
         // Original logic for other types
         let isMusicSneak = coordinator.sneakPeek.type == .music && vm.notchState == .closed && !vm.hideOnClosed && style == .standard
         let isTimerSneak = coordinator.sneakPeek.type == .timer && !vm.hideOnClosed && style == .standard
-        let isReminderSneak = coordinator.sneakPeek.type == .reminder && !vm.hideOnClosed && style == .standard
-        let isOtherSneak = coordinator.sneakPeek.type != .music && coordinator.sneakPeek.type != .timer && coordinator.sneakPeek.type != .reminder && vm.notchState == .closed
+        let isOtherSneak = coordinator.sneakPeek.type != .music && coordinator.sneakPeek.type != .timer && vm.notchState == .closed
         
-        return isMusicSneak || isTimerSneak || isReminderSneak || isOtherSneak
+        return isMusicSneak || isTimerSneak || isOtherSneak
     }
 
     private func resolvedSneakPeekStyle() -> SneakPeekStyle {
@@ -2803,7 +2691,6 @@ struct ContentView: View {
 private struct MediaNotchSection<Content: View>: View {
     @ObservedObject private var musicManager: MusicManager
     @ObservedObject private var timerManager: TimerManager
-    @ObservedObject private var reminderManager: ReminderLiveActivityManager
     @ObservedObject private var recordingManager: ScreenRecordingManager
     @ObservedObject private var doNotDisturbManager: DoNotDisturbManager
     @ObservedObject private var capsLockManager: CapsLockManager
@@ -2817,7 +2704,6 @@ private struct MediaNotchSection<Content: View>: View {
     init(
         musicManager: MusicManager,
         timerManager: TimerManager,
-        reminderManager: ReminderLiveActivityManager,
         recordingManager: ScreenRecordingManager,
         doNotDisturbManager: DoNotDisturbManager,
         capsLockManager: CapsLockManager,
@@ -2829,7 +2715,6 @@ private struct MediaNotchSection<Content: View>: View {
     ) {
         _musicManager = ObservedObject(wrappedValue: musicManager)
         _timerManager = ObservedObject(wrappedValue: timerManager)
-        _reminderManager = ObservedObject(wrappedValue: reminderManager)
         _recordingManager = ObservedObject(wrappedValue: recordingManager)
         _doNotDisturbManager = ObservedObject(wrappedValue: doNotDisturbManager)
         _capsLockManager = ObservedObject(wrappedValue: capsLockManager)
@@ -2880,7 +2765,6 @@ private struct ClipboardNotchSection<Content: View>: View {
 
 private enum MusicSecondaryLiveActivity: Equatable {
     case timer
-    case reminder(ReminderLiveActivityManager.ReminderEntry)
     case recording
     case focus(FocusModeType)
     case capsLock(showLabel: Bool)
@@ -2891,8 +2775,6 @@ private enum MusicSecondaryLiveActivity: Equatable {
         switch self {
         case .timer:
             return "timer"
-        case .reminder(let entry):
-            return "reminder-\(entry.id)"
         case .recording:
             return "recording"
         case .focus(let mode):
@@ -3022,87 +2904,6 @@ private struct MusicTimerSupplementView: View {
 
 }
 
-private struct MusicReminderSupplementView: View {
-    let entry: ReminderLiveActivityManager.ReminderEntry
-    let now: Date
-    let style: ReminderPresentationStyle
-    let accent: Color
-    let notchHeight: CGFloat
-
-    var body: some View {
-        Group {
-            switch style {
-            case .ringCountdown:
-                ringCountdownView
-            case .digital:
-                digitalCountdownView
-            case .minutes:
-                minutesCountdownView
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-    }
-
-    private var ringCountdownView: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.15), lineWidth: 3)
-            Circle()
-                .trim(from: 0, to: progressValue)
-                .stroke(accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .animation(.smooth(duration: 0.25), value: progressValue)
-        }
-        .frame(width: ringDiameter, height: ringDiameter)
-        .frame(width: max(ringDiameter + 4, 26), height: notchHeight, alignment: .center)
-    }
-
-    private var digitalCountdownView: some View {
-        Text(digitalCountdownText)
-            .font(.system(size: 15, weight: .semibold, design: .monospaced))
-            .foregroundColor(accent)
-            .contentTransition(.numericText())
-            .animation(.smooth(duration: 0.25), value: digitalCountdownText)
-            .frame(width: digitalFrameWidth, alignment: .trailing)
-            .frame(height: notchHeight, alignment: .center)
-    }
-
-    private var minutesCountdownView: some View {
-        Text(minutesCountdownText)
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundColor(accent)
-            .frame(width: minutesFrameWidth, alignment: .trailing)
-            .frame(height: notchHeight, alignment: .center)
-    }
-
-    private var progressValue: Double {
-        guard entry.leadTime > 0 else { return 1 }
-        let remaining = max(entry.event.start.timeIntervalSince(now), 0)
-        let elapsed = entry.leadTime - remaining
-        return min(max(elapsed / entry.leadTime, 0), 1)
-    }
-
-    private var digitalCountdownText: String {
-        ReminderSupplementMetrics.digitalCountdownText(for: entry, now: now)
-    }
-
-    private var minutesCountdownText: String {
-        ReminderSupplementMetrics.minutesCountdownText(for: entry, now: now)
-    }
-
-    private var ringDiameter: CGFloat {
-        ReminderSupplementMetrics.ringDiameter(for: notchHeight)
-    }
-
-    private var digitalFrameWidth: CGFloat {
-        ReminderSupplementMetrics.digitalFrameWidth(for: digitalCountdownText)
-    }
-
-    private var minutesFrameWidth: CGFloat {
-        ReminderSupplementMetrics.minutesFrameWidth(for: minutesCountdownText)
-    }
-}
-
 private struct MusicCapsLockLabelView: View {
     let color: Color
 
@@ -3135,36 +2936,6 @@ private enum TimerSupplementMetrics {
         guard !text.isEmpty else { return 64 }
         let width = musicMeasureText(text, font: MusicSupplementFont.systemFont(ofSize: 12, weight: .medium))
         return max(width + 14, 64)
-    }
-}
-
-private enum ReminderSupplementMetrics {
-    static func digitalCountdownText(for entry: ReminderLiveActivityManager.ReminderEntry, now: Date) -> String {
-        let remaining = max(entry.event.start.timeIntervalSince(now), 0)
-        let totalSeconds = Int(remaining.rounded(.down))
-        let minutes = totalSeconds / 60
-        let seconds = totalSeconds % 60
-        return String(format: "%02d:%02d", minutes, seconds)
-    }
-
-    static func minutesCountdownText(for entry: ReminderLiveActivityManager.ReminderEntry, now: Date) -> String {
-        let remaining = max(entry.event.start.timeIntervalSince(now), 0)
-        let minutes = max(1, Int(ceil(remaining / 60)))
-        return minutes == 1 ? "in 1 min" : "in \(minutes) min"
-    }
-
-    static func digitalFrameWidth(for text: String) -> CGFloat {
-        let width = musicMeasureText(text, font: MusicSupplementFont.monospacedDigitSystemFont(ofSize: 15, weight: .semibold))
-        return max(width + 18, 76)
-    }
-
-    static func minutesFrameWidth(for text: String) -> CGFloat {
-        let width = musicMeasureText(text, font: MusicSupplementFont.systemFont(ofSize: 13, weight: .semibold))
-        return max(width + 18, 88)
-    }
-
-    static func ringDiameter(for notchHeight: CGFloat) -> CGFloat {
-        max(min(notchHeight - 12, 22), 16)
     }
 }
 

@@ -251,11 +251,6 @@ struct ExtensionRateLimitRecord: Codable, Defaults.Serializable, Hashable, Ident
     }
 }
 
-enum CalendarSelectionState: Codable, Defaults.Serializable {
-    case all
-    case selected(Set<String>)
-}
-
 enum FantasticalViewStyle: String, CaseIterable, Codable, Defaults.Serializable {
     case mini = "mini"
     case calendar = "calendar"
@@ -264,52 +259,6 @@ enum FantasticalViewStyle: String, CaseIterable, Codable, Defaults.Serializable 
         switch self {
         case .mini: return "Mini View"
         case .calendar: return "Full Calendar"
-        }
-    }
-}
-
-enum ThirdPartyCalendarApp: String, CaseIterable, Codable, Defaults.Serializable, Identifiable {
-    case fantastical = "fantastical"
-    case notionCalendar = "notionCalendar"
-    case busyCal = "busyCal"
-    case custom = "custom"
-    
-    var id: String { rawValue }
-    
-    var displayName: String {
-        switch self {
-        case .fantastical: return "Fantastical"
-        case .notionCalendar: return "Notion Calendar"
-        case .busyCal: return "BusyCal"
-        case .custom: return "Custom App"
-        }
-    }
-    
-    /// Bundle identifiers to try when looking up the app icon (first match wins).
-    var bundleIdentifiers: [String] {
-        switch self {
-        case .fantastical: return ["com.flexibits.fantastical2.mac", "com.flexibits.fantastical"]
-        case .notionCalendar: return ["com.cron.electron"]
-        case .busyCal: return ["com.busymac.busycal3", "com.busymac.busycal"]
-        case .custom: return []
-        }
-    }
-    
-    var fallbackIconName: String {
-        switch self {
-        case .fantastical: return "calendar.badge.clock"
-        case .notionCalendar: return "calendar.badge.plus"
-        case .busyCal: return "calendar"
-        case .custom: return "app.dashed"
-        }
-    }
-    
-    var fallbackIconColor: Color {
-        switch self {
-        case .fantastical: return .red
-        case .notionCalendar: return .blue
-        case .busyCal: return .green
-        case .custom: return .gray
         }
     }
 }
@@ -616,25 +565,6 @@ enum FocusMonitoringMode: String, CaseIterable, Identifiable, Defaults.Serializa
     }
 }
 
-enum ReminderPresentationStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
-    case ringCountdown = "Ring"
-    case digital = "Digital"
-    case minutes = "Minutes"
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-            case .ringCountdown:
-                return String(localized: "Ring")
-            case .digital:
-                return String(localized: "Digital")
-            case .minutes:
-                return String(localized: "Minutes")
-        }
-    }
-}
-
 // AI Model types for screen assistant
 enum AIModelProvider: String, CaseIterable, Identifiable, Defaults.Serializable {
     case gemini = "Gemini"
@@ -847,8 +777,6 @@ extension Defaults.Keys {
     static let selectedIdleAnimation = Key<CustomIdleAnimation?>("selectedIdleAnimation", default: nil)
     static let animationTransformOverrides = Key<[String: AnimationTransformConfig]>("animationTransformOverrides", default: [:])
     static let tileShowLabels = Key<Bool>("tileShowLabels", default: false)
-    static let showCalendar = Key<Bool>("showCalendar", default: true)
-    static let hideCompletedReminders = Key<Bool>("hideCompletedReminders", default: true)
     static let hideAllDayEvents = Key<Bool>("hideAllDayEvents", default: false)
     static let sliderColor = Key<SliderColorEnum>(
         "sliderUseAlbumArtColor",
@@ -904,7 +832,6 @@ extension Defaults.Keys {
     static let enableLockScreenMediaWidget = Key<Bool>("enableLockScreenMediaWidget", default: true)
     static let enableLockScreenWeatherWidget = Key<Bool>("enableLockScreenWeatherWidget", default: true)
     static let enableLockScreenFocusWidget = Key<Bool>("enableLockScreenFocusWidget", default: true)
-    static let enableLockScreenReminderWidget = Key<Bool>("enableLockScreenReminderWidget", default: true)
     static let enableLockScreenTimerWidget = Key<Bool>("enableLockScreenTimerWidget", default: true)
     static let enableLockScreenCopilotBudgetWidget = Key<Bool>("enableLockScreenCopilotBudgetWidget", default: false)
     static let enableLockScreenDockerHealthWidget = Key<Bool>("enableLockScreenDockerHealthWidget", default: false)
@@ -956,27 +883,8 @@ extension Defaults.Keys {
     static let lockScreenMusicFullscreenVideoArtwork = Key<Bool>("lockScreenMusicFullscreenVideoArtwork", default: true)
     static let lockScreenUseArtworkLayoutOverFullscreenCanvas = Key<Bool>("lockScreenShowCenteredAlbumArtOverFullscreenCanvas", default: true)
     static let lockScreenTimerWidgetUsesBlur = Key<Bool>("lockScreenTimerWidgetUsesBlur", default: false)
-    static let lockScreenReminderChipStyle = Key<LockScreenReminderChipStyle>("lockScreenReminderChipStyle", default: .eventColor)
-    static let lockScreenReminderWidgetHorizontalAlignment = Key<String>("lockScreenReminderWidgetHorizontalAlignment", default: "center")
-    static let lockScreenReminderWidgetVerticalOffset = Key<Double>("lockScreenReminderWidgetVerticalOffset", default: 0)
-    static let lockScreenShowCalendarEvent = Key<Bool>("lockScreenShowCalendarEvent", default: true)
-    static let lockScreenCalendarEventLookaheadWindow = Key<String>("lockScreenCalendarEventLookaheadWindow", default: "3h")
-    static let lockScreenCalendarSelectionMode = Key<String>("lockScreenCalendarSelectionMode", default: "all")
-    static let lockScreenSelectedCalendarIDs = Key<Set<String>>("lockScreenSelectedCalendarIDs", default: [])
-    static let lockScreenShowCalendarCountdown = Key<Bool>("lockScreenShowCalendarCountdown", default: true)
-    static let lockScreenShowCalendarEventEntireDuration = Key<Bool>("lockScreenShowCalendarEventEntireDuration", default: true)
-    static let lockScreenShowCalendarEventAfterStartEnabled = Key<Bool>("lockScreenShowCalendarEventAfterStartEnabled", default: false)
-    static let lockScreenShowCalendarEventAfterStartWindow = Key<String>("lockScreenShowCalendarEventAfterStartWindow", default: "5m")
-    static let lockScreenShowCalendarTimeRemaining = Key<Bool>("lockScreenShowCalendarTimeRemaining", default: true)
-    static let lockScreenShowCalendarStartTimeAfterBegins = Key<Bool>("lockScreenShowCalendarStartTimeAfterBegins", default: true)
-    static let lockScreenWeatherWidgetRowOrder = Key<String>("lockScreenWeatherWidgetRowOrder", default: "weather_calendar_focus")
-    
-    // MARK: Third-party Calendar Integration
-    static let enableThirdPartyCalendarApp = Key<Bool>("enableThirdPartyCalendarApp", default: false)
-    static let selectedCalendarApp = Key<ThirdPartyCalendarApp>("selectedCalendarApp", default: .fantastical)
-    static let customCalendarAppBundleID = Key<String>("customCalendarAppBundleID", default: "")
-    static let fantasticalDefaultView = Key<FantasticalViewStyle>("fantasticalDefaultView", default: .mini)
-    
+    static let lockScreenWeatherWidgetRowOrder = Key<String>("lockScreenWeatherWidgetRowOrder", default: "weather_focus")
+
         // MARK: Battery
     static let showPowerStatusNotifications = Key<Bool>("showPowerStatusNotifications", default: true)
     static let showBatteryIndicator = Key<Bool>("showBatteryIndicator", default: BatteryActivityManager.shared.hasBattery())
@@ -1030,11 +938,6 @@ extension Defaults.Keys {
         static let autoRemoveShelfItems = Key<Bool>("autoRemoveShelfItems", default: false)
         static let expandedDragDetection = Key<Bool>("expandedDragDetection", default: true)
     
-        // MARK: Calendar
-    static let calendarSelectionState = Key<CalendarSelectionState>("calendarSelectionState", default: .all)
-        static let showFullEventTitles = Key<Bool>("showFullEventTitles", default: false)
-        static let autoScrollToNextEvent = Key<Bool>("autoScrollToNextEvent", default: true)
-    
         // MARK: Fullscreen Media Detection
     static let alwaysHideInFullscreen = Key<Bool>("alwaysHideInFullscreen", default: false)
     
@@ -1064,6 +967,9 @@ extension Defaults.Keys {
     static let enableStatsFeature = Key<Bool>("enableStatsFeature", default: false)
     static let autoStartStatsMonitoring = Key<Bool>("autoStartStatsMonitoring", default: true)
     static let statsStopWhenNotchCloses = Key<Bool>("statsStopWhenNotchCloses", default: true)
+
+    // MARK: Idle Animations
+    static let enableIdleAnimations = Key<Bool>("enableIdleAnimations", default: true)
     static let statsUpdateInterval = Key<Double>("statsUpdateInterval", default: 1.0)
     static let showCpuGraph = Key<Bool>("showCpuGraph", default: true)
     static let showMemoryGraph = Key<Bool>("showMemoryGraph", default: true)
@@ -1105,11 +1011,6 @@ extension Defaults.Keys {
     static let timerProgressStyle = Key<TimerProgressStyle>("timerProgressStyle", default: .bar)
     static let mirrorSystemTimer = Key<Bool>("mirrorSystemTimer", default: true)
     
-    // MARK: Reminder Live Activity
-    static let enableReminderLiveActivity = Key<Bool>("enableReminderLiveActivity", default: true)
-    static let reminderPresentationStyle = Key<ReminderPresentationStyle>("reminderPresentationStyle", default: .ringCountdown)
-    static let reminderLeadTime = Key<Int>("reminderLeadTime", default: 5)
-    static let reminderSneakPeekDuration = Key<Double>("reminderSneakPeekDuration", default: 5)
     static let timerControlWindowEnabled = Key<Bool>("timerControlWindowEnabled", default: true)
     
     // MARK: Alarm/Reminder Feature

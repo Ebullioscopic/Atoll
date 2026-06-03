@@ -48,12 +48,10 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     var allowLiveActivityInFullscreen: Bool {
         return true
     }
-    @Published var isHoveringCalendar: Bool = false
     @Published var isBatteryPopoverActive: Bool = false
     @Published var isClipboardPopoverActive: Bool = false
     @Published var isColorPickerPopoverActive: Bool = false
     @Published var isStatsPopoverActive: Bool = false
-    @Published var isReminderPopoverActive: Bool = false
     @Published var isMediaOutputPopoverActive: Bool = false
     @Published var isTimerPopoverActive: Bool = false
     @Published var shouldRecheckHover: Bool = false
@@ -145,27 +143,6 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             .store(in: &cancellables)
         
         setupDetectorObserver()
-
-        ReminderLiveActivityManager.shared.$activeWindowReminders
-            .removeDuplicates()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                guard let self else { return }
-                let updatedTarget = self.calculateDynamicNotchSize()
-                guard self.notchState == .open else { return }
-                guard self.notchSize != updatedTarget else { return }
-                withAnimation(.smooth) {
-                    self.notchSize = updatedTarget
-                }
-                if let delegate = AppDelegate.shared {
-                    delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
-                        animated: true,
-                        force: false
-                    )
-                }
-            }
-            .store(in: &cancellables)
 
         // Observe settings + lyrics changes to dynamically resize the notch
         let enableLyricsPublisher = Defaults.publisher(.enableLyrics).map { $0.newValue }

@@ -277,11 +277,13 @@ struct NotchAgentBusView: View {
     }
 
     private func agentEmoji(for name: String) -> String {
+        if name.contains("hermes") { return "🪬" }
+        if name.contains("openclaw") || name.contains("claw") { return "🐙" }
+        if name.contains("copilot") || name.contains("codex") { return "✨" }
+        if name.contains("terminal") || name.contains("cli") { return "🖥️" }
+        if name.contains("ide") || name.contains("cursor") || name.contains("vscode") { return "💻" }
         if name.contains("antigravity") { return "🚀" }
-        if name.contains("codex") { return "🧠" }
         if name.contains("nerv") { return "🔮" }
-        if name.contains("claude") { return "🪄" }
-        if name.contains("copilot") { return "✨" }
         if name.contains("kilo") { return "⚡" }
         return "🤖"
     }

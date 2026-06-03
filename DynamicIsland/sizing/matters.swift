@@ -65,7 +65,7 @@ func enabledStandardTabCount() -> Int {
     var count = 0
 
     // Home tab
-    if Defaults[.showStandardMediaControls] || Defaults[.showCalendar] || Defaults[.showMirror] {
+    if Defaults[.showStandardMediaControls] || Defaults[.showMirror] {
         count += 1
     }
 
@@ -143,12 +143,6 @@ var minimalisticOpenNotchSize: CGSize {
         size.height += minimalisticLyricsExtraHeight
     }
     
-    let reminderCount = ReminderLiveActivityManager.shared.activeWindowReminders.count
-    if reminderCount > 0 {
-        let reminderHeight = ReminderLiveActivityManager.additionalHeight(forRowCount: reminderCount)
-        size.height += reminderHeight
-    }
-
     if DynamicIslandViewCoordinator.shared.timerLiveActivityEnabled && TimerManager.shared.isExternalTimerActive {
         size.height += minimalisticTimerCountdownBlockHeight
     }

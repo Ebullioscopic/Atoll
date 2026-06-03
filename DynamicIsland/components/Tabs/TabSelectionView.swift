@@ -56,7 +56,6 @@ struct TabSelectionView: View {
     @Default(.enableThirdPartyExtensions) private var enableThirdPartyExtensions
     @Default(.enableExtensionNotchExperiences) private var enableExtensionNotchExperiences
     @Default(.enableExtensionNotchTabs) private var enableExtensionNotchTabs
-    @Default(.showCalendar) private var showCalendar
     @Default(.showMirror) private var showMirror
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
@@ -163,7 +162,7 @@ struct TabSelectionView: View {
         if enableMinimalisticUI {
             return true
         }
-        return showStandardMediaControls || showCalendar || showMirror
+        return showStandardMediaControls || showMirror
     }
 
     private func isSelected(_ tab: TabModel) -> Bool {
