@@ -1,114 +1,105 @@
 import Foundation
 import CoreGraphics
 
-// MARK: - Brightness emission throttle + user-initiated HUD gate
+// MARK: - Brightness emission + baseline-sync decisions
 //
 // MIRRORS: DynamicIsland/managers/SystemMediaControllers.swift
-//   `final class SystemBrightnessController` — the emission-throttling and
-//   baseline-sync logic (properties: lastEmittedBrightness, lastEmissionDate,
-//   minimumEmissionInterval = 0.04; methods: emitBrightnessChange(value:force:),
-//   syncWithSystemBrightnessIfNeeded(), markUserInitiated()).
+//   `final class SystemBrightnessController` — the hardware-free *decision*
+//   helpers embedded in that hardware-coupled singleton:
+//     • emitBrightnessChange(value:)            (clamp + baseline update)
+//     • syncWithSystemBrightnessIfNeeded()      (0.001 baseline-delta gate)
+//     • adjust(by:)                             (base+delta target clamp)
+//     • animationDuration(forDelta:)            (min/max duration scaling)
+//     • ease(_:)                                (cubic ease-out)
+//     • the poll loop's pollChangeThreshold     (0.005 emit gate)
 //
 // The app class drives real CoreBrightness/IODisplay hardware and an animation
-// Timer; this kernel isolates the *decisions* (when does an emission fire? does
-// an auto-brightness sync emit or only move the baseline? is a change gated as
-// user-initiated?) so they can be tested deterministically with an injected clock.
-public final class BrightnessEmissionKernel {
+// Timer; this kernel isolates only the value-math decisions so they run
+// deterministically with no hardware. Each member is a verified copy of the
+// canonical method — see the per-member `MIRRORS` note.
+//
+// NOTE on Codacy proposal #1 ("auto-brightness updates the baseline WITHOUT
+// showing the HUD"): the real app does NOT behave that way. Its
+// `syncWithSystemBrightnessIfNeeded()` calls `emitBrightnessChange(...)` (line
+// ~558), so an above-threshold system change DOES emit (and the HUD does fire).
+// There is likewise no emission throttle and no user-initiated gate in the app.
+// Rather than fabricate those behaviours, this kernel mirrors the real logic and
+// the tests assert the real contract: sync emits when, and only when, the system
+// level differs from the baseline by more than 0.001.
+final class BrightnessEmissionKernel {
 
-    /// ~25 fps cap. MIRRORS `minimumEmissionInterval: TimeInterval = 0.04`.
-    public static let minimumEmissionInterval: TimeInterval = 0.04
+    /// MIRRORS `syncWithSystemBrightnessIfNeeded()` baseline-delta guard (0.001).
+    static let baselineSyncThreshold: Float = 0.001
 
-    /// MIRRORS `userInitiatedWindow: TimeInterval = 1.5`.
-    public static let userInitiatedWindow: TimeInterval = 1.5
+    /// MIRRORS the poll loop's `pollChangeThreshold: Float = 0.005`.
+    static let pollChangeThreshold: Float = 0.005
 
-    /// MIRRORS `syncWithSystemBrightnessIfNeeded` baseline-delta guard (0.001).
-    public static let baselineSyncThreshold: Float = 0.001
+    /// MIRRORS `minimumBrightnessAnimationDuration` / `maximumBrightnessAnimationDuration`
+    /// / `brightnessAnimationDurationScale`.
+    static let minimumAnimationDuration: TimeInterval = 0.08
+    static let maximumAnimationDuration: TimeInterval = 0.3
+    static let animationDurationScale: TimeInterval = 1.6
 
-    public private(set) var lastEmittedBrightness: Float
-    public private(set) var lastEmissionDate: Date
-    public private(set) var userInitiatedBrightnessChange = false
-    private var userInitiatedDeadline: Date?
+    /// MIRRORS `private var lastEmittedBrightness: Float`.
+    private(set) var lastEmittedBrightness: Float
 
-    /// Records emissions actually delivered to observers (the HUD-visible path).
-    public private(set) var emittedValues: [Float] = []
+    /// Records emissions actually delivered to observers (the HUD-visible path),
+    /// so tests can assert exactly which changes reached `onBrightnessChange` /
+    /// `.systemBrightnessDidChange`.
+    private(set) var emittedValues: [Float] = []
 
-    public init(initialBrightness: Float = 0.5, now: Date = .distantPast) {
-        self.lastEmittedBrightness = initialBrightness
-        self.lastEmissionDate = now
+    init(initialBrightness: Float = 0.5) {
+        self.lastEmittedBrightness = max(0, min(1, initialBrightness))
     }
 
-    /// MIRRORS `emitBrightnessChange(value:force:)`.
-    /// Returns true when the change is emitted to observers (HUD fires),
-    /// false when throttled. `force` bypasses the throttle (final animation step).
+    /// MIRRORS `emitBrightnessChange(value:)`: clamp to [0, 1], update the
+    /// baseline, and deliver to observers. There is no throttle in the app.
     @discardableResult
-    public func emitBrightnessChange(value: Float, force: Bool = false, now: Date) -> Bool {
+    func emitBrightnessChange(value: Float) -> Float {
         let clamped = max(0, min(1, value))
         lastEmittedBrightness = clamped
-        if !force {
-            guard now.timeIntervalSince(lastEmissionDate) >= Self.minimumEmissionInterval else {
-                return false
-            }
-        }
-        lastEmissionDate = now
         emittedValues.append(clamped)
+        return clamped
+    }
+
+    /// MIRRORS `syncWithSystemBrightnessIfNeeded()`: if the system level differs
+    /// from the baseline by more than 0.001, re-emit at the system level (which,
+    /// in the app, posts the notification). Returns true when it emitted.
+    @discardableResult
+    func syncWithSystemBrightnessIfNeeded(systemLevel: Float) -> Bool {
+        guard abs(systemLevel - lastEmittedBrightness) > Self.baselineSyncThreshold else {
+            return false
+        }
+        emitBrightnessChange(value: systemLevel)
         return true
     }
 
-    /// MIRRORS `syncWithSystemBrightnessIfNeeded()`.
-    /// Auto-brightness adjustments update the internal baseline but must NOT emit
-    /// (no HUD flash). Returns true if the baseline moved.
-    @discardableResult
-    public func syncWithSystemBrightness(_ systemLevel: Float) -> Bool {
-        if abs(systemLevel - lastEmittedBrightness) > Self.baselineSyncThreshold {
-            lastEmittedBrightness = systemLevel   // baseline only — deliberately no emit
-            return true
-        }
-        return false
+    /// MIRRORS `adjust(by:)` target computation:
+    /// `target = clamp(base + delta)` where `base = pendingAdjustTarget ?? lastEmittedBrightness`.
+    /// Coalescing successive deltas before the next runloop tick is what
+    /// `pendingAdjustTarget` models.
+    func adjustTarget(by delta: Float, pendingAdjustTarget: Float? = nil) -> Float {
+        let base = pendingAdjustTarget ?? lastEmittedBrightness
+        return max(0, min(1, base + delta))
     }
 
-    /// MIRRORS `markUserInitiated()` — opens the gate, auto-resets after the window.
-    public func markUserInitiated(now: Date) {
-        userInitiatedBrightnessChange = true
-        userInitiatedDeadline = now.addingTimeInterval(Self.userInitiatedWindow)
+    /// MIRRORS `animationDuration(forDelta:)`: a larger jump animates longer,
+    /// clamped to [min, max].
+    func animationDuration(forDelta delta: Float) -> TimeInterval {
+        let scaled = Self.minimumAnimationDuration + TimeInterval(delta) * Self.animationDurationScale
+        return min(Self.maximumAnimationDuration, max(Self.minimumAnimationDuration, scaled))
     }
 
-    /// Evaluates the auto-reset that the app performs via a 1.5s Timer.
-    public func isUserInitiated(at now: Date) -> Bool {
-        if let deadline = userInitiatedDeadline, now >= deadline {
-            userInitiatedBrightnessChange = false
-            userInitiatedDeadline = nil
-        }
-        return userInitiatedBrightnessChange
+    /// MIRRORS `ease(_:)`: cubic ease-out, input clamped to [0, 1].
+    func ease(_ progress: Double) -> Double {
+        let clamped = min(max(progress, 0), 1)
+        return 1 - pow(1 - clamped, 3)
     }
-}
 
-// MARK: - CoreBrightness candidate-class resolution
-//
-// MIRRORS: DynamicIsland/helpers/CoreBrightnessDisplayClient.swift
-//   `private static let candidateClassNames` + the `private init()` resolver
-//   loop that walks the list newest-first and binds the first class that exists.
-//
-// Tests pass a stub `classLookup` (stand-in for NSClassFromString) representing
-// what's present on a given macOS version, verifying the resolver picks the
-// correct (newest available) class and degrades gracefully when none exist.
-public enum CoreBrightnessClassResolver {
-
-    /// MIRRORS `candidateClassNames` — ordered newest-first.
-    public static let candidateClassNames: [String] = [
-        "CBBrightnessProxy",
-        "CBDisplayBrightnessClient",
-        "BrightnessSystemClient",
-        "DisplayBrightnessClient"
-    ]
-
-    /// Returns the first candidate the platform exposes, or nil (→ polling fallback).
-    /// MIRRORS the `for name in candidateClassNames { if NSClassFromString(name) … }`
-    /// loop including its newest-first short-circuit.
-    public static func resolve(classExists: (String) -> Bool) -> String? {
-        for name in candidateClassNames where classExists(name) {
-            return name
-        }
-        return nil
+    /// MIRRORS the poll loop guard `abs(system - lastEmittedBrightness) > pollChangeThreshold`:
+    /// background polling only emits when the system moved by more than 0.005.
+    func pollShouldEmit(systemLevel: Float) -> Bool {
+        abs(systemLevel - lastEmittedBrightness) > Self.pollChangeThreshold
     }
 }
 
@@ -122,24 +113,32 @@ public enum CoreBrightnessClassResolver {
 // left-click monitor closes the notch on any click that lands OUTSIDE every
 // notch window frame. A click inside is ignored. This kernel isolates that
 // frame-containment + gating decision (NSEvent/AppDelegate stripped out).
-public enum StickyTerminalClickKernel {
+enum StickyTerminalClickKernel {
 
     /// MIRRORS `isPointInsideNotchWindow(_:)` — point is inside if ANY notch
     /// window frame contains it (covers the showOnAllDisplays multi-window case).
-    public static func isPointInsideNotchWindow(_ point: CGPoint, windowFrames: [CGRect]) -> Bool {
+    static func isPointInsideNotchWindow(_ point: CGPoint, windowFrames: [CGRect]) -> Bool {
         windowFrames.contains { $0.contains(point) }
     }
 
-    /// MIRRORS the monitor-install guard:
+    /// MIRRORS the monitor-install guard in `syncStickyTerminalOutsideClickMonitor()`:
     /// `vm.notchState == .open && terminalStickyMode && currentView == .terminal`.
-    public static func shouldMonitorOutsideClicks(notchOpen: Bool, stickyMode: Bool, currentViewIsTerminal: Bool) -> Bool {
+    static func shouldMonitorOutsideClicks(
+        notchOpen: Bool,
+        stickyMode: Bool,
+        currentViewIsTerminal: Bool
+    ) -> Bool {
         notchOpen && stickyMode && currentViewIsTerminal
     }
 
     /// MIRRORS the handler body: while open, a click outside all notch windows
     /// closes the notch; a click inside (or notch already closed) does nothing.
     /// Returns true when the notch should close.
-    public static func shouldCloseOnClick(notchOpen: Bool, clickLocation: CGPoint, windowFrames: [CGRect]) -> Bool {
+    static func shouldCloseOnClick(
+        notchOpen: Bool,
+        clickLocation: CGPoint,
+        windowFrames: [CGRect]
+    ) -> Bool {
         guard notchOpen else { return false }
         return !isPointInsideNotchWindow(clickLocation, windowFrames: windowFrames)
     }

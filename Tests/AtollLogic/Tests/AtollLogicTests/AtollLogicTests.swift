@@ -5,119 +5,98 @@ import XCTest
 // ("Prompt proposal for missing tests"). Each scenario maps to a kernel that
 // mirrors the canonical app logic — see AtollLogic.swift `// MIRRORS:` refs.
 //
-// Codacy proposed 5 scenarios. Four map to real logic and are covered below.
-// The 5th ("custom terminal scroll knob reflects the underlying SwiftTerm view")
-// targets code that does not exist: Atoll's terminal uses SwiftTerm's built-in
-// scrolling and has NO custom scroll knob/scroller (verified — no NSScroller /
-// knob / scrollOffset code in TerminalManager, NotchTerminalView, or
-// TerminalFloatingPanel). It is documented as not-applicable in
-// testScrollKnob_notApplicable_swiftTermOwnsScrolling below rather than faked.
+// Codacy proposed 5 scenarios. They are reconciled against the ACTUAL app code:
+//
+//   #1 "auto-brightness updates the baseline WITHOUT showing the HUD" — the app
+//      does NOT do this. `syncWithSystemBrightnessIfNeeded()` re-emits (and the
+//      app posts `.systemBrightnessDidChange`) when the system level differs by
+//      > 0.001. We test that real contract rather than a fabricated silent sync.
+//   #2 "emissions throttled to >= 0.04s apart" — the app has NO emission
+//      throttle. The real rate-limiting lives in the poll loop's 0.005 change
+//      threshold, which we test instead.
+//   #3 desktop click outside the notch closes the sticky terminal — real, tested.
+//   #4 "CoreBrightness client resolves the right class per macOS version" — the
+//      app does NOT resolve among candidate classes; CoreBrightnessDisplayClient
+//      loads a single `DisplayBrightnessClient` directly. There is no resolver
+//      logic to test, so this proposal is documented as not-applicable rather
+//      than asserted against a fabricated resolver.
+//   #5 "custom terminal scroll knob reflects the SwiftTerm view" — Atoll has no
+//      custom scroll knob (SwiftTerm owns scrolling). Documented not-applicable.
 
 final class BrightnessEmissionTests: XCTestCase {
 
-    // Codacy #2: brightness emissions are throttled to >= 0.04s apart.
-    func testEmissionThrottledToMinimumInterval() {
-        let t0 = Date(timeIntervalSinceReferenceDate: 0)
-        let k = BrightnessEmissionKernel(initialBrightness: 0.5, now: t0)
-
-        XCTAssertTrue(k.emitBrightnessChange(value: 0.60, now: t0.addingTimeInterval(0.04)),
-                      "first change past the interval should emit")
-        // 20ms later — inside the 40ms window — must be throttled.
-        XCTAssertFalse(k.emitBrightnessChange(value: 0.65, now: t0.addingTimeInterval(0.06)),
-                       "change inside the 0.04s window must be throttled (no HUD spam)")
-        // 40ms after the last *emission* — boundary is inclusive, should emit.
-        XCTAssertTrue(k.emitBrightnessChange(value: 0.70, now: t0.addingTimeInterval(0.10)),
-                      "change at exactly the interval boundary should emit")
-
-        XCTAssertEqual(k.emittedValues.count, 2, "only the two non-throttled values reach observers")
-        XCTAssertEqual(k.emittedValues.first ?? .nan, 0.60, accuracy: 0.0001)
-        XCTAssertEqual(k.emittedValues.last ?? .nan, 0.70, accuracy: 0.0001)
-        // Latest internal value still tracks the throttled write.
-        XCTAssertEqual(k.lastEmittedBrightness, 0.70, accuracy: 0.0001)
-    }
-
-    func testForcedEmissionBypassesThrottle() {
-        let t0 = Date(timeIntervalSinceReferenceDate: 0)
-        let k = BrightnessEmissionKernel(initialBrightness: 0.5, now: t0)
-        XCTAssertTrue(k.emitBrightnessChange(value: 0.60, now: t0.addingTimeInterval(0.04)))
-        // Final animation step fires immediately despite being inside the window.
-        XCTAssertTrue(k.emitBrightnessChange(value: 0.61, force: true, now: t0.addingTimeInterval(0.05)),
-                      "force=true (final animation tick) must bypass the throttle")
-    }
-
     func testEmissionClampsToUnitRange() {
-        let t0 = Date(timeIntervalSinceReferenceDate: 0)
-        let k = BrightnessEmissionKernel(initialBrightness: 0.5, now: t0)
-        k.emitBrightnessChange(value: 1.8, now: t0.addingTimeInterval(1))
-        XCTAssertEqual(k.lastEmittedBrightness, 1.0, accuracy: 0.0001)
-        k.emitBrightnessChange(value: -0.3, now: t0.addingTimeInterval(2))
-        XCTAssertEqual(k.lastEmittedBrightness, 0.0, accuracy: 0.0001)
+        let kernel = BrightnessEmissionKernel(initialBrightness: 0.5)
+        XCTAssertEqual(kernel.emitBrightnessChange(value: 1.8), 1.0, accuracy: 0.0001)
+        XCTAssertEqual(kernel.lastEmittedBrightness, 1.0, accuracy: 0.0001)
+        XCTAssertEqual(kernel.emitBrightnessChange(value: -0.3), 0.0, accuracy: 0.0001)
+        XCTAssertEqual(kernel.lastEmittedBrightness, 0.0, accuracy: 0.0001)
     }
 
-    // Codacy #1: auto-brightness updates the baseline WITHOUT showing the HUD.
-    func testAutoBrightnessUpdatesBaselineWithoutEmitting() {
-        let t0 = Date(timeIntervalSinceReferenceDate: 0)
-        let k = BrightnessEmissionKernel(initialBrightness: 0.50, now: t0)
-
-        let moved = k.syncWithSystemBrightness(0.42) // ambient sensor drift
-        XCTAssertTrue(moved, "a meaningful system delta should move the baseline")
-        XCTAssertEqual(k.lastEmittedBrightness, 0.42, accuracy: 0.0001,
-                       "baseline tracks the system level")
-        XCTAssertTrue(k.emittedValues.isEmpty,
-                      "auto-brightness sync must NOT emit — no HUD flash on ambient changes")
+    func testEmissionDeliversEveryValueToObservers() {
+        // The app's emitBrightnessChange has no throttle — every call reaches
+        // observers (the animation Timer relies on this to stream interpolated
+        // steps to the HUD).
+        let kernel = BrightnessEmissionKernel(initialBrightness: 0.5)
+        kernel.emitBrightnessChange(value: 0.60)
+        kernel.emitBrightnessChange(value: 0.65)
+        kernel.emitBrightnessChange(value: 0.70)
+        XCTAssertEqual(kernel.emittedValues.count, 3, "every emission reaches observers; no throttle")
+        XCTAssertEqual(kernel.emittedValues.last ?? .nan, 0.70, accuracy: 0.0001)
     }
 
-    func testAutoBrightnessIgnoresSubThresholdJitter() {
-        let t0 = Date(timeIntervalSinceReferenceDate: 0)
-        let k = BrightnessEmissionKernel(initialBrightness: 0.50, now: t0)
-        let moved = k.syncWithSystemBrightness(0.5005) // < 0.001 threshold
-        XCTAssertFalse(moved, "sub-threshold sensor jitter must not move the baseline")
-        XCTAssertEqual(k.lastEmittedBrightness, 0.50, accuracy: 0.0001)
+    // Codacy #1 (reconciled): auto-brightness sync re-emits when the system level
+    // diverges from the baseline by more than 0.001 — the app's real behaviour.
+    func testSyncEmitsWhenSystemDivergesAboveThreshold() {
+        let kernel = BrightnessEmissionKernel(initialBrightness: 0.50)
+        let didEmit = kernel.syncWithSystemBrightnessIfNeeded(systemLevel: 0.42)
+        XCTAssertTrue(didEmit, "an above-threshold system delta re-emits at the system level")
+        XCTAssertEqual(kernel.lastEmittedBrightness, 0.42, accuracy: 0.0001)
+        XCTAssertEqual(kernel.emittedValues, [0.42], "the sync emission reaches observers")
     }
 
-    func testUserInitiatedGateOpensThenAutoResets() {
-        let t0 = Date(timeIntervalSinceReferenceDate: 0)
-        let k = BrightnessEmissionKernel(initialBrightness: 0.5, now: t0)
-        XCTAssertFalse(k.isUserInitiated(at: t0), "gate starts closed")
-
-        k.markUserInitiated(now: t0)
-        XCTAssertTrue(k.isUserInitiated(at: t0.addingTimeInterval(0.5)),
-                      "within the 1.5s window the change is user-initiated (HUD allowed)")
-        XCTAssertFalse(k.isUserInitiated(at: t0.addingTimeInterval(1.5)),
-                       "at/after the window the gate auto-resets")
-    }
-}
-
-final class CoreBrightnessClassResolverTests: XCTestCase {
-
-    // Codacy #4: CoreBrightness client init resolves the right class per macOS version.
-    func testResolvesNewestAvailableClass() {
-        // Newest two present → newest wins.
-        let picked = CoreBrightnessClassResolver.resolve { name in
-            name == "CBBrightnessProxy" || name == "CBDisplayBrightnessClient"
-        }
-        XCTAssertEqual(picked, "CBBrightnessProxy",
-                       "resolver must prefer the newest available candidate")
+    func testSyncIgnoresSubThresholdJitter() {
+        let kernel = BrightnessEmissionKernel(initialBrightness: 0.50)
+        let didEmit = kernel.syncWithSystemBrightnessIfNeeded(systemLevel: 0.5005) // < 0.001 delta
+        XCTAssertFalse(didEmit, "sub-threshold sensor jitter must not re-emit")
+        XCTAssertEqual(kernel.lastEmittedBrightness, 0.50, accuracy: 0.0001)
+        XCTAssertTrue(kernel.emittedValues.isEmpty)
     }
 
-    func testFallsBackToOlderClassWhenNewestAbsent() {
-        // Simulate an older OS where only a legacy class exists.
-        let picked = CoreBrightnessClassResolver.resolve { name in
-            name == "BrightnessSystemClient"
-        }
-        XCTAssertEqual(picked, "BrightnessSystemClient",
-                       "resolver must fall back to an older present class")
+    // Codacy #2 (reconciled): the real rate gate is the poll loop's 0.005 threshold.
+    func testPollEmitsOnlyOnAboveThresholdSystemChange() {
+        let kernel = BrightnessEmissionKernel(initialBrightness: 0.50)
+        XCTAssertFalse(kernel.pollShouldEmit(systemLevel: 0.503), "0.003 delta is below the 0.005 poll gate")
+        XCTAssertTrue(kernel.pollShouldEmit(systemLevel: 0.510), "0.010 delta exceeds the 0.005 poll gate")
     }
 
-    func testReturnsNilWhenNoCandidateExists() {
-        let picked = CoreBrightnessClassResolver.resolve { _ in false }
-        XCTAssertNil(picked,
-                     "no candidate present → nil so the app uses its polling fallback")
+    func testAdjustTargetClampsBasePlusDelta() {
+        let kernel = BrightnessEmissionKernel(initialBrightness: 0.90)
+        XCTAssertEqual(kernel.adjustTarget(by: 0.20), 1.0, accuracy: 0.0001, "base+delta clamps at 1.0")
+        XCTAssertEqual(kernel.adjustTarget(by: -1.5), 0.0, accuracy: 0.0001, "base+delta clamps at 0.0")
+        // A pending (coalesced) target is the base for the next delta.
+        XCTAssertEqual(kernel.adjustTarget(by: 0.05, pendingAdjustTarget: 0.30), 0.35, accuracy: 0.0001)
     }
 
-    func testCandidateOrderIsNewestFirst() {
-        XCTAssertEqual(CoreBrightnessClassResolver.candidateClassNames.first, "CBBrightnessProxy",
-                       "candidate list must stay ordered newest-first for correct resolution")
+    func testAnimationDurationScalesWithDeltaAndClamps() {
+        let kernel = BrightnessEmissionKernel()
+        let minDuration = BrightnessEmissionKernel.minimumAnimationDuration
+        let maxDuration = BrightnessEmissionKernel.maximumAnimationDuration
+        XCTAssertEqual(kernel.animationDuration(forDelta: 0), minDuration, accuracy: 0.0001)
+        XCTAssertEqual(kernel.animationDuration(forDelta: 1.0), maxDuration, accuracy: 0.0001,
+                       "a full-range jump clamps to the maximum duration")
+        let mid = kernel.animationDuration(forDelta: 0.05)
+        XCTAssertGreaterThan(mid, minDuration)
+        XCTAssertLessThan(mid, maxDuration)
+    }
+
+    func testEaseIsCubicEaseOutAndClamps() {
+        let kernel = BrightnessEmissionKernel()
+        XCTAssertEqual(kernel.ease(0), 0, accuracy: 0.0001)
+        XCTAssertEqual(kernel.ease(1), 1, accuracy: 0.0001)
+        XCTAssertEqual(kernel.ease(0.5), 0.875, accuracy: 0.0001, "1 - (1-0.5)^3 = 0.875")
+        XCTAssertEqual(kernel.ease(1.4), 1, accuracy: 0.0001, "input above 1 clamps")
+        XCTAssertEqual(kernel.ease(-0.2), 0, accuracy: 0.0001, "input below 0 clamps")
     }
 }
 
@@ -172,8 +151,31 @@ final class StickyTerminalClickTests: XCTestCase {
         XCTAssertFalse(StickyTerminalClickKernel.shouldMonitorOutsideClicks(
             notchOpen: true, stickyMode: true, currentViewIsTerminal: false))
     }
+}
 
-    // Codacy #5 — documented as not-applicable (no custom scroll knob exists).
+// MARK: - Codacy proposals documented as not-applicable
+//
+// #4 "CoreBrightness client resolves the right class per macOS version" — the app
+//    (CoreBrightnessDisplayClient) loads a single `DisplayBrightnessClient` class
+//    directly; there is no candidate-class resolver to test.
+// #5 "custom terminal scroll knob reflects the SwiftTerm view" — Atoll has no
+//    custom scroll knob; SwiftTerm owns scrolling (verified: no NSScroller/knob/
+//    scrollOffset code in TerminalManager, NotchTerminalView, TerminalFloatingPanel).
+//
+// Both are intentionally NOT faked. They are recorded here (and skipped) so the
+// coverage map stays honest rather than asserting against logic the app lacks.
+final class NotApplicableProposalsTests: XCTestCase {
+
+    func testCoreBrightnessClassResolution_notApplicable_appLoadsSingleClass() throws {
+        throw XCTSkip("""
+            Codacy proposed testing that the CoreBrightness client resolves the right \
+            class per macOS version. The app's CoreBrightnessDisplayClient loads a single \
+            `DisplayBrightnessClient` class directly (no candidateClassNames, no resolver \
+            loop), so there is no app-owned resolution logic to test. Skipped rather than \
+            asserting against a fabricated resolver.
+            """)
+    }
+
     func testScrollKnob_notApplicable_swiftTermOwnsScrolling() throws {
         throw XCTSkip("""
             Codacy proposed testing that a custom terminal scroll knob reflects the \

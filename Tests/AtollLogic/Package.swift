@@ -3,11 +3,13 @@ import PackageDescription
 
 // Standalone test package for Atoll decision-logic that Codacy's PR #3 review
 // flagged as lacking automated coverage. These are *pure-logic parity* tests:
-// each source type mirrors — line-for-line, with a `// MIRRORS:` reference back
-// to the canonical implementation — the small, hardware-free decision kernels
-// embedded inside the app's hardware-coupled singletons
-// (SystemBrightnessController, CoreBrightnessDisplayClient, ContentView's
-// sticky-terminal outside-click monitor).
+// each source type mirrors — with a `// MIRRORS:` reference back to the
+// canonical implementation — the small, hardware-free decision kernels embedded
+// inside the app's hardware-coupled singletons (SystemBrightnessController and
+// ContentView's sticky-terminal outside-click monitor). The kernels mirror what
+// the app actually does; where a Codacy proposal described behaviour the app
+// does not implement, it is documented as not-applicable instead of faked. Types
+// are `internal` (this package exists only for its own test target).
 //
 // Why a separate package instead of an in-app XCTest target:
 //   * The app is a single `DynamicIsland` application target with no existing
