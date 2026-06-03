@@ -199,4 +199,3 @@ class ScreenshotSnippingTool: NSObject, ObservableObject {
         finishSnipping()
     }
 }
-

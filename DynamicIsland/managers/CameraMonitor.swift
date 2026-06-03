@@ -44,7 +44,7 @@ private func cameraPropertyListener(
 class CameraMonitor: ObservableObject {
     // MARK: - Published Properties
     @Published var isCameraActive: Bool = false
-    @Published var activeApp: String? = nil
+    @Published var activeApp: String?
     @Published var isMonitoring: Bool = false
     
     // MARK: - Private Properties

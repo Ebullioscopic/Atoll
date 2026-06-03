@@ -49,7 +49,6 @@ class ShareServiceFinder: NSObject, NSSharingServicePickerDelegate {
 
             picker.show(relativeTo: dummyView.bounds, of: dummyView, preferredEdge: .minY)
 
-
             // Timeout task
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(timeout))

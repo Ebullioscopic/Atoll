@@ -23,7 +23,6 @@
 import SwiftUI
 import Defaults
 
-
 struct MusicControllerSelectionView: View {
     let onContinue: () -> Void
 
@@ -130,7 +129,6 @@ struct ControllerOptionView: View {
         .contentShape(Rectangle())
     }
 }
-
 
 extension MediaControllerType {
     var description: String {

@@ -38,11 +38,9 @@ struct BatteryView: View {
     var iconStatus: String {
         if isCharging {
             return "bolt"
-        }
-        else if isPluggedIn {
+        } else if isPluggedIn {
             return "plug"
-        }
-        else {
+        } else {
             return ""
         }
     }
@@ -297,7 +295,6 @@ struct BatteryMenuView: View {
     }
 }
 
-
 /// A view that displays the battery status and allows interaction to show detailed information.
 struct DynamicIslandBatteryView: View {
     
@@ -367,7 +364,7 @@ struct DynamicIslandBatteryView: View {
                 maxCapacity: maxCapacity,
                 timeToFullCharge: timeToFullCharge,
                 isInLowPowerMode: isInLowPowerMode,
-                onDismiss: { 
+                onDismiss: {
                     showPopupMenu = false
                 }
             )
@@ -387,7 +384,6 @@ struct DynamicIslandBatteryView: View {
         vm.isBatteryPopoverActive = showPopupMenu && isHoveringPopover
     }
 }
-
 
 private struct BatteryTemporaryHUDMetrics {
     let width: CGFloat
@@ -485,7 +481,7 @@ struct BatteryTemporaryActivityView: View {
     let topCornerRadius: CGFloat
     @Default(.lowBatteryHUDStyle) var lowBatteryHUDStyle
     @Default(.fullBatteryHUDStyle) var fullBatteryHUDStyle
-    var styleOverride: BatteryNotificationStyle? = nil
+    var styleOverride: BatteryNotificationStyle?
 
     @State private var pulse = false
     @State private var showBatteryIndicator = false
@@ -531,7 +527,6 @@ struct BatteryTemporaryActivityView: View {
             return isLowPowerMode ? .yellow : .green
         }
     }
-
 
     private var surfaceShape: AnyShape {
         if isDynamicIslandMode {

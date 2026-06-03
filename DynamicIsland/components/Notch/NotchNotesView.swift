@@ -33,7 +33,7 @@ struct NotchNotesView: View {
     // Editor State
     @State private var editorTitle: String = ""
     @State private var editorContent: String = ""
-    @State private var editorImageData: Data? = nil
+    @State private var editorImageData: Data?
     @State private var editorColorIndex: Int = 0
     @State private var editorNoteId: UUID?
     @State private var autoSaveTask: Task<Void, Never>?
@@ -225,7 +225,7 @@ struct NotchNotesView: View {
         var notes = savedNotes
         let now = Date()
 
-        var fileName: String? = nil
+        var fileName: String?
         if let data = editorImageData {
             let name = "note_image_\(id.uuidString).png"
             let fileURL = NoteItem.noteImageDataDirectory.appendingPathComponent(name)
@@ -573,7 +573,6 @@ struct NotchClipboardItemRow: View {
     }
 }
 
-
 struct NoteListView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     let notes: [NoteItem]
@@ -592,7 +591,7 @@ struct NoteListView: View {
     @StateObject private var appleNotesSync = AppleNotesSyncManager.shared
     @State private var showAppleNotesSheet = false
     @State private var searchText = ""
-    @State private var selectedColorFilter: Int? = nil
+    @State private var selectedColorFilter: Int?
     @State private var isSearchExpanded = false
     @State private var suppressionToken = UUID()
     @State private var isSuppressing = false
@@ -600,8 +599,8 @@ struct NoteListView: View {
     @State private var autoCloseToken = UUID()
 
     var sortedNotes: [NoteItem] {
-        var filtered = searchText.isEmpty ? notes : notes.filter { 
-            $0.title.localizedCaseInsensitiveContains(searchText) || 
+        var filtered = searchText.isEmpty ? notes : notes.filter {
+            $0.title.localizedCaseInsensitiveContains(searchText) ||
             $0.content.localizedCaseInsensitiveContains(searchText)
         }
         
@@ -609,7 +608,7 @@ struct NoteListView: View {
             filtered = filtered.filter { $0.colorIndex == colorIndex }
         }
         
-        return filtered.sorted { 
+        return filtered.sorted {
             if $0.isPinned != $1.isPinned {
                 return $0.isPinned
             }
@@ -628,7 +627,7 @@ struct NoteListView: View {
                 Spacer()
                 
                 if enableNoteSearch || enableNoteColorFiltering {
-                    Button(action: { 
+                    Button(action: {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             isSearchExpanded.toggle()
                         }
@@ -790,7 +789,7 @@ struct NoteListView: View {
                         LazyVGrid(columns: columns, spacing: 8) {
                             ForEach(sortedNotes) { note in
                                 NoteRow(
-                                    note: note, 
+                                    note: note,
                                     onDelete: { onDeleteItem(note) },
                                     onTogglePin: { onTogglePin(note) },
                                     isCompact: useGrid
@@ -1235,8 +1234,6 @@ struct NoteEditorView: View {
             Divider()
                 .background(Color.white.opacity(0.1))
 
-
-            
             // Content Input
             ZStack(alignment: .topLeading) {
                 if content.isEmpty { // Placeholder

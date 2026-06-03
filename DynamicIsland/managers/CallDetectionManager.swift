@@ -40,14 +40,14 @@ class CallDetectionManager: ObservableObject {
 
     /// Bundle identifiers of apps that indicate a call is active
     private let callAppBundleIDs: Set<String> = [
-        "com.apple.FaceTime",
+        "com.apple.FaceTime"
     ]
 
     /// Process names that indicate an active call audio session
     private let callAudioProcessNames: Set<String> = [
         "avconferenced",    // FaceTime/phone call audio daemon
         "callservicesd",    // Call services daemon
-        "telephonyutilitiesd", // Telephony utilities
+        "telephonyutilitiesd" // Telephony utilities
     ]
 
     private var defaultsObservation: AnyCancellable?
@@ -203,5 +203,3 @@ class CallDetectionManager: ObservableObject {
         }
     }
 }
-
-

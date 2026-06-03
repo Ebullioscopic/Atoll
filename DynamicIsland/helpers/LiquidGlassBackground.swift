@@ -135,8 +135,8 @@ private final class LiquidGlassContainerView: NSView {
 /// All 20 available liquid‑glass variants.
 /// Apple does not publicly describe how each value looks so experiment and pick the one you like!
 public enum LiquidGlassVariant: Int, CaseIterable, Identifiable, Defaults.Serializable, Sendable {
-    case v0  = 0,  v1  = 1,  v2  = 2,  v3  = 3,  v4  = 4
-    case v5  = 5,  v6  = 6,  v7  = 7,  v8  = 8,  v9  = 9
+    case v0  = 0, v1  = 1, v2  = 2, v3  = 3, v4  = 4
+    case v5  = 5, v6  = 6, v7  = 7, v8  = 8, v9  = 9
     case v10 = 10, v11 = 11, v12 = 12, v13 = 13, v14 = 14
     case v15 = 15, v16 = 16, v17 = 17, v18 = 18, v19 = 19
 
@@ -184,7 +184,6 @@ public struct LiquidGlassBackground<Content: View>: NSViewRepresentable {
         self.content      = content()
     }
 
-
     @inline(__always)
     private func setterSelector(for key: String, privateVariant: Bool = true) -> Selector? {
         guard !key.isEmpty else { return nil }
@@ -216,8 +215,6 @@ public struct LiquidGlassBackground<Content: View>: NSViewRepresentable {
         let f   = unsafeBitCast(imp, to: VariantSetterIMP.self)
         f(object, sel, value)
     }
-
-
 
     public func makeNSView(context: Context) -> NSView {
         // `NSGlassEffectView` is private. Look it up dynamically to avoid compile‑time coupling.

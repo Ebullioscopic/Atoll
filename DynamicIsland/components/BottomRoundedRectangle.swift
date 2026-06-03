@@ -22,7 +22,6 @@
 
 import SwiftUI
 
-
 struct BottomRoundedRectangle: Shape {
     var radius: CGFloat
     

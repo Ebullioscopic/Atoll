@@ -23,8 +23,8 @@ struct CircularGaugeView: View {
     let value: Double
     let tint: Color
     let centerPrimaryText: String
-    var centerSecondaryText: String? = nil
-    var subtitle: String? = nil
+    var centerSecondaryText: String?
+    var subtitle: String?
     var size: CGFloat = 72
     var lineWidth: CGFloat = 8
     var backgroundTint: Color = Color.primary.opacity(0.08)

@@ -113,7 +113,7 @@ struct TabSelectionView: View {
     }
     var body: some View {
         HStack(spacing: 24) {
-            ForEach(Array(tabs.enumerated()), id: \.element.id) { idx, tab in
+            ForEach(Array(tabs.enumerated()), id: \.element.id) { _, tab in
                 let isSelected = isSelected(tab)
                 let activeAccent = tab.accentColor ?? .white
 
@@ -140,7 +140,6 @@ struct TabSelectionView: View {
                     }
                 }
 
-                
             }
         }
         .animation(.smooth(duration: 0.3), value: coordinator.currentView)

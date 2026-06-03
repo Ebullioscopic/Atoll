@@ -172,7 +172,7 @@ struct ProfileCard: View {
             .frame(height: 160)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(isSelected ? 
+                    .fill(isSelected ?
                           LinearGradient(colors: profile.gradient.map { $0.opacity(0.15) }, startPoint: .topLeading, endPoint: .bottomTrailing) :
                           LinearGradient(colors: [Color.gray.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing)
                     )
@@ -180,7 +180,7 @@ struct ProfileCard: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(
-                        isSelected ? 
+                        isSelected ?
                         LinearGradient(colors: profile.gradient, startPoint: .topLeading, endPoint: .bottomTrailing) :
                         LinearGradient(colors: [Color.clear], startPoint: .topLeading, endPoint: .bottomTrailing),
                         lineWidth: isSelected ? 2 : 0

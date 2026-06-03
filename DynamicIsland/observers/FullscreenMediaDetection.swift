@@ -53,7 +53,7 @@ class FullscreenMediaDetector: ObservableObject {
                 
                 group.addTask {
                     let screenParameterNotifications = NSWorkspace.shared.notificationCenter.notifications(
-                        named:  NSApplication.didChangeScreenParametersNotification
+                        named: NSApplication.didChangeScreenParametersNotification
                     )
                     
                     for await _ in screenParameterNotifications {
@@ -78,7 +78,6 @@ class FullscreenMediaDetector: ObservableObject {
             return
         }
         
-
         let apps = detector.detectFullscreenApps(debug: false)
         let names = NSScreen.screens.map { $0.localizedName }
         var newStatus: [String: Bool] = [:]

@@ -197,7 +197,7 @@ struct InlineHUD: View {
         return HStack {
             HStack(spacing: 5) {
                 Group {
-                    switch (type) {
+                    switch type {
                         case .volume:
                             if icon.isEmpty {
                                 // Show headphone icon if Bluetooth audio is connected, otherwise speaker
@@ -286,7 +286,7 @@ struct InlineHUD: View {
                 .frame(width: vm.closedNotchSize.width - 20)
             
             HStack {
-                if (type == .mic) {
+                if type == .mic {
                     Text(value.isZero ? "muted" : "unmuted")
                         .foregroundStyle(.gray)
                         .lineLimit(1)
@@ -294,7 +294,7 @@ struct InlineHUD: View {
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .contentTransition(.interpolate)
-                } else if (type == .timer) {
+                } else if type == .timer {
                     Text(TimerManager.shared.formattedRemainingTime())
                         .foregroundStyle(TimerManager.shared.timerColor)
                         .lineLimit(1)
@@ -302,7 +302,7 @@ struct InlineHUD: View {
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .contentTransition(.interpolate)
-                } else if (type == .capsLock) {
+                } else if type == .capsLock {
                     if showCapsLockLabel {
                         Text("Caps Lock")
                             .foregroundStyle(capsLockAccentColor)
@@ -314,7 +314,7 @@ struct InlineHUD: View {
                             .frame(maxWidth: .infinity, alignment: .trailing)
                             .contentTransition(.interpolate)
                     }
-                } else if (type == .bluetoothAudio) {
+                } else if type == .bluetoothAudio {
                     if hasBatteryLevel {
                         let indicatorSpacing: CGFloat = {
                             if useCircularIndicator {
@@ -464,7 +464,7 @@ struct InlineHUD: View {
     }
 
     func SpeakerSymbol(_ value: CGFloat) -> String {
-        switch(value) {
+        switch value {
             case 0:
                 return "speaker"
             case 0...0.3:
@@ -479,7 +479,7 @@ struct InlineHUD: View {
     }
     
     func BrightnessSymbol(_ value: CGFloat) -> String {
-        switch(value) {
+        switch value {
             case 0...0.6:
                 return "sun.min"
             case 0.6...1:
@@ -497,7 +497,7 @@ struct InlineHUD: View {
     }
     
     func Type2Name(_ type: SneakContentType) -> String {
-        switch(type) {
+        switch type {
             case .volume:
                 return String(localized: "Volume")
             case .brightness:

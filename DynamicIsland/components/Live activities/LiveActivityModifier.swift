@@ -39,7 +39,7 @@ struct LiveActivityModifier<Left: View, Right: View>: ViewModifier {
                 HStack {
                     leftContent()
                     Spacer()
-                        //.frame(minWidth: vm.closedNotchSize.width)
+                        // .frame(minWidth: vm.closedNotchSize.width)
                     rightContent()
                 }
                 .padding()

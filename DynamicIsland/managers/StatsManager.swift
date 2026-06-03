@@ -25,7 +25,7 @@ import IOKit.ps
 import IOKit.graphics
 import Darwin
 import AppKit
-//import Network
+// import Network
 
 struct MemoryBreakdown: Equatable {
     let totalBytes: UInt64
@@ -599,7 +599,6 @@ class StatsManager: ObservableObject {
     func startMonitoring() {
         guard !isMonitoring else { return }
         
-        
         // Reset baseline for accurate measurement
         let initialStats = getNetworkStats()
         previousNetworkStats = initialStats
@@ -1124,7 +1123,7 @@ class StatsManager: ObservableObject {
     }
 
     private func collectNetworkInterfaces(deltaTime: TimeInterval) -> [NetworkInterfaceMetrics] {
-        var interfacesPointer: UnsafeMutablePointer<ifaddrs>? = nil
+        var interfacesPointer: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&interfacesPointer) == 0, let startPointer = interfacesPointer else {
             return networkInterfaces
         }
@@ -1370,9 +1369,9 @@ class StatsManager: ObservableObject {
             
             let name = String(cString: interface.ifa_name)
             // Skip loopback and virtual interfaces, but include en0, en1, etc. and Wi-Fi interfaces
-            guard !name.hasPrefix("lo") && 
-                  !name.hasPrefix("gif") && 
-                  !name.hasPrefix("stf") && 
+            guard !name.hasPrefix("lo") &&
+                  !name.hasPrefix("gif") &&
+                  !name.hasPrefix("stf") &&
                   !name.hasPrefix("bridge") &&
                   !name.hasPrefix("utun") &&
                   !name.hasPrefix("awdl") else {

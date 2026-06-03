@@ -560,9 +560,9 @@ private struct ParameterSliderRow: View {
     @Binding var value: CGFloat
     let range: ClosedRange<CGFloat>
     let formatter: (CGFloat) -> String
-    var resetLabel: String? = nil
-    var resetValue: CGFloat? = nil
-    var step: CGFloat? = nil
+    var resetLabel: String?
+    var resetValue: CGFloat?
+    var step: CGFloat?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {

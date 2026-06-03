@@ -273,5 +273,3 @@ extension PrivacyIndicatorManager {
         return screenRecordingManager
     }
 }
-
-

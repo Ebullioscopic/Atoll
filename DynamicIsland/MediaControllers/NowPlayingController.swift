@@ -205,7 +205,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         let process = Process()
         guard
             let scriptURL = Bundle.main.url(forResource: "mediaremote-adapter", withExtension: "pl"),
-            //let frameworkPath = Bundle.main.privateFrameworksPath?.appending("/MediaRemoteAdapter.framework")
+            // let frameworkPath = Bundle.main.privateFrameworksPath?.appending("/MediaRemoteAdapter.framework")
             let frameworkPath =
                 Bundle.main.resourceURL?
                     .appendingPathComponent("MediaRemoteAdapter.framework")
@@ -273,7 +273,6 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         // if this update is a diff keep the previous currentTime, otherwise default to 0.
         newPlaybackState.currentTime = payload.elapsedTime ?? (diff ? self.playbackState.currentTime : 0)
 
-        
         if let shuffleMode = payload.shuffleMode {
             newPlaybackState.isShuffled = shuffleMode != 1
         } else if !diff {
@@ -331,7 +330,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         // Cider artwork fallback: if the source is Cider and artwork is missing/tiny,
         // fetch from iTunes Search API.
         if Self.ciderBundleIDs.contains(newPlaybackState.bundleIdentifier),
-           (newPlaybackState.artwork == nil || (newPlaybackState.artwork?.count ?? 0) < 512),
+           newPlaybackState.artwork == nil || (newPlaybackState.artwork?.count ?? 0) < 512,
            !newPlaybackState.title.isEmpty {
             let fallback = await fetchCiderArtworkFallback(
                 title: newPlaybackState.title,

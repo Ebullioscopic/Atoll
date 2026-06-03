@@ -265,8 +265,7 @@ class SpotifyController: MediaControllerProtocol {
         guard canvasFetchTask == nil else { return }
 
         if lastCanvasRequestTrackURI == trackURI,
-           Date().timeIntervalSince(lastCanvasRequestDate) < 5
-        {
+           Date().timeIntervalSince(lastCanvasRequestDate) < 5 {
             return
         }
 
@@ -454,8 +453,7 @@ private enum SpotifyCanvasProtobuf {
                     let canvasData = try reader.readLengthDelimited()
                     if let record = try parseCanvasRecord(from: canvasData),
                        record.trackURI == trackURI,
-                       let canvasURL = record.canvasURL
-                    {
+                       let canvasURL = record.canvasURL {
                         matchingURLs.append(canvasURL)
                     }
                 default:

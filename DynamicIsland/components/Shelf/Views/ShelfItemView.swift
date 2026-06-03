@@ -110,7 +110,7 @@ struct ShelfItemView: View {
             }
         }
         .onAppear {
-            Task { 
+            Task {
                 await viewModel.loadThumbnail()
                 // Pre-render drag preview once on appear
                 if cachedPreviewImage == nil {
@@ -203,7 +203,6 @@ struct ShelfItemView: View {
         return renderer.nsImage ?? (viewModel.thumbnail ?? item.icon)
     }
 
-    
 }
 
 // MARK: - Draggable Click Handler with NSDraggingSource
@@ -410,7 +409,6 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
         func draggingSession(_ session: NSDraggingSession, willBeginAt screenPoint: NSPoint) {
             ShelfSelectionModel.shared.beginDrag()
         }
-        
         
         func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
             ShelfSelectionModel.shared.endDrag()

@@ -479,11 +479,10 @@ struct CPUDetailsGrid: View {
     }
 }
 
-
 struct CPUProcessList: View {
     let processes: [ProcessStats]
     let accentColor: Color
-    var displayLimit: Int? = nil
+    var displayLimit: Int?
     
     private var visibleProcesses: [ProcessStats] {
         if let limit = displayLimit {

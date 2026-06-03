@@ -92,4 +92,3 @@ class TrayDrop: ObservableObject {
         items.forEach { delete(item: $0) }
     }
 }
-

@@ -109,5 +109,3 @@ struct DownloadLiveActivity: View {
         }
     }
 }
-
-

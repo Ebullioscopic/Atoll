@@ -95,7 +95,7 @@ final class LocalSendService: NSObject, ObservableObject {
                 .hostPort(
                     host: .init(multicastGroupHost),
                     port: .init(integerLiteral: NWEndpoint.Port.IntegerLiteralType(defaultPort))
-                ),
+                )
             ])
             let params = NWParameters.udp
             params.allowLocalEndpointReuse = true
@@ -319,7 +319,7 @@ final class LocalSendService: NSObject, ObservableObject {
             for path in paths {
                 guard var components = URLComponents(string: "\(scheme)://\(ip):\(port)\(path)") else { continue }
                 components.queryItems = [
-                    URLQueryItem(name: "fingerprint", value: "atoll.localsend.bridge"),
+                    URLQueryItem(name: "fingerprint", value: "atoll.localsend.bridge")
                 ]
                 guard let url = components.url else { continue }
 
@@ -610,7 +610,7 @@ final class LocalSendService: NSObject, ObservableObject {
             "protocol": "http",
             "download": false,
             "announcement": true,
-            "announce": true,
+            "announce": true
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: payload) else { return }
         connectionGroup?.send(content: data, completion: { _ in })
@@ -733,7 +733,7 @@ final class LocalSendService: NSObject, ObservableObject {
                 "token": "atoll.localsend.bridge",
                 "fingerprint": "atoll.localsend.bridge",
                 "download": false,
-                "hasWebInterface": false,
+                "hasWebInterface": false
             ]
             return httpResponse(status: 200, json: responseJSON)
         }
@@ -747,7 +747,7 @@ final class LocalSendService: NSObject, ObservableObject {
                 "fingerprint": "atoll.localsend.bridge",
                 "port": defaultPort,
                 "protocol": "http",
-                "download": false,
+                "download": false
             ]
             return httpResponse(status: 200, json: responseJSON)
         }
@@ -769,7 +769,7 @@ final class LocalSendService: NSObject, ObservableObject {
             "Content-Length: \(body.count)",
             "Connection: close",
             "",
-            "",
+            ""
         ].joined(separator: "\r\n")
 
         var response = Data(headers.utf8)
@@ -881,7 +881,7 @@ final class LocalSendService: NSObject, ObservableObject {
                 "id": file.id,
                 "fileName": file.name,
                 "size": file.data.count,
-                "fileType": file.mimeType,
+                "fileType": file.mimeType
             ]
         }
 
@@ -895,9 +895,9 @@ final class LocalSendService: NSObject, ObservableObject {
                 "token": "atoll.localsend.bridge",
                 "port": defaultPort,
                 "protocol": device.https ? "https" : "http",
-                "download": false,
+                "download": false
             ],
-            "files": filesMap,
+            "files": filesMap
         ]
 
         var lastError: Error?
@@ -978,7 +978,7 @@ final class LocalSendService: NSObject, ObservableObject {
         components?.queryItems = [
             URLQueryItem(name: "sessionId", value: sessionID),
             URLQueryItem(name: "fileId", value: file.id),
-            URLQueryItem(name: "token", value: token),
+            URLQueryItem(name: "token", value: token)
         ]
 
         guard let url = components?.url else { throw LocalSendServiceError.invalidTarget }

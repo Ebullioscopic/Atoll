@@ -907,7 +907,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .terminal, title: "Cursor style", keywords: ["terminal", "cursor", "block", "underline", "bar", "blink"], highlightID: SettingsTab.terminal.highlightID(for: "Cursor style")),
             SettingsSearchEntry(tab: .terminal, title: "Scrollback lines", keywords: ["terminal", "scrollback", "buffer", "history"], highlightID: SettingsTab.terminal.highlightID(for: "Scrollback lines")),
             SettingsSearchEntry(tab: .terminal, title: "Option as Meta", keywords: ["terminal", "option", "meta", "alt", "key"], highlightID: SettingsTab.terminal.highlightID(for: "Option as Meta")),
-            SettingsSearchEntry(tab: .terminal, title: "Mouse reporting", keywords: ["terminal", "mouse", "reporting", "vim", "tmux"], highlightID: SettingsTab.terminal.highlightID(for: "Mouse reporting")),
+            SettingsSearchEntry(tab: .terminal, title: "Mouse reporting", keywords: ["terminal", "mouse", "reporting", "vim", "tmux"], highlightID: SettingsTab.terminal.highlightID(for: "Mouse reporting"))
         ]
     }
 
@@ -1498,7 +1498,6 @@ struct Charge: View {
                     }
                     .settingsHighlight(id: highlightID("Low battery style"))
 
-
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("Low battery threshold")
@@ -1529,7 +1528,6 @@ struct Charge: View {
                             .foregroundStyle(.secondary)
                     }
                     .settingsHighlight(id: highlightID("Full battery style"))
-
 
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -1696,10 +1694,7 @@ final class HUDPreviewViewModel: ObservableObject {
         // Initial state from volume
         let vol = SystemVolumeController.shared.currentVolume
         self.level = vol
-        if vol <= 0.01 { self.iconName = "speaker.slash.fill" }
-        else if vol < 0.33 { self.iconName = "speaker.wave.1.fill" }
-        else if vol < 0.66 { self.iconName = "speaker.wave.2.fill" }
-        else { self.iconName = "speaker.wave.3.fill" }
+        if vol <= 0.01 { self.iconName = "speaker.slash.fill" } else if vol < 0.33 { self.iconName = "speaker.wave.1.fill" } else if vol < 0.66 { self.iconName = "speaker.wave.2.fill" } else { self.iconName = "speaker.wave.3.fill" }
 
         // Listeners
         NotificationCenter.default.publisher(for: .systemVolumeDidChange)
@@ -1709,10 +1704,7 @@ final class HUDPreviewViewModel: ObservableObject {
                 guard let self else { return }
                 if let vol = info["value"] as? Float {
                     self.level = vol
-                    if vol <= 0.01 { self.iconName = "speaker.slash.fill" }
-                    else if vol < 0.33 { self.iconName = "speaker.wave.1.fill" }
-                    else if vol < 0.66 { self.iconName = "speaker.wave.2.fill" }
-                    else { self.iconName = "speaker.wave.3.fill" }
+                    if vol <= 0.01 { self.iconName = "speaker.slash.fill" } else if vol < 0.33 { self.iconName = "speaker.wave.1.fill" } else if vol < 0.66 { self.iconName = "speaker.wave.2.fill" } else { self.iconName = "speaker.wave.3.fill" }
                 }
             }
             .store(in: &cancellables)
@@ -2595,8 +2587,6 @@ struct HUDInlineSettings: View {
                 }
             }
 
-
-
             if enableSystemHUD && !Defaults[.enableCustomOSD] && (hasAccessibilityPermission || enableThirdPartyDDCIntegration) {
                 Section {
                     Toggle("Volume HUD", isOn: $enableVolumeHUD)
@@ -2734,7 +2724,6 @@ struct Media: View {
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
     @Default(.parallaxEffectIntensity) private var parallaxEffectIntensity
 
-    
     @ObservedObject private var musicManager = MusicManager.shared
 
     private var isAppleMusicActive: Bool {
@@ -2899,7 +2888,7 @@ struct Media: View {
                 .settingsHighlight(id: highlightID("Show live canvas in Dynamic Island"))
                 .help("Replaces the artwork tile with the live canvas when the current app provides one, and reuses that moving canvas for the surrounding lighting effect.")
                 
-                //Parallax Effect Intensity to control how much parallax is wanted
+                // Parallax Effect Intensity to control how much parallax is wanted
                 Slider(value: $parallaxEffectIntensity, in: 0...12, step: 1.0) {
                     HStack {
                         Text("Parallax Effect Intensity")
@@ -2910,7 +2899,7 @@ struct Media: View {
                 }
                 .settingsHighlight(id: highlightID("Enable album art parallax effect"))
                 
-                Picker("Sneak Peek Style", selection: $sneakPeekStyles){
+                Picker("Sneak Peek Style", selection: $sneakPeekStyles) {
                     ForEach(SneakPeekStyle.allCases) { style in
                         Text(style.rawValue).tag(style)
                     }
@@ -3066,7 +3055,6 @@ struct Media: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
-
 
 struct About: View {
     @State private var showBuildNumber: Bool = false
@@ -3730,7 +3718,7 @@ struct Appearance: View {
     @Default(.enableLockScreenMediaWidget) private var enableLockScreenMediaWidget
     @Default(.enableLockScreenTimerWidget) private var enableLockScreenTimerWidget
     @Default(.externalDisplayStyle) private var externalDisplayStyle
-    @State private var selectedListVisualizer: CustomVisualizer? = nil
+    @State private var selectedListVisualizer: CustomVisualizer?
 
     @State private var isIconImporterPresented = false
     @State private var isIconDropTarget = false
@@ -7702,7 +7690,7 @@ struct TerminalSettings: View {
 /// falling back to an asset catalog image or an SF Symbol.
 struct AppIconImage: View {
     let bundleIdentifiers: [String]
-    var assetFallback: String? = nil
+    var assetFallback: String?
     var symbolFallback: String = "app.fill"
     var symbolColor: Color = .accentColor
     var size: CGFloat = 16

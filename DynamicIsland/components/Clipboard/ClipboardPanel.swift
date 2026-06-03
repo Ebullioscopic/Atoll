@@ -186,7 +186,7 @@ struct ClipboardPanelView: View {
             // Header with tabs
             ClipboardPanelHeader(
                 selectedTab: $selectedTab,
-                searchText: $searchText, 
+                searchText: $searchText,
                 onClose: onClose
             )
             

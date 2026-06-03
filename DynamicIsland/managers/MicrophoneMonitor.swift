@@ -44,7 +44,7 @@ private func microphonePropertyListener(
 class MicrophoneMonitor: ObservableObject {
     // MARK: - Published Properties
     @Published var isMicActive: Bool = false
-    @Published var activeApp: String? = nil
+    @Published var activeApp: String?
     @Published var isMonitoring: Bool = false
     
     // MARK: - Private Properties

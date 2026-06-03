@@ -150,6 +150,4 @@ struct OnboardingView: View {
         await AVCaptureDevice.requestAccess(for: .video)
     }
 
-
 }
-

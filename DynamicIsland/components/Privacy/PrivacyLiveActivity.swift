@@ -29,7 +29,7 @@ struct PrivacyLiveActivity: View {
     
     // Calculate if both camera and mic are active
     private var bothIndicatorsActive: Bool {
-        privacyManager.indicatorLayout.showsCameraIndicator && 
+        privacyManager.indicatorLayout.showsCameraIndicator &&
         privacyManager.indicatorLayout.showsMicrophoneIndicator
     }
     

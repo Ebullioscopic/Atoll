@@ -27,9 +27,9 @@ public enum TimerDisplayMode: String, CaseIterable, Defaults.Serializable, Ident
     var displayName: String {
         switch self {
         case .tab:
-            return String(localized:"Tab")
+            return String(localized: "Tab")
         case .popover:
-            return String(localized:"Popover")
+            return String(localized: "Popover")
         }
     }
 

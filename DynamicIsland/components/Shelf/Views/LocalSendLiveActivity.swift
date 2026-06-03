@@ -38,7 +38,7 @@ struct LocalSendLiveActivity: View {
     }
     
     private var isActive: Bool {
-        localSend.isSending || localSend.transferState == .completed || 
+        localSend.isSending || localSend.transferState == .completed ||
         isFailedOrRejected
     }
     

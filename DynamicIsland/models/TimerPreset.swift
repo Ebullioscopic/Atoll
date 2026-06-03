@@ -97,8 +97,8 @@ struct TimerPreset: Identifiable, Codable, Hashable, Defaults.Serializable {
     }
 
     static let defaultPresets: [TimerPreset] = [
-        TimerPreset(name: String(localized:"Focus"), duration: 25 * 60, color: Color.orange),
-        TimerPreset(name: String(localized:"Break"), duration: 5 * 60, color: Color.green),
-        TimerPreset(name: String(localized:"Deep Work"), duration: 45 * 60, color: Color.purple)
+        TimerPreset(name: String(localized: "Focus"), duration: 25 * 60, color: Color.orange),
+        TimerPreset(name: String(localized: "Break"), duration: 5 * 60, color: Color.green),
+        TimerPreset(name: String(localized: "Deep Work"), duration: 45 * 60, color: Color.purple)
     ]
 }

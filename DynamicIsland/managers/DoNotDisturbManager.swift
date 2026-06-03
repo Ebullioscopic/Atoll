@@ -1477,7 +1477,7 @@ private enum FocusMetadataDecoder {
 }
 
 private final class FocusMetadataReader {
-    private let pathToDatabase:URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/DoNotDisturb/DB/ModeConfigurations.json")
+    private let pathToDatabase: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/DoNotDisturb/DB/ModeConfigurations.json")
 
     struct DNDConfigRoot: Codable {
         let data: [DNDDataEntry]
@@ -1498,7 +1498,7 @@ private final class FocusMetadataReader {
         let tintColorName: String?
     }
 
-    private init(){}
+    private init() {}
 
     static let shared = FocusMetadataReader()
 
@@ -1557,7 +1557,7 @@ private final class FocusMetadataReader {
 }
 
 extension Color {
-    static func stringToColor(for string:String) -> Color {
+    static func stringToColor(for string: String) -> Color {
         let cleanName = string.lowercased()
             .replacingOccurrences(of: "system", with: "")
             .replacingOccurrences(of: "color", with: "")

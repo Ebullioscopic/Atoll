@@ -62,7 +62,7 @@ struct CircularHUDView: View {
                 .animation(.interactiveSpring(response: 0.35, dampingFraction: 0.85, blendDuration: 0), value: value)
             
             // 3. The "Ball" Indicator (Oversized White Pallino)
-            GeometryReader { geometry in
+            GeometryReader { _ in
                 let radius = size / 2
                 let trackWidth = strokeWidth * 1.5
                 let startAngle = 144.0
@@ -101,8 +101,6 @@ struct CircularHUDView: View {
                 }
             }
 
-
-
         }
         .frame(width: size, height: size)
         .shadow(color: .black.opacity(0.2), radius: 15, x: 0, y: 5)
@@ -132,18 +130,13 @@ struct CircularHUDView: View {
             
             if deviceInfo.isAirPods {
                 // Use AirPods icon when AirPods are connected
-                if value < 0.01 { return "headphones.slash" }
-                else { return "airpods" }
+                if value < 0.01 { return "headphones.slash" } else { return "airpods" }
             } else if deviceInfo.isHeadphones {
                 // Use headphone icons when other headphones are connected
-                if value < 0.01 { return "headphones.slash" }
-                else { return "headphones" }
+                if value < 0.01 { return "headphones.slash" } else { return "headphones" }
             } else {
                 // Use speaker icons for built-in speakers
-                if value < 0.01 { return "speaker.slash.fill" }
-                else if value < 0.33 { return "speaker.wave.1.fill" }
-                else if value < 0.66 { return "speaker.wave.2.fill" }
-                else { return "speaker.wave.3.fill" }
+                if value < 0.01 { return "speaker.slash.fill" } else if value < 0.33 { return "speaker.wave.1.fill" } else if value < 0.66 { return "speaker.wave.2.fill" } else { return "speaker.wave.3.fill" }
             }
         case .brightness:
             return "sun.max.fill"
@@ -193,7 +186,7 @@ struct CircularHUDView: View {
         let isAirPods = name.contains("airpod")
         
         // Check for other headphones
-        let isHeadphones = name.contains("headphone") || 
+        let isHeadphones = name.contains("headphone") ||
                           name.contains("ear") ||
                           name.contains("buds") ||
                           name.contains("beats")

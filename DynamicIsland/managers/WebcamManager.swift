@@ -155,9 +155,9 @@ class WebcamManager: NSObject, ObservableObject {
     /// Sets up the capture session with a completion handler
     private func setupCaptureSession(completion: @escaping (Bool) -> Void) {
         sessionQueue.async { [weak self] in
-            guard let self = self else { 
+            guard let self = self else {
                 completion(false)
-                return 
+                return
             }
             
             // Clean up any existing session before creating a new one
