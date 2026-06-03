@@ -49,8 +49,11 @@ final class StableTerminalContainerView: NSView {
 
     override func resizeSubviews(withOldSize oldSize: NSSize) {
         let size = bounds.size
-        // Block degenerate sizes — the terminal would collapse to 2×1
-        guard size.width >= 10, size.height >= 10 else { return }
+        // Block degenerate sizes — the terminal would collapse to 2×1, and the
+        // inner inset (`insetBy(dx:dy:)` removes 2×inset per axis) would yield a
+        // negative terminal frame below 2×inset. Require enough room for both.
+        let minTerminalSide = 2 * notchTerminalInnerTextInset + 2
+        guard size.width >= minTerminalSide, size.height >= minTerminalSide else { return }
         // Manually fill children to bounds — bypasses autoresizing math
         // that breaks when oldSize was zero but child kept its old frame.
         // The terminal view gets an inner inset so glyphs don't hug the edge;
@@ -160,6 +163,12 @@ class TerminalManager: ObservableObject {
     /// KVO of the scroller's value/proportion/enabled state that drives the knob.
     private var scrollerObservations: [NSKeyValueObservation] = []
 
+    deinit {
+        // Invalidate KVO so dangling observers can't fire into stale state.
+        scrollerObservations.forEach { $0.invalidate() }
+        scrollerObservations = []
+    }
+
     /// Custom rounded scrollbar knob rendered on top of the terminal.
     private lazy var scrollKnobView: TerminalScrollKnobView = {
         let v = TerminalScrollKnobView()
@@ -258,7 +267,8 @@ class TerminalManager: ObservableObject {
         // Blur + gutter tint fill the full bounds; the terminal is inset so its
         // glyphs don't hug the edge, and the gutter tint is masked to the ring.
         let containerSize = containerView.bounds.size
-        if containerSize.width >= 10, containerSize.height >= 10 {
+        if containerSize.width >= 2 * notchTerminalInnerTextInset + 2,
+           containerSize.height >= 2 * notchTerminalInnerTextInset + 2 {
             let bounds = containerView.bounds
             let terminalFrame = bounds.insetBy(
                 dx: notchTerminalInnerTextInset,
@@ -467,7 +477,11 @@ class TerminalManager: ObservableObject {
         guard let scroller = view.subviews.compactMap({ $0 as? NSScroller }).first else { return }
         terminalScroller = scroller
         // Hide SwiftTerm's own scroller drawing; it stays alive as our data source.
+        // alphaValue alone leaves it exposed to VoiceOver, so also drop it from the
+        // accessibility tree — only the custom knob should be the visible scroll control.
         scroller.alphaValue = 0
+        scroller.setAccessibilityElement(false)
+        scroller.setAccessibilityHidden(true)
 
         scrollerObservations.forEach { $0.invalidate() }
         scrollerObservations = []
@@ -500,7 +514,8 @@ class TerminalManager: ObservableObject {
         }
 
         let bounds = containerView.bounds
-        guard bounds.width >= 10, bounds.height >= 10 else { return }
+        guard bounds.width >= 2 * notchTerminalInnerTextInset + 2,
+              bounds.height >= 2 * notchTerminalInnerTextInset + 2 else { return }
 
         // Track lives inside the inset terminal area, along its right edge.
         let terminalFrame = bounds.insetBy(

@@ -749,7 +749,7 @@ struct ContentView: View {
                     // Install the outside-click monitor for terminal opens that don't
                     // change `currentView` (e.g. shortcut re-opening with the terminal
                     // tab already selected, where the cursor never enters the notch).
-                    syncStickyTerminalOutsideClickMonitor()
+                    syncTerminalOutsideClickMonitor()
                 }
                 #if os(macOS)
                 if newState == .open {
@@ -804,7 +804,7 @@ struct ContentView: View {
                         currentView: currentViewString
                     )
                 }
-                syncStickyTerminalOutsideClickMonitor()
+                syncTerminalOutsideClickMonitor()
             }
             .sensoryFeedback(.alignment, trigger: haptics)
             .contextMenu {
@@ -879,7 +879,7 @@ struct ContentView: View {
                 startHiddenEdgeHoverPolling()
             }
             .onChange(of: terminalStickyMode) { _, _ in
-                syncStickyTerminalOutsideClickMonitor()
+                syncTerminalOutsideClickMonitor()
             }
             .onChange(of: vm.notchState) { _, state in
                 if state == .open {
@@ -2046,7 +2046,7 @@ struct ContentView: View {
     ///
     /// While the cursor is hovering inside the notch, hover handling owns close
     /// behavior, so the monitor is not installed; it is re-synced on hover-out.
-    private func syncStickyTerminalOutsideClickMonitor() {
+    private func syncTerminalOutsideClickMonitor() {
         guard vm.notchState == .open, coordinator.currentView == .terminal, !isHovering else {
             removeStickyTerminalClickMonitor()
             return
@@ -2169,11 +2169,12 @@ struct ContentView: View {
                     if self.vm.notchState == .open && !self.shouldPreventAutoClose() {
                         self.vm.close()
                     } else if self.vm.notchState == .open
-                                && Defaults[.terminalStickyMode]
                                 && self.coordinator.currentView == .terminal {
                         // Re-sync monitor state through one code path to avoid
                         // monitor lifecycle races between hover and state updates.
-                        self.syncStickyTerminalOutsideClickMonitor()
+                        // Applies whenever the Terminal tab is open, independent
+                        // of sticky mode (the monitor itself gates on hover/tab).
+                        self.syncTerminalOutsideClickMonitor()
                     }
                 }
             }
