@@ -745,6 +745,11 @@ struct ContentView: View {
                 }
                 if newState == .closed {
                     removeStickyTerminalClickMonitor()
+                } else {
+                    // Install the outside-click monitor for terminal opens that don't
+                    // change `currentView` (e.g. shortcut re-opening with the terminal
+                    // tab already selected, where the cursor never enters the notch).
+                    syncStickyTerminalOutsideClickMonitor()
                 }
                 #if os(macOS)
                 if newState == .open {
@@ -2030,10 +2035,19 @@ struct ContentView: View {
         }
     }
 
-    /// Installs the global outside-click monitor when Terminal + sticky mode are active (e.g. keyboard-opened terminal).
-    /// Removes the monitor when the tab, sticky setting, or open state no longer applies.
+    /// Installs the global outside-click monitor whenever the Terminal tab is open
+    /// (e.g. keyboard-opened terminal), regardless of sticky mode.
+    ///
+    /// Sticky mode only controls whether the terminal closes when the cursor leaves
+    /// the notch (see `shouldPreventAutoClose`).  An outside click should always close
+    /// the terminal — this covers the case where the terminal is opened via the
+    /// shortcut and the cursor never enters the notch, so there's no hover-out event
+    /// to trigger the normal auto-close.
+    ///
+    /// While the cursor is hovering inside the notch, hover handling owns close
+    /// behavior, so the monitor is not installed; it is re-synced on hover-out.
     private func syncStickyTerminalOutsideClickMonitor() {
-        guard vm.notchState == .open, terminalStickyMode, coordinator.currentView == .terminal else {
+        guard vm.notchState == .open, coordinator.currentView == .terminal, !isHovering else {
             removeStickyTerminalClickMonitor()
             return
         }

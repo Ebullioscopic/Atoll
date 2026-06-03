@@ -117,6 +117,8 @@ Atoll builds upon the work of several open-source projects and draws inspiration
 
 - [**SwiftTerm**](https://github.com/migueldeicaza/SwiftTerm) - Terminal tab implementation in the standard mode was adapted from this project
 
+- [**DynamicNotch**](https://github.com/jackson-storm/DynamicNotch) - thanks DynamicNotch for letting us use their battery huds
+
 - Wick - Thanks Nate for allowing us to replicate the iOS like Timer design for the Lock Screen Widget
 
 ## Contributors

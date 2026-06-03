@@ -3,14 +3,25 @@
     <channel>
         <title>Atoll</title>
         <item>
+            <title>2.2.0</title>
+            <pubDate>Sat, 30 May 2026 00:15:41 +0530</pubDate>
+            <sparkle:version>12</sparkle:version>
+            <sparkle:shortVersionString>2.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.6</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/Ebullioscopic/Atoll/releases/download/v2.2.0/Atoll.2.2.0.dmg" length="24896635" type="application/octet-stream" sparkle:edSignature="KYQRBZXriQaqBTCSpAI4VyfEwAwOm42VHGmbGDD1A7TQ0BOgFdHXGUuYvRSSRJE3aRBdVPaTuZYBdrxrQJ/aCw=="/>
+            <!-- <sparkle:deltas>
+                <enclosure url="https://raw.githubusercontent.com/Ebullioscopic/Atoll/main/Updates/Atoll12-11.delta" sparkle:deltaFrom="11" length="7377790" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="YWMneUHuP8SluQ0UuPxdm2uCd8ko+MitIjUd2l47aE3AD+M7ImkK2slLD/WwWDs9gKkta0ZQGhZvioP4a6RjAQ=="/>
+            </sparkle:deltas> -->
+        </item>
+        <item>
             <title>2.1.0</title>
             <pubDate>Sat, 21 Mar 2026 23:51:32 +0530</pubDate>
             <sparkle:version>11</sparkle:version>
             <sparkle:shortVersionString>2.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.6</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/Ebullioscopic/Atoll/releases/download/v2.1.0/Atoll%202.1.0.dmg" length="23361812" type="application/octet-stream" sparkle:edSignature="Q8Ki261habL7a/6X7kT4dcjAPXMPPScUKFbhZGPAOY9v4mgPmJGyTeFus25YFYTlMvyAYR2fMMK4H9m5fhBCCQ=="/>
+            <enclosure url="https://raw.githubusercontent.com/Ebullioscopic/Atoll/main/Updates/Atoll%202.1.0.dmg" length="23361812" type="application/octet-stream" sparkle:edSignature="Q8Ki261habL7a/6X7kT4dcjAPXMPPScUKFbhZGPAOY9v4mgPmJGyTeFus25YFYTlMvyAYR2fMMK4H9m5fhBCCQ=="/>
             <sparkle:deltas>
-                <enclosure url="https://github.com/Ebullioscopic/Atoll/releases/download/v2.1.0/Atoll11-8.delta" sparkle:deltaFrom="8" length="2108778" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="8z8NaV51LSrYU9EdZ9h0rMUiH3wsIwbw9YnSvcHZFmz50O2OZdl2JWMcooq7+rhFdefBzLYNKkqcolZmHw4xDA=="/>
+                <enclosure url="https://raw.githubusercontent.com/Ebullioscopic/Atoll/main/Updates/Atoll11-8.delta" sparkle:deltaFrom="8" length="2108778" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="862528" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,en" sparkle:edSignature="8z8NaV51LSrYU9EdZ9h0rMUiH3wsIwbw9YnSvcHZFmz50O2OZdl2JWMcooq7+rhFdefBzLYNKkqcolZmHw4xDA=="/>
             </sparkle:deltas>
         </item>
         <item>

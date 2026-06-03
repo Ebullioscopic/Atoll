@@ -904,6 +904,10 @@
         }
       }
     },
+    "%@ left" : {
+      "comment" : "A string indicating how much time there is left of an event.",
+      "extractionState" : "manual"
+    },
     "%@ Models" : {
       "comment" : "merge:ko:alt='%@ 모델'",
       "localizations" : {
@@ -23945,6 +23949,7 @@
       }
     },
     "HH" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -25404,6 +25409,14 @@
           }
         }
       }
+    },
+    "in %@" : {
+      "comment" : "\"In x hours\" as showed on the lock screen calendar widget.",
+      "extractionState" : "manual"
+    },
+    "in %lld" : {
+      "comment" : "A label used to indicate an event happening in a set amount of time.",
+      "extractionState" : "manual"
     },
     "In progress" : {
       "localizations" : {
@@ -30378,7 +30391,6 @@
       }
     },
     "min" : {
-      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -30408,6 +30420,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "分钟"
+          }
+        }
+      }
+    },
+    "min plural" : {
+      "comment" : "Shortened plural form of minutes. Should be kept short as it is used for the calendar reminder HUD.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "min"
           }
         }
       }
@@ -30862,6 +30886,7 @@
       }
     },
     "MM" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -34089,6 +34114,10 @@
           }
         }
       }
+    },
+    "now" : {
+      "comment" : "A string indicating that an event is starting at the current time.",
+      "extractionState" : "manual"
     },
     "Now Playing" : {
       "comment" : "Name of the media controller type for the \"Now Playing\" option.",
@@ -39366,7 +39395,6 @@
       }
     },
     "Running" : {
-      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -45149,6 +45177,7 @@
       }
     },
     "SS" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {

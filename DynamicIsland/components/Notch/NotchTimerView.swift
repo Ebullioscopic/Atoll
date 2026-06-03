@@ -184,7 +184,7 @@ struct NotchTimerView: View {
                         icon: "xmark",
                         foreground: .white.opacity(0.95),
                         background: Color.white.opacity(0.16),
-                        accessibilityLabel: "Cancel",
+                        accessibilityLabel: String(localized: "Cancel"),
                         action: stopTimerAction
                     )
                 } else {
@@ -192,7 +192,7 @@ struct NotchTimerView: View {
                         icon: "stop.fill",
                         foreground: .white.opacity(0.95),
                         background: Color.white.opacity(0.16),
-                        accessibilityLabel: "Stop",
+                        accessibilityLabel: String(localized: "Stop"),
                         action: stopTimerAction
                     )
                 }
@@ -251,7 +251,7 @@ struct NotchTimerView: View {
                     .minimumScaleFactor(0.8)
 
                 if timerManager.isOvertime {
-                    Text("Overtime")
+                    Text(String(localized: "Overtime"))
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
@@ -401,9 +401,9 @@ struct NotchTimerView: View {
 
     private var timerStatusText: String? {
         if timerManager.isOvertime {
-            return "Overtime"
+            return String(localized: "Overtime")
         } else if timerManager.isPaused {
-            return "Paused"
+            return String(localized: "Paused")
         } else if timerManager.isFinished {
             return "Completed"
         }
@@ -441,7 +441,7 @@ struct NotchTimerView: View {
     }
 
     private var pauseAccessibilityLabel: String {
-        timerManager.isPaused ? "Resume" : "Pause"
+        timerManager.isPaused ? String(localized: "Resume") : String(localized: "Pause")
     }
 
     private var startButtonColor: Color {
@@ -467,7 +467,7 @@ struct NotchTimerView: View {
                 }
             }
         } label: {
-            Label("Start", systemImage: "play.fill")
+            Label(String(localized: "Start"), systemImage: "play.fill")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.white)
                 .frame(maxWidth: .infinity)
@@ -490,7 +490,7 @@ struct NotchTimerView: View {
 
     private var resetButton: some View {
         Button(action: resetCustomTimerInputs) {
-            Label("Reset", systemImage: "arrow.counterclockwise")
+            Label(String(localized: "Reset"), systemImage: "arrow.counterclockwise")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.9))
                 .frame(maxWidth: .infinity)
@@ -615,11 +615,11 @@ private struct DurationInputRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
-            DurationField(label: String(localized: "HH"), value: $hours, range: 0...23, width: fieldWidth)
+            DurationField(label: String(localized: "Hours"), value: $hours, range: 0...23, width: fieldWidth)
             colon
-            DurationField(label: String(localized: "MM"), value: $minutes, range: 0...59, width: fieldWidth)
+            DurationField(label: String(localized: "Minutes"), value: $minutes, range: 0...59, width: fieldWidth)
             colon
-            DurationField(label: String(localized: "SS"), value: $seconds, range: 0...59, width: fieldWidth)
+            DurationField(label: String(localized: "Seconds"), value: $seconds, range: 0...59, width: fieldWidth)
         }
     }
 
