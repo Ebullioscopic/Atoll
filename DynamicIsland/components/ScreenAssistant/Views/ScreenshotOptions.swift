@@ -176,7 +176,7 @@ struct ScreenshotOptionButton: View {
                 .fill(Color(NSColor.controlBackgroundColor))
                 .opacity(0.5)
         )
-        .onHover { isHovered in
+        .onHover { _ in
             // Add subtle hover effect if needed
         }
     }

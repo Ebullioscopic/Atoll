@@ -49,7 +49,7 @@ class AlarmManager: ObservableObject {
     // MARK: - Notification Permission
 
     private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, error in
             if let error = error {
                 print("[AlarmManager] Notification permission error: \(error)")
             }

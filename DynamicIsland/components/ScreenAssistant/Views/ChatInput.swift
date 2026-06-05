@@ -299,7 +299,7 @@ struct ChatInputView: View {
     
     private func handleFilesDrop(_ providers: [NSItemProvider]) -> Bool {
         for provider in providers {
-            _ = provider.loadObject(ofClass: URL.self) { url, error in
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
                 if let url = url {
                     DispatchQueue.main.async {
                         screenAssistantManager.addFiles([url])

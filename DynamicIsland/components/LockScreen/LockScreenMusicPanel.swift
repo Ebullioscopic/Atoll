@@ -200,7 +200,7 @@ struct LockScreenMusicPanel: View {
                 isArtworkFullscreen = false
             }
         }
-        .onChange(of: isExpanded) { _, expanded in
+        .onChange(of: isExpanded) { _, _ in
             updatePanelSize()
         }
         .onChange(of: showMediaOutputControl) { _, enabled in

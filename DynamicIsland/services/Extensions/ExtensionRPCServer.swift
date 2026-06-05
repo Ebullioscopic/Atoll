@@ -212,7 +212,7 @@ final class ExtensionRPCServer {
         guard let clientConn = connections[connID] else { return }
         let connection = clientConn.connection
 
-        connection.receiveMessage { [weak self] content, context, isComplete, error in
+        connection.receiveMessage { [weak self] content, _, _, error in
             guard let self else { return }
 
             if let error {

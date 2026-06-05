@@ -50,7 +50,7 @@ struct ColorCodedProgressBar: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
+        GeometryReader { _ in
             ZStack(alignment: .leading) {
                 // Background track
                 RoundedRectangle(cornerRadius: height / 2)
