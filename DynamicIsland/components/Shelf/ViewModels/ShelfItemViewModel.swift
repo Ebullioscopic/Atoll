@@ -35,7 +35,6 @@ final class ShelfItemViewModel: ObservableObject {
     @Published var isRenaming: Bool = false
     @Published var draftTitle: String = ""
     private var sharingLifecycle: SharingLifecycleDelegate?
-    private var quickShareLifecycle: SharingLifecycleDelegate?
     private var sharingAccessingURLs: [URL] = []
     private static var copiedURLs: [URL] = []
 

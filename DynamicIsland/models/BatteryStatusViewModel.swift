@@ -35,7 +35,6 @@ enum BatteryTemporaryHUDKind: Equatable {
 /// A view model that manages and monitors the battery status of the device
 class BatteryStatusViewModel: ObservableObject {
 
-    private var powerSourceChangedCallback: IOPowerSourceCallbackType?
     private var runLoopSource: Unmanaged<CFRunLoopSource>?
     var animations: DynamicIslandAnimations = DynamicIslandAnimations()
     private let lowBatteryAlertSoundPlayer = AudioPlayer()

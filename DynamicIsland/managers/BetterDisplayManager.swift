@@ -107,7 +107,6 @@ final class BetterDisplayManager: ObservableObject {
     // MARK: Private
 
     private var osdObserver: NSObjectProtocol?
-    private var responseObserver: NSObjectProtocol?
     private var workspaceObserver: NSObjectProtocol?
     private var workspaceTermObserver: NSObjectProtocol?
     private var launchedObserver: NSObjectProtocol?

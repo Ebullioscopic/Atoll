@@ -118,12 +118,6 @@ final class VerticalHUDWindowManager {
         window.nsWindow.ignoresMouseEvents = !shouldAllowInteraction
     }
 
-    private func updateWindowInteractivity() {
-        for window in windows.values {
-            applyInteractivity(window)
-        }
-    }
-
     private func teardownWindows() {
         hideWorkItem?.cancel()
         hideWorkItem = nil

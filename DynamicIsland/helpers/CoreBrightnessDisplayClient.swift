@@ -27,7 +27,6 @@ final class CoreBrightnessDisplayClient {
     private var clientInstance: NSObject?
     private let getSelector = NSSelectorFromString("brightnessForDisplay:")
     private let setSelector = NSSelectorFromString("setBrightness:forDisplay:")
-    private let notificationSelector = NSSelectorFromString("setNotificationBlock:")
 
     var onBrightnessChange: ((Float) -> Void)?
     private var available = false

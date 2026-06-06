@@ -44,10 +44,6 @@ struct FileShareView: View {
         quickShare.availableProviders.first(where: { $0.id == quickShareProvider }) ?? QuickShareProvider(id: "System Share Menu", imageData: nil, supportsRawText: true)
     }
 
-    private var notchToggleProviders: [QuickShareProvider] {
-        quickShare.availableProviders.filter { $0.id == "AirDrop" || $0.id == "LocalSend" }
-    }
-
     var body: some View {
         dropArea
             .background(NSViewHost(view: $hostView))

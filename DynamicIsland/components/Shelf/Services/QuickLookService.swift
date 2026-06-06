@@ -34,9 +34,7 @@ final class QuickLookService: ObservableObject {
     @Published var isQuickLookOpen: Bool = false
 
     private var previewPanel: QLPreviewPanel?
-    private var dataSource: QuickLookDataSource?
     private var accessingURLs: [URL] = []
-    private var previewPanelObserver: Any?
 
     func show(urls: [URL], selectFirst: Bool = true, slideshow: Bool = false) {
         guard !urls.isEmpty else { return }

@@ -44,11 +44,6 @@ final class ExtensionRPCService {
         "badgeIcon", "leadingContent", "icon", "tint"
     ]
 
-    // Enum-typed fields that can appear inside arrays (like content elements)
-    private static let contentElementTypeFields: Set<String> = [
-        "text", "icon", "progress", "graph", "gauge", "spacer", "divider", "webView"
-    ]
-
     init(bundleIdentifier: String, server: ExtensionRPCServer) {
         self.bundleIdentifier = bundleIdentifier
         self.server = server
