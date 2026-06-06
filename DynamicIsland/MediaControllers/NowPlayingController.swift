@@ -40,9 +40,6 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     var isWorking: Bool {
         return process != nil && process?.isRunning == true
     }
-    private var lastMusicItem:
-        (title: String, artist: String, album: String, duration: TimeInterval, artworkData: Data?)?
-
     /// Tracks the current track identity to prevent stale artwork (issue #404).
     private var currentTrackID: String = ""
 

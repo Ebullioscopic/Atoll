@@ -360,10 +360,6 @@ struct NotchNotesView: View {
         }
     }
 
-    private func scaleDownEditor() {
-        closeEditor()
-    }
-    
     private func closeEditor() {
         autoSaveTask?.cancel()
         autoSaveTask = nil

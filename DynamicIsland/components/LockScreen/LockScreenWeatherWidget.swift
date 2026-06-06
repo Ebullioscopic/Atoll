@@ -137,7 +137,6 @@ struct LockScreenWeatherWidget: View {
 	private var stackAlignment: VerticalAlignment { isInline ? .firstTextBaseline : .top }
 	private var stackSpacing: CGFloat { isInline ? 14 : 22 }
 	private var mainRowAlignment: Alignment { isInline ? .leading : .center }
-	private var secondaryRowAlignment: Alignment { .center }
 	private var focusRowAlignment: Alignment { .center }
 	private var gaugeDiameter: CGFloat { 64 }
 	private var topPadding: CGFloat { isInline ? 6 : 22 }

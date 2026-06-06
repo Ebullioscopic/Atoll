@@ -68,9 +68,6 @@ class ScreenRecordingManager: ObservableObject {
     private var durationTimer: Timer?
     private var debounceIdleTask: Task<Void, Never>?
     
-    // MARK: - Configuration
-    private let debounceDelay: TimeInterval = 0.2 // Debounce rapid changes
-    
     // MARK: - Initialization
     private init() {
         // No initial setup needed

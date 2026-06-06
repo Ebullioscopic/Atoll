@@ -224,33 +224,6 @@ class IdleAnimationManager {
     
     // MARK: - User Animations
     
-    /// Load user-imported animations from storage directory
-    private func loadStoredUserAnimations() -> [CustomIdleAnimation]? {
-        do {
-            let files = try FileManager.default.contentsOfDirectory(at: storageDirectory, includingPropertiesForKeys: nil)
-            let jsonFiles = files.filter { $0.pathExtension.lowercased() == "json" }
-            
-            let animations = jsonFiles.map { url -> CustomIdleAnimation in
-                let name = url.deletingPathExtension().lastPathComponent
-                return CustomIdleAnimation(
-                    name: name,
-                    source: .lottieFile(url),
-                    speed: 1.0,
-                    isBuiltIn: false
-                )
-            }
-            
-            if !animations.isEmpty {
-                print("💾 [IdleAnimationManager] Loaded \(animations.count) stored user animations")
-            }
-            return animations.isEmpty ? nil : animations
-            
-        } catch {
-            print("❌ [IdleAnimationManager] Error loading stored animations: \(error)")
-            return nil
-        }
-    }
-    
     // MARK: - Import & Export
     
     /// Import a Lottie JSON file from URL (either local file or download from remote)

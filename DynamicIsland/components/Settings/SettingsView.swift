@@ -3731,15 +3731,6 @@ struct Appearance: View {
         return screen.safeAreaInsets.top > 0
     }
 
-    private var notchWidthRange: ClosedRange<Double> {
-        let minW = Double(currentRecommendedMinimumNotchWidth())
-        let maxW = min(900, Double(maxAllowedNotchWidth()))
-        return minW...max(minW, maxW)
-    }
-    private var defaultOpenNotchWidth: CGFloat {
-        currentRecommendedMinimumNotchWidth()
-    }
-
     private func highlightID(_ title: String) -> String {
         SettingsTab.appearance.highlightID(for: title)
     }
@@ -7437,11 +7428,6 @@ struct TerminalSettings: View {
                 || font.fontDescriptor.symbolicTraits.contains(.monoSpace)
         }
         .sorted()
-    }
-
-    /// Display name for the font picker — shows "System Monospaced" when no custom font is set.
-    private var fontDisplayName: String {
-        terminalFontFamily.isEmpty ? "System Monospaced" : terminalFontFamily
     }
 
     private var cursorStyleBinding: Binding<TerminalCursorStyleOption> {

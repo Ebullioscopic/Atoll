@@ -1309,10 +1309,6 @@ struct LockScreenMusicPanel: View {
         isExpanded ? 58 : 34
     }
 
-    private var appIconCornerRadius: CGFloat {
-        isExpanded ? 18 : 12
-    }
-
     private var appIconOffset: CGFloat {
         isExpanded ? 18 : 12
     }

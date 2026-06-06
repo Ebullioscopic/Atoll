@@ -252,10 +252,6 @@ struct ContentView: View {
         guard !isMusicControlWindowVisible else { return }
         enqueueMusicControlWindowSync(forceRefresh: forceRefresh, delay: delay)
     }
-    private var dynamicNotchResizeAnimation: Animation? {
-        nil
-    }
-    
     private let zeroHeightHoverPadding: CGFloat = 10
     private let statsAdditionalRowHeight: CGFloat = statsSecondRowContentHeight + statsGridSpacingHeight
     private let musicControlPauseGrace: TimeInterval = 5

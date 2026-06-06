@@ -60,8 +60,6 @@ class WebcamManager: NSObject, ObservableObject {
 
     private let sessionQueue = DispatchQueue(label: "DynamicIsland.WebcamManager.SessionQueue", qos: .userInitiated)
     
-    private var isCleaningUp: Bool = false
-    
     // MARK: - Constants
     
     enum WebcamError: Error, LocalizedError {
