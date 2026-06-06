@@ -565,15 +565,25 @@ class ScreenAssistantManager: NSObject, ObservableObject {
             "parts": parts
         ])
         
-        var requestBody: [String: Any] = [
+        var generationConfig: [String: Any] = [
+            "temperature": 0.7,
+            "topP": 0.8,
+            "topK": 40,
+            "maxOutputTokens": 2048,
+            "responseMimeType": "text/plain"
+        ]
+        
+        // Add thinking configuration if enabled and model supports it
+        let selectedModel = Defaults[.selectedAIModel]
+        if selectedModel?.supportsThinking == true && Defaults[.enableThinkingMode] {
+            generationConfig["thinkingConfig"] = [
+                "thinkingBudget": 0 // 0 means unlimited thinking
+            ]
+        }
+        
+        let requestBody: [String: Any] = [
             "contents": contents,
-            "generationConfig": [
-                "temperature": 0.7,
-                "topP": 0.8,
-                "topK": 40,
-                "maxOutputTokens": 2048,
-                "responseMimeType": "text/plain"
-            ],
+            "generationConfig": generationConfig,
             "safetySettings": [
                 [
                     "category": "HARM_CATEGORY_HARASSMENT",
@@ -593,16 +603,6 @@ class ScreenAssistantManager: NSObject, ObservableObject {
                 ]
             ]
         ]
-        
-        // Add thinking configuration if enabled and model supports it
-        let selectedModel = Defaults[.selectedAIModel]
-        if selectedModel?.supportsThinking == true && Defaults[.enableThinkingMode] {
-            requestBody["generationConfig"] = (requestBody["generationConfig"] as! [String: Any]).merging([
-                "thinkingConfig": [
-                    "thinkingBudget": 0 // 0 means unlimited thinking
-                ]
-            ]) { (_, new) in new }
-        }
         
         return requestBody
     }

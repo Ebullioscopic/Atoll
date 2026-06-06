@@ -99,9 +99,9 @@ final class KeyboardBrightnessSensor {
         )?.takeUnretainedValue() else {
             throw SensorError.Keyboard.notStandard
         }
-        if CFGetTypeID(property) == CFNumberGetTypeID() {
+        if CFGetTypeID(property) == CFNumberGetTypeID(), let number = property as? CFNumber {
             var rawValue: Float = 0
-            if CFNumberGetValue(property as! CFNumber, .floatType, &rawValue) {
+            if CFNumberGetValue(number, .floatType, &rawValue) {
                 return rawValue / maxKeyboardBrightness
             }
         }
