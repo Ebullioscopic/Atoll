@@ -135,13 +135,12 @@ struct ClipboardItem: Identifiable, Codable {
 }
 
 enum ClipboardItemType: String, CaseIterable, Codable {
-    case text = "text"
-    case url = "url"
-    case file = "file"
-    case image = "image"
-    case rtf = "rtf"
-    case unknown = "unknown"
-
+    case text
+    case url
+    case file
+    case image
+    case rtf
+    case unknown
     var icon: String {
         switch self {
         case .text: return "doc.text"

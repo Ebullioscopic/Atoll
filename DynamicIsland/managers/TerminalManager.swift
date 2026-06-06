@@ -691,13 +691,12 @@ class TerminalManager: ObservableObject {
 
 /// Codable-friendly cursor style enum that bridges to SwiftTerm's `CursorStyle`.
 enum TerminalCursorStyleOption: String, CaseIterable, Defaults.Serializable {
-    case blinkBlock = "blinkBlock"
-    case steadyBlock = "steadyBlock"
-    case blinkUnderline = "blinkUnderline"
-    case steadyUnderline = "steadyUnderline"
-    case blinkBar = "blinkBar"
-    case steadyBar = "steadyBar"
-
+    case blinkBlock
+    case steadyBlock
+    case blinkUnderline
+    case steadyUnderline
+    case blinkBar
+    case steadyBar
     var swiftTermStyle: CursorStyle {
         switch self {
         case .blinkBlock: return .blinkBlock

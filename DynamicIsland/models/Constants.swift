@@ -252,9 +252,8 @@ struct ExtensionRateLimitRecord: Codable, Defaults.Serializable, Hashable, Ident
 }
 
 enum FantasticalViewStyle: String, CaseIterable, Codable, Defaults.Serializable {
-    case mini = "mini"
-    case calendar = "calendar"
-    
+    case mini
+    case calendar
     var displayName: String {
         switch self {
         case .mini: return "Mini View"
@@ -264,9 +263,9 @@ enum FantasticalViewStyle: String, CaseIterable, Codable, Defaults.Serializable 
 }
 
 enum ClipboardDisplayMode: String, CaseIterable, Codable, Defaults.Serializable {
-    case popover = "popover"     // Traditional popover attached to button
-    case panel = "panel"         // Floating panel near notch
-    case separateTab = "separateTab" // Separate tab in Dynamic Island
+    case popover     // Traditional popover attached to button
+    case panel         // Floating panel near notch
+    case separateTab // Separate tab in Dynamic Island
     
     var displayName: String {
         switch self {
@@ -286,8 +285,8 @@ enum ClipboardDisplayMode: String, CaseIterable, Codable, Defaults.Serializable 
 }
 
 enum ScreenAssistantDisplayMode: String, CaseIterable, Codable, Defaults.Serializable {
-    case popover = "popover"     // Traditional popover attached to button
-    case panel = "panel"         // Floating panel near notch
+    case popover     // Traditional popover attached to button
+    case panel         // Floating panel near notch
     
     var displayName: String {
         switch self {
@@ -305,8 +304,8 @@ enum ScreenAssistantDisplayMode: String, CaseIterable, Codable, Defaults.Seriali
 }
 
 enum ColorPickerDisplayMode: String, CaseIterable, Codable, Defaults.Serializable {
-    case popover = "popover"     // Traditional popover attached to button
-    case panel = "panel"         // Floating panel near notch
+    case popover     // Traditional popover attached to button
+    case panel         // Floating panel near notch
     
     var displayName: String {
         switch self {
@@ -550,9 +549,8 @@ enum TimerProgressStyle: String, CaseIterable, Identifiable, Defaults.Serializab
 }
 
 enum FocusMonitoringMode: String, CaseIterable, Identifiable, Defaults.Serializable {
-    case withoutDevTools = "withoutDevTools"
-    case useDevTools = "useDevTools"
-
+    case withoutDevTools
+    case useDevTools
     var id: String { rawValue }
 
     var displayName: String {

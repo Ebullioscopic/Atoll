@@ -894,10 +894,10 @@ private struct WTTRCurrentCondition: Decodable {
         case weatherCode
         case weatherDesc
         case langEn = "lang_en"
-        case pressure = "pressure"
-        case pressureInches = "pressureInches"
+        case pressure
+        case pressureInches
         case airQuality = "air_quality"
-        case isday = "isday"
+        case isday
     }
 
     let tempC: String
@@ -948,10 +948,10 @@ private struct WTTRAirQuality: Decodable {
 
 private struct WTTRDailyWeather: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case maxtempC = "maxtempC"
-        case maxtempF = "maxtempF"
-        case mintempC = "mintempC"
-        case mintempF = "mintempF"
+        case maxtempC
+        case maxtempF
+        case mintempC
+        case mintempF
     }
 
     let maxtempC: String?
@@ -966,7 +966,7 @@ private struct WTTRNearestArea: Decodable {
     let country: [WTTRTextValue]?
 
     private enum CodingKeys: String, CodingKey {
-        case areaName = "areaName"
+        case areaName
         case region
         case country
     }

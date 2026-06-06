@@ -48,12 +48,11 @@ struct ScreenAssistantFile: Identifiable, Codable {
     let audioFileName: String? // For audio recordings
     
     enum FileType: String, CaseIterable, Codable {
-        case document = "document"
-        case image = "image"
-        case audio = "audio"
-        case video = "video"
-        case other = "other"
-        
+        case document
+        case image
+        case audio
+        case video
+        case other
         var iconName: String {
             switch self {
             case .document: return "doc.text"
