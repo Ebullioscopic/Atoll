@@ -35,7 +35,14 @@ final class ExtensionNotchExperienceManager: ObservableObject {
     private let currentProcessID = ProcessInfo.processInfo.processIdentifier
 
     private init() {
-        activeExperiences = eventBridge.loadPersistedNotchExperiences()
+        // Drop persisted experiences whose owning extension app is no longer
+        // running — restoring them produces ghost tabs that nothing can
+        // dismiss (the extension that would re-present or dismiss is dead).
+        activeExperiences = eventBridge.loadPersistedNotchExperiences().filter { payload in
+            !NSRunningApplication.runningApplications(
+                withBundleIdentifier: payload.bundleIdentifier
+            ).isEmpty
+        }
         sortExperiences()
         observerToken = eventBridge.observeNotchExperienceSnapshots { [weak self] payloads, sourcePID in
             self?.applySnapshot(payloads, sourcePID: sourcePID)

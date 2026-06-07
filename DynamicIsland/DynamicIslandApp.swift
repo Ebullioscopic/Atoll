@@ -232,6 +232,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        // Tear down process taps/aggregate devices and flush mixer settings.
+        MixerCoordinator.shared.prepareForTermination()
+
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]
@@ -555,6 +558,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Initialize idle animations (load bundled + built-in face)
         idleAnimationManager.initializeDefaultAnimations()
+
+        // Start the per-app volume mixer engine if enabled; keeps engine in
+        // sync with the settings toggle from here on.
+        MixerCoordinator.shared.bootstrap()
 
         applySelectedAppIcon()
         installTopMenuItemsIfNeeded()

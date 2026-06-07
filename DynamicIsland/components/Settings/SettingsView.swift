@@ -66,6 +66,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case shortcuts
     case notes
     case terminal
+    case mixer
     case about
 
     var id: String { rawValue }
@@ -78,7 +79,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .hudAndOSD, .battery:                                           return .system
         case .timer, .calendar, .notes:                                      return .productivity
         case .clipboard, .screenAssistant, .colorPicker, .shelf,
-             .downloads, .shortcuts:                                         return .utilities
+             .downloads, .shortcuts, .mixer:                                 return .utilities
         case .stats, .terminal:                                              return .developer
         case .extensions:                                                    return .integrations
         case .about:                                                         return .info
@@ -107,6 +108,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return String(localized: "Shortcuts")
         case .notes: return String(localized: "Notes")
         case .terminal: return String(localized: "Terminal")
+        case .mixer: return String(localized: "Mixer")
         case .about: return String(localized: "About")
         }
     }
@@ -133,6 +135,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return "keyboard"
         case .notes: return "note.text"
         case .terminal: return "apple.terminal"
+        case .mixer: return "slider.horizontal.3"
         case .about: return "info.circle"
         }
     }
@@ -159,6 +162,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return .orange
         case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
+        case .mixer: return Color(red: 0.95, green: 0.55, blue: 0.2)
         case .about: return .secondary
         }
     }
@@ -504,6 +508,7 @@ struct SettingsView: View {
             .shelf,
             .downloads,
             .shortcuts,
+            .mixer,
             // Developer
             .stats,
             .terminal,
@@ -925,6 +930,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .terminal, title: "Scrollback lines", keywords: ["terminal", "scrollback", "buffer", "history"], highlightID: SettingsTab.terminal.highlightID(for: "Scrollback lines")),
             SettingsSearchEntry(tab: .terminal, title: "Option as Meta", keywords: ["terminal", "option", "meta", "alt", "key"], highlightID: SettingsTab.terminal.highlightID(for: "Option as Meta")),
             SettingsSearchEntry(tab: .terminal, title: "Mouse reporting", keywords: ["terminal", "mouse", "reporting", "vim", "tmux"], highlightID: SettingsTab.terminal.highlightID(for: "Mouse reporting")),
+            SettingsSearchEntry(tab: .mixer, title: "Enable volume mixer", keywords: ["mixer", "volume", "per-app", "audio", "eq", "equalizer", "boost", "routing"], highlightID: SettingsTab.mixer.highlightID(for: "Enable volume mixer")),
         ]
     }
 
@@ -1019,6 +1025,10 @@ struct SettingsView: View {
         case .terminal:
             SettingsForm(tab: .terminal) {
                 TerminalSettings()
+            }
+        case .mixer:
+            SettingsForm(tab: .mixer) {
+                MixerSettings()
             }
         case .about:
             if let controller = updaterController {

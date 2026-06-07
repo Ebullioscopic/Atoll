@@ -647,6 +647,13 @@ struct ContentView: View {
                     }
                 }
             }
+            .onChange(of: vm.isMixerPopoverActive) { _, newPopoverState in
+                runAfter(0.1) {
+                    if !newPopoverState && !isHovering && vm.notchState == .open && !shouldPreventAutoClose() {
+                        vm.close()
+                    }
+                }
+            }
             .onChange(of: vm.shouldRecheckHover) { _, _ in
                 // Recheck hover state when popovers are closed
                 runAfter(0.1) {
@@ -1085,6 +1092,8 @@ struct ContentView: View {
                                 NotchNotesView()
                             case .terminal:
                                 NotchTerminalView()
+                            case .mixer:
+                                NotchMixerView()
                             case .extensionExperience:
                                 if let payload = currentExtensionTabPayload() {
                                     ExtensionNotchExperienceTabView(payload: payload)
@@ -2112,6 +2121,7 @@ struct ContentView: View {
          vm.isClipboardPopoverActive || 
          vm.isColorPickerPopoverActive || 
          vm.isStatsPopoverActive ||
+         vm.isMixerPopoverActive ||
          vm.isTimerPopoverActive ||
          vm.isMediaOutputPopoverActive ||
          vm.isReminderPopoverActive

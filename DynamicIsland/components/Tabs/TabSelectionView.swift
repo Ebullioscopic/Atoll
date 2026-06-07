@@ -90,6 +90,9 @@ struct TabSelectionView: View {
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
+        if Defaults[.enableMixerFeature] {
+            tabsArray.append(TabModel(label: "Mixer", icon: "slider.horizontal.3", view: .mixer))
+        }
         if extensionTabsEnabled {
             for payload in extensionTabPayloads {
                 guard let tab = payload.descriptor.tab else { continue }

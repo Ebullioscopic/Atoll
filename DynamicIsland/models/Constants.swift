@@ -1046,6 +1046,11 @@ extension Defaults.Keys {
     static let showDiskGraph = Key<Bool>("showDiskGraph", default: false)
     static let cpuTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("cpuTemperatureUnit", default: .celsius)
     
+    // MARK: Mixer Feature
+    // Default ON in this fork — the per-app mixer is its reason to exist.
+    // Can still be disabled in Settings → Mixer.
+    static let enableMixerFeature = Key<Bool>("enableMixerFeature", default: true)
+
     // MARK: Terminal Feature
     static let enableTerminalFeature = Key<Bool>("enableTerminalFeature", default: false)
     static let terminalShellPath = Key<String>("terminalShellPath", default: "/bin/zsh")

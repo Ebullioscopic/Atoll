@@ -92,6 +92,11 @@ func enabledStandardTabCount() -> Int {
         count += 1
     }
 
+    // Mixer tab
+    if Defaults[.enableMixerFeature] {
+        count += 1
+    }
+
     return count
 }
 

@@ -197,7 +197,11 @@ struct ExtensionNotchExperienceTabView: View {
             if let tabConfiguration {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 18) {
-                        header(for: tabConfiguration)
+                        // Webview-only tabs render their own UI; the large
+                        // icon + title header just wastes notch height.
+                        if tabConfiguration.webContent == nil || !tabConfiguration.sections.isEmpty {
+                            header(for: tabConfiguration)
+                        }
                         ForEach(Array(tabConfiguration.sections.enumerated()), id: \.offset) { index, section in
                             ExtensionNotchSectionView(
                                 section: section,

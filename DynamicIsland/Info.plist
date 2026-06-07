@@ -7,10 +7,14 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>CFBundleDisplayName</key>
+	<string>Atoll Mixer</string>
 	<key>NSAppleMusicUsageDescription</key>
 	<string>Atoll uses Apple Music to fetch animated artwork for the lock screen wallpaper.</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>Atoll needs audio capture permission to display the real-time music waveform visualizer.</string>
+	<string>Atoll needs audio capture permission for the music waveform visualizer and to control per-app volume in the Mixer tab.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Atoll uses Bluetooth to list and connect paired audio devices in the Mixer tab.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Atoll needs screen recording permission to capture screenshots for the AI assistant feature.</string>
 	<key>SUEnableDownloaderService</key>

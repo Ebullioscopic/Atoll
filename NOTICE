@@ -5,3 +5,12 @@ modified and adapted for Atoll (DynamicIsland). The boring.notch project
 is licensed under the GNU General Public License v3.0.
 
 See the LICENSE file for the full GPL v3 text.
+
+This fork additionally includes the per-app volume mixer engine derived
+from the FineTune project (https://github.com/ronitsingh10/FineTune),
+Copyright (c) Ronit Singh, licensed under the GNU General Public License
+v3.0. The engine sources live under DynamicIsland/Mixer/ and were modified
+for integration: aggregate-device naming changed from "FineTune-*" to
+"AtollMixer-*", settings persistence moved to Application Support/AtollMixer,
+the TCC permission SPI made unconditional, and the URL-scheme handler,
+menu bar UI, media keys, and updater subsystems removed.
