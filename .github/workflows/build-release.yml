@@ -1,0 +1,84 @@
+name: Build Release DMG
+
+# Builds Atoll Mixer and attaches a DMG to the GitHub release.
+# Trigger: create a release (or push a tag) named v* — easiest path is
+# GitHub → Releases → "Draft a new release" → type a new tag → Publish.
+#
+# The app is ad-hoc signed (no Apple Developer ID / notarization), so after
+# downloading, macOS quarantine must be cleared once:
+#     xattr -cr /Applications/Atoll.app
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Build (Release, ad-hoc signed)
+        run: |
+          xcodebuild \
+            -project DynamicIsland.xcodeproj \
+            -scheme DynamicIsland \
+            -configuration Release \
+            -derivedDataPath build \
+            -skipMacroValidation \
+            -skipPackagePluginValidation \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="-" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            build
+
+      - name: Create DMG
+        run: |
+          APP="build/Build/Products/Release/Atoll.app"
+          test -d "$APP"
+          VERSION="${GITHUB_REF_NAME:-manual}"
+          mkdir -p dist/dmg
+          cp -R "$APP" dist/dmg/
+          ln -s /Applications dist/dmg/Applications
+          hdiutil create \
+            -volname "Atoll Mixer" \
+            -srcfolder dist/dmg \
+            -ov -format UDZO \
+            "dist/AtollMixer-${VERSION}.dmg"
+          ls -lh dist/*.dmg
+
+      - name: Attach DMG to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.dmg
+          generate_release_notes: true
+          body: |
+            **Install**: open the DMG, drag Atoll into Applications, then clear
+            quarantine once (the app is ad-hoc signed, not notarized):
+
+            ```
+            xattr -cr /Applications/Atoll.app
+            ```
+
+            Grant System Audio Recording when prompted for the Mixer tab.
+
+      - name: Upload artifact (manual runs)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: AtollMixer-dmg
+          path: dist/*.dmg
