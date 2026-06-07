@@ -1922,14 +1922,18 @@ struct ContentView: View {
 
         hiddenEdgeHoverPollingTask = Task { @MainActor in
             while !Task.isCancelled {
+                // Only hide-until-hover mode needs the fast edge poll. In every
+                // other mode this loop would otherwise busy-wake at 20 Hz forever
+                // doing nothing, so back off to a slow idle tick.
                 if self.shouldUseHiddenEdgeHoverPolling {
                     let hovering = self.hiddenHoverActivationContainsMouse()
                     if hovering != self.isHovering {
                         self.handleHover(hovering)
                     }
+                    try? await Task.sleep(for: .milliseconds(80))
+                } else {
+                    try? await Task.sleep(for: .milliseconds(500))
                 }
-
-                try? await Task.sleep(for: .milliseconds(50))
             }
 
             self.hiddenEdgeHoverPollingTask = nil

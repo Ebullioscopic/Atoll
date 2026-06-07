@@ -636,11 +636,52 @@ final class AudioEngine {
         logger.info("Settings reset: engine state synchronized")
     }
 
+    // MARK: - Lazy Tap Lifecycle
+
+    /// True if the EQ would actually alter audio (enabled and not flat). The
+    /// default `EQSettings.flat` is `isEnabled == true`, so `isEnabled` alone
+    /// can't distinguish "user configured EQ" from "untouched".
+    private func eqIsActive(_ eq: EQSettings) -> Bool {
+        eq.isEnabled && (eq.preampDB != 0 || eq.bandGains.contains { $0 != 0 })
+    }
+
+    /// Whether `app` needs a process tap, i.e. it has any non-default audio
+    /// processing. When this is false the app's audio can flow natively and the
+    /// tap (process tap + aggregate device + IO proc serviced by coreaudiod) is
+    /// pure idle overhead, so we avoid creating one — and reclaim it once the
+    /// app goes silent (see the health monitor).
+    private func appNeedsTap(_ app: AudioApp) -> Bool {
+        if volumeState.getVolume(for: app.id) != 1.0 { return true }
+        if volumeState.getBoost(for: app.id) != .x1 { return true }
+        if volumeState.getMute(for: app.id) { return true }
+        if eqIsActive(settingsManager.getEQSettings(for: app.persistenceIdentifier)) { return true }
+        // Explicit (non-default) device routing requires a tap to re-route.
+        if !settingsManager.isFollowingDefault(for: app.persistenceIdentifier) { return true }
+        if let uid = appDeviceRouting[app.id] ?? deviceVolumeMonitor.defaultDeviceUID {
+            if eqIsActive(settingsManager.getDeviceEQSettings(forDeviceUID: uid)) { return true }
+            if let selection = settingsManager.getAutoEQSelection(for: uid), selection.isEnabled { return true }
+        }
+        // Global loudness processing applies to every app.
+        if settingsManager.appSettings.loudnessCompensationEnabled { return true }
+        if settingsManager.appSettings.loudnessEqualizationEnabled { return true }
+        return false
+    }
+
+    /// Creates a tap for `app` only if it currently needs one. Resolves device
+    /// routing the same way `applyPersistedSettings` does. Never tears down —
+    /// teardown happens at coarse, silence-gated points only.
+    @discardableResult
+    private func ensureTapIfNeeded(for app: AudioApp) -> Bool {
+        guard appNeedsTap(app) else { return false }
+        guard let deviceUID = appDeviceRouting[app.id] ?? deviceVolumeMonitor.defaultDeviceUID else { return false }
+        appDeviceRouting[app.id] = deviceUID
+        ensureTapExists(for: app, deviceUID: deviceUID)
+        return taps[app.id] != nil
+    }
+
     func setVolume(for app: AudioApp, to volume: Float) {
         volumeState.setVolume(for: app.id, to: volume, identifier: app.persistenceIdentifier)
-        if let deviceUID = appDeviceRouting[app.id] {
-            ensureTapExists(for: app, deviceUID: deviceUID)
-        }
+        ensureTapIfNeeded(for: app)
         if let tap = taps[app.id] {
             tap.volume = effectiveVolume(for: app.id, deviceUIDs: tap.currentDeviceUIDs)
             if settingsManager.appSettings.loudnessCompensationEnabled {
@@ -660,6 +701,7 @@ final class AudioEngine {
 
     func setBoost(for app: AudioApp, to boost: BoostLevel) {
         volumeState.setBoost(for: app.id, to: boost, identifier: app.persistenceIdentifier)
+        ensureTapIfNeeded(for: app)
         if let tap = taps[app.id] {
             tap.volume = effectiveVolume(for: app.id, deviceUIDs: tap.currentDeviceUIDs)
         }
@@ -740,6 +782,7 @@ final class AudioEngine {
 
     func setMute(for app: AudioApp, to muted: Bool) {
         volumeState.setMute(for: app.id, to: muted, identifier: app.persistenceIdentifier)
+        ensureTapIfNeeded(for: app)
         taps[app.id]?.isMuted = muted
     }
 
@@ -749,9 +792,11 @@ final class AudioEngine {
 
     /// Update EQ settings for an app
     func setEQSettings(_ settings: EQSettings, for app: AudioApp) {
-        guard let tap = taps[app.id] else { return }
-        tap.updateEQSettings(settings)
+        // Persist first so appNeedsTap() sees the new settings, then create the
+        // tap on demand (an app with no prior adjustment may not be tapped yet).
         settingsManager.setEQSettings(settings, for: app.persistenceIdentifier)
+        ensureTapIfNeeded(for: app)
+        taps[app.id]?.updateEQSettings(settings)
     }
 
     /// Get EQ settings for an app
@@ -765,6 +810,11 @@ final class AudioEngine {
     /// to each app's own EQ. Applied immediately to all live taps on that device.
     func setDeviceEQ(_ settings: EQSettings, forDeviceUID deviceUID: String) {
         settingsManager.setDeviceEQSettings(settings, forDeviceUID: deviceUID)
+        // Device EQ affects every app routed to this device — ensure they're
+        // tapped (enabling it makes appNeedsTap() true for those apps).
+        for app in apps where (appDeviceRouting[app.id] ?? deviceVolumeMonitor.defaultDeviceUID) == deviceUID {
+            ensureTapIfNeeded(for: app)
+        }
         for (_, tap) in taps where tap.currentDeviceUID == deviceUID {
             tap.updateDeviceEQSettings(settings)
         }
@@ -788,6 +838,7 @@ final class AudioEngine {
         } else {
             settingsManager.setAutoEQSelection(for: deviceUID, to: nil)
         }
+        ensureTapsForDevice(deviceUID)
         applyAutoEQToTaps(for: deviceUID)
     }
 
@@ -795,7 +846,16 @@ final class AudioEngine {
         guard var selection = settingsManager.getAutoEQSelection(for: deviceUID) else { return }
         selection.isEnabled = enabled
         settingsManager.setAutoEQSelection(for: deviceUID, to: selection)
+        ensureTapsForDevice(deviceUID)
         applyAutoEQToTaps(for: deviceUID)
+    }
+
+    /// Ensures every app routed to `deviceUID` has a tap if it now needs one
+    /// (e.g. after enabling a per-device processing feature).
+    private func ensureTapsForDevice(_ deviceUID: String) {
+        for app in apps where (appDeviceRouting[app.id] ?? deviceVolumeMonitor.defaultDeviceUID) == deviceUID {
+            ensureTapIfNeeded(for: app)
+        }
     }
 
     func getAutoEQSelection(for deviceUID: String) -> AutoEQSelection? {
@@ -814,16 +874,32 @@ final class AudioEngine {
     }
 
     func setLoudnessCompensationEnabled(_ enabled: Bool) {
+        // Global loudness applies to every app, so enabling it makes them all
+        // need a tap. (Disabling leaves taps to be reclaimed once silent.)
+        if enabled { ensureTapsForAllApps() }
         for tap in taps.values {
             tap.updateLoudnessCompensation(volume: effectiveLoudnessVolume(for: tap), enabled: enabled)
         }
     }
 
     func setLoudnessEqualizationEnabled(_ enabled: Bool) {
+        if enabled { ensureTapsForAllApps() }
         var settings = LoudnessEqualizerSettings()
         settings.enabled = enabled
         for tap in taps.values {
             tap.updateLoudnessEqualization(settings)
+        }
+    }
+
+    /// Creates a tap for every audio app that lacks one. Used when a global
+    /// processing feature turns on and must apply to all apps regardless of
+    /// their per-app settings.
+    private func ensureTapsForAllApps() {
+        for app in apps {
+            guard taps[app.id] == nil else { continue }
+            guard let deviceUID = appDeviceRouting[app.id] ?? deviceVolumeMonitor.defaultDeviceUID else { continue }
+            appDeviceRouting[app.id] = deviceUID
+            ensureTapExists(for: app, deviceUID: deviceUID)
         }
     }
 
@@ -971,7 +1047,10 @@ final class AudioEngine {
                 }
             }
         } else {
-            ensureTapExists(for: app, deviceUID: targetUID)
+            // Explicit routing needs a tap; switching back to follow-default on an
+            // otherwise-default app does not (it plays natively) — ensureTapIfNeeded
+            // creates only in the former case.
+            ensureTapIfNeeded(for: app)
         }
     }
 
@@ -1209,24 +1288,30 @@ final class AudioEngine {
                 continue
             }
 
-            // Always create tap for audio apps (always-on strategy)
-            ensureTapExists(for: app, deviceUID: deviceUID)
-
-            // Only mark as applied if tap was successfully created
-            // This allows retry on next applyPersistedSettings() call if tap failed
-            guard taps[app.id] != nil else { continue }
+            // Lazy-tap strategy: only create a tap for apps that need processing.
+            // Apps at default (100%, unmuted, no EQ, follow-default) play
+            // natively, so coreaudiod isn't burdened with an idle aggregate
+            // device. A tap is created on demand the moment the user adjusts the
+            // app (setVolume/setMute/etc.) or a global feature turns on.
+            if appNeedsTap(app) {
+                ensureTapExists(for: app, deviceUID: deviceUID)
+                // If creation failed, retry on the next applyPersistedSettings() pass.
+                guard taps[app.id] != nil else { continue }
+            }
+            // Mark applied even when intentionally untapped, so we don't
+            // reprocess this app on every pass.
             appliedPIDs.insert(app.id)
 
-            if savedVolume != nil {
+            if savedVolume != nil, let tap = taps[app.id] {
                 let effective = effectiveVolume(for: app.id, deviceUIDs: [deviceUID])
                 let displayPercent = Int(effective * 100)
                 logger.debug("Applying saved volume \(displayPercent)% (with boost) to \(app.name)")
-                taps[app.id]?.volume = effective
+                tap.volume = effective
             }
 
-            if let muted = savedMute, muted {
+            if let muted = savedMute, muted, let tap = taps[app.id] {
                 logger.debug("Applying saved mute state to \(app.name)")
-                taps[app.id]?.isMuted = true
+                tap.isMuted = true
             }
         }
     }
@@ -1914,6 +1999,24 @@ final class AudioEngine {
                 let now = Date()
 
                 for (pid, tap) in self.taps {
+                    // Only health-check apps that are actively streaming (isRunning=true).
+                    // Paused apps have no callbacks, which is normal — not a health signal.
+                    let isActivelyStreaming = self.processMonitor.activeApps.contains { $0.id == pid }
+
+                    // Lazy-tap reclaim: drop taps for apps that no longer need
+                    // processing once they're silent, so coreaudiod stops servicing
+                    // an idle aggregate device. Gated on silence because invalidate()
+                    // isn't ramped and would pop live audio; playing-but-default apps
+                    // are reclaimed when they next go quiet. Sole teardown site.
+                    if !isActivelyStreaming, !self.appNeedsTap(tap.app) {
+                        self.taps.removeValue(forKey: pid)
+                        tap.invalidate()
+                        consecutiveMisses[pid] = nil
+                        self.tapRecoveryCooldownUntil[pid] = nil
+                        self.logger.debug("Reclaimed idle default tap for \(tap.app.name)")
+                        continue
+                    }
+
                     // Skip muted apps — no callbacks while muted isn't a health signal
                     guard !tap.isMuted else { continue }
 
@@ -1924,9 +2027,6 @@ final class AudioEngine {
 
                     guard tap.isHealthCheckEligible(minActiveSeconds: 5.0) else { continue }
 
-                    // Only health-check apps that are actively streaming (isRunning=true).
-                    // Paused apps have no callbacks, which is normal — not a health signal.
-                    let isActivelyStreaming = self.processMonitor.activeApps.contains { $0.id == pid }
                     guard isActivelyStreaming else {
                         consecutiveMisses[pid] = 0
                         continue

@@ -288,6 +288,8 @@ final class YouTubeMusicController: MediaControllerProtocol {
                 await self?.updatePlaybackInfo()
             }
         }
+        // Playback polling tolerates jitter; coalesce wakeups.
+        updateTimer?.tolerance = configuration.updateInterval * 0.2
     }
     
     private func stopPeriodicUpdates() {

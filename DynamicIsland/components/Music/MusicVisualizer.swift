@@ -84,6 +84,8 @@ class AudioSpectrum: NSView {
         animationTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
             self?.updateBars()
         }
+        // Random-bar animation — jitter is imperceptible, so let wakeups coalesce.
+        animationTimer?.tolerance = 0.1
     }
     
     private func stopAnimating() {

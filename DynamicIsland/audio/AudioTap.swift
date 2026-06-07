@@ -123,6 +123,17 @@ class AudioTap: NSObject {
     // Debounce restart requests
     private var pendingRestartWorkItem: DispatchWorkItem?
 
+    // Number of live visualizer views currently consuming spectrum data.
+    // The CoreAudio capture path (process tap + aggregate device + IO proc
+    // firing at buffer rate) only runs while at least one consumer is active,
+    // so a paused player or a hidden notch doesn't keep the audio thread awake.
+    // Mutated only on `audioQueue`.
+    private var consumerCount = 0
+    // Debounce capture teardown so brief gaps (track changes, quick
+    // open/close) don't churn the heavy CoreAudio setup.
+    private var pendingStopWorkItem: DispatchWorkItem?
+    private let captureStopDebounce: TimeInterval = 2.0
+
     private let targetBundleIDs = [
         "com.apple.Music",
         "com.spotify.client",
@@ -281,19 +292,59 @@ class AudioTap: NSObject {
     func restartCapture() {
         // Cancel any pending restart
         pendingRestartWorkItem?.cancel()
-        
+
         // Debounce: wait 500ms before actually restarting
         let workItem = DispatchWorkItem { [weak self] in
             self?.audioQueue.async {
+                guard let self else { return }
+                // Nothing is consuming spectrum data right now — no point
+                // rebuilding the tap; the next consumer will start it fresh
+                // and pick up the current process list.
+                guard self.consumerCount > 0 else { return }
                 print("🔄 [AudioTap] Restarting capture...")
-                self?.stopCaptureSync()
+                self.stopCaptureSync()
                 // Small delay to let CoreAudio fully release resources
                 Thread.sleep(forTimeInterval: 0.1)
-                self?.startCaptureSync()
+                self.startCaptureSync()
             }
         }
         pendingRestartWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
+    }
+
+    /// Registers a live visualizer. The first consumer brings the CoreAudio
+    /// capture path up; teardown is deferred until the last one leaves.
+    func addConsumer() {
+        audioQueue.async { [weak self] in
+            guard let self else { return }
+            self.pendingStopWorkItem?.cancel()
+            self.pendingStopWorkItem = nil
+            self.consumerCount += 1
+            if self.consumerCount == 1 {
+                self.startCaptureSync()
+            }
+        }
+    }
+
+    /// Unregisters a visualizer. When the count reaches zero the capture path
+    /// is torn down after a short debounce so brief gaps don't churn setup.
+    func removeConsumer() {
+        audioQueue.async { [weak self] in
+            guard let self else { return }
+            guard self.consumerCount > 0 else { return }
+            self.consumerCount -= 1
+            guard self.consumerCount == 0 else { return }
+
+            self.pendingStopWorkItem?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                self?.audioQueue.async {
+                    guard let self, self.consumerCount == 0 else { return }
+                    self.stopCaptureSync()
+                }
+            }
+            self.pendingStopWorkItem = work
+            self.audioQueue.asyncAfter(deadline: .now() + self.captureStopDebounce, execute: work)
+        }
     }
 
     func stopCapture() {

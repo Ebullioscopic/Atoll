@@ -124,6 +124,9 @@ class BluetoothAudioManager: ObservableObject {
         pollingTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             self?.checkForDeviceChanges()
         }
+        // Connection changes aren't latency-sensitive; allow the OS to coalesce
+        // this always-on poll with other wakeups to save battery.
+        pollingTimer?.tolerance = 1.0
     }
     
     /// Checks for device connection/disconnection changes

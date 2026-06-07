@@ -116,7 +116,8 @@ struct LockScreenWeatherWidget: View {
 			refreshTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
 				self?.fireNow()
 			}
-			refreshTimer?.tolerance = 0
+			// Weather refresh isn't latency-sensitive; allow coalescing.
+			refreshTimer?.tolerance = 3.0
 			if let refreshTimer {
 				RunLoop.main.add(refreshTimer, forMode: .common)
 			}
@@ -187,7 +188,8 @@ struct LockScreenWeatherWidget: View {
 				self.minuteTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
 					self?.fireNow()
 				}
-				self.minuteTimer?.tolerance = 0
+				// Minute cadence tolerates several seconds of drift; coalesce.
+				self.minuteTimer?.tolerance = 10.0
 				if let minuteTimer {
 					RunLoop.main.add(minuteTimer, forMode: .common)
 				}

@@ -625,6 +625,8 @@ class StatsManager: ObservableObject {
                 self.updateSystemStats()
             }
         }
+        // Allow ~10% jitter so the OS can coalesce these wakeups.
+        monitoringTimer?.tolerance = interval * 0.1
     }
 
     private func handleUpdateIntervalChange(_ newValue: Double) {

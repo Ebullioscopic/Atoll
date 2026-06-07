@@ -116,6 +116,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var previousScreens: [NSScreen]?
     private var onboardingWindowController: NSWindowController?
     private var cancellables = Set<AnyCancellable>()
+    private var audioTapObserversInstalled = false
     private var windowsHiddenForLock = false
     private var optionalShortcutHandlersRegistered = false
     private weak var focusWithoutDevToolsMenuItem: NSMenuItem?
@@ -180,6 +181,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Setup observers for music player state changes to restart AudioTap capture
     private func setupAudioTapMusicObservers() {
+        // Install once — this is called both at launch and whenever the
+        // waveform setting flips on; re-running it would leak duplicate
+        // NSWorkspace observers (and fire duplicate restartCapture calls).
+        guard !audioTapObserversInstalled else { return }
+        audioTapObserversInstalled = true
+
         // Listen for app launches to restart capture when music apps are opened
         let targetBundleIDs = [
             "com.apple.Music",
@@ -594,21 +601,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup Privacy Indicator Manager (camera and microphone monitoring)
         PrivacyIndicatorManager.shared.startMonitoring()
         
-        // Setup Real-time Audio Waveform capture if enabled
+        // Setup Real-time Audio Waveform capture if enabled.
+        // Capture itself is started on demand by the visualizer views
+        // (AudioTap consumer tracking) so the CoreAudio tap doesn't run while
+        // nothing is on-screen reading it; here we only install the observers
+        // that keep the captured process list current.
         if Defaults[.enableRealTimeWaveform] {
-            Task {
-                await AudioTap.shared.startCapture()
-            }
             setupAudioTapMusicObservers()
         }
-        
+
         // Observe enableRealTimeWaveform changes
         Defaults.publisher(.enableRealTimeWaveform, options: [])
             .sink { [weak self] change in
                 if change.newValue {
-                    Task {
-                        await AudioTap.shared.startCapture()
-                    }
                     self?.setupAudioTapMusicObservers()
                 } else {
                     AudioTap.shared.stopCapture()

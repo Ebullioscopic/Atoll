@@ -220,6 +220,8 @@ class ClipboardManager: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.checkClipboard()
         }
+        // Pasteboard polling tolerates jitter; coalesce wakeups to save battery.
+        timer?.tolerance = 0.15
     }
     
     func stopMonitoring() {

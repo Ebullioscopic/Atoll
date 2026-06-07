@@ -785,6 +785,8 @@ final class SystemBrightnessController {
                 self.lastEmittedBrightness = max(0, min(1, system))
             }
         }
+        // Fallback poll — let the OS coalesce it with nearby wakeups.
+        pollTimer?.tolerance = pollInterval * 0.2
     }
 
     deinit {

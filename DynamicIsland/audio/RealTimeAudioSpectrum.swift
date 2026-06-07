@@ -29,6 +29,10 @@ class RealTimeAudioSpectrum: NSView {
     private var barLayers: [CAShapeLayer] = []
     private var isPlaying: Bool = true
     private var animationTimer: Timer?
+    // Tracks whether this view is registered as an AudioTap consumer, so
+    // add/remove stay balanced across the many paths that stop animation
+    // (deinit, dismantle, window changes, pause).
+    private var isCountedConsumer: Bool = false
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -82,15 +86,25 @@ class RealTimeAudioSpectrum: NSView {
 
     private func startAnimating() {
         guard animationTimer == nil else { return }
+        // Bring the CoreAudio capture path up only while we're actually
+        // reading from it (nil -> non-nil transition).
+        if !isCountedConsumer {
+            isCountedConsumer = true
+            AudioTap.shared.addConsumer()
+        }
         // Use a timer at ~30fps for smooth animation
         animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { [weak self] _ in
             self?.updateBarsFromAudio()
         }
     }
-    
+
     private func stopAnimating() {
         animationTimer?.invalidate()
         animationTimer = nil
+        if isCountedConsumer {
+            isCountedConsumer = false
+            AudioTap.shared.removeConsumer()
+        }
         resetBars()
     }
     
@@ -105,11 +119,13 @@ class RealTimeAudioSpectrum: NSView {
         // Get real-time magnitudes from AudioTap
         let magnitudes = AudioTap.shared.getSmoothedMagnitudes()
         
+        #if DEBUG
         // Debug: log magnitudes periodically
         debugLogCounter += 1
         if debugLogCounter % 60 == 0 { // Every 2 seconds at 30fps
             print("📊 [Spectrum] Magnitudes: [\(magnitudes.x), \(magnitudes.y), \(magnitudes.z), \(magnitudes.w)]")
         }
+        #endif
         
         // Update each bar with its corresponding band magnitude
         for (index, barLayer) in barLayers.enumerated() {

@@ -187,8 +187,11 @@ class TimerManager: ObservableObject {
                 }
             }
         }
+        // Modest tolerance — keeps the visible seconds steady while still
+        // letting the OS coalesce the tick.
+        timerInstance?.tolerance = 0.1
     }
-    
+
     func startDemoTimer(duration: TimeInterval) {
         startTimer(duration: duration, name: "Demo Timer")
     }
@@ -267,6 +270,8 @@ class TimerManager: ObservableObject {
                 }
             }
         }
+        // Modest tolerance — steady display, coalesced wakeups.
+        timerInstance?.tolerance = 0.1
     }
 
     func adoptExternalTimer(name: String, totalDuration: TimeInterval, remaining: TimeInterval, isPaused: Bool) {

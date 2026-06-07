@@ -18,6 +18,7 @@
 
 import Foundation
 import os
+import Darwin
 
 class SystemOSDManager {
     private init() {}
@@ -198,23 +199,48 @@ class SystemOSDManager {
         previous?.cancel()
     }
 
+    /// Returns the PIDs of all processes named `name`, using libproc entirely
+    /// in-process.
+    ///
+    /// The suppression watcher calls this every 150ms; the previous
+    /// implementation forked `/usr/bin/pgrep` on every tick (~6-7 process
+    /// spawns per second, indefinitely), which dominated the app's idle CPU and
+    /// energy use. Enumerating PIDs via `proc_listallpids` avoids the fork
+    /// entirely.
+    private static func pids(named name: String) -> [pid_t] {
+        let estimate = proc_listallpids(nil, 0)
+        guard estimate > 0 else { return [] }
+
+        // Over-allocate to absorb processes that spawn between the count and the
+        // fill; proc_listallpids returns the number actually written.
+        var buffer = [pid_t](repeating: 0, count: Int(estimate) + 32)
+        let byteCount = Int32(buffer.count * MemoryLayout<pid_t>.size)
+        let written = buffer.withUnsafeMutableBufferPointer {
+            proc_listallpids($0.baseAddress, byteCount)
+        }
+        guard written > 0 else { return [] }
+
+        var matches: [pid_t] = []
+        var nameBuffer = [CChar](repeating: 0, count: 256)
+        for index in 0..<Int(written) {
+            let pid = buffer[index]
+            guard pid > 0 else { continue }
+            let length = nameBuffer.withUnsafeMutableBufferPointer {
+                proc_name(pid, $0.baseAddress, UInt32($0.count))
+            }
+            guard length > 0 else { continue }
+            if String(cString: nameBuffer) == name {
+                matches.append(pid)
+            }
+        }
+        return matches
+    }
+
     /// Returns the newest OSDUIHelper PID, or nil if none.
     private static func osduiHelperPID() -> Int32? {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["-n", "OSDUIHelper"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        do {
-            try task.run()
-            task.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let trimmed = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return Int32(trimmed)
-        } catch {
-            return nil
-        }
+        // launchd respawns the helper as a fresh, higher PID; the highest PID is
+        // the newest incarnation (matching the old `pgrep -n` behaviour).
+        pids(named: "OSDUIHelper").max()
     }
 
     /// Sends SIGSTOP to all OSDUIHelper processes. Idempotent.
@@ -232,24 +258,7 @@ class SystemOSDManager {
 
     /// Check if OSDUIHelper is currently running
     public static func isOSDUIHelperRunning() -> Bool {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["OSDUIHelper"]
-        
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        
-        do {
-            try task.run()
-            task.waitUntilExit()
-            
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            return task.terminationStatus == 0 && !output!.isEmpty
-        } catch {
-            return false
-        }
+        !pids(named: "OSDUIHelper").isEmpty
     }
     
     /// Async version of status checking to avoid main thread blocking
