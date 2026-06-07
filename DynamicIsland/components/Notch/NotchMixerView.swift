@@ -161,7 +161,7 @@ private struct MixerAppRow: View {
     private var boost: BoostLevel { engine.getBoost(for: app) }
     private var eqActive: Bool {
         let eq = engine.getEQSettings(for: app)
-        return eq.isEnabled && eq.bandGains.contains(where: { $0 != 0 })
+        return eq.isEnabled && (eq.bandGains.contains(where: { $0 != 0 }) || eq.preampDB != 0)
     }
 
     var body: some View {
@@ -340,7 +340,7 @@ private struct MixerDeviceEQBar: View {
                     HStack(spacing: 6) {
                         ForEach(engine.outputDevices, id: \.uid) { device in
                             let eq = engine.getDeviceEQ(forDeviceUID: device.uid)
-                            let active = eq.isEnabled && eq.bandGains.contains(where: { $0 != 0 })
+                            let active = eq.isEnabled && (eq.bandGains.contains(where: { $0 != 0 }) || eq.preampDB != 0)
                             MixerChip(
                                 title: active ? "\(device.name) ●" : device.name,
                                 selected: editingDeviceUID == device.uid
@@ -385,15 +385,24 @@ private struct MixerEQSection: View {
     }
 }
 
-// MARK: - Shared 10-band editor
+// MARK: - Shared 10-band editor (+ preamp)
 
 private struct MixerEQEditor: View {
     let get: () -> EQSettings
     let set: (EQSettings) -> Void
 
     @State private var settings: EQSettings = EQSettings()
+    /// Band index being typed into; -1 is the preamp column.
+    @State private var editingField: Int?
+    @State private var fieldText: String = ""
+    @FocusState private var fieldFocused: Bool
 
+    private static let preampIndex = -1
     private static let bandLabels = ["31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"]
+    private static let bandHelp = [
+        "31.25 Hz", "62.5 Hz", "125 Hz", "250 Hz", "500 Hz",
+        "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz",
+    ]
     private static let quickPresets: [EQPreset] = [.flat, .bassBoost, .vocalClarity, .trebleBoost]
 
     var body: some View {
@@ -413,38 +422,128 @@ private struct MixerEQEditor: View {
                 }
             }
 
-            HStack(alignment: .bottom, spacing: 9) {
+            HStack(alignment: .bottom, spacing: 8) {
+                // Preamp: gain stage before the band filters.
+                column(
+                    index: Self.preampIndex,
+                    value: settings.preampDB,
+                    label: "Pre",
+                    help: "Preamp — gain applied before the EQ bands (\(Int(EQSettings.minGainDB))…\(Int(EQSettings.maxGainDB)) dB)",
+                    accent: .orange,
+                    binding: Binding(
+                        get: { settings.preampDB },
+                        set: { newValue in
+                            settings.preampDB = newValue
+                            apply()
+                        }
+                    )
+                )
+
+                Rectangle()
+                    .fill(Color.white.opacity(0.15))
+                    .frame(width: 1, height: 64)
+
                 ForEach(0..<EQSettings.bandCount, id: \.self) { band in
-                    VStack(spacing: 2) {
-                        Text(gainLabel(settings.bandGains[band]))
-                            .font(.system(size: 6.5).monospacedDigit())
-                            .foregroundStyle(settings.bandGains[band] == 0 ? .gray : .green)
-                            .frame(width: 23)
-                            .lineLimit(1)
-                        MixerVerticalSlider(
-                            value: Binding(
-                                get: { settings.bandGains[band] },
-                                set: { newValue in
-                                    settings.bandGains[band] = newValue
-                                    apply()
-                                }
-                            ),
-                            range: EQSettings.minGainDB...EQSettings.maxGainDB
+                    column(
+                        index: band,
+                        value: settings.bandGains[band],
+                        label: Self.bandLabels[band],
+                        help: "\(Self.bandHelp[band]) center — click the value to type an exact gain",
+                        accent: .green,
+                        binding: Binding(
+                            get: { settings.bandGains[band] },
+                            set: { newValue in
+                                settings.bandGains[band] = newValue
+                                apply()
+                            }
                         )
-                        .frame(width: 14, height: 52)
-                        Text(Self.bandLabels[band])
-                            .font(.system(size: 7))
-                            .foregroundStyle(.secondary)
-                    }
+                    )
                 }
             }
             .opacity(settings.isEnabled ? 1 : 0.35)
+
+            Text("Hz")
+                .font(.system(size: 6.5))
+                .foregroundStyle(.white.opacity(0.35))
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 2)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .onAppear {
             settings = get()
         }
+    }
+
+    @ViewBuilder
+    private func column(
+        index: Int,
+        value: Float,
+        label: String,
+        help: String,
+        accent: Color,
+        binding: Binding<Float>
+    ) -> some View {
+        VStack(spacing: 2) {
+            valueControl(index: index, value: value, accent: accent)
+            MixerVerticalSlider(value: binding, range: EQSettings.minGainDB...EQSettings.maxGainDB)
+                .frame(width: 14, height: 52)
+            Text(label)
+                .font(.system(size: 7))
+                .foregroundStyle(index == Self.preampIndex ? .orange : .secondary)
+        }
+        .help(help)
+    }
+
+    @ViewBuilder
+    private func valueControl(index: Int, value: Float, accent: Color) -> some View {
+        if editingField == index {
+            TextField("", text: $fieldText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 7).monospacedDigit())
+                .multilineTextAlignment(.center)
+                .frame(width: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.white.opacity(0.15))
+                )
+                .focused($fieldFocused)
+                .onSubmit { commitField() }
+                .onExitCommand {
+                    editingField = nil
+                }
+                .onChange(of: fieldFocused) { _, focused in
+                    if !focused { commitField() }
+                }
+        } else {
+            Text(gainLabel(value))
+                .font(.system(size: 6.5).monospacedDigit())
+                .foregroundStyle(value == 0 ? .gray : accent)
+                .frame(width: 26)
+                .lineLimit(1)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    fieldText = value == 0 ? "" : String(format: "%.1f", value)
+                    editingField = index
+                    fieldFocused = true
+                }
+        }
+    }
+
+    private func commitField() {
+        guard let index = editingField else { return }
+        editingField = nil
+        let normalized = fieldText
+            .replacingOccurrences(of: ",", with: ".")
+            .trimmingCharacters(in: .whitespaces)
+        guard let typed = Float(normalized), typed.isFinite else { return }
+        let clamped = max(EQSettings.minGainDB, min(EQSettings.maxGainDB, typed))
+        if index == Self.preampIndex {
+            settings.preampDB = clamped
+        } else if settings.bandGains.indices.contains(index) {
+            settings.bandGains[index] = clamped
+        }
+        apply()
     }
 
     private func gainLabel(_ gain: Float) -> String {

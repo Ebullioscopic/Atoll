@@ -12,6 +12,9 @@ final class EQProcessor: BiquadProcessor, @unchecked Sendable {
     /// Currently applied EQ settings (needed for sample rate recalculation)
     private var _currentSettings: EQSettings?
 
+    /// Linear preamp gain read on the RT thread (same pattern as AutoEQProcessor)
+    private nonisolated(unsafe) var _preampGain: Float = 1.0
+
     /// Read-only access to current settings
     var currentSettings: EQSettings? { _currentSettings }
 
@@ -32,6 +35,7 @@ final class EQProcessor: BiquadProcessor, @unchecked Sendable {
     func updateSettings(_ settings: EQSettings) {
         setEnabled(settings.isEnabled)
         _currentSettings = settings
+        _preampGain = powf(10.0, settings.clampedPreampDB / 20.0)
 
         let coefficients = BiquadMath.coefficientsForAllBands(
             gains: settings.clampedGains,
@@ -50,6 +54,13 @@ final class EQProcessor: BiquadProcessor, @unchecked Sendable {
     }
 
     // MARK: - BiquadProcessor Overrides
+
+    override func preProcess(output: UnsafeMutablePointer<Float>, frameCount: Int) {
+        var preamp = _preampGain
+        guard preamp != 1.0 else { return }
+        let sampleCount = frameCount * 2
+        vDSP_vsmul(output, 1, &preamp, output, 1, vDSP_Length(sampleCount))
+    }
 
     override func recomputeCoefficients() -> (coefficients: [Double], sectionCount: Int)? {
         guard let settings = _currentSettings else { return nil }
