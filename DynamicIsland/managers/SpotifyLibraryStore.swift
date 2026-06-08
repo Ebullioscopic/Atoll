@@ -40,6 +40,7 @@ final class SpotifyLibraryStore: ObservableObject {
     }
 
     func loadHome() async {
+        guard !isLoading else { return }   // avoid concurrent re-fires hammering the API
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -50,8 +51,13 @@ final class SpotifyLibraryStore: ObservableObject {
             let (playlistsPage, recents) = try await (pl, rp)
             playlists = playlistsPage.items.map { SpotifyLibraryItem(playlist: $0) }
             recentlyPlayed = Self.mapRecents(recents)
+        } catch SpotifyAPIError.http(429) {
+            errorMessage = String(localized: "Spotify is rate-limiting — wait a minute, then reopen the tab.")
+            NSLog("[SpotifyAPI] loadHome: 429 rate limited")
         } catch {
-            errorMessage = String(localized: "Couldn't load your Spotify library.")
+            // Diagnostic: surface the concrete error (e.g. http(403) / decoding / notAuthenticated).
+            errorMessage = "Couldn't load library: \(error)"
+            NSLog("[SpotifyAPI] loadHome failed: %@", String(describing: error))
         }
     }
 

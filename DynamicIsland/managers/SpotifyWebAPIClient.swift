@@ -87,7 +87,11 @@ final class SpotifyWebAPIClient: SpotifyAPI {
     private func getJSON<T: Decodable>(_ path: String) async throws -> T {
         let data = try await perform(path: path, method: "GET", body: nil, query: nil)
         do { return try JSONDecoder().decode(T.self, from: data) }
-        catch { throw SpotifyAPIError.decoding }
+        catch {
+            let snippet = String(data: data.prefix(500), encoding: .utf8) ?? "<non-utf8>"
+            NSLog("[SpotifyAPI] DECODE FAIL %@ -> %@ | body: %@", path, String(describing: error), snippet)
+            throw SpotifyAPIError.decoding
+        }
     }
     private func put(_ path: String, query: String?, body: [String: Any]?) async throws {
         let data = body.map { try? JSONSerialization.data(withJSONObject: $0) } ?? nil
@@ -96,13 +100,23 @@ final class SpotifyWebAPIClient: SpotifyAPI {
 
     private func perform(path: String, method: String, body: Data?, query: String?) async throws -> Data {
         func send(forceRefresh: Bool) async throws -> (Data, HTTPURLResponse) {
-            guard let token = await tokenProvider(forceRefresh) else { throw SpotifyAPIError.notAuthenticated }
+            guard let token = await tokenProvider(forceRefresh) else {
+                NSLog("[SpotifyAPI] NO TOKEN for %@ (forceRefresh: %@)", path, forceRefresh ? "true" : "false")
+                throw SpotifyAPIError.notAuthenticated
+            }
             var urlString = base + path
             if let query { urlString += (path.contains("?") ? "&" : "?") + query }
             guard let url = URL(string: urlString) else { throw SpotifyAPIError.http(-1) }
             var req = URLRequest(url: url)
             req.httpMethod = method
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            // Identify as the Spotify web player. Requests carrying only a bare Bearer
+            // token are throttled aggressively (HTTP 429); the real web player sends these.
+            req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+            req.setValue("https://open.spotify.com", forHTTPHeaderField: "Origin")
+            req.setValue("https://open.spotify.com/", forHTTPHeaderField: "Referer")
+            req.setValue("WebPlayer", forHTTPHeaderField: "App-Platform")
+            req.setValue("application/json", forHTTPHeaderField: "Accept")
             if let body, !body.isEmpty {
                 req.httpBody = body
                 req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -115,7 +129,12 @@ final class SpotifyWebAPIClient: SpotifyAPI {
         if http.statusCode == 401 {
             (data, http) = try await send(forceRefresh: true)
         }
-        guard (200..<300).contains(http.statusCode) else { throw SpotifyAPIError.http(http.statusCode) }
+        guard (200..<300).contains(http.statusCode) else {
+            let snippet = String(data: data.prefix(500), encoding: .utf8) ?? "<non-utf8>"
+            NSLog("[SpotifyAPI] HTTP %d %@ | body: %@", http.statusCode, path, snippet)
+            throw SpotifyAPIError.http(http.statusCode)
+        }
+        NSLog("[SpotifyAPI] OK %d %@ (%d bytes)", http.statusCode, path, data.count)
         return data
     }
 }
