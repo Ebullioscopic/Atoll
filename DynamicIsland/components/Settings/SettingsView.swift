@@ -68,6 +68,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case terminal
     case mixer
     case folders
+    case spotify
     case about
 
     var id: String { rawValue }
@@ -80,7 +81,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .hudAndOSD, .battery:                                           return .system
         case .timer, .calendar, .notes:                                      return .productivity
         case .clipboard, .screenAssistant, .colorPicker, .shelf,
-             .downloads, .shortcuts, .mixer, .folders:                       return .utilities
+             .downloads, .shortcuts, .mixer, .folders, .spotify:              return .utilities
         case .stats, .terminal:                                              return .developer
         case .extensions:                                                    return .integrations
         case .about:                                                         return .info
@@ -111,6 +112,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .terminal: return String(localized: "Terminal")
         case .mixer: return String(localized: "Mixer")
         case .folders: return String(localized: "Folders")
+        case .spotify: return String(localized: "Spotify")
         case .about: return String(localized: "About")
         }
     }
@@ -139,6 +141,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .terminal: return "apple.terminal"
         case .mixer: return "slider.horizontal.3"
         case .folders: return "folder.fill"
+        case .spotify: return "music.note.list"
         case .about: return "info.circle"
         }
     }
@@ -167,6 +170,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
         case .mixer: return Color(red: 0.95, green: 0.55, blue: 0.2)
         case .folders: return Color(red: 0.35, green: 0.55, blue: 0.95)
+        case .spotify: return Color(red: 0.114, green: 0.725, blue: 0.329)
         case .about: return .secondary
         }
     }
@@ -511,6 +515,7 @@ struct SettingsView: View {
             .colorPicker,
             .shelf,
             .folders,
+            .spotify,
             .downloads,
             .shortcuts,
             .mixer,
@@ -1038,6 +1043,10 @@ struct SettingsView: View {
         case .folders:
             SettingsForm(tab: .folders) {
                 FoldersSettings()
+            }
+        case .spotify:
+            SettingsForm(tab: .spotify) {
+                SpotifySettings()
             }
         case .about:
             if let controller = updaterController {
