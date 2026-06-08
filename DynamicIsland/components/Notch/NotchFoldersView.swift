@@ -42,6 +42,8 @@ struct NotchFoldersView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .foregroundStyle(.white)
+        .environment(\.colorScheme, .dark)
         .onAppear { store.start(recentLimit: recentLimit) }
         .onDisappear { store.stopRecentFilesQuery() }
     }
