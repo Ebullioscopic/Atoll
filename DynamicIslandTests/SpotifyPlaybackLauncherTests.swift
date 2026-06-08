@@ -83,4 +83,14 @@ final class SpotifyPlaybackLauncherTests: XCTestCase {
         try await launcher.playLikedSongs(shuffle: true)
         XCTAssertEqual(api.started?.context, "spotify:collection:tracks")
     }
+
+    func test_playTrack_remote_appliesShuffle_andContextOffset() async throws {
+        let desktop = MockDesktop(); desktop.running = false
+        let api = MockAPI(); api.devices = [SpotifyDevice(id: "d1", name: "P", is_active: true)]
+        let launcher = SpotifyPlaybackLauncher(desktop: desktop, api: api)
+        try await launcher.playTrack(uri: "spotify:track:t1", inContext: "spotify:playlist:p1", shuffle: true)
+        XCTAssertEqual(api.shuffleSet, true)
+        XCTAssertEqual(api.started?.context, "spotify:playlist:p1")
+        XCTAssertEqual(api.started?.offset, "spotify:track:t1")
+    }
 }

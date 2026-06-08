@@ -16,7 +16,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import AppKit
 import Foundation
 
 enum SpotifyLaunchError: Error, Equatable { case noActiveDevice }
@@ -56,6 +55,7 @@ final class SpotifyPlaybackLauncher {
             await desktop.playTrack(uri: uri, inContext: contextURI)
         } else {
             let deviceID = try await activeDeviceID()
+            try await api.setShuffle(shuffle, deviceID: deviceID)
             try await api.startPlayback(contextURI: contextURI, uris: contextURI == nil ? [uri] : nil, offsetURI: contextURI == nil ? nil : uri, deviceID: deviceID)
         }
     }
