@@ -102,6 +102,11 @@ func enabledStandardTabCount() -> Int {
         count += 1
     }
 
+    // Spotify tab
+    if Defaults[.enableSpotifyFeature] {
+        count += 1
+    }
+
     return count
 }
 

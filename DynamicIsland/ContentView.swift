@@ -165,6 +165,10 @@ struct ContentView: View {
             return CGSize(width: baseSize.width, height: 260)
         }
 
+        if coordinator.currentView == .spotify {
+            return CGSize(width: baseSize.width, height: 300)
+        }
+
         if coordinator.currentView == .extensionExperience {
             if let preferredHeight = extensionTabPreferredHeight(baseSize: baseSize) {
                 return CGSize(width: baseSize.width, height: preferredHeight)
@@ -1100,6 +1104,8 @@ struct ContentView: View {
                                 NotchMixerView()
                             case .folders:
                                 NotchFoldersView()
+                            case .spotify:
+                                NotchSpotifyView()
                             case .extensionExperience:
                                 if let payload = currentExtensionTabPayload() {
                                     ExtensionNotchExperienceTabView(payload: payload)

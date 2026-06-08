@@ -1024,7 +1024,9 @@ extension Defaults.Keys {
     static let spotifyAuthAccessTokenExpiration = Key<Double>("spotifyAuthAccessTokenExpiration", default: 0)
     static let spotifyAuthLastValidatedAt = Key<Double>("spotifyAuthLastValidatedAt", default: 0)
     static let spotifyDefaultShuffle = Key<Bool>("spotifyDefaultShuffle", default: false)
-    
+    static let enableSpotifyFeature = Key<Bool>("enableSpotifyFeature", default: false)
+    static let spotifyRecentLimit = Key<Int>("spotifyRecentLimit", default: 20)
+
     // MARK: Bluetooth Audio Devices
     static let showBluetoothDeviceConnections = Key<Bool>("showBluetoothDeviceConnections", default: true)
     static let useColorCodedBatteryDisplay = Key<Bool>("useColorCodedBatteryDisplay", default: true)

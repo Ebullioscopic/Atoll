@@ -96,6 +96,9 @@ struct TabSelectionView: View {
         if Defaults[.enableFoldersFeature] {
             tabsArray.append(TabModel(label: "Folders", icon: "folder.fill", view: .folders))
         }
+        if Defaults[.enableSpotifyFeature] {
+            tabsArray.append(TabModel(label: "Spotify", icon: "music.note.list", view: .spotify))
+        }
         if extensionTabsEnabled {
             for payload in extensionTabPayloads {
                 guard let tab = payload.descriptor.tab else { continue }

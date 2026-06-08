@@ -81,6 +81,7 @@ public enum NotchViews {
     case terminal
     case mixer
     case folders
+    case spotify
     case extensionExperience
 }
 
