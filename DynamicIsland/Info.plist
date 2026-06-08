@@ -29,5 +29,24 @@
 	<array>
 		<dict/>
 	</array>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Pin to Atoll</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>pinFolderToAtoll</string>
+			<key>NSPortName</key>
+			<string>Atoll</string>
+			<key>NSSendTypes</key>
+			<array>
+				<string>public.file-url</string>
+				<string>NSFilenamesPboardType</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

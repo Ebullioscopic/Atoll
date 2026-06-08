@@ -97,6 +97,11 @@ func enabledStandardTabCount() -> Int {
         count += 1
     }
 
+    // Folders tab
+    if Defaults[.enableFoldersFeature] {
+        count += 1
+    }
+
     return count
 }
 

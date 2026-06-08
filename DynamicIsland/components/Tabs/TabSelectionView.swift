@@ -93,6 +93,9 @@ struct TabSelectionView: View {
         if Defaults[.enableMixerFeature] {
             tabsArray.append(TabModel(label: "Mixer", icon: "slider.horizontal.3", view: .mixer))
         }
+        if Defaults[.enableFoldersFeature] {
+            tabsArray.append(TabModel(label: "Folders", icon: "folder.fill", view: .folders))
+        }
         if extensionTabsEnabled {
             for payload in extensionTabPayloads {
                 guard let tab = payload.descriptor.tab else { continue }

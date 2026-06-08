@@ -1067,7 +1067,16 @@ extension Defaults.Keys {
     static let terminalForegroundColor = Key<Color>("terminalForegroundColor", default: .white)
     static let terminalCursorColor = Key<Color>("terminalCursorColor", default: Color(.selectedControlColor))
     static let terminalStickyMode = Key<Bool>("terminalStickyMode", default: false)
-    
+
+    // MARK: Folders Feature
+    static let enableFoldersFeature = Key<Bool>("enableFoldersFeature", default: false)
+    static let foldersShowSystemShortcuts = Key<Bool>("foldersShowSystemShortcuts", default: true)
+    static let foldersShowRecentFiles = Key<Bool>("foldersShowRecentFiles", default: true)
+    static let foldersShowRecentDownloads = Key<Bool>("foldersShowRecentDownloads", default: true)
+    static let foldersShowHidden = Key<Bool>("foldersShowHidden", default: false)
+    static let foldersSortMode = Key<FolderSortMode>("foldersSortMode", default: .nameAsc)
+    static let foldersRecentLimit = Key<Int>("foldersRecentLimit", default: 10)
+
     // MARK: Timer Feature
     static let enableTimerFeature = Key<Bool>("enableTimerFeature", default: true)
     static let timerDisplayMode = Key<TimerDisplayMode>("timerDisplayMode", default: .tab)

@@ -30,6 +30,16 @@
 		7EF19C172F577040005B9929 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 7EF19C162F577040005B9929 /* SwiftTerm */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		52F9A0F32FD75B31007ABCD3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F54406DF2CD4987A00C7AFD9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F54406E62CD4987A00C7AFD9;
+			remoteInfo = DynamicIsland;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
 		7EA69B1B2F5AE13500EB2D16 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -43,6 +53,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		52F9A0EF2FD75B31007ABCD3 /* DynamicIslandTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicIslandTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7E25ECA02E6C6C3800700E72 /* CoreBrightness.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBrightness.framework; path = /System/Library/PrivateFrameworks/CoreBrightness.framework; sourceTree = "<absolute>"; };
 		7E25ECA22E6C6E2600700E72 /* OSD.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OSD.framework; path = /System/Library/PrivateFrameworks/OSD.framework; sourceTree = "<absolute>"; };
 		7E25ECA42E6C6E7800700E72 /* DisplayServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DisplayServices.framework; path = /System/Library/PrivateFrameworks/DisplayServices.framework; sourceTree = "<absolute>"; };
@@ -90,6 +101,11 @@
 /* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		52F9A0F02FD75B31007ABCD3 /* DynamicIslandTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DynamicIslandTests;
+			sourceTree = "<group>";
+		};
 		7EA69B1C2F5AE15C00EB2D16 /* Contents */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -110,6 +126,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		52F9A0EC2FD75B31007ABCD3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F54406E42CD4987A00C7AFD9 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -173,6 +196,7 @@
 			children = (
 				7EA69B1C2F5AE15C00EB2D16 /* Contents */,
 				7E8840D52E9A341F00C5CB8C /* LottieAnimations */,
+				52F9A0F02FD75B31007ABCD3 /* DynamicIslandTests */,
 				7E81304F2E3FB42700E08F3F /* Frameworks */,
 				7E81303F2E3FB40500E08F3F /* mediaremote-adapter */,
 				F54406E92CD4987A00C7AFD9 /* DynamicIsland */,
@@ -184,6 +208,7 @@
 			isa = PBXGroup;
 			children = (
 				F54406E72CD4987A00C7AFD9 /* Atoll.app */,
+				52F9A0EF2FD75B31007ABCD3 /* DynamicIslandTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -191,6 +216,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		52F9A0EE2FD75B31007ABCD3 /* DynamicIslandTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 52F9A0F72FD75B31007ABCD3 /* Build configuration list for PBXNativeTarget "DynamicIslandTests" */;
+			buildPhases = (
+				52F9A0EB2FD75B31007ABCD3 /* Sources */,
+				52F9A0EC2FD75B31007ABCD3 /* Frameworks */,
+				52F9A0ED2FD75B31007ABCD3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				52F9A0F42FD75B31007ABCD3 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				52F9A0F02FD75B31007ABCD3 /* DynamicIslandTests */,
+			);
+			name = DynamicIslandTests;
+			packageProductDependencies = (
+			);
+			productName = DynamicIslandTests;
+			productReference = 52F9A0EF2FD75B31007ABCD3 /* DynamicIslandTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		F54406E62CD4987A00C7AFD9 /* DynamicIsland */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F54406F62CD4987B00C7AFD9 /* Build configuration list for PBXNativeTarget "DynamicIsland" */;
@@ -234,9 +282,13 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1600;
+				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					52F9A0EE2FD75B31007ABCD3 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = F54406E62CD4987A00C7AFD9;
+					};
 					F54406E62CD4987A00C7AFD9 = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -276,11 +328,19 @@
 			projectRoot = "";
 			targets = (
 				F54406E62CD4987A00C7AFD9 /* DynamicIsland */,
+				52F9A0EE2FD75B31007ABCD3 /* DynamicIslandTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		52F9A0ED2FD75B31007ABCD3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F54406E52CD4987A00C7AFD9 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -319,6 +379,13 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		52F9A0EB2FD75B31007ABCD3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F54406E32CD4987A00C7AFD9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -328,7 +395,59 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		52F9A0F42FD75B31007ABCD3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F54406E62CD4987A00C7AFD9 /* DynamicIsland */;
+			targetProxy = 52F9A0F32FD75B31007ABCD3 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		52F9A0F52FD75B31007ABCD3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PNUPJ8DUVS;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = aatricks.DynamicIslandTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Atoll.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Atoll";
+			};
+			name = Debug;
+		};
+		52F9A0F62FD75B31007ABCD3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PNUPJ8DUVS;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = aatricks.DynamicIslandTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Atoll.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Atoll";
+			};
+			name = Release;
+		};
 		F54406F42CD4987B00C7AFD9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -591,6 +710,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		52F9A0F72FD75B31007ABCD3 /* Build configuration list for PBXNativeTarget "DynamicIslandTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				52F9A0F52FD75B31007ABCD3 /* Debug */,
+				52F9A0F62FD75B31007ABCD3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F54406E22CD4987A00C7AFD9 /* Build configuration list for PBXProject "DynamicIsland" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

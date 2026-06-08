@@ -94,6 +94,7 @@ extension AppDelegate {
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
+    private var folderServiceProvider: FolderServiceProvider?
     var windows: [NSScreen: NSWindow] = [:]
     var viewModels: [NSScreen: DynamicIslandViewModel] = [:]
     var window: NSWindow?
@@ -543,7 +544,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         LockScreenManager.shared.configure(viewModel: vm)
         extensionXPCServiceHost.start()
         extensionRPCServer.start()
-        
+
+        let folderServiceProvider = FolderServiceProvider()
+        NSApp.servicesProvider = folderServiceProvider
+        self.folderServiceProvider = folderServiceProvider   // retain
+        NSUpdateDynamicServices()
+
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()
         Defaults.Keys.migrateMusicAuxControls()
