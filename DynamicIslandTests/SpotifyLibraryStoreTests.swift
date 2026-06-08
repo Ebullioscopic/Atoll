@@ -58,8 +58,12 @@ final class SpotifyLibraryStoreTests: XCTestCase {
 
     func test_clearSearch_emptiesResults() async {
         let api = StoreMockAPI()
+        api.searchResp = SpotifySearchResponse(
+            playlists: .init(items: [SpotifyPlaylist(id: "p1", name: "Mix", uri: "spotify:playlist:p1", images: [], tracks: .init(total: 1), owner: .init(display_name: nil))], next: nil, total: 1),
+            albums: nil, tracks: nil)
         let store = SpotifyLibraryStore(api: api)
         await store.performSearch("x")
+        XCTAssertFalse(store.searchResults.isEmpty, "precondition: results populated")
         store.clearSearch()
         XCTAssertTrue(store.searchResults.isEmpty)
     }

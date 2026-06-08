@@ -69,6 +69,7 @@ final class SpotifyLibraryStore: ObservableObject {
     func performSearch(_ query: String) async {
         do {
             let r = try await api.search(query: query, types: [.playlist, .album, .track], limit: 20)
+            guard !Task.isCancelled else { return }
             var grouped = SpotifyGroupedResults()
             grouped.playlists = (r.playlists?.items ?? []).map { SpotifyLibraryItem(playlist: $0) }
             grouped.albums = (r.albums?.items ?? []).map { SpotifyLibraryItem(album: $0) }
