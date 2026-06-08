@@ -55,7 +55,9 @@ final class SpotifyWebAPIClient: SpotifyAPI {
         return paging.items
     }
     func search(query: String, types: [SpotifySearchType], limit: Int) async throws -> SpotifySearchResponse {
-        let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=+")
+        let q = query.addingPercentEncoding(withAllowedCharacters: allowed) ?? query
         let t = types.map(\.rawValue).joined(separator: ",")
         return try await getJSON("/search?q=\(q)&type=\(t)&limit=\(limit)")
     }
