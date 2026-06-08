@@ -32,7 +32,7 @@ final class SpotifyModelsTests: XCTestCase {
         XCTAssertEqual(paging.next, "https://api/next")
     }
 
-    func test_decode_track_tolueratesMissingOptionals() throws {
+    func test_decode_track_toleratesMissingOptionals() throws {
         let json = """
         {"id":"t1","name":"Song","uri":"spotify:track:t1","artists":[{"name":"Artist"}]}
         """.data(using: .utf8)!
@@ -60,5 +60,13 @@ final class SpotifyModelsTests: XCTestCase {
         XCTAssertEqual(item.contextURI, "spotify:playlist:p1")
         XCTAssertEqual(item.kind, .playlist)
         XCTAssertEqual(item.subtitle, "5 tracks")
+    }
+
+    func test_decode_playlist_nullImages_doesNotThrow() throws {
+        let json = """
+        {"id":"p1","name":"N","uri":"spotify:playlist:p1","images":null,"tracks":{"total":0},"owner":{"display_name":null}}
+        """.data(using: .utf8)!
+        let p = try JSONDecoder().decode(SpotifyPlaylist.self, from: json)
+        XCTAssertNil(p.images)
     }
 }

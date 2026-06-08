@@ -40,7 +40,7 @@ struct SpotifyPlaylist: Codable, Equatable, Identifiable {
     let id: String
     let name: String
     let uri: String
-    let images: [SpotifyImage]
+    let images: [SpotifyImage]?
     let tracks: CountRef
     let owner: OwnerRef
 }
@@ -58,7 +58,7 @@ struct SpotifyAlbum: Codable, Equatable, Identifiable {
     let id: String
     let name: String
     let uri: String
-    let images: [SpotifyImage]
+    let images: [SpotifyImage]?
     let artists: [SpotifyArtistRef]
 }
 
@@ -108,14 +108,14 @@ struct SpotifyLibraryItem: Identifiable, Equatable {
     init(playlist p: SpotifyPlaylist) {
         self.init(id: p.uri, title: p.name,
                   subtitle: "\(p.tracks.total) tracks",
-                  imageURL: p.images.first.flatMap { URL(string: $0.url) },
+                  imageURL: p.images?.first.flatMap { URL(string: $0.url) },
                   contextURI: p.uri, kind: .playlist)
     }
 
     init(album a: SpotifyAlbum) {
         self.init(id: a.uri, title: a.name,
                   subtitle: a.artists.map(\.name).joined(separator: ", "),
-                  imageURL: a.images.first.flatMap { URL(string: $0.url) },
+                  imageURL: a.images?.first.flatMap { URL(string: $0.url) },
                   contextURI: a.uri, kind: .album)
     }
 
