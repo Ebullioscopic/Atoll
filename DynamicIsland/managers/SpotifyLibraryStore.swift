@@ -17,6 +17,7 @@
  */
 
 import Combine
+import Defaults
 import Foundation
 
 @MainActor
@@ -43,8 +44,9 @@ final class SpotifyLibraryStore: ObservableObject {
         errorMessage = nil
         defer { isLoading = false }
         do {
+            let recentLimit = Defaults[.spotifyRecentLimit]
             async let pl = api.currentUserPlaylists(limit: 50, offset: 0)
-            async let rp = api.recentlyPlayed(limit: 20)
+            async let rp = api.recentlyPlayed(limit: recentLimit)
             let (playlistsPage, recents) = try await (pl, rp)
             playlists = playlistsPage.items.map { SpotifyLibraryItem(playlist: $0) }
             recentlyPlayed = Self.mapRecents(recents)
@@ -84,6 +86,7 @@ final class SpotifyLibraryStore: ObservableObject {
     func clearSearch() {
         searchTask?.cancel()
         searchResults = SpotifyGroupedResults()
+        errorMessage = nil
     }
 
     private static func mapRecents(_ items: [SpotifyPlayHistoryItem]) -> [SpotifyLibraryItem] {
@@ -93,14 +96,20 @@ final class SpotifyLibraryStore: ObservableObject {
             let contextURI = item.context?.uri ?? item.track.uri
             guard !seen.contains(contextURI) else { continue }
             seen.insert(contextURI)
-            let isContext = item.context != nil
+            let kind: SpotifyLibraryKind
+            switch item.context?.type {
+            case "playlist": kind = .playlist          // drillable via playlistTracks
+            case "collection": kind = .likedSongs       // drillable via savedTracks
+            case .some: kind = .album                    // album / artist → play-on-tap (no track-list endpoint)
+            case nil: kind = .track                      // played outside any context → a single track
+            }
             result.append(SpotifyLibraryItem(
                 id: contextURI,
                 title: item.track.name,
                 subtitle: item.track.artists.map(\.name).joined(separator: ", "),
                 imageURL: item.track.album?.images?.first.flatMap { URL(string: $0.url) },
                 contextURI: contextURI,
-                kind: isContext ? .playlist : .track))
+                kind: kind))
         }
         return result
     }

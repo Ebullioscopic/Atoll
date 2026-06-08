@@ -67,4 +67,18 @@ final class SpotifyLibraryStoreTests: XCTestCase {
         store.clearSearch()
         XCTAssertTrue(store.searchResults.isEmpty)
     }
+
+    func test_loadHome_recentlyPlayed_mapsContextTypeToKind() async {
+        let api = StoreMockAPI()
+        let track = SpotifyTrack(id: "t", name: "T", uri: "spotify:track:t", artists: [.init(name: "A")], album: nil, duration_ms: nil)
+        api.recents = [
+            SpotifyPlayHistoryItem(track: track, context: .init(uri: "spotify:album:al", type: "album")),
+            SpotifyPlayHistoryItem(track: track, context: .init(uri: "spotify:playlist:pl", type: "playlist")),
+        ]
+        let store = SpotifyLibraryStore(api: api)
+        await store.loadHome()
+        let byURI = Dictionary(uniqueKeysWithValues: store.recentlyPlayed.map { ($0.contextURI, $0.kind) })
+        XCTAssertEqual(byURI["spotify:album:al"], .album)
+        XCTAssertEqual(byURI["spotify:playlist:pl"], .playlist)
+    }
 }
