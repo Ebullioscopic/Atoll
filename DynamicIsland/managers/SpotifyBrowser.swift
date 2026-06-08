@@ -30,22 +30,26 @@ final class SpotifyBrowser: ObservableObject {
     private let api: SpotifyAPI
     private let pageSize = 50
     private var offset = 0
+    private var loadGeneration = 0
 
     init(api: SpotifyAPI = SpotifyWebAPIClient()) { self.api = api }
 
     func open(_ item: SpotifyLibraryItem) async {
+        loadGeneration += 1
         currentContext = item
         tracks = []
         offset = 0
         canLoadMore = false
         errorMessage = nil
+        isLoading = false
         await loadMoreTracks()
     }
 
     func loadMoreTracks() async {
         guard let context = currentContext, !isLoading else { return }
+        let generation = loadGeneration
         isLoading = true
-        defer { isLoading = false }
+        defer { if generation == loadGeneration { isLoading = false } }
         do {
             let page: SpotifyPaging<SpotifyTrack>
             switch context.kind {
@@ -54,22 +58,26 @@ final class SpotifyBrowser: ObservableObject {
             default:
                 page = try await api.playlistTracks(playlistID: Self.playlistID(from: context.contextURI), limit: pageSize, offset: offset)
             }
+            guard generation == loadGeneration else { return }
             tracks.append(contentsOf: page.items)
             offset += page.items.count
             canLoadMore = page.next != nil
             errorMessage = nil
         } catch {
+            guard generation == loadGeneration else { return }
             errorMessage = String(localized: "Couldn\u{2019}t load tracks.")
             canLoadMore = false
         }
     }
 
     func back() {
+        loadGeneration += 1
         currentContext = nil
         tracks = []
         offset = 0
         canLoadMore = false
         errorMessage = nil
+        isLoading = false
     }
 
     private static func playlistID(from uri: String) -> String {

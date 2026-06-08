@@ -68,4 +68,13 @@ final class SpotifyBrowserTests: XCTestCase {
         XCTAssertNil(browser.currentContext)
         XCTAssertTrue(browser.tracks.isEmpty)
     }
+
+    func test_open_secondContext_replacesTracks() async {
+        let api = BrowserMockAPI()
+        api.pages = [.init(items: [track("a")], next: nil, total: 1), .init(items: [track("b")], next: nil, total: 1)]
+        let browser = SpotifyBrowser(api: api)
+        await browser.open(playlistItem())
+        await browser.open(playlistItem())
+        XCTAssertEqual(browser.tracks.map(\.name), ["b"])
+    }
 }

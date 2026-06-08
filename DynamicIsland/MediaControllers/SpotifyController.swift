@@ -26,6 +26,7 @@ import SwiftUI
 
 class SpotifyController: MediaControllerProtocol, SpotifyDesktopControlling {
     static let bundleIdentifier = "com.spotify.client"
+    static let sharedForLaunch = SpotifyController()
 
     // MARK: - Properties
     @Published private var playbackState: PlaybackState = PlaybackState(
