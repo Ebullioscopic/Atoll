@@ -106,7 +106,8 @@ final class SpotifyOAuthManager: ObservableObject {
         var req = URLRequest(url: tokenURL)
         req.httpMethod = "POST"
         req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        req.httpBody = form.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? $0.value)" }
+        let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        req.httpBody = form.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: unreserved) ?? $0.value)" }
             .joined(separator: "&").data(using: .utf8)
         do {
             let (data, response) = try await session.data(for: req)
@@ -121,7 +122,7 @@ final class SpotifyOAuthManager: ObservableObject {
             defaults.set(token.access_token, forKey: "spotifyOAuthAccessToken")
             defaults.set(Date().timeIntervalSince1970 + token.expires_in, forKey: "spotifyOAuthExpiration")
             if let rt = token.refresh_token { defaults.set(rt, forKey: "spotifyOAuthRefreshToken") }
-            isAuthenticated = !(defaults.string(forKey: "spotifyOAuthRefreshToken") ?? "").isEmpty || !token.access_token.isEmpty
+            isAuthenticated = !(defaults.string(forKey: "spotifyOAuthRefreshToken") ?? "").isEmpty
             errorMessage = nil
         } catch {
             NSLog("[SpotifyOAuth] token error: %@", String(describing: error))
