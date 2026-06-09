@@ -24,6 +24,22 @@ enum SpotifyAPIError: Error, Equatable {
     case decoding
 }
 
+/// A playlist/saved-tracks item wrapping a `track`. Decodes leniently: a present-but-
+/// undecodable track (e.g. a podcast episode or local file missing `artists`) becomes
+/// nil and is dropped, rather than failing the whole page.
+struct SpotifyTrackItem: Codable, Equatable {
+    let track: SpotifyTrack?
+    private enum CodingKeys: String, CodingKey { case track }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        track = (try? c.decodeIfPresent(SpotifyTrack.self, forKey: .track)) ?? nil
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(track, forKey: .track)
+    }
+}
+
 final class SpotifyWebAPIClient: SpotifyAPI {
     private let session: URLSession
     private let tokenProvider: (_ forceRefresh: Bool) async -> String?
@@ -41,13 +57,11 @@ final class SpotifyWebAPIClient: SpotifyAPI {
         try await getJSON("/me/playlists?limit=\(limit)&offset=\(offset)")
     }
     func playlistTracks(playlistID: String, limit: Int, offset: Int) async throws -> SpotifyPaging<SpotifyTrack> {
-        struct ItemWrap: Codable, Equatable { let track: SpotifyTrack? }
-        let paging: SpotifyPaging<ItemWrap> = try await getJSON("/playlists/\(playlistID)/tracks?limit=\(limit)&offset=\(offset)")
+        let paging: SpotifyPaging<SpotifyTrackItem> = try await getJSON("/playlists/\(playlistID)/tracks?limit=\(limit)&offset=\(offset)")
         return SpotifyPaging(items: paging.items.compactMap { $0.track }, next: paging.next, total: paging.total)
     }
     func savedTracks(limit: Int, offset: Int) async throws -> SpotifyPaging<SpotifyTrack> {
-        struct ItemWrap: Codable, Equatable { let track: SpotifyTrack? }
-        let paging: SpotifyPaging<ItemWrap> = try await getJSON("/me/tracks?limit=\(limit)&offset=\(offset)")
+        let paging: SpotifyPaging<SpotifyTrackItem> = try await getJSON("/me/tracks?limit=\(limit)&offset=\(offset)")
         return SpotifyPaging(items: paging.items.compactMap { $0.track }, next: paging.next, total: paging.total)
     }
     func recentlyPlayed(limit: Int) async throws -> [SpotifyPlayHistoryItem] {

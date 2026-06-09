@@ -103,4 +103,16 @@ final class SpotifyWebAPIClientTests: XCTestCase {
         do { _ = try await client.availableDevices(); XCTFail("expected throw") }
         catch { /* ok */ }
     }
+
+    func test_playlistTracks_skipsUndecodableItems() async throws {
+        MockURLProtocol.handler = { req in
+            // item0 is a valid track; item1's track lacks `artists` (podcast-episode shape)
+            // and must be dropped, not fail the whole page.
+            let body = #"{"items":[{"track":{"id":"t1","name":"Song","uri":"spotify:track:t1","artists":[{"name":"A"}]}},{"track":{"id":"e1","name":"Episode","uri":"spotify:episode:e1"}}],"next":null,"total":2}"#
+            return (self.http(req.url!, 200), body.data(using: .utf8)!)
+        }
+        let client = SpotifyWebAPIClient(session: makeSession(), tokenProvider: { _ in "T" })
+        let page = try await client.playlistTracks(playlistID: "p1", limit: 50, offset: 0)
+        XCTAssertEqual(page.items.map(\.name), ["Song"])
+    }
 }
