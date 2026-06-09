@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import AppKit
 import Combine
 import Foundation
 import WebKit
@@ -36,6 +37,7 @@ final class SpotifyPlayerManager: ObservableObject {
     @Published private(set) var currentTrack: String?
 
     private var webView: WKWebView?
+    private var hostWindow: NSWindow?
     private var started = false
 
     /// Build the hidden web view and connect the SDK. Idempotent. No-op if not authenticated.
@@ -49,15 +51,31 @@ final class SpotifyPlayerManager: ObservableObject {
         ucc.add(MessageProxy(self), name: "spotify")
         config.userContentController = ucc
 
-        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 80), configuration: config)
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 360, height: 120), configuration: config)
         self.webView = web
+
+        // A WKWebView that isn't in a window has its media playback suspended by WebKit,
+        // so the SDK device registers but produces no audio. Host it in an off-screen,
+        // click-through window kept alive for the app's lifetime.
+        let win = NSWindow(contentRect: CGRect(x: -32000, y: -32000, width: 360, height: 120),
+                           styleMask: [.borderless], backing: .buffered, defer: false)
+        win.isReleasedWhenClosed = false
+        win.ignoresMouseEvents = true
+        win.hasShadow = false
+        win.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        win.contentView = web
+        win.orderFrontRegardless()
+        self.hostWindow = win
+
         // An https baseURL gives the page a secure context (EME/DRM requires it).
         web.loadHTMLString(Self.html, baseURL: URL(string: "https://atoll.localhost/"))
-        NSLog("[SpotifyPlayer] start: loading Web Playback SDK page")
+        NSLog("[SpotifyPlayer] start: loading Web Playback SDK page (windowed)")
     }
 
     func stop() {
         webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.disconnect();", completionHandler: nil)
+        hostWindow?.orderOut(nil)
+        hostWindow = nil
         webView = nil
         started = false
         isReady = false
