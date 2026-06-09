@@ -62,8 +62,10 @@ final class SpotifyPlaybackLauncher {
 
     func playTrack(uri: String, inContext contextURI: String?, shuffle: Bool) async throws {
         if let deviceID = inAppDeviceID() {
-            try await api.setShuffle(shuffle, deviceID: deviceID)
+            // Start audio first (one round-trip) so a song tap feels immediate; the
+            // shuffle state for the continuing queue is set right after, best-effort.
             try await api.startPlayback(contextURI: contextURI, uris: contextURI == nil ? [uri] : nil, offsetURI: contextURI == nil ? nil : uri, deviceID: deviceID)
+            try? await api.setShuffle(shuffle, deviceID: deviceID)
         } else if desktop.isRunning() {
             await desktop.setShuffle(shuffle)
             await desktop.playTrack(uri: uri, inContext: contextURI)

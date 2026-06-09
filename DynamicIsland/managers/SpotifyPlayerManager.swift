@@ -35,6 +35,8 @@ final class SpotifyPlayerManager: ObservableObject {
     @Published private(set) var statusMessage: String?
     @Published private(set) var isPaused = true
     @Published private(set) var currentTrack: String?
+    @Published private(set) var currentArtist: String?
+    @Published private(set) var artworkURL: String?
 
     private var webView: WKWebView?
     private var hostWindow: NSWindow?
@@ -113,6 +115,8 @@ final class SpotifyPlayerManager: ObservableObject {
         case "state":
             isPaused = body["paused"] as? Bool ?? true
             currentTrack = body["track"] as? String
+            currentArtist = body["artist"] as? String
+            artworkURL = body["image"] as? String
         case "error":
             let kind = body["kind"] as? String ?? "?"
             let message = body["message"] as? String ?? ""
@@ -139,6 +143,36 @@ final class SpotifyPlayerManager: ObservableObject {
       function post(msg) {
         try { window.webkit.messageHandlers.spotify.postMessage(msg); } catch (e) {}
       }
+      function updateMediaSession(s) {
+        if (!('mediaSession' in navigator)) return;
+        var t = (s && s.track_window && s.track_window.current_track) ? s.track_window.current_track : null;
+        if (t) {
+          try {
+            navigator.mediaSession.metadata = new MediaMetadata({
+              title: t.name || '',
+              artist: (t.artists || []).map(function(a){ return a.name; }).join(', '),
+              album: (t.album && t.album.name) ? t.album.name : '',
+              artwork: ((t.album && t.album.images) ? t.album.images : []).map(function(i){ return { src: i.url }; })
+            });
+          } catch (e) {}
+        }
+        try { navigator.mediaSession.playbackState = (s && s.paused) ? 'paused' : 'playing'; } catch (e) {}
+        try {
+          if (navigator.mediaSession.setPositionState && s && s.duration) {
+            navigator.mediaSession.setPositionState({ duration: s.duration/1000, position: (s.position||0)/1000, playbackRate: 1 });
+          }
+        } catch (e) {}
+      }
+      function setupMediaSessionHandlers(player) {
+        if (!('mediaSession' in navigator)) return;
+        var ms = navigator.mediaSession;
+        function set(a, fn) { try { ms.setActionHandler(a, fn); } catch (e) {} }
+        set('play', function(){ player.resume(); });
+        set('pause', function(){ player.pause(); });
+        set('previoustrack', function(){ player.previousTrack(); });
+        set('nexttrack', function(){ player.nextTrack(); });
+        set('seekto', function(d){ if (d && d.seekTime != null) player.seek(d.seekTime * 1000); });
+      }
       window.addEventListener('error', function(e) {
         post({ type: 'error', kind: 'js', message: '' + (e && e.message ? e.message : e) });
       });
@@ -149,12 +183,19 @@ final class SpotifyPlayerManager: ObservableObject {
           getOAuthToken: function(cb) { __tokenCbs.push(cb); post({ type: 'token_request' }); },
           volume: 0.8
         });
+        setupMediaSessionHandlers(player);
         player.addListener('ready', function(d) { post({ type: 'ready', device_id: d.device_id }); });
         player.addListener('not_ready', function(d) { post({ type: 'not_ready', device_id: d.device_id }); });
         player.addListener('player_state_changed', function(s) {
+          updateMediaSession(s);
+          var t = (s && s.track_window && s.track_window.current_track) ? s.track_window.current_track : null;
           post({ type: 'state',
                  paused: s ? s.paused : true,
-                 track: (s && s.track_window && s.track_window.current_track) ? s.track_window.current_track.name : null });
+                 position: s ? s.position : 0,
+                 duration: s ? s.duration : 0,
+                 track: t ? t.name : null,
+                 artist: t ? (t.artists || []).map(function(a){ return a.name; }).join(', ') : null,
+                 image: (t && t.album && t.album.images && t.album.images[0]) ? t.album.images[0].url : null });
         });
         player.addListener('initialization_error', function(e) { post({ type: 'error', kind: 'init', message: e.message }); });
         player.addListener('authentication_error', function(e) { post({ type: 'error', kind: 'auth', message: e.message }); });
