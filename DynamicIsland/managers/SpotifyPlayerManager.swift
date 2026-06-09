@@ -42,8 +42,8 @@ final class SpotifyPlayerManager: ObservableObject {
     private var webView: WKWebView?
     private var hostWindow: NSWindow?
     private var commandsConfigured = false
-    private var currentDuration: Double = 0
-    private var currentPosition: Double = 0
+    private(set) var currentDuration: Double = 0
+    private(set) var currentPosition: Double = 0
     /// Build the hidden web view and connect the SDK once. No-op if a player already
     /// exists (prevents duplicate "Atoll" devices) or if not authenticated.
     func start() {
@@ -102,8 +102,9 @@ final class SpotifyPlayerManager: ObservableObject {
     func togglePlay() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.togglePlay();", completionHandler: nil) }
     func nextTrack() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.nextTrack();", completionHandler: nil) }
     func previousTrack() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.previousTrack();", completionHandler: nil) }
-    private func resume() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.resume();", completionHandler: nil) }
-    private func pause() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.pause();", completionHandler: nil) }
+    func resume() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.resume();", completionHandler: nil) }
+    func pause() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.pause();", completionHandler: nil) }
+    func seek(toMilliseconds ms: Double) { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.seek(\(Int(ms)));", completionHandler: nil) }
 
     // MARK: - System now-playing (Control Center / media keys / notch)
     private func configureRemoteCommands() {

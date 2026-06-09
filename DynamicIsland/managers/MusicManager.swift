@@ -432,6 +432,7 @@ class MusicManager: ObservableObject {
     // Pear Desktop auto-detection
     private static let pearDesktopBundleID = YouTubeMusicConfiguration.default.bundleIdentifier
     private var isPearDesktopAutoSwitched: Bool = false
+    private var isAtollAutoSwitched: Bool = false
 
     // Published properties for UI
     @Published var songTitle: String = "I'm Handsome"
@@ -538,6 +539,9 @@ class MusicManager: ObservableObject {
         // Observe Pear Desktop launch/terminate for auto-detection
         setupPearDesktopAutoDetection()
 
+        // Observe the in-app Spotify Web Playback SDK player becoming the active device
+        setupAtollAutoDetection()
+
         // Initialize deprecation check asynchronously
         Task { @MainActor in
             do {
@@ -595,6 +599,42 @@ class MusicManager: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    // MARK: - Atoll In-App Player Auto-Detection
+    private func setupAtollAutoDetection() {
+        SpotifyPlayerManager.shared.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.evaluateAtollAutoSwitch() }
+            .store(in: &cancellables)
+    }
+
+    /// When Atoll's web player has a loaded track it becomes the active media source (so the
+    /// notch shows it + drives it); when it goes idle we revert to the user's preferred controller.
+    private func evaluateAtollAutoSwitch() {
+        let player = SpotifyPlayerManager.shared
+        let atollActive = player.isReady && !(player.currentTrack ?? "").isEmpty
+        if atollActive, !isAtollAutoSwitched {
+            isAtollAutoSwitched = true
+            activateAtollController()
+        } else if !atollActive, isAtollAutoSwitched {
+            isAtollAutoSwitched = false
+            setActiveControllerBasedOnPreference()
+        }
+    }
+
+    private func activateAtollController() {
+        controllerCancellables.removeAll()
+        let controller = SpotifyWebPlayerController()
+        controller.playbackStatePublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                guard let self, self.activeController === controller else { return }
+                self.updateFromPlaybackState(state)
+            }
+            .store(in: &controllerCancellables)
+        activeController = controller
+        forceUpdate()
     }
 
     deinit {
