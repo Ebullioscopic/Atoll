@@ -69,11 +69,15 @@ final class SpotifyWebAPIClient: SpotifyAPI {
         return paging.items
     }
     func search(query: String, types: [SpotifySearchType], limit: Int) async throws -> SpotifySearchResponse {
-        var allowed = CharacterSet.urlQueryAllowed
-        allowed.remove(charactersIn: "&=+")
-        let q = query.addingPercentEncoding(withAllowedCharacters: allowed) ?? query
-        let t = types.map(\.rawValue).joined(separator: ",")
-        return try await getJSON("/search?q=\(q)&type=\(t)&limit=\(limit)")
+        // Build with URLComponents so the comma in `type` and any query chars are
+        // encoded correctly (a hand-built string mis-parsed → Spotify "Invalid limit").
+        var comps = URLComponents()
+        comps.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "type", value: types.map(\.rawValue).joined(separator: ",")),
+            URLQueryItem(name: "limit", value: String(limit))
+        ]
+        return try await getJSON("/search?\(comps.percentEncodedQuery ?? "")")
     }
     func availableDevices() async throws -> [SpotifyDevice] {
         struct DevicesResponse: Codable, Equatable { let devices: [SpotifyDevice] }
@@ -120,7 +124,10 @@ final class SpotifyWebAPIClient: SpotifyAPI {
             }
             var urlString = base + path
             if let query { urlString += (path.contains("?") ? "&" : "?") + query }
-            guard let url = URL(string: urlString) else { throw SpotifyAPIError.http(-1) }
+            guard let url = URL(string: urlString) else {
+                NSLog("[SpotifyAPI] BAD URL: %@", urlString)
+                throw SpotifyAPIError.http(-1)
+            }
             var req = URLRequest(url: url)
             req.httpMethod = method
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

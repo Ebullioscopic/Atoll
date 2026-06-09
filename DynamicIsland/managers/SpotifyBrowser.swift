@@ -65,7 +65,13 @@ final class SpotifyBrowser: ObservableObject {
             errorMessage = nil
         } catch {
             guard generation == loadGeneration else { return }
-            errorMessage = String(localized: "Couldn\u{2019}t load tracks.")
+            if case SpotifyAPIError.http(403) = error {
+                // Spotify blocks reading tracks of its own editorial/algorithmic playlists
+                // (Discover Weekly, Daily Mix, etc.). The context is still playable.
+                errorMessage = String(localized: "Spotify won’t share this playlist’s track list — tap “Play all” to play it.")
+            } else {
+                errorMessage = String(localized: "Couldn\u{2019}t load tracks.")
+            }
             canLoadMore = false
         }
     }
