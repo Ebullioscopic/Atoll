@@ -27,6 +27,8 @@ final class SpotifyOAuthManager: ObservableObject {
     static let scopes = [
         "playlist-read-private", "playlist-read-collaborative",
         "user-read-recently-played", "user-library-read",
+        // Like / unlike the current track from the media controls:
+        "user-library-modify",
         "user-read-playback-state", "user-modify-playback-state",
         // Web Playback SDK (in-app standalone playback):
         "streaming", "user-read-email", "user-read-private"
@@ -69,7 +71,22 @@ final class SpotifyOAuthManager: ObservableObject {
         let access_token: String
         let expires_in: Double
         let refresh_token: String?
+        let scope: String?
     }
+
+    private let scopesKey = "spotifyOAuthScopes"
+
+    /// Scopes actually granted by Spotify for the current session (parsed from the token
+    /// response). Empty for sessions authorized before scope tracking existed — those must
+    /// reconnect to pick up newer scopes.
+    var grantedScopes: Set<String> {
+        Set((defaults.string(forKey: scopesKey) ?? "").split(separator: " ").map(String.init))
+    }
+
+    /// Whether the session can add/remove Liked Songs. False for older sessions that were
+    /// authorized before `user-library-modify` was requested — the Like control dims until
+    /// the user disconnects and reconnects.
+    var canModifyLibrary: Bool { grantedScopes.contains("user-library-modify") }
 
     func exchangeCode(_ code: String, verifier: String) async {
         await postToken([
@@ -115,6 +132,7 @@ final class SpotifyOAuthManager: ObservableObject {
         defaults.removeObject(forKey: "spotifyOAuthAccessToken")
         defaults.removeObject(forKey: "spotifyOAuthRefreshToken")
         defaults.removeObject(forKey: "spotifyOAuthExpiration")
+        defaults.removeObject(forKey: scopesKey)
         isAuthenticated = false
     }
 
@@ -140,6 +158,9 @@ final class SpotifyOAuthManager: ObservableObject {
             defaults.set(token.access_token, forKey: "spotifyOAuthAccessToken")
             defaults.set(Date().timeIntervalSince1970 + token.expires_in, forKey: "spotifyOAuthExpiration")
             if let rt = token.refresh_token { defaults.set(rt, forKey: "spotifyOAuthRefreshToken") }
+            // Spotify returns `scope` on both code-exchange and refresh; keep the last known
+            // set if a refresh response happens to omit it.
+            if let scope = token.scope { defaults.set(scope, forKey: scopesKey) }
             isAuthenticated = !(defaults.string(forKey: "spotifyOAuthRefreshToken") ?? "").isEmpty
             errorMessage = nil
         } catch {

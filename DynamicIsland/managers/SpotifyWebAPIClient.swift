@@ -85,6 +85,37 @@ final class SpotifyWebAPIClient: SpotifyAPI {
         return r.devices
     }
 
+    // MARK: Liked Songs (library)
+
+    func savedTracksContains(ids: [String]) async throws -> [Bool] {
+        let trimmed = ids.compactMap(Self.bareTrackID).filter { !$0.isEmpty }
+        guard !trimmed.isEmpty else { return [] }
+        return try await getJSON("/me/tracks/contains?ids=\(trimmed.joined(separator: ","))")
+    }
+    func saveTracks(ids: [String]) async throws {
+        let trimmed = ids.compactMap(Self.bareTrackID).filter { !$0.isEmpty }
+        guard !trimmed.isEmpty else { return }
+        try await put("/me/tracks", query: "ids=\(trimmed.joined(separator: ","))", body: nil)
+    }
+    func removeSavedTracks(ids: [String]) async throws {
+        let trimmed = ids.compactMap(Self.bareTrackID).filter { !$0.isEmpty }
+        guard !trimmed.isEmpty else { return }
+        try await delete("/me/tracks", query: "ids=\(trimmed.joined(separator: ","))")
+    }
+
+    /// Normalize `spotify:track:ID` or an open.spotify.com URL down to the bare base-62 ID
+    /// that the `/me/tracks` endpoints expect; pass through an already-bare ID unchanged.
+    static func bareTrackID(_ raw: String) -> String? {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        if value.hasPrefix("spotify:track:") { return String(value.dropFirst("spotify:track:".count)) }
+        if let url = URL(string: value) {
+            let parts = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
+            if let i = parts.firstIndex(of: "track"), i + 1 < parts.count { return parts[i + 1] }
+        }
+        return value.contains(":") || value.contains("/") ? nil : value
+    }
+
     // MARK: PUT playback
 
     func startPlayback(contextURI: String?, uris: [String]?, offsetURI: String?, deviceID: String?) async throws {
@@ -98,6 +129,9 @@ final class SpotifyWebAPIClient: SpotifyAPI {
         var q = "state=\(on)"
         if let deviceID { q += "&device_id=\(deviceID)" }
         try await put("/me/player/shuffle", query: q, body: nil)
+    }
+    func transferPlayback(deviceIDs: [String], play: Bool) async throws {
+        try await put("/me/player", query: nil, body: ["device_ids": deviceIDs, "play": play])
     }
 
     // MARK: Core request with 401 retry
@@ -114,6 +148,9 @@ final class SpotifyWebAPIClient: SpotifyAPI {
     private func put(_ path: String, query: String?, body: [String: Any]?) async throws {
         let data = body.map { try? JSONSerialization.data(withJSONObject: $0) } ?? nil
         _ = try await perform(path: path, method: "PUT", body: data ?? Data(), query: query)
+    }
+    private func delete(_ path: String, query: String?) async throws {
+        _ = try await perform(path: path, method: "DELETE", body: Data(), query: query)
     }
 
     private func perform(path: String, method: String, body: Data?, query: String?) async throws -> Data {

@@ -37,6 +37,7 @@ final class SpotifyPlayerManager: ObservableObject {
     @Published private(set) var isPaused = true
     @Published private(set) var currentTrack: String?
     @Published private(set) var currentArtist: String?
+    @Published private(set) var currentTrackURI: String?
     @Published private(set) var artworkURL: String?
 
     private var webView: WKWebView?
@@ -88,6 +89,7 @@ final class SpotifyPlayerManager: ObservableObject {
         webView = nil
         isReady = false
         deviceID = nil
+        currentTrackURI = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         MPNowPlayingInfoCenter.default().playbackState = .stopped
     }
@@ -171,6 +173,7 @@ final class SpotifyPlayerManager: ObservableObject {
             isPaused = body["paused"] as? Bool ?? true
             currentTrack = body["track"] as? String
             currentArtist = body["artist"] as? String
+            currentTrackURI = body["uri"] as? String
             artworkURL = body["image"] as? String
             currentDuration = ((body["duration"] as? Double) ?? 0) / 1000
             currentPosition = ((body["position"] as? Double) ?? 0) / 1000
@@ -254,6 +257,7 @@ final class SpotifyPlayerManager: ObservableObject {
                  duration: s ? s.duration : 0,
                  track: t ? t.name : null,
                  artist: t ? (t.artists || []).map(function(a){ return a.name; }).join(', ') : null,
+                 uri: t ? t.uri : null,
                  image: (t && t.album && t.album.images && t.album.images[0]) ? t.album.images[0].url : null });
         });
         player.addListener('initialization_error', function(e) { post({ type: 'error', kind: 'init', message: e.message }); });

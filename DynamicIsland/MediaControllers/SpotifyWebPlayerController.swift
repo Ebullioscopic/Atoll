@@ -49,6 +49,9 @@ final class SpotifyWebPlayerController: ObservableObject, MediaControllerProtoco
         state.isPlaying = manager.isReady && !manager.isPaused
         state.title = manager.currentTrack ?? ""
         state.artist = manager.currentArtist ?? ""
+        // Carry the Spotify track URI so the media layer (e.g. the Like control) can act on
+        // the in-app player's current track, matching the desktop controller's convention.
+        state.contentIdentifier = manager.currentTrackURI
         state.duration = manager.currentDuration
         state.currentTime = manager.currentPosition
         state.playbackRate = manager.isPaused ? 0 : 1

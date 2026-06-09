@@ -31,6 +31,7 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
     case mediaOutput
     case airPlay
     case lyrics
+    case like
     case seekBackward
     case seekForward
     case none
@@ -62,6 +63,7 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
         .shuffle,
         .repeatMode,
         .lyrics,
+        .like,
         .mediaOutput,
         .airPlay
     ]
@@ -91,6 +93,8 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
             return String(localized: "AirPlay")
         case .lyrics:
             return String(localized: "Lyrics")
+        case .like:
+            return String(localized: "Like (Spotify)")
         case .seekBackward:
             return String(localized: "Rewind 10s")
         case .seekForward:
@@ -118,6 +122,8 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
             return "airplayaudio"
         case .lyrics:
             return "quote.bubble"
+        case .like:
+            return "heart"
         case .seekBackward:
             return "gobackward.10"
         case .seekForward:

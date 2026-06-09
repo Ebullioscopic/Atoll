@@ -653,10 +653,11 @@ private struct MinimalisticReminderDetailsView: View {
     // MARK: - Progress Bar (Full Width)
     
     @ObservedObject var musicManager = MusicManager.shared
+    @ObservedObject var likeController = SpotifyLikeController.shared
     @State private var sliderValue: Double = MusicManager.shared.estimatedPlaybackPosition()
     @State private var dragging: Bool = false
     @State private var lastDragged: Date = .distantPast
-    
+
     /// Whether the progress timeline should be paused (no ticks).
     private var isProgressTimelinePaused: Bool {
         !musicManager.isPlaying || musicManager.isLiveStream || musicManager.playbackRate <= 0
@@ -961,6 +962,16 @@ private struct MinimalisticReminderDetailsView: View {
             ) {
                 enableLyrics.toggle()
             }
+        case .like:
+            controlButton(
+                icon: likeController.isLiked ? "heart.fill" : "heart",
+                isActive: likeController.isLiked,
+                symbolEffect: .replace
+            ) {
+                likeController.toggle()
+            }
+            .opacity(likeController.canLike ? 1 : 0.35)
+            .disabled(!likeController.canLike)
         }
     }
 

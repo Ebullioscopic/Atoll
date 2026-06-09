@@ -144,4 +144,22 @@ protocol SpotifyAPI {
     func availableDevices() async throws -> [SpotifyDevice]
     func startPlayback(contextURI: String?, uris: [String]?, offsetURI: String?, deviceID: String?) async throws
     func setShuffle(_ on: Bool, deviceID: String?) async throws
+    /// Whether each of `ids` is in the user's Liked Songs. Parallel to the input order.
+    func savedTracksContains(ids: [String]) async throws -> [Bool]
+    /// Add tracks to Liked Songs. Requires the `user-library-modify` scope.
+    func saveTracks(ids: [String]) async throws
+    /// Remove tracks from Liked Songs. Requires the `user-library-modify` scope.
+    func removeSavedTracks(ids: [String]) async throws
+    /// Move the active playback session onto `deviceIDs`, optionally resuming it.
+    func transferPlayback(deviceIDs: [String], play: Bool) async throws
+}
+
+// Default no-op/empty implementations so lightweight mocks that don't exercise the
+// library/transfer surface keep conforming without boilerplate. The real
+// `SpotifyWebAPIClient` overrides each of these.
+extension SpotifyAPI {
+    func savedTracksContains(ids: [String]) async throws -> [Bool] { ids.map { _ in false } }
+    func saveTracks(ids: [String]) async throws {}
+    func removeSavedTracks(ids: [String]) async throws {}
+    func transferPlayback(deviceIDs: [String], play: Bool) async throws {}
 }

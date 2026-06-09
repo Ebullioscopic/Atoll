@@ -467,6 +467,9 @@ class MusicManager: ObservableObject {
     @Published var animations: DynamicIslandAnimations = .init()
     @Published var avgColor: NSColor = .white
     @Published var bundleIdentifier: String? = nil
+    /// Stable identifier for the current track (e.g. `spotify:track:…`), when the active
+    /// source provides one. Drives source-specific actions like Spotify Like/Unlike.
+    @Published var contentIdentifier: String? = nil
     @Published var songDuration: TimeInterval = 0
     @Published var elapsedTime: TimeInterval = 0
     @Published var timestampDate: Date = .init()
@@ -862,6 +865,10 @@ class MusicManager: ObservableObject {
 
         if state.bundleIdentifier != self.bundleIdentifier {
             self.bundleIdentifier = state.bundleIdentifier
+        }
+
+        if state.contentIdentifier != self.contentIdentifier {
+            self.contentIdentifier = state.contentIdentifier
         }
 
         if repeatModeChanged {

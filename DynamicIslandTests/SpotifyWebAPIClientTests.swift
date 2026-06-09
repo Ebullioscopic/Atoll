@@ -104,6 +104,71 @@ final class SpotifyWebAPIClientTests: XCTestCase {
         catch { /* ok */ }
     }
 
+    func test_savedTracksContains_decodesBoolArray_andNormalizesURIs() async throws {
+        var captured: URLRequest?
+        MockURLProtocol.handler = { req in
+            captured = req
+            return (self.http(req.url!, 200), "[true,false]".data(using: .utf8)!)
+        }
+        let client = SpotifyWebAPIClient(session: makeSession(), tokenProvider: { _ in "T" })
+        let result = try await client.savedTracksContains(ids: ["spotify:track:abcdefghijklmnopqrstuv", "xyzabcdefghijklmnopqrs"])
+        XCTAssertEqual(result, [true, false])
+        let url = try XCTUnwrap(captured?.url?.absoluteString)
+        XCTAssertTrue(url.contains("/v1/me/tracks/contains"))
+        // The `spotify:track:` prefix must be stripped to the bare id for this endpoint.
+        XCTAssertTrue(url.contains("ids=abcdefghijklmnopqrstuv,xyzabcdefghijklmnopqrs"), url)
+    }
+
+    func test_saveTracks_sendsPutWithIds() async throws {
+        var captured: URLRequest?
+        MockURLProtocol.handler = { req in
+            captured = req
+            return (self.http(req.url!, 200), Data())
+        }
+        let client = SpotifyWebAPIClient(session: makeSession(), tokenProvider: { _ in "T" })
+        try await client.saveTracks(ids: ["spotify:track:abcdefghijklmnopqrstuv"])
+        XCTAssertEqual(captured?.httpMethod, "PUT")
+        let url = try XCTUnwrap(captured?.url?.absoluteString)
+        XCTAssertTrue(url.contains("/v1/me/tracks"))
+        XCTAssertTrue(url.contains("ids=abcdefghijklmnopqrstuv"), url)
+    }
+
+    func test_removeSavedTracks_sendsDeleteWithIds() async throws {
+        var captured: URLRequest?
+        MockURLProtocol.handler = { req in
+            captured = req
+            return (self.http(req.url!, 200), Data())
+        }
+        let client = SpotifyWebAPIClient(session: makeSession(), tokenProvider: { _ in "T" })
+        try await client.removeSavedTracks(ids: ["abcdefghijklmnopqrstuv"])
+        XCTAssertEqual(captured?.httpMethod, "DELETE")
+        let url = try XCTUnwrap(captured?.url?.absoluteString)
+        XCTAssertTrue(url.contains("/v1/me/tracks"))
+        XCTAssertTrue(url.contains("ids=abcdefghijklmnopqrstuv"), url)
+    }
+
+    func test_transferPlayback_sendsPutWithDeviceIdsAndPlay() async throws {
+        var captured: URLRequest?
+        var capturedBody: Data?
+        MockURLProtocol.handler = { req in
+            captured = req
+            capturedBody = req.httpBody ?? req.httpBodyStream.flatMap { stream in
+                stream.open(); defer { stream.close() }
+                var data = Data(); var buf = [UInt8](repeating: 0, count: 1024)
+                while stream.hasBytesAvailable { let n = stream.read(&buf, maxLength: buf.count); if n <= 0 { break }; data.append(buf, count: n) }
+                return data
+            }
+            return (self.http(req.url!, 204), Data())
+        }
+        let client = SpotifyWebAPIClient(session: makeSession(), tokenProvider: { _ in "T" })
+        try await client.transferPlayback(deviceIDs: ["atoll-dev"], play: true)
+        XCTAssertEqual(captured?.httpMethod, "PUT")
+        XCTAssertTrue(captured?.url?.absoluteString.contains("/v1/me/player") == true)
+        let json = try XCTUnwrap(capturedBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] })
+        XCTAssertEqual(json["device_ids"] as? [String], ["atoll-dev"])
+        XCTAssertEqual(json["play"] as? Bool, true)
+    }
+
     func test_playlistTracks_skipsUndecodableItems() async throws {
         MockURLProtocol.handler = { req in
             // item0 is a valid track; item1's track lacks `artists` (podcast-episode shape)

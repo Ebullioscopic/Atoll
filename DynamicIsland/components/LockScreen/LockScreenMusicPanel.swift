@@ -35,6 +35,7 @@ struct LockScreenMusicPanel: View {
     static let expandedSize = CGSize(width: 720, height: 340)
 
     @ObservedObject var musicManager = MusicManager.shared
+    @ObservedObject private var likeController = SpotifyLikeController.shared
     @ObservedObject private var routeManager = AudioRouteManager.shared
     @ObservedObject private var fullscreenArtworkManager = FullScreenArtworkWindowManager.shared
     @StateObject private var volumeModel = MediaOutputVolumeViewModel()
@@ -740,6 +741,18 @@ struct LockScreenMusicPanel: View {
                     enableLyrics.toggle()
                 }
             }
+        case .like:
+            controlButton(
+                icon: likeController.isLiked ? "heart.fill" : "heart",
+                size: 18,
+                isActive: likeController.isLiked,
+                activeColor: brandAccentColor,
+                symbolEffect: .replace
+            ) {
+                likeController.toggle()
+            }
+            .opacity(likeController.canLike ? 1 : 0.35)
+            .disabled(!likeController.canLike)
         }
     }
 

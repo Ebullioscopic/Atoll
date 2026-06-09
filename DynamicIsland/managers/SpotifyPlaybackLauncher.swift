@@ -24,6 +24,7 @@ enum SpotifyLaunchError: Error, Equatable { case noActiveDevice }
 @MainActor
 protocol SpotifyDesktopControlling {
     func isRunning() -> Bool
+    func play() async
     func playContext(uri: String, shuffle: Bool) async
     func playTrack(uri: String, inContext contextURI: String?) async
     func setShuffle(_ on: Bool) async
@@ -80,7 +81,35 @@ final class SpotifyPlaybackLauncher {
         let deviceID: String
         if let d = inAppDeviceID() { deviceID = d } else { deviceID = try await activeDeviceID() }
         try await api.setShuffle(shuffle, deviceID: deviceID)
-        try await api.startPlayback(contextURI: "spotify:collection:tracks", uris: nil, offsetURI: nil, deviceID: deviceID)
+        // Starting the Liked Songs collection with shuffle on otherwise begins from a fixed
+        // point, so every launch yields the same order. Seeding playback at a random saved
+        // track makes the shuffled queue genuinely different each time.
+        let offsetURI: String? = shuffle ? (try? await randomLikedTrackURI()) : nil
+        try await api.startPlayback(contextURI: "spotify:collection:tracks", uris: nil, offsetURI: offsetURI, deviceID: deviceID)
+    }
+
+    /// A randomly chosen track URI from the user's Liked Songs, or nil if it can't be
+    /// determined (empty library / API failure) — in which case playback just starts normally.
+    private func randomLikedTrackURI() async throws -> String? {
+        let first = try await api.savedTracks(limit: 1, offset: 0)
+        guard let total = first.total, total > 1 else { return first.items.first?.uri }
+        let randomOffset = Int.random(in: 0..<total)
+        let page = try await api.savedTracks(limit: 1, offset: randomOffset)
+        return page.items.first?.uri ?? first.items.first?.uri
+    }
+
+    /// Continue whatever was playing last rather than starting a fresh context. Prefers
+    /// Atoll's in-app device (moves the existing session onto it, preserving queue +
+    /// position), then the desktop app, then resuming on the active Connect device.
+    func resumeLastPlayback() async throws {
+        if let deviceID = inAppDeviceID() {
+            try await api.transferPlayback(deviceIDs: [deviceID], play: true)
+        } else if desktop.isRunning() {
+            await desktop.play()
+        } else {
+            let deviceID = try await activeDeviceID()
+            try await api.startPlayback(contextURI: nil, uris: nil, offsetURI: nil, deviceID: deviceID)
+        }
     }
 
     private func activeDeviceID() async throws -> String {

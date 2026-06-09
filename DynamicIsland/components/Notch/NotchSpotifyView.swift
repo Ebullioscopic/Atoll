@@ -75,6 +75,7 @@ struct NotchSpotifyView: View {
 
     private var homeView: some View {
         VStack(spacing: 6) {
+            resumeButton
             // Search intentionally omitted: Spotify blocks /search for personal API apps
             // without Extended Quota Mode (returns 400 "Invalid limit").
             ScrollView {
@@ -87,6 +88,29 @@ struct NotchSpotifyView: View {
             }
         }
         .overlay(alignment: .bottom) { errorBanner }
+    }
+
+    /// Continue the last Spotify session (same queue + position) rather than starting a
+    /// fresh context. Prefers Atoll's in-app player when it's the standalone device.
+    private var resumeButton: some View {
+        Button {
+            Task { await launch { try await launcher.resumeLastPlayback() } }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "play.circle.fill").font(.system(size: 18))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(String(localized: "Resume")).font(.system(size: 12, weight: .semibold))
+                    Text(String(localized: "Continue where you left off")).font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 12).padding(.top, 4)
     }
 
     @ViewBuilder private func section(_ title: String, _ items: [SpotifyLibraryItem]) -> some View {

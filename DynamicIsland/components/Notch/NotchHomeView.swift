@@ -277,6 +277,7 @@ struct AlbumArtView: View {
 struct MusicControlsView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var musicManager = MusicManager.shared
+    @ObservedObject var likeController = SpotifyLikeController.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @State private var sliderValue: Double = MusicManager.shared.estimatedPlaybackPosition()
     @State private var dragging: Bool = false
@@ -635,6 +636,16 @@ struct MusicControlsView: View {
             ) {
                 enableLyrics.toggle()
             }
+        case .like:
+            HoverButton(
+                icon: likeController.isLiked ? "heart.fill" : "heart",
+                iconColor: likeController.isLiked ? brandAccentColor : .white,
+                scale: .medium
+            ) {
+                likeController.toggle()
+            }
+            .opacity(likeController.canLike ? 1 : 0.35)
+            .disabled(!likeController.canLike)
         }
     }
 
