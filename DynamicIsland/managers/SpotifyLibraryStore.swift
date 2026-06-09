@@ -84,6 +84,10 @@ final class SpotifyLibraryStore: ObservableObject {
             grouped.tracks = r.tracks?.items ?? []
             searchResults = grouped
             errorMessage = nil
+        } catch SpotifyAPIError.http(400), SpotifyAPIError.http(403) {
+            // Spotify blocks /search (catalog) for developer apps without Extended Quota
+            // Mode (Nov 2024). The 400 "Invalid limit" / 403 is the platform refusing access.
+            errorMessage = String(localized: "Spotify doesn’t allow search on personal API apps.")
         } catch {
             errorMessage = String(localized: "Search failed.")
         }
