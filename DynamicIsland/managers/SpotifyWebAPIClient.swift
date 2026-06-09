@@ -110,12 +110,6 @@ final class SpotifyWebAPIClient: SpotifyAPI {
             var req = URLRequest(url: url)
             req.httpMethod = method
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            // Identify as the Spotify web player. Requests carrying only a bare Bearer
-            // token are throttled aggressively (HTTP 429); the real web player sends these.
-            req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
-            req.setValue("https://open.spotify.com", forHTTPHeaderField: "Origin")
-            req.setValue("https://open.spotify.com/", forHTTPHeaderField: "Referer")
-            req.setValue("WebPlayer", forHTTPHeaderField: "App-Platform")
             req.setValue("application/json", forHTTPHeaderField: "Accept")
             if let body, !body.isEmpty {
                 req.httpBody = body
@@ -134,7 +128,6 @@ final class SpotifyWebAPIClient: SpotifyAPI {
             NSLog("[SpotifyAPI] HTTP %d %@ | body: %@", http.statusCode, path, snippet)
             throw SpotifyAPIError.http(http.statusCode)
         }
-        NSLog("[SpotifyAPI] OK %d %@ (%d bytes)", http.statusCode, path, data.count)
         return data
     }
 }
