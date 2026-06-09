@@ -52,7 +52,7 @@ final class SpotifyWebPlayerController: ObservableObject, MediaControllerProtoco
         state.duration = manager.currentDuration
         state.currentTime = manager.currentPosition
         state.playbackRate = manager.isPaused ? 0 : 1
-        state.lastUpdated = Date()
+        state.lastUpdated = manager.lastStateDate
         if let urlString = manager.artworkURL, let url = URL(string: urlString) {
             state.liveArtworkURL = nil
             if let cache = artworkCache, cache.url == urlString { state.artwork = cache.data }
