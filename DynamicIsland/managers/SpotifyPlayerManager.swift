@@ -40,12 +40,10 @@ final class SpotifyPlayerManager: ObservableObject {
 
     private var webView: WKWebView?
     private var hostWindow: NSWindow?
-    private var started = false
-
-    /// Build the hidden web view and connect the SDK. Idempotent. No-op if not authenticated.
+    /// Build the hidden web view and connect the SDK once. No-op if a player already
+    /// exists (prevents duplicate "Atoll" devices) or if not authenticated.
     func start() {
-        guard !started, SpotifyOAuthManager.shared.isAuthenticated else { return }
-        started = true
+        guard webView == nil, SpotifyOAuthManager.shared.isAuthenticated else { return }
 
         let config = WKWebViewConfiguration()
         config.mediaTypesRequiringUserActionForPlayback = []   // allow SDK autoplay
@@ -53,25 +51,29 @@ final class SpotifyPlayerManager: ObservableObject {
         ucc.add(MessageProxy(self), name: "spotify")
         config.userContentController = ucc
 
-        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 360, height: 120), configuration: config)
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 1, height: 1), configuration: config)
         self.webView = web
 
-        // A WKWebView that isn't in a window has its media playback suspended by WebKit,
-        // so the SDK device registers but produces no audio. Host it in an off-screen,
-        // click-through window kept alive for the app's lifetime.
-        let win = NSWindow(contentRect: CGRect(x: -32000, y: -32000, width: 360, height: 120),
+        // WebKit suspends a web view that is off-screen or fully occluded, which kills the
+        // Spotify Connect device (RBS assertion failures / NearSuspended). Host it in a 1×1,
+        // ~invisible, click-through window that is genuinely ON-screen and on top, so the
+        // web process — and thus the device + audio — stays alive.
+        let screen = NSScreen.main?.frame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let win = NSWindow(contentRect: CGRect(x: screen.minX, y: screen.minY, width: 1, height: 1),
                            styleMask: [.borderless], backing: .buffered, defer: false)
         win.isReleasedWhenClosed = false
         win.ignoresMouseEvents = true
         win.hasShadow = false
-        win.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        win.alphaValue = 0.02
+        win.level = .floating
+        win.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         win.contentView = web
         win.orderFrontRegardless()
         self.hostWindow = win
 
         // An https baseURL gives the page a secure context (EME/DRM requires it).
         web.loadHTMLString(Self.html, baseURL: URL(string: "https://atoll.localhost/"))
-        NSLog("[SpotifyPlayer] start: loading Web Playback SDK page (windowed)")
+        NSLog("[SpotifyPlayer] start: loading Web Playback SDK page (on-screen)")
     }
 
     func stop() {
@@ -79,7 +81,6 @@ final class SpotifyPlayerManager: ObservableObject {
         hostWindow?.orderOut(nil)
         hostWindow = nil
         webView = nil
-        started = false
         isReady = false
         deviceID = nil
     }
