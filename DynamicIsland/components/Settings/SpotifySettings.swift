@@ -23,6 +23,9 @@ struct SpotifySettings: View {
     @Default(.enableSpotifyFeature) private var enableSpotify
     @Default(.spotifyDefaultShuffle) private var defaultShuffle
     @Default(.spotifyRecentLimit) private var recentLimit
+    @ObservedObject private var oauth = SpotifyOAuthManager.shared
+    @Default(.spotifyOAuthClientID) private var clientID
+    @State private var authSheet: AuthSheetData?
 
     var body: some View {
         Form {
@@ -35,8 +38,36 @@ struct SpotifySettings: View {
                     Text("Recently played shown: \(recentLimit)")
                 }
             }
-            SpotifyAuthSettingsSection()
+            Section(String(localized: "Spotify Account (Web API)")) {
+                TextField(String(localized: "Client ID"), text: $clientID)
+                    .textFieldStyle(.roundedBorder)
+                LabeledContent(String(localized: "Redirect URI"), value: SpotifyOAuthManager.redirectURI)
+                Text(String(localized: "Create a free app at developer.spotify.com, add the redirect URI above to it, paste its Client ID here, then Connect."))
+                    .font(.caption).foregroundStyle(.secondary)
+                if oauth.isAuthenticated {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        Text(String(localized: "Connected"))
+                    }
+                    Button(String(localized: "Disconnect"), role: .destructive) { oauth.disconnect() }
+                } else {
+                    Button(String(localized: "Connect with Spotify")) {
+                        let (url, verifier) = oauth.makeAuthorizeURL()
+                        if let url { authSheet = AuthSheetData(url: url, verifier: verifier) }
+                    }
+                    .disabled(clientID.isEmpty)
+                }
+            }
         }
         .formStyle(.grouped)
+        .sheet(item: $authSheet) { data in
+            SpotifyOAuthSheet(authorizeURL: data.url, verifier: data.verifier, onFinished: {})
+        }
     }
+}
+
+struct AuthSheetData: Identifiable {
+    let id = UUID()
+    let url: URL
+    let verifier: String
 }

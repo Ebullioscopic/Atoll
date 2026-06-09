@@ -30,7 +30,7 @@ final class SpotifyWebAPIClient: SpotifyAPI {
     private let base = "https://api.spotify.com/v1"
 
     init(session: URLSession = .shared,
-         tokenProvider: @escaping (_ forceRefresh: Bool) async -> String? = { await SpotifyAuthManager.shared.validAccessToken(forceRefresh: $0) }) {
+         tokenProvider: @escaping (_ forceRefresh: Bool) async -> String? = { await SpotifyOAuthManager.shared.validAccessToken(forceRefresh: $0) }) {
         self.session = session
         self.tokenProvider = tokenProvider
     }

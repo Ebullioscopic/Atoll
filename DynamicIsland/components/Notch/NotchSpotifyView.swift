@@ -23,7 +23,7 @@ import SwiftUI
 struct NotchSpotifyView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject private var store = SpotifyLibraryStore.shared
-    @ObservedObject private var auth = SpotifyAuthManager.shared
+    @ObservedObject private var auth = SpotifyOAuthManager.shared
     @StateObject private var browser = SpotifyBrowser()
     @Default(.spotifyDefaultShuffle) private var defaultShuffle
     @State private var query = ""
@@ -54,7 +54,7 @@ struct NotchSpotifyView: View {
         VStack(spacing: 10) {
             Image(systemName: "music.note").font(.largeTitle)
             Text(String(localized: "Connect Spotify")).font(.headline)
-            Text(String(localized: "Add your Spotify cookie in Settings ▸ Spotify to browse and launch playlists."))
+            Text(String(localized: "Add a Spotify Client ID in Settings ▸ Spotify and tap Connect."))
                 .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
         .padding().frame(maxWidth: .infinity, maxHeight: .infinity)

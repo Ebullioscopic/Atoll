@@ -17,7 +17,7 @@
  */
 
 import SwiftUI
-import WebKit
+@preconcurrency import WebKit
 
 struct SpotifyOAuthSheet: View {
     let authorizeURL: URL
@@ -61,7 +61,7 @@ private struct AuthWebView: NSViewRepresentable {
         return web
     }
     func updateNSView(_ nsView: WKWebView, context: Context) {}
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    @MainActor final class Coordinator: NSObject, WKNavigationDelegate {
         let onCallback: (URL) -> Void
         init(onCallback: @escaping (URL) -> Void) { self.onCallback = onCallback }
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
