@@ -64,6 +64,13 @@ final class SpotifyPlayerManager: ObservableObject {
         deviceID = nil
     }
 
+    /// Tear down and reconnect so the SDK picks up a freshly-scoped token (e.g. after re-Connect).
+    func restart() {
+        stop()
+        statusMessage = nil
+        start()
+    }
+
     // MARK: - Optional transport (the tab can drive the in-app player directly)
     func togglePlay() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.togglePlay();", completionHandler: nil) }
     func nextTrack() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.nextTrack();", completionHandler: nil) }

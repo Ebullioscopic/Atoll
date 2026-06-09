@@ -81,7 +81,7 @@ struct SpotifySettings: View {
         }
         .formStyle(.grouped)
         .sheet(item: $authSheet) { data in
-            SpotifyOAuthSheet(authorizeURL: data.url, verifier: data.verifier, onFinished: {})
+            SpotifyOAuthSheet(authorizeURL: data.url, verifier: data.verifier, onFinished: { SpotifyPlayerManager.shared.restart() })
         }
     }
 }

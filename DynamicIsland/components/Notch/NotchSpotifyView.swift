@@ -55,8 +55,10 @@ struct NotchSpotifyView: View {
         }
         .onChange(of: auth.isAuthenticated) { _, isAuthed in
             if isAuthed {
-                SpotifyPlayerManager.shared.start()
+                SpotifyPlayerManager.shared.restart()   // pick up the freshly-scoped token
                 Task { await store.loadHome() }
+            } else {
+                SpotifyPlayerManager.shared.stop()
             }
         }
     }
