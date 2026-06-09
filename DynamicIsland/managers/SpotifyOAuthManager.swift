@@ -27,7 +27,9 @@ final class SpotifyOAuthManager: ObservableObject {
     static let scopes = [
         "playlist-read-private", "playlist-read-collaborative",
         "user-read-recently-played", "user-library-read",
-        "user-read-playback-state", "user-modify-playback-state"
+        "user-read-playback-state", "user-modify-playback-state",
+        // Web Playback SDK (in-app standalone playback):
+        "streaming", "user-read-email", "user-read-private"
     ]
 
     @Published private(set) var isAuthenticated = false
