@@ -24,6 +24,7 @@ struct NotchSpotifyView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject private var store = SpotifyLibraryStore.shared
     @ObservedObject private var auth = SpotifyOAuthManager.shared
+    @ObservedObject private var player = SpotifyPlayerManager.shared
     @StateObject private var browser = SpotifyBrowser()
     @Default(.spotifyDefaultShuffle) private var defaultShuffle
     @State private var query = ""
@@ -47,9 +48,16 @@ struct NotchSpotifyView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
-        .onAppear { shuffle = defaultShuffle; if store.playlists.isEmpty { Task { await store.loadHome() } } }
+        .onAppear {
+            shuffle = defaultShuffle
+            SpotifyPlayerManager.shared.start()
+            if store.playlists.isEmpty { Task { await store.loadHome() } }
+        }
         .onChange(of: auth.isAuthenticated) { _, isAuthed in
-            if isAuthed { Task { await store.loadHome() } }
+            if isAuthed {
+                SpotifyPlayerManager.shared.start()
+                Task { await store.loadHome() }
+            }
         }
     }
 
@@ -186,7 +194,7 @@ struct NotchSpotifyView: View {
     }
 
     @ViewBuilder private var errorBanner: some View {
-        if let msg = launchError ?? store.errorMessage {
+        if let msg = launchError ?? store.errorMessage ?? player.statusMessage {
             Text(msg).font(.caption2).padding(6).background(.red.opacity(0.8)).clipShape(Capsule()).padding(.bottom, 6)
         }
     }

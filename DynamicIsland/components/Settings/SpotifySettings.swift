@@ -25,6 +25,8 @@ struct SpotifySettings: View {
     @Default(.spotifyRecentLimit) private var recentLimit
     @ObservedObject private var oauth = SpotifyOAuthManager.shared
     @Default(.spotifyOAuthClientID) private var clientID
+    @Default(.spotifyStandalonePlayback) private var standalone
+    @ObservedObject private var player = SpotifyPlayerManager.shared
     @State private var authSheet: AuthSheetData?
 
     var body: some View {
@@ -38,6 +40,21 @@ struct SpotifySettings: View {
                     Text("Recently played shown: \(recentLimit)")
                 }
             }
+            Section(String(localized: "Standalone Playback")) {
+                Toggle(String(localized: "Play inside Atoll (no Spotify app needed)"), isOn: $standalone)
+                Text(String(localized: "Requires Spotify Premium. Plays audio through Atoll itself as a Spotify Connect device."))
+                    .font(.caption).foregroundStyle(.secondary)
+                if standalone {
+                    if player.isReady {
+                        HStack(spacing: 6) { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green); Text(String(localized: "Atoll player ready")) }
+                    } else if let status = player.statusMessage {
+                        Text(status).font(.caption).foregroundStyle(.red)
+                    } else {
+                        Text(String(localized: "Starting player…")).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .onAppear { SpotifyPlayerManager.shared.start() }
             Section(String(localized: "Spotify Account (Web API)")) {
                 TextField(String(localized: "Client ID"), text: $clientID)
                     .textFieldStyle(.roundedBorder)
