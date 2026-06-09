@@ -1,0 +1,156 @@
+/*
+ * Atoll (DynamicIsland)
+ * Copyright (C) 2024-2026 Atoll Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import Combine
+import Foundation
+import WebKit
+
+/// Drives Spotify's Web Playback SDK inside a hidden WKWebView so Atoll can play
+/// audio itself (a Spotify Connect device named "Atoll") without the desktop app.
+/// Requires Spotify Premium and the `streaming` OAuth scope. The web view is the
+/// audio sink; `deviceID` (set on the SDK `ready` event) is the target for
+/// `SpotifyWebAPIClient.startPlayback(deviceID:)`.
+@MainActor
+final class SpotifyPlayerManager: ObservableObject {
+    static let shared = SpotifyPlayerManager()
+
+    @Published private(set) var deviceID: String?
+    @Published private(set) var isReady = false
+    @Published private(set) var statusMessage: String?
+    @Published private(set) var isPaused = true
+    @Published private(set) var currentTrack: String?
+
+    private var webView: WKWebView?
+    private var started = false
+
+    /// Build the hidden web view and connect the SDK. Idempotent. No-op if not authenticated.
+    func start() {
+        guard !started, SpotifyOAuthManager.shared.isAuthenticated else { return }
+        started = true
+
+        let config = WKWebViewConfiguration()
+        config.mediaTypesRequiringUserActionForPlayback = []   // allow SDK autoplay
+        let ucc = WKUserContentController()
+        ucc.add(MessageProxy(self), name: "spotify")
+        config.userContentController = ucc
+
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 80), configuration: config)
+        self.webView = web
+        // An https baseURL gives the page a secure context (EME/DRM requires it).
+        web.loadHTMLString(Self.html, baseURL: URL(string: "https://atoll.localhost/"))
+        NSLog("[SpotifyPlayer] start: loading Web Playback SDK page")
+    }
+
+    func stop() {
+        webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.disconnect();", completionHandler: nil)
+        webView = nil
+        started = false
+        isReady = false
+        deviceID = nil
+    }
+
+    // MARK: - Optional transport (the tab can drive the in-app player directly)
+    func togglePlay() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.togglePlay();", completionHandler: nil) }
+    func nextTrack() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.nextTrack();", completionHandler: nil) }
+    func previousTrack() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.previousTrack();", completionHandler: nil) }
+
+    // MARK: - JS -> Swift bridge
+    fileprivate func handle(_ body: [String: Any]) {
+        switch body["type"] as? String ?? "" {
+        case "token_request":
+            Task { [weak self] in
+                let token = await SpotifyOAuthManager.shared.validAccessToken() ?? ""
+                self?.webView?.evaluateJavaScript("window.__atollProvideToken('\(token)')", completionHandler: nil)
+            }
+        case "ready":
+            deviceID = body["device_id"] as? String
+            isReady = true
+            statusMessage = nil
+            NSLog("[SpotifyPlayer] READY device_id=%@", deviceID ?? "nil")
+        case "not_ready":
+            isReady = false
+            NSLog("[SpotifyPlayer] not_ready (device went offline)")
+        case "state":
+            isPaused = body["paused"] as? Bool ?? true
+            currentTrack = body["track"] as? String
+        case "error":
+            let kind = body["kind"] as? String ?? "?"
+            let message = body["message"] as? String ?? ""
+            NSLog("[SpotifyPlayer] ERROR %@: %@", kind, message)
+            statusMessage = kind == "account"
+                ? String(localized: "In-app playback needs Spotify Premium.")
+                : "Player error (\(kind)): \(message)"
+        case let other:
+            NSLog("[SpotifyPlayer] event %@: %@", other, String(describing: body))
+        }
+    }
+
+    // MARK: - SDK page
+    private static let html = """
+    <!DOCTYPE html>
+    <html><head><meta charset="utf-8"></head><body>
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
+    <script>
+      var __tokenCbs = [];
+      window.__atollProvideToken = function(token) {
+        var cbs = __tokenCbs; __tokenCbs = [];
+        for (var i = 0; i < cbs.length; i++) { cbs[i](token); }
+      };
+      function post(msg) {
+        try { window.webkit.messageHandlers.spotify.postMessage(msg); } catch (e) {}
+      }
+      window.addEventListener('error', function(e) {
+        post({ type: 'error', kind: 'js', message: '' + (e && e.message ? e.message : e) });
+      });
+      window.onSpotifyWebPlaybackSDKReady = function() {
+        post({ type: 'sdk_ready' });
+        var player = new Spotify.Player({
+          name: 'Atoll',
+          getOAuthToken: function(cb) { __tokenCbs.push(cb); post({ type: 'token_request' }); },
+          volume: 0.8
+        });
+        player.addListener('ready', function(d) { post({ type: 'ready', device_id: d.device_id }); });
+        player.addListener('not_ready', function(d) { post({ type: 'not_ready', device_id: d.device_id }); });
+        player.addListener('player_state_changed', function(s) {
+          post({ type: 'state',
+                 paused: s ? s.paused : true,
+                 track: (s && s.track_window && s.track_window.current_track) ? s.track_window.current_track.name : null });
+        });
+        player.addListener('initialization_error', function(e) { post({ type: 'error', kind: 'init', message: e.message }); });
+        player.addListener('authentication_error', function(e) { post({ type: 'error', kind: 'auth', message: e.message }); });
+        player.addListener('account_error', function(e) { post({ type: 'error', kind: 'account', message: e.message }); });
+        player.addListener('playback_error', function(e) { post({ type: 'error', kind: 'playback', message: e.message }); });
+        window.__atollPlayer = player;
+        player.connect().then(function(ok) { post({ type: 'connect', ok: ok }); });
+      };
+    </script>
+    </body></html>
+    """
+}
+
+/// Weak proxy so the user-content-controller (which strongly retains its handlers)
+/// doesn't create a retain cycle with the manager.
+@MainActor
+private final class MessageProxy: NSObject, WKScriptMessageHandler {
+    weak var target: SpotifyPlayerManager?
+    init(_ target: SpotifyPlayerManager) { self.target = target }
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any] else { return }
+        target?.handle(body)
+    }
+}
