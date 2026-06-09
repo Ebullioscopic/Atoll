@@ -93,4 +93,34 @@ final class SpotifyPlaybackLauncherTests: XCTestCase {
         XCTAssertEqual(api.started?.context, "spotify:playlist:p1")
         XCTAssertEqual(api.started?.offset, "spotify:track:t1")
     }
+
+    func test_inAppDevice_preferred_overDesktop() async throws {
+        let desktop = MockDesktop(); desktop.running = true   // desktop IS running...
+        let api = MockAPI()
+        let launcher = SpotifyPlaybackLauncher(desktop: desktop, api: api, inAppDeviceID: { "atoll-dev" })
+        try await launcher.playContext(uri: "spotify:playlist:p1", shuffle: true)
+        // ...but the in-app device wins: Web API targets it, AppleScript NOT used.
+        XCTAssertEqual(api.started?.context, "spotify:playlist:p1")
+        XCTAssertEqual(api.started?.device, "atoll-dev")
+        XCTAssertEqual(api.shuffleSet, true)
+        XCTAssertNil(desktop.playedContext)
+    }
+
+    func test_inAppDevice_nil_fallsBackToDesktop() async throws {
+        let desktop = MockDesktop(); desktop.running = true
+        let api = MockAPI()
+        let launcher = SpotifyPlaybackLauncher(desktop: desktop, api: api, inAppDeviceID: { nil })
+        try await launcher.playContext(uri: "spotify:playlist:p1", shuffle: false)
+        XCTAssertEqual(desktop.playedContext?.uri, "spotify:playlist:p1")
+        XCTAssertNil(api.started)
+    }
+
+    func test_inAppDevice_preferred_forLikedSongs() async throws {
+        let desktop = MockDesktop(); desktop.running = true
+        let api = MockAPI()
+        let launcher = SpotifyPlaybackLauncher(desktop: desktop, api: api, inAppDeviceID: { "atoll-dev" })
+        try await launcher.playLikedSongs(shuffle: false)
+        XCTAssertEqual(api.started?.context, "spotify:collection:tracks")
+        XCTAssertEqual(api.started?.device, "atoll-dev")
+    }
 }

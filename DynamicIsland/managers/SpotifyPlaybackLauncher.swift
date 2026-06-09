@@ -17,6 +17,7 @@
  */
 
 import Foundation
+import Defaults
 
 enum SpotifyLaunchError: Error, Equatable { case noActiveDevice }
 
@@ -32,14 +33,24 @@ protocol SpotifyDesktopControlling {
 final class SpotifyPlaybackLauncher {
     private let desktop: SpotifyDesktopControlling
     private let api: SpotifyAPI
+    private let inAppDeviceID: @MainActor () -> String?
 
-    init(desktop: SpotifyDesktopControlling, api: SpotifyAPI) {
+    init(desktop: SpotifyDesktopControlling,
+         api: SpotifyAPI,
+         inAppDeviceID: @escaping @MainActor () -> String? = {
+            guard Defaults[.spotifyStandalonePlayback], SpotifyPlayerManager.shared.isReady else { return nil }
+            return SpotifyPlayerManager.shared.deviceID
+         }) {
         self.desktop = desktop
         self.api = api
+        self.inAppDeviceID = inAppDeviceID
     }
 
     func playContext(uri: String, shuffle: Bool) async throws {
-        if desktop.isRunning() {
+        if let deviceID = inAppDeviceID() {
+            try await api.setShuffle(shuffle, deviceID: deviceID)
+            try await api.startPlayback(contextURI: uri, uris: nil, offsetURI: nil, deviceID: deviceID)
+        } else if desktop.isRunning() {
             await desktop.setShuffle(shuffle)
             await desktop.playContext(uri: uri, shuffle: shuffle)
         } else {
@@ -50,7 +61,10 @@ final class SpotifyPlaybackLauncher {
     }
 
     func playTrack(uri: String, inContext contextURI: String?, shuffle: Bool) async throws {
-        if desktop.isRunning() {
+        if let deviceID = inAppDeviceID() {
+            try await api.setShuffle(shuffle, deviceID: deviceID)
+            try await api.startPlayback(contextURI: contextURI, uris: contextURI == nil ? [uri] : nil, offsetURI: contextURI == nil ? nil : uri, deviceID: deviceID)
+        } else if desktop.isRunning() {
             await desktop.setShuffle(shuffle)
             await desktop.playTrack(uri: uri, inContext: contextURI)
         } else {
@@ -61,8 +75,8 @@ final class SpotifyPlaybackLauncher {
     }
 
     func playLikedSongs(shuffle: Bool) async throws {
-        // Liked Songs has no reliable AppleScript URI; always drive via Web API context.
-        let deviceID = try await activeDeviceID()
+        let deviceID: String
+        if let d = inAppDeviceID() { deviceID = d } else { deviceID = try await activeDeviceID() }
         try await api.setShuffle(shuffle, deviceID: deviceID)
         try await api.startPlayback(contextURI: "spotify:collection:tracks", uris: nil, offsetURI: nil, deviceID: deviceID)
     }
