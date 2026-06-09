@@ -37,6 +37,7 @@ final class SpotifyOAuthManager: ObservableObject {
     private let session: URLSession
     private let authorizeBase = "https://accounts.spotify.com/authorize"
     private let tokenURL = URL(string: "https://accounts.spotify.com/api/token")!
+    private var refreshTask: Task<String?, Never>?
 
     init(defaults: UserDefaults = .standard, session: URLSession = .shared) {
         self.defaults = defaults
@@ -86,13 +87,26 @@ final class SpotifyOAuthManager: ObservableObject {
         }
         let refresh = defaults.string(forKey: "spotifyOAuthRefreshToken") ?? ""
         guard !refresh.isEmpty else { return token.isEmpty ? nil : token }
-        await postToken([
-            "grant_type": "refresh_token",
-            "refresh_token": refresh,
-            "client_id": clientID
-        ], isRefresh: true)
-        let newToken = defaults.string(forKey: "spotifyOAuthAccessToken") ?? ""
-        return newToken.isEmpty ? nil : newToken
+
+        // Coalesce concurrent refreshes onto a single task — PKCE rotates refresh
+        // tokens, so two parallel refreshes with the same token revoke each other.
+        if let inFlight = refreshTask {
+            return await inFlight.value
+        }
+        let task = Task<String?, Never> { [weak self] in
+            guard let self else { return nil }
+            await self.postToken([
+                "grant_type": "refresh_token",
+                "refresh_token": refresh,
+                "client_id": self.clientID
+            ], isRefresh: true)
+            let newToken = self.defaults.string(forKey: "spotifyOAuthAccessToken") ?? ""
+            return newToken.isEmpty ? nil : newToken
+        }
+        refreshTask = task
+        let result = await task.value
+        refreshTask = nil
+        return result
     }
 
     func disconnect() {
@@ -113,9 +127,11 @@ final class SpotifyOAuthManager: ObservableObject {
             let (data, response) = try await session.data(for: req)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 let snippet = String(data: data.prefix(300), encoding: .utf8) ?? ""
-                NSLog("[SpotifyOAuth] token endpoint failed: %@", snippet)
+                NSLog("[SpotifyOAuth] token endpoint failed (%d): %@", (response as? HTTPURLResponse)?.statusCode ?? -1, snippet)
                 errorMessage = String(localized: "Spotify sign-in failed.")
-                if isRefresh { disconnect() }
+                // Only a definitively revoked/invalid grant should clear the session;
+                // transient 429/5xx/network errors must keep the refresh token.
+                if isRefresh, snippet.contains("invalid_grant") { disconnect() }
                 return
             }
             let token = try JSONDecoder().decode(TokenResponse.self, from: data)

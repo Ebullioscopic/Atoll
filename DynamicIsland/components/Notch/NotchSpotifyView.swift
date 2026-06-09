@@ -48,6 +48,9 @@ struct NotchSpotifyView: View {
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
         .onAppear { shuffle = defaultShuffle; if store.playlists.isEmpty { Task { await store.loadHome() } } }
+        .onChange(of: auth.isAuthenticated) { _, isAuthed in
+            if isAuthed { Task { await store.loadHome() } }
+        }
     }
 
     private var connectView: some View {

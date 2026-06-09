@@ -57,6 +57,9 @@ struct SpotifySettings: View {
                     }
                     .disabled(clientID.isEmpty)
                 }
+                if let err = oauth.errorMessage {
+                    Text(err).font(.caption).foregroundStyle(.red)
+                }
             }
         }
         .formStyle(.grouped)

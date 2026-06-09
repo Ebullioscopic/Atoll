@@ -19,6 +19,13 @@
 import XCTest
 @testable import Atoll
 
+private final class CallCounter {
+    private let lock = NSLock()
+    private var n = 0
+    func bump() { lock.lock(); n += 1; lock.unlock() }
+    var count: Int { lock.lock(); defer { lock.unlock() }; return n }
+}
+
 private final class OAuthMockProtocol: URLProtocol {
     nonisolated(unsafe) static var handler: ((URLRequest) -> (HTTPURLResponse, Data))?
     override class func canInit(with r: URLRequest) -> Bool { true }
@@ -86,5 +93,26 @@ final class SpotifyOAuthManagerTests: XCTestCase {
         let mgr = SpotifyOAuthManager(defaults: store(), session: session())
         let tok = await mgr.validAccessToken()
         XCTAssertNil(tok)
+    }
+
+    func test_concurrentRefresh_coalescesToOneNetworkCall() async {
+        let d = store()
+        d.set("CID", forKey: "spotifyOAuthClientID")
+        d.set("OLD", forKey: "spotifyOAuthAccessToken")
+        d.set("RT", forKey: "spotifyOAuthRefreshToken")
+        d.set(Date().timeIntervalSince1970 - 10, forKey: "spotifyOAuthExpiration")
+        let counter = CallCounter()
+        OAuthMockProtocol.handler = { req in
+            counter.bump()
+            let body = #"{"access_token":"NEW","token_type":"Bearer","expires_in":3600,"refresh_token":"RT2"}"#
+            return (self.http(req.url!, 200), body.data(using: .utf8)!)
+        }
+        let mgr = SpotifyOAuthManager(defaults: d, session: session())
+        async let a = mgr.validAccessToken()
+        async let b = mgr.validAccessToken()
+        let (ta, tb) = await (a, b)
+        XCTAssertEqual(ta, "NEW")
+        XCTAssertEqual(tb, "NEW")
+        XCTAssertEqual(counter.count, 1, "two concurrent refreshes must coalesce to a single token request")
     }
 }
