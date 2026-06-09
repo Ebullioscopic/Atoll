@@ -19,6 +19,7 @@
 import AppKit
 import Combine
 import Foundation
+import MediaPlayer
 import WebKit
 
 /// Drives Spotify's Web Playback SDK inside a hidden WKWebView so Atoll can play
@@ -40,6 +41,9 @@ final class SpotifyPlayerManager: ObservableObject {
 
     private var webView: WKWebView?
     private var hostWindow: NSWindow?
+    private var commandsConfigured = false
+    private var currentDuration: Double = 0
+    private var currentPosition: Double = 0
     /// Build the hidden web view and connect the SDK once. No-op if a player already
     /// exists (prevents duplicate "Atoll" devices) or if not authenticated.
     func start() {
@@ -83,6 +87,8 @@ final class SpotifyPlayerManager: ObservableObject {
         webView = nil
         isReady = false
         deviceID = nil
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        MPNowPlayingInfoCenter.default().playbackState = .stopped
     }
 
     /// Tear down and reconnect so the SDK picks up a freshly-scoped token (e.g. after re-Connect).
@@ -96,6 +102,51 @@ final class SpotifyPlayerManager: ObservableObject {
     func togglePlay() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.togglePlay();", completionHandler: nil) }
     func nextTrack() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.nextTrack();", completionHandler: nil) }
     func previousTrack() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.previousTrack();", completionHandler: nil) }
+    private func resume() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.resume();", completionHandler: nil) }
+    private func pause() { webView?.evaluateJavaScript("window.__atollPlayer && window.__atollPlayer.pause();", completionHandler: nil) }
+
+    // MARK: - System now-playing (Control Center / media keys / notch)
+    private func configureRemoteCommands() {
+        guard !commandsConfigured else { return }
+        commandsConfigured = true
+        let cc = MPRemoteCommandCenter.shared()
+        cc.playCommand.addTarget { [weak self] _ in self?.resume(); return .success }
+        cc.pauseCommand.addTarget { [weak self] _ in self?.pause(); return .success }
+        cc.togglePlayPauseCommand.addTarget { [weak self] _ in self?.togglePlay(); return .success }
+        cc.nextTrackCommand.addTarget { [weak self] _ in self?.nextTrack(); return .success }
+        cc.previousTrackCommand.addTarget { [weak self] _ in self?.previousTrack(); return .success }
+    }
+
+    private func updateNowPlaying() {
+        let center = MPNowPlayingInfoCenter.default()
+        guard isReady, let title = currentTrack, !title.isEmpty else {
+            center.nowPlayingInfo = nil
+            center.playbackState = .stopped
+            return
+        }
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: title,
+            MPMediaItemPropertyArtist: currentArtist ?? "",
+            MPMediaItemPropertyPlaybackDuration: currentDuration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: currentPosition,
+            MPNowPlayingInfoPropertyPlaybackRate: isPaused ? 0.0 : 1.0
+        ]
+        center.nowPlayingInfo = info
+        center.playbackState = isPaused ? .paused : .playing
+
+        if let urlStr = artworkURL, let url = URL(string: urlStr) {
+            Task { [weak self] in
+                guard let data = try? await URLSession.shared.data(from: url).0,
+                      let image = NSImage(data: data) else { return }
+                await MainActor.run {
+                    guard let self, self.currentTrack == title else { return }
+                    var updated = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? info
+                    updated[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                    MPNowPlayingInfoCenter.default().nowPlayingInfo = updated
+                }
+            }
+        }
+    }
 
     // MARK: - JS -> Swift bridge
     fileprivate func handle(_ body: [String: Any]) {
@@ -109,6 +160,7 @@ final class SpotifyPlayerManager: ObservableObject {
             deviceID = body["device_id"] as? String
             isReady = true
             statusMessage = nil
+            configureRemoteCommands()
             NSLog("[SpotifyPlayer] READY device_id=%@", deviceID ?? "nil")
         case "not_ready":
             isReady = false
@@ -118,6 +170,9 @@ final class SpotifyPlayerManager: ObservableObject {
             currentTrack = body["track"] as? String
             currentArtist = body["artist"] as? String
             artworkURL = body["image"] as? String
+            currentDuration = ((body["duration"] as? Double) ?? 0) / 1000
+            currentPosition = ((body["position"] as? Double) ?? 0) / 1000
+            updateNowPlaying()
         case "error":
             let kind = body["kind"] as? String ?? "?"
             let message = body["message"] as? String ?? ""
