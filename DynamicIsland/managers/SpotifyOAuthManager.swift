@@ -62,6 +62,11 @@ final class SpotifyOAuthManager: ObservableObject {
             .init(name: "code_challenge_method", value: "S256"),
             .init(name: "code_challenge", value: challenge),
             .init(name: "scope", value: Self.scopes.joined(separator: " ")),
+            // Force the consent screen every time. Without this, Spotify silently
+            // auto-approves an already-authorized app and reissues a token with the
+            // ORIGINAL scopes — so newly added scopes (e.g. user-library-modify) never
+            // get granted just by disconnecting/reconnecting in-app.
+            .init(name: "show_dialog", value: "true"),
             .init(name: "state", value: UUID().uuidString)
         ]
         return (comps?.url, verifier)
@@ -87,6 +92,13 @@ final class SpotifyOAuthManager: ObservableObject {
     /// authorized before `user-library-modify` was requested — the Like control dims until
     /// the user disconnects and reconnects.
     var canModifyLibrary: Bool { grantedScopes.contains("user-library-modify") }
+
+    /// Human-readable dump of the scopes Spotify actually granted this session — for
+    /// diagnosing permission problems from the Settings screen.
+    var grantedScopesDisplay: String {
+        let raw = defaults.string(forKey: scopesKey) ?? ""
+        return raw.isEmpty ? String(localized: "(none recorded — reconnect)") : grantedScopes.sorted().joined(separator: "\n")
+    }
 
     func exchangeCode(_ code: String, verifier: String) async {
         await postToken([
@@ -161,6 +173,7 @@ final class SpotifyOAuthManager: ObservableObject {
             // Spotify returns `scope` on both code-exchange and refresh; keep the last known
             // set if a refresh response happens to omit it.
             if let scope = token.scope { defaults.set(scope, forKey: scopesKey) }
+            NSLog("[SpotifyOAuth] token ok (refresh:%@) granted scopes: %@", isRefresh ? "true" : "false", token.scope ?? "<none in response>")
             isAuthenticated = !(defaults.string(forKey: "spotifyOAuthRefreshToken") ?? "").isEmpty
             errorMessage = nil
         } catch {

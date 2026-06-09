@@ -66,6 +66,21 @@ struct SpotifySettings: View {
                         Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                         Text(String(localized: "Connected"))
                     }
+                    if !oauth.canModifyLibrary {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                            Text(String(localized: "Like/unlike isn’t authorized for this session. Disconnect and reconnect — the Spotify consent screen will now ask for the library permission."))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    DisclosureGroup(String(localized: "Granted permissions")) {
+                        Text(oauth.grantedScopesDisplay)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .font(.caption)
                     Button(String(localized: "Disconnect"), role: .destructive) { oauth.disconnect() }
                 } else {
                     Button(String(localized: "Connect with Spotify")) {

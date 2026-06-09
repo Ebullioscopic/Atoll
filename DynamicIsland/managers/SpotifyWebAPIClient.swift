@@ -86,25 +86,40 @@ final class SpotifyWebAPIClient: SpotifyAPI {
     }
 
     // MARK: Liked Songs (library)
+    //
+    // The old per-type endpoints (PUT/DELETE /me/tracks, GET /me/tracks/contains) are
+    // deprecated and now return a bare 403 "Forbidden" even with a valid user-library-modify
+    // token. The current unified Library API takes full Spotify URIs in a `uris` query param:
+    //   https://developer.spotify.com/documentation/web-api/reference/save-library-items
 
     func savedTracksContains(ids: [String]) async throws -> [Bool] {
-        let trimmed = ids.compactMap(Self.bareTrackID).filter { !$0.isEmpty }
-        guard !trimmed.isEmpty else { return [] }
-        return try await getJSON("/me/tracks/contains?ids=\(trimmed.joined(separator: ","))")
+        let uris = Self.trackURIsQuery(ids)
+        guard !uris.isEmpty else { return [] }
+        return try await getJSON("/me/library/contains?uris=\(uris)")
     }
     func saveTracks(ids: [String]) async throws {
-        let trimmed = ids.compactMap(Self.bareTrackID).filter { !$0.isEmpty }
-        guard !trimmed.isEmpty else { return }
-        try await put("/me/tracks", query: "ids=\(trimmed.joined(separator: ","))", body: nil)
+        let uris = Self.trackURIsQuery(ids)
+        guard !uris.isEmpty else { return }
+        try await put("/me/library", query: "uris=\(uris)", body: nil)
     }
     func removeSavedTracks(ids: [String]) async throws {
-        let trimmed = ids.compactMap(Self.bareTrackID).filter { !$0.isEmpty }
-        guard !trimmed.isEmpty else { return }
-        try await delete("/me/tracks", query: "ids=\(trimmed.joined(separator: ","))")
+        let uris = Self.trackURIsQuery(ids)
+        guard !uris.isEmpty else { return }
+        try await delete("/me/library", query: "uris=\(uris)")
     }
 
-    /// Normalize `spotify:track:ID` or an open.spotify.com URL down to the bare base-62 ID
-    /// that the `/me/tracks` endpoints expect; pass through an already-bare ID unchanged.
+    /// Build the percent-encoded, comma-separated `uris` value the unified `/me/library`
+    /// endpoints expect (`spotify%3Atrack%3A<id>,…`), accepting bare IDs, `spotify:track:`
+    /// URIs, or open.spotify.com URLs. Colons are encoded; commas stay as separators.
+    static func trackURIsQuery(_ ids: [String]) -> String {
+        ids.compactMap { raw -> String? in
+            guard let bare = bareTrackID(raw) else { return nil }
+            return "spotify:track:\(bare)".addingPercentEncoding(withAllowedCharacters: .alphanumerics)
+        }.joined(separator: ",")
+    }
+
+    /// Normalize `spotify:track:ID` or an open.spotify.com URL down to the bare base-62 ID;
+    /// pass through an already-bare ID unchanged.
     static func bareTrackID(_ raw: String) -> String? {
         let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return nil }

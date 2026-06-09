@@ -104,7 +104,7 @@ final class SpotifyWebAPIClientTests: XCTestCase {
         catch { /* ok */ }
     }
 
-    func test_savedTracksContains_decodesBoolArray_andNormalizesURIs() async throws {
+    func test_savedTracksContains_decodesBoolArray_andEncodesURIs() async throws {
         var captured: URLRequest?
         MockURLProtocol.handler = { req in
             captured = req
@@ -114,12 +114,12 @@ final class SpotifyWebAPIClientTests: XCTestCase {
         let result = try await client.savedTracksContains(ids: ["spotify:track:abcdefghijklmnopqrstuv", "xyzabcdefghijklmnopqrs"])
         XCTAssertEqual(result, [true, false])
         let url = try XCTUnwrap(captured?.url?.absoluteString)
-        XCTAssertTrue(url.contains("/v1/me/tracks/contains"))
-        // The `spotify:track:` prefix must be stripped to the bare id for this endpoint.
-        XCTAssertTrue(url.contains("ids=abcdefghijklmnopqrstuv,xyzabcdefghijklmnopqrs"), url)
+        // Unified Library endpoint; bare and prefixed inputs both normalize to encoded URIs.
+        XCTAssertTrue(url.contains("/v1/me/library/contains?uris="), url)
+        XCTAssertTrue(url.contains("uris=spotify%3Atrack%3Aabcdefghijklmnopqrstuv,spotify%3Atrack%3Axyzabcdefghijklmnopqrs"), url)
     }
 
-    func test_saveTracks_sendsPutWithIds() async throws {
+    func test_saveTracks_sendsPutToLibraryWithURIs() async throws {
         var captured: URLRequest?
         MockURLProtocol.handler = { req in
             captured = req
@@ -129,11 +129,11 @@ final class SpotifyWebAPIClientTests: XCTestCase {
         try await client.saveTracks(ids: ["spotify:track:abcdefghijklmnopqrstuv"])
         XCTAssertEqual(captured?.httpMethod, "PUT")
         let url = try XCTUnwrap(captured?.url?.absoluteString)
-        XCTAssertTrue(url.contains("/v1/me/tracks"))
-        XCTAssertTrue(url.contains("ids=abcdefghijklmnopqrstuv"), url)
+        XCTAssertTrue(url.contains("/v1/me/library?uris="), url)
+        XCTAssertTrue(url.contains("uris=spotify%3Atrack%3Aabcdefghijklmnopqrstuv"), url)
     }
 
-    func test_removeSavedTracks_sendsDeleteWithIds() async throws {
+    func test_removeSavedTracks_sendsDeleteToLibraryWithURIs() async throws {
         var captured: URLRequest?
         MockURLProtocol.handler = { req in
             captured = req
@@ -143,8 +143,8 @@ final class SpotifyWebAPIClientTests: XCTestCase {
         try await client.removeSavedTracks(ids: ["abcdefghijklmnopqrstuv"])
         XCTAssertEqual(captured?.httpMethod, "DELETE")
         let url = try XCTUnwrap(captured?.url?.absoluteString)
-        XCTAssertTrue(url.contains("/v1/me/tracks"))
-        XCTAssertTrue(url.contains("ids=abcdefghijklmnopqrstuv"), url)
+        XCTAssertTrue(url.contains("/v1/me/library?uris="), url)
+        XCTAssertTrue(url.contains("uris=spotify%3Atrack%3Aabcdefghijklmnopqrstuv"), url)
     }
 
     func test_transferPlayback_sendsPutWithDeviceIdsAndPlay() async throws {
