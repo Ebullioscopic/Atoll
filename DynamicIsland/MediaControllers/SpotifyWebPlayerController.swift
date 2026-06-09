@@ -54,11 +54,11 @@ final class SpotifyWebPlayerController: ObservableObject, MediaControllerProtoco
         state.playbackRate = manager.isPaused ? 0 : 1
         state.lastUpdated = Date()
         if let urlString = manager.artworkURL, let url = URL(string: urlString) {
-            state.liveArtworkURL = url
+            state.liveArtworkURL = nil
             if let cache = artworkCache, cache.url == urlString { state.artwork = cache.data }
         }
         subject.send(state)
-
+    
         // Fetch artwork once per track for the (non-live) artwork slot.
         if let urlString = manager.artworkURL, artworkCache?.url != urlString, let url = URL(string: urlString) {
             Task { [weak self] in

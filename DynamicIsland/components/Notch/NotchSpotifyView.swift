@@ -145,7 +145,8 @@ struct NotchSpotifyView: View {
                     LazyVStack(alignment: .leading, spacing: 2) {
                         ForEach(Array(browser.tracks.enumerated()), id: \.offset) { _, track in
                             Button {
-                                Task { await launch { try await launcher.playTrack(uri: track.uri, inContext: ctx.kind == .likedSongs ? nil : ctx.contextURI, shuffle: shuffle) } }
+                                Task { await launch { let contextURI = (ctx.kind == .likedSongs && !SpotifyPlayerManager.shared.isReady) ? nil : ctx.contextURI
+                                try await launcher.playTrack(uri: track.uri, inContext: contextURI, shuffle: shuffle) } }
                             } label: {
                                 HStack(spacing: 8) {
                                     Text(track.name).lineLimit(1).font(.system(size: 12))
