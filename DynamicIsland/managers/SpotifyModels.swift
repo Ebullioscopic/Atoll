@@ -41,8 +41,10 @@ struct SpotifyPlaylist: Codable, Equatable, Identifiable {
     let name: String
     let uri: String
     let images: [SpotifyImage]?
-    let tracks: CountRef
-    let owner: OwnerRef
+    // Spotify omits `tracks` / `owner` on some playlist objects (e.g. certain
+    // library entries) — optional so one such playlist doesn't fail the whole list.
+    let tracks: CountRef?
+    let owner: OwnerRef?
 }
 
 struct SpotifyTrack: Codable, Equatable, Identifiable {
@@ -107,7 +109,7 @@ struct SpotifyLibraryItem: Identifiable, Equatable {
 
     init(playlist p: SpotifyPlaylist) {
         self.init(id: p.uri, title: p.name,
-                  subtitle: "\(p.tracks.total) tracks",
+                  subtitle: "\(p.tracks?.total ?? 0) tracks",
                   imageURL: p.images?.first.flatMap { URL(string: $0.url) },
                   contextURI: p.uri, kind: .playlist)
     }

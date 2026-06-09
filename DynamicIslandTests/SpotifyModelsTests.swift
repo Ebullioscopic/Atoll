@@ -28,7 +28,7 @@ final class SpotifyModelsTests: XCTestCase {
         XCTAssertEqual(paging.items.count, 1)
         XCTAssertEqual(paging.items[0].name, "Chill")
         XCTAssertEqual(paging.items[0].uri, "spotify:playlist:p1")
-        XCTAssertEqual(paging.items[0].tracks.total, 42)
+        XCTAssertEqual(paging.items[0].tracks?.total, 42)
         XCTAssertEqual(paging.next, "https://api/next")
     }
 
@@ -68,5 +68,16 @@ final class SpotifyModelsTests: XCTestCase {
         """.data(using: .utf8)!
         let p = try JSONDecoder().decode(SpotifyPlaylist.self, from: json)
         XCTAssertNil(p.images)
+    }
+
+    func test_decode_playlist_missingTracksAndOwner_doesNotThrow() throws {
+        // Real /me/playlists payload shape that previously failed: no `tracks`, images null.
+        let json = """
+        {"id":"01WzDKQXzp47Bb25T4YVuk","name":"Pending","uri":"spotify:playlist:01WzDKQXzp47Bb25T4YVuk","images":null}
+        """.data(using: .utf8)!
+        let p = try JSONDecoder().decode(SpotifyPlaylist.self, from: json)
+        XCTAssertNil(p.tracks)
+        XCTAssertNil(p.owner)
+        XCTAssertEqual(SpotifyLibraryItem(playlist: p).subtitle, "0 tracks")
     }
 }
