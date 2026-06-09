@@ -75,21 +75,13 @@ struct NotchSpotifyView: View {
 
     private var homeView: some View {
         VStack(spacing: 6) {
-            TextField(String(localized: "Search Spotify"), text: $query)
-                .textFieldStyle(.roundedBorder)
-                .onChange(of: query) { _, q in store.search(query: q) }
-                .padding(.horizontal, 12).padding(.top, 8)
+            // Search intentionally omitted: Spotify blocks /search for personal API apps
+            // without Extended Quota Mode (returns 400 "Invalid limit").
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    if !store.searchResults.isEmpty {
-                        section(String(localized: "Playlists"), store.searchResults.playlists)
-                        section(String(localized: "Albums"), store.searchResults.albums)
-                        trackSection(String(localized: "Tracks"), store.searchResults.tracks, context: nil)
-                    } else {
-                        itemRow(store.likedSongs)
-                        section(String(localized: "Playlists"), store.playlists)
-                        section(String(localized: "Recently Played"), store.recentlyPlayed)
-                    }
+                    itemRow(store.likedSongs)
+                    section(String(localized: "Playlists"), store.playlists)
+                    section(String(localized: "Recently Played"), store.recentlyPlayed)
                 }
                 .padding(.horizontal, 12).padding(.bottom, 8)
             }
