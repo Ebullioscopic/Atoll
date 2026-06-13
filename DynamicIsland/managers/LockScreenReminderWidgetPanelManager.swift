@@ -105,7 +105,7 @@ final class LockScreenReminderWidgetPanelManager {
         newWindow.backgroundColor = .clear
         newWindow.hasShadow = false
         newWindow.ignoresMouseEvents = true
-        newWindow.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
+        newWindow.level = .screenSaver
         newWindow.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
 
         ScreenCaptureVisibilityManager.shared.register(newWindow, scope: .entireInterface)

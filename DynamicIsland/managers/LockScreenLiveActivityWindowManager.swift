@@ -92,7 +92,7 @@ class LockScreenLiveActivityWindowManager {
         window.isReleasedWhenClosed = false
         window.ignoresMouseEvents = false
         window.hasShadow = false
-        window.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
+        window.level = .screenSaver
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         window.alphaValue = 0
         window.animationBehavior = .none

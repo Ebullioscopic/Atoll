@@ -182,7 +182,7 @@ final class TimerControlWindowManager {
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
-        window.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
+        window.level = .screenSaver
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         window.ignoresMouseEvents = false
         window.isMovable = false
