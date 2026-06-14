@@ -134,7 +134,7 @@ class LockScreenPanelManager {
             newWindow.isReleasedWhenClosed = false
             newWindow.isOpaque = false
             newWindow.backgroundColor = .clear
-            newWindow.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.statusWindow)) + 1)
+            newWindow.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
             newWindow.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
             newWindow.isMovable = false
             newWindow.hasShadow = false

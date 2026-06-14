@@ -21,6 +21,7 @@ import Defaults
 import SkyLightWindow
 import SwiftUI
 import QuartzCore
+import Combine
 
 @MainActor
 class LockScreenLiveActivityWindowManager {
@@ -36,6 +37,7 @@ class LockScreenLiveActivityWindowManager {
     private var screenChangeObserver: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
     private var currentNotchSize: CGSize?
+    private var siriVisibilityCancellable: AnyCancellable?
 
     /// Whether the target screen uses Dynamic Island (pill) mode.
     private var isDynamicIslandMode: Bool {
@@ -49,6 +51,7 @@ class LockScreenLiveActivityWindowManager {
 
     private init() {
         registerScreenChangeObservers()
+        setupSiriVisibilityMonitoring()
     }
 
     private func timestamp() -> String {
@@ -92,7 +95,7 @@ class LockScreenLiveActivityWindowManager {
         window.isReleasedWhenClosed = false
         window.ignoresMouseEvents = false
         window.hasShadow = false
-        window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.statusWindow)) + 1)
+        window.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         window.alphaValue = 0
         window.animationBehavior = .none
@@ -141,6 +144,29 @@ class LockScreenLiveActivityWindowManager {
             self?.handleScreenGeometryChange(reason: "screens-did-wake")
         }
         workspaceObservers = [wakeObserver]
+    }
+
+    private func setupSiriVisibilityMonitoring() {
+        SiriVisibilityMonitor.shared.startMonitoring()
+        
+        siriVisibilityCancellable = SiriVisibilityMonitor.shared.$isSiriVisible
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isSiriVisible in
+                self?.updateWindowVisibilityForSiri(isSiriVisible)
+            }
+    }
+
+    private func updateWindowVisibilityForSiri(_ isSiriVisible: Bool) {
+        guard let window else { return }
+        
+        let targetAlpha: CGFloat = isSiriVisible ? 0.0 : 1.0
+        
+        if window.alphaValue != targetAlpha {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.3  // Smooth crossfade
+                window.animator().alphaValue = targetAlpha
+            }
+        }
     }
 
     private func handleScreenGeometryChange(reason: String) {
