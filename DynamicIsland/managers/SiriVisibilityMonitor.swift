@@ -18,6 +18,7 @@
 
 import Cocoa
 import Combine
+import Defaults
 
 @MainActor
 final class SiriVisibilityMonitor: ObservableObject {
@@ -29,10 +30,18 @@ final class SiriVisibilityMonitor: ObservableObject {
     private var lastSiriState = false
     private var isScreenLocked = false
     private var isDisplayOn = true
+    private var isPluggedIn = false
+    private var isInLowPowerMode = false
     private var cancellables = Set<AnyCancellable>()
     
-    private let idleInterval: TimeInterval = 0.5    // Slow heartbeat when locked
-    private let activeInterval: TimeInterval = 0.1  // Fast polling when Siri is visible
+    // Polling intervals calculated dynamically
+    private var currentIdleInterval: TimeInterval {
+        calculateIntervals().idle
+    }
+    
+    private var currentActiveInterval: TimeInterval {
+        calculateIntervals().active
+    }
     
     private init() {
         setupStateObservers()
@@ -58,10 +67,65 @@ final class SiriVisibilityMonitor: ObservableObject {
             self?.isDisplayOn = true
             self?.updateMonitoringState()
         }
+
+        // Observe power state
+        NotificationCenter.default.addObserver(forName: NSNotification.Name.NSProcessInfoPowerStateDidChange, object: nil, queue: .main) { [weak self] _ in
+            self?.isInLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+            self?.updateMonitoringState()
+        }
+        self.isInLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+
+        // Observe plugged in state via BatteryActivityManager
+        BatteryActivityManager.shared.onPowerSourceChange = { [weak self] pluggedIn in
+            Task { @MainActor in
+                self?.isPluggedIn = pluggedIn
+                self?.updateMonitoringState()
+            }
+        }
+        
+        // Observe responsiveness mode preference
+        Defaults.publisher(.siriResponsivenessMode)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateMonitoringState()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func calculateIntervals() -> (idle: TimeInterval, active: TimeInterval) {
+        let mode = Defaults[.siriResponsivenessMode]
+        
+        let effectiveMode: SiriResponsivenessMode
+        if mode == .automatic {
+            if isInLowPowerMode {
+                effectiveMode = .powerSaver
+            } else if isPluggedIn {
+                effectiveMode = .highPerformance
+            } else {
+                effectiveMode = .balanced
+            }
+        } else {
+            effectiveMode = mode
+        }
+
+        let intervals: (idle: TimeInterval, active: TimeInterval)
+        switch effectiveMode {
+        case .highPerformance:
+            intervals = (idle: 0.2, active: 0.03) // 30Hz active
+        case .balanced, .automatic:
+            intervals = (idle: 0.5, active: 0.1)  // 10Hz active
+        case .powerSaver:
+            intervals = (idle: 1.0, active: 0.25) // 4Hz active
+        }
+        
+        print("⏱️ [SiriVisibilityMonitor] Mode: \(effectiveMode) (User Pref: \(mode)) -> Intervals: Idle \(intervals.idle)s, Active \(intervals.active)s")
+        return intervals
     }
     
     private func updateMonitoringState() {
         let shouldMonitor = isScreenLocked && isDisplayOn
+        
+        print("🔌 [SiriVisibilityMonitor] State Update - Locked: \(isScreenLocked), Display: \(isDisplayOn), Plugged: \(isPluggedIn), LPM: \(isInLowPowerMode)")
         
         if shouldMonitor {
             startMonitoring()
@@ -77,7 +141,7 @@ final class SiriVisibilityMonitor: ObservableObject {
     
     private func startMonitoring() {
         // If already monitoring with correct interval, do nothing
-        let currentInterval = isSiriVisible ? activeInterval : idleInterval
+        let currentInterval = isSiriVisible ? currentActiveInterval : currentIdleInterval
         
         // Restart timer if interval changed or if it was nil
         if monitoringTimer?.timeInterval != currentInterval {
