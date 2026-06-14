@@ -211,10 +211,15 @@ final class SiriVisibilityMonitor: ObservableObject {
     func autohide(_ window: NSWindow?, cancellables: inout Set<AnyCancellable>) {
         guard let window else { return }
         
-        $isSiriVisible
-            .removeDuplicates()
+        Publishers.CombineLatest($isSiriVisible, LockScreenManager.shared.$isLocked)
+            .removeDuplicates { $0.0 == $1.0 && $0.1 == $1.1 }
             .receive(on: RunLoop.main)
-            .sink { isVisible in
+            .sink { isVisible, isLocked in
+                // Safety: Only manage visibility if the screen is actually locked.
+                // This prevents 'autohide' from fighting with the manager's hide animation
+                // during unlock, and prevents clearing unlock animations via removeAllAnimations().
+                guard isLocked else { return }
+                
                 let targetAlpha: CGFloat = isVisible ? 0.0 : 1.0
                 
                 // Stop any current animation to prevent flickering if state changes mid-fade
