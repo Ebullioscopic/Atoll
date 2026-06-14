@@ -34,6 +34,10 @@ final class SiriVisibilityMonitor: ObservableObject {
     private var isInLowPowerMode = false
     private var cancellables = Set<AnyCancellable>()
     
+    // Hysteresis: Require multiple consecutive "not found" checks before declaring Siri gone
+    private var disappearanceConfirmationCount = 0
+    private let disappearanceThreshold = 3 // ~100ms at high performance
+    
     // Polling intervals calculated dynamically
     private var currentIdleInterval: TimeInterval {
         calculateIntervals().idle
@@ -161,13 +165,30 @@ final class SiriVisibilityMonitor: ObservableObject {
     private func checkSiriVisibility() {
         let isSiriActive = detectSiriWindow()
         
-        if isSiriActive != lastSiriState {
-            lastSiriState = isSiriActive
-            isSiriVisible = isSiriActive
-            
-            // Adjust polling rate immediately based on visibility
-            startMonitoring()
+        if isSiriActive {
+            // Siri is found: Update state immediately
+            disappearanceConfirmationCount = 0
+            if !lastSiriState {
+                updateSiriVisibility(true)
+            }
+        } else {
+            // Siri not found: Debounce disappearance
+            if lastSiriState {
+                disappearanceConfirmationCount += 1
+                if disappearanceConfirmationCount >= disappearanceThreshold {
+                    updateSiriVisibility(false)
+                    disappearanceConfirmationCount = 0
+                }
+            }
         }
+    }
+
+    private func updateSiriVisibility(_ visible: Bool) {
+        lastSiriState = visible
+        isSiriVisible = visible
+        
+        // Adjust polling rate immediately based on visibility
+        startMonitoring()
     }
     
     private func detectSiriWindow() -> Bool {
@@ -191,9 +212,14 @@ final class SiriVisibilityMonitor: ObservableObject {
         guard let window else { return }
         
         $isSiriVisible
+            .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { isVisible in
                 let targetAlpha: CGFloat = isVisible ? 0.0 : 1.0
+                
+                // Stop any current animation to prevent flickering if state changes mid-fade
+                window.contentView?.layer?.removeAllAnimations()
+                
                 if window.alphaValue != targetAlpha {
                     NSAnimationContext.runAnimationGroup { context in
                         context.duration = 0.25 // Smooth fade
