@@ -111,11 +111,11 @@ final class SiriVisibilityMonitor: ObservableObject {
         let intervals: (idle: TimeInterval, active: TimeInterval)
         switch effectiveMode {
         case .highPerformance:
-            intervals = (idle: 0.2, active: 0.03) // 30Hz active
+            intervals = (idle: 0.2, active: 0.03) // ~33Hz active
         case .balanced, .automatic:
-            intervals = (idle: 0.5, active: 0.1)  // 10Hz active
+            intervals = (idle: 0.5, active: 0.06) // ~16Hz active (Fluid motion)
         case .powerSaver:
-            intervals = (idle: 1.0, active: 0.25) // 4Hz active
+            intervals = (idle: 2.0, active: 0.25) // 4Hz active, 0.5Hz idle
         }
         
         print("⏱️ [SiriVisibilityMonitor] Mode: \(effectiveMode) (User Pref: \(mode)) -> Intervals: Idle \(intervals.idle)s, Active \(intervals.active)s")
