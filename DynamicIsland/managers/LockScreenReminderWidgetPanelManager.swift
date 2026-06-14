@@ -21,6 +21,7 @@ import SwiftUI
 import SkyLightWindow
 import QuartzCore
 import Defaults
+import Combine
 
 @MainActor
 final class LockScreenReminderWidgetPanelManager {
