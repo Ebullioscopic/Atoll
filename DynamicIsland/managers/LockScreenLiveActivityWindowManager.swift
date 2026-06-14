@@ -37,7 +37,7 @@ class LockScreenLiveActivityWindowManager {
     private var screenChangeObserver: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
     private var currentNotchSize: CGSize?
-    private var siriVisibilityCancellable: AnyCancellable?
+    private var siriVisibilityCancellables = Set<AnyCancellable>()
 
     /// Whether the target screen uses Dynamic Island (pill) mode.
     private var isDynamicIslandMode: Bool {
@@ -51,7 +51,6 @@ class LockScreenLiveActivityWindowManager {
 
     private init() {
         registerScreenChangeObservers()
-        setupSiriVisibilityMonitoring()
     }
 
     private func timestamp() -> String {
@@ -104,6 +103,12 @@ class LockScreenLiveActivityWindowManager {
 
         self.window = window
         self.hasDelegated = false
+        
+        // Use the centralized autohide helper
+        var siriCancellables = Set<AnyCancellable>()
+        SiriVisibilityMonitor.shared.autohide(window, cancellables: &siriCancellables)
+        self.siriVisibilityCancellables = siriCancellables
+
         return window
     }
 
@@ -146,28 +151,6 @@ class LockScreenLiveActivityWindowManager {
         workspaceObservers = [wakeObserver]
     }
 
-    private func setupSiriVisibilityMonitoring() {
-        SiriVisibilityMonitor.shared.startMonitoring()
-        
-        siriVisibilityCancellable = SiriVisibilityMonitor.shared.$isSiriVisible
-            .receive(on: RunLoop.main)
-            .sink { [weak self] isSiriVisible in
-                self?.updateWindowVisibilityForSiri(isSiriVisible)
-            }
-    }
-
-    private func updateWindowVisibilityForSiri(_ isSiriVisible: Bool) {
-        guard let window else { return }
-        
-        let targetAlpha: CGFloat = isSiriVisible ? 0.0 : 1.0
-        
-        if window.alphaValue != targetAlpha {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.3  // Smooth crossfade
-                window.animator().alphaValue = targetAlpha
-            }
-        }
-    }
 
     private func handleScreenGeometryChange(reason: String) {
         guard let window else { return }

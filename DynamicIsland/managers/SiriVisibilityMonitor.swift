@@ -20,22 +20,72 @@ import Cocoa
 import Combine
 
 @MainActor
-final class SiriVisibilityMonitor {
+final class SiriVisibilityMonitor: ObservableObject {
     static let shared = SiriVisibilityMonitor()
     
     @Published private(set) var isSiriVisible = false
     
     private var monitoringTimer: Timer?
     private var lastSiriState = false
+    private var isScreenLocked = false
+    private var isDisplayOn = true
+    private var cancellables = Set<AnyCancellable>()
     
-    private init() {}
+    private let idleInterval: TimeInterval = 0.5    // Slow heartbeat when locked
+    private let activeInterval: TimeInterval = 0.1  // Fast polling when Siri is visible
     
-    func startMonitoring() {
-        guard monitoringTimer == nil else { return }
+    private init() {
+        setupStateObservers()
+    }
+    
+    private func setupStateObservers() {
+        // Observe lock state via LockScreenManager
+        LockScreenManager.shared.$isLocked
+            .receive(on: RunLoop.main)
+            .sink { [weak self] locked in
+                self?.isScreenLocked = locked
+                self?.updateMonitoringState()
+            }
+            .store(in: &cancellables)
+            
+        // Observe display sleep/wake
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        workspaceCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.isDisplayOn = false
+            self?.updateMonitoringState()
+        }
+        workspaceCenter.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.isDisplayOn = true
+            self?.updateMonitoringState()
+        }
+    }
+    
+    private func updateMonitoringState() {
+        let shouldMonitor = isScreenLocked && isDisplayOn
         
-        // Poll every 0.5 seconds to detect Siri presence
-        monitoringTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkSiriVisibility()
+        if shouldMonitor {
+            startMonitoring()
+        } else {
+            stopMonitoring()
+            // Reset state when monitoring stops
+            if isSiriVisible {
+                isSiriVisible = false
+                lastSiriState = false
+            }
+        }
+    }
+    
+    private func startMonitoring() {
+        // If already monitoring with correct interval, do nothing
+        let currentInterval = isSiriVisible ? activeInterval : idleInterval
+        
+        // Restart timer if interval changed or if it was nil
+        if monitoringTimer?.timeInterval != currentInterval {
+            monitoringTimer?.invalidate()
+            monitoringTimer = Timer.scheduledTimer(withTimeInterval: currentInterval, repeats: true) { [weak self] _ in
+                self?.checkSiriVisibility()
+            }
+            monitoringTimer?.tolerance = currentInterval * 0.1
         }
     }
     
@@ -50,11 +100,13 @@ final class SiriVisibilityMonitor {
         if isSiriActive != lastSiriState {
             lastSiriState = isSiriActive
             isSiriVisible = isSiriActive
+            
+            // Adjust polling rate immediately based on visibility
+            startMonitoring()
         }
     }
     
     private func detectSiriWindow() -> Bool {
-        // Look only at windows currently rendered on screen
         let options = CGWindowListOption(arrayLiteral: .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             return false
@@ -62,13 +114,30 @@ final class SiriVisibilityMonitor {
         
         return windowList.contains { window in
             let owner = window[kCGWindowOwnerName as String] as? String ?? ""
-            
-            // Siri's lock screen window is massive (Height > 500 per the reported case)
-            // We ensure we are detecting the actual Siri UI, not a tiny background daemon window
             let bounds = window[kCGWindowBounds as String] as? [String: Int] ?? [:]
             let height = bounds["Height"] ?? 0
             
-            return owner == "Siri" && height > 500
+            // Siri lock screen window is large (usually covers bottom half or more)
+            return owner == "Siri" && height > 400
         }
+    }
+    
+    /// Centralized helper to automatically fade a window based on Siri visibility.
+    func autohide(_ window: NSWindow?, cancellables: inout Set<AnyCancellable>) {
+        guard let window else { return }
+        
+        $isSiriVisible
+            .receive(on: RunLoop.main)
+            .sink { isVisible in
+                let targetAlpha: CGFloat = isVisible ? 0.0 : 1.0
+                if window.alphaValue != targetAlpha {
+                    NSAnimationContext.runAnimationGroup { context in
+                        context.duration = 0.25 // Smooth fade
+                        context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                        window.animator().alphaValue = targetAlpha
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
 }
