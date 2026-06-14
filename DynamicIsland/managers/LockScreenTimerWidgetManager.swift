@@ -230,7 +230,7 @@ final class LockScreenTimerWidgetPanelManager {
         newWindow.isOpaque = false
         newWindow.backgroundColor = .clear
         newWindow.hasShadow = false
-        newWindow.level = .screenSaver
+        newWindow.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.statusWindow)) + 1)
         newWindow.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         newWindow.ignoresMouseEvents = false
         newWindow.isMovable = false
