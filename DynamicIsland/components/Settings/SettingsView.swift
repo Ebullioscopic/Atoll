@@ -26,6 +26,7 @@ private enum SettingsTabGroup: String, CaseIterable, Identifiable {
     case utilities
     case developer
     case integrations
+    case social
     case info
 
     var id: String { rawValue }
@@ -40,6 +41,7 @@ private enum SettingsTabGroup: String, CaseIterable, Identifiable {
         case .utilities:        return String(localized: "Utilities")
         case .developer:        return String(localized: "Developer")
         case .integrations:     return String(localized: "Integrations")
+        case .social:           return String(localized: "Social")
         case .info:             return nil
         }
     }
@@ -66,6 +68,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case shortcuts
     case notes
     case terminal
+    case whatsapp
     case about
 
     var id: String { rawValue }
@@ -81,6 +84,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
              .downloads, .shortcuts:                                         return .utilities
         case .stats, .terminal:                                              return .developer
         case .extensions:                                                    return .integrations
+        case .whatsapp:                                                      return .social
         case .about:                                                         return .info
         }
     }
@@ -107,6 +111,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return String(localized: "Shortcuts")
         case .notes: return String(localized: "Notes")
         case .terminal: return String(localized: "Terminal")
+        case .whatsapp: return String(localized: "WhatsApp")
         case .about: return String(localized: "About")
         }
     }
@@ -133,6 +138,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return "keyboard"
         case .notes: return "note.text"
         case .terminal: return "apple.terminal"
+        case .whatsapp: return "message.fill"
         case .about: return "info.circle"
         }
     }
@@ -159,6 +165,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return .orange
         case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
+        case .whatsapp: return Color(red: 0.15, green: 0.68, blue: 0.38)
         case .about: return .secondary
         }
     }
@@ -509,6 +516,8 @@ struct SettingsView: View {
             .terminal,
             // Integrations
             .extensions,
+            // Social
+            .whatsapp,
             // Info
             .about
         ]
@@ -1023,6 +1032,10 @@ struct SettingsView: View {
         case .terminal:
             SettingsForm(tab: .terminal) {
                 TerminalSettings()
+            }
+        case .whatsapp:
+            SettingsForm(tab: .whatsapp) {
+                SocialSettingsView()
             }
         case .about:
             if let controller = updaterController {

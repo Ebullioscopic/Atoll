@@ -100,6 +100,12 @@ extension AppDelegate {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    override init() {
+        print("DEBUG: AppDelegate init started")
+        super.init()
+        print("DEBUG: AppDelegate init finished")
+    }
+
     var statusItem: NSStatusItem?
     var windows: [NSScreen: NSWindow] = [:]
     var viewModels: [NSScreen: DynamicIslandViewModel] = [:]
@@ -119,6 +125,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let systemTimerBridge = SystemTimerBridge.shared
     let extensionXPCServiceHost = ExtensionXPCServiceHost.shared
     let extensionRPCServer = ExtensionRPCServer.shared
+    let whatsAppManager = WhatsAppManager.shared
     var closeNotchWorkItem: DispatchWorkItem?
     private var previousScreens: [NSScreen]?
     private var onboardingWindowController: NSWindowController?
@@ -431,6 +438,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func calculateRequiredNotchSize() -> CGSize {
+        // Check if WhatsApp expanding HUD is showing
+        if vm.notchState == .closed,
+           coordinator.expandingView.show,
+           case .whatsApp = coordinator.expandingView.type {
+            let screen: NSScreen = NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
+            let isIslandMode = shouldUseDynamicIslandMode(for: screen.localizedName)
+            let contentSize = WhatsAppNotificationLayout.totalSize(
+                isReplying: coordinator.isWhatsAppReplying,
+                hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
+                isDynamicIslandMode: isIslandMode,
+                closedNotchHeight: vm.closedNotchSize.height
+            )
+            let targetSize = CGSize(
+                width: contentSize.width + (cornerRadiusInsets.closed.bottom * 2),
+                height: contentSize.height
+            )
+            return addShadowPadding(to: targetSize, isMinimalistic: Defaults[.enableMinimalisticUI])
+        }
+
         // Check if inline sneak peek is showing and notch is closed
         let airPodsListeningModeSneakActive = vm.notchState == .closed &&
                                       coordinator.sneakPeek.show &&
@@ -511,7 +537,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             isStatsTabActive: coordinator.currentView == .stats,
             secondRowProgress: coordinator.statsSecondRowExpansion
         )
-        var result = addShadowPadding(
+        let result = addShadowPadding(
             to: adjustedContentSize,
             isMinimalistic: Defaults[.enableMinimalisticUI]
         )
@@ -566,7 +592,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let newY = (screenFrame.origin.y + screenFrame.height - clampedHeight).rounded()
         let targetFrame = NSRect(x: newX, y: newY, width: clampedWidth, height: clampedHeight)
 
-        window.setFrame(targetFrame, display: true)
+        window.setFrame(targetFrame, display: true, animate: animated)
     }
 
     private func shouldAnimateResize(for newSize: CGSize) -> Bool {
@@ -577,6 +603,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        print("DEBUG: applicationDidFinishLaunching started")
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]
@@ -591,6 +618,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         LockScreenManager.shared.configure(viewModel: vm)
         extensionXPCServiceHost.start()
         extensionRPCServer.start()
+        print("DEBUG: Instantiating WhatsAppManager...")
+        print("DEBUG: WhatsAppManager auth state is \(WhatsAppManager.shared.authState)")
         
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()
@@ -823,6 +852,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             forName: Notification.Name.notchHeightChanged, object: nil, queue: nil
         ) { [weak self] _ in
+            self?.updateWindowSizeIfNeeded()
             self?.adjustWindowPosition()
         }
 

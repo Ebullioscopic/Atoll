@@ -62,6 +62,9 @@ class LockScreenManager: ObservableObject {
     private init() {
         setupObservers()
         print("LockScreenManager: 🔒 Initialized")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            print("DEBUG: ASYNC NSApplication.shared.delegate is \(String(describing: NSApplication.shared.delegate))")
+        }
     }
     
     deinit {
