@@ -943,6 +943,20 @@ extension Defaults.Keys {
         default: true
     )
     static let lockScreenPanelUsesBlur = Key<Bool>("lockScreenPanelUsesBlur", default: true)
+
+    // MARK: Notch Glass
+    static let notchGlassEnabled = Key<Bool>("notchGlassEnabled", default: false)
+    static let blendBlackTopIntoLiquidGlass = Key<Bool>("blendBlackTopIntoLiquidGlass", default: false)
+    static let notchGlassCustomizationMode = Key<LockScreenGlassCustomizationMode>(
+        "notchGlassCustomizationMode",
+        default: .standard
+    )
+    static let notchLiquidGlassVariant = Key<LiquidGlassVariant>(
+        "notchLiquidGlassVariant",
+        default: .defaultVariant
+    )
+    static let notchGlassShowsBorder = Key<Bool>("notchGlassShowsBorder", default: false)
+
     static let lockScreenMusicMergedAirPlayOutput = Key<Bool>("lockScreenMusicMergedAirPlayOutput", default: true)
     static let lockScreenMusicFullscreenArtworkEnabled = Key<Bool>("lockScreenMusicFullscreenArtworkEnabled", default: true)
     static let lockScreenKeepAlbumArtVisibleDuringFullscreenArtwork = Key<Bool>("lockScreenKeepAlbumArtVisibleDuringFullscreenArtwork", default: false)

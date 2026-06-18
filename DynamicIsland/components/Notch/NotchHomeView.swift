@@ -775,6 +775,7 @@ struct MusicSliderView: View {
     var onValueChange: (Double) -> Void
     var labelLayout: TimeLabelLayout = .stacked
     var trailingLabel: TrailingLabel = .duration
+    var showsTrack: Bool = true
     var restingTrackHeight: CGFloat = 5
     var draggingTrackHeight: CGFloat = 9
 
@@ -841,16 +842,20 @@ struct MusicSliderView: View {
             Text(timeString(from: sliderValue))
                 .font(inlineLabelFont)
                 .foregroundColor(timeLabelColor)
-                .frame(width: 42, alignment: .leading)
+                .frame(width: showsTrack ? 42 : nil, alignment: .leading)
 
-            sliderCore
-                .frame(height: sliderFrameHeight)
-                .frame(maxWidth: .infinity)
+            if showsTrack {
+                sliderCore
+                    .frame(height: sliderFrameHeight)
+                    .frame(maxWidth: .infinity)
+            } else {
+                Spacer(minLength: 0)
+            }
 
             Text(trailingTimeText)
                 .font(inlineLabelFont)
                 .foregroundColor(timeLabelColor)
-                .frame(width: 48, alignment: .trailing)
+                .frame(width: showsTrack ? 48 : nil, alignment: .trailing)
         }
     }
 
@@ -864,14 +869,18 @@ struct MusicSliderView: View {
                 
         case .inline:
             HStack(spacing: 10) {
-                Spacer()
-                    .frame(width: 42)
+                if showsTrack {
+                    Spacer()
+                        .frame(width: 42)
+                }
                 LiveStreamProgressIndicator(tint: sliderTint)
                     .frame(maxWidth: .infinity)
                     .frame(height: sliderFrameHeight)
 
-                Spacer()
-                    .frame(width: 48)
+                if showsTrack {
+                    Spacer()
+                        .frame(width: 48)
+                }
             }
         }
     }

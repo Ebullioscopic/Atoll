@@ -282,7 +282,7 @@ struct InlineHUD: View {
             .frame(width: infoWidth, height: vm.notchSize.height - (hoverAnimation ? 0 : 12), alignment: .leading)
             
             Rectangle()
-                .fill(.black)
+                .fill(Defaults[.notchGlassEnabled] ? Color.clear : Color.black)
                 .frame(width: vm.closedNotchSize.width - 20)
             
             HStack {

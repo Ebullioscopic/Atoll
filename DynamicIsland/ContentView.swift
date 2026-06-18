@@ -93,6 +93,13 @@ struct ContentView: View {
     @Default(.showOnAllDisplays) var showOnAllDisplays
     @Default(.lowBatteryHUDStyle) var lowBatteryHUDStyle
     @Default(.fullBatteryHUDStyle) var fullBatteryHUDStyle
+
+    // Notch glass settings
+    @Default(.notchGlassEnabled) var notchGlassEnabled
+    @Default(.blendBlackTopIntoLiquidGlass) var blendBlackTopIntoLiquidGlass
+    @Default(.notchGlassCustomizationMode) var notchGlassCustomizationMode
+    @Default(.notchLiquidGlassVariant) var notchLiquidGlassVariant
+    @Default(.notchGlassShowsBorder) var notchGlassShowsBorder
     
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
@@ -294,10 +301,20 @@ struct ContentView: View {
         guard vm.notchState == .open else {
             return activeCornerRadiusInsets.closed.bottom
         }
+        if enableMinimalisticUI && isIslandMode {
+            return minimalisticFloatingIslandShellHorizontalInset
+        }
         if Defaults[.cornerRadiusScaling] {
             return activeCornerRadiusInsets.opened.top - 5
         }
         return activeCornerRadiusInsets.opened.bottom - 5
+    }
+
+    private var notchOpenHorizontalPadding: CGFloat {
+        if enableMinimalisticUI && isIslandMode {
+            return minimalisticFloatingIslandContentHorizontalInset
+        }
+        return 12
     }
 
     private var bodyHoverAreaPadding: CGFloat {
@@ -347,6 +364,88 @@ struct ContentView: View {
     
     private var currentShadowPadding: CGFloat {
         notchShadowPaddingValue(isMinimalistic: enableMinimalisticUI)
+    }
+
+    /// Whether the notch is currently using any form of liquid glass.
+    private var notchUsesLiquidGlass: Bool {
+        guard notchGlassEnabled else { return false }
+        if #available(macOS 26.0, *) {
+            return true
+        }
+        return false
+    }
+
+    /// Whether the notch uses the custom liquid glass variant (NSGlassEffectView).
+    private var notchUsesCustomLiquidGlass: Bool {
+        notchUsesLiquidGlass && notchGlassCustomizationMode == .customLiquid
+    }
+
+    /// Whether the notch uses the standard system liquid glass (.glassEffect).
+    private var notchUsesStandardLiquidGlass: Bool {
+        notchUsesLiquidGlass && notchGlassCustomizationMode == .standard
+    }
+
+    /// The background layer for the notch: solid black (default) or liquid glass.
+    @ViewBuilder
+    private var notchBackgroundLayer: some View {
+        if notchUsesCustomLiquidGlass {
+            ZStack {
+                LiquidGlassBackground(
+                    variant: notchLiquidGlassVariant,
+                    cornerRadius: vm.notchState == .open
+                        ? activeCornerRadiusInsets.opened.bottom
+                        : activeCornerRadiusInsets.closed.bottom
+                ) {
+                    Color.clear
+                }
+                
+                if blendBlackTopIntoLiquidGlass && enableMinimalisticUI {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0.0),
+                            .init(color: .black, location: vm.notchState == .closed ? 1.0 : 0.45),
+                            .init(color: .clear, location: vm.notchState == .closed ? 1.0 : 0.85)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+            }
+        } else if notchUsesStandardLiquidGlass {
+            if #available(macOS 26.0, *) {
+                ZStack {
+                    notchStandardGlassSurface
+                    if blendBlackTopIntoLiquidGlass && enableMinimalisticUI {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black, location: 0.0),
+                                .init(color: .black, location: vm.notchState == .closed ? 1.0 : 0.45),
+                                .init(color: .clear, location: vm.notchState == .closed ? 1.0 : 0.85)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                }
+            } else {
+                Color.black
+            }
+        } else {
+            Color.black
+        }
+    }
+
+    /// Standard liquid glass surface for the notch (macOS 26+).
+    @available(macOS 26.0, *)
+    private var notchStandardGlassSurface: some View {
+        Rectangle()
+            .fill(.clear)
+            .glassEffect(
+                .clear.interactive(),
+                in: .rect(cornerRadius: vm.notchState == .open
+                    ? activeCornerRadiusInsets.opened.bottom
+                    : activeCornerRadiusInsets.closed.bottom)
+            )
     }
 
     private var currentNotchShape: NotchShape {
@@ -511,8 +610,8 @@ struct ContentView: View {
         NotchLayout()
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
-            .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-            .background(.black)
+            .padding([.horizontal, .bottom], vm.notchState == .open ? notchOpenHorizontalPadding : 0)
+            .background(notchBackgroundLayer)
             .clipShape(resolvedClipShape)
             .compositingGroup()
             .shadow(
@@ -521,6 +620,16 @@ struct ContentView: View {
                     : .clear,
                 radius: Defaults[.cornerRadiusScaling] ? 10 : 5
             )
+            .overlay {
+                if notchUsesLiquidGlass && notchGlassShowsBorder {
+                    resolvedClipShape
+                        .stroke(
+                            Color.white.opacity(notchUsesCustomLiquidGlass ? 0.15 : 0.14),
+                            lineWidth: notchUsesCustomLiquidGlass ? 0.95 : 0.9
+                        )
+                        .allowsHitTesting(false)
+                }
+            }
             // Extra horizontal inset for Dynamic Island mode so the shadow
             // is not clipped by the outer frame constraint
             .padding(.horizontal, isIslandMode ? dynamicIslandShadowInset : 0)
@@ -700,12 +809,26 @@ struct ContentView: View {
             }
     }
 
+    /// Outer layout width: matches notch-attached content width, with extra
+    /// horizontal room on floating islands only for the drop shadow outside the clip.
+    private var rootLayoutMaxWidth: CGFloat {
+        let contentWidth = dynamicNotchSize.width
+        guard vm.notchState == .open, isDynamicIslandMode else {
+            return contentWidth
+        }
+        return contentWidth + dynamicIslandShadowInset * 2
+    }
+
     private var rootBodyView: some View {
         ZStack(alignment: .top) {
             configuredMainLayout
+                .frame(
+                    width: vm.notchState == .open ? dynamicNotchSize.width : nil,
+                    alignment: .top
+                )
         }
         .frame(
-            maxWidth: dynamicNotchSize.width + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0),
+            maxWidth: rootLayoutMaxWidth,
             maxHeight: dynamicNotchSize.height + currentShadowPadding + (isDynamicIslandMode ? dynamicIslandTopOffset : 0),
             alignment: .top
         )
@@ -1156,7 +1279,7 @@ struct ContentView: View {
                     .fill(.clear)
                     .frame(width: sideSize, height: sideSize)
                 Rectangle()
-                    .fill(.black)
+                    .fill(.clear)
                     .frame(width: vm.closedNotchSize.width - 20)
                 IdleAnimationView()
                     .frame(width: sideSize, height: sideSize)
@@ -1210,7 +1333,7 @@ struct ContentView: View {
             .frame(width: wingBaseWidth, height: notchContentHeight)
 
             Rectangle()
-                .fill(.black)
+                .fill(.clear)
                 .frame(width: effectiveCenterWidth, height: notchContentHeight)
                 .overlay(
                     HStack(alignment: .top) {

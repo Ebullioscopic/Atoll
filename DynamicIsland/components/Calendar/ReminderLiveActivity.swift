@@ -59,7 +59,7 @@ struct ReminderLiveActivity: View {
                 }
 
             Rectangle()
-                .fill(.black)
+                .fill(.clear)
                 .frame(width: vm.closedNotchSize.width, height: notchContentHeight)
 
             Color.clear

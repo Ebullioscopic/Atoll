@@ -51,7 +51,7 @@ struct RecordingLiveActivity: View {
             
             // Center - Black fill
             Rectangle()
-                .fill(.black)
+                .fill(.clear)
                 .frame(width: vm.closedNotchSize.width + (isHovering ? 8 : 0))
             
             // Right - Empty for symmetry with animation
