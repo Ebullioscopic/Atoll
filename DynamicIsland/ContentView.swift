@@ -159,11 +159,12 @@ struct ContentView: View {
 
         if vm.notchState == .closed,
            coordinator.expandingView.show,
-           case .whatsApp = coordinator.expandingView.type,
+           case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type,
            isWhatsAppExpansionVisible {
             let contentSize = WhatsAppNotificationLayout.totalSize(
                 isReplying: coordinator.isWhatsAppReplying,
                 hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
+                messages: messages,
                 isDynamicIslandMode: isDynamicIslandMode,
                 closedNotchHeight: vm.closedNotchSize.height
             )
@@ -489,6 +490,11 @@ struct ContentView: View {
         return true
     }
 
+    private var currentWhatsAppMessages: [WhatsAppIncomingMessage] {
+        guard case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type else { return [] }
+        return messages
+    }
+
     private var currentScreenExpansionType: SneakContentType? {
         isCurrentScreenExpansionVisible ? coordinator.expandingView.type : nil
     }
@@ -693,15 +699,7 @@ struct ContentView: View {
                 }
             }
             .onChange(of: coordinator.isWhatsAppReplying) { _, replying in
-                if replying {
-                    cancelWhatsAppDismissTask()
-                    coordinator.cancelExpandingViewHide()
-                }
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    syncWhatsAppWindowSizeIfNeeded(forReplying: replying)
-                }
+                syncWhatsAppWindowSizeIfNeeded(forReplying: replying)
             }
             .onChange(of: coordinator.isWhatsAppFilePreviewVisible) { _, _ in
                 syncWhatsAppWindowSizeIfNeeded()
@@ -832,6 +830,11 @@ struct ContentView: View {
         ZStack(alignment: .top) {
             configuredMainLayout
         }
+        .frame(
+            width: isWhatsAppExpansionVisible ? dynamicNotchSize.width + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0) : nil,
+            height: isWhatsAppExpansionVisible ? dynamicNotchSize.height + currentShadowPadding + (isDynamicIslandMode ? dynamicIslandTopOffset : 0) : nil,
+            alignment: .top
+        )
         .frame(
             maxWidth: (dynamicNotchSize.width + (vm.notchState == .open ? 24 : 0) + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)).rounded(),
             maxHeight: (dynamicNotchSize.height + (vm.notchState == .open ? 12 : 0) + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)).rounded(),
@@ -1041,10 +1044,10 @@ struct ContentView: View {
                         )
                         .id(batteryModel.activeTemporaryHUDToken)
                       } else if isWhatsAppExpansionVisible,
-                                case .whatsApp(let senderName, let messageText, let chatId, let avatarUrl) = coordinator.expandingView.type {
+                                case .whatsApp(let senderName, let messages, let chatId, let avatarUrl) = coordinator.expandingView.type {
                         WhatsAppTemporaryActivityView(
                                     senderName: senderName,
-                                    messageText: messageText,
+                                    messages: messages,
                                     chatId: chatId,
                                     avatarUrl: avatarUrl,
                                     isReplying: $coordinator.isWhatsAppReplying,
@@ -1052,6 +1055,7 @@ struct ContentView: View {
                                     isDynamicIslandMode: isDynamicIslandMode,
                                     topCornerRadius: activeCornerRadiusInsets.closed.top
                                 )
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                       } else if isSneakPeekVisibleOnCurrentScreen && (Defaults[.inlineHUD] || isAirPodsListeningModeSneak) && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && !coordinator.sneakPeek.type.isExtensionPayload && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(
@@ -2109,6 +2113,7 @@ struct ContentView: View {
                 guard vm.notchState == .closed else { return }
                 guard !self.coordinator.isHoverOpenSuppressed else { return }
                 guard self.isHovering else { return }
+                guard !self.isWhatsAppExpansionVisible else { return }
                 guard !self.handleClosedMusicWaveformTapIfNeeded() else { return }
                 if Defaults[.enableHaptics] {
                     self.triggerHapticIfAllowed()
@@ -2295,7 +2300,6 @@ struct ContentView: View {
             await MainActor.run {
                 guard self.isWhatsAppExpansionVisible else { return }
                 guard !self.isHovering else { return }
-                guard !self.coordinator.isWhatsAppReplying else { return }
                 guard !self.coordinator.suppressWhatsAppAutoDismiss else { return }
                 guard self.coordinator.expandingView.type == activeType else { return }
                 self.coordinator.toggleExpandingView(status: false, type: activeType)
@@ -2309,6 +2313,7 @@ struct ContentView: View {
         let contentSize = WhatsAppNotificationLayout.totalSize(
             isReplying: replying,
             hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
+            messages: currentWhatsAppMessages,
             isDynamicIslandMode: isDynamicIslandMode,
             closedNotchHeight: vm.closedNotchSize.height
         )
@@ -2328,7 +2333,6 @@ struct ContentView: View {
               !coordinator.isWhatsAppReplying else { return }
 
         cancelWhatsAppDismissTask()
-        coordinator.cancelExpandingViewHide()
 
         // Pre-size with reply height before the state flip so the HUD keeps
         // its notch anchor and doesn't "detach" on first activation.

@@ -441,12 +441,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Check if WhatsApp expanding HUD is showing
         if vm.notchState == .closed,
            coordinator.expandingView.show,
-           case .whatsApp = coordinator.expandingView.type {
+           case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type {
             let screen: NSScreen = NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
             let isIslandMode = shouldUseDynamicIslandMode(for: screen.localizedName)
             let contentSize = WhatsAppNotificationLayout.totalSize(
                 isReplying: coordinator.isWhatsAppReplying,
                 hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
+                messages: messages,
                 isDynamicIslandMode: isIslandMode,
                 closedNotchHeight: vm.closedNotchSize.height
             )
@@ -596,6 +597,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func shouldAnimateResize(for newSize: CGSize) -> Bool {
+        if coordinator.expandingView.show,
+           case .whatsApp = coordinator.expandingView.type {
+            return false
+        }
         if Defaults[.enableMinimalisticUI] && !ReminderLiveActivityManager.shared.activeWindowReminders.isEmpty {
             return false
         }

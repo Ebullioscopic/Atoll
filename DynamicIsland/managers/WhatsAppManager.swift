@@ -50,8 +50,40 @@ public final class WhatsAppManager: ObservableObject {
         WhatsAppWebEngine.shared.sendReply(chatId: chatId, text: text, completion: completion)
     }
 
+    public func selectPollOption(
+        chatId: String,
+        messageId: String,
+        questionText: String,
+        selectedOptionTexts: [String],
+        optionText: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        WhatsAppWebEngine.shared.selectPollOption(
+            chatId: chatId,
+            messageId: messageId,
+            questionText: questionText,
+            selectedOptionTexts: selectedOptionTexts,
+            optionText: optionText,
+            completion: completion
+        )
+    }
+
     public func sendDocument(chatId: String, fileURL: URL, completion: @escaping (Result<Void, Error>) -> Void) {
         WhatsAppWebEngine.shared.sendDocument(chatId: chatId, fileURL: fileURL, completion: completion)
+    }
+
+    public func downloadDocument(
+        chatId: String,
+        messageId: String,
+        fileName: String,
+        completion: @escaping (Result<URL, Error>) -> Void
+    ) {
+        WhatsAppWebEngine.shared.downloadDocument(
+            chatId: chatId,
+            messageId: messageId,
+            fileName: fileName,
+            completion: completion
+        )
     }
 
     /// Invia un documento con didascalia opzionale (un solo messaggio in chat).
@@ -157,7 +189,9 @@ public final class WhatsAppManager: ObservableObject {
         let coordinator = DynamicIslandViewCoordinator.shared
         let previewType: SneakContentType = .whatsApp(
             senderName: "Atoll Preview",
-            messageText: "Notifica di prova: tocca per rispondere e attendi per chiudere.",
+            messages: [
+                WhatsAppIncomingMessage(text: "Notifica di prova: tocca per rispondere e attendi per chiudere.")
+            ],
             chatId: Self.previewChatId,
             avatarUrl: nil
         )
@@ -174,7 +208,7 @@ public final class WhatsAppManager: ObservableObject {
             return
         }
 
-        coordinator.toggleExpandingView(status: true, type: previewType, autoHideDuration: .infinity)
+        coordinator.toggleExpandingView(status: true, type: previewType, autoHideDuration: 15)
     }
 
     // MARK: - Private

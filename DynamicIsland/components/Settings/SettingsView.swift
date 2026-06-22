@@ -111,7 +111,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return String(localized: "Shortcuts")
         case .notes: return String(localized: "Notes")
         case .terminal: return String(localized: "Terminal")
-        case .whatsapp: return String(localized: "WhatsApp")
+        case .whatsapp: return String(localized: "Social")
         case .about: return String(localized: "About")
         }
     }
@@ -8593,6 +8593,209 @@ struct TerminalSettings: View {
             }
         }
         .navigationTitle("Terminal")
+    }
+}
+
+// MARK: - Social (WhatsApp) Settings
+
+struct SocialSettingsView: View {
+    @ObservedObject private var manager = WhatsAppManager.shared
+
+    @Default(.whatsAppEnabled) var whatsAppEnabled
+    @Default(.isWhatsAppAnimEnabled) var isWhatsAppAnimEnabled
+    @State private var disconnecting = false
+
+    private func highlightID(_ title: String) -> String {
+        SettingsTab.whatsapp.highlightID(for: title)
+    }
+
+    var body: some View {
+            Form {
+                Section {
+                    HStack(spacing: 10) {
+                        Image("WhatsApp")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 28, height: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("WhatsApp")
+                                .font(.headline)
+                            Text("Native notifications in the Dynamic Island")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Defaults.Toggle(key: .whatsAppEnabled) {
+                        Text("Enable WhatsApp")
+                    }
+                    .settingsHighlight(id: highlightID("Enable WhatsApp"))
+
+                    if whatsAppEnabled {
+                        Defaults.Toggle(key: .isWhatsAppAnimEnabled) {
+                            Text("Checkmark animation")
+                        }
+                        .settingsHighlight(id: highlightID("Checkmark animation"))
+
+                        HStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .fill(statusColor.opacity(0.15))
+                                    .frame(width: 24, height: 24)
+                                Image(systemName: statusIcon)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(statusColor)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(statusTitle)
+                                    .font(.subheadline.weight(.medium))
+                                Text(statusSubtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+
+                        if manager.authState != .authenticated {
+                            Button {
+                                manager.connectWhatsApp()
+                            } label: {
+                                Label("Connect WhatsApp", systemImage: "qrcode")
+                            }
+                            .settingsHighlight(id: highlightID("Connect WhatsApp"))
+                        } else {
+                            Button {
+                                disconnecting = true
+                                manager.disconnect()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { disconnecting = false }
+                            } label: {
+                                if disconnecting {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Label("Disconnect", systemImage: "person.crop.circle.badge.minus")
+                                }
+                            }
+                            .foregroundStyle(.red)
+                            .disabled(disconnecting)
+                        }
+
+                        if manager.authState != .authenticated {
+                            NativeStepRow(
+                                number: 1,
+                                icon: "qrcode.viewfinder",
+                                title: "Click \"Connect WhatsApp\"",
+                                subtitle: "A window with WhatsApp Web will open"
+                            )
+                            NativeStepRow(
+                                number: 2,
+                                icon: "iphone",
+                                title: "Scan the QR code from your phone",
+                                subtitle: "WhatsApp → Linked devices → Link a device"
+                            )
+                            NativeStepRow(
+                                number: 3,
+                                icon: "bell.badge.fill",
+                                title: "Receive notifications in the Dynamic Island",
+                                subtitle: "Reply directly from the notch, without opening any app"
+                            )
+                        }
+
+                        Button {
+                            manager.showPreviewNotification()
+                        } label: {
+                            Label("Preview notification", systemImage: "sparkles.rectangle.stack")
+                        }
+                    }
+                } header: {
+                    Text("WhatsApp")
+                } footer: {
+                    Text(footerText)
+                }
+            }
+            .navigationTitle("Social")
+        }
+
+    // MARK: - Computed
+
+    private var statusTitle: String {
+        switch manager.authState {
+        case .idle:          return String(localized: "Waiting")
+        case .loading:       return String(localized: "Loading…")
+        case .qrRequired:    return String(localized: "QR required")
+        case .authenticated: return String(localized: "Connected")
+        case .error:         return String(localized: "Error")
+        }
+    }
+
+    private var statusSubtitle: String {
+        switch manager.authState {
+        case .idle:          return String(localized: "Enable the integration to get started")
+        case .loading:       return String(localized: "Connecting to WhatsApp Web…")
+        case .qrRequired:    return String(localized: "Click \"Connect WhatsApp\" and scan the QR code")
+        case .authenticated: return String(localized: "Messages will arrive in the Dynamic Island")
+        case .error(let e):  return String(localized: "Error: \(e)")
+        }
+    }
+
+    private var statusIcon: String {
+        switch manager.authState {
+        case .authenticated: return "checkmark"
+        case .error:         return "exclamationmark"
+        case .qrRequired:    return "qrcode"
+        case .loading:       return "arrow.triangle.2.circlepath"
+        case .idle:          return "minus"
+        }
+    }
+
+    private var statusColor: Color {
+        switch manager.authState {
+        case .authenticated: return .green
+        case .error:         return .red
+        case .qrRequired:    return .orange
+        default:             return .secondary
+        }
+    }
+
+    private var footerText: String {
+        switch manager.authState {
+        case .authenticated:
+            return String(localized: "The session is persistent. You won't need to scan the QR code every time Atoll starts.")
+        case .qrRequired:
+            return String(localized: "Open the connection window and scan the QR code with WhatsApp on your phone.")
+        default:
+            return String(localized: "Atoll uses WhatsApp Web natively — no external tools required.")
+        }
+    }
+}
+
+private struct NativeStepRow: View {
+    let number: Int
+    let icon: String
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.15))
+                    .frame(width: 28, height: 28)
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.accentColor)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
 
