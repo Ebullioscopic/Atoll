@@ -26,14 +26,13 @@ import SwiftUI
 
 class FullscreenMediaDetector: ObservableObject {
     static let shared = FullscreenMediaDetector()
-    private let detector: MacroVisionKit
+    private let detector: FullScreenMonitor
     @ObservedObject private var musicManager = MusicManager.shared
     @MainActor @Published private(set) var fullscreenStatus: [String: Bool] = [:]
     private var notificationTask: Task<Void, Never>?
 
     private init() {
-        self.detector = MacroVisionKit.shared
-        detector.configuration.includeSystemApps = true
+        self.detector = FullScreenMonitor.shared
         setupNotificationObservers()
         updateFullScreenStatus()
     }
@@ -78,17 +77,27 @@ class FullscreenMediaDetector: ObservableObject {
             return
         }
         
+        Task { @MainActor in
+            let spaces = await detector.detectFullscreenApps(debug: false)
+            let names = NSScreen.screens.map { $0.localizedName }
+            var newStatus: [String: Bool] = [:]
+            
+            for name in names {
+                newStatus[name] = spaces.contains { space in
+                    guard let screen = detector.screen(for: space) else { return false }
+                    guard screen.localizedName == name else { return false }
+                    
+                    return space.runningApps.contains { bundleId in
+                        bundleId != "com.apple.finder" && 
+                        (bundleId == self.musicManager.bundleIdentifier || Defaults[.hideNotchOption] == .always)
+                    }
+                }
+            }
 
-        let apps = detector.detectFullscreenApps(debug: false)
-        let names = NSScreen.screens.map { $0.localizedName }
-        var newStatus: [String: Bool] = [:]
-        for name in names {
-            newStatus[name] = apps.contains { $0.screen.localizedName == name && $0.bundleIdentifier != "com.apple.finder" && ($0.bundleIdentifier == musicManager.bundleIdentifier || Defaults[.hideNotchOption] == .always) }
-        }
-
-        if newStatus != fullscreenStatus {
-            fullscreenStatus = newStatus
-            NSLog("✅ Fullscreen status: \(newStatus)")
+            if newStatus != self.fullscreenStatus {
+                self.fullscreenStatus = newStatus
+                NSLog("✅ Fullscreen status: \(newStatus)")
+            }
         }
     }
 

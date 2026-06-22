@@ -81,8 +81,10 @@ class BluetoothAudioManager: ObservableObject {
     private init() {
         print("🎧 [BluetoothAudioManager] Initializing...")
         setupBluetoothObservers()
-        checkInitialDevices()
-        startPollingForChanges()
+        DispatchQueue.main.async { [weak self] in
+            self?.checkInitialDevices()
+            self?.startPollingForChanges()
+        }
     }
     
     deinit {

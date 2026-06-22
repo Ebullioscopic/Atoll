@@ -61,8 +61,7 @@ class QuickShareService: ObservableObject {
     
     @MainActor
     func discoverAvailableProviders() async {
-        // Move the heavy NSSharingService enumeration off the main thread
-        let result: (providers: [QuickShareProvider], services: [String: NSSharingService]) = await Task.detached(priority: .userInitiated) {
+        let result: (providers: [QuickShareProvider], services: [String: NSSharingService]) = {
             let testItems: [Any] = [
                 URL(string: "https://apple.com")! as NSURL,
                 "Test Text" as NSString
@@ -139,7 +138,7 @@ class QuickShareService: ObservableObject {
             }
 
             return (providers, services)
-        }.value
+        }()
 
         var providers = result.providers
         if let idx = providers.firstIndex(where: { $0.id == "LocalSend" }) {

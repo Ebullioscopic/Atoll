@@ -18,7 +18,76 @@
 
 import Combine
 import Defaults
+import Foundation
 import SwiftUI
+
+enum WhatsAppIncomingMediaKind: String, Equatable {
+    case image
+    case sticker
+}
+
+struct WhatsAppIncomingPollOption: Equatable, Identifiable {
+    let id: String
+    let text: String
+    let isSelected: Bool
+    let voteCount: Int
+
+    init(id: String = UUID().uuidString, text: String, isSelected: Bool = false, voteCount: Int = 0) {
+        self.id = id
+        self.text = text
+        self.isSelected = isSelected
+        self.voteCount = voteCount
+    }
+}
+
+struct WhatsAppIncomingLinkPreview: Equatable {
+    let url: String
+    let title: String
+    let domain: String
+    let imageDataUrl: String?
+    let appleMapsUrl: String?
+}
+
+struct WhatsAppIncomingDocumentPreview: Equatable {
+    let fileName: String
+    let detail: String
+    let mimeType: String?
+    let thumbnailDataUrl: String?
+}
+
+struct WhatsAppIncomingMessage: Equatable, Identifiable {
+    let id: String
+    let text: String
+    let mediaKind: WhatsAppIncomingMediaKind?
+    let mediaDataUrl: String?
+    let linkPreview: WhatsAppIncomingLinkPreview?
+    let documentPreview: WhatsAppIncomingDocumentPreview?
+    let groupSender: String?
+    let pollOptions: [WhatsAppIncomingPollOption]
+    let pollAllowsMultipleSelection: Bool
+
+    init(
+        id: String = UUID().uuidString,
+        text: String,
+        mediaKind: WhatsAppIncomingMediaKind? = nil,
+        mediaDataUrl: String? = nil,
+        linkPreview: WhatsAppIncomingLinkPreview? = nil,
+        documentPreview: WhatsAppIncomingDocumentPreview? = nil,
+        groupSender: String? = nil,
+        pollOptions: [WhatsAppIncomingPollOption] = [],
+        pollAllowsMultipleSelection: Bool = false
+    ) {
+        self.id = id
+        self.text = text
+        self.mediaKind = mediaKind
+        self.mediaDataUrl = mediaDataUrl
+        self.linkPreview = linkPreview
+        self.documentPreview = documentPreview
+        self.groupSender = groupSender
+        self.pollOptions = pollOptions
+        self.pollAllowsMultipleSelection = pollAllowsMultipleSelection
+    }
+}
 
 enum SneakContentType: Equatable {
     case brightness
@@ -37,6 +106,7 @@ enum SneakContentType: Equatable {
     case lockScreen
     case capsLock
     case extensionLiveActivity(bundleID: String, activityID: String)
+    case whatsApp(senderName: String, messages: [WhatsAppIncomingMessage], chatId: String, avatarUrl: String?)
 }
 
 extension SneakContentType {
@@ -60,6 +130,8 @@ extension SneakContentType {
             return true
         case let (.extensionLiveActivity(lb, la), .extensionLiveActivity(rb, ra)):
             return lb == rb && la == ra
+        case let (.whatsApp(ls, lm, lc, la), .whatsApp(rs, rm, rc, ra)):
+            return ls == rs && lm == rm && lc == rc && la == ra
         default:
             return false
         }
@@ -349,7 +421,13 @@ class DynamicIslandViewCoordinator: ObservableObject {
             resolvedDuration = duration
         }
         sneakPeekDuration = resolvedDuration
-        let bypassedTypes: [SneakContentType] = [.music, .timer, .reminder, .bluetoothAudio]
+        let isBypassed: Bool
+        switch type {
+        case .music, .timer, .reminder, .bluetoothAudio:
+            isBypassed = true
+        default:
+            isBypassed = false
+        }
         
         // Check if it's an extension type
         let isExtensionType: Bool
@@ -359,7 +437,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
             isExtensionType = false
         }
         
-        if !isExtensionType && !bypassedTypes.contains(type) && !Defaults[.enableSystemHUD] {
+        if !isExtensionType && !isBypassed && !Defaults[.enableSystemHUD] {
             return
         }
         DispatchQueue.main.async {
@@ -385,6 +463,16 @@ class DynamicIslandViewCoordinator: ObservableObject {
     private var sneakPeekDuration: TimeInterval = 1.5
     private var sneakPeekTask: Task<Void, Never>?
 
+    func cancelSneakPeekHide() {
+        sneakPeekTask?.cancel()
+        sneakPeekTask = nil
+    }
+
+    func cancelExpandingViewHide() {
+        expandingViewTask?.cancel()
+        expandingViewTask = nil
+    }
+
     // Helper function to manage sneakPeek timer using Swift Concurrency
     private func scheduleSneakPeekHide(after duration: TimeInterval) {
         sneakPeekTask?.cancel()
@@ -405,12 +493,18 @@ class DynamicIslandViewCoordinator: ObservableObject {
         }
     }
     
+    @Published var isWhatsAppReplying: Bool = false
+    @Published var isWhatsAppFilePreviewVisible: Bool = false
+    /// Blocca auto-dismiss mentre è aperto NSOpenPanel o altre interazioni modali.
+    @Published var suppressWhatsAppAutoDismiss: Bool = false
+    
     @Published var sneakPeek: sneakPeek = .init() {
         didSet {
             if sneakPeek.show {
                 scheduleSneakPeekHide(after: sneakPeekDuration)
             } else {
                 sneakPeekTask?.cancel()
+                isWhatsAppReplying = false
             }
         }
     }
@@ -423,7 +517,14 @@ class DynamicIslandViewCoordinator: ObservableObject {
         autoHideDuration: TimeInterval? = nil
     ) {
         Task { @MainActor in
-            withAnimation(.smooth) {
+            let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
+            let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
+
+            if case .whatsApp = type {
+                isWhatsAppReplying = status
+            }
+
+            withAnimation(status ? openAnimation : closeAnimation) {
                 self.expandingView.show = status
                 self.expandingView.type = type
                 self.expandingView.value = value
@@ -439,19 +540,44 @@ class DynamicIslandViewCoordinator: ObservableObject {
         didSet {
             if expandingView.show {
                 expandingViewTask?.cancel()
-                // Only auto-hide for battery, not for downloads (DownloadManager handles that)
-                if expandingView.type != .download {
-                    let duration = expandingView.autoHideDuration ?? 3
-                    expandingViewTask = Task { [weak self] in
-                        try? await Task.sleep(for: .seconds(duration))
-                        guard let self = self, !Task.isCancelled else { return }
-                        self.toggleExpandingView(status: false, type: .battery)
-                    }
+                if expandingView.type == .download {
+                    return
                 }
+
+                let duration = expandingView.autoHideDuration ?? 3
+                guard duration.isFinite else { return }
+
+                scheduleExpandingViewHide(after: duration, type: expandingView.type)
             } else {
                 expandingViewTask?.cancel()
+                isWhatsAppReplying = false
+                isWhatsAppFilePreviewVisible = false
+                suppressWhatsAppAutoDismiss = false
             }
         }
+    }
+
+    private func scheduleExpandingViewHide(after duration: TimeInterval, type dismissType: SneakContentType) {
+        expandingViewTask?.cancel()
+        expandingViewTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard let self = self, !Task.isCancelled else { return }
+            await MainActor.run {
+                self.dismissExpandingViewIfAllowed(type: dismissType)
+            }
+        }
+    }
+
+    @MainActor
+    private func dismissExpandingViewIfAllowed(type dismissType: SneakContentType) {
+        guard expandingView.show, expandingView.type == dismissType else { return }
+
+        if case .whatsApp = dismissType, suppressWhatsAppAutoDismiss {
+            scheduleExpandingViewHide(after: 1, type: dismissType)
+            return
+        }
+
+        toggleExpandingView(status: false, type: dismissType)
     }
 
     

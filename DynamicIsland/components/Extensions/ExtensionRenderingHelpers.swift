@@ -380,11 +380,12 @@ struct ExtensionProgressIndicatorView: View {
             .frame(width: resolvedDiameter, height: resolvedDiameter)
         case let .bar(width, height, cornerRadius, color):
             let barColor = color?.resolvedColor(fallback: accent) ?? accent
-            Capsule()
+            let activeRadius = cornerRadius ?? (height / 2)
+            RoundedRectangle(cornerRadius: activeRadius, style: .continuous)
                 .fill(Color.white.opacity(0.18))
                 .frame(width: width ?? 80, height: height)
                 .overlay(alignment: .leading) {
-                    Capsule()
+                    RoundedRectangle(cornerRadius: activeRadius, style: .continuous)
                         .fill(barColor)
                         .frame(width: (width ?? 80) * CGFloat(max(0, min(progress, 1))), height: height)
                         .animation(.smooth(duration: 0.25), value: progress)

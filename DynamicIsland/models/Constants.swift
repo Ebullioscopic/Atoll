@@ -1287,6 +1287,11 @@ extension Defaults.Keys {
     static let enableAppleNotesSync = Key<Bool>("enableAppleNotesSync", default: false)
     static let appleNotesLastSyncDate = Key<Date?>("appleNotesLastSyncDate", default: nil)
     
+    // MARK: - WhatsApp Settings
+    static let whatsAppEnabled = Key<Bool>("whatsAppEnabled", default: false)
+    static let isWhatsAppAnimEnabled = Key<Bool>("isWhatsAppAnimEnabled", default: false)
+    
+    
     // Helper to determine the default media controller based on macOS version
     static var defaultMediaController: MediaControllerType {
         if #available(macOS 15.4, *) {
