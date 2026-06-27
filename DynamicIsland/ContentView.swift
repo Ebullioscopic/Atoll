@@ -81,6 +81,7 @@ struct ContentView: View {
     @Default(.enableCapsLockIndicator) var enableCapsLockIndicator
     @Default(.enableExtensionLiveActivities) var enableExtensionLiveActivities
     @Default(.showStandardMediaControls) var showStandardMediaControls
+    @Default(.enableLyrics) var enableLyrics
     @Default(.externalDisplayStyle) var externalDisplayStyle
     @Default(.hideNonNotchUntilHover) var hideNonNotchUntilHover
     @Default(.terminalStickyMode) var terminalStickyMode
@@ -96,8 +97,23 @@ struct ContentView: View {
     
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
-        let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: isDynamicIslandMode) : openNotchSize
-        
+        // Always start from the open-size base so the frame constraint never changes
+        // when the notch opens/closes — a frame constraint change during the open
+        // transition causes HostingScrollView.retargetContentOffsetIfNeeded to see a
+        // cached _sizeThatFits result that no longer matches the live layout, which
+        // triggers beginTransaction inside a layout pass → crash.
+        var baseSize = enableMinimalisticUI ? minimalisticOpenNotchSize(isDynamicIslandMode: isDynamicIslandMode, screen: currentScreenName) : openNotchSize
+
+        // Always add the lyrics height so the frame stays stable when the notch opens.
+        // standardMusicLyricsOpenHeightAdjustment returns 0 when lyrics are off or
+        // irrelevant, so this is a no-op in most configurations.
+        baseSize.height += standardMusicLyricsOpenHeightAdjustment(
+            currentView: coordinator.currentView,
+            isMinimalistic: enableMinimalisticUI,
+            lyricsEnabled: enableLyrics,
+            standardMediaControlsEnabled: showStandardMediaControls
+        )
+
         // When inline sneak peek is active in closed notch, use the wider inline width
         // so the outer maxWidth frame doesn't clip the expanded content
         let airPodsListeningModeSneakActive = vm.notchState == .closed
@@ -156,7 +172,7 @@ struct ContentView: View {
                 return CGSize(width: width, height: height)
             }
         }
-        
+
         if coordinator.currentView == .timer {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
         }
@@ -205,6 +221,7 @@ struct ContentView: View {
 
     @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
+    @State private var lastNotchOpenedAt: Date = .distantPast
     @State private var lastHapticTime: Date = Date()
     @State private var hoverClickMonitor: Any?
     @State private var hoverClickLocalMonitor: Any?
@@ -267,6 +284,8 @@ struct ContentView: View {
     private let statsAdditionalRowHeight: CGFloat = statsSecondRowContentHeight + statsGridSpacingHeight
     private let musicControlPauseGrace: TimeInterval = 5
     private let musicControlResumeDelay: TimeInterval = 0.24
+    private let hoverExitDebounce: TimeInterval = 0.1
+    private let hoverOpenTransitionRecoveryWindow: TimeInterval = 0.45
 
     // MARK: - Tab switch direction for smooth transitions
     
@@ -525,7 +544,7 @@ struct ContentView: View {
         NotchLayout()
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
-            .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
+            .padding([.horizontal, .bottom], vm.notchState == .open ? openNotchSurfaceBottomPadding : 0)
             .background(.black)
             .clipShape(resolvedClipShape)
             .compositingGroup()
@@ -722,7 +741,7 @@ struct ContentView: View {
         }
         .frame(
             maxWidth: (dynamicNotchSize.width + (vm.notchState == .open ? 24 : 0) + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)).rounded(),
-            maxHeight: (dynamicNotchSize.height + (vm.notchState == .open ? 12 : 0) + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)).rounded(),
+            maxHeight: (dynamicNotchSize.height + (vm.notchState == .open ? openNotchSurfaceBottomPadding : 0) + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)).rounded(),
             alignment: .top
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -865,7 +884,7 @@ struct ContentView: View {
 
     @ViewBuilder
       func NotchLayout() -> some View {
-          VStack(alignment: .leading) {
+          VStack(alignment: .leading, spacing: vm.notchState == .open ? openNotchSectionSpacing : 0) {
               VStack(alignment: .leading) {
                   if coordinator.firstLaunch {
                       Spacer()
@@ -1880,6 +1899,7 @@ struct ContentView: View {
 
     // MARK: - Private Methods
     private func openNotch() {
+        lastNotchOpenedAt = Date()
         withAnimation(.bouncy.speed(1.2)) {
             vm.open()
         }
@@ -2060,6 +2080,16 @@ struct ContentView: View {
     }
 
     // MARK: - Hover Management
+
+    private var remainingHoverOpenTransitionRecovery: TimeInterval {
+        max(0, hoverOpenTransitionRecoveryWindow - Date().timeIntervalSince(lastNotchOpenedAt))
+    }
+
+    private func shouldDeferHoverExitForOpenTransition(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
+        vm.notchState == .open
+            && remainingHoverOpenTransitionRecovery > 0
+            && vm.isMouseHovering(position: location)
+    }
     
     /// Handle hover state changes with debouncing
     private func handleHover(_ hovering: Bool) {
@@ -2112,8 +2142,19 @@ struct ContentView: View {
             }
         } else {
             hoverTask = Task {
-                try? await Task.sleep(for: .milliseconds(100))
+                try? await Task.sleep(for: .seconds(hoverExitDebounce))
                 guard !Task.isCancelled else { return }
+
+                let transitionRecoveryDelay = await MainActor.run {
+                    self.shouldDeferHoverExitForOpenTransition()
+                        ? self.remainingHoverOpenTransitionRecovery
+                        : 0
+                }
+
+                if transitionRecoveryDelay > 0 {
+                    try? await Task.sleep(for: .seconds(transitionRecoveryDelay))
+                    guard !Task.isCancelled else { return }
+                }
 
                 await MainActor.run {
                     withAnimation(.bouncy.speed(1.2)) {

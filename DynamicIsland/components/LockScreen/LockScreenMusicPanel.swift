@@ -836,23 +836,30 @@ struct LockScreenMusicPanel: View {
 
     private func lyricsSection(alignment: Alignment) -> some View {
         let line = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lyricFontSize: CGFloat = isExpanded ? 14 : 12
+        let lyricMinimumFontSize: CGFloat = isExpanded ? 5 : 4
         let transition: AnyTransition = .asymmetric(
             insertion: .move(edge: .bottom).combined(with: .opacity),
             removal: .move(edge: .top).combined(with: .opacity)
         )
 
-        return HStack(spacing: 8) {
+        return HStack(alignment: .top, spacing: 8) {
             if !line.isEmpty {
                 Image(systemName: "music.note")
-                    .font(.system(size: isExpanded ? 14 : 12, weight: .semibold))
+                    .font(.system(size: lyricFontSize, weight: .semibold))
                     .foregroundColor(.white.opacity(0.7))
                     .symbolRenderingMode(.monochrome)
 
-                Text(line)
-                    .font(.system(size: isExpanded ? 14 : 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.88))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                TwoLineFittingText(
+                    text: line,
+                    fontSize: lyricFontSize,
+                    minimumFontSize: lyricMinimumFontSize,
+                    weight: .semibold,
+                    nsWeight: .semibold,
+                    textColor: .white.opacity(0.88),
+                    alignment: .topLeading,
+                    multilineTextAlignment: .leading
+                )
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.trailing, 6)
                     .id(line)

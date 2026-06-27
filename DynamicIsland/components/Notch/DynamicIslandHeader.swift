@@ -199,23 +199,6 @@ struct DynamicIslandHeader: View {
                         }
                     }
                     
-                    if Defaults[.settingsIconInNotch] {
-                        Button(action: {
-                            SettingsWindowController.shared.showWindow()
-                        }) {
-                            Capsule()
-                                .fill(.black)
-                                .frame(width: 30, height: 30)
-                                .overlay {
-                                    Image(systemName: "gear")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
-                                }
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                    
                     // Screen Recording Indicator
                     if Defaults[.enableScreenRecordingDetection] && Defaults[.showRecordingIndicator] && !shouldSuppressStatusIndicators {
                         RecordingIndicator()
@@ -230,6 +213,23 @@ struct DynamicIslandHeader: View {
                             .frame(width: 30, height: 30)
                             .transition(.opacity)
                     }
+                }
+
+                if shouldShowSettingsIcon {
+                    Button(action: {
+                        SettingsWindowController.shared.showWindow()
+                    }) {
+                        Capsule()
+                            .fill(.black)
+                            .frame(width: 30, height: 30)
+                            .overlay {
+                                Image(systemName: "gear")
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .imageScale(.medium)
+                            }
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
 
                 if vm.notchState == .open && showBatteryIndicator {
@@ -312,8 +312,12 @@ struct DynamicIslandHeader: View {
 }
 
 private extension DynamicIslandHeader {
+    var shouldShowSettingsIcon: Bool {
+        vm.notchState == .open && (Defaults[.settingsIconInNotch] || !Defaults[.menubarIcon])
+    }
+
     var shouldSuppressStatusIndicators: Bool {
-        Defaults[.settingsIconInNotch]
+        shouldShowSettingsIcon
             && Defaults[.enableClipboardManager]
             && Defaults[.showClipboardIcon]
             && Defaults[.showColorPickerIcon]
