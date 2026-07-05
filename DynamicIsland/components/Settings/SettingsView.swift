@@ -6580,11 +6580,14 @@ struct TimerSettings: View {
     @Default(.lockScreenTimerGlassStyle) private var lockScreenTimerGlassStyle
     @Default(.lockScreenTimerGlassCustomizationMode) private var lockScreenTimerGlassCustomizationMode
     @Default(.lockScreenTimerLiquidGlassVariant) private var lockScreenTimerLiquidGlassVariant
+    @Default(.togglEnabled) private var togglEnabled
+    @ObservedObject private var togglManager = TogglManager.shared
     @AppStorage("customTimerDuration") private var customTimerDuration: Double = 600
     @State private var customHours: Int = 0
     @State private var customMinutes: Int = 10
     @State private var customSeconds: Int = 0
     @State private var showingResetConfirmation = false
+    @State private var togglTokenInput: String = ""
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.timer.highlightID(for: title)
@@ -6618,6 +6621,8 @@ struct TimerSettings: View {
             if enableTimerFeature {
                 timerConfigurationSections
             }
+
+            togglIntegrationSection
         }
         .navigationTitle("Timer")
         .onAppear { syncCustomDuration() }
@@ -6908,6 +6913,81 @@ struct TimerSettings: View {
         } footer: {
             Text("Select a custom sound to play when a timer ends. Supported formats include MP3, M4A, WAV, and AIFF.")
         }
+    }
+
+    // MARK: - Toggl Integration
+
+    @ViewBuilder
+    private var togglIntegrationSection: some View {
+        Section {
+            Defaults.Toggle(key: .togglEnabled) {
+                Text("Enable Toggl time tracking")
+            }
+
+            if togglEnabled {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        SecureField("Toggl API token", text: $togglTokenInput)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Save") {
+                            Task { await togglManager.saveToken(togglTokenInput) }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(togglTokenInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+
+                    togglStatusRow
+                }
+                .padding(.vertical, 4)
+
+                if case .connected = togglManager.connectionStatus {
+                    Button("Disconnect") {
+                        togglManager.disconnect()
+                        togglTokenInput = ""
+                    }
+                    .foregroundStyle(.red)
+                    .buttonStyle(.bordered)
+                }
+            }
+        } header: {
+            Text("Toggl Integration")
+        } footer: {
+            if togglEnabled {
+                Text("Enter your Toggl API token (Profile → API Token on toggl.com). Time entries are saved when you stop the timer. Rate limit: ~30 requests/day on the free plan.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var togglStatusRow: some View {
+        HStack(spacing: 6) {
+            switch togglManager.connectionStatus {
+            case .disconnected:
+                Image(systemName: "circle.fill")
+                    .font(.system(size: 7))
+                    .foregroundStyle(.secondary)
+                Text("Not connected")
+                    .foregroundStyle(.secondary)
+            case .connecting:
+                ProgressView().scaleEffect(0.65).frame(width: 14, height: 14)
+                Text("Connecting…")
+                    .foregroundStyle(.secondary)
+            case .connected:
+                Image(systemName: "circle.fill")
+                    .font(.system(size: 7))
+                    .foregroundStyle(.green)
+                Text("Connected")
+                    .foregroundStyle(.green)
+            case .error(let msg):
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundStyle(.red)
+                Text(msg)
+                    .foregroundStyle(.red)
+                    .lineLimit(1)
+            }
+        }
+        .font(.system(size: 12))
+        .animation(.easeInOut(duration: 0.2), value: togglManager.connectionStatus)
     }
 
     private var customDurationDisplay: String {
