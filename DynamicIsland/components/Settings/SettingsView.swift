@@ -717,6 +717,8 @@ struct SettingsView: View {
             // Live Activities
             SettingsSearchEntry(tab: .liveActivities, title: "Enable Screen Recording Detection", keywords: ["screen recording", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Screen Recording Detection")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Recording Indicator", keywords: ["recording indicator", "red dot"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Recording Indicator")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Recording Controls", keywords: ["screen recording", "stop button", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Recording Controls")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Recording Hover Style", keywords: ["screen recording", "hover", "inline", "stop"], highlightID: SettingsTab.liveActivities.highlightID(for: "Recording Hover Style")),
             SettingsSearchEntry(tab: .liveActivities, title: "Enable Focus Detection", keywords: ["focus", "do not disturb", "dnd"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Focus Detection")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Focus Indicator", keywords: ["focus icon", "moon"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Focus Indicator")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Focus Label", keywords: ["focus label", "text"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Focus Label")),
@@ -4049,12 +4051,20 @@ struct LiveActivitiesSettings: View {
     @ObservedObject private var fullDiskAccessPermission = FullDiskAccessPermissionStore.shared
 
     @Default(.enableScreenRecordingDetection) var enableScreenRecordingDetection
+    @Default(.showRecordingIndicator) var showRecordingIndicator
+    @Default(.recordingHoverStyle) var recordingHoverStyle
+    @Default(.recordingControlMode) var recordingControlMode
+    @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @Default(.enableDoNotDisturbDetection) var enableDoNotDisturbDetection
     @Default(.focusIndicatorNonPersistent) var focusIndicatorNonPersistent
     @Default(.capsLockIndicatorTintMode) var capsLockTintMode
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.liveActivities.highlightID(for: title)
+    }
+
+    private var availableRecordingHoverStyles: [RecordingHoverStyle] {
+        enableMinimalisticUI ? RecordingHoverStyle.allCases : [.inline]
     }
 
     var body: some View {
@@ -4070,6 +4080,40 @@ struct LiveActivitiesSettings: View {
                 }
                 .disabled(!enableScreenRecordingDetection)
                 .settingsHighlight(id: highlightID("Show Recording Indicator"))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Recording controls", selection: $recordingControlMode) {
+                        ForEach(RecordingControlMode.allCases) { mode in
+                            Text(mode.title)
+                                .tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text("Indicator only keeps the recording live activity passive. With stop button enables native recording controls.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .disabled(!enableScreenRecordingDetection)
+                .settingsHighlight(id: highlightID("Recording Controls"))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Recording hover style", selection: $recordingHoverStyle) {
+                        ForEach(availableRecordingHoverStyles) { style in
+                            Text(style.title)
+                                .tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(enableMinimalisticUI
+                         ? "Default uses the expanded recording HUD. Inline keeps the stop control inside the notch height."
+                         : "Default hover style is available only in Minimalistic mode. Inline will be used here.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .disabled(!enableScreenRecordingDetection || !showRecordingIndicator || recordingControlMode != .withStopButton)
+                .settingsHighlight(id: highlightID("Recording Hover Style"))
 
                 if recordingManager.isMonitoring {
                     HStack {
@@ -4268,6 +4312,16 @@ struct LiveActivitiesSettings: View {
         .navigationTitle("Live Activities")
         .onAppear {
             fullDiskAccessPermission.refreshStatus()
+            normalizeRecordingHoverStyle()
+        }
+        .onChange(of: enableMinimalisticUI) { _, _ in
+            normalizeRecordingHoverStyle()
+        }
+    }
+
+    private func normalizeRecordingHoverStyle() {
+        if !enableMinimalisticUI && recordingHoverStyle == .default {
+            recordingHoverStyle = .inline
         }
     }
 }

@@ -78,6 +78,9 @@ struct ContentView: View {
     @Default(.enableDoNotDisturbDetection) var enableDoNotDisturbDetection
     @Default(.showDoNotDisturbIndicator) var showDoNotDisturbIndicator
     @Default(.enableScreenRecordingDetection) var enableScreenRecordingDetection
+    @Default(.showRecordingIndicator) var showRecordingIndicator
+    @Default(.recordingHoverStyle) var recordingHoverStyle
+    @Default(.recordingControlMode) var recordingControlMode
     @Default(.enableCapsLockIndicator) var enableCapsLockIndicator
     @Default(.enableExtensionLiveActivities) var enableExtensionLiveActivities
     @Default(.showStandardMediaControls) var showStandardMediaControls
@@ -122,6 +125,13 @@ struct ContentView: View {
                 ) + notchHorizontalPadding * 2
                 : 460
             return CGSize(width: max(baseSize.width, inlineWidth), height: baseSize.height)
+        }
+
+        if recordingLiveActivityVisibleOnClosedNotch {
+            return CGSize(
+                width: vm.closedNotchSize.width + recordingHUDExtraWidth,
+                height: vm.effectiveClosedNotchHeight + recordingHUDExtraHeight
+            )
         }
         
         // Handle battery HUD expansion sizing
@@ -467,6 +477,60 @@ struct ContentView: View {
         isCurrentScreenExpansionVisible ? coordinator.expandingView.type : nil
     }
 
+    private var hasActiveMusicSnapshotForClosedPairing: Bool {
+        if musicManager.isPlaying { return true }
+
+        let hasMusicMetadata = !musicManager.songTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !musicManager.artistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return !musicManager.isPlayerIdle && hasMusicMetadata
+    }
+
+    private var recordingLiveActivityVisibleOnClosedNotch: Bool {
+        vm.notchState == .closed
+            && enableScreenRecordingDetection
+            && showRecordingIndicator
+            && !vm.hideOnClosed
+            && recordingManager.isRecording
+            && !closedMusicPairingEligible(hasActiveMusicSnapshot: hasActiveMusicSnapshotForClosedPairing)
+    }
+
+    private var recordingStopControlsEnabled: Bool {
+        recordingControlMode == .withStopButton
+            && recordingManager.canStopFromHUD
+    }
+
+    private var effectiveRecordingHoverStyle: RecordingHoverStyle {
+        enableMinimalisticUI ? recordingHoverStyle : .inline
+    }
+
+    private var recordingHUDDefaultExpandedOnHover: Bool {
+        recordingLiveActivityVisibleOnClosedNotch
+            && recordingStopControlsEnabled
+            && isHovering
+            && effectiveRecordingHoverStyle == .default
+    }
+
+    private var recordingHUDInlineExpandedOnHover: Bool {
+        recordingLiveActivityVisibleOnClosedNotch
+            && recordingStopControlsEnabled
+            && isHovering
+            && effectiveRecordingHoverStyle == .inline
+    }
+
+    private var recordingHUDExtraWidth: CGFloat {
+        if recordingHUDDefaultExpandedOnHover {
+            return 140
+        }
+        if recordingHUDInlineExpandedOnHover {
+            return 176
+        }
+        return 132
+    }
+
+    private var recordingHUDExtraHeight: CGFloat {
+        recordingHUDDefaultExpandedOnHover ? 70 : 0
+    }
+
     private var displayedBatteryHUDLevel: Int {
         let resolvedLevel = batteryModel.activeTemporaryHUDLevelOverride
             ?? Int(batteryModel.levelBattery.rounded())
@@ -500,6 +564,21 @@ struct ContentView: View {
         }
     }
 
+    private var activeClosedRecordingSurfaceShape: AnyShape? {
+        guard recordingHUDDefaultExpandedOnHover else { return nil }
+
+        if isDynamicIslandMode {
+            return AnyShape(DynamicIslandPillShape(cornerRadius: dynamicIslandPillCornerRadiusInsets.opened))
+        }
+
+        return AnyShape(
+            NotchShape(
+                topCornerRadius: activeCornerRadiusInsets.closed.top,
+                bottomCornerRadius: 40
+            )
+        )
+    }
+
     private func resolvedBatteryNotificationStyle(for kind: BatteryTemporaryHUDKind) -> BatteryNotificationStyle {
         switch kind {
         case .charging:
@@ -515,6 +594,9 @@ struct ContentView: View {
     /// Resolves the clip/content shape per-screen: pill on non-notch screens
     /// when dynamic island mode is active, standard notch shape otherwise.
     private var resolvedClipShape: AnyShape {
+        if let activeClosedRecordingSurfaceShape {
+            return activeClosedRecordingSurfaceShape
+        }
         if let activeClosedBatterySurfaceShape {
             return activeClosedBatterySurfaceShape
         }
@@ -579,6 +661,7 @@ struct ContentView: View {
                         handleHover(hovering)
                     }
                     .onTapGesture {
+                        guard !recordingOpenGestureLocked else { return }
                         if handleClosedMusicWaveformTapIfNeeded() {
                             return
                         }
@@ -953,8 +1036,8 @@ struct ContentView: View {
                           TimerLiveActivity()
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .reminder) && vm.notchState == .closed && reminderManager.isActive && enableReminderLiveActivity && !vm.hideOnClosed {
                           ReminderLiveActivity()
-                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording) && vm.notchState == .closed && (recordingManager.isRecording || !recordingManager.isRecorderIdle) && Defaults[.enableScreenRecordingDetection] && !vm.hideOnClosed && !musicPairingEligible {
-                          RecordingLiveActivity()
+                      } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording) && vm.notchState == .closed && recordingManager.isRecording && Defaults[.enableScreenRecordingDetection] && Defaults[.showRecordingIndicator] && !vm.hideOnClosed && !musicPairingEligible {
+                          RecordingLiveActivity(hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .download) && vm.notchState == .closed && downloadManager.isDownloading && Defaults[.enableDownloadListener] && !vm.hideOnClosed {
                           DownloadLiveActivity()
                               .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
@@ -1322,7 +1405,7 @@ struct ContentView: View {
             return .reminder(reminder)
         }
 
-        if enableScreenRecordingDetection && (recordingManager.isRecording || !recordingManager.isRecorderIdle) {
+        if enableScreenRecordingDetection && showRecordingIndicator && recordingManager.isRecording {
             return .recording
         }
 
@@ -2130,6 +2213,7 @@ struct ContentView: View {
                 await MainActor.run {
                     guard self.vm.notchState == .closed,
                           self.isHovering,
+                          !self.recordingLiveActivityVisibleOnClosedNotch,
                           !self.isSneakPeekVisibleOnCurrentScreen,
                           !self.coordinator.isHoverOpenSuppressed else { return }
 
@@ -2353,6 +2437,7 @@ struct ContentView: View {
 
     private func handleOpenScrollGesture(translation: CGFloat, phase: NSEvent.Phase) {
         guard vm.notchState == .closed else { return }
+        guard !recordingOpenGestureLocked else { return }
 
         withAnimation(.smooth) {
             gestureProgress = (translation / Defaults[.gestureSensitivity]) * 20
@@ -2373,6 +2458,10 @@ struct ContentView: View {
             }
             openNotch()
         }
+    }
+
+    private var recordingOpenGestureLocked: Bool {
+        recordingLiveActivityVisibleOnClosedNotch
     }
 
     private func handleCloseScrollGesture(translation: CGFloat, phase: NSEvent.Phase) {
@@ -2707,7 +2796,7 @@ struct ContentView: View {
 
     private func hideMusicControlWindow() {}
     #endif
-    
+
     private func shouldFixSizeForSneakPeek() -> Bool {
         guard isSneakPeekVisibleOnCurrentScreen else { return false }
         let style = resolvedSneakPeekStyle()

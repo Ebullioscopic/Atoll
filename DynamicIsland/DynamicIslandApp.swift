@@ -492,6 +492,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return CGSize(width: inlineSneakPeekWidth, height: vm.effectiveClosedNotchHeight)
         }
 
+        if recordingHUDVisibleOnClosedNotchForSizing() {
+            let recordingHoverExtraWidth: CGFloat = {
+                guard recordingStopControlsEnabledForSizing() else { return 132 }
+                switch effectiveRecordingHoverStyleForSizing() {
+                case .default:
+                    return 140
+                case .inline:
+                    return 176
+                }
+            }()
+            let recordingHoverExtraHeight: CGFloat = {
+                guard recordingStopControlsEnabledForSizing() else { return 0 }
+                return effectiveRecordingHoverStyleForSizing() == .default ? 70 : 0
+            }()
+            let recordingHUDSize = CGSize(
+                width: vm.closedNotchSize.width + recordingHoverExtraWidth,
+                height: vm.effectiveClosedNotchHeight + recordingHoverExtraHeight
+            )
+            return addShadowPadding(to: recordingHUDSize, isMinimalistic: Defaults[.enableMinimalisticUI])
+        }
+
         // Check for battery HUD expansion
         if vm.notchState == .closed && 
            coordinator.expandingView.show && 
@@ -552,12 +573,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             isStatsTabActive: coordinator.currentView == .stats,
             secondRowProgress: coordinator.statsSecondRowExpansion
         )
-        var result = addShadowPadding(
+        let result = addShadowPadding(
             to: adjustedContentSize,
             isMinimalistic: Defaults[.enableMinimalisticUI]
         )
 
         return result
+    }
+
+    private func recordingHUDVisibleOnClosedNotchForSizing() -> Bool {
+        vm.notchState == .closed
+            && Defaults[.enableScreenRecordingDetection]
+            && Defaults[.showRecordingIndicator]
+            && !vm.hideOnClosed
+            && ScreenRecordingManager.shared.isRecording
+            && !closedMusicPairingEligibleForSizing()
+    }
+
+    private func closedMusicPairingEligibleForSizing() -> Bool {
+        let musicManager = MusicManager.shared
+        let hasMusicMetadata = !musicManager.songTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !musicManager.artistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasActiveMusicSnapshot = musicManager.isPlaying || (!musicManager.isPlayerIdle && hasMusicMetadata)
+
+        return vm.notchState == .closed
+            && hasActiveMusicSnapshot
+            && coordinator.musicLiveActivityEnabled
+            && (Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls])
+            && !vm.hideOnClosed
+            && !LockScreenManager.shared.isLocked
+            && !LockScreenManager.shared.shouldDelayPostUnlockMusicHUD
+    }
+
+    private func recordingStopControlsEnabledForSizing() -> Bool {
+        Defaults[.recordingControlMode] == .withStopButton
+            && ScreenRecordingManager.shared.canStopFromHUD
+    }
+
+    private func effectiveRecordingHoverStyleForSizing() -> RecordingHoverStyle {
+        Defaults[.enableMinimalisticUI] ? Defaults[.recordingHoverStyle] : .inline
     }
 
     /// Adds Dynamic Island shadow/top insets on non-notch screens, or top bleed on physical-notch screens.
