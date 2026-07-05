@@ -204,6 +204,10 @@ struct ContentView: View {
            let preferredHeight = extensionMinimalisticPreferredHeight(baseSize: baseSize) {
             return CGSize(width: baseSize.width, height: preferredHeight)
         }
+
+        if coordinator.currentView == .llmUsage {
+            return CGSize(width: baseSize.width, height: max(baseSize.height, llmUsageOpenNotchHeight))
+        }
         
         guard coordinator.currentView == .stats else {
             return baseSize
