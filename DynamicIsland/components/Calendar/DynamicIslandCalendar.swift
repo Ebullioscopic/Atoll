@@ -226,7 +226,7 @@ struct CalendarView: View {
                 EmptyEventsView(selectedDate: selectedDate)
                 Spacer(minLength: 0)
             } else {
-                EventListView(events: calendarManager.events)
+                EventListView(events: calendarManager.events, selectedDate: selectedDate)
             }
         }
         .listRowBackground(Color.clear)
@@ -463,6 +463,7 @@ struct StandaloneCalendarView: View {
             } else {
                 StandaloneEventCardList(
                     events: filteredEvents,
+                    selectedDate: selectedDate,
                     showFullEventTitles: Defaults[.showFullEventTitles],
                     onToggleReminder: { reminderID, completed in
                         Task {
@@ -570,31 +571,85 @@ private extension Date {
 
 private struct StandaloneEventCardList: View {
     @Environment(\.openURL) private var openURL
+    @Default(.autoScrollToNextEvent) private var autoScrollToNextEvent
     let events: [EventModel]
+    let selectedDate: Date
     let showFullEventTitles: Bool
     let onToggleReminder: (String, Bool) -> Void
 
+    private var allDayEvents: [EventModel] {
+        events.filter { $0.isAllDay }
+    }
+
+    private var timedEvents: [EventModel] {
+        events.filter { !$0.isAllDay }
+    }
+
+    private func scrollToRelevantEvent(proxy: ScrollViewProxy) {
+        guard autoScrollToNextEvent else { return }
+        let now = Date()
+        let inProgress = timedEvents.first(where: { event in
+            if event.type.isReminder {
+                return event.start <= now && now < event.start.addingTimeInterval(3600)
+            }
+            return event.start <= now && event.end > now
+        })
+        let nextUpcoming = timedEvents.first(where: { $0.start > now })
+        let lastTimed = timedEvents.last
+        guard let target = inProgress ?? nextUpcoming ?? lastTimed else { return }
+
+        withTransaction(Transaction(animation: nil)) {
+            proxy.scrollTo(target.id, anchor: .top)
+        }
+    }
+
     var body: some View {
-        ZStack {
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(events) { event in
+        VStack(spacing: 0) {
+            // Pinned all-day section
+            if !allDayEvents.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(allDayEvents) { event in
                         eventCard(event)
                     }
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 1)
+                        .padding(.horizontal, 2)
                 }
                 .padding(.vertical, 2)
             }
-            .clipped()
 
-            LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: 16)
-                .allowsHitTesting(false)
-                .frame(maxHeight: .infinity, alignment: .top)
+            // Scrollable timed events with auto-scroll
+            ScrollViewReader { proxy in
+                ZStack {
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(timedEvents) { event in
+                                eventCard(event)
+                                    .id(event.id)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .clipped()
 
-            LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                .frame(height: 16)
-                .allowsHitTesting(false)
-                .frame(maxHeight: .infinity, alignment: .bottom)
+                    LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 16)
+                        .allowsHitTesting(false)
+                        .frame(maxHeight: .infinity, alignment: .top)
+
+                    LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 16)
+                        .allowsHitTesting(false)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                }
+                .onAppear {
+                    scrollToRelevantEvent(proxy: proxy)
+                }
+                .onChange(of: selectedDate) { _, _ in
+                    scrollToRelevantEvent(proxy: proxy)
+                }
+            }
         }
         .clipped()
     }
@@ -730,6 +785,7 @@ struct EventListView: View {
     @Environment(\.openURL) private var openURL
     @ObservedObject private var calendarManager = CalendarManager.shared
     let events: [EventModel]
+    let selectedDate: Date
     @Default(.autoScrollToNextEvent) private var autoScrollToNextEvent
     @Default(.showFullEventTitles) private var showFullEventTitles
     @Default(.hideCompletedReminders) private var hideCompletedReminders
@@ -761,13 +817,29 @@ struct EventListView: View {
         )
     }
 
+    private var allDayEvents: [EventModel] {
+        filteredEvents.filter { $0.isAllDay }
+    }
+
+    private var timedEvents: [EventModel] {
+        filteredEvents.filter { !$0.isAllDay }
+    }
+
     private func scrollToRelevantEvent(proxy: ScrollViewProxy) {
         guard autoScrollToNextEvent else { return }
         let now = Date()
-        let nonAllDayUpcoming = filteredEvents.first(where: { !$0.isAllDay && $0.end > now })
-        let firstAllDay = filteredEvents.first(where: { $0.isAllDay })
-        let lastEvent = filteredEvents.last
-        guard let target = nonAllDayUpcoming ?? firstAllDay ?? lastEvent else { return }
+
+        // Only scroll within timed events — all-day events are pinned at the top
+        let inProgress = timedEvents.first(where: { event in
+            if event.type.isReminder {
+                // Reminders are point-in-time; treat them as "in progress" only at their start time
+                return event.start <= now && now < event.start.addingTimeInterval(3600)
+            }
+            return event.start <= now && event.end > now
+        })
+        let nextUpcoming = timedEvents.first(where: { $0.start > now })
+        let lastTimed = timedEvents.last
+        guard let target = inProgress ?? nextUpcoming ?? lastTimed else { return }
 
         Task { @MainActor in
             withTransaction(Transaction(animation: nil)) {
@@ -777,10 +849,11 @@ struct EventListView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ZStack {
-                List {
-                    ForEach(filteredEvents) { event in
+        VStack(spacing: 0) {
+            // Pinned all-day section — always visible at top, does not scroll
+            if !allDayEvents.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(allDayEvents) { event in
                         Button(action: {
                             if let url = event.calendarAppURL() {
                                 openURL(url)
@@ -788,36 +861,59 @@ struct EventListView: View {
                         }) {
                             eventRow(event)
                         }
-                        .id(event.id)
                         .padding(.leading, -5)
                         .buttonStyle(PlainButtonStyle())
-                        .listRowSeparator(.automatic)
-                        .listRowSeparatorTint(.gray.opacity(0.2))
-                        .listRowBackground(Color.clear)
                     }
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 1)
+                        .padding(.horizontal, 4)
                 }
-                .listStyle(.plain)
-                .scrollIndicators(.never)
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-
-                LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 16)
-                    .allowsHitTesting(false)
-                    .alignmentGuide(.top) { d in d[.top] }
-                    .frame(maxHeight: .infinity, alignment: .top)
-
-                LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 16)
-                    .allowsHitTesting(false)
-                    .alignmentGuide(.bottom) { d in d[.bottom] }
-                    .frame(maxHeight: .infinity, alignment: .bottom)
             }
-            .onAppear {
-                scrollToRelevantEvent(proxy: proxy)
-            }
-            .onChange(of: filteredEvents) { _, _ in
-                scrollToRelevantEvent(proxy: proxy)
+
+            // Scrollable timed events section — auto-scrolls to current/next event
+            ScrollViewReader { proxy in
+                ZStack {
+                    List {
+                        ForEach(timedEvents) { event in
+                            Button(action: {
+                                if let url = event.calendarAppURL() {
+                                    openURL(url)
+                                }
+                            }) {
+                                eventRow(event)
+                            }
+                            .id(event.id)
+                            .padding(.leading, -5)
+                            .buttonStyle(PlainButtonStyle())
+                            .listRowSeparator(.automatic)
+                            .listRowSeparatorTint(.gray.opacity(0.2))
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollIndicators(.never)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
+
+                    LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 16)
+                        .allowsHitTesting(false)
+                        .alignmentGuide(.top) { d in d[.top] }
+                        .frame(maxHeight: .infinity, alignment: .top)
+
+                    LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 16)
+                        .allowsHitTesting(false)
+                        .alignmentGuide(.bottom) { d in d[.bottom] }
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                }
+                .onAppear {
+                    scrollToRelevantEvent(proxy: proxy)
+                }
+                .onChange(of: selectedDate) { _, _ in
+                    scrollToRelevantEvent(proxy: proxy)
+                }
             }
         }
         Spacer(minLength: 0)
