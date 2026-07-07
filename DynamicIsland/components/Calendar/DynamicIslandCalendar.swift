@@ -20,6 +20,34 @@ import SwiftUI
 import Defaults
 import EventKit
 
+// MARK: - Shared auto-scroll helpers
+
+/// Partition events into all-day and timed groups.
+func partitionEvents(_ events: [EventModel]) -> (allDay: [EventModel], timed: [EventModel]) {
+    (events.filter { $0.isAllDay }, events.filter { !$0.isAllDay })
+}
+
+/// Determine which timed event to scroll to, based on a reference time.
+/// For today, pass Date() to find in-progress/upcoming events.
+/// For other dates, pass startOfDay to scroll to the first event of that day.
+func scrollTargetForTimedEvents(timed: [EventModel], referenceTime: Date) -> EventModel? {
+    let inProgress = timed.first(where: { event in
+        if event.type.isReminder {
+            // Reminders are point-in-time; treat as "in progress" only within 1h of start
+            return event.start <= referenceTime && referenceTime < event.start.addingTimeInterval(3600)
+        }
+        return event.start <= referenceTime && event.end > referenceTime
+    })
+    let nextUpcoming = timed.first(where: { $0.start > referenceTime })
+    let lastTimed = timed.last
+    return inProgress ?? nextUpcoming ?? lastTimed
+}
+
+/// Reference time for auto-scroll: current time for today, startOfDay for past/future days.
+func scrollReferenceTime(for date: Date) -> Date {
+    Calendar.current.isDateInToday(date) ? Date() : Calendar.current.startOfDay(for: date)
+}
+
 struct Config: Equatable {
     var past: Int = 7
     var future: Int = 14
@@ -578,28 +606,22 @@ private struct StandaloneEventCardList: View {
     let onToggleReminder: (String, Bool) -> Void
 
     private var allDayEvents: [EventModel] {
-        events.filter { $0.isAllDay }
+        partitionEvents(events).allDay
     }
 
     private var timedEvents: [EventModel] {
-        events.filter { !$0.isAllDay }
+        partitionEvents(events).timed
     }
 
     private func scrollToRelevantEvent(proxy: ScrollViewProxy) {
         guard autoScrollToNextEvent else { return }
-        let now = Date()
-        let inProgress = timedEvents.first(where: { event in
-            if event.type.isReminder {
-                return event.start <= now && now < event.start.addingTimeInterval(3600)
-            }
-            return event.start <= now && event.end > now
-        })
-        let nextUpcoming = timedEvents.first(where: { $0.start > now })
-        let lastTimed = timedEvents.last
-        guard let target = inProgress ?? nextUpcoming ?? lastTimed else { return }
+        let refTime = scrollReferenceTime(for: selectedDate)
+        guard let target = scrollTargetForTimedEvents(timed: timedEvents, referenceTime: refTime) else { return }
 
-        withTransaction(Transaction(animation: nil)) {
-            proxy.scrollTo(target.id, anchor: .top)
+        Task { @MainActor in
+            withTransaction(Transaction(animation: nil)) {
+                proxy.scrollTo(target.id, anchor: .top)
+            }
         }
     }
 
@@ -818,28 +840,17 @@ struct EventListView: View {
     }
 
     private var allDayEvents: [EventModel] {
-        filteredEvents.filter { $0.isAllDay }
+        partitionEvents(filteredEvents).allDay
     }
 
     private var timedEvents: [EventModel] {
-        filteredEvents.filter { !$0.isAllDay }
+        partitionEvents(filteredEvents).timed
     }
 
     private func scrollToRelevantEvent(proxy: ScrollViewProxy) {
         guard autoScrollToNextEvent else { return }
-        let now = Date()
-
-        // Only scroll within timed events — all-day events are pinned at the top
-        let inProgress = timedEvents.first(where: { event in
-            if event.type.isReminder {
-                // Reminders are point-in-time; treat them as "in progress" only at their start time
-                return event.start <= now && now < event.start.addingTimeInterval(3600)
-            }
-            return event.start <= now && event.end > now
-        })
-        let nextUpcoming = timedEvents.first(where: { $0.start > now })
-        let lastTimed = timedEvents.last
-        guard let target = inProgress ?? nextUpcoming ?? lastTimed else { return }
+        let refTime = scrollReferenceTime(for: selectedDate)
+        guard let target = scrollTargetForTimedEvents(timed: timedEvents, referenceTime: refTime) else { return }
 
         Task { @MainActor in
             withTransaction(Transaction(animation: nil)) {
