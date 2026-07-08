@@ -48,6 +48,94 @@ func scrollReferenceTime(for date: Date) -> Date {
     Calendar.current.isDateInToday(date) ? Date() : Calendar.current.startOfDay(for: date)
 }
 
+// MARK: - Compact all-day events strip
+
+/// Horizontal, single-row strip of all-day events.
+///
+/// The Dynamic Island calendar panel is height-constrained (`CalendarView` is
+/// capped at a fixed height). The previous design stacked one full row per
+/// all-day event in a pinned top section, so two all-day events could consume
+/// the entire panel and leave no room for the timed-events scroll area below
+/// (#566 follow-up). This strip keeps the all-day section at a constant
+/// single-row height regardless of how many all-day events exist — extra
+/// events scroll horizontally within the strip instead of growing vertically.
+private struct AllDayEventsStrip: View {
+    @Environment(\.openURL) private var openURL
+    let events: [EventModel]
+    var onToggleReminder: ((String, Bool) -> Void)? = nil
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(events) { event in
+                        allDayChip(event)
+                    }
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 3)
+            }
+            .frame(height: 32)
+            .clipped()
+
+            Rectangle()
+                .fill(Color.gray.opacity(0.2))
+                .frame(height: 1)
+                .padding(.horizontal, 4)
+        }
+    }
+
+    private func allDayChip(_ event: EventModel) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(Color(event.calendar.color))
+                .frame(width: 8, height: 8)
+
+            Text(event.title)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .lineLimit(1)
+
+            if event.isAllDay {
+                Text("All-day")
+                    .font(.caption2)
+                    .foregroundColor(Color(white: 0.6))
+                    .lineLimit(1)
+            }
+
+            if event.type.isReminder, let onToggleReminder {
+                reminderToggle(for: event, using: onToggleReminder)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(Color.white.opacity(0.08)))
+        .contentShape(Capsule())
+        .onTapGesture {
+            if let url = event.calendarAppURL() {
+                openURL(url)
+            }
+        }
+    }
+
+    private func reminderToggle(for event: EventModel, using onToggleReminder: @escaping (String, Bool) -> Void) -> some View {
+        let isCompleted: Bool
+        if case .reminder(let completed) = event.type {
+            isCompleted = completed
+        } else {
+            isCompleted = false
+        }
+        return ReminderToggle(
+            isOn: Binding(
+                get: { isCompleted },
+                set: { newValue in onToggleReminder(event.id, newValue) }
+            ),
+            color: Color(event.calendar.color)
+        )
+    }
+}
+
 struct Config: Equatable {
     var past: Int = 7
     var future: Int = 14
@@ -861,25 +949,20 @@ struct EventListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Pinned all-day section — always visible at top, does not scroll
+            // Compact all-day strip — fixed single-row height so the timed
+            // scroll area below always keeps room in the height-constrained
+            // Dynamic Island panel, even with multiple all-day events (#566 follow-up).
             if !allDayEvents.isEmpty {
-                VStack(spacing: 0) {
-                    ForEach(allDayEvents) { event in
-                        Button(action: {
-                            if let url = event.calendarAppURL() {
-                                openURL(url)
-                            }
-                        }) {
-                            eventRow(event)
+                AllDayEventsStrip(
+                    events: allDayEvents,
+                    onToggleReminder: { reminderID, completed in
+                        Task {
+                            await calendarManager.setReminderCompleted(
+                                reminderID: reminderID, completed: completed
+                            )
                         }
-                        .padding(.leading, -5)
-                        .buttonStyle(PlainButtonStyle())
                     }
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 1)
-                        .padding(.horizontal, 4)
-                }
+                )
             }
 
             // Scrollable timed events section — auto-scrolls to current/next event
