@@ -692,6 +692,7 @@ private struct StandaloneEventCardList: View {
     let selectedDate: Date
     let showFullEventTitles: Bool
     let onToggleReminder: (String, Bool) -> Void
+    @State private var initialAutoScrollDone = false
 
     private var allDayEvents: [EventModel] {
         partitionEvents(events).allDay
@@ -755,9 +756,20 @@ private struct StandaloneEventCardList: View {
                 }
                 .onAppear {
                     scrollToRelevantEvent(proxy: proxy)
+                    if !timedEvents.isEmpty {
+                        initialAutoScrollDone = true
+                    }
                 }
                 .onChange(of: selectedDate) { _, _ in
                     scrollToRelevantEvent(proxy: proxy)
+                }
+                .onChange(of: timedEvents.isEmpty) { wasEmpty, isEmpty in
+                    // Retrigger the initial auto-scroll once, when timed events become
+                    // available after the view appeared (e.g. async calendar load).
+                    // Guarded so later data refreshes don't re-scroll. (#566 follow-up)
+                    guard wasEmpty, !isEmpty, !initialAutoScrollDone else { return }
+                    scrollToRelevantEvent(proxy: proxy)
+                    initialAutoScrollDone = true
                 }
             }
         }
@@ -900,6 +912,7 @@ struct EventListView: View {
     @Default(.showFullEventTitles) private var showFullEventTitles
     @Default(.hideCompletedReminders) private var hideCompletedReminders
     @Default(.hideAllDayEvents) private var hideAllDayEvents
+    @State private var initialAutoScrollDone = false
 
     static func filteredEvents(
         events: [EventModel],
@@ -1004,9 +1017,20 @@ struct EventListView: View {
                 }
                 .onAppear {
                     scrollToRelevantEvent(proxy: proxy)
+                    if !timedEvents.isEmpty {
+                        initialAutoScrollDone = true
+                    }
                 }
                 .onChange(of: selectedDate) { _, _ in
                     scrollToRelevantEvent(proxy: proxy)
+                }
+                .onChange(of: timedEvents.isEmpty) { wasEmpty, isEmpty in
+                    // Retrigger the initial auto-scroll once, when timed events become
+                    // available after the view appeared (e.g. async calendar load).
+                    // Guarded so later data refreshes don't re-scroll. (#566 follow-up)
+                    guard wasEmpty, !isEmpty, !initialAutoScrollDone else { return }
+                    scrollToRelevantEvent(proxy: proxy)
+                    initialAutoScrollDone = true
                 }
             }
         }
