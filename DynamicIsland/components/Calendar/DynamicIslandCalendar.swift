@@ -716,18 +716,15 @@ private struct StandaloneEventCardList: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Pinned all-day section
+            // Compact all-day strip — a single fixed-height row of small chips
+            // (like macOS Calendar's Day view), so multiple all-day events no
+            // longer stack into full rows and consume the whole panel (#566).
             if !allDayEvents.isEmpty {
-                VStack(spacing: 8) {
-                    ForEach(allDayEvents) { event in
-                        eventCard(event)
-                    }
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 1)
-                        .padding(.horizontal, 2)
-                }
-                .padding(.vertical, 2)
+                AllDayEventsStrip(
+                    events: allDayEvents,
+                    onToggleReminder: onToggleReminder
+                )
+                .padding(.vertical, 4)
             }
 
             // Scrollable timed events with auto-scroll
