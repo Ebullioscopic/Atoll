@@ -31,6 +31,16 @@ func partitionEvents(_ events: [EventModel]) -> (allDay: [EventModel], timed: [E
 /// For today, pass Date() to find in-progress/upcoming events.
 /// For other dates, pass startOfDay to scroll to the first event of that day.
 func scrollTargetForTimedEvents(timed: [EventModel], referenceTime: Date) -> EventModel? {
+    // Prefer an event that carries a conference (Join Meeting) link and is
+    // currently active, so its Join button is scrolled into view (#566 feedback:
+    // all-day events used to push these out of the visible area).
+    let activeConference = timed.first(where: { event in
+        guard event.conferenceURL != nil else { return false }
+        if event.type.isReminder {
+            return event.start <= referenceTime && referenceTime < event.start.addingTimeInterval(3600)
+        }
+        return event.start <= referenceTime && event.end > referenceTime
+    })
     let inProgress = timed.first(where: { event in
         if event.type.isReminder {
             // Reminders are point-in-time; treat as "in progress" only within 1h of start
@@ -40,7 +50,7 @@ func scrollTargetForTimedEvents(timed: [EventModel], referenceTime: Date) -> Eve
     })
     let nextUpcoming = timed.first(where: { $0.start > referenceTime })
     let lastTimed = timed.last
-    return inProgress ?? nextUpcoming ?? lastTimed
+    return activeConference ?? inProgress ?? nextUpcoming ?? lastTimed
 }
 
 /// Reference time for auto-scroll: current time for today, startOfDay for past/future days.
@@ -305,33 +315,24 @@ struct CalendarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading) {
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(selectedDate.formatted(.dateTime.month(.abbreviated)))
-                        .font(.title3)
+                        .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
                     Text(selectedDate.formatted(.dateTime.year()))
-                        .font(.title3)
-                        .fontWeight(.light)
+                        .font(.caption)
+                        .fontWeight(.regular)
                         .foregroundColor(Color(white: 0.65))
                 }
+                .frame(width: 62)
 
-                ZStack(alignment: .top) {
-                    WheelPicker(selectedDate: $selectedDate, config: Config())
-                    HStack(alignment: .top) {
-                        LinearGradient(
-                            colors: [Color.black, .clear], startPoint: .leading, endPoint: .trailing
-                        )
-                        .frame(width: 20)
-                        Spacer()
-                        LinearGradient(
-                            colors: [.clear, Color.black], startPoint: .leading, endPoint: .trailing
-                        )
-                        .frame(width: 20)
-                    }
-                }
+                WheelPicker(selectedDate: $selectedDate, config: Config())
+                    .frame(maxWidth: .infinity)
             }
+            .padding(.horizontal, 4)
+            .padding(.top, 2)
 
             let filteredEvents = EventListView.filteredEvents(
                 events: calendarManager.events,
@@ -346,7 +347,12 @@ struct CalendarView: View {
             }
         }
         .listRowBackground(Color.clear)
-        .frame(height: 120)
+        // Cap to fit the expanded notch window: openNotchSize.height is 200 and
+        // mainContent adds 8pt padding, leaving ~184pt of usable height.
+        // Empirically 158 is the sweet spot: shows ~2-3 timed events (vs ~1 at
+        // the old 120) while keeping the left music player's controls fully
+        // inside the notch bounds — anything ≥170 risks clipping the bottom row.
+        .frame(height: 158)
         .onChange(of: selectedDate) {
             Task {
                 await calendarManager.updateCurrentDate(selectedDate)
@@ -716,22 +722,23 @@ private struct StandaloneEventCardList: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Compact all-day strip — a single fixed-height row of small chips
-            // (like macOS Calendar's Day view), so multiple all-day events no
-            // longer stack into full rows and consume the whole panel (#566).
-            if !allDayEvents.isEmpty {
-                AllDayEventsStrip(
-                    events: allDayEvents,
-                    onToggleReminder: onToggleReminder
-                )
-                .padding(.vertical, 4)
-            }
-
-            // Scrollable timed events with auto-scroll
+            // Scrollable timed events with auto-scroll. The all-day strip is
+            // rendered as a floating overlay ON TOP of the full-height scroll
+            // area (see the ZStack below) instead of consuming vertical space,
+            // so the timed-events scroll region keeps the entire panel height
+            // and never shrinks to a tiny hit box (#566 feedback: issue #1).
             ScrollViewReader { proxy in
-                ZStack {
+                ZStack(alignment: .top) {
                     ScrollView {
                         LazyVStack(spacing: 8) {
+                            // Reserve the strip's height at the top of the
+                            // scroll content so the first event isn't hidden
+                            // behind the floating all-day strip.
+                            if !allDayEvents.isEmpty {
+                                Color.clear
+                                    .frame(height: 41)
+                            }
+
                             ForEach(timedEvents) { event in
                                 eventCard(event)
                                     .id(event.id)
@@ -741,15 +748,20 @@ private struct StandaloneEventCardList: View {
                     }
                     .clipped()
 
-                    LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .frame(maxHeight: .infinity, alignment: .top)
-
-                    LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
+                    // Floating all-day strip overlay (32pt chip row + 1pt
+                    // divider + 8pt vertical padding ≈ 41pt). It sits above the
+                    // scroll area and events scroll underneath it, like macOS
+                    // Calendar's Day view. No shadow gradient is drawn on top
+                    // of the events anymore (#566 feedback: issue #2).
+                    if !allDayEvents.isEmpty {
+                        AllDayEventsStrip(
+                            events: allDayEvents,
+                            onToggleReminder: onToggleReminder
+                        )
+                        .padding(.vertical, 4)
+                        .background(Color.black.opacity(0.4))
+                        .frame(maxWidth: .infinity, alignment: .top)
+                    }
                 }
                 .onAppear {
                     scrollToRelevantEvent(proxy: proxy)
@@ -1000,17 +1012,8 @@ struct EventListView: View {
                     .scrollContentBackground(.hidden)
                     .background(Color.clear)
 
-                    LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .alignmentGuide(.top) { d in d[.top] }
-                        .frame(maxHeight: .infinity, alignment: .top)
-
-                    LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .alignmentGuide(.bottom) { d in d[.bottom] }
-                        .frame(maxHeight: .infinity, alignment: .bottom)
+                    // (Shadows intentionally removed — #566 feedback: the gradient
+                    // overlay was permanently drawn on top of the events.)
                 }
                 .onAppear {
                     scrollToRelevantEvent(proxy: proxy)
