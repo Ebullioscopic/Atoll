@@ -182,7 +182,7 @@ struct LockScreenMusicPanel: View {
             logPanelAppearance()
             updatePanelSize(animated: false)
             routeManager.refreshDevices()
-            if isAppleMusicActive {
+            if musicManager.isAppleMusicActive {
                 Task { await airPlayManager.refreshDevices() }
             }
             logGlassState(reason: "Panel appeared")
@@ -213,7 +213,7 @@ struct LockScreenMusicPanel: View {
         }
         .onChange(of: isVolumeSliderVisible) { _, visible in
             if useMergedAirPlayOutput {
-                if visible && isAppleMusicActive {
+                if visible && musicManager.isAppleMusicActive {
                     Task { await airPlayManager.refreshDevices() }
                 }
             }
@@ -643,7 +643,7 @@ struct LockScreenMusicPanel: View {
             return fallbackSlots
         }
 
-        let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive, isSpotifyActive: isSpotifyActive)
+        let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, isSpotifyActive: musicManager.isSpotifyActive)
         return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
     }
 
@@ -1037,16 +1037,8 @@ struct LockScreenMusicPanel: View {
         return Color.white.opacity(0.08)
     }
 
-    private var isAppleMusicActive: Bool {
-        musicManager.bundleIdentifier == "com.apple.Music"
-    }
-
-    private var isSpotifyActive: Bool {
-        musicManager.bundleIdentifier == SpotifyController.bundleIdentifier
-    }
-
     private var useMergedAirPlayOutput: Bool {
-        mergedAirPlayOutput && isAppleMusicActive && slotConfig.contains(where: { $0 == .mediaOutput || $0 == .airPlay })
+        mergedAirPlayOutput && musicManager.isAppleMusicActive && slotConfig.contains(where: { $0 == .mediaOutput || $0 == .airPlay })
     }
 
     private var shouldShowAirPlay: Bool {

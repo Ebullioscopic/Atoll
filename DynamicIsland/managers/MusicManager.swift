@@ -493,6 +493,9 @@ class MusicManager: ObservableObject {
     @Published var avgColor: NSColor = .white
     @Published var secondaryColor: NSColor = .gray
     @Published var bundleIdentifier: String? = nil
+
+    var isAppleMusicActive: Bool { bundleIdentifier == "com.apple.Music" }
+    var isSpotifyActive: Bool { bundleIdentifier == SpotifyController.bundleIdentifier }
     @Published var songDuration: TimeInterval = 0
     @Published var elapsedTime: TimeInterval = 0
     @Published var timestampDate: Date = .init()

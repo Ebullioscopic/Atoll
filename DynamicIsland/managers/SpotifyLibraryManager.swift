@@ -21,6 +21,7 @@ import AuthenticationServices
 import CryptoKit
 import Defaults
 import Foundation
+import Security
 
 /// Official Spotify Web API access via OAuth 2.0 PKCE, scoped to the user's
 /// Liked Songs (user-library-read / user-library-modify). Independent from
@@ -41,10 +42,28 @@ final class SpotifyLibraryManager: NSObject, ObservableObject {
     @Published private(set) var errorMessage: String?
 
     private var authSession: ASWebAuthenticationSession?
+    /// Spotify rotates the refresh token on every exchange, so concurrent
+    /// refreshes must share a single in-flight request.
+    private var refreshTask: Task<String?, Never>?
 
     private override init() {
         super.init()
+        migrateLegacyTokensIfNeeded()
         refreshPublishedState()
+    }
+
+    /// Tokens were briefly stored in Defaults; move them into the Keychain once.
+    private func migrateLegacyTokensIfNeeded() {
+        let legacyAccessToken = Defaults[.spotifyLibraryAccessToken]
+        if !legacyAccessToken.isEmpty {
+            TokenStore.write(legacyAccessToken, account: TokenStore.accessTokenAccount)
+            Defaults[.spotifyLibraryAccessToken] = ""
+        }
+        let legacyRefreshToken = Defaults[.spotifyLibraryRefreshToken]
+        if !legacyRefreshToken.isEmpty {
+            TokenStore.write(legacyRefreshToken, account: TokenStore.refreshTokenAccount)
+            Defaults[.spotifyLibraryRefreshToken] = ""
+        }
     }
 
     var configuredClientID: String {
@@ -61,7 +80,10 @@ final class SpotifyLibraryManager: NSObject, ObservableObject {
             return
         }
 
-        let verifier = Self.randomURLSafeString(length: 64)
+        guard let verifier = Self.randomURLSafeString(length: 64) else {
+            errorMessage = "Unable to generate secure random data for the login."
+            return
+        }
         let challenge = Self.codeChallenge(for: verifier)
 
         var components = URLComponents(url: Self.authorizeURL, resolvingAgainstBaseURL: false)!
@@ -92,6 +114,8 @@ final class SpotifyLibraryManager: NSObject, ObservableObject {
     }
 
     func disconnect() {
+        TokenStore.delete(TokenStore.accessTokenAccount)
+        TokenStore.delete(TokenStore.refreshTokenAccount)
         Defaults[.spotifyLibraryAccessToken] = ""
         Defaults[.spotifyLibraryRefreshToken] = ""
         Defaults[.spotifyLibraryTokenExpiration] = 0
@@ -137,26 +161,39 @@ final class SpotifyLibraryManager: NSObject, ObservableObject {
     // MARK: - Tokens
 
     func validAccessToken(forceRefresh: Bool = false) async -> String? {
-        let cachedToken = Defaults[.spotifyLibraryAccessToken]
-        let expiration = Defaults[.spotifyLibraryTokenExpiration]
-        if !forceRefresh, !cachedToken.isEmpty, expiration > Date().timeIntervalSince1970 + 60 {
+        if !forceRefresh,
+           let cachedToken = TokenStore.read(TokenStore.accessTokenAccount),
+           !cachedToken.isEmpty,
+           Defaults[.spotifyLibraryTokenExpiration] > Date().timeIntervalSince1970 + 60 {
             return cachedToken
         }
 
-        let refreshToken = Defaults[.spotifyLibraryRefreshToken]
-        let clientID = configuredClientID
-        guard !refreshToken.isEmpty, !clientID.isEmpty else { return nil }
-
-        do {
-            try await exchangeToken(body: [
-                "grant_type": "refresh_token",
-                "refresh_token": refreshToken,
-                "client_id": clientID
-            ])
-            return Defaults[.spotifyLibraryAccessToken]
-        } catch {
-            return nil
+        if let refreshTask {
+            return await refreshTask.value
         }
+
+        guard let refreshToken = TokenStore.read(TokenStore.refreshTokenAccount),
+              !refreshToken.isEmpty
+        else { return nil }
+        let clientID = configuredClientID
+        guard !clientID.isEmpty else { return nil }
+
+        let task = Task<String?, Never> { [weak self] in
+            do {
+                try await self?.exchangeToken(body: [
+                    "grant_type": "refresh_token",
+                    "refresh_token": refreshToken,
+                    "client_id": clientID
+                ])
+                return TokenStore.read(TokenStore.accessTokenAccount)
+            } catch {
+                return nil
+            }
+        }
+        refreshTask = task
+        let token = await task.value
+        refreshTask = nil
+        return token
     }
 
     private struct TokenResponse: Decodable {
@@ -188,16 +225,17 @@ final class SpotifyLibraryManager: NSObject, ObservableObject {
         }
 
         let token = try JSONDecoder().decode(TokenResponse.self, from: data)
-        Defaults[.spotifyLibraryAccessToken] = token.accessToken
+        TokenStore.write(token.accessToken, account: TokenStore.accessTokenAccount)
         if let refreshToken = token.refreshToken, !refreshToken.isEmpty {
-            Defaults[.spotifyLibraryRefreshToken] = refreshToken
+            TokenStore.write(refreshToken, account: TokenStore.refreshTokenAccount)
         }
         Defaults[.spotifyLibraryTokenExpiration] = Date().timeIntervalSince1970 + token.expiresIn
         refreshPublishedState()
     }
 
     private func refreshPublishedState() {
-        isAuthenticated = !Defaults[.spotifyLibraryRefreshToken].isEmpty && !configuredClientID.isEmpty
+        let hasRefreshToken = !(TokenStore.read(TokenStore.refreshTokenAccount) ?? "").isEmpty
+        isAuthenticated = hasRefreshToken && !configuredClientID.isEmpty
         if isAuthenticated {
             statusText = "Connected — like button ready."
         } else if configuredClientID.isEmpty {
@@ -255,10 +293,12 @@ final class SpotifyLibraryManager: NSObject, ObservableObject {
 
     // MARK: - PKCE helpers
 
-    private static func randomURLSafeString(length: Int) -> String {
+    private static func randomURLSafeString(length: Int) -> String? {
         let charset = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
         var bytes = [UInt8](repeating: 0, count: length)
-        _ = SecRandomCopyBytes(kSecRandomDefault, length, &bytes)
+        guard SecRandomCopyBytes(kSecRandomDefault, length, &bytes) == errSecSuccess else {
+            return nil
+        }
         return String(bytes.map { charset[Int($0) % charset.count] })
     }
 
@@ -277,5 +317,50 @@ extension SpotifyLibraryManager: ASWebAuthenticationPresentationContextProviding
         MainActor.assumeIsolated {
             NSApp.mainWindow ?? NSApp.windows.first ?? ASPresentationAnchor()
         }
+    }
+}
+
+/// Keychain-backed storage for the OAuth token pair. The client ID and token
+/// expiration are not secrets and stay in Defaults.
+private enum TokenStore {
+    static let accessTokenAccount = "spotify-library-access-token"
+    static let refreshTokenAccount = "spotify-library-refresh-token"
+
+    private static let service = "com.Ebullioscopic.Atoll.SpotifyLibrary"
+
+    private static func baseQuery(for account: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+    }
+
+    static func read(_ account: String) -> String? {
+        var query = baseQuery(for: account)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data
+        else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func write(_ value: String, account: String) {
+        let data = Data(value.utf8)
+        let update = [kSecValueData as String: data]
+        let status = SecItemUpdate(baseQuery(for: account) as CFDictionary, update as CFDictionary)
+        if status == errSecItemNotFound {
+            var attributes = baseQuery(for: account)
+            attributes[kSecValueData as String] = data
+            attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+            SecItemAdd(attributes as CFDictionary, nil)
+        }
+    }
+
+    static func delete(_ account: String) {
+        SecItemDelete(baseQuery(for: account) as CFDictionary)
     }
 }

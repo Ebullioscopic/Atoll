@@ -547,17 +547,9 @@ struct MusicControlsView: View {
         }
     }
 
-    private var isAppleMusicActive: Bool {
-        musicManager.bundleIdentifier == "com.apple.Music"
-    }
-
-    private var isSpotifyActive: Bool {
-        musicManager.bundleIdentifier == SpotifyController.bundleIdentifier
-    }
-
     private var displayedSlots: [MusicControlButton] {
         if showCustomControls {
-            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive, isSpotifyActive: isSpotifyActive)
+            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, isSpotifyActive: musicManager.isSpotifyActive)
             return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
         }
 

@@ -1077,6 +1077,8 @@ extension Defaults.Keys {
     static let spotifyAuthAccessTokenExpiration = Key<Double>("spotifyAuthAccessTokenExpiration", default: 0)
     static let spotifyAuthLastValidatedAt = Key<Double>("spotifyAuthLastValidatedAt", default: 0)
     static let spotifyLibraryClientID = Key<String>("spotifyLibraryClientID", default: "")
+    // The OAuth token pair lives in the Keychain (see SpotifyLibraryManager.TokenStore);
+    // these two keys remain only for the one-time migration of early builds.
     static let spotifyLibraryAccessToken = Key<String>("spotifyLibraryAccessToken", default: "")
     static let spotifyLibraryRefreshToken = Key<String>("spotifyLibraryRefreshToken", default: "")
     static let spotifyLibraryTokenExpiration = Key<Double>("spotifyLibraryTokenExpiration", default: 0)
