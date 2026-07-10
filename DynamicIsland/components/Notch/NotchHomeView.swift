@@ -551,9 +551,13 @@ struct MusicControlsView: View {
         musicManager.bundleIdentifier == "com.apple.Music"
     }
 
+    private var isSpotifyActive: Bool {
+        musicManager.bundleIdentifier == SpotifyController.bundleIdentifier
+    }
+
     private var displayedSlots: [MusicControlButton] {
         if showCustomControls {
-            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive)
+            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive, isSpotifyActive: isSpotifyActive)
             return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
         }
 
@@ -637,6 +641,16 @@ struct MusicControlsView: View {
             ) {
                 enableLyrics.toggle()
             }
+        case .likeTrack:
+            HoverButton(
+                icon: musicManager.isCurrentTrackLiked == true ? "heart.fill" : "heart",
+                iconColor: musicManager.isCurrentTrackLiked == true ? brandAccentColor : .white,
+                scale: .medium
+            ) {
+                MusicManager.shared.toggleLike()
+            }
+            .disabled(musicManager.isCurrentTrackLiked == nil)
+            .opacity(musicManager.isCurrentTrackLiked == nil ? 0.4 : 1)
         }
     }
 

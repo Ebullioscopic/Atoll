@@ -522,6 +522,13 @@ class MusicManager: ObservableObject {
     private var explicitLookupTask: Task<Void, Never>?
     private var explicitLookupKey: String?
 
+    // MARK: - Spotify Liked Songs
+    /// nil = unknown (not Spotify, not connected, or lookup pending) — the like button renders disabled.
+    @Published private(set) var isCurrentTrackLiked: Bool? = nil
+    private var likedLookupTrackID: String?
+    private var likedLookupTask: Task<Void, Never>?
+    private var likeToggleTask: Task<Void, Never>?
+
     /// Inserts lyrics with insertion-order eviction to keep the cache bounded.
     private func storeLyricsInCache(_ lyrics: [LyricLine], for key: LyricsLookupKey) {
         if lyricsCache[key] == nil {
@@ -873,6 +880,7 @@ class MusicManager: ObservableObject {
         }
         
         updateLiveStreamState(with: state)
+        self.refreshLikedFlag(for: state)
         self.timestampDate = state.lastUpdated
 
         // Manage lyric sync task based on playback/lyrics availability
@@ -881,6 +889,61 @@ class MusicManager: ObservableObject {
             startLyricSync()
         } else {
             stopLyricSync()
+        }
+    }
+
+    @MainActor
+    private func refreshLikedFlag(for state: PlaybackState) {
+        guard state.bundleIdentifier == SpotifyController.bundleIdentifier,
+              SpotifyLibraryManager.shared.isAuthenticated,
+              let lookupKey = SpotifyExplicitnessResolver.LookupKey(
+                  contentIdentifier: state.contentIdentifier,
+                  contentURL: state.contentURL
+              )
+        else {
+            likedLookupTask?.cancel()
+            likedLookupTask = nil
+            likedLookupTrackID = nil
+            if isCurrentTrackLiked != nil {
+                isCurrentTrackLiked = nil
+            }
+            return
+        }
+
+        guard likedLookupTrackID != lookupKey.trackID else { return }
+
+        likedLookupTask?.cancel()
+        likeToggleTask?.cancel()
+        likedLookupTrackID = lookupKey.trackID
+        isCurrentTrackLiked = nil
+
+        let trackID = lookupKey.trackID
+        likedLookupTask = Task { [weak self] in
+            let saved = await SpotifyLibraryManager.shared.isTrackSaved(trackID: trackID)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self, self.likedLookupTrackID == trackID else { return }
+                self.isCurrentTrackLiked = saved
+            }
+        }
+    }
+
+    @MainActor
+    func toggleLike() {
+        guard let trackID = likedLookupTrackID,
+              let currentValue = isCurrentTrackLiked else { return }
+
+        let targetValue = !currentValue
+        isCurrentTrackLiked = targetValue
+
+        likeToggleTask?.cancel()
+        likeToggleTask = Task { [weak self] in
+            let success = await SpotifyLibraryManager.shared.setTrackSaved(targetValue, trackID: trackID)
+            guard !Task.isCancelled, !success else { return }
+            await MainActor.run {
+                guard let self, self.likedLookupTrackID == trackID else { return }
+                self.isCurrentTrackLiked = currentValue
+            }
         }
     }
 

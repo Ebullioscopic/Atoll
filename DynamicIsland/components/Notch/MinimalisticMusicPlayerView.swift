@@ -990,9 +990,13 @@ private struct MinimalisticReminderDetailsView: View {
         musicManager.bundleIdentifier == "com.apple.Music"
     }
 
+    private var isSpotifyActive: Bool {
+        musicManager.bundleIdentifier == SpotifyController.bundleIdentifier
+    }
+
     private var displayedSlots: [MusicControlButton] {
         if showCustomControls {
-            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive)
+            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive, isSpotifyActive: isSpotifyActive)
             return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
         }
 
@@ -1068,6 +1072,17 @@ private struct MinimalisticReminderDetailsView: View {
             ) {
                 enableLyrics.toggle()
             }
+        case .likeTrack:
+            controlButton(
+                icon: musicManager.isCurrentTrackLiked == true ? "heart.fill" : "heart",
+                isActive: musicManager.isCurrentTrackLiked == true,
+                activeColor: brandAccentColor,
+                symbolEffect: .replace
+            ) {
+                musicManager.toggleLike()
+            }
+            .disabled(musicManager.isCurrentTrackLiked == nil)
+            .opacity(musicManager.isCurrentTrackLiked == nil ? 0.4 : 1)
         }
     }
 
