@@ -767,7 +767,11 @@ struct EventListView: View {
         let nonAllDayUpcoming = filteredEvents.first(where: { !$0.isAllDay && $0.end > now })
         let firstAllDay = filteredEvents.first(where: { $0.isAllDay })
         let lastEvent = filteredEvents.last
-        guard let target = nonAllDayUpcoming ?? firstAllDay ?? lastEvent else { return }
+        // All-day events sort to the top of the list (start == midnight). Anchoring the
+        // scroll to the next *timed* event pushes them above the viewport, so they only
+        // appear after scrolling up (#156). Prefer the first all-day event as the anchor
+        // when one exists so it stays visible, with upcoming timed events just below.
+        guard let target = firstAllDay ?? nonAllDayUpcoming ?? lastEvent else { return }
 
         Task { @MainActor in
             withTransaction(Transaction(animation: nil)) {
