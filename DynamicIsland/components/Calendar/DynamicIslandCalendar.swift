@@ -85,7 +85,7 @@ private struct AllDayEventsStrip: View {
                 .padding(.horizontal, 4)
                 .padding(.vertical, 3)
             }
-            .frame(height: 32)
+            .frame(height: 28)
             .clipped()
 
             Rectangle()
@@ -155,12 +155,25 @@ struct Config: Equatable {
     var offset: Int = 2
 }
 
+/// Reports the measured width of a single date cell, used to translate a
+/// mouse drag (in points) into a scroll-position step.
+private struct CellWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 struct WheelPicker: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @Binding var selectedDate: Date
     @State private var scrollPosition: Int?
     @State private var haptics: Bool = false
     @State private var byClick: Bool = false
+    /// Tracks a mouse press-drag so an external mouse can scrub dates like a
+    /// trackpad two-finger scroll (macOS ScrollView doesn't pan on mouse drag).
+    @State private var dragAnchorPos: Int? = nil
+    @State private var measuredCellWidth: CGFloat = 40
     let config: Config
 
     var body: some View {
@@ -217,6 +230,31 @@ struct WheelPicker: View {
                 }
             }
         }
+        .onPreferenceChange(CellWidthKey.self) { measuredCellWidth = $0 }
+        // Mouse press-drag scrubs dates (trackpad two-finger scroll still works
+        // natively — that arrives as a scroll event, not a drag gesture, so the
+        // two never conflict). Steps = drag points / measured cell width.
+        // `.simultaneousGesture` (not `.gesture`) so the drag runs alongside the
+        // strip's own gestures instead of swallowing the date-cell taps.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 4)
+                .onChanged { value in
+                    if dragAnchorPos == nil { dragAnchorPos = scrollPosition }
+                    guard let start = dragAnchorPos, measuredCellWidth > 1 else { return }
+                    let steps = Int((-value.translation.width / measuredCellWidth).rounded())
+                    let spacerNum = config.offset
+                    let totalItems = totalDateItems() + 2 * spacerNum
+                    let newPos = min(max(spacerNum, start + steps), totalItems - 1)
+                    if newPos != scrollPosition {
+                        withTransaction(Transaction(animation: nil)) {
+                            scrollPosition = newPos
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    dragAnchorPos = nil
+                }
+        )
     }
 
     private func dateButton(date: Date, isSelected: Bool, id: Int, onClick: @escaping () -> Void) -> some View {
@@ -233,6 +271,9 @@ struct WheelPicker: View {
         }
         .buttonStyle(PlainButtonStyle())
         .id(id)
+        .background(GeometryReader { geo in
+            Color.clear.preference(key: CellWidthKey.self, value: geo.size.width)
+        })
     }
 
     private func dayText(date: String, isToday: Bool, isSelected: Bool) -> some View {
@@ -310,29 +351,70 @@ struct CalendarView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject private var calendarManager = CalendarManager.shared
     @State private var selectedDate = Date()
+    @State private var dateExpanded = false
     @Default(.hideAllDayEvents) private var hideAllDayEvents
     @Default(.hideCompletedReminders) private var hideCompletedReminders
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 10) {
+            // Compact-by-default date header: when collapsed it shows a single
+            // small "weekday, month day" line (~20pt) so the event list below
+            // keeps almost the entire 120pt panel. Hovering the header expands
+            // the horizontal date-scroll strip (with edge-fade shadows) — the
+            // shadows therefore appear exactly when it is scrollable, matching
+            // the maintainer's review #1 intent (not permanently drawn).
+            HStack(alignment: .center, spacing: 8) {
+                // Left label: one compact line when collapsed; month + year when expanded.
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(selectedDate.formatted(.dateTime.month(.abbreviated)))
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                    Text(selectedDate.formatted(.dateTime.year()))
-                        .font(.caption)
-                        .fontWeight(.regular)
-                        .foregroundColor(Color(white: 0.65))
+                    if dateExpanded {
+                        Text(selectedDate.formatted(.dateTime.month(.abbreviated)))
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                        Text(selectedDate.formatted(.dateTime.year()))
+                            .font(.caption)
+                            .fontWeight(.regular)
+                            .foregroundColor(Color(white: 0.65))
+                    } else {
+                        Text(selectedDate.formatted(.dateTime.weekday(.abbreviated))
+                             + ", " + selectedDate.formatted(.dateTime.month(.abbreviated))
+                             + " " + selectedDate.formatted(.dateTime.day()))
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                    }
                 }
-                .frame(width: 62)
+                .frame(width: 72, alignment: .leading)
 
-                WheelPicker(selectedDate: $selectedDate, config: Config())
-                    .frame(maxWidth: .infinity)
+                ZStack {
+                    WheelPicker(selectedDate: $selectedDate, config: Config())
+                        .frame(maxWidth: .infinity)
+                    // Edge fades indicating the date strip is horizontally
+                    // scrollable. Subtle (0.45) so they hint without hiding text.
+                    LinearGradient(colors: [Color.black.opacity(0.45), .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: 16)
+                        .allowsHitTesting(false)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    LinearGradient(colors: [.clear, Color.black.opacity(0.45)], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: 16)
+                        .allowsHitTesting(false)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                // Use the WheelPicker's natural height (50pt) when expanded so its
+                // date cells are never clipped top/bottom. Collapsed = 0 height.
+                .frame(height: dateExpanded ? 50 : 0)
+                .opacity(dateExpanded ? 1 : 0)
+                .allowsHitTesting(dateExpanded)
+                .clipped()
             }
             .padding(.horizontal, 4)
             .padding(.top, 2)
+            .contentShape(Rectangle())
+            .onHover { inside in
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    dateExpanded = inside
+                }
+            }
 
             let filteredEvents = EventListView.filteredEvents(
                 events: calendarManager.events,
@@ -347,12 +429,13 @@ struct CalendarView: View {
             }
         }
         .listRowBackground(Color.clear)
-        // Cap to fit the expanded notch window: openNotchSize.height is 200 and
-        // mainContent adds 8pt padding, leaving ~184pt of usable height.
-        // Empirically 158 is the sweet spot: shows ~2-3 timed events (vs ~1 at
-        // the old 120) while keeping the left music player's controls fully
-        // inside the notch bounds — anything ≥170 risks clipping the bottom row.
-        .frame(height: 158)
+        // Restore the original expanded-notch window height (120pt). Bumping this
+        // to 158 grew the whole Dynamic Island window and distorted the music
+        // player's internal spacing — both flagged in review #2. The internal
+        // wins (all-day floating strip + single-line title) remain, so more timed
+        // events are visible at 120 than before, but we no longer enlarge the
+        // window or touch the music player's layout.
+        .frame(height: 120)
         .onChange(of: selectedDate) {
             Task {
                 await calendarManager.updateCurrentDate(selectedDate)
@@ -713,9 +796,12 @@ private struct StandaloneEventCardList: View {
         let refTime = scrollReferenceTime(for: selectedDate)
         guard let target = scrollTargetForTimedEvents(timed: timedEvents, referenceTime: refTime) else { return }
 
+        // When an all-day strip overlays the top of the list, anchor the
+        // scrolled-to event to .center so it isn't hidden behind the strip.
+        let anchor: UnitPoint = allDayEvents.isEmpty ? .top : .center
         Task { @MainActor in
             withTransaction(Transaction(animation: nil)) {
-                proxy.scrollTo(target.id, anchor: .top)
+                proxy.scrollTo(target.id, anchor: anchor)
             }
         }
     }
@@ -950,11 +1036,14 @@ struct EventListView: View {
     }
 
     private var allDayEvents: [EventModel] {
-        partitionEvents(filteredEvents).allDay
+        partitionEvents(filteredEvents).allDay.sorted { $0.start < $1.start }
     }
 
     private var timedEvents: [EventModel] {
-        partitionEvents(filteredEvents).timed
+        // Sorted by start time so `scrollTargetForTimedEvents` (which uses
+        // `first(where:)` to pick in-progress / next-upcoming) returns the true
+        // nearest-to-now event, and the list renders chronologically. (#566)
+        partitionEvents(filteredEvents).timed.sorted { $0.start < $1.start }
     }
 
     private func scrollToRelevantEvent(proxy: ScrollViewProxy) {
@@ -962,32 +1051,25 @@ struct EventListView: View {
         let refTime = scrollReferenceTime(for: selectedDate)
         guard let target = scrollTargetForTimedEvents(timed: timedEvents, referenceTime: refTime) else { return }
 
+        // The List has .padding(.top: 30) when all-day events are present,
+        // which lives inside the ScrollView's coordinate space.  Scrolling to
+        // .top therefore places the target event just below that inset — i.e.
+        // fully visible beneath the floating all-day overlay.
+        let anchor: UnitPoint = .top
         Task { @MainActor in
             withTransaction(Transaction(animation: nil)) {
-                proxy.scrollTo(target.id, anchor: .top)
+                proxy.scrollTo(target.id, anchor: anchor)
             }
         }
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Compact all-day strip — fixed single-row height so the timed
-            // scroll area below always keeps room in the height-constrained
-            // Dynamic Island panel, even with multiple all-day events (#566 follow-up).
-            if !allDayEvents.isEmpty {
-                AllDayEventsStrip(
-                    events: allDayEvents,
-                    onToggleReminder: { reminderID, completed in
-                        Task {
-                            await calendarManager.setReminderCompleted(
-                                reminderID: reminderID, completed: completed
-                            )
-                        }
-                    }
-                )
-            }
-
-            // Scrollable timed events section — auto-scrolls to current/next event
+        // Timed-events list fills the whole panel; the all-day strip floats as
+        // an overlay on top (zero vertical cost) so the scroll area below keeps
+        // its full height inside the 120pt Dynamic Island panel.  The List
+        // carries a top padding equal to the strip height so that
+        // scrollTo(.top) lands the target event fully below the overlay. (#566)
+        ZStack(alignment: .top) {
             ScrollViewReader { proxy in
                 ZStack {
                     List {
@@ -1011,6 +1093,10 @@ struct EventListView: View {
                     .scrollIndicators(.never)
                     .scrollContentBackground(.hidden)
                     .background(Color.clear)
+                    // Push list content down so scrollTo(.top) positions the
+                    // target event fully below the floating all-day overlay
+                    // (28pt strip + 1pt separator + 1pt margin = 30pt).
+                    .padding(.top, allDayEvents.isEmpty ? 0 : 30)
 
                     // (Shadows intentionally removed — #566 feedback: the gradient
                     // overlay was permanently drawn on top of the events.)
@@ -1032,6 +1118,20 @@ struct EventListView: View {
                     scrollToRelevantEvent(proxy: proxy)
                     initialAutoScrollDone = true
                 }
+            }
+
+            if !allDayEvents.isEmpty {
+                AllDayEventsStrip(
+                    events: allDayEvents,
+                    onToggleReminder: { reminderID, completed in
+                        Task {
+                            await calendarManager.setReminderCompleted(
+                                reminderID: reminderID, completed: completed
+                            )
+                        }
+                    }
+                )
+                .background(Color.black.opacity(0.95))
             }
         }
         Spacer(minLength: 0)

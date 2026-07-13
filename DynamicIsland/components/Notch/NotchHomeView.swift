@@ -723,9 +723,6 @@ struct NotchHomeView: View {
                 if shouldShowMusicPlayer {
                     MusicPlayerView(albumArtNamespace: albumArtNamespace)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        // Cap height so the album art (aspectRatio 1) doesn't grow
-                        // with the calendar column — keeps controls inside the notch.
-                        .frame(maxHeight: 158)
                 }
                 
                 if Defaults[.showCalendar] {
