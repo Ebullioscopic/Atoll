@@ -138,7 +138,7 @@ final class ShelfItemViewModel: ObservableObject {
 
     // MARK: - Drag & Drop helpers
     func dragItemProvider() -> NSItemProvider {
-    let selectedItems = selection.selectedItems(in: ShelfStateViewModel.shared.items)
+        let selectedItems = selection.selectedItems(in: ShelfStateViewModel.shared.items)
         if selectedItems.count > 1 && selectedItems.contains(where: { $0.id == item.id }) {
             return createMultiItemProvider(for: selectedItems)
         }
@@ -149,20 +149,23 @@ final class ShelfItemViewModel: ObservableObject {
         switch item.kind {
         case .file:
             let provider = NSItemProvider()
-            // Drag initiation needs synchronous URL - resolve on background thread with timeout
-            let semaphore = DispatchSemaphore(value: 0)
-            var resolvedURL: URL?
-            Task.detached { [item] in
-                resolvedURL = await ShelfStateViewModel.shared.resolveAndUpdateBookmarkAsync(for: item)
-                semaphore.signal()
+            // Use registerFileRepresentation with async load handler
+            provider.registerFileRepresentation(forTypeIdentifier: UTType.fileURL.identifier, fileOptions: [], visibility: .all) { completion in
+                // This is called on a background thread - we can do async work
+                Task {
+                    let url = await ShelfStateViewModel.shared.resolveAndUpdateBookmarkAsync(for: item)
+                    if let url = url {
+                        _ = url.startAccessingSecurityScopedResource()
+                        completion(url, true, nil)
+                    } else {
+                        completion(nil, false, nil)
+                    }
+                }
+                // Return nil progress - completion will be called async
+                return nil
             }
-            _ = semaphore.wait(timeout: .now() + 5.0)
-            let url = resolvedURL
-            if let url = url {
-                provider.registerObject(url as NSURL, visibility: .all)
-            } else {
-                provider.registerObject(item.displayName as NSString, visibility: .all)
-            }
+            // Fallback: also register display name as plain text
+            provider.registerObject(item.displayName as NSString, visibility: .all)
             return provider
         case .text(let string):
             return NSItemProvider(object: string as NSString)
@@ -173,35 +176,38 @@ final class ShelfItemViewModel: ObservableObject {
 
     private func createMultiItemProvider(for items: [ShelfItem]) -> NSItemProvider {
         let provider = NSItemProvider()
-        var urls: [URL] = []
         var textItems: [String] = []
+        var fileItems: [ShelfItem] = []
+        
         for item in items {
             switch item.kind {
             case .file:
-                let semaphore = DispatchSemaphore(value: 0)
-                var resolvedURL: URL?
-                Task.detached { [item] in
-                    resolvedURL = await ShelfStateViewModel.shared.resolveAndUpdateBookmarkAsync(for: item)
-                    semaphore.signal()
-                }
-                _ = semaphore.wait(timeout: .now() + 5.0)
-                let url = resolvedURL
-                if let url = url {
-                    urls.append(url)
-                } else {
-                    textItems.append(item.displayName)
-                }
+                fileItems.append(item)
             case .text(let string):
                 textItems.append(string)
             case .link:
                 break
             }
         }
-        if !urls.isEmpty {
-            for url in urls {
-                provider.registerObject(url as NSURL, visibility: .all)
+        
+        // Register file representations with lazy loading
+        if !fileItems.isEmpty {
+            for fileItem in fileItems {
+                provider.registerFileRepresentation(forTypeIdentifier: UTType.fileURL.identifier, fileOptions: [], visibility: .all) { completion in
+                    Task {
+                        let url = await ShelfStateViewModel.shared.resolveAndUpdateBookmarkAsync(for: fileItem)
+                        if let url = url {
+                            _ = url.startAccessingSecurityScopedResource()
+                            completion(url, true, nil)
+                        } else {
+                            completion(nil, false, nil)
+                        }
+                    }
+                    return nil
+                }
             }
         }
+        
         if !textItems.isEmpty {
             provider.registerObject(textItems.joined(separator: "\n") as NSString, visibility: .all)
         }

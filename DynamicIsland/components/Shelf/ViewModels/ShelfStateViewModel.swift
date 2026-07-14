@@ -41,6 +41,10 @@ final class ShelfStateViewModel: ObservableObject {
     // Queue for deferred bookmark updates to avoid publishing during view updates
     private var pendingBookmarkUpdates: [ShelfItem.ID: Data] = [:]
     private var updateTask: Task<Void, Never>?
+    
+    // Cache for URL-to-item mapping to avoid resolving all bookmarks for lookup
+    private var urlToItemCache: [String: ShelfItem.ID] = [:]
+    private var urlCacheInvalidated = true
 
     private init() {
         items = ShelfPersistenceService.shared.load()
@@ -62,6 +66,7 @@ final class ShelfStateViewModel: ObservableObject {
             }
         }
         items = merged
+        invalidateURLCache()
         if !addedIDs.isEmpty {
             ExtensionRPCServer.shared.notifyShelfItemsChanged(itemIDs: addedIDs, action: "added")
         }
@@ -70,6 +75,7 @@ final class ShelfStateViewModel: ObservableObject {
     func remove(_ item: ShelfItem) {
         item.cleanupStoredData()
         items.removeAll { $0.id == item.id }
+        invalidateURLCache()
         ExtensionRPCServer.shared.notifyShelfItemsChanged(itemIDs: [item.id.uuidString], action: "removed")
     }
 
@@ -78,6 +84,7 @@ final class ShelfStateViewModel: ObservableObject {
         if case .file = items[idx].kind {
             items[idx].kind = .file(bookmark: bookmark)
         }
+        invalidateURLCache()
     }
 
     private func scheduleDeferredBookmarkUpdate(for item: ShelfItem, bookmark: Data) {
@@ -159,19 +166,45 @@ final class ShelfStateViewModel: ObservableObject {
         return result.url
     }
 
-    // Sync version for backward compatibility - uses synchronous bookmark resolution (blocks calling thread)
-    func resolveFileURL(for item: ShelfItem) -> URL? {
-        guard case .file(let bookmarkData) = item.kind else { return nil }
-        let bookmark = Bookmark(data: bookmarkData)
-        let result = bookmark.resolve()
-        if let refreshed = result.refreshedData, refreshed != bookmarkData {
-            NSLog("Bookmark for \(item) stale; refreshing")
-            scheduleDeferredBookmarkUpdate(for: item, bookmark: refreshed)
+    // Find item by URL using cached mapping (avoids resolving all bookmarks)
+    func findItem(by url: URL) -> ShelfItem? {
+        let path = url.standardizedFileURL.path
+        if urlCacheInvalidated {
+            rebuildURLCache()
         }
-        return result.url
+        if let itemID = urlToItemCache[path],
+           let idx = items.firstIndex(where: { $0.id == itemID }) {
+            return items[idx]
+        }
+        // Fallback: sync resolution for cache miss
+        return items.first { itm in
+            if case .file = itm.kind {
+                return resolveFileURL(for: itm)?.standardizedFileURL.path == path
+            }
+            return false
+        }
+    }
+    
+    private func rebuildURLCache() {
+        urlToItemCache.removeAll()
+        for item in items {
+            if case .file(let bookmarkData) = item.kind {
+                let bookmark = Bookmark(data: bookmarkData)
+                let result = bookmark.resolve()
+                if let url = result.url {
+                    urlToItemCache[url.standardizedFileURL.path] = item.id
+                }
+            }
+        }
+        urlCacheInvalidated = false
+    }
+    
+    private func invalidateURLCache() {
+        urlCacheInvalidated = true
     }
 
-    func resolveAndUpdateBookmark(for item: ShelfItem) -> URL? {
+    // Sync version for backward compatibility - uses synchronous bookmark resolution
+    func resolveFileURL(for item: ShelfItem) -> URL? {
         guard case .file(let bookmarkData) = item.kind else { return nil }
         let bookmark = Bookmark(data: bookmarkData)
         let result = bookmark.resolve()
