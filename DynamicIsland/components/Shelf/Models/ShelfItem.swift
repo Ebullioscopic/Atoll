@@ -207,7 +207,7 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
     func cleanupStoredData() {
         // Only resolve bookmark for temporary items - persisted items don't need cleanup
         guard isTemporary, case let .file(bookmark) = kind,
-              let context = resolvedContext(for: bookmark) else { return }
+              let context = resolvedContextSync(for: bookmark) else { return }
         
         let url = context.url
         
@@ -253,7 +253,7 @@ extension ShelfItem {
     var identityKey: String {
         switch kind {
         case .file(let bookmark):
-            if let url = resolvedContext(for: bookmark)?.url {
+            if let url = resolvedContextSync(for: bookmark)?.url {
                 return "file://" + url.standardizedFileURL.path
             }
             return "file://missing/" + bookmark.base64EncodedString()
@@ -280,12 +280,24 @@ private extension ShelfItemKind {
 }
 
 private extension ShelfItem {
-    func resolvedContext(for bookmarkData: Data) -> (url: URL, bookmark: Data)? {
+    func resolvedContext(for bookmarkData: Data) async -> (url: URL, bookmark: Data)? {
         let bookmark = Bookmark(data: bookmarkData)
-        let result = bookmark.resolve()
+        let result = await bookmark.resolveAsync()
         if let url = result.url {
             return (url, result.refreshedData ?? bookmarkData)
         }
         return nil
+    }
+
+    // Sync wrapper for backward compatibility
+    func resolvedContextSync(for bookmarkData: Data) -> (url: URL, bookmark: Data)? {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: (url: URL, bookmark: Data)?
+        Task.detached {
+            result = await resolvedContext(for: bookmarkData)
+            semaphore.signal()
+        }
+        _ = semaphore.wait(timeout: .now() + 5.0)
+        return result
     }
 }

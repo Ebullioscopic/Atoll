@@ -107,7 +107,7 @@ final class ExtensionRPCService {
             result = handleShowFilePicker(params: request.params, id: request.id)
 
         case "atoll.shareShelfItems":
-            result = handleShareShelfItems(params: request.params, id: request.id)
+            result = handleShareShelfItemsSync(params: request.params, id: request.id)
 
         case "atoll.addFilesToShelf":
             result = handleAddFilesToShelf(params: request.params, id: request.id)
@@ -486,7 +486,7 @@ final class ExtensionRPCService {
         return RPCSuccessResponse(result: ["itemIDs": .array(newItemIDs)], id: id)
     }
 
-    private func handleShareShelfItems(params: RPCParams?, id: String) -> Codable {
+    private func handleShareShelfItems(params: RPCParams?, id: String) async -> Codable {
         if let err = checkFileSharingAuthorization(id: id) { return err }
 
         guard let itemIDsValue = params?["itemIDs"],
@@ -502,7 +502,8 @@ final class ExtensionRPCService {
             return errorResponse(code: RPCErrorCode.invalidParams, message: "No matching shelf items found", id: id)
         }
 
-        let urls = ShelfStateViewModel.shared.resolveFileURLs(for: items)
+        // Use async resolution since this is called from an async context
+        let urls = await ShelfStateViewModel.shared.resolveFileURLsAsync(for: items)
         guard !urls.isEmpty else {
             return errorResponse(code: RPCErrorCode.internalError, message: "Could not resolve file URLs", id: id)
         }
@@ -518,6 +519,19 @@ final class ExtensionRPCService {
         } else {
             return errorResponse(code: RPCErrorCode.invalidParams, message: "Provider '\(provider)' not found", id: id)
         }
+    }
+
+    // Sync wrapper for backward compatibility - calls async version with semaphore
+    private func handleShareShelfItemsSync(params: RPCParams?, id: String) -> Codable {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: Codable!
+        Task.detached { [weak self] in
+            guard let self = self else { return }
+            result = await self.handleShareShelfItems(params: params, id: id)
+            semaphore.signal()
+        }
+        _ = semaphore.wait(timeout: .now() + 30.0)
+        return result
     }
 
     private func handleAddFilesToShelf(params: RPCParams?, id: String) -> Codable {
