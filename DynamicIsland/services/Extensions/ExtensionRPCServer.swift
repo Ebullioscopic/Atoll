@@ -219,7 +219,7 @@ final class ExtensionRPCServer {
 
             if let data = content, !data.isEmpty {
                 Task { @MainActor in
-                    self.processMessage(data: data, connID: connID)
+                    await self.processMessage(data: data, connID: connID)
                 }
             }
 
@@ -230,7 +230,7 @@ final class ExtensionRPCServer {
         }
     }
 
-    private func processMessage(data: Data, connID: UUID) {
+    private func processMessage(data: Data, connID: UUID) async {
         guard var clientConn = connections[connID] else { return }
 
         // Parse JSON-RPC request
@@ -256,7 +256,7 @@ final class ExtensionRPCServer {
             server: self
         )
 
-        let responseData = service.handleRequest(request)
+        let responseData = await service.handleRequest(request)
         sendRawData(responseData, to: connID)
     }
 
