@@ -4976,7 +4976,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "еще +%lld"
+            "value": "+%lld ещё"
           }
         },
         "sv": {
@@ -7516,7 +7516,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Цилиндр акцента"
+            "value": "Цвет акцента"
           }
         },
         "sv": {
@@ -8104,7 +8104,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Требуется разрешение на универсальный доступ"
+            "value": "Требуется разрешение «Универсальный доступ»"
           }
         },
         "sv": {
@@ -22181,7 +22181,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Круговой"
+            "value": "Круг"
           }
         },
         "sv": {
@@ -27558,12 +27558,6 @@
           "stringUnit": {
             "state": "new",
             "value": ""
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Подключено"
           }
         },
         "sv": {
@@ -43258,7 +43252,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Своб. · %@"
+            "value": "Свободно · %@"
           }
         },
         "sv": {
@@ -56953,7 +56947,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mediuм"
+            "value": "Средний"
           }
         },
         "sv": {
@@ -61478,7 +61472,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Загрузка"
+            "value": "Отправка"
           }
         },
         "sv": {
@@ -67095,7 +67089,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Открыть Настройки"
+            "value": "Открыть настройки"
           }
         },
         "sv": {
@@ -77186,12 +77180,6 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Running"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Выполняется"
           }
         },
         "sv": {
@@ -90851,7 +90839,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Файл подкачки (Swap)"
+            "value": "Подкачка"
           }
         },
         "sv": {
@@ -94731,7 +94719,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Transforм"
+            "value": "Преобразование"
           }
         },
         "sv": {
@@ -97019,7 +97007,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use music visualizer spectrograм"
+            "value": "Использовать спектрограмму визуализатора"
           }
         },
         "sv": {
@@ -97340,7 +97328,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Используется"
+            "value": "Занято"
           }
         },
         "sv": {
@@ -101692,6 +101680,12 @@
             "state": "translated",
             "value": "15 minuten"
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "15 мин"
+          }
         }
       }
     },
@@ -101713,6 +101707,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "30 minuten"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 мин"
           }
         }
       }
@@ -101736,6 +101736,12 @@
             "state": "translated",
             "value": "1 uur"
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 час"
+          }
         }
       }
     },
@@ -101757,6 +101763,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "3 uur"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3 часа"
           }
         }
       }
@@ -101780,6 +101792,12 @@
             "state": "translated",
             "value": "6 uur"
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "6 часов"
+          }
         }
       }
     },
@@ -101801,6 +101819,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "12 uur"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "12 часов"
           }
         }
       }
@@ -101824,6 +101848,12 @@
             "state": "translated",
             "value": "Rest van de dag"
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остаток дня"
+          }
         }
       }
     },
@@ -101845,6 +101875,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Altijd"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Всё время"
           }
         }
       }
@@ -101912,6 +101948,12 @@
             "state": "translated",
             "value": "Links"
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Слева"
+          }
         }
       }
     },
@@ -101933,6 +101975,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rechts"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Справа"
           }
         }
       }
@@ -101956,6 +102004,12 @@
             "state": "translated",
             "value": "Minimalistische gebruikersinterface inschakelen"
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Включить минималистичный интерфейс"
+          }
         }
       }
     },
@@ -101977,6 +102031,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Verberg Dynamic Island tijdens screenshots en opnames"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скрывать Dynamic Island на снимках и записях"
           }
         }
       }
@@ -102000,6 +102060,12 @@
             "state": "translated",
             "value": "Sluit gebaar"
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Жест закрытия"
+          }
         }
       }
     },
@@ -102021,6 +102087,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Omgekeerde veegbewegingen"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Инвертировать жесты смахивания"
           }
         }
       }
@@ -102044,6 +102116,12 @@
             "state": "translated",
             "value": "Omgekeerde scrollbewegingen"
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Инвертировать жесты прокрутки"
+          }
         }
       }
     },
@@ -102065,6 +102143,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Zweefgebied uitbreiden"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Расширить область наведения"
           }
         }
       }
@@ -102088,6 +102172,12 @@
             "state": "translated",
             "value": "Externe weergavestijl"
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Стиль внешнего дисплея"
+          }
         }
       }
     },
@@ -102109,6 +102199,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Verbergen totdat er zweefde"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скрывать до наведения"
           }
         }
       }
@@ -102132,6 +102228,12 @@
             "state": "translated",
             "value": "Schakel focusdetectie in"
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Включить обнаружение фокуса"
+          }
         }
       }
     },
@@ -102154,6 +102256,12 @@
             "state": "translated",
             "value": "Met toegankelijkheidsrechten kan Dynamic Island het oorspronkelijke volume, de helderheid en de toetsenbord-HUD's vervangen."
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Разрешение «Универсальный доступ» позволяет Dynamic Island заменять системные HUD громкости, яркости и подсветки клавиатуры."
+          }
         }
       }
     },
@@ -102175,6 +102283,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Volledige schijftoegang voor de globale modus"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Полный доступ к диску для глобального режима"
           }
         }
       }
@@ -102220,6 +102334,12 @@
             "state": "translated",
             "value": "Vraag volledige schijftoegang aan"
           }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Запросить полный доступ к диску"
+          }
         }
       }
     },
@@ -102241,6 +102361,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Open Privacy en beveiliging"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Открыть «Конфиденциальность и безопасность»"
+          }
+        }
+      }
+    },
+    "Bold text as bright colors": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bold text as bright colors"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Полужирный текст вместо ярких цветов"
           }
         }
       }

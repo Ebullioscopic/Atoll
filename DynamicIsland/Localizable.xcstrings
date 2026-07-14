@@ -846,7 +846,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%.1fс"
+            "value" : "%.1f s"
           }
         },
         "th" : {
@@ -1019,7 +1019,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ · %2$@"
+            "value" : "%@ · %@"
           }
         },
         "th" : {
@@ -1062,6 +1062,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "剩余 %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ осталось"
           }
         }
       }
@@ -2185,7 +2191,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lldд. назад"
+            "value" : "%lldd назад"
           }
         },
         "th" : {
@@ -2269,7 +2275,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lldч. назад"
+            "value" : "%lldh назад"
           }
         },
         "th" : {
@@ -2311,7 +2317,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lldм"
+            "value" : "%lldm"
           }
         },
         "th" : {
@@ -2353,7 +2359,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lldм. назад"
+            "value" : "%lldm назад"
           }
         },
         "th" : {
@@ -2395,6 +2401,12 @@
             "state" : "translated",
             "value" : "%lld秒"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld с"
+          }
         }
       }
     },
@@ -2409,7 +2421,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lldм назад"
+            "value" : "%lld×"
           }
         },
         "th" : {
@@ -3127,7 +3139,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "••••••••"
+            "value" : "+%lld ещё"
           }
         },
         "th" : {
@@ -3387,6 +3399,12 @@
             "state" : "translated",
             "value" : "1. 在浏览器中打开 Spotify 并登录"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1. Откройте Spotify в браузере и войдите в аккаунт"
+          }
         }
       }
     },
@@ -3538,6 +3556,12 @@
             "state" : "translated",
             "value" : "2. 开发者工具 -> Application/Storage -> Cookies -> https://open.spotify.com"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2. Инструменты разработчика → Приложение/Хранилище → Cookies → open.spotify.com"
+          }
         }
       }
     },
@@ -3614,6 +3638,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "3. 复制 `sp_dc` 的值并将其粘贴到此处"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3. Скопируйте значение sp_dc и вставьте сюда"
           }
         }
       }
@@ -4646,7 +4676,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Выделяющий цвет"
+            "value" : "Цвет акцента"
           }
         },
         "th" : {
@@ -6325,6 +6355,12 @@
             "state" : "translated",
             "value" : "调整锁屏计时器小组件宽度，不影响按钮大小。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настраивает ширину виджета таймера на экране блокировки без изменения размера кнопок."
+          }
         }
       }
     },
@@ -7368,6 +7404,12 @@
             "state" : "translated",
             "value" : "请在“系统设置”→“隐私与安全性”→“自动化”中允许 Atoll 控制“备忘录”。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешите Atoll доступ к заметкам: «Настройки системы» → «Конфиденциальность и безопасность» → «Автоматизация»."
+          }
         }
       }
     },
@@ -7941,6 +7983,12 @@
           }
         },
         "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amazon Music"
+          }
+        },
+        "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Amazon Music"
@@ -8523,6 +8571,12 @@
             "state" : "translated",
             "value" : "Apple 备忘录"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Заметки"
+          }
         }
       }
     },
@@ -9103,6 +9157,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll 仅使用本地 `sp_dc` cookie 来请求 Spotify 内部的 web-player 令牌，并获取当前曲目匹配的 Canvas。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll использует cookie sp_dc только для получения токена веб-плеера Spotify и загрузки Canvas для текущего трека."
           }
         }
       }
@@ -10101,6 +10161,12 @@
             "state" : "translated",
             "value" : "电池电量 %d%%，暂停充电"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Заряд батареи: %d%%, зарядка приостановлена"
+          }
         }
       }
     },
@@ -10263,6 +10329,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电池提示框"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уведомления батареи"
           }
         }
       }
@@ -11051,7 +11123,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bold text as bright цв."
+            "value" : "Полужирный текст вместо ярких цветов"
           }
         },
         "th" : {
@@ -11271,6 +11343,12 @@
             "state" : "translated",
             "value" : "İkisi de etkin"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оба активны"
+          }
         }
       }
     },
@@ -11443,6 +11521,12 @@
             "state" : "translated",
             "value" : "亮度微调步长"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Точный шаг яркости"
+          }
         }
       }
     },
@@ -11564,6 +11648,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "亮度步长"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шаг яркости"
           }
         }
       }
@@ -12070,6 +12160,12 @@
             "state" : "translated",
             "value" : "日历应用"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложение календаря"
+          }
         }
       }
     },
@@ -12368,6 +12464,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Yalnızca kamera"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Только камера"
           }
         }
       }
@@ -12729,6 +12831,12 @@
             "state" : "translated",
             "value" : "摄氏度"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цельсий"
+          }
         }
       }
     },
@@ -12814,6 +12922,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更改媒体输出"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сменить аудиовыход"
           }
         }
       }
@@ -12992,6 +13106,12 @@
             "state" : "translated",
             "value" : "充电提示持续时间"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Длительность показа зарядки"
+          }
         }
       }
     },
@@ -13013,6 +13133,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "充电提示框"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уведомление зарядки"
           }
         }
       }
@@ -13036,6 +13162,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂停充电"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зарядка приостановлена"
           }
         }
       }
@@ -14327,7 +14459,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Классическая форма выреза, плавно переходящая в верхний край экрана"
+            "value" : "Очистить"
           }
         },
         "th" : {
@@ -15595,6 +15727,12 @@
             "state" : "translated",
             "value" : "收起时的刘海/胶囊宽度"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ширина закрытого выреза"
+          }
         }
       }
     },
@@ -16546,6 +16684,12 @@
             "state" : "translated",
             "value" : "“紧凑”将保持提示内联。“标准”则使用带有充电动画的较高全尺寸提示框。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Компактный — уведомление в строке. Стандартный — полноценный HUD с анимацией зарядки."
+          }
         }
       }
     },
@@ -16567,6 +16711,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“紧凑”与充电提示框匹配。“标准”则使用展开的 DynamicNotch 风格卡片。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Компактный — как HUD зарядки. Стандартный — развёрнутая карточка DynamicNotch."
           }
         }
       }
@@ -16967,6 +17117,12 @@
             "state" : "translated",
             "value" : "连接 Spotify"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подключить Spotify"
+          }
         }
       }
     },
@@ -16989,12 +17145,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Verbonden"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Подключено"
           }
         },
         "th" : {
@@ -17968,7 +18118,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Масштабирование радиуса углов"
+            "value" : "Скругление углов"
           }
         },
         "th" : {
@@ -18238,7 +18388,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Создание и дизайн: пипетка, зеркало, визуальные эффекты"
+            "value" : "Из буфера обмена"
           }
         },
         "th" : {
@@ -18689,6 +18839,12 @@
             "state" : "translated",
             "value" : "当前：%@"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сейчас: %@"
+          }
         }
       }
     },
@@ -18920,6 +19076,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自定义专注模式元数据"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свои метаданные фокуса"
           }
         }
       }
@@ -19715,6 +19877,12 @@
             "state" : "translated",
             "value" : "自定义计时器样式"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стиль таймера"
+          }
         }
       }
     },
@@ -20101,6 +20269,12 @@
             "state" : "translated",
             "value" : "自定义实体刘海宽度"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ширина выреза"
+          }
         }
       }
     },
@@ -20136,6 +20310,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自定义拖放文件时出现的 LocalSend 设备选择弹出窗口的外观。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройте внешний вид всплывающего окна выбора устройства LocalSend при перетаскивании файлов."
           }
         }
       }
@@ -20433,6 +20613,12 @@
             "state" : "translated",
             "value" : "默认视图"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вид по умолчанию"
+          }
         }
       }
     },
@@ -20722,6 +20908,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已拒绝"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запрещено"
           }
         }
       }
@@ -21145,6 +21337,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设备选择样式"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стиль выбора устройства"
           }
         }
       }
@@ -21618,6 +21816,12 @@
             "state" : "translated",
             "value" : "启用外接显示器亮度集成时不可用。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отключено при активной интеграции яркости внешнего дисплея."
+          }
         }
       }
     },
@@ -21679,6 +21883,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "启用外接显示器音量集成时不可用。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отключено при активной интеграции громкости внешнего дисплея."
           }
         }
       }
@@ -22305,7 +22515,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Отображает ближайшее предстоящее событие календаря над или под виджетом погоды. Выбор календаря здесь не зависит от фильтра календаря в динамическом острове."
+            "value" : "Не беспокоить"
           }
         },
         "th" : {
@@ -23641,6 +23851,12 @@
             "state" : "translated",
             "value" : "Düzenle"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Изменить"
+          }
         }
       }
     },
@@ -23885,6 +24101,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空插槽"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пустой слот"
           }
         }
       }
@@ -24530,6 +24752,12 @@
             "state" : "translated",
             "value" : "启用彩色频谱图"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цветные спектрограммы"
+          }
         }
       }
     },
@@ -24617,7 +24845,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Включить цветную спектрограмму"
+            "value" : "Цветные спектрограммы"
           }
         },
         "th" : {
@@ -26028,6 +26256,12 @@
             "state" : "translated",
             "value" : "启用实时波形"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Волновая форма в реальном времени"
+          }
         }
       }
     },
@@ -26633,6 +26867,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "启用第三方日历应用启动"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открывать события в стороннем календаре"
           }
         }
       }
@@ -27785,6 +28025,12 @@
             "state" : "translated",
             "value" : "展开宽度调整仅适用于标准刘海布局。请关闭简约界面后再编辑。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Расширенная настройка ширины доступна только для стандартного выреза. Отключите минималистичный интерфейс."
+          }
         }
       }
     },
@@ -28092,6 +28338,12 @@
             "state" : "translated",
             "value" : "华氏度"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фаренгейт"
+          }
         }
       }
     },
@@ -28252,6 +28504,12 @@
             "state" : "translated",
             "value" : "拖放到此处的文件将通过此服务共享"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файлы, перетащенные сюда, будут отправлены через этот сервис"
+          }
         }
       }
     },
@@ -28335,6 +28593,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从架子共享的文件将使用此服务"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файлы с панели будут отправлены через этот сервис"
           }
         }
       }
@@ -28658,7 +28922,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Фокус"
+            "value" : "Фокус: %@"
           }
         },
         "th" : {
@@ -28969,6 +29233,12 @@
             "state" : "translated",
             "value" : "快进 10 秒"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вперёд на 10 с"
+          }
         }
       }
     },
@@ -29043,7 +29313,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Текст"
+            "value" : "Свободно · %@"
           }
         },
         "th" : {
@@ -29179,6 +29449,12 @@
             "state" : "translated",
             "value" : "完全访问"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полный доступ"
+          }
         }
       }
     },
@@ -29200,6 +29476,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "满电量"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полный заряд"
           }
         }
       }
@@ -29223,6 +29505,12 @@
             "state" : "translated",
             "value" : "满电提示持续时间"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Длительность показа полного заряда"
+          }
         }
       }
     },
@@ -29244,6 +29532,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "满电提示样式"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стиль уведомления полного заряда"
           }
         }
       }
@@ -29308,6 +29602,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "满电阈值"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Порог полной зарядки"
           }
         }
       }
@@ -29390,6 +29690,12 @@
             "state" : "translated",
             "value" : "完全磁盘访问解锁自定义专注模式图标、颜色和标签。标准专注检测无需此权限即可工作——仅在需要个性化指示器时授予访问权限。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полный доступ к диску открывает пользовательские иконки, цвета и метки фокуса. Стандартное обнаружение работает и без него."
+          }
         }
       }
     },
@@ -29411,6 +29717,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "右键点按显示全屏封面"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полноэкранная обложка по ПКМ"
           }
         }
       }
@@ -29480,6 +29792,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已充满提示框"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уведомление полного заряда"
           }
         }
       }
@@ -30052,6 +30370,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "手动获取 cookie"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Получить cookie вручную"
           }
         }
       }
@@ -30930,6 +31254,12 @@
             "state" : "translated",
             "value" : "Merhaba, cam!"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Привет, стекло!"
+          }
         }
       }
     },
@@ -31056,6 +31386,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "隐藏当前事件并显示下一个即将到来的事件"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прятать прошедшее событие"
           }
         }
       }
@@ -31523,7 +31859,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ступенчатый"
+            "value" : "Иерархический"
           }
         },
         "th" : {
@@ -31872,6 +32208,12 @@
             "state" : "translated",
             "value" : "小时"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Часы"
+          }
         }
       }
     },
@@ -32037,6 +32379,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提示框持续时间"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Длительность показа"
           }
         }
       }
@@ -32259,6 +32607,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提示框测试"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тестирование HUD"
           }
         }
       }
@@ -32790,6 +33144,12 @@
             "state" : "translated",
             "value" : "%@后"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "через %@"
+          }
         }
       }
     },
@@ -32813,6 +33173,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "还有 %lld"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "через %lld"
           }
         }
       }
@@ -33698,6 +34064,12 @@
             "state" : "translated",
             "value" : "显示全屏封面时保留专辑封面"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показывать обложку в полноэкранном режиме"
+          }
         }
       }
     },
@@ -33998,6 +34370,12 @@
             "state" : "translated",
             "value" : "上次同步"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последняя синхронизация"
+          }
         }
       }
     },
@@ -34031,6 +34409,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上次更新"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Последнее обновление"
           }
         }
       }
@@ -34474,7 +34858,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Лёгкий режим"
+            "value" : "Ширина линии: %lld пк"
           }
         },
         "th" : {
@@ -34660,6 +35044,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "液态玻璃变体"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вариант Liquid Glass"
           }
         }
       }
@@ -35298,6 +35688,12 @@
             "state" : "translated",
             "value" : "LocalSend 设备选择器"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбор устройства LocalSend"
+          }
         }
       }
     },
@@ -35330,7 +35726,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Загрузка..."
+            "value" : "Экран блокировки"
           }
         },
         "th" : {
@@ -36151,6 +36547,12 @@
             "state" : "translated",
             "value" : "低电量"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Низкий заряд"
+          }
         }
       }
     },
@@ -36172,6 +36574,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "低电量提示持续时间"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Длительность показа низкого заряда"
           }
         }
       }
@@ -36195,6 +36603,12 @@
             "state" : "translated",
             "value" : "低电量提示框"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уведомление низкого заряда"
+          }
         }
       }
     },
@@ -36217,6 +36631,12 @@
             "state" : "translated",
             "value" : "低电量提示样式"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стиль уведомления низкого заряда"
+          }
         }
       }
     },
@@ -36238,6 +36658,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "低电量阈值"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Порог низкого заряда"
           }
         }
       }
@@ -36426,6 +36852,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "歌词"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Текст песни"
           }
         }
       }
@@ -36646,6 +37078,12 @@
             "state" : "translated",
             "value" : "请确保 LocalSend 在其他设备上运行"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Убедитесь, что LocalSend запущен на других устройствах"
+          }
         }
       }
     },
@@ -36705,6 +37143,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "手动"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вручную"
           }
         }
       }
@@ -36811,6 +37255,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "匹配专辑封面"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Соответствовать обложке"
           }
         }
       }
@@ -37737,7 +38187,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Таймаут отсутствия активности медиа"
+            "value" : "Пауза при бездействии медиа"
           }
         },
         "th" : {
@@ -37941,6 +38391,12 @@
             "state" : "translated",
             "value" : "媒体面板宽度"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ширина медиа-панели"
+          }
         }
       }
     },
@@ -38028,7 +38484,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Эфир активности воспроизведения медиа"
+            "value" : "Live Activity воспроизведения"
           }
         },
         "th" : {
@@ -38252,8 +38708,8 @@
         },
         "ru" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Medium"
+            "state" : "translated",
+            "value" : "Средний"
           }
         },
         "th" : {
@@ -38764,6 +39220,12 @@
             "state" : "translated",
             "value" : "方法来源"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Источник"
+          }
         }
       }
     },
@@ -39150,6 +39612,12 @@
             "state" : "translated",
             "value" : "Yalnızca mikrofon"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Только микрофон"
+          }
         }
       }
     },
@@ -39325,6 +39793,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "分钟"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "мин"
           }
         }
       }
@@ -39670,6 +40144,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "镜像摄像头"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зеркальное отображение камеры"
           }
         }
       }
@@ -40399,6 +40879,12 @@
             "state" : "translated",
             "value" : "音乐"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Музыка"
+          }
         }
       }
     },
@@ -40590,6 +41076,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音乐可视化"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Визуализатор музыки"
           }
         }
       }
@@ -41239,7 +41731,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Загрузка"
+            "value" : "Отправка"
           }
         },
         "th" : {
@@ -41404,6 +41896,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下一首"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Следующий трек"
           }
         }
       }
@@ -42101,6 +42599,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未找到设备"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Устройства не найдены"
           }
         }
       }
@@ -43147,6 +43651,12 @@
             "state" : "translated",
             "value" : "未确定"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не определено"
+          }
         }
       }
     },
@@ -43287,6 +43797,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kayıt yok"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запись не ведётся"
           }
         }
       }
@@ -43809,6 +44325,12 @@
             "state" : "translated",
             "value" : "“备忘录”返回了空响应。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Заметки вернули пустой ответ."
+          }
         }
       }
     },
@@ -43820,6 +44342,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“备忘录”脚本未返回结果。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скрипт заметок не вернул результат."
           }
         }
       }
@@ -43934,6 +44462,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "现在"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "сейчас"
           }
         }
       }
@@ -44231,6 +44765,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暂停中"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приостановлено"
           }
         }
       }
@@ -44592,6 +45132,12 @@
             "state" : "translated",
             "value" : "在浏览器中打开"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть в браузере"
+          }
         }
       }
     },
@@ -44760,6 +45306,12 @@
             "state" : "translated",
             "value" : "打开隐私与安全性"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть «Конфиденциальность и безопасность»"
+          }
         }
       }
     },
@@ -44823,6 +45375,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开 Spotify Web 播放器"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть Spotify Web Player"
           }
         }
       }
@@ -45236,7 +45794,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Использование Option в качестве Meta клавиши отправляет Esc+клавишу вместо специальных символов macOS. Отправка сообщений о действиях мыши передаёт события мыши приложениям терминала, например vim или tmux."
+            "value" : "Устройства вывода"
           }
         },
         "th" : {
@@ -45569,6 +46127,12 @@
             "state" : "translated",
             "value" : "视差效果强度"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Интенсивность эффекта параллакса"
+          }
         }
       }
     },
@@ -45592,6 +46156,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从剪贴板粘贴"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вставить из буфера обмена"
           }
         }
       }
@@ -45645,6 +46215,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已暂停"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пауза"
           }
         }
       }
@@ -45795,6 +46371,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每次按键调整的百分比。按住 Shift+Option 时使用微调步长。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Изменение процента за нажатие. Точный шаг — при удержании Shift+Option."
           }
         }
       }
@@ -46426,6 +47008,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "播放 / 暂停"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Воспроизведение / Пауза"
           }
         }
       }
@@ -47439,6 +48027,12 @@
             "state" : "translated",
             "value" : "上一首"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Предыдущий трек"
+          }
         }
       }
     },
@@ -47564,6 +48158,12 @@
             "state" : "translated",
             "value" : "PRO"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRO"
+          }
         }
       }
     },
@@ -47605,48 +48205,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "效率"
-          }
-        }
-      }
-    },
-    "Progress" : {
-      "comment" : "Name of the download indicator style that shows a progress bar.",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "진행도"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vooruitgang"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Прогресс"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ความคืบหน้า"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "İlerleme"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "进度"
           }
         }
       }
@@ -48061,6 +48619,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "快速共享设置"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройки быстрой отправки"
           }
         }
       }
@@ -48721,6 +49285,12 @@
             "state" : "translated",
             "value" : "推荐最小宽度根据启用的标签页数量自动调整。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рекомендуемая минимальная ширина определяется автоматически по числу включённых вкладок."
+          }
         }
       }
     },
@@ -48801,6 +49371,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kayıt etkin"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запись активна"
           }
         }
       }
@@ -48984,6 +49560,12 @@
             "state" : "translated",
             "value" : "刷新设备"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновить список"
+          }
         }
       }
     },
@@ -49019,6 +49601,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已拒绝"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отклонено"
           }
         }
       }
@@ -49726,6 +50314,12 @@
             "state" : "translated",
             "value" : "重复播放"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повтор"
+          }
         }
       }
     },
@@ -49747,6 +50341,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当当前应用提供动态 Canvas 时，用它替换封面磁贴，并重复利用该动态 Canvas 生成周围的灯光效果。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Заменяет обложку на Live Canvas, если приложение его поддерживает, и использует его для эффекта подсветки."
           }
         }
       }
@@ -49833,6 +50433,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请求完全磁盘访问"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запросить полный доступ к диску"
           }
         }
       }
@@ -50198,6 +50804,12 @@
             "state" : "translated",
             "value" : "重置媒体宽度"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сбросить ширину медиа"
+          }
         }
       }
     },
@@ -50231,6 +50843,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重置音乐"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сбросить музыку"
           }
         }
       }
@@ -50352,6 +50970,12 @@
             "state" : "translated",
             "value" : "重置会话"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сбросить сессию"
+          }
         }
       }
     },
@@ -50386,6 +51010,12 @@
             "state" : "translated",
             "value" : "重置计时器"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сбросить таймер"
+          }
         }
       }
     },
@@ -50419,6 +51049,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重置计时器宽度"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сбросить ширину таймера"
           }
         }
       }
@@ -50553,6 +51189,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重置天气"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сбросить погоду"
           }
         }
       }
@@ -50921,7 +51563,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Перезапускает процессы оболочки. Любые несохраненные данные в терминале будут потеряны."
+            "value" : "Восстановить"
           }
         },
         "th" : {
@@ -51070,6 +51712,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "受限"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ограничено"
           }
         }
       }
@@ -51285,6 +51933,12 @@
             "state" : "translated",
             "value" : "后退 10 秒"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назад на 10 с"
+          }
         }
       }
     },
@@ -51395,6 +52049,12 @@
             "state" : "translated",
             "value" : "在锁屏上右键点击专辑封面将其设置为壁纸。再次右键点击或点击背景恢复原始壁纸。如果有 Canvas 可用，Atoll 还可以在动态 Canvas 上方保留相同的专辑封面和播放器布局。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ПКМ по обложке на экране блокировки — установить обои. ПКМ или клик по фону — восстановить originals. При наличии canvas обложка и плеер отображаются поверх него."
+          }
         }
       }
     },
@@ -51497,6 +52157,12 @@
             "state" : "translated",
             "value" : "标尺式"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Линейка"
+          }
         }
       }
     },
@@ -51580,12 +52246,6 @@
             "value" : "Running"
           }
         },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Запущено"
-          }
-        },
         "th" : {
           "stringUnit" : {
             "state" : "translated",
@@ -51630,6 +52290,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在当前目标显示器上运行真实的刘海动画。如果外部屏幕正在使用灵动岛模式，电池提示框将首先发送到那里。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запускает анимацию выреза на целевом дисплее. При использовании Dynamic Island на внешнем экране HUD батареи выводится туда."
           }
         }
       }
@@ -52020,6 +52686,12 @@
             "state" : "translated",
             "value" : "重新扫描"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сканировать снова"
+          }
         }
       }
     },
@@ -52055,6 +52727,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在扫描设备..."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поиск устройств…"
           }
         }
       }
@@ -53196,6 +53874,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择设备"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбрать устройство"
           }
         }
       }
@@ -54512,6 +55196,12 @@
             "state" : "translated",
             "value" : "显示「更改媒体输出」控制"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показывать кнопку «Сменить аудиовыход»"
+          }
         }
       }
     },
@@ -54767,6 +55457,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在电池图标内显示百分比"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Процент заряда внутри иконки"
           }
         }
       }
@@ -55813,6 +56509,12 @@
             "state" : "translated",
             "value" : "显示浮动媒体控制"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Плавающие элементы управления"
+          }
         }
       }
     },
@@ -56088,6 +56790,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在灵动岛中显示动态 Canvas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live Canvas в Dynamic Island"
           }
         }
       }
@@ -56442,6 +57150,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示合并的隔空播放和输出设备"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Объединять устройства AirPlay и вывода"
           }
         }
       }
@@ -57231,6 +57945,12 @@
             "state" : "translated",
             "value" : "在无刘海显示器上显示歌曲标题和艺人"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Название и исполнитель на внешних дисплеях"
+          }
         }
       }
     },
@@ -57709,6 +58429,12 @@
             "state" : "translated",
             "value" : "缩小锁屏媒体面板同时保持展开视图全宽。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уменьшает медиа-панель экрана блокировки, сохраняя развёрнутый вид на всю ширину."
+          }
         }
       }
     },
@@ -57743,6 +58469,12 @@
             "state" : "translated",
             "value" : "随机播放"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перемешать"
+          }
         }
       }
     },
@@ -57767,6 +58499,12 @@
             "state" : "translated",
             "value" : "登录 Spotify 以自动捕获 `sp_dc` cookie，或者在下面粘贴。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Войдите в Spotify для автоматического получения cookie `sp_dc` или вставьте его вручную."
+          }
         }
       }
     },
@@ -57790,6 +58528,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用 Spotify 登录"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Войти через Spotify"
           }
         }
       }
@@ -57858,7 +58602,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Простой и минималистичный интерфейс с самым необходимым для повседневных задач."
+            "value" : "Размер и масштаб"
           }
         },
         "th" : {
@@ -58507,7 +59251,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Стиль предварительного просмотра"
+            "value" : "Стиль быстрого просмотра"
           }
         },
         "th" : {
@@ -58765,6 +59509,12 @@
             "state" : "translated",
             "value" : "sp_dc cookie"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie sp_dc"
+          }
         }
       }
     },
@@ -58991,6 +59741,12 @@
             "state" : "translated",
             "value" : "Spotify Canvas 会话"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify Canvas"
+          }
         }
       }
     },
@@ -59014,6 +59770,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spotify 经常屏蔽应用内登录。请通过您的常用浏览器登录，然后在设置中粘贴 sp_dc。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify часто блокирует вход из приложений. Войдите через браузер и вставьте sp_dc в настройках."
           }
         }
       }
@@ -59405,7 +60167,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Стандартные элементы управления предыдущим/следующим треком"
+            "value" : "Начать"
           }
         },
         "th" : {
@@ -59790,6 +60552,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开始计时"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустить таймер"
           }
         }
       }
@@ -60469,6 +61237,12 @@
             "state" : "translated",
             "value" : "步长"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Величина шага"
+          }
         }
       }
     },
@@ -60501,7 +61275,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Держите дела под контролем с календарём, таймером и мониторингом батареи."
+            "value" : "Остановить"
           }
         },
         "th" : {
@@ -61134,7 +61908,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Файл подкачки (Swap)"
+            "value" : "Подкачка"
           }
         },
         "th" : {
@@ -61221,6 +61995,12 @@
             "state" : "translated",
             "value" : "立即同步"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Синхронизировать"
+          }
         }
       }
     },
@@ -61230,6 +62010,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "与 Apple 备忘录同步"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Синхронизация с Заметками"
           }
         }
       }
@@ -61887,6 +62673,12 @@
             "state" : "translated",
             "value" : "终端透明度仅影响终端背景；文本保持完全不透明。模糊将使用窗口后方的系统材质。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прозрачность терминала влияет только на фон; текст остаётся непрозрачным. Размытие использует системный материал."
+          }
         }
       }
     },
@@ -61908,6 +62700,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "测试充电提示框"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тест уведомления зарядки"
           }
         }
       }
@@ -61931,6 +62729,12 @@
             "state" : "translated",
             "value" : "测试充满电提示框"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тест уведомления полного заряда"
+          }
         }
       }
     },
@@ -61952,6 +62756,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "测试低电量提示框"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тест уведомления низкого заряда"
           }
         }
       }
@@ -62178,6 +62988,12 @@
             "state" : "translated",
             "value" : "这些临时提示框再现了充电、低电量和充满电时的刘海提醒。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Эти временные HUD воссоздают уведомления зарядки, низкого и полного заряда для предпросмотра."
+          }
         }
       }
     },
@@ -62259,6 +63075,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "第三方日历集成"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сторонние календари"
           }
         }
       }
@@ -62468,7 +63290,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Плиточный"
+            "value" : "Мозаичный"
           }
         },
         "th" : {
@@ -63321,6 +64143,12 @@
             "state" : "translated",
             "value" : "计时器小组件宽度"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ширина виджета таймера"
+          }
         }
       }
     },
@@ -63876,7 +64704,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пропустить"
+            "value" : "Преобразование"
           }
         },
         "th" : {
@@ -64308,6 +65136,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "与 macOS“备忘录”进行双向同步。在 Atoll 中创建的备忘录会显示在“备忘录”的 Atoll 文件夹中，现有的 Apple 备忘录也会导入刘海区域。出现提示时，请授予“备忘录”自动化权限。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Двусторонняя синхронизация с Apple Заметками. Заметки Atoll появляются в папке Atoll, а существующие заметки импортируются в вырез."
           }
         }
       }
@@ -64795,6 +65629,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无标题备忘录"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без названия"
           }
         }
       }
@@ -65428,6 +66268,12 @@
             "state" : "translated",
             "value" : "在全屏动态画布上使用专辑封面布局"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Макет обложки поверх полноэкранного canvas"
+          }
         }
       }
     },
@@ -65530,7 +66376,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Использовать DevTools"
+            "value" : "С DevTools"
           }
         },
         "th" : {
@@ -65577,6 +66423,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用增强型液态玻璃边框"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Улучшенная жидкостная рамка"
           }
         }
       }
@@ -65705,7 +66557,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Использовать визуализацию музыки (спектрограмму)"
+            "value" : "Использовать спектрограмму визуализатора"
           }
         },
         "th" : {
@@ -65888,7 +66740,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Использовать без DevTools"
+            "value" : "Без DevTools"
           }
         },
         "th" : {
@@ -65942,7 +66794,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Использовать без инструментов разработчика (DevTools)"
+            "value" : "Занято"
           }
         },
         "th" : {
@@ -66131,6 +66983,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当 Amazon Music 应用是活动媒体源时使用 macOS 正在播放。播放控制遵循系统正在播放目标。如果 Amazon Music 应用不支持远程拖拽，在时间轴上拖动可能无效。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Использует «Сейчас играет» при активном Amazon Music. Управление следует системному воспроизведению."
           }
         }
       }
@@ -66339,6 +67197,12 @@
             "state" : "translated",
             "value" : "验证 Cookie"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверить cookie"
+          }
         }
       }
     },
@@ -66362,6 +67226,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在验证..."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверка…"
           }
         }
       }
@@ -66398,6 +67268,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "变体 %lld"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вариант %lld"
           }
         }
       }
@@ -66656,6 +67532,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "垂直条"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вертикальная полоса"
           }
         }
       }
@@ -66961,6 +67843,12 @@
             "state" : "translated",
             "value" : "音量微调步长"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Точный шаг громкости"
+          }
         }
       }
     },
@@ -67082,6 +67970,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音量步长"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шаг громкости"
           }
         }
       }
@@ -67554,6 +68448,12 @@
             "state" : "translated",
             "value" : "Karşılama penceresi"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Окно приветствия"
+          }
         }
       }
     },
@@ -67826,6 +68726,12 @@
             "state" : "translated",
             "value" : "启用后，点击日历事件将打开选定的第三方日历应用程序，而不是 Apple 日历。"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "При включении клик по событиям открывает выбранное приложение календаря вместо Apple Calendar."
+          }
         }
       }
     },
@@ -67953,6 +68859,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "启用时，音乐可视化将显示与音乐同步的实时音频频谱数据。需要 macOS 14.2+，通过 Accelerate 框架使用最少的 CPU/GPU 资源。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "При включении визуализатор показывает спектр аудио в реальном времени, синхронизированный с музыкой. Требуется macOS 14.2+, минимальная нагрузка на систему."
           }
         }
       }
@@ -68164,6 +69076,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "宽度调整仅适用于标准刘海布局。禁用简约界面以编辑此值。"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройка ширины доступна только для стандартного выреза. Отключите минималистичный интерфейс."
           }
         }
       }
@@ -68426,7 +69344,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Работает со всеми медиа приложениями, включая браузеры, определяя, что воспроизводится. Заметка: функция может быть удалена в будущих версиях macOS."
+            "value" : "Запись"
           }
         },
         "th" : {
@@ -68479,6 +69397,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "仅写入"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Только запись"
           }
         }
       }
@@ -69085,6 +70009,170 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "YouTube 音乐需要安装此第三方应用程序： "
+          }
+        }
+      }
+    },
+    "Visualizer candles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visualizer candles"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Столбцы визуализатора"
+          }
+        }
+      }
+    },
+    "Color extraction" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Color extraction"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Извлечение цвета"
+          }
+        }
+      }
+    },
+    "Symbol" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Symbol"
+          }
+        }
+      }
+    },
+    "3D" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3D"
+          }
+        }
+      }
+    },
+    "Legacy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legacy"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Классический"
+          }
+        }
+      }
+    },
+    "Vibrant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibrant"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Яркий"
+          }
+        }
+      }
+    },
+    "Compact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compact"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Компактный"
+          }
+        }
+      }
+    },
+    "Show AirPods listening mode changes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show AirPods listening mode changes"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показывать смену режимов прослушивания AirPods"
+          }
+        }
+      }
+    },
+    "Accessibility permission required" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accessibility permission required"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Требуется разрешение «Универсальный доступ»"
+          }
+        }
+      }
+    },
+    "Open Settings" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть настройки"
+          }
+        }
+      }
+    },
+    "Accessibility permission lets Dynamic Island replace the native volume, brightness, and keyboard HUDs." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accessibility permission lets Dynamic Island replace the native volume, brightness, and keyboard HUDs."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешение «Универсальный доступ» позволяет Dynamic Island заменять системные HUD громкости, яркости и подсветки клавиатуры."
           }
         }
       }
