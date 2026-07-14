@@ -48,6 +48,33 @@ struct Bookmark: Sendable, Equatable, Codable {
         }
     }
 
+    func resolveAsync() async -> (url: URL?, refreshedData: Data?) {
+        guard !data.isEmpty else { return (nil, nil) }
+        return await Task.detached(priority: .userInitiated) { [data] in
+            var isStale = false
+            do {
+                let url = try URL(
+                    resolvingBookmarkData: data,
+                    options: [.withSecurityScope],
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
+                if isStale, let newData = try? url.bookmarkData(options: [.withSecurityScope]) {
+                    NSLog("⚠️ Bookmark was stale for \(url.path), refreshed")
+                    return (url, newData)
+                }
+                return (url, nil)
+            } catch {
+                NSLog("❌ Failed to resolve bookmark asynchronously: \(error.localizedDescription)")
+                return (nil, nil)
+            }
+        }.value
+    }
+
+    func resolveURL() -> URL? {
+        return resolve().url
+    }
+
     func resolve() -> (url: URL?, refreshedData: Data?) {
         guard !data.isEmpty else { return (nil, nil) }
         var isStale = false
@@ -69,22 +96,8 @@ struct Bookmark: Sendable, Equatable, Codable {
         }
     }
 
-    func resolveURL() -> URL? {
-        return resolve().url
-    }
-
-    var refreshedData: Data? {
-        return resolve().refreshedData
-    }
-    
-    static func update(in items: inout [ShelfItem], for item: ShelfItem, newBookmark: Data) {
-        guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
-        guard case .file = items[idx].kind else { return }
-        items[idx].kind = ShelfItemKind.file(bookmark: newBookmark)
-    }
-
     func validate() async -> Bool {
-        let (url, _) = resolve()
+        let (url, _) = await resolveAsync()
         guard let url = url else { return false }
         return url.accessSecurityScopedResource { url in
             FileManager.default.fileExists(atPath: url.path)
@@ -104,6 +117,12 @@ struct Bookmark: Sendable, Equatable, Codable {
         guard let url = url else { return nil }
         return try url.accessSecurityScopedResource { url in
             try block(url)
+        }
+    }
+
+    func invalidate() {
+        if let url = resolveURL() {
+            url.stopAccessingSecurityScopedResource()
         }
     }
 }

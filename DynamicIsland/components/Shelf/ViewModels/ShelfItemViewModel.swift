@@ -31,6 +31,8 @@ import ObjectiveC
 final class ShelfItemViewModel: ObservableObject {
     @Published private(set) var item: ShelfItem
     @Published var thumbnail: NSImage?
+    @Published var displayName: String = ""
+    @Published var icon: NSImage?
     @Published var isDropTargeted: Bool = false
     @Published var isRenaming: Bool = false
     @Published var draftTitle: String = ""
@@ -43,17 +45,41 @@ final class ShelfItemViewModel: ObservableObject {
 
     init(item: ShelfItem) {
         self.item = item
-        self.draftTitle = item.displayName
+        self.displayName = ""  // Will be loaded asynchronously
+        self.icon = nil        // Will be loaded asynchronously
         Task { await loadThumbnail() }
+        Task { await loadDisplayName() }
+        Task { await loadIcon() }
     }
 
     var isSelected: Bool { selection.isSelected(item.id) }
 
+    func loadDisplayName() async {
+        let name = await item.loadDisplayName()
+        await MainActor.run { self.displayName = name }
+    }
+
+    func loadIcon() async {
+        let image = await item.loadIcon()
+        await MainActor.run { self.icon = image }
+    }
+
     func loadThumbnail() async {
-        guard let url = item.fileURL else { return }
-        if let image = await ThumbnailService.shared.thumbnail(for: url, size: CGSize(width: 56, height: 56)) {
+        guard case .file(let bookmarkData) = item.kind else { return }
+        let bookmark = Bookmark(data: bookmarkData)
+        let (url, _) = await bookmark.resolveAsync()
+        guard let resolvedURL = url else { return }
+        if let image = await ThumbnailService.shared.thumbnail(for: resolvedURL, size: CGSize(width: 56, height: 56)) {
             self.thumbnail = image
         }
+    }
+
+    // Async version to resolve file URL without blocking main thread
+    func resolveFileURL() async -> URL? {
+        guard case .file(let bookmarkData) = item.kind else { return nil }
+        let bookmark = Bookmark(data: bookmarkData)
+        let (url, _) = await bookmark.resolveAsync()
+        return url
     }
 
     // MARK: - Drag & Drop helpers

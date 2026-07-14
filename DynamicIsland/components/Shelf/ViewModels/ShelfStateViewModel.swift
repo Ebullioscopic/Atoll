@@ -135,7 +135,31 @@ final class ShelfStateViewModel: ObservableObject {
         }
     }
 
+    // Async version that resolves bookmark on background thread
+    func resolveFileURLAsync(for item: ShelfItem) async -> URL? {
+        guard case .file(let bookmarkData) = item.kind else { return nil }
+        let bookmark = Bookmark(data: bookmarkData)
+        let result = await bookmark.resolveAsync()
+        if let refreshed = result.refreshedData, refreshed != bookmarkData {
+            NSLog("Bookmark for \(item) stale; refreshing")
+            await MainActor.run { scheduleDeferredBookmarkUpdate(for: item, bookmark: refreshed) }
+        }
+        return result.url
+    }
 
+    // Async version for user-initiated actions
+    func resolveAndUpdateBookmarkAsync(for item: ShelfItem) async -> URL? {
+        guard case .file(let bookmarkData) = item.kind else { return nil }
+        let bookmark = Bookmark(data: bookmarkData)
+        let result = await bookmark.resolveAsync()
+        if let refreshed = result.refreshedData, refreshed != bookmarkData {
+            NSLog("Bookmark for \(item) stale; refreshing")
+            await MainActor.run { updateBookmark(for: item, bookmark: refreshed) }
+        }
+        return result.url
+    }
+
+    // Sync version for backward compatibility (used in drag operations, etc.) - but uses background resolution
     func resolveFileURL(for item: ShelfItem) -> URL? {
         guard case .file(let bookmarkData) = item.kind else { return nil }
         let bookmark = Bookmark(data: bookmarkData)

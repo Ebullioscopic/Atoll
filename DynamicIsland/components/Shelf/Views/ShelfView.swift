@@ -80,18 +80,22 @@ struct ShelfView: View {
         guard quickLookService.isQuickLookOpen && !selection.selectedIDs.isEmpty else { return }
         
         let selectedItems = selection.selectedItems(in: tvm.items)
-        let urls: [URL] = selectedItems.compactMap { item in
-            if let fileURL = item.fileURL {
-                return fileURL
-            }
-            if case .link(let url) = item.kind {
-                return url
-            }
-            return nil
-        }
         
-        if !urls.isEmpty {
-            quickLookService.updateSelection(urls: urls)
+        Task {
+            var urls: [URL] = []
+            for item in selectedItems {
+                if let fileURL = await ShelfStateViewModel.shared.resolveFileURLAsync(for: item) {
+                    urls.append(fileURL)
+                } else if case .link(let url) = item.kind {
+                    urls.append(url)
+                }
+            }
+            
+            if !urls.isEmpty {
+                await MainActor.run {
+                    quickLookService.updateSelection(urls: urls)
+                }
+            }
         }
     }
 

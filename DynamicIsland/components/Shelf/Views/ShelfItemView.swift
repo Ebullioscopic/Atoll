@@ -64,7 +64,7 @@ struct ShelfItemView: View {
                     viewModel: viewModel,
                     cachedPreviewImage: $cachedPreviewImage,
                     dragPreviewContent: {
-                        DragPreviewView(thumbnail: viewModel.thumbnail ?? item.icon, displayName: item.displayName)
+                        DragPreviewView(thumbnail: viewModel.thumbnail ?? viewModel.icon, displayName: viewModel.displayName)
                     },
                     onRightClick: viewModel.handleRightClick,
                     onClick: { event, nsview in
@@ -89,6 +89,8 @@ struct ShelfItemView: View {
         .onAppear {
             Task { 
                 await viewModel.loadThumbnail()
+                await viewModel.loadDisplayName()
+                await viewModel.loadIcon()
                 // Pre-render drag preview once on appear
                 if cachedPreviewImage == nil {
                     cachedPreviewImage = await renderDragPreview()
@@ -110,7 +112,7 @@ struct ShelfItemView: View {
     // MARK: - View Components
 
     private var iconView: some View {
-        Image(nsImage: viewModel.thumbnail ?? item.icon)
+        Image(nsImage: viewModel.thumbnail ?? viewModel.icon ?? NSImage())
             .resizable()
             .aspectRatio(contentMode: .fit)
             .frame(width: 56, height: 56)
@@ -119,7 +121,7 @@ struct ShelfItemView: View {
     }
 
     private var textView: some View {
-        Text(item.displayName)
+        Text(viewModel.displayName)
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(Color.white)
             .lineLimit(2)
@@ -174,10 +176,10 @@ struct ShelfItemView: View {
     
     @MainActor
     private func renderDragPreview() async -> NSImage {
-        let content = DragPreviewView(thumbnail: viewModel.thumbnail ?? item.icon, displayName: item.displayName)
+        let content = DragPreviewView(thumbnail: viewModel.thumbnail ?? viewModel.icon ?? NSImage(), displayName: viewModel.displayName)
         let renderer = ImageRenderer(content: content)
         renderer.scale = NSScreen.main?.backingScaleFactor ?? 2.0
-        return renderer.nsImage ?? (viewModel.thumbnail ?? item.icon)
+        return renderer.nsImage ?? (viewModel.thumbnail ?? viewModel.icon ?? NSImage())
     }
 
     
@@ -223,7 +225,7 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
         }
         
         // Fallback to icon if rendering fails
-        return viewModel.thumbnail ?? item.icon
+        return viewModel.thumbnail ?? viewModel.icon ?? NSImage()
     }
     
     final class DraggableClickView: NSView, NSDraggingSource {

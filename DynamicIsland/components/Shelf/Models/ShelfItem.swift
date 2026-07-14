@@ -68,57 +68,26 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     var kind: ShelfItemKind
     var isTemporary: Bool
-    init(id: UUID = UUID(), kind: ShelfItemKind, isTemporary: Bool = false) {
+    // Cached display name and icon to avoid blocking on bookmark resolution
+    var cachedDisplayName: String?
+    var cachedIconData: Data?
+    init(id: UUID = UUID(), kind: ShelfItemKind, isTemporary: Bool = false, cachedDisplayName: String? = nil, cachedIconData: Data? = nil) {
         self.id = id
         self.kind = kind
         self.isTemporary = isTemporary
+        self.cachedDisplayName = cachedDisplayName
+        self.cachedIconData = cachedIconData
     }
     
     var displayName: String {
         switch kind {
         case .file(let bookmarkData):
-            let bookmark = Bookmark(data: bookmarkData)
-            guard let resolvedURL = bookmark.resolveURL() else { return "" }
-            
-            // Check for stored data files (text blocks, weblocs, etc.) to provide friendly names
-            if resolvedURL.pathExtension.lowercased() == "json" && resolvedURL.path.contains("TextBlocks") {
-                do {
-                    let data = try Data(contentsOf: resolvedURL)
-                    let decoder = JSONDecoder()
-                    decoder.dateDecodingStrategy = .iso8601
-                    struct TextBlockData: Codable {
-                        let content: String
-                        let title: String?
-                        var displayTitle: String {
-                            if let title = title, !title.isEmpty {
-                                return title
-                            }
-                            let firstLine = content.components(separatedBy: .newlines).first ?? content
-                            if firstLine.count > 50 {
-                                return String(firstLine.prefix(47)) + "..."
-                            }
-                            return firstLine
-                        }
-                    }
-                    if let textData = try? decoder.decode(TextBlockData.self, from: data) {
-                        return textData.displayTitle
-                    }
-                } catch {
-                    // Fall through to default naming
-                }
-            } else if resolvedURL.pathExtension.lowercased() == "webloc" && resolvedURL.path.contains("WebLocs") {
-                do {
-                    let data = try Data(contentsOf: resolvedURL)
-                    if let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
-                       let urlString = plist["URL"] as? String {
-                        let title = plist["Title"] as? String
-                        return title ?? urlString
-                    }
-                } catch {
-                    // Fall through to default naming
-                }
+            if let cached = cachedDisplayName, !cached.isEmpty {
+                return cached
             }
-            return (try? resolvedURL.resourceValues(forKeys: [.localizedNameKey]).localizedName) ?? resolvedURL.lastPathComponent
+            // No synchronous fallback - return empty string if not cached
+            // Async resolution should be done via loadDisplayName()
+            return ""
         case .text(let string):
             return string.trimmingCharacters(in: .whitespacesAndNewlines)
         case .link(let url):
@@ -135,25 +104,98 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
     
     var fileURL: URL? {
         guard case .file = kind else { return nil }
-        return ShelfStateViewModel.shared.resolveFileURL(for: self)
+        // Don't resolve synchronously - use async method from ShelfStateViewModel
+        return nil
     }
     
     var URL: URL? {
-        if case let .file(bookmark) = kind { return resolvedContext(for: bookmark)?.url }
-        else if case let .link(url) = kind { return url }
-        else { return nil }
+        if case let .file(bookmark) = kind { 
+            // Don't resolve synchronously
+            return nil
+        } else if case let .link(url) = kind { 
+            return url 
+        } else { 
+            return nil 
+        }
     }
     
     var icon: NSImage {
+        if let cachedData = cachedIconData, let cachedImage = NSImage(data: cachedData) {
+            return cachedImage
+        }
         guard case .file = kind else {
             return Self.thumbnailSymbolImage(systemName: kind.iconSymbolName) ?? NSImage()
         }
-        if let resolvedURL = ShelfStateViewModel.shared.resolveFileURL(for: self) {
-            return NSWorkspace.shared.icon(forFile: resolvedURL.path)
-        }
-        return NSImage()
+        // Return generic file icon instead of blocking on bookmark resolution
+        return NSWorkspace.shared.icon(forFileType: "public.item")
     }
     
+    // Async methods to load display name and icon without blocking
+    func loadDisplayName() async -> String {
+        // If we have a cached name, return it
+        if let cached = cachedDisplayName, !cached.isEmpty {
+            return cached
+        }
+        // Otherwise try to resolve asynchronously
+        guard case .file(let bookmarkData) = kind else { return displayName }
+        let bookmark = Bookmark(data: bookmarkData)
+        let (url, _) = await bookmark.resolveAsync()
+        guard let resolvedURL = url else { return "" }
+        
+        if resolvedURL.pathExtension.lowercased() == "json" && resolvedURL.path.contains("TextBlocks") {
+            do {
+                let data = try Data(contentsOf: resolvedURL)
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                struct TextBlockData: Codable {
+                    let content: String
+                    let title: String?
+                    var displayTitle: String {
+                        if let title = title, !title.isEmpty {
+                            return title
+                        }
+                        let firstLine = content.components(separatedBy: .newlines).first ?? content
+                        if firstLine.count > 50 {
+                            return String(firstLine.prefix(47)) + "..."
+                        }
+                        return firstLine
+                    }
+                }
+                if let textData = try? decoder.decode(TextBlockData.self, from: data) {
+                    return textData.displayTitle
+                }
+            } catch {
+                // Fall through
+            }
+        } else if resolvedURL.pathExtension.lowercased() == "webloc" && resolvedURL.path.contains("WebLocs") {
+            do {
+                let data = try Data(contentsOf: resolvedURL)
+                if let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                   let urlString = plist["URL"] as? String {
+                    let title = plist["Title"] as? String
+                    return title ?? urlString
+                }
+            } catch {
+                // Fall through
+            }
+        }
+        return (try? resolvedURL.resourceValues(forKeys: [.localizedNameKey]).localizedName) ?? resolvedURL.lastPathComponent
+    }
+    
+    func loadIcon() async -> NSImage {
+        if let cachedData = cachedIconData, let cachedImage = NSImage(data: cachedData) {
+            return cachedImage
+        }
+        guard case .file(let bookmarkData) = kind else {
+            return Self.thumbnailSymbolImage(systemName: kind.iconSymbolName) ?? NSImage()
+        }
+        let bookmark = Bookmark(data: bookmarkData)
+        let (url, _) = await bookmark.resolveAsync()
+        if let resolvedURL = url {
+            return NSWorkspace.shared.icon(forFile: resolvedURL.path)
+        }
+        return NSWorkspace.shared.icon(forFileType: "public.item")
+    }
 
     func cleanupStoredData() {
         guard case let .file(bookmark) = kind,
@@ -235,8 +277,9 @@ private extension ShelfItemKind {
 private extension ShelfItem {
     func resolvedContext(for bookmarkData: Data) -> (url: URL, bookmark: Data)? {
         let bookmark = Bookmark(data: bookmarkData)
-        if let url = bookmark.resolveURL() {
-            return (url, bookmark.refreshedData ?? bookmarkData)
+        let result = bookmark.resolve()
+        if let url = result.url {
+            return (url, result.refreshedData ?? bookmarkData)
         }
         return nil
     }
