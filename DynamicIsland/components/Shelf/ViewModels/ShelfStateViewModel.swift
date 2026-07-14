@@ -159,7 +159,7 @@ final class ShelfStateViewModel: ObservableObject {
         return result.url
     }
 
-    // Sync version for backward compatibility (used in drag operations, etc.) - but uses background resolution
+    // Sync version for backward compatibility - uses synchronous bookmark resolution (blocks calling thread)
     func resolveFileURL(for item: ShelfItem) -> URL? {
         guard case .file(let bookmarkData) = item.kind else { return nil }
         let bookmark = Bookmark(data: bookmarkData)
