@@ -133,6 +133,7 @@ actor YouTubeMusicWebSocketClient {
     private let onMessage: @Sendable (Data) async -> Void
     private let onDisconnect: @Sendable (URLSessionWebSocketTask.CloseCode?, Data?) async -> Void
     private var authenticated = false
+    private var isIntentionalDisconnect = false
     private var lastCloseCode: URLSessionWebSocketTask.CloseCode?
     private var lastCloseReason: Data?
     
@@ -154,25 +155,21 @@ actor YouTubeMusicWebSocketClient {
     func connect(to url: URL, with token: String) async throws {
         await disconnect()
         
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        components?.queryItems = [URLQueryItem(name: "token", value: token)]
-        
-        guard let wsURL = components?.url else {
-            throw YouTubeMusicError.invalidURL
-        }
-        
-        var request = URLRequest(url: wsURL)
+        // URL already has token query param from WebSocketURLBuilder.buildURL
+        var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let newTask = session.webSocketTask(with: request)
         task = newTask
         authenticated = false
+        isIntentionalDisconnect = false
         newTask.resume()
         
         Task { await listenForMessages() }
     }
     
     func disconnect() async {
+        isIntentionalDisconnect = true
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
         authenticated = false
@@ -210,8 +207,15 @@ actor YouTubeMusicWebSocketClient {
         // Capture close code before clearing task
         lastCloseCode = task?.closeCode
         lastCloseReason = task?.closeReason
+        
+        let closeCode = lastCloseCode
+        let closeReason = lastCloseReason
         task = nil
-        await onDisconnect(lastCloseCode, lastCloseReason)
+        
+        // Only call onDisconnect for unexpected closures, not intentional disconnects
+        if !isIntentionalDisconnect {
+            await onDisconnect(closeCode, closeReason)
+        }
     }
 }
 

@@ -185,6 +185,11 @@ final class YouTubeMusicController: MediaControllerProtocol {
             return
         }
         
+        // Disconnect existing client first to avoid stale callbacks
+        if let existingClient = webSocketClient {
+            await existingClient.disconnect()
+        }
+        
         let client = YouTubeMusicWebSocketClient(
             onMessage: { [weak self] data in
                 await self?.handleWebSocketMessage(data)
