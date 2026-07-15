@@ -78,9 +78,10 @@ struct ShelfView: View {
     
     private func updateQuickLookSelection() {
         guard quickLookService.isQuickLookOpen && !selection.selectedIDs.isEmpty else { return }
-        
+
         let selectedItems = selection.selectedItems(in: tvm.items)
-        
+        let capturedIDs = selection.selectedIDs
+
         Task {
             var urls: [URL] = []
             for item in selectedItems {
@@ -90,10 +91,13 @@ struct ShelfView: View {
                     urls.append(url)
                 }
             }
-            
+
             if !urls.isEmpty {
                 await MainActor.run {
-                    quickLookService.updateSelection(urls: urls)
+                    // Only update if selection hasn't changed since we started resolving
+                    if selection.selectedIDs == capturedIDs {
+                        quickLookService.updateSelection(urls: urls)
+                    }
                 }
             }
         }
