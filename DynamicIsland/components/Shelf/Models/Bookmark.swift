@@ -119,10 +119,4 @@ struct Bookmark: Sendable, Equatable, Codable {
             try block(url)
         }
     }
-
-    func invalidate() {
-        if let url = resolveURL() {
-            url.stopAccessingSecurityScopedResource()
-        }
-    }
 }
