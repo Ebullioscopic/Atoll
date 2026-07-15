@@ -1301,21 +1301,13 @@ extension Defaults.Keys {
     static let enableAppleNotesSync = Key<Bool>("enableAppleNotesSync", default: false)
     static let appleNotesLastSyncDate = Key<Date?>("appleNotesLastSyncDate", default: nil)
     
-    // Default media controller.
-    //
-    // Use the system "Now Playing" (MediaRemote) controller by default: it
-    // reads the macOS Now Playing target and therefore works with EVERY media
-    // app — Apple Music, NetEase Cloud Music (网易云音乐), Spotify, QQ Music,
-    // etc. Apple Music also registers with the system Now Playing, so picking
-    // Now Playing does NOT lose Apple Music support; it merely restores the
-    // third-party players that the Apple-Music-only controller cannot see.
-    //
-    // Previously the default was switched to `.appleMusic` on macOS 15.4+, which
-    // silently broke recognition of NetEase Cloud Music and other apps (see
-    // Settings footer: "'Now Playing' ... works with all media apps"). Restored
-    // to `.nowPlaying` so all players are recognized out of the box.
+    // Helper to determine the default media controller based on macOS version
     static var defaultMediaController: MediaControllerType {
-        .nowPlaying
+        if #available(macOS 15.4, *) {
+            return .appleMusic
+        } else {
+            return .nowPlaying
+        }
     }
     
     // Migration helper to convert from legacy enableGradient Boolean to new ProgressBarStyle enum

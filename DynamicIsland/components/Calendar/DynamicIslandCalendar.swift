@@ -60,6 +60,25 @@ func scrollReferenceTime(for date: Date) -> Date {
 
 // MARK: - Compact all-day events strip
 
+/// Shared layout metrics for the all-day events strip.
+///
+/// The strip height and the space reserved for it in the timed-events list must
+/// stay in sync across `AllDayEventsStrip`, `StandaloneEventCardList`, and
+/// `EventListView`. Centralising the values here avoids the hardcoded
+/// `28` / `3` / `41` / `30` duplicated in multiple views (#566 review).
+private enum AllDayStripMetrics {
+    /// Height of the horizontal chip row inside `AllDayEventsStrip`.
+    static let chipRowHeight: CGFloat = 28
+    /// Vertical padding applied around the chips and the strip content.
+    static let verticalPadding: CGFloat = 3
+    /// Top inset pushed onto the timed `List` so `scrollTo(.top)` lands the
+    /// target event fully below the floating all-day overlay
+    /// (chip row + 1pt divider + 1pt margin ≈ 30pt). Shared by `EventListView`
+    /// and `StandaloneEventCardList` so both reserve exactly the same space.
+    /// (#566 review: de-duplicate the hardcoded 28/3/41/30)
+    static let listTopInset: CGFloat = 30
+}
+
 /// Horizontal, single-row strip of all-day events.
 ///
 /// The Dynamic Island calendar panel is height-constrained (`CalendarView` is
@@ -83,9 +102,9 @@ private struct AllDayEventsStrip: View {
                     }
                 }
                 .padding(.horizontal, 4)
-                .padding(.vertical, 3)
+                .padding(.vertical, AllDayStripMetrics.verticalPadding)
             }
-            .frame(height: 28)
+            .frame(height: AllDayStripMetrics.chipRowHeight)
             .clipped()
 
             Rectangle()
@@ -119,7 +138,7 @@ private struct AllDayEventsStrip: View {
             }
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 3)
+        .padding(.vertical, AllDayStripMetrics.verticalPadding)
         .background(Capsule().fill(Color.white.opacity(0.08)))
         .contentShape(Capsule())
         .onTapGesture {
@@ -784,11 +803,14 @@ private struct StandaloneEventCardList: View {
     @State private var initialAutoScrollDone = false
 
     private var allDayEvents: [EventModel] {
-        partitionEvents(events).allDay
+        partitionEvents(events).allDay.sorted { $0.start < $1.start }
     }
 
     private var timedEvents: [EventModel] {
-        partitionEvents(events).timed
+        // Sorted by start time so `scrollTargetForTimedEvents` (which uses
+        // `first(where:)` to pick in-progress / next-upcoming) returns the true
+        // nearest-to-now event, and the list renders chronologically. (#566)
+        partitionEvents(events).timed.sorted { $0.start < $1.start }
     }
 
     private func scrollToRelevantEvent(proxy: ScrollViewProxy) {
@@ -796,9 +818,10 @@ private struct StandaloneEventCardList: View {
         let refTime = scrollReferenceTime(for: selectedDate)
         guard let target = scrollTargetForTimedEvents(timed: timedEvents, referenceTime: refTime) else { return }
 
-        // When an all-day strip overlays the top of the list, anchor the
-        // scrolled-to event to .center so it isn't hidden behind the strip.
-        let anchor: UnitPoint = allDayEvents.isEmpty ? .top : .center
+        // The List reserves `listTopInset` at its top when an all-day strip is
+        // present, so scrolling to `.top` lands the target event just below the
+        // overlay — fully visible. Mirrors `EventListView`. (#566)
+        let anchor: UnitPoint = .top
         Task { @MainActor in
             withTransaction(Transaction(animation: nil)) {
                 proxy.scrollTo(target.id, anchor: anchor)
@@ -807,47 +830,34 @@ private struct StandaloneEventCardList: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Scrollable timed events with auto-scroll. The all-day strip is
-            // rendered as a floating overlay ON TOP of the full-height scroll
-            // area (see the ZStack below) instead of consuming vertical space,
-            // so the timed-events scroll region keeps the entire panel height
-            // and never shrinks to a tiny hit box (#566 feedback: issue #1).
+        // Timed-events list fills the whole panel; the all-day strip floats as
+        // an overlay on top (zero vertical cost) so the scroll area below keeps
+        // its full height inside the constrained calendar panel. The List
+        // carries a top padding equal to the strip height so scrollTo(.top)
+        // lands the target event fully below the overlay. Using `List` (instead
+        // of the previous `LazyVStack`-in-`ScrollView`) keeps the scroll
+        // behaviour and look consistent with `EventListView` and gives built-in
+        // separators. (#566 review: unify the two event lists)
+        ZStack(alignment: .top) {
             ScrollViewReader { proxy in
-                ZStack(alignment: .top) {
-                    ScrollView {
-                        LazyVStack(spacing: 8) {
-                            // Reserve the strip's height at the top of the
-                            // scroll content so the first event isn't hidden
-                            // behind the floating all-day strip.
-                            if !allDayEvents.isEmpty {
-                                Color.clear
-                                    .frame(height: 41)
-                            }
-
-                            ForEach(timedEvents) { event in
-                                eventCard(event)
-                                    .id(event.id)
-                            }
+                ZStack {
+                    List {
+                        ForEach(timedEvents) { event in
+                            eventCard(event)
+                                .id(event.id)
+                                .padding(.bottom, 8)
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .listRowInsets(EdgeInsets())
                         }
-                        .padding(.vertical, 2)
                     }
-                    .clipped()
-
-                    // Floating all-day strip overlay (32pt chip row + 1pt
-                    // divider + 8pt vertical padding ≈ 41pt). It sits above the
-                    // scroll area and events scroll underneath it, like macOS
-                    // Calendar's Day view. No shadow gradient is drawn on top
-                    // of the events anymore (#566 feedback: issue #2).
-                    if !allDayEvents.isEmpty {
-                        AllDayEventsStrip(
-                            events: allDayEvents,
-                            onToggleReminder: onToggleReminder
-                        )
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.4))
-                        .frame(maxWidth: .infinity, alignment: .top)
-                    }
+                    .listStyle(.plain)
+                    .scrollIndicators(.never)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
+                    // Push list content down so scrollTo(.top) positions the
+                    // target event fully below the floating all-day overlay.
+                    .padding(.top, allDayEvents.isEmpty ? 0 : AllDayStripMetrics.listTopInset)
                 }
                 .onAppear {
                     scrollToRelevantEvent(proxy: proxy)
@@ -866,6 +876,19 @@ private struct StandaloneEventCardList: View {
                     scrollToRelevantEvent(proxy: proxy)
                     initialAutoScrollDone = true
                 }
+            }
+
+            // Floating all-day strip overlay (28pt chip row + 1pt divider ≈ 29pt).
+            // It sits above the list and events scroll underneath it, like macOS
+            // Calendar's Day view. Matches `EventListView`'s overlay exactly so
+            // the reserved `listTopInset` (30) lines up with the real strip
+            // height. No shadow gradient is drawn on top of the events anymore.
+            if !allDayEvents.isEmpty {
+                AllDayEventsStrip(
+                    events: allDayEvents,
+                    onToggleReminder: onToggleReminder
+                )
+                .background(Color.black.opacity(0.95))
             }
         }
         .clipped()
@@ -1096,7 +1119,7 @@ struct EventListView: View {
                     // Push list content down so scrollTo(.top) positions the
                     // target event fully below the floating all-day overlay
                     // (28pt strip + 1pt separator + 1pt margin = 30pt).
-                    .padding(.top, allDayEvents.isEmpty ? 0 : 30)
+                    .padding(.top, allDayEvents.isEmpty ? 0 : AllDayStripMetrics.listTopInset)
 
                     // (Shadows intentionally removed — #566 feedback: the gradient
                     // overlay was permanently drawn on top of the events.)
