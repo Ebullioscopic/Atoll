@@ -246,6 +246,8 @@ final class CPUSensorCollector {
             return ["Te05", "Te0L", "Te0P", "Te0S", "Tf04", "Tf09", "Tf0A", "Tf0B", "Tf0D", "Tf0E", "Tf44", "Tf49", "Tf4A", "Tf4B", "Tf4D", "Tf4E"]
         case .m4, .m4Pro, .m4Max, .m4Ultra:
             return ["Te05", "Te09", "Te0H", "Te0S", "Tp01", "Tp05", "Tp09", "Tp0D", "Tp0V", "Tp0Y", "Tp0b", "Tp0e"]
+        case .m5, .m5Pro, .m5Max, .m5Ultra:
+            return ["Te05", "Te09", "Te0H", "Te0S", "Tp01", "Tp05", "Tp09", "Tp0D", "Tp0V", "Tp0Y", "Tp0b", "Tp0e"]
         default:
             return ["TC0P", "TC0E", "TC0F", "TC0H", "TC0D"]
         }

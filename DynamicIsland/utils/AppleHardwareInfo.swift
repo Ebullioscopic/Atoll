@@ -38,6 +38,10 @@ enum ApplePlatform: String {
     case m4Pro
     case m4Max
     case m4Ultra
+    case m5
+    case m5Pro
+    case m5Max
+    case m5Ultra
 }
 
 struct CPUClusterFrequencies {
@@ -111,6 +115,12 @@ final class AppleHardwareInfo {
             if name.contains("pro") { return .m4Pro }
             return .m4
         }
+        if name.contains("m5") {
+            if name.contains("ultra") { return .m5Ultra }
+            if name.contains("max") { return .m5Max }
+            if name.contains("pro") { return .m5Pro }
+            return .m5
+        }
         return nil
     }
 
@@ -153,6 +163,7 @@ final class AppleHardwareInfo {
 
         let lowerName = cpuName.lowercased()
         let isM4 = lowerName.contains("m4")
+        let isM5 = lowerName.contains("m5")
         var eFreq: [Int32] = []
         var pFreq: [Int32] = []
 
@@ -161,10 +172,10 @@ final class AppleHardwareInfo {
             guard let name = di_getIOName(service), name == "pmgr", let props = di_getIOProperties(service) else { continue }
 
             if let data = props["voltage-states1-sram"] as? Data {
-                eFreq = di_convertCFDataToFrequencies(data, isM4: isM4)
+                eFreq = di_convertCFDataToFrequencies(data, isM4: isM4 || isM5)
             }
             if let data = props["voltage-states5-sram"] as? Data {
-                pFreq = di_convertCFDataToFrequencies(data, isM4: isM4)
+                pFreq = di_convertCFDataToFrequencies(data, isM4: isM4 || isM5)
             }
         }
 
