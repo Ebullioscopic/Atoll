@@ -131,13 +131,19 @@ actor YouTubeMusicWebSocketClient {
     private var task: URLSessionWebSocketTask?
     private let session: URLSession
     private let onMessage: @Sendable (Data) async -> Void
-    private let onDisconnect: @Sendable () async -> Void
+    private let onDisconnect: @Sendable (URLSessionWebSocketTask.CloseCode?, Data?) async -> Void
+    private var authenticated = false
+    private var lastCloseCode: URLSessionWebSocketTask.CloseCode?
+    private var lastCloseReason: Data?
     
-    var isConnected: Bool { task != nil }
+    var isConnected: Bool { task?.state == .running }
+    var isAuthenticated: Bool { authenticated }
+    var closeCode: URLSessionWebSocketTask.CloseCode? { lastCloseCode }
+    var closeReason: Data? { lastCloseReason }
     
     init(
         onMessage: @escaping @Sendable (Data) async -> Void,
-        onDisconnect: @escaping @Sendable () async -> Void,
+        onDisconnect: @escaping @Sendable (URLSessionWebSocketTask.CloseCode?, Data?) async -> Void,
         session: URLSession = .shared
     ) {
         self.onMessage = onMessage
@@ -148,11 +154,19 @@ actor YouTubeMusicWebSocketClient {
     func connect(to url: URL, with token: String) async throws {
         await disconnect()
         
-        var request = URLRequest(url: url)
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "token", value: token)]
+        
+        guard let wsURL = components?.url else {
+            throw YouTubeMusicError.invalidURL
+        }
+        
+        var request = URLRequest(url: wsURL)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let newTask = session.webSocketTask(with: request)
         task = newTask
+        authenticated = false
         newTask.resume()
         
         Task { await listenForMessages() }
@@ -161,6 +175,7 @@ actor YouTubeMusicWebSocketClient {
     func disconnect() async {
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
+        authenticated = false
     }
     
     private func listenForMessages() async {
@@ -180,19 +195,29 @@ actor YouTubeMusicWebSocketClient {
                     continue
                 }
                 
+                if let wsMessage = WebSocketMessage(from: data), !authenticated {
+                    if wsMessage.type == .playerInfo || wsMessage.type == .videoChanged || wsMessage.type == .playerStateChanged {
+                        authenticated = true
+                    }
+                }
+                
                 await onMessage(data)
             } catch {
                 break
             }
         }
+        
+        // Capture close code before clearing task
+        lastCloseCode = task?.closeCode
+        lastCloseReason = task?.closeReason
         task = nil
-        await onDisconnect()
+        await onDisconnect(lastCloseCode, lastCloseReason)
     }
 }
 
 // MARK: - WebSocket URL Helper
 struct WebSocketURLBuilder {
-    static func buildURL(from baseURL: String) -> URL? {
+    static func buildURL(from baseURL: String, with token: String? = nil) -> URL? {
         guard var components = URLComponents(string: baseURL) else { return nil }
 
         switch components.scheme {
@@ -205,6 +230,11 @@ struct WebSocketURLBuilder {
         }
 
         components.path = "/api/v1/ws"
+        
+        if let token = token {
+            components.queryItems = [URLQueryItem(name: "token", value: token)]
+        }
+        
         return components.url
     }
 }

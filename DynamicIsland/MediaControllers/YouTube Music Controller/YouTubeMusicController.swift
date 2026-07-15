@@ -180,7 +180,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
     }
     
     private func setupWebSocketIfPossible(token: String) async {
-        guard let wsURL = WebSocketURLBuilder.buildURL(from: configuration.baseURL) else {
+        guard let wsURL = WebSocketURLBuilder.buildURL(from: configuration.baseURL, with: token) else {
             print("[YouTubeMusicController] Failed to build WebSocket URL")
             return
         }
@@ -189,8 +189,8 @@ final class YouTubeMusicController: MediaControllerProtocol {
             onMessage: { [weak self] data in
                 await self?.handleWebSocketMessage(data)
             },
-            onDisconnect: { [weak self] in
-                await self?.handleWebSocketDisconnect()
+            onDisconnect: { [weak self] closeCode, closeReason in
+                await self?.handleWebSocketDisconnect(closeCode: closeCode, closeReason: closeReason)
             }
         )
         
@@ -198,7 +198,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
             try await client.connect(to: wsURL, with: token)
             webSocketClient = client
             stopPeriodicUpdates() // WebSocket will provide real-time updates
-            reconnectDelay = configuration.reconnectDelay.lowerBound
+            // Do NOT reset reconnectDelay here - wait for authenticated message
         } catch {
             print("[YouTubeMusicController] WebSocket connection failed: \(error)")
             await scheduleReconnect()
@@ -218,6 +218,8 @@ final class YouTubeMusicController: MediaControllerProtocol {
                let response = PlaybackResponse.from(websocketData: data) {
                 await updatePlaybackState(with: response)
             }
+            // Reset reconnect delay on successful authenticated message
+            reconnectDelay = configuration.reconnectDelay.lowerBound
 
         case .positionChanged:
             guard let data = message.extractData() else { return }
@@ -263,10 +265,20 @@ final class YouTubeMusicController: MediaControllerProtocol {
         }
     }
     
-    private func handleWebSocketDisconnect() async {
+    private func handleWebSocketDisconnect(closeCode: URLSessionWebSocketTask.CloseCode?, closeReason: Data?) async {
+        // Check if this was an auth failure (close code 1008)
+        let wasAuthFailure = closeCode?.rawValue == 1008
+        
         webSocketClient = nil
         await startPeriodicUpdates() // Fallback to polling
-        await scheduleReconnect()
+        
+        if wasAuthFailure {
+            // Token invalid, invalidate and re-authenticate
+            await authManager.invalidateToken()
+            await scheduleReconnect()
+        } else {
+            await scheduleReconnect()
+        }
     }
     
     private func scheduleReconnect() async {
