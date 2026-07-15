@@ -98,10 +98,10 @@ final class ExtensionRPCService {
 
         // MARK: File Sharing
         case "atoll.getShelfItems":
-            result = handleGetShelfItems(params: request.params, id: request.id)
+            result = await handleGetShelfItems(params: request.params, id: request.id)
 
         case "atoll.getShelfItemData":
-            result = handleGetShelfItemData(params: request.params, id: request.id)
+            result = await handleGetShelfItemData(params: request.params, id: request.id)
 
         case "atoll.showFilePicker":
             result = handleShowFilePicker(params: request.params, id: request.id)
@@ -379,7 +379,7 @@ final class ExtensionRPCService {
 
     // MARK: - File Sharing Handlers
 
-    private func handleGetShelfItems(params: RPCParams?, id: String) -> Codable {
+    private func handleGetShelfItems(params: RPCParams?, id: String) async -> Codable {
         if let err = checkFileSharingAuthorization(id: id) { return err }
 
         let items = ShelfStateViewModel.shared.items
@@ -393,10 +393,15 @@ final class ExtensionRPCService {
             switch item.kind {
             case .file(let bookmark):
                 entry["kind"] = .string("file")
-                if let url = Bookmark(data: bookmark).resolveURL() {
+                let bookmarkObj = Bookmark(data: bookmark)
+                let result = await bookmarkObj.resolveAsync()
+                if let url = result.url {
                     entry["path"] = .string(url.path)
-                    if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-                       let size = attrs[.size] as? Int {
+                    // File attribute lookup off MainActor
+                    let attrs = await Task.detached(priority: .userInitiated) { [url] in
+                        try? FileManager.default.attributesOfItem(atPath: url.path)
+                    }.value
+                    if let attrs = attrs, let size = attrs[.size] as? Int {
                         entry["size"] = .int(size)
                     }
                 }
@@ -414,7 +419,7 @@ final class ExtensionRPCService {
         return RPCSuccessResponse(result: ["items": .array(result)], id: id)
     }
 
-    private func handleGetShelfItemData(params: RPCParams?, id: String) -> Codable {
+    private func handleGetShelfItemData(params: RPCParams?, id: String) async -> Codable {
         if let err = checkFileSharingAuthorization(id: id) { return err }
 
         guard let itemID = params?["itemID"]?.stringValue,
@@ -428,14 +433,22 @@ final class ExtensionRPCService {
 
         switch item.kind {
         case .file(let bookmark):
-            guard let url = Bookmark(data: bookmark).resolveURL() else {
+            let bookmarkObj = Bookmark(data: bookmark)
+            let result = await bookmarkObj.resolveAsync()
+            guard let url = result.url else {
                 return errorResponse(code: RPCErrorCode.internalError, message: "Cannot resolve file bookmark", id: id)
             }
-            guard let fileData = url.accessSecurityScopedResource(accessor: { try? Data(contentsOf: $0) }) else {
+            // Read file data off MainActor
+            let fileData = await Task.detached(priority: .userInitiated) { [url] in
+                url.accessSecurityScopedResource { url in
+                    try? Data(contentsOf: url)
+                }
+            }.value
+            guard let data = fileData else {
                 return errorResponse(code: RPCErrorCode.internalError, message: "Cannot read file data", id: id)
             }
-            let base64 = fileData.base64EncodedString()
-            logDiagnostics("RPC: getShelfItemData returned \(fileData.count) bytes for \(bundleIdentifier)")
+            let base64 = data.base64EncodedString()
+            logDiagnostics("RPC: getShelfItemData returned \(data.count) bytes for \(bundleIdentifier)")
             return RPCSuccessResponse(result: [
                 "data": .string(base64),
                 "fileName": .string(url.lastPathComponent),
