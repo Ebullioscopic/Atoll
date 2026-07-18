@@ -93,6 +93,12 @@ struct ContentView: View {
     @Default(.showOnAllDisplays) var showOnAllDisplays
     @Default(.lowBatteryHUDStyle) var lowBatteryHUDStyle
     @Default(.fullBatteryHUDStyle) var fullBatteryHUDStyle
+
+    // Notch glass settings
+    @Default(.notchGlassEnabled) var notchGlassEnabled
+    @Default(.notchGlassCustomizationMode) var notchGlassCustomizationMode
+    @Default(.notchLiquidGlassVariant) var notchLiquidGlassVariant
+    @Default(.notchGlassShowsBorder) var notchGlassShowsBorder
     
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
@@ -363,6 +369,61 @@ struct ContentView: View {
         notchShadowPaddingValue(isMinimalistic: enableMinimalisticUI)
     }
 
+    /// Whether the notch is currently using any form of liquid glass.
+    private var notchUsesLiquidGlass: Bool {
+        guard notchGlassEnabled else { return false }
+        if #available(macOS 26.0, *) {
+            return true
+        }
+        return false
+    }
+
+    /// Whether the notch uses the custom liquid glass variant (NSGlassEffectView).
+    private var notchUsesCustomLiquidGlass: Bool {
+        notchUsesLiquidGlass && notchGlassCustomizationMode == .customLiquid
+    }
+
+    /// Whether the notch uses the standard system liquid glass (.glassEffect).
+    private var notchUsesStandardLiquidGlass: Bool {
+        notchUsesLiquidGlass && notchGlassCustomizationMode == .standard
+    }
+
+    /// The background layer for the notch: solid black (default) or liquid glass.
+    @ViewBuilder
+    private var notchBackgroundLayer: some View {
+        if notchUsesCustomLiquidGlass {
+            LiquidGlassBackground(
+                variant: notchLiquidGlassVariant,
+                cornerRadius: vm.notchState == .open
+                    ? activeCornerRadiusInsets.opened.bottom
+                    : activeCornerRadiusInsets.closed.bottom
+            ) {
+                Color.clear
+            }
+        } else if notchUsesStandardLiquidGlass {
+            if #available(macOS 26.0, *) {
+                notchStandardGlassSurface
+            } else {
+                Color.black
+            }
+        } else {
+            Color.black
+        }
+    }
+
+    /// Standard liquid glass surface for the notch (macOS 26+).
+    @available(macOS 26.0, *)
+    private var notchStandardGlassSurface: some View {
+        Rectangle()
+            .fill(.clear)
+            .glassEffect(
+                .clear.interactive(),
+                in: .rect(cornerRadius: vm.notchState == .open
+                    ? activeCornerRadiusInsets.opened.bottom
+                    : activeCornerRadiusInsets.closed.bottom)
+            )
+    }
+
     private var currentNotchShape: NotchShape {
         let topRadius = (vm.notchState == .open && Defaults[.cornerRadiusScaling])
             ? activeCornerRadiusInsets.opened.top
@@ -526,7 +587,7 @@ struct ContentView: View {
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-            .background(.black)
+            .background(notchBackgroundLayer)
             .clipShape(resolvedClipShape)
             .compositingGroup()
             .shadow(
@@ -535,6 +596,16 @@ struct ContentView: View {
                     : .clear,
                 radius: Defaults[.cornerRadiusScaling] ? 10 : 5
             )
+            .overlay {
+                if notchUsesLiquidGlass && notchGlassShowsBorder {
+                    resolvedClipShape
+                        .stroke(
+                            Color.white.opacity(notchUsesCustomLiquidGlass ? 0.15 : 0.14),
+                            lineWidth: notchUsesCustomLiquidGlass ? 0.95 : 0.9
+                        )
+                        .allowsHitTesting(false)
+                }
+            }
             // Extra horizontal inset for Dynamic Island mode so the shadow
             // is not clipped by the outer frame constraint
             .padding(.horizontal, isIslandMode ? dynamicIslandShadowInset : 0)

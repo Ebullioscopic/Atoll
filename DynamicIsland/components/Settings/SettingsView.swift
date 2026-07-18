@@ -4231,6 +4231,10 @@ struct Appearance: View {
     @Default(.enableLockScreenMediaWidget) private var enableLockScreenMediaWidget
     @Default(.enableLockScreenTimerWidget) private var enableLockScreenTimerWidget
     @Default(.externalDisplayStyle) private var externalDisplayStyle
+    @Default(.notchGlassEnabled) private var notchGlassEnabled
+    @Default(.notchGlassCustomizationMode) private var notchGlassCustomizationMode
+    @Default(.notchLiquidGlassVariant) private var notchLiquidGlassVariant
+    @Default(.notchGlassShowsBorder) private var notchGlassShowsBorder
     @State private var selectedListVisualizer: CustomVisualizer? = nil
 
     @State private var isIconImporterPresented = false
@@ -4289,6 +4293,16 @@ struct Appearance: View {
         Binding(
             get: { timerGlassModeIsGlass ? .glass : .classic },
             set: { mode in timerGlassModeIsGlass = (mode == .glass) }
+        )
+    }
+
+    private var notchVariantBinding: Binding<Double> {
+        Binding(
+            get: { Double(notchLiquidGlassVariant.rawValue) },
+            set: { newValue in
+                let raw = Int(newValue.rounded())
+                notchLiquidGlassVariant = LiquidGlassVariant.clamped(raw)
+            }
         )
     }
 
@@ -4414,6 +4428,55 @@ struct Appearance: View {
                 Text("Lock Screen Glass")
             } footer: {
                 Text("Configure lock screen materials from the Appearance tab. Custom Liquid unlocks variant sliders for both widgets whenever Liquid Glass is selected.")
+            }
+
+            Section {
+                if #available(macOS 26.0, *) {
+                    Defaults.Toggle(key: .notchGlassEnabled) {
+                        Text("Enable Liquid Glass")
+                    }
+                    .settingsHighlight(id: highlightID("Notch Liquid Glass"))
+
+                    if notchGlassEnabled {
+                        Picker("Glass mode", selection: $notchGlassCustomizationMode) {
+                            ForEach(LockScreenGlassCustomizationMode.allCases) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .settingsHighlight(id: highlightID("Notch glass mode"))
+
+                        if notchGlassCustomizationMode == .customLiquid {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("Liquid variant")
+                                    Spacer()
+                                    Text("v\(notchLiquidGlassVariant.rawValue)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Slider(value: notchVariantBinding, in: liquidVariantRange, step: 1)
+
+                                LockScreenGlassVariantPreviewCell(variant: $notchLiquidGlassVariant)
+                                    .padding(.top, 6)
+                            }
+                            .settingsHighlight(id: highlightID("Notch liquid variant"))
+                        }
+
+                        Defaults.Toggle(key: .notchGlassShowsBorder) {
+                            Text("Show border")
+                        }
+                        .settingsHighlight(id: highlightID("Notch glass border"))
+                    }
+                } else {
+                    Text("Liquid Glass requires macOS 26 or later.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Notch Glass")
+            } footer: {
+                Text("Replace the notch's black background with Liquid Glass. Applies to the expanded notch view and live activity HUDs.")
             }
 
             Section {

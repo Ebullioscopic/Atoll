@@ -25557,6 +25557,9 @@
         }
       }
     },
+    "Enable Liquid Glass" : {
+
+    },
     "Enable lock screen live activity" : {
       "localizations" : {
         "ko" : {
@@ -34664,6 +34667,9 @@
         }
       }
     },
+    "Liquid variant" : {
+
+    },
     "Listens for Focus session changes via distributed notifications" : {
       "localizations" : {
         "ko" : {
@@ -43592,6 +43598,9 @@
       },
       "shouldTranslate" : false
     },
+    "Notch Glass" : {
+
+    },
     "Notch Height" : {
       "localizations" : {
         "ar" : {
@@ -49729,6 +49738,9 @@
         }
       }
     },
+    "Replace the notch's black background with Liquid Glass. Applies to the expanded notch view and live activity HUDs." : {
+
+    },
     "Replaces the artwork tile with the live canvas when the current app provides one, and reuses that moving canvas for the surrounding lighting effect." : {
       "localizations" : {
         "nl" : {
@@ -54890,6 +54902,9 @@
           }
         }
       }
+    },
+    "Show border" : {
+
     },
     "Show calendar" : {
       "localizations" : {
