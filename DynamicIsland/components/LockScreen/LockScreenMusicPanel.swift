@@ -473,7 +473,9 @@ struct LockScreenMusicPanel: View {
         guard musicManager.hasActiveSession else { return }
 
         let artwork = musicManager.albumArt
-        let videoURL = musicManager.videoArtworkURL
+        let supportsCanvas = musicManager.bundleIdentifier == "com.apple.Music"
+            || musicManager.bundleIdentifier == SpotifyController.bundleIdentifier
+        let canvasURL = (fullscreenVideoArtwork && supportsCanvas) ? musicManager.videoArtworkURL : nil
 
         withAnimation(.easeInOut(duration: 0.28)) {
             isArtworkFullscreen = true
@@ -489,8 +491,8 @@ struct LockScreenMusicPanel: View {
 
         FullScreenArtworkWindowManager.shared.show(
             artwork: artwork,
-            videoURL: fullscreenVideoArtwork ? videoURL : nil,
-            allowLiveWallpaper: fullscreenVideoArtwork
+            videoURL: canvasURL,
+            allowLiveWallpaper: fullscreenVideoArtwork && supportsCanvas
         )
     }
 
