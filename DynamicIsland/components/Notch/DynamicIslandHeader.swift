@@ -40,6 +40,22 @@ struct DynamicIslandHeader: View {
     @Default(.showBatteryPercentInside) var showBatteryPercentInside
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
+
+    private var currentScreenName: String {
+        vm.screen ?? coordinator.selectedScreen
+    }
+
+    private var isDynamicIslandMode: Bool {
+        shouldUseDynamicIslandMode(for: currentScreenName)
+    }
+
+    private var shouldDrawPhysicalNotchSpacer: Bool {
+        guard !enableMinimalisticUI, !isDynamicIslandMode else { return false }
+        let topInset = NSScreen.screens
+            .first(where: { $0.localizedName == currentScreenName })?
+            .safeAreaInsets.top ?? 0
+        return topInset > 0
+    }
     
     var body: some View {
         HStack(spacing: 0) {
@@ -61,8 +77,7 @@ struct DynamicIslandHeader: View {
             if vm.notchState == .open {
                 let spacerWidth = min(vm.closedNotchSize.width, 300)
                 Rectangle()
-                    .fill(enableMinimalisticUI ? .clear : (NSScreen.screens
-                        .first(where: { $0.localizedName == coordinator.selectedScreen })?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear))
+                    .fill(shouldDrawPhysicalNotchSpacer ? .black : .clear)
                     .frame(width: spacerWidth)
                     .mask {
                         NotchShape()
@@ -75,15 +90,9 @@ struct DynamicIslandHeader: View {
                         Button(action: {
                             vm.toggleCameraPreview()
                         }) {
-                            Capsule()
-                                .fill(.black)
-                                .frame(width: 30, height: 30)
-                                .overlay {
-                                    Image(systemName: "web.camera")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
-                                }
+                            Image(systemName: "web.camera")
+                                .foregroundColor(.white)
+                                .imageScale(.medium)
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
@@ -102,15 +111,9 @@ struct DynamicIslandHeader: View {
                                 coordinator.currentView = .notes
                             }
                         }) {
-                            Capsule()
-                                .fill(.black)
-                                .frame(width: 30, height: 30)
-                                .overlay {
-                                    Image(systemName: "doc.on.clipboard")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
-                                }
+                            Image(systemName: "doc.on.clipboard")
+                                .foregroundColor(.white)
+                                .imageScale(.medium)
                         }
                         .buttonStyle(PlainButtonStyle())
                         .popover(isPresented: $showClipboardPopover, arrowEdge: .bottom) {
@@ -134,7 +137,7 @@ struct DynamicIslandHeader: View {
                     }
                     
                     // ColorPicker button
-                    if Defaults[.enableColorPickerFeature] && showColorPickerIcon{
+                    if Defaults[.enableColorPickerFeature] && showColorPickerIcon {
                         Button(action: {
                             switch Defaults[.colorPickerDisplayMode] {
                             case .panel:
@@ -143,15 +146,9 @@ struct DynamicIslandHeader: View {
                                 showColorPickerPopover.toggle()
                             }
                         }) {
-                            Capsule()
-                                .fill(.black)
-                                .frame(width: 30, height: 30)
-                                .overlay {
-                                    Image(systemName: "eyedropper")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
-                                }
+                            Image(systemName: "eyedropper")
+                                .foregroundColor(.white)
+                                .imageScale(.medium)
                         }
                         .buttonStyle(PlainButtonStyle())
                         .popover(isPresented: $showColorPickerPopover, arrowEdge: .bottom) {
@@ -175,15 +172,9 @@ struct DynamicIslandHeader: View {
                                 showTimerPopover.toggle()
                             }
                         }) {
-                            Capsule()
-                                .fill(.black)
-                                .frame(width: 30, height: 30)
-                                .overlay {
-                                    Image(systemName: "timer")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
-                                }
+                            Image(systemName: "timer")
+                                .foregroundColor(.white)
+                                .imageScale(.medium)
                         }
                         .buttonStyle(PlainButtonStyle())
                         .popover(isPresented: $showTimerPopover, arrowEdge: .bottom) {
@@ -203,15 +194,9 @@ struct DynamicIslandHeader: View {
                         Button(action: {
                             SettingsWindowController.shared.showWindow()
                         }) {
-                            Capsule()
-                                .fill(.black)
-                                .frame(width: 30, height: 30)
-                                .overlay {
-                                    Image(systemName: "gear")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
-                                }
+                            Image(systemName: "gear")
+                                .foregroundColor(.white)
+                                .imageScale(.medium)
                         }
                         .buttonStyle(PlainButtonStyle())
                     }

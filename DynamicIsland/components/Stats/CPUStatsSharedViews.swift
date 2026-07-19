@@ -50,14 +50,23 @@ struct StatsCard<Content: View>: View {
         }
         .padding(padding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(background)
-        )
+        .background(cardBackground)
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(Color.white.opacity(0.05), lineWidth: 0.5)
+                .stroke(Color.white.opacity(isNotchLiquidGlassActive ? 0.14 : 0.05), lineWidth: 0.5)
         )
+    }
+
+    @ViewBuilder
+    private var cardBackground: some View {
+        if isNotchLiquidGlassActive {
+            LiquidGlassBackground(variant: Defaults[.notchLiquidGlassVariant], cornerRadius: cornerRadius) {
+                Color.white.opacity(0.04)
+            }
+        } else {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(background)
+        }
     }
 }
 

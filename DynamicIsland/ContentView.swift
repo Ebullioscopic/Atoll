@@ -93,6 +93,14 @@ struct ContentView: View {
     @Default(.showOnAllDisplays) var showOnAllDisplays
     @Default(.lowBatteryHUDStyle) var lowBatteryHUDStyle
     @Default(.fullBatteryHUDStyle) var fullBatteryHUDStyle
+
+    // Notch glass settings
+    @Default(.notchGlassEnabled) var notchGlassEnabled
+    @Default(.blendBlackTopIntoLiquidGlass) var blendBlackTopIntoLiquidGlass
+    @Default(.semiLiquidGlassAmount) var semiLiquidGlassAmount
+    @Default(.notchGlassCustomizationMode) var notchGlassCustomizationMode
+    @Default(.notchLiquidGlassVariant) var notchLiquidGlassVariant
+    @Default(.notchGlassShowsBorder) var notchGlassShowsBorder
     
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
@@ -363,6 +371,93 @@ struct ContentView: View {
         notchShadowPaddingValue(isMinimalistic: enableMinimalisticUI)
     }
 
+    /// Whether the notch is currently using any form of liquid glass.
+    private var notchUsesLiquidGlass: Bool {
+        guard notchGlassEnabled else { return false }
+        if #available(macOS 26.0, *) {
+            return true
+        }
+        return false
+    }
+
+    /// Whether the notch uses the custom liquid glass variant (NSGlassEffectView).
+    private var notchUsesCustomLiquidGlass: Bool {
+        notchUsesLiquidGlass && notchGlassCustomizationMode == .customLiquid
+    }
+
+    /// Whether the notch uses the standard system liquid glass (.glassEffect).
+    private var notchUsesStandardLiquidGlass: Bool {
+        notchUsesLiquidGlass && notchGlassCustomizationMode == .standard
+    }
+
+    private var resolvedSemiLiquidGlassAmount: CGFloat {
+        min(max(CGFloat(semiLiquidGlassAmount), 0), 1)
+    }
+
+    @ViewBuilder
+    private var semiLiquidGlassOverlay: some View {
+        if blendBlackTopIntoLiquidGlass {
+            if vm.notchState == .closed {
+                Color.black
+            } else {
+                let blackEndLocation = resolvedSemiLiquidGlassAmount
+                let fadeStartLocation = max(0, blackEndLocation - 0.035)
+                let fadeEndLocation = min(1, blackEndLocation + 0.22)
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0.0),
+                        .init(color: .black, location: fadeStartLocation),
+                        .init(color: .clear, location: fadeEndLocation)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+        }
+    }
+
+    /// The background layer for the notch: solid black (default) or liquid glass.
+    @ViewBuilder
+    private var notchBackgroundLayer: some View {
+        if notchUsesCustomLiquidGlass {
+            ZStack {
+                LiquidGlassBackground(
+                    variant: notchLiquidGlassVariant,
+                    cornerRadius: vm.notchState == .open
+                        ? activeCornerRadiusInsets.opened.bottom
+                        : activeCornerRadiusInsets.closed.bottom
+                ) {
+                    Color.clear
+                }
+                semiLiquidGlassOverlay
+            }
+        } else if notchUsesStandardLiquidGlass {
+            if #available(macOS 26.0, *) {
+                ZStack {
+                    notchStandardGlassSurface
+                    semiLiquidGlassOverlay
+                }
+            } else {
+                Color.black
+            }
+        } else {
+            Color.black
+        }
+    }
+
+    /// Standard liquid glass surface for the notch (macOS 26+).
+    @available(macOS 26.0, *)
+    private var notchStandardGlassSurface: some View {
+        Rectangle()
+            .fill(.clear)
+            .glassEffect(
+                .clear.interactive(),
+                in: .rect(cornerRadius: vm.notchState == .open
+                    ? activeCornerRadiusInsets.opened.bottom
+                    : activeCornerRadiusInsets.closed.bottom)
+            )
+    }
+
     private var currentNotchShape: NotchShape {
         let topRadius = (vm.notchState == .open && Defaults[.cornerRadiusScaling])
             ? activeCornerRadiusInsets.opened.top
@@ -526,8 +621,13 @@ struct ContentView: View {
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-            .background(.black)
+            .background {
+                notchBackgroundLayer
+                    .mask(resolvedClipShape)
+                    .compositingGroup()
+            }
             .clipShape(resolvedClipShape)
+            .mask(resolvedClipShape)
             .compositingGroup()
             .shadow(
                 color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
@@ -546,8 +646,8 @@ struct ContentView: View {
     private var configuredMainLayout: some View {
         mainLayoutBase
             .conditionalModifier(!useModernCloseAnimation) { view in
-                let hoverAnimation = Animation.bouncy.speed(1.2)
-                let notchStateAnimation = Animation.spring.speed(1.2)
+                let hoverAnimation = Animation.smooth(duration: 0.18)
+                let notchStateAnimation = Animation.spring(response: 0.32, dampingFraction: 0.92, blendDuration: 0)
                 return view
                     .animation(hoverAnimation, value: isHovering)
                     .animation(notchStateAnimation, value: vm.notchState)
@@ -555,9 +655,11 @@ struct ContentView: View {
                     .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
             }
             .conditionalModifier(useModernCloseAnimation) { view in
-                let hoverAnimation = Animation.bouncy.speed(1.2)
-                let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
-                let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
+                let hoverAnimation = Animation.smooth(duration: 0.18)
+                let openAnimation = enableMinimalisticUI
+                    ? Animation.spring(response: 0.34, dampingFraction: 0.94, blendDuration: 0)
+                    : Animation.spring(response: 0.48, dampingFraction: 0.76, blendDuration: 0)
+                let closeAnimation = Animation.spring(response: 0.30, dampingFraction: 1.0, blendDuration: 0)
                 let notchAnimation = vm.notchState == .open ? openAnimation : closeAnimation
                 return view
                     .animation(hoverAnimation, value: isHovering)
@@ -1231,7 +1333,7 @@ struct ContentView: View {
             .frame(width: wingBaseWidth, height: notchContentHeight)
 
             Rectangle()
-                .fill(.black)
+                .fill(notchUsesLiquidGlass ? Color.clear : Color.black)
                 .frame(width: effectiveCenterWidth, height: notchContentHeight)
                 .overlay(
                     HStack(alignment: .top) {
@@ -1880,7 +1982,10 @@ struct ContentView: View {
 
     // MARK: - Private Methods
     private func openNotch() {
-        withAnimation(.bouncy.speed(1.2)) {
+        let animation: Animation = enableMinimalisticUI
+            ? .smooth(duration: 0.28)
+            : .spring(response: 0.48, dampingFraction: 0.76, blendDuration: 0)
+        withAnimation(animation) {
             vm.open()
         }
     }
@@ -2078,7 +2183,7 @@ struct ContentView: View {
         }
 
         if hovering {
-            withAnimation(.bouncy.speed(1.2)) {
+            withAnimation(.smooth(duration: 0.18)) {
                 isHovering = true
             }
 
@@ -2116,7 +2221,7 @@ struct ContentView: View {
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    withAnimation(.bouncy.speed(1.2)) {
+                    withAnimation(.smooth(duration: 0.18)) {
                         self.isHovering = false
                     }
 

@@ -821,6 +821,9 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .appearance, title: "Corner radius scaling", keywords: ["corner radius", "shape"], highlightID: SettingsTab.appearance.highlightID(for: "Corner radius scaling")),
             SettingsSearchEntry(tab: .appearance, title: "Use simpler close animation", keywords: ["close animation", "notch"], highlightID: SettingsTab.appearance.highlightID(for: "Use simpler close animation")),
             SettingsSearchEntry(tab: .appearance, title: "Notch Width", keywords: ["expanded notch", "width", "resize"], highlightID: SettingsTab.appearance.highlightID(for: "Expanded notch width")),
+            SettingsSearchEntry(tab: .appearance, title: "Enable Liquid Glass", keywords: ["notch glass", "liquid glass", "material"], highlightID: SettingsTab.appearance.highlightID(for: "Notch Liquid Glass")),
+            SettingsSearchEntry(tab: .appearance, title: "Blend black top into Liquid Glass", keywords: ["blend", "black top", "liquid glass", "gradient"], highlightID: SettingsTab.appearance.highlightID(for: "Blend black top into Liquid Glass")),
+            SettingsSearchEntry(tab: .appearance, title: "Semi Liquid Glass", keywords: ["semi liquid glass", "black glass boundary", "black reach", "glass start", "notch transparency"], highlightID: SettingsTab.appearance.highlightID(for: "Semi Liquid Glass")),
             SettingsSearchEntry(tab: .appearance, title: "Enable colored spectrograms", keywords: ["spectrogram", "audio"], highlightID: SettingsTab.appearance.highlightID(for: "Enable colored spectrograms")),
             SettingsSearchEntry(tab: .appearance, title: "Enable blur effect behind album art", keywords: ["blur", "album art"], highlightID: SettingsTab.appearance.highlightID(for: "Enable blur effect behind album art")),
             SettingsSearchEntry(tab: .appearance, title: "Slider color", keywords: ["slider", "accent"], highlightID: SettingsTab.appearance.highlightID(for: "Slider color")),
@@ -4231,6 +4234,12 @@ struct Appearance: View {
     @Default(.enableLockScreenMediaWidget) private var enableLockScreenMediaWidget
     @Default(.enableLockScreenTimerWidget) private var enableLockScreenTimerWidget
     @Default(.externalDisplayStyle) private var externalDisplayStyle
+    @Default(.notchGlassEnabled) private var notchGlassEnabled
+    @Default(.blendBlackTopIntoLiquidGlass) private var blendBlackTopIntoLiquidGlass
+    @Default(.semiLiquidGlassAmount) private var semiLiquidGlassAmount
+    @Default(.notchGlassCustomizationMode) private var notchGlassCustomizationMode
+    @Default(.notchLiquidGlassVariant) private var notchLiquidGlassVariant
+    @Default(.notchGlassShowsBorder) private var notchGlassShowsBorder
     @State private var selectedListVisualizer: CustomVisualizer? = nil
 
     @State private var isIconImporterPresented = false
@@ -4289,6 +4298,25 @@ struct Appearance: View {
         Binding(
             get: { timerGlassModeIsGlass ? .glass : .classic },
             set: { mode in timerGlassModeIsGlass = (mode == .glass) }
+        )
+    }
+
+    private var notchVariantBinding: Binding<Double> {
+        Binding(
+            get: { Double(notchLiquidGlassVariant.rawValue) },
+            set: { newValue in
+                let raw = Int(newValue.rounded())
+                notchLiquidGlassVariant = LiquidGlassVariant.clamped(raw)
+            }
+        )
+    }
+
+    private var semiLiquidGlassBinding: Binding<Double> {
+        Binding(
+            get: { semiLiquidGlassAmount },
+            set: { newValue in
+                semiLiquidGlassAmount = min(max(newValue, 0), 1)
+            }
         )
     }
 
@@ -4414,6 +4442,89 @@ struct Appearance: View {
                 Text("Lock Screen Glass")
             } footer: {
                 Text("Configure lock screen materials from the Appearance tab. Custom Liquid unlocks variant sliders for both widgets whenever Liquid Glass is selected.")
+            }
+
+            Section {
+                if #available(macOS 26.0, *) {
+                    Defaults.Toggle(key: .notchGlassEnabled) {
+                        Text("Enable Liquid Glass")
+                    }
+                    .settingsHighlight(id: highlightID("Notch Liquid Glass"))
+
+                    if notchGlassEnabled {
+                        Defaults.Toggle(key: .blendBlackTopIntoLiquidGlass) {
+                            Text("Blend black top into Liquid Glass")
+                        }
+                        .settingsHighlight(id: highlightID("Blend black top into Liquid Glass"))
+                        
+                        Text("Replace the notch's black background with Liquid Glass. Black-top blend keeps the top area dark and fades smoothly into liquid glass, both on notch screens and external-display Dynamic Island mode.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Semi Liquid Glass")
+                                Spacer()
+                                Text("Black \(Int((semiLiquidGlassAmount * 100).rounded()))%")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Slider(value: semiLiquidGlassBinding, in: 0...1, step: 0.05) {
+                                Text("Semi Liquid Glass")
+                            } minimumValueLabel: {
+                                Text("Glass earlier")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            } maximumValueLabel: {
+                                Text("More black")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text("Controls how far the black top section extends before fading into Liquid Glass.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .settingsHighlight(id: highlightID("Semi Liquid Glass"))
+
+                        Picker("Glass mode", selection: $notchGlassCustomizationMode) {
+                            ForEach(LockScreenGlassCustomizationMode.allCases) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .settingsHighlight(id: highlightID("Notch glass mode"))
+
+                        if notchGlassCustomizationMode == .customLiquid {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("Liquid variant")
+                                    Spacer()
+                                    Text("v\(notchLiquidGlassVariant.rawValue)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Slider(value: notchVariantBinding, in: liquidVariantRange, step: 1)
+
+                                LockScreenGlassVariantPreviewCell(variant: $notchLiquidGlassVariant)
+                                    .padding(.top, 6)
+                            }
+                            .settingsHighlight(id: highlightID("Notch liquid variant"))
+                        }
+
+                        Defaults.Toggle(key: .notchGlassShowsBorder) {
+                            Text("Show border")
+                        }
+                        .settingsHighlight(id: highlightID("Notch glass border"))
+                    }
+                } else {
+                    Text("Liquid Glass requires macOS 26 or later.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Notch Glass")
+            } footer: {
+                Text("Replace the notch's black background with Liquid Glass. Applies to the expanded notch view and live activity HUDs.")
             }
 
             Section {

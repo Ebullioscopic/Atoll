@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import Defaults
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -46,7 +47,7 @@ struct RankedProcessPopover: View {
             .padding(configuration.padding)
             .frame(width: configuration.width)
             .frame(minHeight: configuration.minHeight)
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(popoverBackground)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .shadow(color: .black.opacity(0.28), radius: 12, x: 0, y: 8)
             .overlay(alignment: .topTrailing) {
@@ -65,6 +66,17 @@ struct RankedProcessPopover: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .allowsHitTesting(false)
             }
+    }
+
+    @ViewBuilder
+    private var popoverBackground: some View {
+        if isNotchLiquidGlassActive {
+            LiquidGlassBackground(variant: Defaults[.notchLiquidGlassVariant], cornerRadius: 14) {
+                Color.clear
+            }
+        } else {
+            Color(NSColor.controlBackgroundColor)
+        }
     }
     
     @ViewBuilder

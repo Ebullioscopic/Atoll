@@ -204,15 +204,19 @@ struct CalendarView: View {
                 ZStack(alignment: .top) {
                     WheelPicker(selectedDate: $selectedDate, config: Config())
                     HStack(alignment: .top) {
-                        LinearGradient(
-                            colors: [Color.black, .clear], startPoint: .leading, endPoint: .trailing
-                        )
-                        .frame(width: 20)
+                        if !isNotchLiquidGlassActive {
+                            LinearGradient(
+                                colors: [Color.black, .clear], startPoint: .leading, endPoint: .trailing
+                            )
+                            .frame(width: 20)
+                        }
                         Spacer()
-                        LinearGradient(
-                            colors: [.clear, Color.black], startPoint: .leading, endPoint: .trailing
-                        )
-                        .frame(width: 20)
+                        if !isNotchLiquidGlassActive {
+                            LinearGradient(
+                                colors: [.clear, Color.black], startPoint: .leading, endPoint: .trailing
+                            )
+                            .frame(width: 20)
+                        }
                     }
                 }
             }
@@ -430,15 +434,17 @@ struct StandaloneCalendarView: View {
                                 centerDatePicker(on: target, proxy: proxy)
                             }
 
-                            LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                                .frame(height: 16)
-                                .allowsHitTesting(false)
-                                .frame(maxHeight: .infinity, alignment: .top)
+                            if !isNotchLiquidGlassActive {
+                                LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
+                                    .frame(height: 16)
+                                    .allowsHitTesting(false)
+                                    .frame(maxHeight: .infinity, alignment: .top)
 
-                            LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                                .frame(height: 16)
-                                .allowsHitTesting(false)
-                                .frame(maxHeight: .infinity, alignment: .bottom)
+                                LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
+                                    .frame(height: 16)
+                                    .allowsHitTesting(false)
+                                    .frame(maxHeight: .infinity, alignment: .bottom)
+                            }
                         }
                         .frame(height: max(0, pickerViewportHeight - 22))
                         .clipped()
@@ -586,15 +592,17 @@ private struct StandaloneEventCardList: View {
             }
             .clipped()
 
-            LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: 16)
-                .allowsHitTesting(false)
-                .frame(maxHeight: .infinity, alignment: .top)
+            if !isNotchLiquidGlassActive {
+                LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 16)
+                    .allowsHitTesting(false)
+                    .frame(maxHeight: .infinity, alignment: .top)
 
-            LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                .frame(height: 16)
-                .allowsHitTesting(false)
-                .frame(maxHeight: .infinity, alignment: .bottom)
+                LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 16)
+                    .allowsHitTesting(false)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+            }
         }
         .clipped()
     }
@@ -801,17 +809,19 @@ struct EventListView: View {
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
 
-                LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 16)
-                    .allowsHitTesting(false)
-                    .alignmentGuide(.top) { d in d[.top] }
-                    .frame(maxHeight: .infinity, alignment: .top)
+                if !isNotchLiquidGlassActive {
+                    LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 16)
+                        .allowsHitTesting(false)
+                        .alignmentGuide(.top) { d in d[.top] }
+                        .frame(maxHeight: .infinity, alignment: .top)
 
-                LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 16)
-                    .allowsHitTesting(false)
-                    .alignmentGuide(.bottom) { d in d[.bottom] }
-                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 16)
+                        .allowsHitTesting(false)
+                        .alignmentGuide(.bottom) { d in d[.bottom] }
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                }
             }
             .onAppear {
                 scrollToRelevantEvent(proxy: proxy)

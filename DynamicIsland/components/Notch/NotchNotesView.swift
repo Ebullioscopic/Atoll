@@ -525,15 +525,17 @@ struct NotchClipboardList: View {
                         .padding(.bottom, 20)
                     }
 
-                    LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .frame(maxHeight: .infinity, alignment: .top)
+                    if !isNotchLiquidGlassActive {
+                        LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 16)
+                            .allowsHitTesting(false)
+                            .frame(maxHeight: .infinity, alignment: .top)
 
-                    LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 16)
+                            .allowsHitTesting(false)
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                    }
                 }
             }
         }
@@ -608,7 +610,11 @@ struct NotchClipboardItemRow: View {
             }
         }
         .padding(10)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(isHovered ? 0.3 : 0.15))
+        .background(
+            isNotchLiquidGlassActive
+                ? Color.white.opacity(isHovered ? 0.12 : 0.07)
+                : Color(nsColor: .controlBackgroundColor).opacity(isHovered ? 0.3 : 0.15)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
     
@@ -865,15 +871,17 @@ struct NoteListView: View {
                         .padding(.bottom, 20)
                     }
 
-                    LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .frame(maxHeight: .infinity, alignment: .top)
+                    if !isNotchLiquidGlassActive {
+                        LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 16)
+                            .allowsHitTesting(false)
+                            .frame(maxHeight: .infinity, alignment: .top)
 
-                    LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 16)
+                            .allowsHitTesting(false)
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                    }
                 }
             }
         }
@@ -1018,7 +1026,7 @@ struct NoteRow: View {
                     .padding(.vertical, isCompact ? 2 : 3)
                     .background(
                         Capsule()
-                            .fill(Color(white: 0.12)) // Softer dark gray, not solid black
+                            .fill(isNotchLiquidGlassActive ? Color.white.opacity(0.14) : Color(white: 0.12))
                             .overlay(
                                 Capsule()
                                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
@@ -1215,7 +1223,7 @@ struct NoteEditorView: View {
                                 .font(.system(size: 10, weight: .medium, design: .monospaced))
                                 .foregroundStyle(.secondary.opacity(0.5))
                                 .padding(4)
-                                .background(Color.black.opacity(0.5))
+                                .background(isNotchLiquidGlassActive ? Color.white.opacity(0.12) : Color.black.opacity(0.5))
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
                                 .padding(8)
                         }
@@ -1225,7 +1233,7 @@ struct NoteEditorView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity) // Ensure VStack takes full space
-        .background(Color.black) // Ensure solid background
+        .background(isNotchLiquidGlassActive ? Color.clear : Color.black)
         .onAppear {
             if isNew {
                 isContentFocused = true

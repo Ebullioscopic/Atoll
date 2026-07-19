@@ -133,17 +133,19 @@ struct NotchTimerView: View {
                     .scrollContentBackground(.hidden)
                     .scrollIndicators(.never)
 
-                    LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .alignmentGuide(.top) { d in d[.top] }
-                        .frame(maxHeight: .infinity, alignment: .top)
+                    if !isNotchLiquidGlassActive {
+                        LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 16)
+                            .allowsHitTesting(false)
+                            .alignmentGuide(.top) { d in d[.top] }
+                            .frame(maxHeight: .infinity, alignment: .top)
 
-                    LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .alignmentGuide(.bottom) { d in d[.bottom] }
-                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 16)
+                            .allowsHitTesting(false)
+                            .alignmentGuide(.bottom) { d in d[.bottom] }
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                    }
                 }
                 .frame(height: listHeight)
             }
