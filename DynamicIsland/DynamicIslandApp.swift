@@ -372,23 +372,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Rebuilds the notch's CGSSpace membership from the current hide option and the
-    /// live windows. The space pins the notch above every space (fullscreen included)
-    /// and is used **only** for "Never hide"; the hide options keep the set empty so
-    /// FullscreenMediaDetector can hide the notch. Assigning the whole set lets the
-    /// CGSSpace diff additions/removals, so this is safe to call on any change.
+    /// Rebuilds the notch's CGSSpace membership from the live windows.
+    /// NSWindow collection behavior covers normal Spaces most of the time, but the
+    /// private space keeps the notch anchored during Mission Control/Space switches.
+    /// Fullscreen visibility is still owned by FullscreenMediaDetector and
+    /// `hideOnClosed`; this membership only controls where the window lives.
     @MainActor
     private func syncNotchSpaceMembership() {
-        guard Defaults[.hideNotchOption] == .never else {
-            NotchSpaceManager.shared.notchSpace.windows = []
-            return
-        }
+        NotchSpaceManager.shared.notchSpace.windows = currentDynamicIslandWindows()
+    }
+
+    private func currentDynamicIslandWindows() -> Set<NSWindow> {
         if Defaults[.showOnAllDisplays] {
-            NotchSpaceManager.shared.notchSpace.windows = Set(windows.values)
+            return Set(windows.values)
         } else if let window = window {
-            NotchSpaceManager.shared.notchSpace.windows = [window]
-        } else {
-            NotchSpaceManager.shared.notchSpace.windows = []
+            return [window]
+        }
+        return []
+    }
+
+    @MainActor
+    private func reassertDynamicIslandWindowSpacePresence() {
+        guard !windowsHiddenForLock else { return }
+
+        syncNotchSpaceMembership()
+
+        for window in currentDynamicIslandWindows() {
+            window.collectionBehavior = DynamicIslandWindow.pinnedCollectionBehavior
+            window.orderFrontRegardless()
         }
     }
 
@@ -420,12 +431,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         
         window.orderFrontRegardless()
-        // Pin above every space (fullscreen included) only for "Never hide"; the
-        // hide options leave the window on the collectionBehavior path so
-        // FullscreenMediaDetector can hide it. See NotchSpaceManager.
-        if Defaults[.hideNotchOption] == .never {
-            NotchSpaceManager.shared.notchSpace.windows.insert(window)
-        }
+        NotchSpaceManager.shared.notchSpace.windows.insert(window)
         //SkyLightOperator.shared.delegateWindow(window)
         return window
     }
@@ -873,8 +879,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }.store(in: &cancellables)
 
-        // Pin/unpin the notch above all spaces when the hide option changes:
-        // "Never hide" joins the max-level CGSSpace, the hide options leave it.
+        // The hide option changes fullscreen visibility, not Spaces pinning.
+        // Re-sync in case the user changes it while macOS is moving Spaces.
         Defaults.publisher(.hideNotchOption, options: []).sink { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.syncNotchSpaceMembership()
@@ -914,6 +920,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.reassertDynamicIslandWindowSpacePresence()
+                self?.adjustWindowPosition()
+            }
+        }
 
         NotificationCenter.default.addObserver(
             forName: Notification.Name.selectedScreenChanged, object: nil, queue: nil
@@ -1554,15 +1571,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if window == nil {
                 window = createDynamicIslandWindow(for: selectedScreen, with: vm)
             }
-            
             if let window = window {
                 positionWindow(window, on: selectedScreen, changeAlpha: changeAlpha)
-                
+
                 if vm.notchState == .closed {
                     vm.close()
                 }
             }
         }
+
+        syncNotchSpaceMembership()
     }
     
     @objc func togglePopover(_ sender: Any?) {

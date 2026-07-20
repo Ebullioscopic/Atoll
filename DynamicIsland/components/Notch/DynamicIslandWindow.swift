@@ -23,6 +23,13 @@
 import Cocoa
 
 class DynamicIslandWindow: NSPanel {
+    static let pinnedCollectionBehavior: NSWindow.CollectionBehavior = [
+        .fullScreenAuxiliary,
+        .canJoinAllSpaces,
+        .ignoresCycle,
+        .stationary,
+    ]
+
     override init(
         contentRect: NSRect,
         styleMask: NSWindow.StyleMask,
@@ -44,12 +51,7 @@ class DynamicIslandWindow: NSPanel {
         backgroundColor = .clear
         isMovable = false
         
-        collectionBehavior = [
-            .fullScreenAuxiliary,
-            .canJoinAllSpaces,
-            .ignoresCycle,
-            .stationary,
-        ]
+        collectionBehavior = Self.pinnedCollectionBehavior
         
         isReleasedWhenClosed = false
         level = .mainMenu + 3
