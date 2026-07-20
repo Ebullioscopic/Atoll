@@ -18,7 +18,6 @@
 
 import Foundation
 import AppKit
-import Defaults
 import SwiftUI
 
 @_silgen_name("CGSIsScreenWatcherPresent")
@@ -130,15 +129,12 @@ class ScreenRecordingManager: ObservableObject {
     @Published var isRecording: Bool = false
     @Published var isMonitoring: Bool = false
     @Published var recordingDuration: TimeInterval = 0
-    @Published var isRecorderIdle: Bool = true
-    @Published var lastUpdated: Date = .distantPast
     @Published var stopControlState: RecordingStopControlState = .unavailable
 
     private let coordinator = DynamicIslandViewCoordinator.shared
     private let stopController: ScreenRecordingStopControlling
     private var recordingStartTime: Date?
     private var durationTimer: Timer?
-    private var debounceIdleTask: Task<Void, Never>?
     private var stopRequestTask: Task<Void, Never>?
     private var stopFailureClearTask: Task<Void, Never>?
 
@@ -147,7 +143,6 @@ class ScreenRecordingManager: ObservableObject {
     }
 
     deinit {
-        debounceIdleTask?.cancel()
         stopRequestTask?.cancel()
         stopFailureClearTask?.cancel()
         durationTimer?.invalidate()
@@ -234,11 +229,8 @@ class ScreenRecordingManager: ObservableObject {
         let currentRecordingState = CGSIsScreenWatcherPresent()
         guard currentRecordingState != isRecording else { return }
 
-        lastUpdated = Date()
-
         if currentRecordingState {
             startDurationTracking()
-            updateIdleState(recording: true)
             clearStopFailure()
             stopControlState = .ready
             coordinator.toggleExpandingView(status: true, type: .recording)
@@ -248,7 +240,6 @@ class ScreenRecordingManager: ObservableObject {
             screenRecordingDebugLog("Screen recording started")
         } else {
             stopDurationTracking()
-            updateIdleState(recording: false)
             stopRequestTask?.cancel()
             stopRequestTask = nil
             stopControlState = .unavailable
@@ -280,7 +271,8 @@ class ScreenRecordingManager: ObservableObject {
         recordingStartTime = nil
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.recordingDuration = 0
+            guard let self, !self.isRecording, self.recordingStartTime == nil else { return }
+            self.recordingDuration = 0
         }
 
         screenRecordingDebugLog("Stopped duration tracking")
@@ -313,27 +305,6 @@ class ScreenRecordingManager: ObservableObject {
                 stopControlState = isRecording ? .ready : .unavailable
             }
             stopFailureClearTask = nil
-        }
-    }
-
-    private func updateIdleState(recording: Bool) {
-        if recording {
-            isRecorderIdle = false
-            debounceIdleTask?.cancel()
-            return
-        }
-
-        debounceIdleTask?.cancel()
-        debounceIdleTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(Defaults[.waitInterval]))
-            guard let self, !Task.isCancelled else { return }
-            await MainActor.run {
-                if self.lastUpdated.timeIntervalSinceNow < -Defaults[.waitInterval] {
-                    withAnimation {
-                        self.isRecorderIdle = !self.isRecording
-                    }
-                }
-            }
         }
     }
 }

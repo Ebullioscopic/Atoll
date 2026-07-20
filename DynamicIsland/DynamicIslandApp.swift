@@ -372,12 +372,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Rebuilds the notch's CGSSpace membership from the live windows. This matches
-    /// the v2.2.0 behavior that kept the notch pinned across macOS Spaces; fullscreen
-    /// hide options collapse the SwiftUI content instead of removing the panel from
-    /// the shared space.
+    /// Rebuilds the notch's CGSSpace membership from the current hide option and the
+    /// live windows. The space pins the notch above every space (fullscreen included)
+    /// and is used **only** for "Never hide"; the hide options keep the set empty so
+    /// FullscreenMediaDetector can hide the notch. Assigning the whole set lets the
+    /// CGSSpace diff additions/removals, so this is safe to call on any change.
     @MainActor
     private func syncNotchSpaceMembership() {
+        guard Defaults[.hideNotchOption] == .never else {
+            NotchSpaceManager.shared.notchSpace.windows = []
+            return
+        }
         if Defaults[.showOnAllDisplays] {
             NotchSpaceManager.shared.notchSpace.windows = Set(windows.values)
         } else if let window = window {
@@ -399,7 +404,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let window = DynamicIslandWindow(
             contentRect: NSRect(
                 x: 0, y: 0, width: roundedWidth, height: roundedHeight),
-            styleMask: [.borderless, .nonactivatingPanel, .utilityWindow, .hudWindow],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -415,7 +420,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         
         window.orderFrontRegardless()
-        NotchSpaceManager.shared.notchSpace.windows.insert(window)
+        // Pin above every space (fullscreen included) only for "Never hide"; the
+        // hide options leave the window on the collectionBehavior path so
+        // FullscreenMediaDetector can hide it. See NotchSpaceManager.
+        if Defaults[.hideNotchOption] == .never {
+            NotchSpaceManager.shared.notchSpace.windows.insert(window)
+        }
         //SkyLightOperator.shared.delegateWindow(window)
         return window
     }
@@ -588,13 +598,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             || !musicManager.artistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasActiveMusicSnapshot = musicManager.isPlaying || (!musicManager.isPlayerIdle && hasMusicMetadata)
 
-        return vm.notchState == .closed
-            && hasActiveMusicSnapshot
-            && coordinator.musicLiveActivityEnabled
-            && (Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls])
-            && !vm.hideOnClosed
-            && !LockScreenManager.shared.isLocked
-            && !LockScreenManager.shared.shouldDelayPostUnlockMusicHUD
+        return isClosedMusicPairingEligible(
+            notchState: vm.notchState,
+            hasActiveMusicSnapshot: hasActiveMusicSnapshot,
+            musicLiveActivityEnabled: coordinator.musicLiveActivityEnabled,
+            closedMusicContentEnabled: Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls],
+            hideOnClosed: vm.hideOnClosed,
+            isLocked: LockScreenManager.shared.isLocked,
+            isDeferredAfterUnlock: LockScreenManager.shared.shouldDelayPostUnlockMusicHUD
+        )
     }
 
     private func recordingStopControlsEnabledForSizing() -> Bool {

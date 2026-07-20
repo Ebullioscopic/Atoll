@@ -351,13 +351,15 @@ struct ContentView: View {
     }
 
     private func closedMusicPairingEligible(hasActiveMusicSnapshot: Bool) -> Bool {
-        vm.notchState == .closed
-            && hasActiveMusicSnapshot
-            && coordinator.musicLiveActivityEnabled
-            && closedMusicContentEnabled
-            && !vm.hideOnClosed
-            && !lockScreenManager.isLocked
-            && !isMusicHUDDeferredAfterUnlock
+        isClosedMusicPairingEligible(
+            notchState: vm.notchState,
+            hasActiveMusicSnapshot: hasActiveMusicSnapshot,
+            musicLiveActivityEnabled: coordinator.musicLiveActivityEnabled,
+            closedMusicContentEnabled: closedMusicContentEnabled,
+            hideOnClosed: vm.hideOnClosed,
+            isLocked: lockScreenManager.isLocked,
+            isDeferredAfterUnlock: isMusicHUDDeferredAfterUnlock
+        )
     }
 
     private var closedLiveActivitySwapTransition: AnyTransition {
