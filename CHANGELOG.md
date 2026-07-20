@@ -71,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Lock Screen & Live Activities**: Full support for Lock Screen widgets, Live Activities, and expanding lock screen music players with flip animations.
+- **Screen Recording HUD**: Added a recording live activity with optional native stop controls and configurable hover presentation.
 - **Screen Assistant (AI)**: Introducing Screen Assistant with snipping capabilities and Gemini API integration.
 - **Advanced System HUDs**: Dynamic polling HUDs for Volume (mute/unmute), Brightness, Bluetooth, and Privacy Access Indicators.
 - **Clipboard Manager**: New floating clipboard manager panel with customizable settings and quick access.
@@ -86,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Performance**: Disabled `OSDUIHelper` polling in favor of event-driven system HUD monitoring to drastically reduce CPU footprint.
 
 ### Fixed
+- Fixed Dynamic Island window pinning so it stays anchored while switching macOS Spaces.
 - Fixed timeline reset and playback jumping issues in the Media Player.
 - Fixed jittering animations on brightness and volume HUDs.
 - Fixed corner radius clipping and window alignment bugs across multiple popup panels.
