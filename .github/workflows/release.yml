@@ -87,19 +87,20 @@ jobs:
           BASE_VERSION=$(cat VERSION | tr -d '[:space:]')
           CHANNEL="${{ steps.channel.outputs.channel }}"
           DATE_STAMP=$(date -u +%Y%m%d)
+          # Use the total commit count for a perfectly monotonically increasing build number
+          BUILD_NUMBER=$(git rev-list HEAD --count)
 
           case "$CHANNEL" in
             nightly)
-              VERSION="${BASE_VERSION}-nightly.${DATE_STAMP}.${{ github.run_number }}"
-              BUILD_NUMBER="${DATE_STAMP}${{ github.run_number }}"
+              COUNT=$(git tag -l "v${BASE_VERSION}-nightly.*" 2>/dev/null | wc -l | tr -d ' ')
+              NEXT=$((COUNT + 1))
+              VERSION="${BASE_VERSION}-nightly.${DATE_STAMP}.${NEXT}"
               PRERELEASE="true"
               ;;
             alpha)
-              # Auto-increment: count existing alpha tags for this base version
               COUNT=$(git tag -l "v${BASE_VERSION}-alpha.*" 2>/dev/null | wc -l | tr -d ' ')
               NEXT=$((COUNT + 1))
               VERSION="${BASE_VERSION}-alpha.${NEXT}"
-              BUILD_NUMBER="${DATE_STAMP}002"
               PRERELEASE="true"
               ;;
             beta)
@@ -111,9 +112,6 @@ jobs:
               ;;
             stable)
               VERSION="${BASE_VERSION}"
-              # Continue existing build number sequence
-              LAST_BUILD=$(git tag -l 'v*' | xargs -I{} git tag -l --format='%(creatordate:unix) {}' {} 2>/dev/null | sort -rn | head -1 | awk '{print $2}' | sed 's/v//' | grep -oE '[0-9]+$' || echo "12")
-              BUILD_NUMBER=$((LAST_BUILD + 1))
               PRERELEASE="false"
               ;;
           esac
