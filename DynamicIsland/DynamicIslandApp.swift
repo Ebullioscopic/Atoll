@@ -373,10 +373,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Rebuilds the notch's CGSSpace membership from the live windows.
-    /// NSWindow collection behavior covers normal Spaces most of the time, but the
-    /// private space keeps the notch anchored during Mission Control/Space switches.
-    /// Fullscreen visibility is still owned by FullscreenMediaDetector and
-    /// `hideOnClosed`; this membership only controls where the window lives.
+    /// This intentionally does not gate on `hideNotchOption == .never`: Space
+    /// membership keeps the window anchored while switching desktops, while
+    /// FullscreenMediaDetector/`hideOnClosed` owns whether the closed notch renders
+    /// in fullscreen.
     @MainActor
     private func syncNotchSpaceMembership() {
         NotchSpaceManager.shared.notchSpace.windows = currentDynamicIslandWindows()
@@ -498,24 +498,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return CGSize(width: inlineSneakPeekWidth, height: vm.effectiveClosedNotchHeight)
         }
 
-        if recordingHUDVisibleOnClosedNotchForSizing() {
-            let recordingHoverExtraWidth: CGFloat = {
-                guard recordingStopControlsEnabledForSizing() else { return 132 }
-                switch effectiveRecordingHoverStyleForSizing() {
-                case .default:
-                    return 140
-                case .inline:
-                    return 176
-                }
-            }()
-            let recordingHoverExtraHeight: CGFloat = {
-                guard recordingStopControlsEnabledForSizing() else { return 0 }
-                return effectiveRecordingHoverStyleForSizing() == .default ? 70 : 0
-            }()
-            let recordingHUDSize = CGSize(
-                width: vm.closedNotchSize.width + recordingHoverExtraWidth,
-                height: vm.effectiveClosedNotchHeight + recordingHoverExtraHeight
-            )
+        if let recordingHUDSize = recordingHUDLayoutForSizing().size(
+            closedNotchSize: vm.closedNotchSize,
+            effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+        ) {
             return addShadowPadding(to: recordingHUDSize, isMinimalistic: Defaults[.enableMinimalisticUI])
         }
 
@@ -589,13 +575,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return result
     }
 
-    private func recordingHUDVisibleOnClosedNotchForSizing() -> Bool {
-        vm.notchState == .closed
-            && Defaults[.enableScreenRecordingDetection]
-            && Defaults[.showRecordingIndicator]
-            && !vm.hideOnClosed
-            && ScreenRecordingManager.shared.isRecording
-            && !closedMusicPairingEligibleForSizing()
+    private func recordingHUDLayoutForSizing() -> RecordingHUDLayout {
+        makeRecordingHUDLayout(
+            notchState: vm.notchState,
+            screenRecordingDetectionEnabled: Defaults[.enableScreenRecordingDetection],
+            showRecordingIndicator: Defaults[.showRecordingIndicator],
+            hideOnClosed: vm.hideOnClosed,
+            isRecording: ScreenRecordingManager.shared.isRecording,
+            closedMusicPairingEligible: closedMusicPairingEligibleForSizing(),
+            recordingControlMode: Defaults[.recordingControlMode],
+            canStopFromHUD: ScreenRecordingManager.shared.canStopFromHUD,
+            enableMinimalisticUI: Defaults[.enableMinimalisticUI],
+            recordingHoverStyle: Defaults[.recordingHoverStyle],
+            expanded: true
+        )
     }
 
     private func closedMusicPairingEligibleForSizing() -> Bool {
@@ -613,15 +606,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             isLocked: LockScreenManager.shared.isLocked,
             isDeferredAfterUnlock: LockScreenManager.shared.shouldDelayPostUnlockMusicHUD
         )
-    }
-
-    private func recordingStopControlsEnabledForSizing() -> Bool {
-        Defaults[.recordingControlMode] == .withStopButton
-            && ScreenRecordingManager.shared.canStopFromHUD
-    }
-
-    private func effectiveRecordingHoverStyleForSizing() -> RecordingHoverStyle {
-        Defaults[.enableMinimalisticUI] ? Defaults[.recordingHoverStyle] : .inline
     }
 
     /// Adds Dynamic Island shadow/top insets on non-notch screens, or top bleed on physical-notch screens.

@@ -492,49 +492,41 @@ struct ContentView: View {
     }
 
     private var recordingLiveActivityVisibleOnClosedNotch: Bool {
-        vm.notchState == .closed
-            && enableScreenRecordingDetection
-            && showRecordingIndicator
-            && !vm.hideOnClosed
-            && recordingManager.isRecording
-            && !closedMusicPairingEligible(hasActiveMusicSnapshot: hasActiveMusicSnapshotForClosedPairing)
+        recordingHUDLayout.isVisible
     }
 
-    private var recordingStopControlsEnabled: Bool {
-        recordingControlMode == .withStopButton
-            && recordingManager.canStopFromHUD
-    }
-
-    private var effectiveRecordingHoverStyle: RecordingHoverStyle {
-        enableMinimalisticUI ? recordingHoverStyle : .inline
+    private var recordingHUDLayout: RecordingHUDLayout {
+        makeRecordingHUDLayout(
+            notchState: vm.notchState,
+            screenRecordingDetectionEnabled: enableScreenRecordingDetection,
+            showRecordingIndicator: showRecordingIndicator,
+            hideOnClosed: vm.hideOnClosed,
+            isRecording: recordingManager.isRecording,
+            closedMusicPairingEligible: closedMusicPairingEligible(
+                hasActiveMusicSnapshot: hasActiveMusicSnapshotForClosedPairing
+            ),
+            recordingControlMode: recordingControlMode,
+            canStopFromHUD: recordingManager.canStopFromHUD,
+            enableMinimalisticUI: enableMinimalisticUI,
+            recordingHoverStyle: recordingHoverStyle,
+            expanded: isHovering
+        )
     }
 
     private var recordingHUDDefaultExpandedOnHover: Bool {
-        recordingLiveActivityVisibleOnClosedNotch
-            && recordingStopControlsEnabled
-            && isHovering
-            && effectiveRecordingHoverStyle == .default
+        recordingHUDLayout.showsDefaultExpansion
     }
 
     private var recordingHUDInlineExpandedOnHover: Bool {
-        recordingLiveActivityVisibleOnClosedNotch
-            && recordingStopControlsEnabled
-            && isHovering
-            && effectiveRecordingHoverStyle == .inline
+        recordingHUDLayout.showsInlineExpansion
     }
 
     private var recordingHUDExtraWidth: CGFloat {
-        if recordingHUDDefaultExpandedOnHover {
-            return 140
-        }
-        if recordingHUDInlineExpandedOnHover {
-            return 176
-        }
-        return 132
+        recordingHUDLayout.extraWidth
     }
 
     private var recordingHUDExtraHeight: CGFloat {
-        recordingHUDDefaultExpandedOnHover ? 70 : 0
+        recordingHUDLayout.extraHeight
     }
 
     private var displayedBatteryHUDLevel: Int {

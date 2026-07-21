@@ -23,6 +23,9 @@ import SwiftUI
 @_silgen_name("CGSIsScreenWatcherPresent")
 func CGSIsScreenWatcherPresent() -> Bool
 
+// Private SkyLight/CGS symbols are intentionally isolated here. They provide
+// event-driven screen recording detection without polling, but they are not
+// public API and may change across macOS releases.
 @_silgen_name("CGSRegisterNotifyProc")
 func CGSRegisterNotifyProc(
     _ callback: (@convention(c) (Int32, Int32, Int32, UnsafeMutableRawPointer?) -> Void)?,
