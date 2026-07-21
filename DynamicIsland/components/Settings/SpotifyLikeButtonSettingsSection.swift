@@ -49,12 +49,12 @@ struct SpotifyLikeButtonSettingsSection: View {
                     .fill(libraryManager.isAuthenticated ? Color.green : Color.secondary)
                     .frame(width: 8, height: 8)
 
-                Text(libraryManager.statusText)
+                Text(statusText)
                     .foregroundStyle(.secondary)
             }
 
-            if let errorMessage = libraryManager.errorMessage, !errorMessage.isEmpty {
-                Text(errorMessage)
+            if let error = libraryManager.error {
+                Text(message(for: error))
                     .font(.caption)
                     .foregroundStyle(.red)
             }
@@ -79,6 +79,37 @@ struct SpotifyLikeButtonSettingsSection: View {
             Text("Uses Spotify's official Web API (OAuth) with access limited to reading and changing your Liked Songs. Add the 'Like Song' control to a media slot to show the button.")
                 .foregroundStyle(.secondary)
                 .font(.caption)
+        }
+    }
+
+    /// Derived from the view's own client ID binding rather than the manager's
+    /// copy, so the line updates while the user is still typing.
+    private var statusText: String {
+        if libraryManager.isAuthenticated {
+            return String(localized: "Connected — like button ready.")
+        }
+        if clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return String(localized: "Not connected.")
+        }
+        return String(localized: "Client ID saved. Connect your Spotify account.")
+    }
+
+    private func message(for error: SpotifyLibraryError) -> String {
+        switch error {
+        case .missingClientID:
+            return String(localized: "Paste the Client ID of your Spotify Developer app first.")
+        case .secureRandomUnavailable:
+            return String(localized: "Unable to generate secure random data for the login.")
+        case .canceled:
+            return ""
+        case .missingAuthorizationCode:
+            return String(localized: "Spotify did not return an authorization code.")
+        case .authSessionFailed(let description):
+            return String(localized: "Spotify login failed: \(description)")
+        case .tokenExchangeFailed(let description):
+            return String(localized: "Token exchange failed: \(description)")
+        case .refreshTokenRevoked:
+            return String(localized: "Spotify revoked access. Connect your account again.")
         }
     }
 }
