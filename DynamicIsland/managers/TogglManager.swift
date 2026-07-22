@@ -139,7 +139,10 @@ final class TogglManager: ObservableObject {
     func saveToken(_ token: String) async {
         let trimmed = token.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-        writeKeychain(trimmed)
+        guard writeKeychain(trimmed) else {
+            connectionStatus = .error("Could not save token to Keychain")
+            return
+        }
         connectionStatus = .connecting
 
         do {
@@ -147,14 +150,17 @@ final class TogglManager: ObservableObject {
             workspaceId = wsId
             UserDefaults.standard.set(wsId, forKey: workspaceIdKey)
             connectionStatus = .connected
-            async let _ = fetchProjects()
-            async let _ = fetchRecentEntries()
+            Task { await self.fetchProjects() }
+            Task { await self.fetchRecentEntries() }
         } catch {
             connectionStatus = .error(error.localizedDescription)
         }
     }
 
     func disconnect() {
+        // Stop any in-flight stopwatch first so no elapsed interval survives to a
+        // later stopStopwatch() save once auth state is gone.
+        resetStopwatch()
         deleteKeychain()
         workspaceId = nil
         projects = []
@@ -281,6 +287,7 @@ final class TogglManager: ObservableObject {
     // MARK: - Stopwatch
 
     func startStopwatch() {
+        stopwatchTimer?.invalidate()
         // stopwatchStartedAt is the wall-clock moment when elapsed was 0.
         // Pre-seeding elapsed (e.g. from a Toggl sync) shifts this backwards.
         stopwatchStartedAt = Date().addingTimeInterval(-elapsed)
@@ -410,8 +417,10 @@ final class TogglManager: ObservableObject {
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            // Body goes into the error for programmatic handling, but is not logged —
+            // it can echo request payloads or account details.
             let body = String(data: data, encoding: .utf8) ?? "(no body)"
-            print("[Toggl] HTTP \(code) \(method) \(path): \(body)")
+            print("[Toggl] HTTP \(code) \(method) \(path)")
             throw TogglError.httpError(code, body)
         }
         return data
@@ -456,7 +465,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Keychain
 
-    private func writeKeychain(_ token: String) {
+    private func writeKeychain(_ token: String) -> Bool {
         let data = Data(token.utf8)
         let del: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -469,7 +478,11 @@ final class TogglManager: ObservableObject {
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
-        SecItemAdd(add as CFDictionary, nil)
+        let status = SecItemAdd(add as CFDictionary, nil)
+        if status != errSecSuccess {
+            print("[Toggl] Keychain write failed (OSStatus \(status))")
+        }
+        return status == errSecSuccess
     }
 
     private func readKeychain() -> String? {

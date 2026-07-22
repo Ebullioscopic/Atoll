@@ -2979,7 +2979,7 @@ private enum TimerSupplementMetrics {
     }
 }
 
-private enum TogglSupplementMetrics {
+enum TogglSupplementMetrics {
     static func formattedElapsed(for elapsed: TimeInterval) -> String {
         let total = Int(elapsed)
         let h = total / 3600

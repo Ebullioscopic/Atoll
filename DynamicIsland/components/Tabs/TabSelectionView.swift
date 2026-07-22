@@ -155,6 +155,14 @@ struct TabSelectionView: View {
         .onAppear {
             ensureValidSelection(with: tabs)
         }
+        // Re-validate when Toggl availability changes so a selected .toggl tab
+        // moves to a remaining tab the moment it disappears from the tab list.
+        .onChange(of: togglEnabled) { _, _ in
+            ensureValidSelection(with: tabs)
+        }
+        .onChange(of: togglManager.isReady) { _, _ in
+            ensureValidSelection(with: tabs)
+        }
     }
 
     private var extensionTabsEnabled: Bool {

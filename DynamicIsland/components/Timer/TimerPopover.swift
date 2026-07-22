@@ -142,7 +142,6 @@ struct TimerPopover: View {
     private func startCustomTimer() {
         let duration = customDurationInSeconds
         guard duration > 0 else { return }
-        togglManager.clearSaveError()
         withAnimation(.smooth) {
             timerManager.startTimer(duration: duration, name: String(localized: "Custom Timer"))
         }
@@ -150,7 +149,6 @@ struct TimerPopover: View {
     }
 
     private func startPreset(_ preset: TimerPreset) {
-        togglManager.clearSaveError()
         withAnimation(.smooth) {
             timerManager.startTimer(duration: preset.duration, name: preset.name, preset: preset)
         }

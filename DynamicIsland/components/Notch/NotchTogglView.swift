@@ -286,13 +286,7 @@ struct NotchTogglView: View {
     }
 
     private var formattedElapsed: String {
-        let total = Int(togglManager.elapsed)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        return h > 0
-            ? String(format: "%d:%02d:%02d", h, m, s)
-            : String(format: "%d:%02d", m, s)
+        TogglSupplementMetrics.formattedElapsed(for: togglManager.elapsed)
     }
 
     private var startColor: Color { Color(red: 0.142, green: 0.633, blue: 0.265) }

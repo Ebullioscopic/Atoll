@@ -65,15 +65,12 @@ struct TogglLiveActivity: View {
         .contentShape(Rectangle())
     }
 
-    private var elapsedWidth: CGFloat { 72 }
+    // Measured so hour-format times (h:mm:ss) get enough room instead of clipping.
+    private var elapsedWidth: CGFloat {
+        TogglSupplementMetrics.elapsedFrameWidth(for: formattedElapsed)
+    }
 
     private var formattedElapsed: String {
-        let total = Int(togglManager.elapsed)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        return h > 0
-            ? String(format: "%d:%02d:%02d", h, m, s)
-            : String(format: "%d:%02d", m, s)
+        TogglSupplementMetrics.formattedElapsed(for: togglManager.elapsed)
     }
 }

@@ -356,7 +356,8 @@ class TimerManager: ObservableObject {
         withAnimation(.smooth) { isTimerActive = true }
         activeSource = .manual
         isFinished = false
-        isOvertime = false
+        // Offsets at or past the 24h ceiling start directly in overtime.
+        isOvertime = elapsed >= duration
         timerName = name.isEmpty ? "Timer" : name
         totalDuration = duration
         remainingTime = duration - elapsed
