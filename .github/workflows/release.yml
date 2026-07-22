@@ -292,6 +292,12 @@ jobs:
       - name: Sign Sparkle XPC Services
         run: |
           APP_PATH="build/export/${APP_NAME}.app"
+          ENTITLEMENTS_PATH="$RUNNER_TEMP/${APP_NAME}.entitlements"
+
+          # Keep the capabilities Xcode applied to the archived app. Re-signing
+          # without this file strips TCC-gated capabilities such as Camera and
+          # Apple Events automation from the shipped app.
+          codesign -d --entitlements :- "$APP_PATH" > "$ENTITLEMENTS_PATH"
 
           # Sign Sparkle XPC services with hardened runtime
           find "$APP_PATH" -name "*.xpc" -print0 | while IFS= read -r -d '' xpc; do
@@ -310,11 +316,20 @@ jobs:
 
           # Re-sign the entire app
           codesign --force --options runtime \
+            --entitlements "$ENTITLEMENTS_PATH" \
             --sign "Developer ID Application: Hariharan Mudaliar ($TEAM_ID)" \
             "$APP_PATH"
 
           # Verify
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+          # Confirm the shipped app still contains the privacy capabilities
+          # required by the features it exposes. This catches any future
+          # signing change that would silently strip the app's entitlements.
+          FINAL_ENTITLEMENTS_PATH="$RUNNER_TEMP/${APP_NAME}-final.entitlements"
+          codesign -d --entitlements :- "$APP_PATH" > "$FINAL_ENTITLEMENTS_PATH"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.security.device.camera" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"
+          /usr/libexec/PlistBuddy -c "Print :com.apple.security.automation.apple-events" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"
 
       # ─────────────────────────────────────────────────────────────────
       # 14. Create DMG

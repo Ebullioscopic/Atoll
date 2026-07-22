@@ -2,6 +2,14 @@
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>Atoll</title>
+        <item>
+            <title>2.3.0-beta.1</title>
+            <pubDate>Mon, 20 Jul 2026 08:06:57 +0000</pubDate>
+            <sparkle:version>20260720003</sparkle:version>
+            <sparkle:shortVersionString>2.3.0-beta.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.6</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/Ebullioscopic/Atoll/releases/download/v2.3.0-beta.1/Atoll-2.3.0-beta.1.dmg" length="21299788" type="application/octet-stream" sparkle:edSignature="uep1mbmGg1TGnVrXjMfocWcfpFgYqb5LRJbYsmI86vakfc09pn29Ek6QKsTjuO4O48oQOOCuCiNDVxT8NTH2DQ=="/>
+        </item>
         <!-- Beta builds will be auto-populated by the release workflow -->
     </channel>
 </rss>

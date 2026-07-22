@@ -39,6 +39,9 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      - name: Validate privacy configuration
+        run: python3 -m unittest tests.test_privacy_configuration
+
       - name: Download Metal Toolchain
         # The downloadable Metal Toolchain is an Xcode 26+ (macOS 26) component; older Xcode ships metal.
         run: |

@@ -2,6 +2,14 @@
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>Atoll</title>
+        <item>
+            <title>2.3.0-nightly.20260720.7</title>
+            <pubDate>Mon, 20 Jul 2026 07:26:00 +0000</pubDate>
+            <sparkle:version>202607207</sparkle:version>
+            <sparkle:shortVersionString>2.3.0-nightly.20260720.7</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.6</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/Ebullioscopic/Atoll/releases/download/v2.3.0-nightly.20260720.7/Atoll-2.3.0-nightly.20260720.7.dmg" length="21195552" type="application/octet-stream" sparkle:edSignature="3nmLw9ZaD+kvgTcfEeup0hUJr5BUABRDUClNqC7Zn/ioJqoUz9VL03aR31OeelFHmtZmSE1BuKWHo+lG036vCw=="/>
+        </item>
         <!-- Nightly builds will be auto-populated by the release workflow -->
     </channel>
 </rss>
