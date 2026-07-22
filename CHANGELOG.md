@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Toggl Integration**: Toggl Track time tracking as a dedicated notch tab — start/stop entries with description and project, sync a running Toggl timer into the notch, recent-entry quick start, closed-notch live activity with elapsed time, and offline retry for failed saves (#530)
 
 ### Changed
 
