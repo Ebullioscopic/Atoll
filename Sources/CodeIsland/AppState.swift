@@ -1891,8 +1891,7 @@ final class AppState {
     private nonisolated static func readModelFromTranscript(sessionId: String, cwd: String?) -> String? {
         guard let cwd = cwd else { return nil }
         let projectDir = cwd.claudeProjectDirEncoded()
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let path = "\(home)/.claude/projects/\(projectDir)/\(sessionId).jsonl"
+        let path = "\(ClaudeConfigPaths.projectsDir())/\(projectDir)/\(sessionId).jsonl"
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { handle.closeFile() }
         let chunk = handle.readData(ofLength: 32768)
@@ -2272,7 +2271,7 @@ final class AppState {
     private nonisolated static func discoveryWatchRoots() -> [String] {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let candidates: [(String, String)] = [
-            ("claude", "\(home)/.claude/projects"),
+            ("claude", ClaudeConfigPaths.projectsDir()),
             ("codex", "\(home)/.codex/sessions"),
             ("gemini", "\(home)/.gemini/tmp"),
             ("qoder", "\(home)/.qoder/projects"),
@@ -2835,8 +2834,8 @@ final class AppState {
         let claudePids = findClaudePids(candidatePids: candidatePids)
         guard !claudePids.isEmpty else { return [] }
 
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
         let fm = FileManager.default
+        let claudeProjects = ClaudeConfigPaths.projectsDir()
         var results: [DiscoveredSession] = []
         var seenSessionIds: Set<String> = []
 
@@ -2853,7 +2852,7 @@ final class AppState {
             let processStart = getProcessStartTime(pid)
 
             let projectDir = cwd.claudeProjectDirEncoded()
-            let projectPath = "\(home)/.claude/projects/\(projectDir)"
+            let projectPath = "\(claudeProjects)/\(projectDir)"
             guard let files = try? fm.contentsOfDirectory(atPath: projectPath) else { continue }
 
             // Find the most recently modified .jsonl that was written AFTER this process started

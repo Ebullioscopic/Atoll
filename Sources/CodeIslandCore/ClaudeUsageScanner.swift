@@ -66,7 +66,7 @@ public enum ClaudeUsageScanner {
 
     /// One-shot convenience (tests, callers without persistent state).
     public static func scan(
-        claudeHome: String = NSHomeDirectory() + "/.claude",
+        claudeHome: String = ClaudeConfigPaths.configDir(),
         now: Date = Date()
     ) -> Snapshot {
         var cache = FileCache()
@@ -74,7 +74,7 @@ public enum ClaudeUsageScanner {
     }
 
     public static func scan(
-        claudeHome: String = NSHomeDirectory() + "/.claude",
+        claudeHome: String = ClaudeConfigPaths.configDir(),
         now: Date = Date(),
         cache: inout FileCache
     ) -> Snapshot {

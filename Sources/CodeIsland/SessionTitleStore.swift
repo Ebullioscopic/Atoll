@@ -72,8 +72,7 @@ enum SessionTitleStore {
         guard let cwd else { return nil }
 
         let projectDir = cwd.claudeProjectDirEncoded()
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let path = "\(home)/.claude/projects/\(projectDir)/\(sessionId).jsonl"
+        let path = "\(ClaudeConfigPaths.projectsDir())/\(projectDir)/\(sessionId).jsonl"
 
         guard let handle = FileHandle(forReadingAtPath: path) else {
             return nil

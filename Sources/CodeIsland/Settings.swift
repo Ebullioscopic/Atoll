@@ -119,6 +119,10 @@ enum SettingsKey {
     // Hook cwd exclusion (comma-separated substrings; cwd containing any drops the event)
     static let excludedHookCwdSubstrings = "excludedHookCwdSubstrings"
 
+    // Claude Code config dir override (empty = auto-detect). Must match
+    // ClaudeConfigPaths.preferenceKey — that resolver is the only reader.
+    static let claudeConfigDir = "claude_config_dir"
+
     // Webhook forwarding: POST hook events to an external URL
     static let webhookEnabled = "webhookEnabled"
     static let webhookURL = "webhookURL"
@@ -195,6 +199,8 @@ struct SettingsDefaults {
 
     static let excludedHookCwdSubstrings = ""
 
+    static let claudeConfigDir = ""
+
     static let webhookEnabled = false
     static let webhookURL = ""
     static let webhookEventFilter = ""
@@ -259,6 +265,7 @@ class SettingsManager {
             SettingsKey.defaultSource: SettingsDefaults.defaultSource,
             SettingsKey.autoApproveTools: SettingsDefaults.autoApproveTools,
             SettingsKey.excludedHookCwdSubstrings: SettingsDefaults.excludedHookCwdSubstrings,
+            SettingsKey.claudeConfigDir: SettingsDefaults.claudeConfigDir,
             SettingsKey.webhookEnabled: SettingsDefaults.webhookEnabled,
             SettingsKey.webhookURL: SettingsDefaults.webhookURL,
             SettingsKey.webhookEventFilter: SettingsDefaults.webhookEventFilter,
@@ -409,6 +416,13 @@ class SettingsManager {
     var excludedHookCwdSubstrings: String {
         get { defaults.string(forKey: SettingsKey.excludedHookCwdSubstrings) ?? SettingsDefaults.excludedHookCwdSubstrings }
         set { defaults.set(newValue, forKey: SettingsKey.excludedHookCwdSubstrings) }
+    }
+
+    /// Explicit Claude Code config dir. Empty means auto-detect — see `ClaudeConfigPaths`.
+    /// Needed because a Finder-launched app inherits no `$CLAUDE_CONFIG_DIR`.
+    var claudeConfigDir: String {
+        get { defaults.string(forKey: SettingsKey.claudeConfigDir) ?? SettingsDefaults.claudeConfigDir }
+        set { defaults.set(newValue, forKey: SettingsKey.claudeConfigDir) }
     }
 }
 

@@ -70,3 +70,7 @@ skills/
 skills-lock.json
 CLAUDE.md
 build-dir/
+
+# Python bytecode from local syntax checks
+__pycache__/
+*.pyc

@@ -200,7 +200,7 @@ struct ConfigInstaller {
         // Claude Code — uses hook script (with bridge dispatcher + nc fallback)
         CLIConfig(
             name: "Claude Code", source: "claude",
-            configPath: ".claude/settings.json", configKey: "hooks",
+            configPath: "settings.json", configKey: "hooks",
             format: .claude,
             events: [
                 ("UserPromptSubmit", 5, true),
@@ -218,7 +218,9 @@ struct ConfigInstaller {
             ],
             versionedEvents: [
                 "PostToolUseFailure": "2.1.89",
-            ]
+            ],
+            rootOverride: { ClaudeConfigPaths.configDir() },
+            displayPathOverride: { ClaudeConfigPaths.displayPath(ClaudeConfigPaths.settingsPath()) }
         ),
         // Codex — honors $CODEX_HOME (falls back to ~/.codex)
         CLIConfig(
@@ -774,6 +776,10 @@ struct ConfigInstaller {
         // Clean up legacy paths at ~/.claude/hooks/ (#32)
         try? fm.removeItem(atPath: legacyBridgePath)
         try? fm.removeItem(atPath: legacyHookScriptPath)
+
+        // A previous run may have created the Claude config dir after the resolution was
+        // memoized, so re-resolve before installing into it.
+        ClaudeConfigPaths.invalidateCache()
 
         // Install hook script + bridge binary (shared by all CLIs)
         installHookScript(fm: fm)

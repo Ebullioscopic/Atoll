@@ -149,6 +149,10 @@ final class L10n: ObservableObject {
         "excluded_hook_cwd_title": "Ignore Hooks From Paths",
         "excluded_hook_cwd_desc": "Comma-separated substrings. Any hook event whose working directory contains one of them is silently dropped — useful for filtering out background plugins like claude-mem. Example: .claude-mem,.cache/agents",
         "excluded_hook_cwd_placeholder": "e.g. .claude-mem,.cache/agents",
+        "claude_config_dir_title": "Claude Code Config Directory",
+        "claude_config_dir_desc": "Where Claude Code keeps projects/ and settings.json. Leave empty to auto-detect ($CLAUDE_CONFIG_DIR, then whichever of ~/.claude or ~/.config/claude-code actually holds your projects, preferring ~/.claude). Set this if you use a custom CLAUDE_CONFIG_DIR — a Finder-launched app does not inherit your shell environment. Restart CodeIsland after changing.",
+        "claude_config_dir_placeholder": "auto-detect",
+        "claude_config_dir_resolved": "Currently using: %@",
 
         // Webhook forwarding
         "webhook_title": "Webhook Forwarding",
@@ -829,6 +833,10 @@ final class L10n: ObservableObject {
         "excluded_hook_cwd_title": "忽略指定路径的 Hook",
         "excluded_hook_cwd_desc": "用逗号分隔的子串。任何 hook 事件的工作目录如果包含其中之一就会被静默丢弃 —— 适合过滤 claude-mem 等后台插件。示例：.claude-mem,.cache/agents",
         "excluded_hook_cwd_placeholder": "例如 .claude-mem,.cache/agents",
+        "claude_config_dir_title": "Claude Code 配置目录",
+        "claude_config_dir_desc": "Claude Code 存放 projects/ 和 settings.json 的位置。留空则自动检测（先 $CLAUDE_CONFIG_DIR，再是确实包含 projects/ 的 ~/.claude，最后 ~/.config/claude-code）。如果你使用自定义的 CLAUDE_CONFIG_DIR，请在此设置——从访达启动的应用不会继承 shell 环境变量。修改后请重启 CodeIsland。",
+        "claude_config_dir_placeholder": "自动检测",
+        "claude_config_dir_resolved": "当前使用：%@",
 
         // Webhook 转发
         "webhook_title": "Webhook 转发",
@@ -1169,6 +1177,10 @@ final class L10n: ObservableObject {
         "excluded_hook_cwd_title": "忽略指定路徑的 Hook",
         "excluded_hook_cwd_desc": "以逗號分隔的子字串。任何 hook 事件的工作目錄如果包含其中之一就會被靜默丟棄 —— 適合過濾 claude-mem 等背景外掛。範例：.claude-mem,.cache/agents",
         "excluded_hook_cwd_placeholder": "例如 .claude-mem,.cache/agents",
+        "claude_config_dir_title": "Claude Code 設定目錄",
+        "claude_config_dir_desc": "Claude Code 存放 projects/ 和 settings.json 的位置。留空則自動偵測（先 $CLAUDE_CONFIG_DIR，再是確實包含 projects/ 的 ~/.claude，最後 ~/.config/claude-code）。若你使用自訂的 CLAUDE_CONFIG_DIR，請在此設定——從 Finder 啟動的應用程式不會繼承 shell 環境變數。修改後請重新啟動 CodeIsland。",
+        "claude_config_dir_placeholder": "自動偵測",
+        "claude_config_dir_resolved": "目前使用：%@",
 
         // Webhook 轉發
         "webhook_title": "Webhook 轉發",
@@ -1509,6 +1521,10 @@ final class L10n: ObservableObject {
         "excluded_hook_cwd_title": "指定パスの Hook を無視",
         "excluded_hook_cwd_desc": "カンマ区切りの部分文字列。作業ディレクトリにいずれかを含む hook イベントは静かに破棄されます。claude-mem 等のバックグラウンドプラグイン除外に便利です。例：.claude-mem,.cache/agents",
         "excluded_hook_cwd_placeholder": "例: .claude-mem,.cache/agents",
+        "claude_config_dir_title": "Claude Code 設定ディレクトリ",
+        "claude_config_dir_desc": "Claude Code が projects/ と settings.json を保存する場所。空欄の場合は自動検出します（$CLAUDE_CONFIG_DIR、次に projects/ が実在する ~/.claude、次に ~/.config/claude-code の順）。カスタムの CLAUDE_CONFIG_DIR を使用している場合は設定してください。Finder から起動したアプリはシェルの環境変数を継承しません。変更後は CodeIsland を再起動してください。",
+        "claude_config_dir_placeholder": "自動検出",
+        "claude_config_dir_resolved": "現在の使用先: %@",
 
         // Webhook 転送
         "webhook_title": "Webhook 転送",
@@ -1849,6 +1865,10 @@ final class L10n: ObservableObject {
         "excluded_hook_cwd_title": "지정 경로의 Hook 무시",
         "excluded_hook_cwd_desc": "쉼표로 구분된 부분 문자열. 작업 디렉터리에 하나라도 포함된 hook 이벤트는 조용히 폐기됩니다. claude-mem 같은 백그라운드 플러그인 필터링에 유용합니다. 예: .claude-mem,.cache/agents",
         "excluded_hook_cwd_placeholder": "예: .claude-mem,.cache/agents",
+        "claude_config_dir_title": "Claude Code 설정 디렉터리",
+        "claude_config_dir_desc": "Claude Code가 projects/ 및 settings.json을 저장하는 위치입니다. 비워 두면 자동으로 감지합니다($CLAUDE_CONFIG_DIR, 그다음 projects/가 실제로 있는 ~/.claude, 그다음 ~/.config/claude-code). 사용자 지정 CLAUDE_CONFIG_DIR을 사용하는 경우 설정하세요. Finder에서 실행된 앱은 셸 환경 변수를 상속하지 않습니다. 변경 후 CodeIsland를 다시 시작하세요.",
+        "claude_config_dir_placeholder": "자동 감지",
+        "claude_config_dir_resolved": "현재 사용 중: %@",
 
         // Webhook 전달
         "webhook_title": "Webhook 전달",
@@ -2189,6 +2209,10 @@ final class L10n: ObservableObject {
         "excluded_hook_cwd_title": "Belirli Yolların Hook'larını Yoksay",
         "excluded_hook_cwd_desc": "Virgülle ayrılmış alt dizeler. Çalışma dizini bunlardan birini içeren hook olayları sessizce yok sayılır — claude-mem gibi arka plan eklentilerini filtrelemek için kullanışlı. Örn: .claude-mem,.cache/agents",
         "excluded_hook_cwd_placeholder": "örn. .claude-mem,.cache/agents",
+        "claude_config_dir_title": "Claude Code Yapılandırma Dizini",
+        "claude_config_dir_desc": "Claude Code'un projects/ ve settings.json dosyalarını sakladığı yer. Otomatik algılama için boş bırakın ($CLAUDE_CONFIG_DIR, ardından projects/ klasörünü gerçekten içeren ~/.claude, ardından ~/.config/claude-code). Özel bir CLAUDE_CONFIG_DIR kullanıyorsanız bunu ayarlayın; Finder'dan başlatılan bir uygulama kabuk ortam değişkenlerini devralmaz. Değişiklikten sonra CodeIsland'ı yeniden başlatın.",
+        "claude_config_dir_placeholder": "otomatik algıla",
+        "claude_config_dir_resolved": "Şu anda kullanılan: %@",
 
         // Webhook iletme
         "webhook_title": "Webhook İletme",

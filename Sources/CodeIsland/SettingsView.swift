@@ -392,6 +392,7 @@ private struct BehaviorPage: View {
     @AppStorage(SettingsKey.maxToolHistory) private var maxToolHistory = SettingsDefaults.maxToolHistory
     @AppStorage(SettingsKey.autoApproveTools) private var autoApproveRaw: String = SettingsDefaults.autoApproveTools
     @AppStorage(SettingsKey.excludedHookCwdSubstrings) private var excludedHookCwdSubstrings: String = SettingsDefaults.excludedHookCwdSubstrings
+    @AppStorage(SettingsKey.claudeConfigDir) private var claudeConfigDir: String = SettingsDefaults.claudeConfigDir
     @AppStorage(SettingsKey.webhookEnabled) private var webhookEnabled: Bool = SettingsDefaults.webhookEnabled
     @AppStorage(SettingsKey.webhookURL) private var webhookURL: String = SettingsDefaults.webhookURL
     @AppStorage(SettingsKey.webhookEventFilter) private var webhookEventFilter: String = SettingsDefaults.webhookEventFilter
@@ -498,6 +499,19 @@ private struct BehaviorPage: View {
                         }
                     }
                 }
+            }
+
+            Section(l10n["claude_config_dir_title"]) {
+                Text(l10n["claude_config_dir_desc"])
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField(l10n["claude_config_dir_placeholder"], text: $claudeConfigDir)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+                Text(String(format: l10n["claude_config_dir_resolved"],
+                            ClaudeConfigPaths.displayPath(ClaudeConfigPaths.configDir())))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
 
             Section(l10n["excluded_hook_cwd_title"]) {
