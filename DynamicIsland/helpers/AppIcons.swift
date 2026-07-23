@@ -20,21 +20,38 @@ import SwiftUI
 import AppKit
 import Defaults
 
+/// Process-wide cache of resolved app icons keyed by file path.
+/// `NSCache` is thread-safe, so it can be shared across the synchronous
+/// call sites below (which run on the main thread during SwiftUI renders)
+/// without extra locking. App icons rarely change during a session, so
+/// caching removes redundant, main-thread `NSWorkspace` lookups on every
+/// view refresh.
+private let appIconPathCache = NSCache<NSString, NSImage>()
+
+private func cachedIcon(forFile path: String) -> NSImage {
+    if let cached = appIconPathCache.object(forKey: path as NSString) {
+        return cached
+    }
+    let icon = NSWorkspace.shared.icon(forFile: path)
+    appIconPathCache.setObject(icon, forKey: path as NSString)
+    return icon
+}
+
 struct AppIcons {
-    
+
     func getIcon(file path: String) -> NSImage? {
         guard FileManager.default.fileExists(atPath: path)
         else { return nil }
-        
-        return NSWorkspace.shared.icon(forFile: path)
+
+        return cachedIcon(forFile: path)
     }
-    
+
     func getIcon(bundleID: String) -> NSImage? {
         guard let path = NSWorkspace.shared.urlForApplication(
             withBundleIdentifier: bundleID
         )?.absoluteString
         else { return nil }
-        
+
         return getIcon(file: path)
     }
     
@@ -50,22 +67,20 @@ struct AppIcons {
 
 func AppIcon(for bundleID: String) -> Image {
     let workspace = NSWorkspace.shared
-    
+
     if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID) {
-        let appIcon = workspace.icon(forFile: appURL.path)
-        return Image(nsImage: appIcon)
+        return Image(nsImage: cachedIcon(forFile: appURL.path))
     }
-    
+
     return Image(nsImage: workspace.icon(for: .applicationBundle))
 }
 
 
 func AppIconAsNSImage(for bundleID: String) -> NSImage? {
     let workspace = NSWorkspace.shared
-    
+
     if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID) {
-        let appIcon = workspace.icon(forFile: appURL.path)
-        return appIcon
+        return cachedIcon(forFile: appURL.path)
     }
     return nil
 }

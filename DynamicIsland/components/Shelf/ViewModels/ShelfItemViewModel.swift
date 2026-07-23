@@ -124,8 +124,22 @@ final class ShelfItemViewModel: ObservableObject {
         await MainActor.run { self.icon = image }
     }
 
+    /// Cache of file-icon and rendered app-icon images. `NSCache` is
+    /// thread-safe, so it is shared between the detached background work below
+    /// and the main-actor menu code.
+    private static let iconCache = NSCache<NSString, NSImage>()
+
     private func loadIconFromURL(_ url: URL) async -> NSImage {
-        return NSWorkspace.shared.icon(forFile: url.path)
+        let path = url.path
+        if let cached = Self.iconCache.object(forKey: path as NSString) {
+            return cached
+        }
+        // Resolve the icon off the main thread so opening the shelf doesn't hitch.
+        let image = await Task.detached(priority: .utility) {
+            NSWorkspace.shared.icon(forFile: path)
+        }.value
+        Self.iconCache.setObject(image, forKey: path as NSString)
+        return image
     }
 
     // Async version to resolve file URL without blocking main thread
@@ -1201,6 +1215,13 @@ final class ShelfItemViewModel: ObservableObject {
     }
 
     private func nsAppIcon(for appURL: URL, size: CGFloat) -> NSImage? {
+        // Cache the rendered result so repeatedly opening the context menu
+        // doesn't re-fetch and re-render the same icon on the main thread.
+        let cacheKey = "\(appURL.path)@\(size)" as NSString
+        if let cached = Self.iconCache.object(forKey: cacheKey) {
+            return cached
+        }
+
         let baseIcon = NSWorkspace.shared.icon(forFile: appURL.path)
         baseIcon.isTemplate = false
 
@@ -1214,6 +1235,7 @@ final class ShelfItemViewModel: ObservableObject {
         }
 
         rendered.size = targetSize
+        Self.iconCache.setObject(rendered, forKey: cacheKey)
         return rendered
     }
 
