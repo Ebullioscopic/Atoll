@@ -117,6 +117,8 @@ struct CLIConfig {
     var rootOverride: (@Sendable () -> String)? = nil
     /// Optional override for the user-visible config path (e.g. "$CODEX_HOME/hooks.json").
     var displayPathOverride: (@Sendable () -> String)? = nil
+    /// Optional override for the `--source` value passed to the bridge.
+    var bridgeSourceOverride: String? = nil
 
     var fullPath: String {
         if let override = rootOverride {
@@ -334,6 +336,14 @@ struct ConfigInstaller {
             configPath: ".trae/traecli.yaml", configKey: "hooks",
             format: .traecli,
             events: defaultEvents(for: .traecli)
+        ),
+        // Trae CLI Next — hooks.json moved under ~/.trae/cli and uses TraeX event names.
+        CLIConfig(
+            name: "Trae CLI Next", source: "traecli-next",
+            configPath: ".trae/cli/hooks.json", configKey: "hooks",
+            format: .nested,
+            events: traecliNextEvents(),
+            bridgeSourceOverride: "traecli"
         ),
         // Qoder — Claude Code fork with its own documented PermissionRequest hook.
         CLIConfig(
@@ -689,6 +699,24 @@ struct ConfigInstaller {
                 ("Stop", 5, true),
             ]
         }
+    }
+
+    private static func traecliNextEvents() -> [(String, Int, Bool)] {
+        [
+            ("SessionStart", 5, false),
+            ("SessionEnd", 5, true),
+            ("UserPromptSubmit", 5, true),
+            ("PreToolUse", 5, false),
+            ("PostToolUse", 5, true),
+            ("PostToolUseFailure", 5, true),
+            ("PermissionRequest", 86400, false),
+            ("Notification", 86400, false),
+            ("SubagentStart", 5, true),
+            ("SubagentStop", 5, true),
+            ("Stop", 5, true),
+            ("PreCompact", 5, true),
+            ("PostCompact", 5, true),
+        ]
     }
 
     static func customCLIConfigs() -> [CustomCLIConfig] {
@@ -1380,9 +1408,15 @@ struct ConfigInstaller {
 
         let root = parseJSONFile(at: cli.fullPath, fm: fm) ?? [:]
         var hooks = root[cli.configKey] as? [String: Any] ?? [:]
+        if cli.source == "traecli-next" {
+            // Clean up CodeIsland-managed entries written with the old Trae IDE
+            // event names (for example beforeReadFile) at the new Trae CLI path.
+            hooks = removeManagedHookEntries(from: hooks)
+        }
         // Quote the path in case home directory contains spaces or special characters
         let quotedBridge = bridgeCommand.contains(" ") ? "\"\(bridgeCommand)\"" : bridgeCommand
-        let baseCommand = "\(quotedBridge) --source \(cli.source)"
+        let bridgeSource = cli.bridgeSourceOverride ?? cli.source
+        let baseCommand = "\(quotedBridge) --source \(bridgeSource)"
 
         for (event, timeout, _) in cli.events {
             var eventEntries = hooks[event] as? [[String: Any]] ?? []
@@ -1396,7 +1430,9 @@ struct ConfigInstaller {
                 // — otherwise long-running PermissionRequest hooks hang the agent (#103).
                 entry = ["matcher": "*", "hooks": [["type": "command", "command": baseCommand, "timeout": timeout] as [String: Any]]]
             case .nested:
-                let cmd = cli.source == "gemini" ? "\(baseCommand) --event \(event)" : baseCommand
+                let cmd = (cli.source == "gemini" || cli.source == "traecli-next")
+                    ? "\(baseCommand) --event \(event)"
+                    : baseCommand
                 entry = ["hooks": [["type": "command", "command": cmd, "timeout": timeout] as [String: Any]]]
             case .flat:
                 entry = ["command": "\(baseCommand) --event \(event)"]

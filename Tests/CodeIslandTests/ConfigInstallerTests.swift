@@ -211,6 +211,103 @@ final class ConfigInstallerTests: XCTestCase {
         XCTAssertTrue(command.contains("--event beforeSubmitPrompt"))
     }
 
+    func testBuiltInTraeKeepsLegacyIDEHooksPath() throws {
+        let cli = try XCTUnwrap(ConfigInstaller.allCLIs.first { $0.source == "trae" })
+
+        XCTAssertEqual(cli.configPath, ".trae/hooks.json")
+        XCTAssertEqual(cli.format.storageValue, HookFormat.traeIDE.storageValue)
+        XCTAssertTrue(cli.events.contains { $0.0 == "beforeReadFile" })
+    }
+
+    func testTraeCLINextUsesTraeXHooksSchema() throws {
+        let cli = try XCTUnwrap(ConfigInstaller.allCLIs.first { $0.source == "traecli-next" })
+
+        XCTAssertEqual(cli.configPath, ".trae/cli/hooks.json")
+        XCTAssertEqual(cli.format.storageValue, HookFormat.nested.storageValue)
+        XCTAssertEqual(cli.bridgeSourceOverride, "traecli")
+
+        let eventNames = cli.events.map { $0.0 }
+        XCTAssertTrue(eventNames.contains("PreToolUse"))
+        XCTAssertTrue(eventNames.contains("PermissionRequest"))
+        XCTAssertTrue(eventNames.contains("PostToolUseFailure"))
+        XCTAssertFalse(eventNames.contains("beforeReadFile"))
+    }
+
+    func testTraeCLINextInstallUsesSupportedEventsAndCleansLegacyIDEEvents() throws {
+        let fm = FileManager.default
+        let tempDir = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let configDir = tempDir.appendingPathComponent(".trae/cli")
+        try fm.createDirectory(at: configDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: tempDir) }
+
+        let configPath = configDir.appendingPathComponent("hooks.json").path
+        let legacy = """
+        {
+          "hooks": {
+            "beforeReadFile": [
+              {
+                "matcher": "*",
+                "loop_limit": 5,
+                "hooks": [
+                  {
+                    "type": "command",
+                    "command": "\(NSHomeDirectory())/.codeisland/codeisland-bridge --source trae --event beforeReadFile",
+                    "timeout": 5
+                  }
+                ]
+              }
+            ],
+            "Stop": [
+              {
+                "hooks": [
+                  {
+                    "type": "command",
+                    "command": "/usr/local/bin/user-stop",
+                    "timeout": 5
+                  }
+                ]
+              }
+            ]
+          }
+        }
+        """
+        try legacy.write(toFile: configPath, atomically: true, encoding: .utf8)
+
+        let cli = CLIConfig(
+            name: "Trae CLI Next",
+            source: "traecli-next",
+            configPath: configPath,
+            configKey: "hooks",
+            format: .nested,
+            events: [
+                ("PreToolUse", 5, false),
+                ("PermissionRequest", 86400, false),
+                ("Stop", 5, false),
+            ],
+            bridgeSourceOverride: "traecli"
+        )
+
+        XCTAssertTrue(ConfigInstaller.installExternalHooks(cli: cli, fm: fm))
+
+        let data = try XCTUnwrap(fm.contents(atPath: configPath))
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let hooks = try XCTUnwrap(root["hooks"] as? [String: Any])
+        XCTAssertNil(hooks["beforeReadFile"])
+        XCTAssertNotNil(hooks["PreToolUse"])
+        XCTAssertNotNil(hooks["PermissionRequest"])
+
+        let preToolUse = try XCTUnwrap(hooks["PreToolUse"] as? [[String: Any]])
+        let hookList = try XCTUnwrap(preToolUse.first?["hooks"] as? [[String: Any]])
+        let command = try XCTUnwrap(hookList.first?["command"] as? String)
+        XCTAssertTrue(command.contains("codeisland-bridge --source traecli"))
+        XCTAssertTrue(command.contains("--event PreToolUse"))
+
+        let stopEntries = try XCTUnwrap(hooks["Stop"] as? [[String: Any]])
+        XCTAssertTrue(stopEntries.contains {
+            (($0["hooks"] as? [[String: Any]])?.first?["command"] as? String) == "/usr/local/bin/user-stop"
+        })
+    }
+
     func testTraeIDEInstallMigratesOldFlatCodeIslandEntry() throws {
         let fm = FileManager.default
         let tempDir = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
