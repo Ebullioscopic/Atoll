@@ -44,7 +44,8 @@ final class DoNotDisturbManager: ObservableObject {
     private let focusLogStream = FocusLogStream()
     private let assertionsURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/DoNotDisturb/DB/Assertions.json")
-    private var pollingSource: DispatchSourceTimer?
+    private var assertionsFileSource: DispatchSourceFileSystemObject?
+    private var assertionsDirSource: DispatchSourceFileSystemObject?
     private var lastAssertionsModificationDate: Date?
     private var modeCancellable: AnyCancellable?
     /// Periodic task that verifies focus is still active when `isDoNotDisturbActive` is true.
@@ -585,19 +586,90 @@ private extension DoNotDisturbManager {
         stopAssertionsPolling()
         lastAssertionsModificationDate = nil
 
-        let timer = DispatchSource.makeTimerSource(queue: pollingQueue)
-        timer.schedule(deadline: .now() + .seconds(1), repeating: .seconds(2), leeway: .milliseconds(250))
-        timer.setEventHandler { [weak self] in
+        // Watch the Assertions.json file for filesystem events instead of waking every 2s to
+        // compare its modification date. This yields zero wake-ups while idle and reacts the
+        // instant Focus state is written. A directory-watch fallback re-arms the file watch if
+        // the file is currently absent or gets rotated away.
+        beginWatchingAssertionsFile()
+
+        // Read the current state immediately so an already-active Focus is reflected on start.
+        pollingQueue.async { [weak self] in
             self?.pollAssertionsState()
         }
-        timer.resume()
-        pollingSource = timer
     }
 
     func stopAssertionsPolling() {
-        pollingSource?.cancel()
-        pollingSource = nil
+        assertionsFileSource?.cancel()
+        assertionsFileSource = nil
+        assertionsDirSource?.cancel()
+        assertionsDirSource = nil
         lastAssertionsModificationDate = nil
+    }
+
+    /// Arms a filesystem-object watch on `Assertions.json`. If the file doesn't exist yet, falls
+    /// back to watching its parent directory until the file appears. Re-arms itself when the file
+    /// is deleted or renamed (macOS rewrites this file atomically on Focus changes).
+    private func beginWatchingAssertionsFile() {
+        assertionsFileSource?.cancel()
+        assertionsFileSource = nil
+
+        let fd = open(assertionsURL.path, O_EVTONLY)
+        guard fd >= 0 else {
+            beginWatchingAssertionsDirectory()
+            return
+        }
+
+        // File is present now; drop any directory fallback watch.
+        assertionsDirSource?.cancel()
+        assertionsDirSource = nil
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .extend, .attrib, .rename, .delete],
+            queue: pollingQueue
+        )
+        source.setEventHandler { [weak self] in
+            guard let self, let current = self.assertionsFileSource else { return }
+            let flags = current.data
+            if flags.contains(.delete) || flags.contains(.rename) {
+                // File was rotated/removed: re-evaluate (defaults to inactive) then re-arm the watch.
+                self.lastAssertionsModificationDate = nil
+                self.pollAssertionsState()
+                self.beginWatchingAssertionsFile()
+            } else {
+                self.pollAssertionsState()
+            }
+        }
+        source.setCancelHandler { close(fd) }
+        assertionsFileSource = source
+        source.resume()
+    }
+
+    /// Fallback used when `Assertions.json` is missing: watch the containing directory and switch
+    /// to the file watch as soon as the file is created.
+    private func beginWatchingAssertionsDirectory() {
+        assertionsDirSource?.cancel()
+        assertionsDirSource = nil
+
+        let directoryURL = assertionsURL.deletingLastPathComponent()
+        let fd = open(directoryURL.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .extend, .attrib, .rename, .delete],
+            queue: pollingQueue
+        )
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            guard FileManager.default.fileExists(atPath: self.assertionsURL.path) else { return }
+            self.lastAssertionsModificationDate = nil
+            self.beginWatchingAssertionsFile()
+            self.pollAssertionsState()
+        }
+        source.setCancelHandler { close(fd) }
+        assertionsDirSource = source
+        source.resume()
     }
 
     func pollAssertionsState() {
