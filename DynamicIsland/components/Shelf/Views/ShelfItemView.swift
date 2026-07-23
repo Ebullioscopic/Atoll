@@ -26,6 +26,19 @@ import Defaults
 
 import QuickLook
 
+/// Layout metrics for the hover-revealed remove (x) button on a shelf item.
+/// Shared between the SwiftUI overlay and the AppKit drag view's hit-testing so
+/// the corner the button occupies is excluded from the drag/click handler.
+private enum ShelfRemoveButton {
+    /// Diameter of the circular remove button.
+    static let size: CGFloat = 20
+    /// Inset of the button from the item's top-trailing corner.
+    static let inset: CGFloat = 2
+    /// Square corner region (top-trailing) reserved for the button while
+    /// hovering, so clicks there hit the button instead of the drag view.
+    static let hitRegion: CGFloat = 30
+}
+
 struct ShelfItemView: View {
     let item: ShelfItem
     @EnvironmentObject var vm: DynamicIslandViewModel
@@ -35,6 +48,7 @@ struct ShelfItemView: View {
     @State private var showStack = false
     @State private var cachedPreviewImage: NSImage?
     @State private var debouncedDropTarget = false
+    @State private var isHovering = false
 
     private var isSelected: Bool { viewModel.isSelected }
     private var shouldHideDuringDrag: Bool { selection.isDragging && selection.isSelected(item.id) && false }
@@ -58,10 +72,25 @@ struct ShelfItemView: View {
                 .contentShape(Rectangle())
                 .animation(.easeInOut(duration: 0.1), value: debouncedDropTarget)
                 .animation(.easeInOut(duration: 0.1), value: isSelected)
+                .overlay(alignment: .topTrailing) {
+                    if isHovering {
+                        removeButton
+                    }
+                }
 
                 DraggableClickHandler(
                     item: item,
                     viewModel: viewModel,
+                    isHovering: isHovering,
+                    // Hover is detected here (in the AppKit drag view via a
+                    // tracking area) rather than with SwiftUI's `.onHover`,
+                    // because this NSView sits on top of the cell and
+                    // intercepts the mouse-tracking `.onHover` would need.
+                    onHoverChange: { hovering in
+                        withAnimation(.smooth(duration: 0.15)) {
+                            isHovering = hovering
+                        }
+                    },
                     cachedPreviewImage: $cachedPreviewImage,
                     dragPreviewContent: {
                         DragPreviewView(thumbnail: viewModel.thumbnail ?? viewModel.icon, displayName: viewModel.displayName)
@@ -128,6 +157,26 @@ struct ShelfItemView: View {
             .frame(height: 30, alignment: .top)
     }
 
+    /// Hover-revealed circular remove button in the top-trailing corner.
+    /// Removes just this item from the shelf via the same path as the
+    /// right-click "Remove" menu item (`ShelfActionService.remove`).
+    private var removeButton: some View {
+        Circle()
+            .fill(.white)
+            .frame(width: ShelfRemoveButton.size, height: ShelfRemoveButton.size)
+            .overlay(
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.black)
+            )
+            .shadow(color: .black.opacity(0.4), radius: 2)
+            .contentShape(Circle())
+            .onTapGesture { ShelfActionService.remove(item) }
+            .padding(ShelfRemoveButton.inset)
+            .help("Remove from Shelf")
+            .transition(.scale.combined(with: .opacity))
+    }
+
     private var backgroundView: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
             .fill(backgroundColor)
@@ -187,24 +236,30 @@ struct ShelfItemView: View {
 private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
     let item: ShelfItem
     let viewModel: ShelfItemViewModel
+    let isHovering: Bool
+    let onHoverChange: (Bool) -> Void
     @Binding var cachedPreviewImage: NSImage?
     @ViewBuilder let dragPreviewContent: () -> Content
     let onRightClick: (NSEvent, NSView) -> Void
     let onClick: (NSEvent, NSView) -> Void
-    
+
     func makeNSView(context: Context) -> DraggableClickView {
         let view = DraggableClickView()
         view.item = item
         view.viewModel = viewModel
+        view.isHovering = isHovering
+        view.onHoverChange = onHoverChange
         view.dragPreviewImage = cachedPreviewImage ?? renderDragPreview()
         view.onRightClick = onRightClick
         view.onClick = onClick
         return view
     }
-    
+
     func updateNSView(_ nsView: DraggableClickView, context: Context) {
         nsView.item = item
         nsView.viewModel = viewModel
+        nsView.isHovering = isHovering
+        nsView.onHoverChange = onHoverChange
         // Only update preview if cached version is available
         if let cached = cachedPreviewImage {
             nsView.dragPreviewImage = cached
@@ -232,13 +287,54 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
         var dragPreviewImage: NSImage?
         var onRightClick: ((NSEvent, NSView) -> Void)?
         var onClick: ((NSEvent, NSView) -> Void)?
+        var onHoverChange: ((Bool) -> Void)?
+        var isHovering = false
 
         private var mouseDownEvent: NSEvent?
         private let dragThreshold: CGFloat = 3.0
         private var draggedURLs: [URL] = []
         private var draggedItems: [ShelfItem] = []
         private var didStartDragSession = false
-        
+
+        // Detect hover here (this NSView sits on top of the cell and would
+        // otherwise swallow the mouse tracking SwiftUI's `.onHover` relies on).
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            for area in trackingAreas { removeTrackingArea(area) }
+            let area = NSTrackingArea(
+                rect: .zero,
+                options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                owner: self,
+                userInfo: nil
+            )
+            addTrackingArea(area)
+        }
+
+        override func mouseEntered(with event: NSEvent) {
+            onHoverChange?(true)
+        }
+
+        override func mouseExited(with event: NSEvent) {
+            onHoverChange?(false)
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            // While hovering, yield the top-trailing corner to the SwiftUI
+            // remove (x) button drawn beneath this drag view, so tapping it
+            // removes the item instead of opening it or starting a drag.
+            if isHovering {
+                let local = convert(point, from: superview)
+                let corner = NSRect(
+                    x: bounds.maxX - ShelfRemoveButton.hitRegion,
+                    y: bounds.maxY - ShelfRemoveButton.hitRegion,
+                    width: ShelfRemoveButton.hitRegion,
+                    height: ShelfRemoveButton.hitRegion
+                )
+                if corner.contains(local) { return nil }
+            }
+            return super.hitTest(point)
+        }
+
         override func rightMouseDown(with event: NSEvent) {
             onRightClick?(event, self)
         }
