@@ -223,7 +223,15 @@ final class SSHForwarder {
         let handle = pipe.fileHandleForReading
         handle.readabilityHandler = { [weak self] fileHandle in
             let data = fileHandle.availableData
-            guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+            guard !data.isEmpty else {
+                // EOF — ssh closed stderr (it exited). Self-unhook so the dispatch
+                // source can't re-invoke this handler in a tight loop (100% CPU) if
+                // the terminationHandler cleanup is skipped, e.g. because self was
+                // already released or the generation moved on. Same bug class as #278.
+                fileHandle.readabilityHandler = nil
+                return
+            }
+            guard let text = String(data: data, encoding: .utf8) else { return }
             let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !message.isEmpty else { return }
 
