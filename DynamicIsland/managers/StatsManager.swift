@@ -264,7 +264,7 @@ private final class GPUInfoCollector {
     }
 }
 
-struct GPUBreakdown: Equatable {
+struct GPUBreakdown: Equatable, Sendable {
     let render: Double
     let compute: Double
     let video: Double
@@ -308,7 +308,7 @@ struct NetworkInterfaceMetrics: Identifiable, Equatable {
     var id: String { name }
 }
 
-struct DiskDeviceMetrics: Identifiable, Equatable {
+struct DiskDeviceMetrics: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
     let path: URL
@@ -327,7 +327,7 @@ struct DiskDeviceMetrics: Identifiable, Equatable {
     }
 }
 
-struct GPUDeviceMetrics: Identifiable, Equatable {
+struct GPUDeviceMetrics: Identifiable, Equatable, Sendable {
     let id: String
     let vendor: String?
     let model: String
@@ -443,8 +443,8 @@ class StatsManager: ObservableObject {
     private var previousNetworkStats: (bytesIn: UInt64, bytesOut: UInt64) = (0, 0)
     private var previousTimestamp: Date = Date()
     
-    // Disk monitoring state  
-    private var previousDiskStats: (bytesRead: UInt64, bytesWritten: UInt64) = (0, 0)
+    // Disk delta state now lives inside `slowCollector` (see below) so the heavy
+    // IOStorage walk runs off the main actor without racing the fast path.
     private var previousCPULoadInfo: host_cpu_load_info?
     private var previousCpuInfo: processor_info_array_t?
     private var previousCpuInfoCount: mach_msg_type_number_t = 0
@@ -458,13 +458,20 @@ class StatsManager: ObservableObject {
     private let processStatsUpdateInterval: TimeInterval = 2.0
     private let maxProcessEntries: Int = 20
     private var isProcessRefreshInFlight = false
-    private let gpuCollector = GPUInfoCollector()
-    private let cpuSensorCollector = CPUSensorCollector()
     private var cancellables = Set<AnyCancellable>()
     private let minUpdateInterval: TimeInterval = 1.0
     private let maxUpdateInterval: TimeInterval = 60.0
     private let notchCloseStopDelay: TimeInterval = 3.0
     private let tabSwitchStopDelay: TimeInterval = 0.1
+
+    // Heavy/slow metrics (GPU, disk I/O + volumes, thermal + frequency sensors) are
+    // gathered by a dedicated background actor and refreshed on a slower cadence than
+    // the 1s CPU/memory path. Only the final @Published assignments happen on main.
+    private let slowCollector = SystemSlowMetricsCollector()
+    private let slowMetricsInterval: TimeInterval = 5.0
+    private var lastSlowMetricsUpdate: Date = .distantPast
+    private var slowMetricsNeedsBaseline = true
+    private var isSlowRefreshInFlight = false
     
     // MARK: - Initialization
     private init() {
@@ -481,10 +488,7 @@ class StatsManager: ObservableObject {
         let initialStats = aggregateNetworkStats(from: snapshotNetworkInterfaces())
         previousNetworkStats = initialStats
         previousTimestamp = Date()
-        
-        // Initialize baseline disk stats
-        let initialDiskStats = getDiskStats()
-        previousDiskStats = initialDiskStats
+        // Disk baseline is established by `slowCollector` on the first refresh.
 
         Defaults.publisher(.statsUpdateInterval, options: []).sink { [weak self] change in
             self?.handleUpdateIntervalChange(change.newValue)
@@ -556,17 +560,19 @@ class StatsManager: ObservableObject {
         // Reset baseline for accurate measurement
         let initialStats = aggregateNetworkStats(from: snapshotNetworkInterfaces())
         previousNetworkStats = initialStats
-        
-        let initialDiskStats = getDiskStats()
-        previousDiskStats = initialDiskStats
-        
+
         previousTimestamp = Date()
-        
+
         isMonitoring = true
         lastUpdated = Date()
         networkTotals = .zero
         diskTotals = .zero
-        
+        // Force the slow path to re-establish its disk baseline on the first tick so a
+        // paused-then-resumed session does not report one huge accumulated delta.
+        slowMetricsNeedsBaseline = true
+        lastSlowMetricsUpdate = .distantPast
+        isSlowRefreshInFlight = false
+
         scheduleMonitoringTimer()
 
         Task { @MainActor in
@@ -606,6 +612,12 @@ class StatsManager: ObservableObject {
         interfaceTotals.removeAll()
         cpuTemperature = CPUTemperatureMetrics(celsius: nil)
         cpuFrequency = nil
+        // Reset slow-path scheduling so the next session rebaselines cleanly. Any
+        // in-flight slow refresh that lands after this is dropped by the
+        // `isMonitoring` guard in `applySlowMetrics(_:)`.
+        slowMetricsNeedsBaseline = true
+        lastSlowMetricsUpdate = .distantPast
+        isSlowRefreshInFlight = false
     }
 
     private func scheduleMonitoringTimer() {
@@ -662,57 +674,41 @@ class StatsManager: ObservableObject {
     }
     
     // MARK: - Private Methods
+    /// Fast path (runs at the configured interval, 1s by default). Only cheap syscalls
+    /// (CPU load, memory, per-core, network via a single getifaddrs walk) run here on the
+    /// main actor. The expensive GPU/disk/sensor enumerations are handled off-main by
+    /// `maybeRefreshSlowMetrics()` on a slower cadence.
     @MainActor
     private func updateSystemStats() {
         let cpuMetrics = getCPULoadBreakdown()
         let newCpuUsage = cpuMetrics.activeUsage
         let memorySnapshot = getMemorySnapshot()
         let newMemoryUsage = memorySnapshot.usage
-        let gpuSnapshot = getGPUMetrics()
-        let newGpuUsage = gpuSnapshot.usage
         let coreUsage = collectCPUCoreUsage()
-        
+
         // Calculate network speeds (single getifaddrs walk feeds both totals and per-interface metrics)
         let networkSnapshots = snapshotNetworkInterfaces()
         let currentNetworkStats = aggregateNetworkStats(from: networkSnapshots)
         let currentTime = Date()
         let timeInterval = currentTime.timeIntervalSince(previousTimestamp)
-        
+
         var downloadSpeed: Double = 0.0
         var uploadSpeed: Double = 0.0
         var bytesDownloaded: UInt64 = 0
         var bytesUploaded: UInt64 = 0
-        
+
         // Only calculate speeds if we have a reasonable time interval and this isn't the first run
         if timeInterval > 0.1 && (previousNetworkStats.bytesIn > 0 || previousNetworkStats.bytesOut > 0) {
-            bytesDownloaded = currentNetworkStats.bytesIn > previousNetworkStats.bytesIn ? 
+            bytesDownloaded = currentNetworkStats.bytesIn > previousNetworkStats.bytesIn ?
                                 currentNetworkStats.bytesIn - previousNetworkStats.bytesIn : 0
-            bytesUploaded = currentNetworkStats.bytesOut > previousNetworkStats.bytesOut ? 
+            bytesUploaded = currentNetworkStats.bytesOut > previousNetworkStats.bytesOut ?
                                currentNetworkStats.bytesOut - previousNetworkStats.bytesOut : 0
-            
+
             downloadSpeed = Double(bytesDownloaded) / timeInterval / 1_048_576 // Convert to MB/s
             uploadSpeed = Double(bytesUploaded) / timeInterval / 1_048_576 // Convert to MB/s
         }
-        
-        // Calculate disk speeds
-        let currentDiskStats = getDiskStats()
-        var readSpeed: Double = 0.0
-        var writeSpeed: Double = 0.0
-        var bytesRead: UInt64 = 0
-        var bytesWritten: UInt64 = 0
-        
-        // Only calculate speeds if we have a reasonable time interval and this isn't the first run
-        if timeInterval > 0.1 && (previousDiskStats.bytesRead > 0 || previousDiskStats.bytesWritten > 0) {
-            bytesRead = currentDiskStats.bytesRead > previousDiskStats.bytesRead ? 
-                           currentDiskStats.bytesRead - previousDiskStats.bytesRead : 0
-            bytesWritten = currentDiskStats.bytesWritten > previousDiskStats.bytesWritten ? 
-                              currentDiskStats.bytesWritten - previousDiskStats.bytesWritten : 0
-            
-            readSpeed = Double(bytesRead) / timeInterval / 1_048_576 // Convert to MB/s
-            writeSpeed = Double(bytesWritten) / timeInterval / 1_048_576 // Convert to MB/s
-        }
-        
-        // Update cumulative transfer totals
+
+        // Update cumulative transfer totals (network). Disk totals accumulate on the slow path.
         if bytesDownloaded > 0 {
             var updatedTotals = networkTotals
             updatedTotals.downloadedMB += Double(bytesDownloaded) / 1_048_576
@@ -723,60 +719,104 @@ class StatsManager: ObservableObject {
             updatedTotals.uploadedMB += Double(bytesUploaded) / 1_048_576
             networkTotals = updatedTotals
         }
-        if bytesRead > 0 {
-            var updatedDiskTotals = diskTotals
-            updatedDiskTotals.readMB += Double(bytesRead) / 1_048_576
-            diskTotals = updatedDiskTotals
-        }
-        if bytesWritten > 0 {
-            var updatedDiskTotals = diskTotals
-            updatedDiskTotals.writtenMB += Double(bytesWritten) / 1_048_576
-            diskTotals = updatedDiskTotals
-        }
-        
-        // Update current values
+
+        // Update current values (fast path)
         cpuUsage = newCpuUsage
-        gpuUsage = newGpuUsage
         memoryUsage = newMemoryUsage
         networkDownload = max(0.0, downloadSpeed)
         networkUpload = max(0.0, uploadSpeed)
-        diskRead = max(0.0, readSpeed)
-        diskWrite = max(0.0, writeSpeed)
         lastUpdated = Date()
         cpuBreakdown = cpuMetrics
         memoryBreakdown = memorySnapshot.breakdown
         cpuLoadAverage = getLoadAverage()
-        gpuBreakdown = gpuSnapshot.breakdown
-        if gpuDevices != gpuSnapshot.devices {
-            gpuDevices = gpuSnapshot.devices
-        }
         if cpuCoreUsage != coreUsage {
             cpuCoreUsage = coreUsage
         }
         cpuUptime = ProcessInfo.processInfo.systemUptime
-        cpuTemperature = cpuSensorCollector.readTemperature()
-        if let frequencyMetrics = cpuSensorCollector.readFrequency() {
-            cpuFrequency = frequencyMetrics
-        }
-        
-        // Update history arrays (sliding window)
+
+        // Update history arrays (sliding window). GPU/disk reuse the most recent
+        // slow-path values so every series keeps advancing at the fast cadence.
         updateHistory(value: newCpuUsage, history: &cpuHistory)
         updateHistory(value: newMemoryUsage, history: &memoryHistory)
-        updateHistory(value: newGpuUsage, history: &gpuHistory)
+        updateHistory(value: gpuUsage, history: &gpuHistory)
         updateHistory(value: downloadSpeed, history: &networkDownloadHistory)
         updateHistory(value: uploadSpeed, history: &networkUploadHistory)
-        updateHistory(value: readSpeed, history: &diskReadHistory)
-        updateHistory(value: writeSpeed, history: &diskWriteHistory)
-        
+        updateHistory(value: diskRead, history: &diskReadHistory)
+        updateHistory(value: diskWrite, history: &diskWriteHistory)
+
         // Update previous stats for next calculation
         previousNetworkStats = currentNetworkStats
-        previousDiskStats = currentDiskStats
         previousTimestamp = currentTime
         networkInterfaces = collectNetworkInterfaces(from: networkSnapshots, deltaTime: timeInterval)
-        diskDevices = collectDiskDevices()
+
+        // Off-main heavy metrics (GPU, disk I/O + volumes, thermal/frequency), throttled.
+        maybeRefreshSlowMetrics()
+
         // Periodic path: honor the throttle so /bin/ps runs at the intended 0.5Hz, not ~1Hz.
         // force: true is reserved for explicit user-triggered manual refreshes.
         refreshProcessStatsIfNeeded(force: false)
+    }
+
+    /// Kicks off an off-main collection of the heavy metrics when due (~every
+    /// `slowMetricsInterval`, or immediately on the first tick after start). Guarded so at
+    /// most one refresh is in flight; the final @Published assignments happen on main via
+    /// `applySlowMetrics(_:)`.
+    @MainActor
+    private func maybeRefreshSlowMetrics() {
+        let now = Date()
+        let isDue = slowMetricsNeedsBaseline || now.timeIntervalSince(lastSlowMetricsUpdate) >= slowMetricsInterval
+        guard isDue, !isSlowRefreshInFlight else { return }
+
+        let resetBaseline = slowMetricsNeedsBaseline
+        slowMetricsNeedsBaseline = false
+        lastSlowMetricsUpdate = now
+        isSlowRefreshInFlight = true
+
+        Task { [weak self] in
+            guard let self else { return }
+            let snapshot = await self.slowCollector.collect(resetBaseline: resetBaseline)
+            await MainActor.run {
+                self.applySlowMetrics(snapshot)
+                self.isSlowRefreshInFlight = false
+            }
+        }
+    }
+
+    /// Applies a slow-metrics snapshot to the @Published properties on the main actor.
+    /// Mirrors the assignment logic the fast path used to perform inline.
+    @MainActor
+    private func applySlowMetrics(_ snapshot: SlowMetricsSnapshot) {
+        // Drop stale results that land after monitoring stopped.
+        guard isMonitoring else { return }
+
+        gpuUsage = snapshot.gpuUsage
+        gpuBreakdown = snapshot.gpuBreakdown
+        if gpuDevices != snapshot.gpuDevices {
+            gpuDevices = snapshot.gpuDevices
+        }
+
+        diskRead = max(0.0, snapshot.diskRead)
+        diskWrite = max(0.0, snapshot.diskWrite)
+        if snapshot.bytesRead > 0 {
+            var updatedDiskTotals = diskTotals
+            updatedDiskTotals.readMB += Double(snapshot.bytesRead) / 1_048_576
+            diskTotals = updatedDiskTotals
+        }
+        if snapshot.bytesWritten > 0 {
+            var updatedDiskTotals = diskTotals
+            updatedDiskTotals.writtenMB += Double(snapshot.bytesWritten) / 1_048_576
+            diskTotals = updatedDiskTotals
+        }
+        // Preserve prior devices if enumeration returned nothing (matches the previous
+        // fallback where `collectDiskDevices()` returned the existing list on failure).
+        if !snapshot.diskDevices.isEmpty {
+            diskDevices = snapshot.diskDevices
+        }
+
+        cpuTemperature = snapshot.temperature
+        if let frequencyMetrics = snapshot.frequency {
+            cpuFrequency = frequencyMetrics
+        }
     }
     
     private func updateHistory(value: Double, history: inout [Double]) {
@@ -944,45 +984,6 @@ class StatsManager: ObservableObject {
         return (min(100.0, max(0.0, usage)), breakdown)
     }
     
-    private func getGPUMetrics() -> GPUMetricsSnapshot {
-        let devices = gpuCollector.collectDevices()
-        guard !devices.isEmpty else {
-            return .zero
-        }
-        let utilizationValues = devices.compactMap { $0.utilization }
-        let usage: Double
-        if utilizationValues.isEmpty {
-            usage = 0
-        } else {
-            usage = utilizationValues.reduce(0, +) / Double(utilizationValues.count)
-        }
-        let breakdown = makeGPUBreakdown(from: devices)
-        return GPUMetricsSnapshot(usage: usage, breakdown: breakdown, devices: devices)
-    }
-    
-    private func makeGPUBreakdown(from devices: [GPUDeviceMetrics]) -> GPUBreakdown {
-        guard let primary = devices.first(where: { ($0.utilization ?? 0) > 0 || ($0.renderUtilization ?? 0) > 0 || ($0.tilerUtilization ?? 0) > 0 }) else {
-            return .zero
-        }
-        let fallbackTotal = max((primary.renderUtilization ?? 0) + (primary.tilerUtilization ?? 0), 0)
-        let total = max(primary.utilization ?? fallbackTotal, 0)
-        if total.isZero {
-            return GPUBreakdown(
-                render: primary.renderUtilization ?? 0,
-                compute: primary.tilerUtilization ?? 0,
-                video: 0,
-                other: 0
-            )
-        }
-        let render = min(primary.renderUtilization ?? 0, total)
-        let tiler = min(primary.tilerUtilization ?? 0, max(total - render, 0))
-        let remaining = max(total - render - tiler, 0)
-        let compute = remaining * 0.6
-        let video = remaining * 0.25
-        let other = max(remaining - compute - video, 0)
-        return GPUBreakdown(render: render, compute: compute, video: video, other: other)
-    }
-
     private func collectCPUCoreUsage() -> [CPUCoreUsage] {
         var cpuInfo: processor_info_array_t?
         var numCpuInfo: mach_msg_type_number_t = 0
@@ -1140,57 +1141,6 @@ class StatsManager: ObservableObject {
         }
     }
 
-    private func collectDiskDevices() -> [DiskDeviceMetrics] {
-        let keys: [URLResourceKey] = [
-            .volumeNameKey,
-            .volumeTotalCapacityKey,
-            .volumeAvailableCapacityKey,
-            .volumeAvailableCapacityForImportantUsageKey,
-            .volumeAvailableCapacityForOpportunisticUsageKey,
-            .volumeIsRootFileSystemKey,
-            .volumeIsRemovableKey
-        ]
-        guard let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) else {
-            return diskDevices
-        }
-        var devices: [DiskDeviceMetrics] = []
-        for url in urls {
-            guard let values = try? url.resourceValues(forKeys: Set(keys)) else { continue }
-            guard let totalCapacity = values.volumeTotalCapacity.flatMap({ Int64($0) }), totalCapacity > 0 else { continue }
-            let name = values.volumeName ?? url.lastPathComponent
-            let freeCapacityValue: Int64
-            if let free = values.volumeAvailableCapacity {
-                freeCapacityValue = Int64(free)
-            } else if let important = values.volumeAvailableCapacityForImportantUsage {
-                freeCapacityValue = important
-            } else if let opportunistic = values.volumeAvailableCapacityForOpportunisticUsage {
-                freeCapacityValue = opportunistic
-            } else {
-                freeCapacityValue = 0
-            }
-            let clampedFree = max(freeCapacityValue, 0)
-            let device = DiskDeviceMetrics(
-                id: url.path,
-                name: name,
-                path: url,
-                totalBytes: UInt64(totalCapacity),
-                freeBytes: UInt64(clampedFree),
-                isRoot: values.volumeIsRootFileSystem ?? false,
-                isRemovable: values.volumeIsRemovable ?? false
-            )
-            devices.append(device)
-        }
-        return devices.sorted { lhs, rhs in
-            if lhs.isRoot != rhs.isRoot {
-                return lhs.isRoot
-            }
-            if lhs.isRemovable != rhs.isRemovable {
-                return !lhs.isRemovable
-            }
-            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-        }
-    }
-
     private func stringFromSockaddr(_ addressPointer: UnsafePointer<sockaddr>?) -> String? {
         guard let addressPointer else { return nil }
         let family = Int32(addressPointer.pointee.sa_family)
@@ -1286,50 +1236,6 @@ class StatsManager: ObservableObject {
         case .loopback:
             return 4
         }
-    }
-    
-    private func getDiskStats() -> (bytesRead: UInt64, bytesWritten: UInt64) {
-        // Use IOKit to get disk I/O statistics from IOStorage service
-        var totalBytesRead: UInt64 = 0
-        var totalBytesWritten: UInt64 = 0
-        
-        let matchingDict = IOServiceMatching("IOStorage")
-        var iterator: io_iterator_t = 0
-        let result = IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &iterator)
-        
-        guard result == KERN_SUCCESS else {
-            return (totalBytesRead, totalBytesWritten)
-        }
-        
-        defer { IOObjectRelease(iterator) }
-        
-        var service: io_registry_entry_t = IOIteratorNext(iterator)
-        while service != 0 {
-            defer {
-                IOObjectRelease(service)
-                service = IOIteratorNext(iterator)
-            }
-            
-            var properties: Unmanaged<CFMutableDictionary>?
-            let propertiesResult = IORegistryEntryCreateCFProperties(service, &properties, kCFAllocatorDefault, 0)
-            
-            guard propertiesResult == KERN_SUCCESS,
-                  let props = properties?.takeRetainedValue() as? [String: Any],
-                  let statistics = props["Statistics"] as? [String: Any] else {
-                continue
-            }
-            
-            // Use the correct property names for APFS/modern filesystems
-            if let bytesRead = statistics["Bytes read from block device"] as? UInt64 {
-                totalBytesRead += bytesRead
-            }
-            
-            if let bytesWritten = statistics["Bytes written to block device"] as? UInt64 {
-                totalBytesWritten += bytesWritten
-            }
-        }
-        
-        return (totalBytesRead, totalBytesWritten)
     }
     
     // MARK: - Computed Properties for UI
@@ -1533,5 +1439,222 @@ class StatsManager: ObservableObject {
         let result = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &taskInfo, Int32(MemoryLayout<proc_taskinfo>.size))
         guard result == MemoryLayout<proc_taskinfo>.size else { return 0 }
         return taskInfo.pti_resident_size
+    }
+}
+
+// MARK: - Slow (off-main) system metrics
+
+/// Immutable, `Sendable` payload carrying the heavy metrics from the background actor
+/// back to the main actor for publishing.
+private struct SlowMetricsSnapshot: Sendable {
+    let gpuUsage: Double
+    let gpuBreakdown: GPUBreakdown
+    let gpuDevices: [GPUDeviceMetrics]
+    let diskRead: Double
+    let diskWrite: Double
+    let bytesRead: UInt64
+    let bytesWritten: UInt64
+    let diskDevices: [DiskDeviceMetrics]
+    let temperature: CPUTemperatureMetrics
+    let frequency: CPUFrequencyMetrics?
+}
+
+/// Owns the expensive system enumerations (GPU accelerators via IOKit, IOStorage disk I/O
+/// counters, mounted-volume capacities, SMC temperature, IOReport frequency) and their
+/// delta state. Being an `actor` serializes every access, so the non-thread-safe collectors
+/// (`GPUInfoCollector`, `CPUSensorCollector`, `SMC.shared`) are only ever touched from this
+/// single isolation domain — never on the main thread and never concurrently. The calculation
+/// logic is copied verbatim from the former main-actor code; only the execution context moved.
+private actor SystemSlowMetricsCollector {
+    private let gpuCollector = GPUInfoCollector()
+    private let cpuSensorCollector = CPUSensorCollector()
+    private var previousDiskStats: (bytesRead: UInt64, bytesWritten: UInt64) = (0, 0)
+    private var previousTimestamp: Date?
+
+    /// Collects one slow snapshot. When `resetBaseline` is true the disk delta baseline is
+    /// re-primed and throughput is reported as zero (used on the first tick after start so a
+    /// paused-then-resumed session does not emit a single huge accumulated delta).
+    func collect(resetBaseline: Bool) -> SlowMetricsSnapshot {
+        let gpuSnapshot = getGPUMetrics()
+        let diskDevices = collectDiskDevices()
+        let temperature = cpuSensorCollector.readTemperature()
+        let frequency = cpuSensorCollector.readFrequency()
+
+        let currentDiskStats = getDiskStats()
+        let currentTime = Date()
+
+        var readSpeed: Double = 0.0
+        var writeSpeed: Double = 0.0
+        var bytesRead: UInt64 = 0
+        var bytesWritten: UInt64 = 0
+
+        // Only calculate speeds if we have a reasonable time interval and this isn't the first run
+        if !resetBaseline,
+           let previousTime = previousTimestamp {
+            let timeInterval = currentTime.timeIntervalSince(previousTime)
+            if timeInterval > 0.1 && (previousDiskStats.bytesRead > 0 || previousDiskStats.bytesWritten > 0) {
+                bytesRead = currentDiskStats.bytesRead > previousDiskStats.bytesRead ?
+                               currentDiskStats.bytesRead - previousDiskStats.bytesRead : 0
+                bytesWritten = currentDiskStats.bytesWritten > previousDiskStats.bytesWritten ?
+                                  currentDiskStats.bytesWritten - previousDiskStats.bytesWritten : 0
+
+                readSpeed = Double(bytesRead) / timeInterval / 1_048_576 // Convert to MB/s
+                writeSpeed = Double(bytesWritten) / timeInterval / 1_048_576 // Convert to MB/s
+            }
+        }
+
+        previousDiskStats = currentDiskStats
+        previousTimestamp = currentTime
+
+        return SlowMetricsSnapshot(
+            gpuUsage: gpuSnapshot.usage,
+            gpuBreakdown: gpuSnapshot.breakdown,
+            gpuDevices: gpuSnapshot.devices,
+            diskRead: readSpeed,
+            diskWrite: writeSpeed,
+            bytesRead: bytesRead,
+            bytesWritten: bytesWritten,
+            diskDevices: diskDevices,
+            temperature: temperature,
+            frequency: frequency
+        )
+    }
+
+    // MARK: - Heavy collectors (moved off the main actor, logic unchanged)
+
+    private func getGPUMetrics() -> GPUMetricsSnapshot {
+        let devices = gpuCollector.collectDevices()
+        guard !devices.isEmpty else {
+            return .zero
+        }
+        let utilizationValues = devices.compactMap { $0.utilization }
+        let usage: Double
+        if utilizationValues.isEmpty {
+            usage = 0
+        } else {
+            usage = utilizationValues.reduce(0, +) / Double(utilizationValues.count)
+        }
+        let breakdown = makeGPUBreakdown(from: devices)
+        return GPUMetricsSnapshot(usage: usage, breakdown: breakdown, devices: devices)
+    }
+
+    private func makeGPUBreakdown(from devices: [GPUDeviceMetrics]) -> GPUBreakdown {
+        guard let primary = devices.first(where: { ($0.utilization ?? 0) > 0 || ($0.renderUtilization ?? 0) > 0 || ($0.tilerUtilization ?? 0) > 0 }) else {
+            return .zero
+        }
+        let fallbackTotal = max((primary.renderUtilization ?? 0) + (primary.tilerUtilization ?? 0), 0)
+        let total = max(primary.utilization ?? fallbackTotal, 0)
+        if total.isZero {
+            return GPUBreakdown(
+                render: primary.renderUtilization ?? 0,
+                compute: primary.tilerUtilization ?? 0,
+                video: 0,
+                other: 0
+            )
+        }
+        let render = min(primary.renderUtilization ?? 0, total)
+        let tiler = min(primary.tilerUtilization ?? 0, max(total - render, 0))
+        let remaining = max(total - render - tiler, 0)
+        let compute = remaining * 0.6
+        let video = remaining * 0.25
+        let other = max(remaining - compute - video, 0)
+        return GPUBreakdown(render: render, compute: compute, video: video, other: other)
+    }
+
+    private func collectDiskDevices() -> [DiskDeviceMetrics] {
+        let keys: [URLResourceKey] = [
+            .volumeNameKey,
+            .volumeTotalCapacityKey,
+            .volumeAvailableCapacityKey,
+            .volumeAvailableCapacityForImportantUsageKey,
+            .volumeAvailableCapacityForOpportunisticUsageKey,
+            .volumeIsRootFileSystemKey,
+            .volumeIsRemovableKey
+        ]
+        guard let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) else {
+            // Empty result is treated as "no change" by the main-actor applier, preserving
+            // the previous fallback that returned the existing device list on failure.
+            return []
+        }
+        var devices: [DiskDeviceMetrics] = []
+        for url in urls {
+            guard let values = try? url.resourceValues(forKeys: Set(keys)) else { continue }
+            guard let totalCapacity = values.volumeTotalCapacity.flatMap({ Int64($0) }), totalCapacity > 0 else { continue }
+            let name = values.volumeName ?? url.lastPathComponent
+            let freeCapacityValue: Int64
+            if let free = values.volumeAvailableCapacity {
+                freeCapacityValue = Int64(free)
+            } else if let important = values.volumeAvailableCapacityForImportantUsage {
+                freeCapacityValue = important
+            } else if let opportunistic = values.volumeAvailableCapacityForOpportunisticUsage {
+                freeCapacityValue = opportunistic
+            } else {
+                freeCapacityValue = 0
+            }
+            let clampedFree = max(freeCapacityValue, 0)
+            let device = DiskDeviceMetrics(
+                id: url.path,
+                name: name,
+                path: url,
+                totalBytes: UInt64(totalCapacity),
+                freeBytes: UInt64(clampedFree),
+                isRoot: values.volumeIsRootFileSystem ?? false,
+                isRemovable: values.volumeIsRemovable ?? false
+            )
+            devices.append(device)
+        }
+        return devices.sorted { lhs, rhs in
+            if lhs.isRoot != rhs.isRoot {
+                return lhs.isRoot
+            }
+            if lhs.isRemovable != rhs.isRemovable {
+                return !lhs.isRemovable
+            }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private func getDiskStats() -> (bytesRead: UInt64, bytesWritten: UInt64) {
+        // Use IOKit to get disk I/O statistics from IOStorage service
+        var totalBytesRead: UInt64 = 0
+        var totalBytesWritten: UInt64 = 0
+
+        let matchingDict = IOServiceMatching("IOStorage")
+        var iterator: io_iterator_t = 0
+        let result = IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &iterator)
+
+        guard result == KERN_SUCCESS else {
+            return (totalBytesRead, totalBytesWritten)
+        }
+
+        defer { IOObjectRelease(iterator) }
+
+        var service: io_registry_entry_t = IOIteratorNext(iterator)
+        while service != 0 {
+            defer {
+                IOObjectRelease(service)
+                service = IOIteratorNext(iterator)
+            }
+
+            var properties: Unmanaged<CFMutableDictionary>?
+            let propertiesResult = IORegistryEntryCreateCFProperties(service, &properties, kCFAllocatorDefault, 0)
+
+            guard propertiesResult == KERN_SUCCESS,
+                  let props = properties?.takeRetainedValue() as? [String: Any],
+                  let statistics = props["Statistics"] as? [String: Any] else {
+                continue
+            }
+
+            // Use the correct property names for APFS/modern filesystems
+            if let bytesRead = statistics["Bytes read from block device"] as? UInt64 {
+                totalBytesRead += bytesRead
+            }
+
+            if let bytesWritten = statistics["Bytes written to block device"] as? UInt64 {
+                totalBytesWritten += bytesWritten
+            }
+        }
+
+        return (totalBytesRead, totalBytesWritten)
     }
 }
