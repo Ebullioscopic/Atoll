@@ -26,6 +26,16 @@ final class ConfigInstallerTests: XCTestCase {
         let hooks = try XCTUnwrap(hooksAny as? [Any], file: file, line: line)
         return hooks.compactMap { $0 as? [String: Any] }
     }
+
+    func testQoderConfigIncludesPermissionRequestHook() throws {
+        let cli = try XCTUnwrap(ConfigInstaller.allCLIs.first { $0.source == "qoder" })
+        XCTAssertEqual(cli.format, .claude)
+        XCTAssertEqual(cli.configPath, ".qoder/settings.json")
+        let permission = try XCTUnwrap(cli.events.first { $0.0 == "PermissionRequest" })
+        XCTAssertEqual(permission.1, 86400)
+        XCTAssertFalse(permission.2)
+    }
+
     func testRemoveManagedHookEntriesAlsoPrunesLegacyVibeIslandHooks() throws {
         let hooks: [String: Any] = [
             "SessionEnd": [

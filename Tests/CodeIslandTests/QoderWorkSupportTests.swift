@@ -20,6 +20,9 @@ final class QoderWorkSupportTests: XCTestCase {
             XCTFail("QoderWork hooks are Claude-format JSON")
         }
         XCTAssertFalse(cli.events.isEmpty)
+        let permission = try XCTUnwrap(cli.events.first { $0.0 == "PermissionRequest" })
+        XCTAssertEqual(permission.1, 86400)
+        XCTAssertFalse(permission.2)
     }
 
     func testQoderWorkSourceNormalization() {

@@ -294,12 +294,25 @@ struct ConfigInstaller {
             format: .traecli,
             events: defaultEvents(for: .traecli)
         ),
-        // Qoder — Claude Code fork
+        // Qoder — Claude Code fork with its own documented PermissionRequest hook.
         CLIConfig(
             name: "Qoder", source: "qoder",
             configPath: ".qoder/settings.json", configKey: "hooks",
             format: .claude,
-            events: defaultEvents(for: .claude)
+            events: [
+                ("UserPromptSubmit", 5, true),
+                ("PreToolUse", 5, false),
+                ("PostToolUse", 5, true),
+                ("PostToolUseFailure", 5, true),
+                ("PermissionRequest", 86400, false),
+                ("Stop", 5, true),
+                ("SubagentStart", 5, true),
+                ("SubagentStop", 5, true),
+                ("SessionStart", 5, false),
+                ("SessionEnd", 5, true),
+                ("Notification", 86400, false),
+                ("PreCompact", 5, true),
+            ]
         ),
         // QoderWork — Qoder's standalone desktop assistant app (not the IDE).
         // Claude-format hooks, but user-level ~/.qoderwork/settings.json ONLY
@@ -309,7 +322,20 @@ struct ConfigInstaller {
             name: "QoderWork", source: "qoderwork",
             configPath: ".qoderwork/settings.json", configKey: "hooks",
             format: .claude,
-            events: defaultEvents(for: .claude)
+            events: [
+                ("UserPromptSubmit", 5, true),
+                ("PreToolUse", 5, false),
+                ("PostToolUse", 5, true),
+                ("PostToolUseFailure", 5, true),
+                ("PermissionRequest", 86400, false),
+                ("Stop", 5, true),
+                ("SubagentStart", 5, true),
+                ("SubagentStop", 5, true),
+                ("SessionStart", 5, false),
+                ("SessionEnd", 5, true),
+                ("Notification", 86400, false),
+                ("PreCompact", 5, true),
+            ]
         ),
         // Factory — Claude Code fork (uses "droid" as source identifier)
         CLIConfig(
