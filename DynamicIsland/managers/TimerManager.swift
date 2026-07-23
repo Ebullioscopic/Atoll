@@ -133,6 +133,12 @@ class TimerManager: ObservableObject {
     var activeSessionID: UUID? {
         lifecycle.sessionID
     }
+
+    /// Session that most recently reached completion. Starting a replacement
+    /// session clears this value before any delayed cleanup can capture it.
+    var completedSessionID: UUID? {
+        lifecycle.completedSessionID
+    }
     // MARK: - Initialization
     private init() {
         // Simple initialization
@@ -341,6 +347,7 @@ class TimerManager: ObservableObject {
     func completeExternalTimer() {
         guard activeSource == .external else { return }
 
+        lifecycle.completeSession()
         remainingTime = 0
         elapsedTime = totalDuration
         isOvertime = false

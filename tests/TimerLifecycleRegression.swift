@@ -7,6 +7,8 @@ struct TimerLifecycleRegression {
 
         let completedTimer = lifecycle.beginSession()
         precondition(lifecycle.isCurrent(completedTimer))
+        precondition(lifecycle.completeSession() == completedTimer)
+        precondition(lifecycle.completedSessionID == completedTimer)
         var islandIsVisible = true
 
         // Reusing the same duration or external timer ID must still create a
@@ -15,6 +17,7 @@ struct TimerLifecycleRegression {
         precondition(replacementTimer != completedTimer)
         precondition(!lifecycle.isCurrent(completedTimer))
         precondition(lifecycle.isCurrent(replacementTimer))
+        precondition(lifecycle.completedSessionID == nil)
 
         // This is the guard used by delayed Island cleanup. The stale closure
         // must leave the replacement timer visible.

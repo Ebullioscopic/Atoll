@@ -14,16 +14,25 @@ import Foundation
 /// cannot mutate a timer that was started in the meantime.
 struct TimerLifecycle {
     private(set) var sessionID: UUID?
+    private(set) var completedSessionID: UUID?
 
     @discardableResult
     mutating func beginSession() -> UUID {
         let sessionID = UUID()
         self.sessionID = sessionID
+        completedSessionID = nil
         return sessionID
+    }
+
+    @discardableResult
+    mutating func completeSession() -> UUID? {
+        completedSessionID = sessionID
+        return completedSessionID
     }
 
     mutating func endSession() {
         sessionID = nil
+        completedSessionID = nil
     }
 
     func isCurrent(_ candidate: UUID) -> Bool {

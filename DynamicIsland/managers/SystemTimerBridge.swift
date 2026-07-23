@@ -822,7 +822,7 @@ final class SystemTimerBridge {
         DispatchQueue.main.async {
             guard TimerManager.shared.isExternalTimerActive else { return }
             if didComplete {
-                guard let completedSessionID = TimerManager.shared.activeSessionID else { return }
+                guard let completedSessionID = TimerManager.shared.completedSessionID else { return }
                 self.logDebug("Timer finished; scheduling delayed cleanup")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
                     guard TimerManager.shared.activeSource == .external,
