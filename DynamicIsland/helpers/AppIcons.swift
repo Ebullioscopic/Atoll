@@ -88,17 +88,24 @@ func AppIconAsNSImage(for bundleID: String) -> NSImage? {
     return nil
 }
 
-func applySelectedAppIcon() {
+/// Loads the selected app-icon image (Defaults lookup + on-disk image read).
+/// Safe to call off the main thread — it performs no UI mutation. The
+/// `NSImage(contentsOf:)` read is real disk I/O, so the launch path resolves
+/// this off-main and only assigns `applicationIconImage` back on the main actor.
+func loadSelectedAppIconImage() -> NSImage? {
     let customIcons = Defaults[.customAppIcons]
     if let selectedID = Defaults[.selectedAppIconID],
        let icon = customIcons.first(where: { $0.id.uuidString == selectedID }),
        let image = NSImage(contentsOf: icon.fileURL) {
-        NSApp.applicationIconImage = image
-        return
+        return image
     }
 
     let fallbackName = Bundle.main.iconFileName ?? "AppIcon"
-    if let image = NSImage(named: fallbackName) {
+    return NSImage(named: fallbackName)
+}
+
+func applySelectedAppIcon() {
+    if let image = loadSelectedAppIconImage() {
         NSApp.applicationIconImage = image
     }
 }

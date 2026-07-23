@@ -955,11 +955,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
 
-            // Disk I/O: load bundled idle animations off the critical launch path.
+            // Idle animations: resolves bundled resource URLs and reconciles the
+            // Defaults keys that back the animation picker. Kept on the main actor
+            // because those Defaults writes have UI observers — and it only resolves
+            // bundle URLs (no file-content reads), so it stays cheap here.
             self.idleAnimationManager.initializeDefaultAnimations()
 
-            // Disk I/O: read Defaults + load the selected icon image, then apply it.
-            applySelectedAppIcon()
+            // App icon: the image file read is the one real disk hit on this path,
+            // so load it off-main (mirrors ModelPricingManager.loadInitialPricing)
+            // and publish applicationIconImage back on the main actor.
+            Task.detached(priority: .utility) {
+                let image = loadSelectedAppIconImage()
+                await MainActor.run {
+                    if let image { NSApp.applicationIconImage = image }
+                }
+            }
 
             // Instantiate always-on managers whose init only registers
             // observers/pollers. They have no other owner touched during launch,
