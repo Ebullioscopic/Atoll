@@ -55,6 +55,10 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
     /// True only after a stream line explicitly identified the selected app as the now playing source.
     private var targetSessionActive = false
 
+    /// Reused across every stream update to avoid re-allocating a formatter
+    /// on each (1+/second) now playing payload.
+    private static let iso8601Formatter = ISO8601DateFormatter()
+
     init?(bundleIdentifier: String, controllerName: String) {
         self.targetBundleIdentifier = bundleIdentifier
         self.controllerName = controllerName
@@ -136,14 +140,18 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
     }
 
     func toggleShuffle() async {
-        MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
-        playbackState.isShuffled.toggle()
+        await MainActor.run {
+            MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
+            playbackState.isShuffled.toggle()
+        }
     }
 
     func toggleRepeat() async {
-        let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
-        playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off
-        MRMediaRemoteSetRepeatModeFunction(newRepeatMode)
+        await MainActor.run {
+            let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
+            playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off
+            MRMediaRemoteSetRepeatModeFunction(newRepeatMode)
+        }
     }
 
     private func setupNowPlayingObserver() async {
@@ -214,9 +222,12 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         return state
     }
 
-    private func applyIdleBecauseDifferentSource() {
+    private func applyIdleBecauseDifferentSource() async {
         targetSessionActive = false
-        playbackState = Self.makeIdlePlaybackState(bundleIdentifier: targetBundleIdentifier)
+        let idleState = Self.makeIdlePlaybackState(bundleIdentifier: targetBundleIdentifier)
+        await MainActor.run { [weak self] in
+            self?.playbackState = idleState
+        }
     }
 
     private func handleAdapterUpdate(_ update: NowPlayingUpdate) async {
@@ -233,12 +244,12 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
 
         if let source = explicitSource {
             if source != targetBundleIdentifier {
-                applyIdleBecauseDifferentSource()
+                await applyIdleBecauseDifferentSource()
                 return
             }
             targetSessionActive = true
         } else if !diff {
-            applyIdleBecauseDifferentSource()
+            await applyIdleBecauseDifferentSource()
             return
         } else if !targetSessionActive {
             return
@@ -276,7 +287,7 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         }
 
         if let dateString = payload.timestamp,
-           let date = ISO8601DateFormatter().date(from: dateString) {
+           let date = Self.iso8601Formatter.date(from: dateString) {
             newPlaybackState.lastUpdated = date
         } else if !diff {
             newPlaybackState.lastUpdated = Date()
@@ -288,7 +299,9 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         newPlaybackState.isPlaying = payload.playing ?? (diff ? self.playbackState.isPlaying : false)
         newPlaybackState.bundleIdentifier = targetBundleIdentifier
 
-        self.playbackState = newPlaybackState
+        await MainActor.run { [weak self] in
+            self?.playbackState = newPlaybackState
+        }
     }
 }
 

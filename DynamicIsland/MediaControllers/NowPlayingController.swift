@@ -43,6 +43,10 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     private var lastMusicItem:
         (title: String, artist: String, album: String, duration: TimeInterval, artworkData: Data?)?
 
+    /// Reused across every stream update to avoid re-allocating a formatter
+    /// on each (1+/second) now playing payload.
+    private static let iso8601Formatter = ISO8601DateFormatter()
+
     // MARK: - Media Remote Functions
     private let mediaRemoteBundle: CFBundle
     private let MRMediaRemoteSendCommandFunction: @convention(c) (Int, AnyObject?) -> Void
@@ -134,15 +138,19 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     
     func toggleShuffle() async {
         // MRMediaRemoteSendCommandFunction(6, nil)
-        MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
-        playbackState.isShuffled.toggle()
+        await MainActor.run {
+            MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
+            playbackState.isShuffled.toggle()
+        }
     }
-    
+
     func toggleRepeat() async {
         // MRMediaRemoteSendCommandFunction(7, nil)
-        let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
-        playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off
-        MRMediaRemoteSetRepeatModeFunction(newRepeatMode)
+        await MainActor.run {
+            let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
+            playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off
+            MRMediaRemoteSetRepeatModeFunction(newRepeatMode)
+        }
     }
     
     // MARK: - Setup Methods
@@ -243,7 +251,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         }
 
         if let dateString = payload.timestamp,
-           let date = ISO8601DateFormatter().date(from: dateString) {
+           let date = Self.iso8601Formatter.date(from: dateString) {
             newPlaybackState.lastUpdated = date
         } else if !diff {
             newPlaybackState.lastUpdated = Date()
@@ -258,8 +266,10 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             payload.bundleIdentifier ??
             (diff ? self.playbackState.bundleIdentifier : "")
         )
-        
-        self.playbackState = newPlaybackState
+
+        await MainActor.run { [weak self] in
+            self?.playbackState = newPlaybackState
+        }
     }
 }
 
