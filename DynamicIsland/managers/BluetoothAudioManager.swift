@@ -240,9 +240,8 @@ class BluetoothAudioManager: ObservableObject {
     private func checkForDeviceChanges() {
         // Perf: skip the fallback watchdog scan while the display is asleep.
         // Event-driven observers still deliver connect/disconnect while awake,
-        // and a wake will resume this poll. (Behavioral stand-in for
-        // ActivityGate.shared.shouldSuspendBackgroundWork, which is not present
-        // on this branch — swap to that once available.)
+        // and a wake resumes this poll. Uses the thread-safe CoreGraphics check
+        // (this runs off the main actor) rather than the @MainActor ActivityGate.
         guard CGDisplayIsAsleep(CGMainDisplayID()) == 0 else { return }
 
         // Item 3: skip the scan entirely when Bluetooth is powered off.
