@@ -59,33 +59,35 @@ class ModelPricingManager: ObservableObject {
     private let remoteURL = URL(string: "https://raw.githubusercontent.com/Ebullioscopic/Atoll/feat/dynamic-pricing-workflow/DynamicIsland/managers/LLMUsage/pricing.json")!
     
     private init() {
-        loadInitialPricing()
-        Task {
-            await fetchRemotePricing()
+        Task { [weak self] in
+            await self?.loadInitialPricing()
+            await self?.fetchRemotePricing()
         }
     }
-    
-    /// Loads initial pricing from local bundle fallback
-    private func loadInitialPricing() {
-        if let localURL = Bundle.main.url(forResource: "pricing", withExtension: "json", subdirectory: "DynamicIsland/managers/LLMUsage") {
+
+    /// Loads initial pricing from local bundle fallback off the main thread,
+    /// then publishes the decoded result back on the main actor.
+    private func loadInitialPricing() async {
+        let decoded = await Task.detached(priority: .utility) { () -> ModelPricingData? in
+            let localURL = Bundle.main.url(forResource: "pricing", withExtension: "json", subdirectory: "DynamicIsland/managers/LLMUsage")
+                ?? Bundle.main.url(forResource: "pricing", withExtension: "json")
+            guard let localURL else {
+                print("❌ ModelPricingManager: Bundled pricing not found")
+                return nil
+            }
             do {
                 let data = try Data(contentsOf: localURL)
-                self.pricingData = try JSONDecoder().decode(ModelPricingData.self, from: data)
-                print("✅ ModelPricingManager: Loaded bundled pricing fallback")
+                return try JSONDecoder().decode(ModelPricingData.self, from: data)
             } catch {
                 print("❌ ModelPricingManager: Failed to load bundled pricing: \(error)")
+                return nil
             }
-        } else {
-            // Check flat manager path if subdirectory lookup fails
-            if let localURL = Bundle.main.url(forResource: "pricing", withExtension: "json") {
-                do {
-                    let data = try Data(contentsOf: localURL)
-                    self.pricingData = try JSONDecoder().decode(ModelPricingData.self, from: data)
-                    print("✅ ModelPricingManager: Loaded bundled pricing from flat path")
-                } catch {
-                    print("❌ ModelPricingManager: Failed to load bundled pricing (flat): \(error)")
-                }
-            }
+        }.value
+
+        guard let decoded else { return }
+        await MainActor.run {
+            self.pricingData = decoded
+            print("✅ ModelPricingManager: Loaded bundled pricing fallback")
         }
     }
     

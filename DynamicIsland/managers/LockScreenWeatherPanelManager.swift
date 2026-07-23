@@ -27,6 +27,7 @@ final class LockScreenWeatherPanelManager {
     static let shared = LockScreenWeatherPanelManager()
 
     private var window: NSWindow?
+    private var hostingView: NSHostingView<LockScreenWeatherWidget>?
     private var hasDelegated = false
     private(set) var latestFrame: NSRect?
     private var lastSnapshot: LockScreenWeatherSnapshot?
@@ -64,25 +65,52 @@ final class LockScreenWeatherPanelManager {
             return
         }
 
-        let view = LockScreenWeatherWidget(snapshot: snapshot)
-        let hostingView = NSHostingView(rootView: view)
-        let fittingSize = hostingView.fittingSize
-        if snapshot.widgetStyle == .inline {
-            lastInlineBaselineHeight = max(lastInlineBaselineHeight, fittingSize.height)
+        let window = ensureWindow()
+
+        // Reuse a single cached hosting view and only swap its rootView. Recreating
+        // the NSHostingView on every update remounted the SwiftUI tree, re-firing
+        // `.onAppear` (timer/observer re-setup + forced calendar reload). Assigning
+        // `rootView` performs a lightweight diff instead.
+        let hosting = ensureHostingView(in: window, snapshot: snapshot)
+        hosting.rootView = LockScreenWeatherWidget(snapshot: snapshot)
+
+        // `fittingSize` forces a synchronous layout pass. The window frame is only
+        // ever driven by snapshot changes here (internal widget ticks relayout
+        // within the existing bounds), so only re-measure when the snapshot changes.
+        let fittingSize: CGSize
+        if let cachedSize = lastContentSize, snapshot == lastSnapshot {
+            fittingSize = cachedSize
+        } else {
+            fittingSize = hosting.fittingSize
+            if snapshot.widgetStyle == .inline {
+                lastInlineBaselineHeight = max(lastInlineBaselineHeight, fittingSize.height)
+            }
         }
-        hostingView.frame = NSRect(origin: .zero, size: fittingSize)
+        hosting.frame = NSRect(origin: .zero, size: fittingSize)
 
         let targetFrame = frame(for: fittingSize, snapshot: snapshot, on: screen)
-        let window = ensureWindow()
         window.setFrame(targetFrame, display: true)
         latestFrame = targetFrame
-        window.contentView = hostingView
         lastSnapshot = snapshot
         lastContentSize = fittingSize
 
         if makeVisible {
             window.orderFrontRegardless()
         }
+    }
+
+    private func ensureHostingView(in window: NSWindow, snapshot: LockScreenWeatherSnapshot) -> NSHostingView<LockScreenWeatherWidget> {
+        if let hostingView {
+            if window.contentView !== hostingView {
+                window.contentView = hostingView
+            }
+            return hostingView
+        }
+
+        let view = NSHostingView(rootView: LockScreenWeatherWidget(snapshot: snapshot))
+        hostingView = view
+        window.contentView = view
+        return view
     }
 
     private func ensureWindow() -> NSWindow {

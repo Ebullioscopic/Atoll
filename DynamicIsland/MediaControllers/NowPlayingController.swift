@@ -58,6 +58,25 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     private var pipeHandler: JSONLinesPipeHandler?
     private var streamTask: Task<Void, Never>?
 
+    // MARK: - Lazy-start gating
+    /// Optional MediaRemote functions used to detect whether a now-playing
+    /// session exists without keeping the perl `stream` subprocess alive.
+    /// When available we only launch the subprocess while a now-playing app is
+    /// present, and tear it down after a long idle period. When unavailable we
+    /// fall back to the original eager-start behaviour so nothing regresses.
+    private let MRMediaRemoteRegisterForNowPlayingNotificationsFunction:
+        (@convention(c) (DispatchQueue) -> Void)?
+    private let MRMediaRemoteUnregisterForNowPlayingNotificationsFunction:
+        (@convention(c) () -> Void)?
+    private let MRMediaRemoteGetNowPlayingApplicationPIDFunction:
+        (@convention(c) (DispatchQueue, @escaping @convention(block) (Int32) -> Void) -> Void)?
+
+    private var nowPlayingObservers: [NSObjectProtocol] = []
+    private var idleStopTask: Task<Void, Never>?
+    /// How long a now-playing session may be absent before the subprocess is
+    /// torn down. Kept generous so paused/idle sessions keep working.
+    private static let idleStopDelay: Duration = .seconds(180)
+
     // MARK: - Initialization
     init?() {
         guard
@@ -72,7 +91,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
                 bundle, "MRMediaRemoteSetShuffleMode" as CFString),
             let MRMediaRemoteSetRepeatModePointer = CFBundleGetFunctionPointerForName(
                 bundle, "MRMediaRemoteSetRepeatMode" as CFString)
-            
+
         else { return nil }
 
         mediaRemoteBundle = bundle
@@ -85,17 +104,55 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         MRMediaRemoteSetRepeatModeFunction = unsafeBitCast(
             MRMediaRemoteSetRepeatModePointer, to: (@convention(c) (Int) -> Void).self)
 
-        Task { await setupNowPlayingObserver() }
+        // Optional presence-detection functions (may be absent on some macOS builds).
+        if let ptr = CFBundleGetFunctionPointerForName(
+            bundle, "MRMediaRemoteRegisterForNowPlayingNotifications" as CFString) {
+            MRMediaRemoteRegisterForNowPlayingNotificationsFunction = unsafeBitCast(
+                ptr, to: (@convention(c) (DispatchQueue) -> Void).self)
+        } else {
+            MRMediaRemoteRegisterForNowPlayingNotificationsFunction = nil
+        }
+        if let ptr = CFBundleGetFunctionPointerForName(
+            bundle, "MRMediaRemoteUnregisterForNowPlayingNotifications" as CFString) {
+            MRMediaRemoteUnregisterForNowPlayingNotificationsFunction = unsafeBitCast(
+                ptr, to: (@convention(c) () -> Void).self)
+        } else {
+            MRMediaRemoteUnregisterForNowPlayingNotificationsFunction = nil
+        }
+        if let ptr = CFBundleGetFunctionPointerForName(
+            bundle, "MRMediaRemoteGetNowPlayingApplicationPID" as CFString) {
+            MRMediaRemoteGetNowPlayingApplicationPIDFunction = unsafeBitCast(
+                ptr,
+                to: (@convention(c) (DispatchQueue, @escaping @convention(block) (Int32) -> Void) -> Void).self)
+        } else {
+            MRMediaRemoteGetNowPlayingApplicationPIDFunction = nil
+        }
+
+        let canGate = MRMediaRemoteRegisterForNowPlayingNotificationsFunction != nil
+            && MRMediaRemoteGetNowPlayingApplicationPIDFunction != nil
+
+        if canGate {
+            // Lazy: only spin up the perl subprocess once a now-playing app exists.
+            Task { @MainActor [weak self] in self?.beginLazyObservation() }
+        } else {
+            // Fallback: preserve original eager-start behaviour.
+            Task { @MainActor [weak self] in await self?.startStreamingIfNeeded() }
+        }
     }
 
     deinit {
+        MRMediaRemoteUnregisterForNowPlayingNotificationsFunction?()
+        for observer in nowPlayingObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        idleStopTask?.cancel()
         streamTask?.cancel()
-        
+
         if let pipeHandler = self.pipeHandler {
             Task { await pipeHandler.close()
             }
         }
-        
+
         if let process = self.process {
             if process.isRunning {
                 process.terminate()
@@ -105,6 +162,67 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
         self.process = nil
         self.pipeHandler = nil
+    }
+
+    // MARK: - Lazy Observation
+    /// Registers for MediaRemote now-playing notifications (lightweight, no
+    /// subprocess) and starts/stops the perl stream based on session presence.
+    @MainActor
+    private func beginLazyObservation() {
+        MRMediaRemoteRegisterForNowPlayingNotificationsFunction?(DispatchQueue.main)
+
+        let center = NotificationCenter.default
+        let names = [
+            "kMRMediaRemoteNowPlayingApplicationDidChangeNotification",
+            "kMRMediaRemoteNowPlayingApplicationIsPlayingDidChangeNotification",
+        ]
+        for name in names {
+            let token = center.addObserver(
+                forName: Notification.Name(name), object: nil, queue: .main
+            ) { [weak self] _ in
+                self?.evaluateNowPlayingPresence()
+            }
+            nowPlayingObservers.append(token)
+        }
+
+        // Initial check: start immediately if a session already exists at launch.
+        evaluateNowPlayingPresence()
+    }
+
+    /// Queries whether a now-playing app is present and starts or schedules a
+    /// teardown of the perl stream accordingly.
+    @MainActor
+    private func evaluateNowPlayingPresence() {
+        guard let getPID = MRMediaRemoteGetNowPlayingApplicationPIDFunction else {
+            Task { @MainActor [weak self] in await self?.startStreamingIfNeeded() }
+            return
+        }
+        getPID(DispatchQueue.main) { [weak self] pid in
+            // Callback is delivered on the main queue.
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if pid != 0 {
+                    self.idleStopTask?.cancel()
+                    self.idleStopTask = nil
+                    await self.startStreamingIfNeeded()
+                } else {
+                    self.scheduleIdleStop()
+                }
+            }
+        }
+    }
+
+    /// Tears down the subprocess after a grace period if no session reappears.
+    @MainActor
+    private func scheduleIdleStop() {
+        guard process != nil else { return }      // nothing running
+        guard idleStopTask == nil else { return }  // already scheduled
+        idleStopTask = Task { [weak self] in
+            try? await Task.sleep(for: NowPlayingController.idleStopDelay)
+            guard let self, !Task.isCancelled else { return }
+            self.stopStreaming()
+            self.idleStopTask = nil
+        }
     }
 
     // MARK: - Protocol Implementation
@@ -154,7 +272,12 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     }
     
     // MARK: - Setup Methods
-    private func setupNowPlayingObserver() async {
+    /// Idempotently launches the perl `stream` subprocess. Safe to call
+    /// repeatedly — a no-op while a process is already running.
+    @MainActor
+    private func startStreamingIfNeeded() async {
+        guard process == nil else { return }
+
         let process = Process()
         guard
             let scriptURL = Bundle.main.url(forResource: "mediaremote-adapter", withExtension: "pl"),
@@ -168,10 +291,10 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             assertionFailure("Could not find mediaremote-adapter.pl script or framework path")
             return
         }
-        
+
         process.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
         process.arguments = [scriptURL.path, frameworkPath, "stream"]
-        
+
         let pipeHandler = JSONLinesPipeHandler()
         process.standardOutput = await pipeHandler.getPipe()
 
@@ -187,7 +310,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             else { return }
             print("NowPlayingController [stderr]: \(message)")
         }
-        
+
         self.process = process
         self.pipeHandler = pipeHandler
 
@@ -197,8 +320,30 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
                 await self?.processJSONStream()
             }
         } catch {
+            // Reset so a later demand can retry cleanly.
+            self.process = nil
+            self.pipeHandler = nil
             assertionFailure("Failed to launch mediaremote-adapter.pl: \(error)")
         }
+    }
+
+    /// Idempotently tears down the perl `stream` subprocess. Safe to call
+    /// repeatedly — a no-op when nothing is running.
+    @MainActor
+    private func stopStreaming() {
+        streamTask?.cancel()
+        streamTask = nil
+
+        if let pipeHandler = self.pipeHandler {
+            Task { await pipeHandler.close() }
+        }
+
+        if let process = self.process, process.isRunning {
+            process.terminate()
+        }
+
+        self.process = nil
+        self.pipeHandler = nil
     }
 
     // MARK: - Async Stream Processing

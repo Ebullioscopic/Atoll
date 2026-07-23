@@ -44,6 +44,7 @@ struct LockScreenWeatherWidget: View {
 	@Default(.reminderSneakPeekDuration) private var reminderSneakPeekDuration
 
 	@State private var currentTime = Date()
+	@State private var eventCache = NextCalendarEventCache()
 	@State private var calendarRowVisible: Bool = false
 	@State private var lastCalendarLine: String = ""
 	@State private var calendarRowRenderToken: Int = 0
@@ -347,11 +348,59 @@ struct LockScreenWeatherWidget: View {
 		return allowed.contains(event.calendar.id)
 	}
 
+	/// Reference-type memoization cache for `nextCalendarEvent`. Held via `@State`
+	/// so it survives re-renders; mutating its fields never triggers a view update.
+	private final class NextCalendarEventCache {
+		var isValid = false
+		var events: [EventModel] = []
+		var time: Date = .distantPast
+		var entireDuration = false
+		var afterStartEnabled = false
+		var afterStartWindowRaw = ""
+		var lookaheadRaw = ""
+		var selectionMode = ""
+		var selectedIDs: Set<String> = []
+		var result: EventModel?
+	}
+
+	/// `nextCalendarEvent` is read many times per render (row ordering, visibility,
+	/// accessibility, icon config…). Recomputing the `filter`+`sorted` pipeline each
+	/// time is O(n log n) per access. Memoize on the full set of inputs so the work
+	/// happens at most once per unique input combination (i.e. once per render pass).
 	private var nextCalendarEvent: EventModel? {
+		let events = calendarManager.lockScreenEvents
+		let cache = eventCache
+		if cache.isValid,
+		   cache.time == currentTime,
+		   cache.entireDuration == lockScreenShowCalendarEventEntireDuration,
+		   cache.afterStartEnabled == lockScreenShowCalendarEventAfterStartEnabled,
+		   cache.afterStartWindowRaw == lockScreenShowCalendarEventAfterStartWindow,
+		   cache.lookaheadRaw == lockScreenCalendarEventLookaheadWindow,
+		   cache.selectionMode == lockScreenCalendarSelectionMode,
+		   cache.selectedIDs == lockScreenSelectedCalendarIDs,
+		   cache.events == events {
+			return cache.result
+		}
+
+		let result = computeNextCalendarEvent(from: events)
+		cache.isValid = true
+		cache.events = events
+		cache.time = currentTime
+		cache.entireDuration = lockScreenShowCalendarEventEntireDuration
+		cache.afterStartEnabled = lockScreenShowCalendarEventAfterStartEnabled
+		cache.afterStartWindowRaw = lockScreenShowCalendarEventAfterStartWindow
+		cache.lookaheadRaw = lockScreenCalendarEventLookaheadWindow
+		cache.selectionMode = lockScreenCalendarSelectionMode
+		cache.selectedIDs = lockScreenSelectedCalendarIDs
+		cache.result = result
+		return result
+	}
+
+	private func computeNextCalendarEvent(from events: [EventModel]) -> EventModel? {
 		let now = currentTime
 
 		if lockScreenShowCalendarEventEntireDuration {
-			let candidates = calendarManager.lockScreenEvents
+			let candidates = events
 				.filter { $0.end >= now }
 				.filter(passesLockScreenCalendarFilter)
 				.filter { isEventEligibleForLookahead($0, now: now) }
@@ -368,7 +417,7 @@ struct LockScreenWeatherWidget: View {
 				Calendar.current.date(byAdding: .minute, value: graceMinutes, to: event.start) ?? event.start
 			}
 
-			let activeCandidates = calendarManager.lockScreenEvents
+			let activeCandidates = events
 				.filter { !$0.isAllDay }
 				.filter(passesLockScreenCalendarFilter)
 				.filter { $0.start <= now && $0.end >= now }
@@ -380,7 +429,7 @@ struct LockScreenWeatherWidget: View {
 			}
 		}
 
-		let upcoming = calendarManager.lockScreenEvents
+		let upcoming = events
 			.filter { $0.start > now }
 			.filter(passesLockScreenCalendarFilter)
 			.filter { isEventEligibleForLookahead($0, now: now) }
