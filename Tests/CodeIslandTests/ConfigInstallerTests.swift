@@ -134,6 +134,48 @@ final class ConfigInstallerTests: XCTestCase {
         XCTAssertTrue(command.contains("--event stop"))
     }
 
+    func testCodexSessionEndTimeoutRespectsTeardownCapAndRepairsStaleConfig() throws {
+        let fm = FileManager.default
+        let tempDir = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: tempDir) }
+
+        let staleConfig = """
+        {
+          "hooks": {
+            "SessionEnd": [
+              {
+                "hooks": [
+                  {
+                    "type": "command",
+                    "command": "/Users/test/.codeisland/codeisland-bridge --source codex",
+                    "timeout": 5
+                  }
+                ]
+              }
+            ]
+          }
+        }
+        """
+        let configPath = tempDir.appendingPathComponent("hooks.json")
+        try staleConfig.write(to: configPath, atomically: true, encoding: .utf8)
+
+        var codex = try XCTUnwrap(ConfigInstaller.allCLIs.first { $0.source == "codex" })
+        let tempPath = tempDir.path
+        codex.rootOverride = { tempPath }
+
+        let configuredTimeout = try XCTUnwrap(codex.events.first { $0.0 == "SessionEnd" }?.1)
+        XCTAssertEqual(configuredTimeout, 3)
+        XCTAssertTrue(ConfigInstaller.installExternalHooks(cli: codex, fm: fm))
+
+        let data = try Data(contentsOf: configPath)
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let hooks = try XCTUnwrap(root["hooks"] as? [String: Any])
+        let sessionEnd = try XCTUnwrap(hooks["SessionEnd"] as? [[String: Any]])
+        let hookList = try XCTUnwrap(sessionEnd.first?["hooks"] as? [[String: Any]])
+        XCTAssertEqual(hookList.first?["timeout"] as? Int, 3)
+    }
+
     func testTraeIDEHooksUseOfficialNestedSchema() throws {
         let fm = FileManager.default
         let tempDir = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
