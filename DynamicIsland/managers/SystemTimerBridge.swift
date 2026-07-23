@@ -822,12 +822,17 @@ final class SystemTimerBridge {
         DispatchQueue.main.async {
             guard TimerManager.shared.isExternalTimerActive else { return }
             if didComplete {
+                guard let completedSessionID = TimerManager.shared.activeSessionID else { return }
                 self.logDebug("Timer finished; scheduling delayed cleanup")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
-                    if TimerManager.shared.isExternalTimerActive {
-                        self.logDebug("Delayed cleanup firing; ending external timer")
-                        TimerManager.shared.endExternalTimer(triggerSmoothClose: false)
+                    guard TimerManager.shared.activeSource == .external,
+                          TimerManager.shared.activeSessionID == completedSessionID else {
+                        self.logDebug("Skipping delayed cleanup because a newer timer session is active")
+                        return
                     }
+
+                    self.logDebug("Delayed cleanup firing; ending external timer")
+                    TimerManager.shared.endExternalTimer(triggerSmoothClose: false)
                 }
             } else {
                 self.logDebug("Ending external timer immediately")

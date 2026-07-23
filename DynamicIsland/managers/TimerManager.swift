@@ -125,6 +125,14 @@ class TimerManager: ObservableObject {
     private var timerInstance: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var soundPlayer: AVAudioPlayer?
+    private var smoothCloseWorkItem: DispatchWorkItem?
+    private var lifecycle = TimerLifecycle()
+
+    /// Identifies the current timer run. Delayed cleanup must match this value
+    /// before changing presentation state.
+    var activeSessionID: UUID? {
+        lifecycle.sessionID
+    }
     // MARK: - Initialization
     private init() {
         // Simple initialization
@@ -132,6 +140,7 @@ class TimerManager: ObservableObject {
     
     deinit {
         timerInstance?.invalidate()
+        smoothCloseWorkItem?.cancel()
         soundPlayer?.stop()
         cancellables.removeAll()
     }
@@ -144,6 +153,8 @@ class TimerManager: ObservableObject {
 
         // Stop any existing timer
         timerInstance?.invalidate()
+        soundPlayer?.stop()
+        beginTimerSession()
         
         // Start new timer
         withAnimation(.smooth) {
@@ -275,6 +286,7 @@ class TimerManager: ObservableObject {
         timerInstance?.invalidate()
         timerInstance = nil
         soundPlayer?.stop()
+        beginTimerSession()
 
         activeSource = .external
 
@@ -297,6 +309,16 @@ class TimerManager: ObservableObject {
 
     func updateExternalTimer(remaining: TimeInterval, totalDuration: TimeInterval?, isPaused paused: Bool, name: String? = nil) {
         guard activeSource == .external else { return }
+
+        // Clock may reuse both the timer ID and duration. A positive update
+        // after completion is nevertheless a new run and must invalidate the
+        // previous run's delayed close.
+        if remaining > 0 && (isFinished || isOvertime || remainingTime <= 0) {
+            beginTimerSession()
+            withAnimation(.smooth) {
+                isTimerActive = true
+            }
+        }
 
         if let name, !name.isEmpty, name != timerName {
             timerName = name
@@ -342,6 +364,7 @@ class TimerManager: ObservableObject {
     }
     
     private func resetTimer() {
+        endTimerSession()
         withAnimation(.smooth) {
             isTimerActive = false
         }
@@ -381,12 +404,33 @@ class TimerManager: ObservableObject {
     }
 
     private func scheduleSmoothClose() {
+        guard let sessionID = activeSessionID else { return }
+
+        smoothCloseWorkItem?.cancel()
+
         // Wait 3 seconds then smoothly close the live activity
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.lifecycle.isCurrent(sessionID) else { return }
+            self.smoothCloseWorkItem = nil
             withAnimation(.easeInOut(duration: 1.0)) {
                 self.isTimerActive = false
             }
         }
+
+        smoothCloseWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: workItem)
+    }
+
+    private func beginTimerSession() {
+        smoothCloseWorkItem?.cancel()
+        smoothCloseWorkItem = nil
+        lifecycle.beginSession()
+    }
+
+    private func endTimerSession() {
+        smoothCloseWorkItem?.cancel()
+        smoothCloseWorkItem = nil
+        lifecycle.endSession()
     }
     
     private func playTimerSound() {
