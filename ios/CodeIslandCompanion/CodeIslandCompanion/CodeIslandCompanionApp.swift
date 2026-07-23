@@ -4,6 +4,7 @@ import SwiftUI
 struct CodeIslandCompanionApp: App {
     @StateObject private var connection: CompanionConnection
     @StateObject private var liveActivity: LiveActivityController
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let connection = CompanionConnection()
@@ -25,6 +26,13 @@ struct CodeIslandCompanionApp: App {
             ContentView()
                 .environmentObject(connection)
                 .environmentObject(liveActivity)
+        }
+        // MultipeerConnectivity sessions don't survive backgrounding; without
+        // this, returning to the foreground after minimizing the app or
+        // locking the phone left it stuck showing "disconnected" (#261).
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            guard oldPhase == .background, newPhase == .active else { return }
+            connection.reconnectIfNeeded()
         }
     }
 

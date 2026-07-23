@@ -100,6 +100,26 @@ final class CompanionConnection: NSObject, ObservableObject {
         pendingReconnectPeer = nil
     }
 
+    /// MultipeerConnectivity sessions are torn down by iOS while the app is
+    /// backgrounded — unlike Bluetooth, Wi-Fi/Bonjour connectivity has no
+    /// platform-level background continuation, so this is expected, not a bug
+    /// (#261). The problem is that nothing ever told the browser to restart:
+    /// `ContentView`'s `.onAppear { connection.start() }` only fires once, when
+    /// the view first appears, not on every return to the foreground, and
+    /// `start()` no-ops while `browsing` is already (stale-)true. So once the
+    /// session drops in the background, the app was stuck showing
+    /// "disconnected" until the user manually tapped the search toggle.
+    ///
+    /// Call this from a scene-phase observer whenever the app becomes active
+    /// again; it forces a clean restart of discovery only when we're not
+    /// already connected, so it's a no-op for an already-healthy connection.
+    func reconnectIfNeeded() {
+        guard !isDemoMode, mockStatePayload == nil else { return }
+        guard connectedPeer == nil else { return }
+        stop()
+        start()
+    }
+
     func connect(to peer: MCPeerID) {
         exitDemoMode()
         browser.invitePeer(peer, to: session, withContext: nil, timeout: 12)
