@@ -30,7 +30,8 @@ enum HookFormat {
     case traecli
     /// GitHub Copilot CLI style: [{type, bash, timeoutSec}] with top-level version
     case copilot
-    /// Kimi Code CLI style: TOML [[hooks]] arrays in ~/.kimi/config.toml
+    /// Kimi Code CLI style: TOML [[hooks]] arrays in ~/.kimi-code/config.toml
+    /// (legacy kimi-cli used ~/.kimi/config.toml).
     case kimi
     /// Kiro CLI style: per-agent JSON file at ~/.kiro/agents/<name>.json
     /// with hooks keyed by camelCase event names and `timeout_ms` (#127).
@@ -192,6 +193,44 @@ struct ConfigInstaller {
         let raw = (ProcessInfo.processInfo.environment["CODEX_HOME"] ?? "")
             .trimmingCharacters(in: .whitespaces)
         return raw.isEmpty ? "~/.codex/\(filename)" : "$CODEX_HOME/\(filename)"
+    }
+
+    // MARK: - Kimi Code home resolution
+
+    /// Modern Kimi Code CLI data root (`~/.kimi-code`). Prefer this over legacy
+    /// kimi-cli (`~/.kimi`) per https://www.kimi.com/code/docs/kimi-code-cli/guides/migration.html
+    static func kimiCodeHome() -> String { NSHomeDirectory() + "/.kimi-code" }
+
+    /// Legacy kimi-cli data root (`~/.kimi`). Migration leaves this intact.
+    static func kimiLegacyHome() -> String { NSHomeDirectory() + "/.kimi" }
+
+    /// Resolve the Kimi config directory to use for hooks install/status.
+    /// Prefers `~/.kimi-code` when present; falls back to `~/.kimi`; defaults to
+    /// the modern path when neither exists (display / future install target).
+    static func kimiHome(fm: FileManager = .default) -> String {
+        let modern = kimiCodeHome()
+        let legacy = kimiLegacyHome()
+        if fm.fileExists(atPath: modern) { return modern }
+        if fm.fileExists(atPath: legacy) { return legacy }
+        return modern
+    }
+
+    /// Whether any Kimi Code / kimi-cli install footprint is on this machine.
+    static func kimiPresenceDetected(fm: FileManager = .default) -> Bool {
+        let modern = kimiCodeHome()
+        let legacy = kimiLegacyHome()
+        return fm.fileExists(atPath: modern)
+            || fm.fileExists(atPath: legacy)
+            || fm.isExecutableFile(atPath: modern + "/bin/kimi")
+            || fm.fileExists(atPath: modern + "/config.toml")
+            || fm.fileExists(atPath: legacy + "/config.toml")
+    }
+
+    static func displayKimiConfigPath(fm: FileManager = .default) -> String {
+        let home = kimiHome(fm: fm)
+        if home.hasSuffix("/.kimi-code") { return "~/.kimi-code/config.toml" }
+        if home.hasSuffix("/.kimi") { return "~/.kimi/config.toml" }
+        return "~/.kimi-code/config.toml"
     }
 
     // MARK: - All supported CLIs
@@ -437,12 +476,15 @@ struct ConfigInstaller {
                 ("errorOccurred", 5, true),
             ]
         ),
-        // Kimi Code CLI — TOML hooks in ~/.kimi/config.toml
+        // Kimi Code CLI — TOML hooks in ~/.kimi-code/config.toml (legacy: ~/.kimi).
+        // See https://www.kimi.com/code/docs/kimi-code-cli/customization/hooks.html
         CLIConfig(
             name: "Kimi Code CLI", source: "kimi",
-            configPath: ".kimi/config.toml", configKey: "hooks",
+            configPath: "config.toml", configKey: "hooks",
             format: .kimi,
-            events: defaultEvents(for: .kimi)
+            events: defaultEvents(for: .kimi),
+            rootOverride: { ConfigInstaller.kimiHome() },
+            displayPathOverride: { ConfigInstaller.displayKimiConfigPath() }
         ),
         // Kiro CLI — agent-scoped JSON at ~/.kiro/agents/codeisland.json.
         // User must launch with `kiro --agent codeisland` for hooks to fire (#127).
@@ -908,6 +950,8 @@ struct ConfigInstaller {
         // ZCode's config lives one level below the app's real root (~/.zcode/cli/),
         // so detect against the root itself rather than cli.dirPath (#245).
         if source == "zcode" { return FileManager.default.fileExists(atPath: NSHomeDirectory() + "/.zcode") }
+        // Kimi Code CLI moved from ~/.kimi (kimi-cli) to ~/.kimi-code.
+        if source == "kimi" { return kimiPresenceDetected() }
         guard let cli = allCLIs.first(where: { $0.source == source }) else { return false }
         return FileManager.default.fileExists(atPath: cli.dirPath)
     }
@@ -1283,17 +1327,12 @@ struct ConfigInstaller {
     static func installExternalHooks(cli: CLIConfig, fm: FileManager) -> Bool {
         if cli.format == .cline { return installClineHooks(cli: cli, fm: fm) }
         if cli.format == .kimi {
-            // Kimi: do not create ~/.kimi or config files unless there is already
-            // evidence of an existing Kimi installation/configuration.
-            let rootDir = NSHomeDirectory() + "/.kimi"
-            let sessionsDir = rootDir + "/sessions"
-            let hasKimiPresence =
-                fm.fileExists(atPath: cli.dirPath) ||
-                fm.fileExists(atPath: rootDir) ||
-                fm.fileExists(atPath: sessionsDir)
-            guard hasKimiPresence else { return true }
-            if !fm.fileExists(atPath: cli.dirPath) {
-                try? fm.createDirectory(atPath: cli.dirPath, withIntermediateDirectories: true)
+            // Kimi: do not create ~/.kimi-code (or legacy ~/.kimi) unless there is
+            // already evidence of an existing install. Prefer the modern root.
+            guard kimiPresenceDetected(fm: fm) else { return true }
+            let rootDir = kimiHome(fm: fm)
+            if !fm.fileExists(atPath: rootDir) {
+                try? fm.createDirectory(atPath: rootDir, withIntermediateDirectories: true)
             }
             return installKimiHooks(cli: cli, fm: fm)
         }
@@ -2405,12 +2444,18 @@ struct ConfigInstaller {
     }
 
     private static func isKimiHooksInstalled(cli: CLIConfig, fm: FileManager) -> Bool {
-        guard fm.fileExists(atPath: cli.fullPath),
-              let data = fm.contents(atPath: cli.fullPath),
-              let contents = String(data: data, encoding: .utf8) else { return false }
-
-        return cli.events.allSatisfy { (event, _, _) in
-            contentsContainsKimiHook(contents, event: event)
+        // Prefer modern home, but also treat legacy ~/.kimi as installed if our
+        // hooks are still there (migration leaves the old tree intact).
+        var candidates = [kimiCodeHome() + "/config.toml", kimiLegacyHome() + "/config.toml"]
+        let resolved = cli.fullPath
+        if !candidates.contains(resolved) { candidates.append(resolved) }
+        return candidates.contains { path in
+            guard fm.fileExists(atPath: path),
+                  let data = fm.contents(atPath: path),
+                  let contents = String(data: data, encoding: .utf8) else { return false }
+            return cli.events.allSatisfy { (event, _, _) in
+                contentsContainsKimiHook(contents, event: event)
+            }
         }
     }
 
@@ -2453,31 +2498,38 @@ struct ConfigInstaller {
             return
         }
         if cli.format == .kimi {
-            guard fm.fileExists(atPath: cli.fullPath),
-                  let data = fm.contents(atPath: cli.fullPath),
-                  var contents = String(data: data, encoding: .utf8) else { return }
-            contents = removeKimiHooks(from: contents)
+            // Scrub modern + legacy homes; also honor absolute cli.fullPath
+            // (hermetic tests / custom roots).
+            var paths = [kimiCodeHome() + "/config.toml", kimiLegacyHome() + "/config.toml"]
+            let resolved = cli.fullPath
+            if !paths.contains(resolved) { paths.append(resolved) }
+            for path in paths {
+                guard fm.fileExists(atPath: path),
+                      let data = fm.contents(atPath: path),
+                      var contents = String(data: data, encoding: .utf8) else { continue }
+                contents = removeKimiHooks(from: contents)
 
-            // Restore commented-out legacy scalar hooks
-            let lines = contents.components(separatedBy: "\n")
-            var restored: [String] = []
-            for line in lines {
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                if trimmed == "# [CodeIsland] commented out legacy scalar hooks to avoid TOML conflict" {
-                    continue
+                // Restore commented-out legacy scalar hooks
+                let lines = contents.components(separatedBy: "\n")
+                var restored: [String] = []
+                for line in lines {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if trimmed == "# [CodeIsland] commented out legacy scalar hooks to avoid TOML conflict" {
+                        continue
+                    }
+                    if trimmed.range(of: #"^#\s*hooks\s*="#, options: .regularExpression) != nil {
+                        restored.append(line.replacingOccurrences(of: #"^#\s*"#, with: "", options: .regularExpression))
+                    } else {
+                        restored.append(line)
+                    }
                 }
-                if trimmed.range(of: #"^#\s*hooks\s*="#, options: .regularExpression) != nil {
-                    restored.append(line.replacingOccurrences(of: #"^#\s*"#, with: "", options: .regularExpression))
-                } else {
-                    restored.append(line)
+                while let last = restored.last, last.trimmingCharacters(in: .whitespaces).isEmpty {
+                    restored.removeLast()
                 }
-            }
-            while let last = restored.last, last.trimmingCharacters(in: .whitespaces).isEmpty {
-                restored.removeLast()
-            }
-            contents = restored.joined(separator: "\n")
+                contents = restored.joined(separator: "\n")
 
-            fm.createFile(atPath: cli.fullPath, contents: contents.data(using: .utf8))
+                fm.createFile(atPath: path, contents: contents.data(using: .utf8))
+            }
             return
         }
 

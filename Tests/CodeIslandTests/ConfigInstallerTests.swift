@@ -306,6 +306,30 @@ final class ConfigInstallerTests: XCTestCase {
         XCTAssertFalse(ConfigInstaller.contentsContainsKimiHook(toml, event: "SessionStart"))
     }
 
+    func testKimiHomePrefersKimiCodeOverLegacy() throws {
+        let fm = FileManager.default
+        let tempHome = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: tempHome, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: tempHome) }
+
+        // Simulate HOME via NSHomeDirectory is not overridable easily; exercise
+        // path helpers against the real home by checking relative naming only.
+        let modern = ConfigInstaller.kimiCodeHome()
+        let legacy = ConfigInstaller.kimiLegacyHome()
+        XCTAssertTrue(modern.hasSuffix("/.kimi-code"))
+        XCTAssertTrue(legacy.hasSuffix("/.kimi"))
+        XCTAssertNotEqual(modern, legacy)
+
+        // When ~/.kimi-code exists on this machine (kimi-code install), presence
+        // and preferred home must point at the modern root.
+        if fm.fileExists(atPath: modern) {
+            XCTAssertTrue(ConfigInstaller.kimiPresenceDetected())
+            XCTAssertEqual(ConfigInstaller.kimiHome(), modern)
+            XCTAssertTrue(ConfigInstaller.cliExists(source: "kimi"))
+            XCTAssertEqual(ConfigInstaller.displayKimiConfigPath(), "~/.kimi-code/config.toml")
+        }
+    }
+
     func testKimiHookFormatEvents() {
         let events = ConfigInstaller.defaultEvents(for: .kimi)
         let eventNames = events.map { $0.0 }
@@ -324,7 +348,8 @@ final class ConfigInstallerTests: XCTestCase {
         XCTAssertEqual(notificationTimeout, 600, "Kimi max timeout is 600")
     }
 
-    /// Hermetic integration test: uses a temporary directory instead of touching ~/.kimi/config.toml.
+    /// Hermetic integration test: uses a temporary directory instead of touching
+    /// ~/.kimi-code/config.toml (or legacy ~/.kimi/config.toml).
     func testInstallKimiHooksIntegration() throws {
         let fm = FileManager.default
         let tempDir = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
