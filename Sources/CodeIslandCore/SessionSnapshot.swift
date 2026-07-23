@@ -94,6 +94,12 @@ public struct SessionSnapshot: Sendable {
     /// by hooks (`transcript_path` field) and by filesystem discovery, consumed by the
     /// JSONLTailer for incremental streaming of the latest assistant reply.
     public var transcriptPath: String?
+    /// Cursor-only (#265): question text of an AskQuestion the IDE is currently
+    /// blocked on. Cursor exposes no hook for its question tool, so this is a
+    /// display-only wait — the user answers inside Cursor itself. Non-nil means
+    /// a question is pending ("" = pending but text unknown). Set and cleared by
+    /// transcript-tail detection; transient, never persisted.
+    public var cursorPendingQuestion: String?
     /// Recent chat messages (max 3) for preview
     public var recentMessages: [ChatMessage] = []
     // Terminal info for window activation

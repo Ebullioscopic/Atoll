@@ -196,13 +196,14 @@ enum DebugHarness {
         s2.gitBranch = "feat/query-planner"
         s2.gitIsWorktree = true
 
-        // Session 3: Cursor processing
+        // Session 3: Cursor blocked on an in-IDE question (#265 display-only wait)
         var s3 = SessionSnapshot()
-        s3.status = .processing
+        s3.status = .waitingQuestion
         s3.cwd = "/Users/dev/mobile"
         s3.source = "cursor"
         s3.lastUserPrompt = "Fix the scroll jank"
         s3.addRecentMessage(ChatMessage(isUser: true, text: "Fix the scroll jank"))
+        s3.cursorPendingQuestion = "Which list component should I optimize first? (+1)"
 
         state.sessions["preview-multi-1"] = s1
         state.sessions["preview-multi-2"] = s2

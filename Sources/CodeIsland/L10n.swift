@@ -375,6 +375,9 @@ final class L10n: ObservableObject {
         "open_path": "Open",
         "copy_session_id": "Copy session ID",
 
+        // Cursor external question wait (#265)
+        "cursor_question_answer_hint": "Answer in Cursor to continue",
+
         // Session grouping
         "status_running": "Running",
         "status_waiting": "Waiting",
@@ -714,6 +717,9 @@ final class L10n: ObservableObject {
         "submit": "SENDEN",
         "open_path": "Öffnen",
         "copy_session_id": "Sitzungs-ID kopieren",
+
+        // Cursor external question wait (#265)
+        "cursor_question_answer_hint": "Zum Fortfahren in Cursor antworten",
 
         // Session grouping
         "status_running": "Läuft",
@@ -1059,6 +1065,9 @@ final class L10n: ObservableObject {
         "open_path": "打开",
         "copy_session_id": "复制会话 ID",
 
+        // Cursor external question wait (#265)
+        "cursor_question_answer_hint": "请在 Cursor 中回答后继续",
+
         // Session grouping
         "status_running": "运行中",
         "status_waiting": "等待中",
@@ -1402,6 +1411,9 @@ final class L10n: ObservableObject {
         "submit": "提交",
         "open_path": "開啟",
         "copy_session_id": "複製會話 ID",
+
+        // Cursor external question wait (#265)
+        "cursor_question_answer_hint": "請在 Cursor 中回答後繼續",
 
         // Session grouping
         "status_running": "執行中",
@@ -1747,6 +1759,9 @@ final class L10n: ObservableObject {
         "open_path": "開く",
         "copy_session_id": "セッション ID をコピー",
 
+        // Cursor external question wait (#265)
+        "cursor_question_answer_hint": "続行するには Cursor で回答してください",
+
         // Session grouping
         "status_running": "実行中",
         "status_waiting": "待機中",
@@ -2091,6 +2106,9 @@ final class L10n: ObservableObject {
         "open_path": "열기",
         "copy_session_id": "세션 ID 복사",
 
+        // Cursor external question wait (#265)
+        "cursor_question_answer_hint": "계속하려면 Cursor에서 답변하세요",
+
         // Session grouping
         "status_running": "실행 중",
         "status_waiting": "대기 중",
@@ -2434,6 +2452,9 @@ final class L10n: ObservableObject {
         "submit": "GÖNDER",
         "open_path": "Aç",
         "copy_session_id": "Oturum ID Kopyala",
+
+        // Cursor external question wait (#265)
+        "cursor_question_answer_hint": "Devam etmek için Cursor'da yanıtlayın",
 
         // Session grouping
         "status_running": "Çalışıyor",
