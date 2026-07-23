@@ -1,5 +1,37 @@
 # Changelog
 
+## [v1.0.31] - 2026-07-23
+
+### English
+- ZCode approval buttons — allow / always allow / deny now work from the island; verified against ZCode's agent-core schema, safely falls back to ZCode's own dialog when CodeIsland isn't running; restart ZCode once after updating (#258, thanks @JamesJian-tech)
+- Support Codex Desktop hosted by ChatGPT.app — sessions discovered from rollout transcripts, live running/idle state from turn lifecycle events (#267, thanks @Haoo-7); Codex SessionEnd hook timeout capped at upstream's 3s limit (#279, thanks @hexsean)
+- Restore OpenCode plugin for current releases — maps the new session.next.* / permission.v2.* / question.v2.* events, plugin auto-repairs to the ESM build (#257, thanks @x22x22)
+- Detect Kimi Code CLI under ~/.kimi-code — new session layout, hooks, and chat text; legacy ~/.kimi still works (#274, thanks @zephyr110)
+- Fold Cursor Tasks under Agent Sub-Sessions (separate / merge / hide), with closed-task tombstones so a lingering IDE process can't revive finished cards (#262, thanks @zephyr110)
+- Cursor questions no longer stick on "thinking" — the card flips to a waiting state showing the question with an "Answer in Cursor to continue" hint (Cursor exposes no hook to answer from outside) (#265)
+- Add Trae CLI Next hooks at ~/.trae/cli/hooks.json with the TraeX event schema; legacy Trae IDE hooks untouched (#266, thanks @Hayak3)
+- Add Qoder PermissionRequest hooks so approval cards wait for you, plus Qoder support on SSH remote hosts (#272/#273, thanks @ri-char)
+- Honor $CLAUDE_CONFIG_DIR — custom Claude config dirs are auto-detected (env var, ~/.config/claude, ~/.config/claude-code) with a Settings override for Finder launches (#269/#270, thanks @halindrome)
+- Fix overnight CPU pegging one core — the transcript tailer mis-tracked its read offset on long lines split across writes, re-scanning the whole file on every append; also fixes silently dropped messages on split lines (#278)
+- Fix the island detaching from the notch and parking below the menu bar after display reconfigure / wake (#263)
+- Island width slider now works on notched displays — widen beyond the physical notch, never narrower (#268)
+- iOS companion: full English localization (#260) and automatic reconnect when returning to the foreground (#261) — both reach the phone with the next App Store update of Buddy
+
+### 中文
+- ZCode 审批按钮上线——允许 / 始终允许 / 拒绝都能在岛上操作；契约对照 ZCode agent 内核 schema 逐条验证，CodeIsland 未运行时安全回落原生弹窗；升级后需重启一次 ZCode（#258，感谢 @JamesJian-tech）
+- 支持 ChatGPT.app 托管的 Codex Desktop——从 rollout transcript 发现会话，按 turn 生命周期事件实时显示运行/空闲状态（#267，感谢 @Haoo-7）；Codex SessionEnd hook 超时按上游 3 秒上限收紧（#279，感谢 @hexsean）
+- 恢复对新版 OpenCode 的插件支持——映射 session.next.* / permission.v2.* / question.v2.* 新事件，插件自动修复为 ESM 版本（#257，感谢 @x22x22）
+- 识别迁移到 ~/.kimi-code 的 Kimi Code CLI——新会话布局、hooks 与对话内容；旧版 ~/.kimi 继续兼容（#274，感谢 @zephyr110）
+- Cursor Task 纳入「Agent 子会话」设置（独立 / 合并 / 隐藏），结束的 Task 写入墓碑，IDE 进程残留不再复活已完成卡片（#262，感谢 @zephyr110）
+- Cursor 提问不再卡在「思考中」——卡片转为等待态并显示问题文本与「请到 Cursor 中作答」提示（Cursor 未提供可从外部作答的 hook 通道）（#265）
+- 新增 Trae CLI Next 支持——hooks 写入 ~/.trae/cli/hooks.json 并采用 TraeX 事件名；旧版 Trae IDE hooks 不受影响（#266，感谢 @Hayak3）
+- 新增 Qoder 审批 hook（审批卡片会等待你操作）及 SSH 远程主机上的 Qoder 支持（#272/#273，感谢 @ri-char）
+- 支持 $CLAUDE_CONFIG_DIR——自动探测自定义 Claude 配置目录（环境变量、~/.config/claude、~/.config/claude-code），并提供设置项覆盖 Finder 启动场景（#269/#270，感谢 @halindrome）
+- 修复过夜后单核 CPU 满转——transcript tailer 在长行跨多次写入时读偏移记账错误，导致每次追加都整文件重扫；同时修复分片长行消息被静默丢弃的问题（#278）
+- 修复显示器重配置 / 唤醒后灵动岛脱离刘海、跑到菜单栏下方的问题（#263）
+- 灵动岛宽度滑块在有刘海的屏幕上生效了——可比物理刘海更宽，但不会更窄（#268）
+- iOS 配套 app：完整英文本地化（#260）与回到前台自动重连（#261）——随 Buddy 下一次 App Store 更新到达手机
+
 ## [v1.0.30] - 2026-07-10
 
 ### English
