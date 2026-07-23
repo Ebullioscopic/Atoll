@@ -136,4 +136,39 @@ final class RemoteInstallerHookMergeTests: XCTestCase {
         XCTAssertTrue(cmds.contains { $0.contains("buddy-user-hook") }, "user hook was wiped: \(cmds)")
         XCTAssertTrue(cmds.contains { $0.contains("codeisland-remote-hook.py") }, "our hook missing: \(cmds)")
     }
+
+    func testQoderInstallPreservesUserHooks() throws {
+        let userEntry: [String: Any] = [
+            "hooks": [["type": "command", "command": "echo qoder-user-hook", "timeout": 5]],
+        ]
+        try writeJSON(["hooks": ["SessionStart": [userEntry]]], to: ".qoder/settings.json")
+
+        try runConfigureScript()
+
+        let settings = try readJSON(".qoder/settings.json")
+        let hooks = try XCTUnwrap(settings["hooks"] as? [String: Any])
+        let sessionStart = try XCTUnwrap(hooks["SessionStart"] as? [[String: Any]])
+        let cmds = commands(in: sessionStart)
+        XCTAssertTrue(cmds.contains { $0.contains("qoder-user-hook") }, "user hook was wiped: \(cmds)")
+        XCTAssertTrue(cmds.contains { $0.contains("CODEISLAND_SOURCE=qoder") }, "Qoder source missing: \(cmds)")
+        XCTAssertTrue(cmds.contains { $0.contains("codeisland-remote-hook.py") }, "our hook missing: \(cmds)")
+    }
+
+    func testQoderInstallIsIdempotentAcrossReconnects() throws {
+        let userEntry: [String: Any] = [
+            "hooks": [["type": "command", "command": "echo keep-qoder", "timeout": 5]],
+        ]
+        try writeJSON(["hooks": ["Stop": [userEntry]]], to: ".qoder/settings.json")
+
+        try runConfigureScript()
+        try runConfigureScript()
+        try runConfigureScript()
+
+        let settings = try readJSON(".qoder/settings.json")
+        let hooks = try XCTUnwrap(settings["hooks"] as? [String: Any])
+        let stop = try XCTUnwrap(hooks["Stop"] as? [[String: Any]])
+        let cmds = commands(in: stop)
+        XCTAssertEqual(cmds.filter { $0.contains("keep-qoder") }.count, 1, "user hook duplicated or lost: \(cmds)")
+        XCTAssertEqual(cmds.filter { $0.contains("CODEISLAND_SOURCE=qoder") }.count, 1, "our hook not deduped: \(cmds)")
+    }
 }

@@ -5,7 +5,7 @@ import socket
 import subprocess
 import sys
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 # Per-user socket path (#193): CodeIsland injects CODEISLAND_SOCKET_PATH via the hook
 # command, but fall back to a uid-scoped path so multiple users on a shared host never
 # collide on a single /tmp/codeisland.sock.
@@ -114,6 +114,19 @@ def _claude_jsonl_path(session_id, cwd):
     return path if os.path.exists(path) else None
 
 
+def _codeisland_project_dir_encoded(cwd):
+    return "".join("-" if ch == "/" or ch == " " or ord(ch) > 127 else ch for ch in cwd)
+
+
+def _qoder_jsonl_path(session_id, cwd):
+    if not session_id or not cwd:
+        return None
+    home = os.path.expanduser("~")
+    project_dir = _codeisland_project_dir_encoded(cwd)
+    path = os.path.join(home, ".qoder", "projects", project_dir, f"{session_id}.jsonl")
+    return path if os.path.exists(path) else None
+
+
 def _codebuddy_jsonl_path(session_id, cwd):
     if not session_id or not cwd:
         return None
@@ -169,6 +182,10 @@ def _scan_session_jsonl(path):
 
 def _scan_claude_jsonl(session_id, cwd):
     return _scan_session_jsonl(_claude_jsonl_path(session_id, cwd))
+
+
+def _scan_qoder_jsonl(session_id, cwd):
+    return _scan_session_jsonl(_qoder_jsonl_path(session_id, cwd))
 
 
 def _scan_codebuddy_jsonl(session_id, cwd):
@@ -258,6 +275,16 @@ def main():
 
     if SOURCE == "claude":
         extras = _scan_claude_jsonl(session_id, cwd)
+        for key, value in extras.items():
+            if value and not payload.get(key):
+                payload[key] = value
+        if normalized_event == "UserPromptSubmit" and not payload.get("prompt"):
+            prompt = extras.get("last_user_message")
+            if prompt:
+                payload["prompt"] = prompt
+
+    if SOURCE == "qoder":
+        extras = _scan_qoder_jsonl(session_id, cwd)
         for key, value in extras.items():
             if value and not payload.get(key):
                 payload[key] = value

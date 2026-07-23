@@ -14,7 +14,7 @@ private struct RemoteCommandResult: Sendable {
 }
 
 enum RemoteInstaller {
-    private static let remoteHookVersion = "0.1.2"
+    private static let remoteHookVersion = "0.1.3"
     private static let remoteOpencodePluginVersion = "v2"
 
     static func installAll(host: RemoteHost, remoteSocketPath: String) async -> RemoteInstallResult {
@@ -40,7 +40,7 @@ enum RemoteInstaller {
             return RemoteInstallResult(ok: false, message: "Install failed: \(configure.stderrSummary)")
         }
 
-        let summary = configure.stdoutSummary.isEmpty ? "Claude/Codex/CodeBuddy/Traecli/OpenCode remote hooks installed" : configure.stdoutSummary
+        let summary = configure.stdoutSummary.isEmpty ? "Claude/Qoder/Codex/CodeBuddy/Traecli/OpenCode remote hooks installed" : configure.stdoutSummary
         return RemoteInstallResult(ok: true, message: summary)
     }
 
@@ -559,6 +559,35 @@ def install_claude():
     write_json(settings_path, data)
     return "Claude ok"
 
+def install_qoder():
+    qoder_root = home / ".qoder"
+    if not qoder_root.exists() and shutil.which("qodercli") is None and shutil.which("qoder") is None:
+        return "Qoder skipped"
+
+    settings_path = qoder_root / "settings.json"
+    data = ensure_json(settings_path)
+    hooks = data.get("hooks") or {}
+    remove_our_hooks(hooks)
+
+    cmd = command_for("qoder")
+    without_matcher = [{"hooks": [{"type": "command", "command": cmd, "timeout": 60}]}]
+    with_matcher = [{"matcher": "*", "hooks": [{"type": "command", "command": cmd, "timeout": 60}]}]
+    with_long_timeout = [{"matcher": "*", "hooks": [{"type": "command", "command": cmd, "timeout": 86400}]}]
+    precompact = [
+        {"matcher": "auto", "hooks": [{"type": "command", "command": cmd, "timeout": 60}]},
+        {"matcher": "manual", "hooks": [{"type": "command", "command": cmd, "timeout": 60}]},
+    ]
+    append_our_hooks(hooks, "UserPromptSubmit", without_matcher)
+    append_our_hooks(hooks, "PermissionRequest", with_long_timeout)
+    append_our_hooks(hooks, "Notification", with_matcher)
+    append_our_hooks(hooks, "Stop", without_matcher)
+    append_our_hooks(hooks, "SessionStart", without_matcher)
+    append_our_hooks(hooks, "SessionEnd", without_matcher)
+    append_our_hooks(hooks, "PreCompact", precompact)
+    data["hooks"] = hooks
+    write_json(settings_path, data)
+    return "Qoder ok"
+
 # Hermes (Nous Research) is NOT a Claude Code fork. It reads shell hooks from
 # ~/.hermes/config.yaml under a `hooks:` MAP keyed by snake_case event names whose
 # values are lists of { command, timeout }. settings.json is never parsed (#226).
@@ -905,7 +934,7 @@ def install_custom():
         results.append(cli["name"] + " ok")
     return results
 
-parts = [install_claude(), install_hermes(), install_codex(), install_codebuddy(), install_traecli(), install_opencode()] + install_custom()
+parts = [install_claude(), install_qoder(), install_hermes(), install_codex(), install_codebuddy(), install_traecli(), install_opencode()] + install_custom()
 print(" · ".join(parts))
 """
     }
