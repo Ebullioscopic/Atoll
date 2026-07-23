@@ -7,6 +7,29 @@ import CodeIslandCore
 
 private let log = Logger(subsystem: "com.codeisland", category: "AppState")
 
+/// FSEventStream context target. Callbacks hold an unretained pointer to this
+/// box (not `AppState`), and reach the owner only through `weak`, so queued
+/// main-queue deliveries stay safe if `AppState` tears down off the main actor.
+private final class ProjectsWatcherBox: @unchecked Sendable {
+    weak var appState: AppState?
+    private let lock = NSLock()
+    private var cancelled = false
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+
+    func handleChange() {
+        lock.lock()
+        let isCancelled = cancelled
+        lock.unlock()
+        guard !isCancelled else { return }
+        appState?.handleProjectsDirChange()
+    }
+}
+
 struct CodexSubagentMetadata: Equatable, Sendable {
     let parentThreadId: String
     let agentType: String?
@@ -137,7 +160,10 @@ final class AppState {
     }
 
     private var maxHistory: Int { SettingsManager.shared.maxToolHistory }
-    private var cleanupTimer: Timer?
+    /// Torn down from `deinit`, which may run off the main actor (e.g. async
+    /// XCTest ARC). Only mutated on the main actor while `self` is alive.
+    @ObservationIgnored
+    nonisolated(unsafe) private var cleanupTimer: Timer?
     private var autoCollapseTask: Task<Void, Never>?
     private var completionQueue: [String] = []
     /// Mouse must enter the panel before auto-collapse is allowed (prevents instant dismiss)
@@ -148,12 +174,19 @@ final class AppState {
     /// attached. Processes that already had ppid <= 1 at attach time are launchd-managed
     /// daemons (e.g. a Hermes gateway with KeepAlive=true), NOT orphans of a closed
     /// terminal — they must never be terminated by orphan cleanup (#243).
-    private var processMonitors: [String: (source: DispatchSourceProcess, process: ProcessIdentity, attachParentPid: pid_t?)] = [:]
+    /// Cancelled from `deinit` off the main actor.
+    @ObservationIgnored
+    nonisolated(unsafe) private var processMonitors: [String: (source: DispatchSourceProcess, process: ProcessIdentity, attachParentPid: pid_t?)] = [:]
     private var exitingSessions: [String: ProcessIdentity] = [:]
-    private var saveTimer: Timer?
-    private var fsEventStream: FSEventStreamRef?
+    @ObservationIgnored
+    nonisolated(unsafe) private var saveTimer: Timer?
+    @ObservationIgnored
+    nonisolated(unsafe) private var fsEventStream: FSEventStreamRef?
+    @ObservationIgnored
+    nonisolated(unsafe) private var projectsWatcherBox: ProjectsWatcherBox?
     private var lastFSScanTime: Date = .distantPast
-    private var discoveryScanTask: Task<Void, Never>?
+    @ObservationIgnored
+    nonisolated(unsafe) private var discoveryScanTask: Task<Void, Never>?
     private var pendingDiscoveryRescan = false
     private var isShowingCompletion: Bool {
         if case .completionCard = surface { return true }
@@ -181,7 +214,8 @@ final class AppState {
         guard let rid = rotatingSessionId else { return nil }
         return sessions[rid]
     }
-    private var rotationTimer: Timer?
+    @ObservationIgnored
+    nonisolated(unsafe) private var rotationTimer: Timer?
 
     private func startCleanupTimer() {
         guard cleanupTimer == nil else { return }
@@ -1234,12 +1268,24 @@ final class AppState {
             sessions[sessionId] = SessionSnapshot()
         }
         // Extract metadata so blocking-first parent sessions have cwd/source/PID.
-        // Subagent events are routed through the parent session ID; their metadata
-        // can describe the child session and should not overwrite the parent.
+        // Subagent events are routed through the parent session ID; their full metadata
+        // can describe the child session and should not overwrite the parent — only fill gaps.
         if event.agentId == nil {
             extractMetadata(into: &sessions, sessionId: sessionId, event: event)
+        } else {
+            fillMissingParentMetadataFromSubagentEvent(into: &sessions, sessionId: sessionId, event: event)
         }
         tryMonitorSession(sessionId)
+
+        // Closed Task/subagent ids must not surface new permission UI (parity with
+        // ensureSubagent refusing late tool hooks after Stop).
+        if shouldSuppressClosedSubagentUI(sessionId: sessionId, agentId: event.agentId) {
+            let denyResponse = Data(
+                #"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny"}}}"#.utf8
+            )
+            continuation.resume(returning: denyResponse)
+            return
+        }
 
         // New incoming permission request means session needs user decision again.
         dismissedPermissionSessionIds.remove(sessionId)
@@ -1251,6 +1297,7 @@ final class AppState {
         sessions[sessionId]?.currentTool = event.toolName
         sessions[sessionId]?.toolDescription = event.toolDescription
         sessions[sessionId]?.lastActivity = Date()
+        markMergedSubagentWaiting(sessionId: sessionId, agentId: event.agentId, status: .waitingApproval)
         // Backfill tool name/description from cached PreToolUse when the payload is thin.
         enrichPermissionRequestFromCache(sessionId: sessionId, event: event)
 
@@ -1320,7 +1367,13 @@ final class AppState {
             responseData = Data(response.utf8)
         }
         pending.continuation.resume(returning: responseData)
-        sessions[sessionId]?.status = .running
+        resolveMergedSubagentAfterUI(
+            sessionId: sessionId,
+            agentId: pending.event.agentId,
+            subagentStatus: .running,
+            keepSubagentTool: pending.event.toolName,
+            idleParentWhenNoAgent: false
+        )
 
         showNextPending()
         refreshDerivedState()
@@ -1437,9 +1490,14 @@ final class AppState {
         dismissedPermissionSessionIds.remove(sessionId)
         let response = #"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny"}}}"#
         pending.continuation.resume(returning: Data(response.utf8))
-        sessions[sessionId]?.status = .idle
-        sessions[sessionId]?.currentTool = nil
-        sessions[sessionId]?.toolDescription = nil
+        // Folded Task deny must not idle the whole parent chat card.
+        resolveMergedSubagentAfterUI(
+            sessionId: sessionId,
+            agentId: pending.event.agentId,
+            subagentStatus: .processing,
+            keepSubagentTool: nil,
+            idleParentWhenNoAgent: true
+        )
 
         if activeSessionId == sessionId {
             activeSessionId = mostActiveSessionId()
@@ -1474,8 +1532,15 @@ final class AppState {
         }
         if event.agentId == nil {
             extractMetadata(into: &sessions, sessionId: sessionId, event: event)
+        } else {
+            fillMissingParentMetadataFromSubagentEvent(into: &sessions, sessionId: sessionId, event: event)
         }
         tryMonitorSession(sessionId)
+
+        if shouldSuppressClosedSubagentUI(sessionId: sessionId, agentId: event.agentId) {
+            continuation.resume(returning: Data("{}".utf8))
+            return
+        }
 
         guard let question = QuestionPayload.from(event: event) else {
             continuation.resume(returning: Data("{}".utf8))
@@ -1485,6 +1550,7 @@ final class AppState {
 
         sessions[sessionId]?.status = .waitingQuestion
         sessions[sessionId]?.lastActivity = Date()
+        markMergedSubagentWaiting(sessionId: sessionId, agentId: event.agentId, status: .waitingQuestion)
 
         let request = QuestionRequest(event: event, question: question, continuation: continuation)
         questionQueue.append(request)
@@ -1508,8 +1574,18 @@ final class AppState {
         }
         if event.agentId == nil {
             extractMetadata(into: &sessions, sessionId: sessionId, event: event)
+        } else {
+            fillMissingParentMetadataFromSubagentEvent(into: &sessions, sessionId: sessionId, event: event)
         }
         tryMonitorSession(sessionId)
+
+        if shouldSuppressClosedSubagentUI(sessionId: sessionId, agentId: event.agentId) {
+            let denyResponse = Data(
+                #"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny"}}}"#.utf8
+            )
+            continuation.resume(returning: denyResponse)
+            return
+        }
 
         let originalQuestions = event.toolInput?["questions"] as? [[String: Any]]
         var askItems: [AskUserQuestionItem] = []
@@ -1592,6 +1668,7 @@ final class AppState {
 
         sessions[sessionId]?.status = .waitingQuestion
         sessions[sessionId]?.lastActivity = Date()
+        markMergedSubagentWaiting(sessionId: sessionId, agentId: event.agentId, status: .waitingQuestion)
 
         let askState = AskUserQuestionState(items: askItems, answers: [:])
         let request = QuestionRequest(
@@ -1666,7 +1743,13 @@ final class AppState {
         }
         pending.resolution.resumeHook(returning: responseData)
         let sessionId = pending.event.sessionId ?? "default"
-        sessions[sessionId]?.status = .processing
+        resolveMergedSubagentAfterUI(
+            sessionId: sessionId,
+            agentId: pending.event.agentId,
+            subagentStatus: .running,
+            keepSubagentTool: nil,
+            idleParentWhenNoAgent: false
+        )
 
         showNextPending()
         refreshDerivedState()
@@ -1736,7 +1819,13 @@ final class AppState {
         }
         pending.resolution.resumeHook(returning: responseData)
         let sessionId = pending.event.sessionId ?? "default"
-        sessions[sessionId]?.status = .processing
+        resolveMergedSubagentAfterUI(
+            sessionId: sessionId,
+            agentId: pending.event.agentId,
+            subagentStatus: .running,
+            keepSubagentTool: nil,
+            idleParentWhenNoAgent: false
+        )
 
         showNextPending()
         refreshDerivedState()
@@ -1779,7 +1868,13 @@ final class AppState {
             pending.resolution.resumeHook(returning: responseData)
         }
         let sessionId = pending.event.sessionId ?? "default"
-        sessions[sessionId]?.status = .processing
+        resolveMergedSubagentAfterUI(
+            sessionId: sessionId,
+            agentId: pending.event.agentId,
+            subagentStatus: .processing,
+            keepSubagentTool: nil,
+            idleParentWhenNoAgent: false
+        )
 
         showNextPending()
         refreshDerivedState()
@@ -2211,6 +2306,10 @@ final class AppState {
             snapshot.zellijSessionName = p.zellijSessionName
             snapshot.weztermPaneId = p.weztermPaneId
             snapshot.lastActivity = p.lastActivity
+            snapshot.transcriptPath = p.transcriptPath
+            if let closed = p.closedSubagentIds, !closed.isEmpty {
+                snapshot.closedSubagentIds = Set(closed)
+            }
             // Restore persisted cliPid only if the process is still alive — avoids
             // stale sessions reappearing briefly after the app or IDE restarts (#46).
             if let pid = p.cliPid, pid > 0 {
@@ -2221,7 +2320,16 @@ final class AppState {
                 }
             }
             // Skip sessions whose process is dead and status was idle — nothing to show.
-            if snapshot.cliPid == nil && snapshot.status == .idle && snapshot.lastUserPrompt == nil {
+            // Keep Cursor Task tombstones / foldable orphans so applyCursor… can still
+            // honor closedSubagentIds after relaunch (otherwise merge can revive them).
+            if snapshot.cliPid == nil && snapshot.status == .idle && snapshot.lastUserPrompt == nil,
+               !Self.shouldKeepRestoredIdleCursorSession(
+                source: source,
+                sessionId: p.sessionId,
+                providerSessionId: snapshot.providerSessionId,
+                transcriptPath: snapshot.transcriptPath,
+                closedSubagentIds: snapshot.closedSubagentIds
+               ) {
                 continue
             }
             sessions[p.sessionId] = snapshot
@@ -2233,11 +2341,27 @@ final class AppState {
         }
         SessionPersistence.clear()
         _ = applyCodexSubsessionModeToKnownSessions()
+        _ = applyCursorSubsessionModeToKnownSessions()
         if activeSessionId == nil {
             activeSessionId = sessions.first(where: { $0.value.status != .idle })?.key
                 ?? sessions.keys.sorted().first
         }
         refreshDerivedState()
+    }
+
+    /// Idle snapshots with no live process are usually discarded on restore.
+    /// Keep Cursor Task cards that carry a Stop tombstone so merge can still
+    /// honor `closedSubagentIds` after relaunch. A foldable transcript alone is
+    /// not enough — that would rehydrate finished Tasks when Stop was missed.
+    nonisolated static func shouldKeepRestoredIdleCursorSession(
+        source: String,
+        sessionId: String,
+        providerSessionId: String?,
+        transcriptPath: String?,
+        closedSubagentIds: Set<String>
+    ) -> Bool {
+        guard source == "cursor" || source == "cursor-cli" else { return false }
+        return !closedSubagentIds.isEmpty
     }
 
     private nonisolated static func findDiscoveredSessions() -> [DiscoveredSession] {
@@ -2352,19 +2476,21 @@ final class AppState {
         let watchRoots = Self.discoveryWatchRoots()
         guard !watchRoots.isEmpty else { return }
 
+        let box = ProjectsWatcherBox()
+        box.appState = self
+
         var context = FSEventStreamContext()
-        // passUnretained is safe here: the stream is dispatched on .main (same as
-        // @MainActor), so callbacks cannot interleave with deinit. Both
-        // stopSessionDiscovery() and deinit stop/invalidate the stream synchronously
-        // on the main thread before self is deallocated.
-        context.info = Unmanaged.passUnretained(self).toOpaque()
+        // Unretained box is owned by `projectsWatcherBox` until
+        // `tearDownProjectsWatcher()`; the weak back-pointer keeps callbacks
+        // safe across off-main `AppState` deinit.
+        context.info = Unmanaged.passUnretained(box).toOpaque()
 
         let stream = FSEventStreamCreate(
             nil,
             { (_, info, _, _, _, _) in
                 guard let info = info else { return }
-                let appState = Unmanaged<AppState>.fromOpaque(info).takeUnretainedValue()
-                appState.handleProjectsDirChange()
+                let box = Unmanaged<ProjectsWatcherBox>.fromOpaque(info).takeUnretainedValue()
+                box.handleChange()
             },
             &context,
             watchRoots as CFArray,
@@ -2376,12 +2502,13 @@ final class AppState {
         guard let stream = stream else { return }
         FSEventStreamSetDispatchQueue(stream, .main)
         FSEventStreamStart(stream)
+        self.projectsWatcherBox = box
         self.fsEventStream = stream
         log.info("Discovery watcher started on \(watchRoots.joined(separator: ", "))")
     }
 
     /// Called by FSEventStream when a known session-store directory changes.
-    nonisolated private func handleProjectsDirChange() {
+    nonisolated fileprivate func handleProjectsDirChange() {
         Task { @MainActor [weak self] in
             guard let self = self else { return }
             // Debounce: skip if scanned within the last 3 seconds
@@ -2548,6 +2675,9 @@ final class AppState {
         if applyCodexSubsessionModeToKnownSessions() {
             didMutate = true
         }
+        if applyCursorSubsessionModeToKnownSessions() {
+            didMutate = true
+        }
         if didMutate && activeSessionId == nil {
             activeSessionId = sessions.keys.sorted().first
         }
@@ -2628,6 +2758,272 @@ final class AppState {
         return didMutate
     }
 
+    /// Apply Agent Sub-Sessions to known Cursor Task/subagent cards
+    /// (`transcriptPath` is the parent chat; `session_id` is the child).
+    /// `merge` / `hide` only; `separate` is handled by `separateMergedCursorSubagents()`.
+    @discardableResult
+    func applyCursorSubsessionModeToKnownSessions() -> Bool {
+        let mode = Self.currentPluginSessionMode()
+        guard mode == "hide" || mode == "merge" else {
+            return false
+        }
+
+        let candidates = sessions.map { (sessionId: $0.key, session: $0.value) }
+        var didMutate = false
+
+        if mode == "hide" {
+            for candidate in candidates {
+                let source = candidate.session.source
+                guard source == "cursor" || source == "cursor-cli" else { continue }
+                guard cursorFoldIdentity(for: candidate) != nil else { continue }
+                if sessions[candidate.sessionId] != nil {
+                    removeSession(candidate.sessionId)
+                    didMutate = true
+                }
+            }
+            return hideMergedCursorSubagents() || didMutate
+        }
+
+        for candidate in candidates {
+            let source = candidate.session.source
+            guard source == "cursor" || source == "cursor-cli" else { continue }
+            guard let fold = cursorFoldIdentity(for: candidate) else { continue }
+            let parentId = fold.parentId
+            let childId = fold.childId
+
+            // If fold identity collides with this card, prefer the real parent id
+            // (child wrongly reused the parent's providerSessionId).
+            var parentKey = findSessionId(providerSessionId: parentId) ?? parentId
+            if parentKey == candidate.sessionId {
+                parentKey = parentId
+            }
+            if parentKey == candidate.sessionId { continue }
+
+            // Closed ids may sit on the parent (merge Stop) or the child card
+            // (separate Stop). Parent tombstone always wins over a late-running
+            // orphan card — relaunch clears via UserPromptSubmit on the hook path.
+            let childClosed = candidate.session.closedSubagentIds
+            let candidateCarriesClosed = childClosed.contains(childId)
+                || childClosed.contains(candidate.sessionId)
+            let parentHoldsTombstone = sessions[parentKey]?.closedSubagentIds.contains(childId) == true
+
+            if candidateCarriesClosed || parentHoldsTombstone {
+                if sessions[parentKey] == nil {
+                    var parent = SessionSnapshot(startTime: candidate.session.startTime)
+                    parent.source = source
+                    parent.cwd = candidate.session.cwd
+                    parent.model = candidate.session.model
+                    parent.termApp = candidate.session.termApp
+                    parent.termBundleId = candidate.session.termBundleId
+                    parent.transcriptPath = candidate.session.transcriptPath
+                    parent.providerSessionId = parentId
+                    // Closed ids only — parent is not actively working.
+                    parent.status = .idle
+                    parent.lastActivity = candidate.session.lastActivity
+                    sessions[parentKey] = parent
+                }
+                promoteCursorClosedIds(
+                    onto: parentKey,
+                    childId: childId,
+                    candidateSessionId: candidate.sessionId,
+                    childClosed: childClosed
+                )
+                if sessions[candidate.sessionId] != nil {
+                    removeSession(candidate.sessionId)
+                    didMutate = true
+                }
+                continue
+            }
+
+            // Idle orphan: always drop — never overwrite a live merged Task slot
+            // with an AfterAgentResponse→idle discovery card. Tombstones were
+            // already handled above; plain idle must not invent parents either.
+            if candidate.session.status == .idle {
+                if sessions[candidate.sessionId] != nil {
+                    removeSession(candidate.sessionId)
+                    didMutate = true
+                }
+                continue
+            }
+
+            if sessions[parentKey] == nil {
+                var parent = SessionSnapshot(startTime: candidate.session.startTime)
+                parent.source = source
+                parent.cwd = candidate.session.cwd
+                parent.model = candidate.session.model
+                parent.termApp = candidate.session.termApp
+                parent.termBundleId = candidate.session.termBundleId
+                parent.transcriptPath = candidate.session.transcriptPath
+                // Do not copy the Task/subagent process identity onto the parent chat.
+                parent.providerSessionId = parentId
+                parent.status = candidate.session.status == .idle ? .processing : candidate.session.status
+                parent.lastActivity = candidate.session.lastActivity
+                sessions[parentKey] = parent
+            } else if sessions[parentKey]?.transcriptPath == nil,
+                      let path = candidate.session.transcriptPath {
+                sessions[parentKey]?.transcriptPath = path
+            }
+
+            if sessions[candidate.sessionId] != nil {
+                removeSession(candidate.sessionId)
+                didMutate = true
+            }
+
+            // Prefer an existing parent monitor; skip if we only synthesized metadata.
+            if sessions[parentKey]?.cliPid != nil || sessions[parentKey]?.transcriptPath != nil {
+                if sessions[parentKey]?.transcriptPath != nil {
+                    attachTranscriptTailerIfNeeded(sessionId: parentKey)
+                }
+                if sessions[parentKey]?.cliPid != nil {
+                    tryMonitorSession(parentKey)
+                }
+            }
+
+            var subagent = sessions[parentKey]?.subagents[childId]
+                ?? SubagentState(agentId: childId, agentType: "cursor-subagent")
+            subagent.status = candidate.session.status
+            subagent.currentTool = candidate.session.currentTool
+            subagent.toolDescription = candidate.session.toolDescription
+            if candidate.session.lastActivity > subagent.lastActivity {
+                subagent.lastActivity = candidate.session.lastActivity
+            }
+            sessions[parentKey]?.subagents[childId] = subagent
+
+            if sessions[parentKey]?.status != .waitingApproval
+                && sessions[parentKey]?.status != .waitingQuestion {
+                sessions[parentKey]?.status = .running
+                if sessions[parentKey]?.currentTool == nil {
+                    sessions[parentKey]?.currentTool = "Agent"
+                    sessions[parentKey]?.toolDescription = "cursor-subagent"
+                }
+            }
+            if candidate.session.lastActivity > (sessions[parentKey]?.lastActivity ?? .distantPast) {
+                sessions[parentKey]?.lastActivity = candidate.session.lastActivity
+            }
+            activeSessionId = parentKey
+            didMutate = true
+        }
+
+        return didMutate
+    }
+
+    /// Record the foldable child id(s) on the parent — not an arbitrary union of
+    /// whatever closed set the orphan card carried.
+    private func promoteCursorClosedIds(
+        onto parentKey: String,
+        childId: String,
+        candidateSessionId: String,
+        childClosed: Set<String>
+    ) {
+        sessions[parentKey]?.closedSubagentIds.insert(childId)
+        if candidateSessionId != childId {
+            sessions[parentKey]?.closedSubagentIds.insert(candidateSessionId)
+        }
+        for id in childClosed where id == childId || id == candidateSessionId {
+            sessions[parentKey]?.closedSubagentIds.insert(id)
+        }
+    }
+
+    private func markMergedSubagentWaiting(
+        sessionId: String,
+        agentId: String?,
+        status: AgentStatus
+    ) {
+        guard let agentId else { return }
+        guard var session = sessions[sessionId] else { return }
+        var subagent = session.subagents[agentId]
+            ?? SubagentState(agentId: agentId, agentType: "cursor-subagent")
+        subagent.status = status
+        subagent.lastActivity = Date()
+        session.subagents[agentId] = subagent
+        sessions[sessionId] = session
+    }
+
+    /// After Permission/Question UI resolves for a possibly folded Task.
+    /// With `agent_id`, never idle the parent — even if the subagent slot was
+    /// already removed (Stop race). Uses local copies to avoid exclusivity traps
+    /// when mutating nested `sessions[id].subagents[id]` fields.
+    private func resolveMergedSubagentAfterUI(
+        sessionId: String,
+        agentId: String?,
+        subagentStatus: AgentStatus,
+        keepSubagentTool: String?,
+        idleParentWhenNoAgent: Bool
+    ) {
+        if let agentId {
+            guard var session = sessions[sessionId] else { return }
+            if var subagent = session.subagents[agentId] {
+                subagent.status = subagentStatus
+                if subagentStatus == .processing {
+                    subagent.currentTool = nil
+                    subagent.toolDescription = nil
+                } else if let keepSubagentTool {
+                    subagent.currentTool = keepSubagentTool
+                }
+                session.subagents[agentId] = subagent
+            }
+            let hasNonIdleSubagents = session.subagents.values.contains { $0.status != .idle }
+            if hasNonIdleSubagents {
+                let agentType = session.subagents[agentId]?.agentType ?? "cursor-subagent"
+                session.status = .running
+                session.currentTool = "Agent"
+                if session.toolDescription == nil {
+                    session.toolDescription = agentType
+                }
+            } else {
+                session.status = .processing
+                session.currentTool = nil
+                session.toolDescription = nil
+            }
+            sessions[sessionId] = session
+            return
+        }
+
+        if idleParentWhenNoAgent {
+            sessions[sessionId]?.status = .idle
+            sessions[sessionId]?.currentTool = nil
+            sessions[sessionId]?.toolDescription = nil
+        } else {
+            sessions[sessionId]?.status = .processing
+            sessions[sessionId]?.currentTool = nil
+            sessions[sessionId]?.toolDescription = nil
+        }
+    }
+
+    /// Suppress Permission/Question UI for Stop'd Tasks: merged `agent_id` tombstones
+    /// or separate-mode self-tombstones (`closedSubagentIds` contains the card id).
+    private func shouldSuppressClosedSubagentUI(sessionId: String, agentId: String?) -> Bool {
+        let closed = sessions[sessionId]?.closedSubagentIds ?? []
+        if let agentId, closed.contains(agentId) { return true }
+        if agentId == nil, closed.contains(sessionId) { return true }
+        return false
+    }
+
+    /// Parent/child ids when this card's transcript belongs to another Cursor chat.
+    private func cursorFoldIdentity(
+        for candidate: (sessionId: String, session: SessionSnapshot)
+    ) -> (parentId: String, childId: String)? {
+        // Prefer providerSessionId if it folds; else the card key (used as agent_id).
+        let primaryId = candidate.session.providerSessionId ?? candidate.sessionId
+        let parentFromPrimary = CursorSessionFolding.foldTarget(
+            childSessionId: primaryId,
+            transcriptPath: candidate.session.transcriptPath
+        )
+        let parentFromCard = candidate.sessionId == primaryId
+            ? nil
+            : CursorSessionFolding.foldTarget(
+                childSessionId: candidate.sessionId,
+                transcriptPath: candidate.session.transcriptPath
+            )
+        if let parentFromPrimary {
+            return (parentFromPrimary, primaryId)
+        }
+        if let parentFromCard {
+            return (parentFromCard, candidate.sessionId)
+        }
+        return nil
+    }
+
     func applyCurrentPluginSessionMode(persist: Bool = true) {
         let mode = Self.currentPluginSessionMode()
         var didMutate = false
@@ -2635,11 +3031,14 @@ final class AppState {
         switch mode {
         case "separate":
             didMutate = separateMergedCodexSubagents()
+            didMutate = separateMergedCursorSubagents() || didMutate
         case "merge":
             didMutate = applyCodexSubsessionModeToKnownSessions()
+            didMutate = applyCursorSubsessionModeToKnownSessions() || didMutate
         case "hide":
             didMutate = applyCodexSubsessionModeToKnownSessions()
             didMutate = hideMergedCodexSubagents() || didMutate
+            didMutate = applyCursorSubsessionModeToKnownSessions() || didMutate
         default:
             return
         }
@@ -2736,6 +3135,94 @@ final class AppState {
         return didMutate
     }
 
+    /// Split Cursor parent.subagents into standalone cards (Agent Sub-Sessions: separate).
+    @discardableResult
+    private func separateMergedCursorSubagents() -> Bool {
+        let parentCandidates = sessions.map { (sessionId: $0.key, session: $0.value) }
+        var didMutate = false
+
+        for parent in parentCandidates
+        where (parent.session.source == "cursor" || parent.session.source == "cursor-cli")
+            && !parent.session.subagents.isEmpty {
+            for (agentId, subagent) in parent.session.subagents {
+                let childKey = findSessionId(providerSessionId: agentId) ?? agentId
+                guard childKey != parent.sessionId else { continue }
+
+                var child = sessions[childKey] ?? SessionSnapshot(startTime: subagent.startTime)
+                child.source = parent.session.source
+                child.providerSessionId = agentId
+                child.cwd = child.cwd ?? parent.session.cwd
+                child.model = child.model ?? parent.session.model
+                child.permissionMode = child.permissionMode ?? parent.session.permissionMode
+                child.termApp = child.termApp ?? parent.session.termApp
+                child.itermSessionId = child.itermSessionId ?? parent.session.itermSessionId
+                child.ttyPath = child.ttyPath ?? parent.session.ttyPath
+                child.kittyWindowId = child.kittyWindowId ?? parent.session.kittyWindowId
+                child.tmuxPane = child.tmuxPane ?? parent.session.tmuxPane
+                child.tmuxClientTty = child.tmuxClientTty ?? parent.session.tmuxClientTty
+                child.tmuxEnv = child.tmuxEnv ?? parent.session.tmuxEnv
+                child.termBundleId = child.termBundleId ?? parent.session.termBundleId
+                child.cmuxSurfaceId = child.cmuxSurfaceId ?? parent.session.cmuxSurfaceId
+                child.cmuxWorkspaceId = child.cmuxWorkspaceId ?? parent.session.cmuxWorkspaceId
+                child.zellijPaneId = child.zellijPaneId ?? parent.session.zellijPaneId
+                child.zellijSessionName = child.zellijSessionName ?? parent.session.zellijSessionName
+                child.weztermPaneId = child.weztermPaneId ?? parent.session.weztermPaneId
+                child.remoteHostId = child.remoteHostId ?? parent.session.remoteHostId
+                child.remoteHostName = child.remoteHostName ?? parent.session.remoteHostName
+                // Keep the child's own process identity only — the parent Cursor chat
+                // often shares the IDE process, which must not be attributed to Tasks.
+                child.status = subagent.status
+                child.currentTool = subagent.currentTool
+                child.toolDescription = subagent.toolDescription ?? subagent.agentType
+                child.lastActivity = subagent.lastActivity
+                if child.sessionTitle == nil {
+                    child.sessionTitle = subagent.toolDescription ?? subagent.agentType
+                }
+                // Keep parent transcriptPath for later fold identity, but do not
+                // attach a second JSONLTailer on the same parent file (steals the
+                // parent's live tail). Prefer a child-specific path when present.
+                let parentTranscript = parent.session.transcriptPath
+                if child.transcriptPath == nil {
+                    child.transcriptPath = parentTranscript
+                }
+                let shouldTailChildTranscript =
+                    child.transcriptPath != nil && child.transcriptPath != parentTranscript
+
+                sessions[childKey] = child
+                refreshProviderTitle(for: childKey, providerSessionId: agentId)
+                if shouldTailChildTranscript {
+                    attachTranscriptTailerIfNeeded(sessionId: childKey)
+                }
+                if child.cliPid != nil {
+                    tryMonitorSession(childKey)
+                }
+                sessions[parent.sessionId]?.subagents.removeValue(forKey: agentId)
+                if subagent.status != .idle {
+                    activeSessionId = childKey
+                }
+                didMutate = true
+            }
+            if sessions[parent.sessionId]?.subagents.isEmpty == true {
+                clearSubagentProjection(fromParentSession: parent.sessionId)
+            }
+        }
+
+        return didMutate
+    }
+
+    /// Clear Cursor parent.subagents (Agent Sub-Sessions: hide).
+    @discardableResult
+    private func hideMergedCursorSubagents() -> Bool {
+        var didMutate = false
+        for (sessionId, session) in sessions
+        where (session.source == "cursor" || session.source == "cursor-cli") && !session.subagents.isEmpty {
+            sessions[sessionId]?.subagents.removeAll()
+            clearSubagentProjection(fromParentSession: sessionId)
+            didMutate = true
+        }
+        return didMutate
+    }
+
     private func clearSubagentProjection(fromParentSession sessionId: String) {
         guard sessions[sessionId]?.currentTool == "Agent" else { return }
         sessions[sessionId]?.currentTool = nil
@@ -2796,12 +3283,7 @@ final class AppState {
     }
 
     func stopSessionDiscovery() {
-        if let stream = fsEventStream {
-            FSEventStreamStop(stream)
-            FSEventStreamInvalidate(stream)
-            FSEventStreamRelease(stream)
-            fsEventStream = nil
-        }
+        tearDownProjectsWatcher()
         cleanupTimer?.invalidate()
         cleanupTimer = nil
         saveTimer?.invalidate()
@@ -2812,20 +3294,45 @@ final class AppState {
         for key in Array(processMonitors.keys) { stopMonitor(key) }
     }
 
-    deinit {
-        MainActor.assumeIsolated {
-            rotationTimer?.invalidate()
-            cleanupTimer?.invalidate()
-            saveTimer?.invalidate()
+    /// Stops the FSEvents watcher on the main queue so Stop/Invalidate cannot
+    /// race a queued callback. Safe to call from `deinit` (any thread).
+    nonisolated private func tearDownProjectsWatcher() {
+        let teardown = { [self] in
+            // Flip cancel before stopping so any already-queued callback no-ops
+            // instead of touching a dying AppState / freed box.
+            projectsWatcherBox?.cancel()
             if let stream = fsEventStream {
                 FSEventStreamStop(stream)
                 FSEventStreamInvalidate(stream)
                 FSEventStreamRelease(stream)
+                fsEventStream = nil
             }
-            discoveryScanTask?.cancel()
-            for (_, monitor) in processMonitors {
-                monitor.source.cancel()
+            let box = projectsWatcherBox
+            projectsWatcherBox = nil
+            // Keep the box alive until after previously queued main-queue
+            // callbacks drain (Invalidate does not flush them).
+            if let box {
+                DispatchQueue.main.async { _ = box }
             }
+        }
+        if Thread.isMainThread {
+            teardown()
+        } else {
+            DispatchQueue.main.sync(execute: teardown)
+        }
+    }
+
+    deinit {
+        // Must not use MainActor.assumeIsolated: async callers (notably XCTest)
+        // can release AppState off the main actor via ARC. Weak-boxed FSEvents
+        // + main-synced stream teardown keep discovery teardown crash-free.
+        rotationTimer?.invalidate()
+        cleanupTimer?.invalidate()
+        saveTimer?.invalidate()
+        tearDownProjectsWatcher()
+        discoveryScanTask?.cancel()
+        for (_, monitor) in processMonitors {
+            monitor.source.cancel()
         }
     }
 
@@ -3856,7 +4363,8 @@ final class AppState {
                 pid: pid,
                 modifiedAt: best.modified,
                 recentMessages: messages,
-                source: "cursor"
+                source: "cursor",
+                transcriptPath: best.path
             ))
         }
 

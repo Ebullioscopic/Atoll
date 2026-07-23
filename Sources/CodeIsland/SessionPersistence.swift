@@ -31,6 +31,10 @@ struct PersistedSession: Codable {
     let cliStartTime: Date?
     let startTime: Date
     let lastActivity: Date
+    /// Absolute JSONL path for session fold and transcript tailing.
+    let transcriptPath: String?
+    /// Closed subagent ids; kept across relaunch so merge cannot revive them.
+    let closedSubagentIds: [String]?
 }
 
 enum SessionPersistence {
@@ -66,7 +70,9 @@ enum SessionPersistence {
                 cliPid: s.cliPid,
                 cliStartTime: s.cliStartTime,
                 startTime: s.startTime,
-                lastActivity: s.lastActivity
+                lastActivity: s.lastActivity,
+                transcriptPath: s.transcriptPath,
+                closedSubagentIds: s.closedSubagentIds.isEmpty ? nil : Array(s.closedSubagentIds).sorted()
             )
         }
         do {

@@ -312,6 +312,8 @@ class HookServer {
     private static let pluginMarkerBytes = Data("_via_plugin".utf8)
     private static let sourceMarkerBytes = Data(#""_source""#.utf8)
     private static let codexMarkerBytes = Data("codex".utf8)
+    private static let cursorTranscriptMarkerBytes = Data("agent-transcripts".utf8)
+    private static let cursorSourceMarkerBytes = Data("cursor".utf8)
 
     private static func codexSubagentMetadata(from raw: [String: Any]) -> CodexSubagentMetadata? {
         guard let path = nonEmptyString(raw["transcript_path"]) else { return nil }
@@ -346,15 +348,44 @@ class HookServer {
     }
 
     private func routeSubsessionPayloadIfNeeded(data: Data) -> (processedData: Data, responseData: Data?) {
-        let mayNeedRouting = data.range(of: Self.pluginMarkerBytes) != nil
+        let mayNeedPluginOrCodex = data.range(of: Self.pluginMarkerBytes) != nil
             || (data.range(of: Self.sourceMarkerBytes) != nil && data.range(of: Self.codexMarkerBytes) != nil)
-        guard mayNeedRouting,
+        let mayNeedCursor = data.range(of: Self.cursorTranscriptMarkerBytes) != nil
+            && data.range(of: Self.cursorSourceMarkerBytes) != nil
+
+        let mode = UserDefaults.standard.string(forKey: SettingsKey.pluginSessionMode)
+            ?? SettingsDefaults.pluginSessionMode
+
+        // Cursor Task routing is a no-op in separate mode; skip JSON parse when
+        // the payload is Cursor-only (Codex/plugin may still need it below).
+        if mayNeedCursor && !mayNeedPluginOrCodex && mode != "hide" && mode != "merge" {
+            return (data, nil)
+        }
+
+        guard mayNeedPluginOrCodex || mayNeedCursor,
               let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return (data, nil)
         }
 
-        let mode = UserDefaults.standard.string(forKey: SettingsKey.pluginSessionMode)
-            ?? SettingsDefaults.pluginSessionMode
+        // Cursor Task/subagent: apply Agent Sub-Sessions (separate / merge / hide).
+        switch CursorSubsessionRouter.decide(raw: raw, mode: mode) {
+        case .leave:
+            break
+        case .hide:
+            return (data, Self.hiddenPluginResponse(for: raw))
+        case .merge(let parentSessionId, let childSessionId):
+            var rewritten = raw
+            CursorSubsessionRouter.applyMerge(
+                to: &rewritten,
+                parentSessionId: parentSessionId,
+                childSessionId: childSessionId
+            )
+            if let newData = try? JSONSerialization.data(withJSONObject: rewritten) {
+                return (newData, nil)
+            }
+            return (data, nil)
+        }
+
         guard mode == "hide" || mode == "merge" else {
             return (data, nil)
         }
@@ -414,13 +445,11 @@ class HookServer {
     }
 
     private func processRequest(data: Data, connection: NWConnection) {
-        // Sub-session mode pre-filter (#123, #151): events that arrived through a
-        // plugin proxy (`_via_plugin`) or from a Codex native subagent can be
-        // merged into the matching main session, hidden, or kept separate per
-        // the user's setting. "separate" preserves prior behavior.
+        // Sub-session pre-filter (#123, #151): plugin, Codex, or Cursor Task hooks
+        // (Cursor: transcript parent ≠ session_id) follow Agent Sub-Sessions —
+        // merge into the parent, hide, or keep separate.
         //
-        // Cheap byte probes first — JSONSerialization on every PostToolUse on
-        // the main thread is not free.
+        // Cheap byte probes first; avoid JSONSerialization on every PostToolUse.
         let routed = routeSubsessionPayloadIfNeeded(data: data)
         if let responseData = routed.responseData {
             sendResponse(connection: connection, data: responseData)
