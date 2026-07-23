@@ -77,6 +77,13 @@ struct ShelfItemView: View {
                         removeButton
                     }
                 }
+                // Keep removal reachable without hover (VoiceOver / keyboard):
+                // expose the item as one element with a named remove action.
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(viewModel.displayName.isEmpty ? Text("Shelf item") : Text(viewModel.displayName))
+                .accessibilityAction(named: Text("Remove from Shelf")) {
+                    ShelfActionService.remove(item)
+                }
 
                 DraggableClickHandler(
                     item: item,
@@ -160,21 +167,29 @@ struct ShelfItemView: View {
     /// Hover-revealed circular remove button in the top-trailing corner.
     /// Removes just this item from the shelf via the same path as the
     /// right-click "Remove" menu item (`ShelfActionService.remove`).
+    /// Uses a `Button` (not a bare tap gesture) so it carries button
+    /// semantics for VoiceOver; the item also exposes a hover-independent
+    /// "Remove from Shelf" accessibility action (see `body`).
     private var removeButton: some View {
-        Circle()
-            .fill(.white)
-            .frame(width: ShelfRemoveButton.size, height: ShelfRemoveButton.size)
-            .overlay(
-                Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.black)
-            )
-            .shadow(color: .black.opacity(0.4), radius: 2)
-            .contentShape(Circle())
-            .onTapGesture { ShelfActionService.remove(item) }
-            .padding(ShelfRemoveButton.inset)
-            .help("Remove from Shelf")
-            .transition(.scale.combined(with: .opacity))
+        Button {
+            ShelfActionService.remove(item)
+        } label: {
+            Circle()
+                .fill(.white)
+                .frame(width: ShelfRemoveButton.size, height: ShelfRemoveButton.size)
+                .overlay(
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.black)
+                )
+                .shadow(color: .black.opacity(0.4), radius: 2)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Circle())
+        .padding(ShelfRemoveButton.inset)
+        .help("Remove from Shelf")
+        .accessibilityLabel("Remove from Shelf")
+        .transition(.scale.combined(with: .opacity))
     }
 
     private var backgroundView: some View {
