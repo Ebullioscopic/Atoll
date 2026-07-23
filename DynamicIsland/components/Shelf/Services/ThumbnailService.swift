@@ -58,6 +58,12 @@ actor ThumbnailService {
             if let thumbnail = thumbnail {
                 cache.setObject(thumbnail, forKey: cacheKey as NSString, cost: estimatedCost(of: thumbnail))
                 cacheKeys.insert(cacheKey)
+                // NSCache evicts silently, so `cacheKeys` would grow unbounded.
+                // Reconcile against the cache once it exceeds the count limit,
+                // dropping keys whose objects are already gone.
+                if cacheKeys.count > 256 {
+                    cacheKeys = cacheKeys.filter { cache.object(forKey: $0 as NSString) != nil }
+                }
             }
             pendingRequests[cacheKey] = nil
             return thumbnail
@@ -73,7 +79,10 @@ actor ThumbnailService {
     }
 
     func clearCache(for url: URL) {
-        let keysToRemove = cacheKeys.filter { $0.starts(with: url.path) }
+        // Keys are "<path>_<w>x<h>"; match on the "<path>_" boundary so that
+        // invalidating /tmp/a does not also evict /tmp/ab's thumbnails.
+        let prefix = "\(url.path)_"
+        let keysToRemove = cacheKeys.filter { $0.hasPrefix(prefix) }
         for key in keysToRemove {
             cache.removeObject(forKey: key as NSString)
             cacheKeys.remove(key)

@@ -98,12 +98,19 @@ struct JSONLUsageParser {
 
         while let chunk = try? fh.read(upToCount: chunkSize), !chunk.isEmpty {
             buffer.append(chunk)
-            while let newlineIndex = buffer.firstIndex(of: newline) {
-                let lineData = buffer.subdata(in: buffer.startIndex..<newlineIndex)
-                buffer.removeSubrange(buffer.startIndex...newlineIndex)
+            // Scan the whole chunk advancing a cursor, then trim the consumed
+            // prefix once. The previous per-line removeSubrange shifted the rest
+            // of the buffer for every newline → quadratic on newline-dense JSONL.
+            var searchStart = buffer.startIndex
+            while let newlineIndex = buffer[searchStart...].firstIndex(of: newline) {
+                let lineData = buffer[searchStart..<newlineIndex]
                 if !lineData.isEmpty, let line = String(data: lineData, encoding: .utf8) {
                     handler(line)
                 }
+                searchStart = buffer.index(after: newlineIndex)
+            }
+            if searchStart != buffer.startIndex {
+                buffer.removeSubrange(buffer.startIndex..<searchStart)
             }
         }
 

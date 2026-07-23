@@ -47,9 +47,12 @@ struct AppIcons {
     }
 
     func getIcon(bundleID: String) -> NSImage? {
+        // Use the POSIX path, not absoluteString ("file://…"): getIcon(file:)
+        // guards on fileExists(atPath:), which only accepts POSIX paths, so
+        // absoluteString made this lookup always return nil.
         guard let path = NSWorkspace.shared.urlForApplication(
             withBundleIdentifier: bundleID
-        )?.absoluteString
+        )?.path
         else { return nil }
 
         return getIcon(file: path)

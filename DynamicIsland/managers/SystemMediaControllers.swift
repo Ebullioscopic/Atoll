@@ -70,8 +70,6 @@ final class SystemVolumeController {
     private var listenersInstalled = false
     private var volumeElement: AudioObjectPropertyElement?
     private var muteElement: AudioObjectPropertyElement?
-    private var cachedVolumeElements: [AudioObjectPropertyElement]?
-    private var cachedMuteElements: [AudioObjectPropertyElement]?
     private var volumeListenerRegistrations: [VolumeListenerRegistration] = []
     private let silenceThreshold: Float = 0.001 // Treat very low values as mute requests.
 
@@ -375,10 +373,6 @@ final class SystemVolumeController {
     private func refreshPropertyElements() {
         volumeElement = resolveElement(selector: kAudioDevicePropertyVolumeScalar, deviceID: currentDeviceID)
         muteElement = resolveElement(selector: kAudioDevicePropertyMute, deviceID: currentDeviceID)
-        // Invalidate the probed element-list caches so they are recomputed for
-        // the (potentially new) current device on next access.
-        cachedVolumeElements = nil
-        cachedMuteElements = nil
     }
 
     private func resolveElement(selector: AudioObjectPropertySelector, deviceID: AudioDeviceID) -> AudioObjectPropertyElement? {
@@ -482,28 +476,21 @@ final class SystemVolumeController {
         return AudioObjectSetPropertyData(currentDeviceID, &address, 0, nil, size, &data)
     }
 
+    // Computed on each access rather than cached: these are called synchronously
+    // from the public API on arbitrary threads while `refreshPropertyElements()`
+    // runs on `callbackQueue`, so a shared cache would race. The probe is cheap.
     private func volumeElements() -> [AudioObjectPropertyElement] {
-        if let cached = cachedVolumeElements {
-            return cached
-        }
-        let elements = candidateElements.filter { element in
+        candidateElements.filter { element in
             var address = makeAddress(selector: kAudioDevicePropertyVolumeScalar, element: element)
             return propertyExists(deviceID: currentDeviceID, address: &address)
         }
-        cachedVolumeElements = elements
-        return elements
     }
 
     private func muteElements() -> [AudioObjectPropertyElement] {
-        if let cached = cachedMuteElements {
-            return cached
-        }
-        let elements = candidateElements.filter { element in
+        candidateElements.filter { element in
             var address = makeAddress(selector: kAudioDevicePropertyMute, element: element)
             return propertyExists(deviceID: currentDeviceID, address: &address)
         }
-        cachedMuteElements = elements
-        return elements
     }
 }
 
