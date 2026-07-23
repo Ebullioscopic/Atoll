@@ -45,28 +45,16 @@ struct AntigravityUsageProvider: UsageProvider {
         var snapshot = UsageSnapshot()
         snapshot.lastUpdated = now
 
-        // Try to find Antigravity credentials in Keychain
-        print("[Antigravity] Starting fetchSnapshot")
         let token = try await loadKeychainToken()
         guard let token else {
-            print("[Antigravity] No token found in Keychain")
             throw UsageError.notConfigured("Antigravity not signed in")
         }
-        print("[Antigravity] Token loaded from Keychain, accessToken: \(token.accessToken?.prefix(20) ?? "nil")..., length: \(token.accessToken?.count ?? 0)")
 
-        // Try language server first (running Antigravity app) - quick 3s attempt
-        print("[Antigravity] Trying language server...")
         if let lsSnapshot = try await fetchFromLanguageServer(now: now) {
-            print("[Antigravity] Language server returned data")
             return lsSnapshot
         }
-        print("[Antigravity] Language server returned nil, falling back to Cloud Code")
 
-        // Fall back to Cloud Code API (primary source) - direct call with timeout
-        print("[Antigravity] Trying Cloud Code API...")
-        let result = try await fetchFromCloudCode(token: token, now: now)
-        print("[Antigravity] Cloud Code API returned data")
-        return result
+        return try await fetchFromCloudCode(token: token, now: now)
     }
 
     // MARK: - Keychain
@@ -84,10 +72,8 @@ struct AntigravityUsageProvider: UsageProvider {
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        print("[Antigravity] Keychain query status: \(status)")
         guard status == errSecSuccess, let data = item as? Data,
               let string = String(data: data, encoding: .utf8) else {
-            print("[Antigravity] Keychain query failed: \(status)")
             return nil
         }
 
@@ -127,22 +113,15 @@ struct AntigravityUsageProvider: UsageProvider {
 
     // MARK: - Language Server
 
-private func fetchFromLanguageServer(now: Date) async throws -> UsageSnapshot? {
-        // Quick 3s attempt
-        print("[Antigravity] Starting language server discovery")
-        print("[Antigravity] Calling withTimeout...")
+    private func fetchFromLanguageServer(now: Date) async throws -> UsageSnapshot? {
         return try await withTimeout(seconds: 3) {
-            print("[Antigravity] Inside withTimeout, calling discoverLanguageServers...")
             let discoveries = try await discoverLanguageServers()
-            print("[Antigravity] Discovered \(discoveries.count) language servers")
 
             if discoveries.isEmpty {
-                print("[Antigravity] No language servers found, returning nil")
                 return nil
             }
 
             for discovery in discoveries {
-                // HTTPS first (LS serves self-signed cert), then HTTP, then extension port
                 var endpoints: [(scheme: String, port: Int)] = []
                 for port in discovery.ports {
                     endpoints.append(("https", port))
@@ -153,37 +132,26 @@ private func fetchFromLanguageServer(now: Date) async throws -> UsageSnapshot? {
                 }
 
                 for endpoint in endpoints {
-                    // Try RetrieveUserQuotaSummary first (authoritative - merged pools + weekly windows)
-                    print("[Antigravity] Trying LS \(endpoint.scheme)://127.0.0.1:\(endpoint.port) RetrieveUserQuotaSummary")
                     if let summary = try await callLS(scheme: endpoint.scheme, port: endpoint.port, csrf: discovery.csrf, method: "RetrieveUserQuotaSummary") {
                         if let snapshot = parseQuotaSummary(summary, now: now) {
-                            print("[Antigravity] RetrieveUserQuotaSummary succeeded")
                             return snapshot
                         }
                     }
 
-                    // Fall back to GetUserStatus
-                    print("[Antigravity] Trying LS \(endpoint.scheme)://127.0.0.1:\(endpoint.port) GetUserStatus")
                     if let status = try await callLS(scheme: endpoint.scheme, port: endpoint.port, csrf: discovery.csrf, method: "GetUserStatus") {
                         if let snapshot = parseUserStatus(status, now: now) {
-                            print("[Antigravity] GetUserStatus succeeded")
                             return snapshot
                         }
                     }
 
-                    // Fall back to GetCommandModelConfigs
-                    print("[Antigravity] Trying LS \(endpoint.scheme)://127.0.0.1:\(endpoint.port) GetCommandModelConfigs")
                     if let fallback = try await callLS(scheme: endpoint.scheme, port: endpoint.port, csrf: discovery.csrf, method: "GetCommandModelConfigs") {
                         if let snapshot = parseCommandModelConfigs(fallback, now: now) {
-                            print("[Antigravity] GetCommandModelConfigs succeeded")
                             return snapshot
                         }
                     }
                 }
             }
 
-            // No snapshot found
-            print("[Antigravity] No snapshot found from language servers")
             return nil
         }
     }
@@ -195,62 +163,60 @@ private func fetchFromLanguageServer(now: Date) async throws -> UsageSnapshot? {
     }
 
     private func discoverLanguageServers() async throws -> [LSDiscovery] {
-        print("[Antigravity] discoverLanguageServers: starting...")
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/bin/ps")
-        task.arguments = ["aux"]
+        return try await withCheckedThrowingContinuation { continuation in
+            Task.detached {
+                let task = Process()
+                task.executableURL = URL(fileURLWithPath: "/bin/ps")
+                task.arguments = ["aux"]
 
-        let pipe = Pipe()
-        task.standardOutput = pipe
+                let pipe = Pipe()
+                task.standardOutput = pipe
 
-        try task.run()
-        print("[Antigravity] discoverLanguageServers: waiting for ps aux to exit...")
-        
-        // Add timeout to waitUntilExit
-        let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 second timeout
-            print("[Antigravity] discoverLanguageServers: timeout, terminating process")
-            task.terminate()
-        }
-        
-        task.waitUntilExit()
-        timeoutTask.cancel()
-        print("[Antigravity] discoverLanguageServers: ps aux exited with status \(task.terminationStatus)")
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        print("[Antigravity] discoverLanguageServers: read \(data.count) bytes from ps aux")
-        guard let output = String(data: data, encoding: .utf8) else { 
-            print("[Antigravity] discoverLanguageServers: failed to decode output")
-            return [] 
-        }
-
-        var discoveries: [LSDiscovery] = []
-
-        for line in output.split(separator: "\n") {
-            let parts = line.split(separator: " ", omittingEmptySubsequences: false)
-            guard parts.count >= 11 else { continue }
-
-            let command = parts[10...].joined(separator: " ")
-
-            // Look for language_server with antigravity markers
-            if command.contains("language_server") && (command.contains("antigravity") || command.contains("antigravity-ide")) {
-                print("[Antigravity] Found antigravity language_server: \(command)")
-                if let discovery = parseLanguageServerCommand(command) {
-                    discoveries.append(discovery)
+                do {
+                    try task.run()
+                } catch {
+                    continuation.resume(throwing: error)
+                    return
                 }
-            }
 
-            // Also check for `agy` command
-            if command.contains("agy") && command.contains("language_server") {
-                print("[Antigravity] Found agy language_server: \(command)")
-                if let discovery = parseLanguageServerCommand(command) {
-                    discoveries.append(discovery)
+                let timeoutTask = Task {
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                    task.terminate()
                 }
+
+                task.waitUntilExit()
+                timeoutTask.cancel()
+
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                guard let output = String(data: data, encoding: .utf8) else {
+                    continuation.resume(returning: [])
+                    return
+                }
+
+                var discoveries: [LSDiscovery] = []
+
+                for line in output.split(separator: "\n") {
+                    let parts = line.split(separator: " ", omittingEmptySubsequences: false)
+                    guard parts.count >= 11 else { continue }
+
+                    let command = parts[10...].joined(separator: " ")
+
+                    if command.contains("language_server") && (command.contains("antigravity") || command.contains("antigravity-ide")) {
+                        if let discovery = parseLanguageServerCommand(String(command)) {
+                            discoveries.append(discovery)
+                        }
+                    }
+
+                    if command.contains("agy") && command.contains("language_server") {
+                        if let discovery = parseLanguageServerCommand(String(command)) {
+                            discoveries.append(discovery)
+                        }
+                    }
+                }
+
+                continuation.resume(returning: discoveries)
             }
         }
-
-        print("[Antigravity] discoverLanguageServers: returning \(discoveries.count) discoveries")
-        return discoveries
     }
 
     private func parseLanguageServerCommand(_ command: String) -> LSDiscovery? {
@@ -312,11 +278,11 @@ private func fetchFromLanguageServer(now: Date) async throws -> UsageSnapshot? {
 
         var pooled: [String: (fraction: Double, resetTime: Date?)] = [:]
 
-        let bucketMap: [String: (pool: String, window: String, gaugeLabel: String, modelLabel: String, periodMs: Int)] = [
-            "gemini-5h": ("gemini", "session", "Session", "5h", 5 * 60 * 60 * 1000),
-            "gemini-weekly": ("gemini", "weekly", "Weekly", "Weekly", 7 * 24 * 60 * 60 * 1000),
-            "3p-5h": ("claude", "session", "Session", "5h", 5 * 60 * 60 * 1000),
-            "3p-weekly": ("claude", "weekly", "Weekly", "Weekly", 7 * 24 * 60 * 60 * 1000)
+        let bucketMap: [String: (pool: String, window: String, label: String, periodMs: Int)] = [
+            "gemini-5h": ("gemini", "session", "Session", 5 * 60 * 60 * 1000),
+            "gemini-weekly": ("gemini", "weekly", "Weekly", 7 * 24 * 60 * 60 * 1000),
+            "3p-5h": ("claude", "session", "Session", 5 * 60 * 60 * 1000),
+            "3p-weekly": ("claude", "weekly", "Weekly", 7 * 24 * 60 * 60 * 1000)
         ]
 
         var models: [ModelUsage] = []
@@ -332,11 +298,10 @@ private func fetchFromLanguageServer(now: Date) async throws -> UsageSnapshot? {
                 let resetTime = (bucket["resetTime"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) }
                 pooled[id] = (fraction, resetTime)
 
-                // Create model entries for UI pool selector, store fraction in costUSD
                 let usedPct = (1 - max(0, min(1, fraction))) * 100
                 let limit = UsageLimit(used: usedPct, limit: 100, resetsAt: resetTime)
                 // Use hasUnpricedModel to encode pool: true = claude, false = gemini
-models.append(ModelUsage(model: spec.modelLabel, totals: UsageTotals(
+                models.append(ModelUsage(model: spec.label, totals: UsageTotals(
                     inputTokens: Int(usedPct), // Store used percentage here
                     outputTokens: 0,
                     costUSD: fraction, // Store fraction for cost
@@ -360,11 +325,11 @@ models.append(ModelUsage(model: spec.modelLabel, totals: UsageTotals(
         }
         if let entry = pooled["3p-5h"] {
             let usedPct = (1 - max(0, min(1, entry.fraction))) * 100
-            // Store Claude 5h in a way we can access it - use sessionLimit for now but we'll differentiate in UI
+            snapshot.sessionLimit = UsageLimit(used: usedPct, limit: 100, resetsAt: entry.resetTime)
         }
         if let entry = pooled["3p-weekly"] {
             let usedPct = (1 - max(0, min(1, entry.fraction))) * 100
-            // Store Claude Weekly
+            snapshot.weekLimit = UsageLimit(used: usedPct, limit: 100, resetsAt: entry.resetTime)
         }
 
         return snapshot
@@ -373,9 +338,6 @@ models.append(ModelUsage(model: spec.modelLabel, totals: UsageTotals(
     private func parseUserStatus(_ data: Data, now: Date) -> UsageSnapshot? {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let userStatus = obj["userStatus"] as? [String: Any] else { return nil }
-
-        let plan = (userStatus["userTier"] as? [String: Any])?["name"] as? String ??
-                   (userStatus["planStatus"] as? [String: Any])?["planInfo"].flatMap { ($0 as? [String: Any])?["planName"] as? String }
 
         var configs: [AntigravityModelConfig] = []
 
@@ -388,7 +350,7 @@ models.append(ModelUsage(model: spec.modelLabel, totals: UsageTotals(
             }
         }
 
-        return buildSnapshot(from: configs, plan: plan, now: now)
+        return buildSnapshot(from: configs, now: now)
     }
 
     private func parseCommandModelConfigs(_ data: Data, now: Date) -> UsageSnapshot? {
@@ -402,7 +364,7 @@ models.append(ModelUsage(model: spec.modelLabel, totals: UsageTotals(
             }
         }
 
-        return buildSnapshot(from: configs, plan: nil as String?, now: now)
+        return buildSnapshot(from: configs, now: now)
     }
 
     private func parseModelConfig(_ obj: [String: Any]) -> AntigravityModelConfig? {
@@ -420,8 +382,6 @@ models.append(ModelUsage(model: spec.modelLabel, totals: UsageTotals(
     // MARK: - Cloud Code API
 
     private func fetchFromCloudCode(token: AntigravityKeychainToken, now: Date) async throws -> UsageSnapshot {
-        // 15s overall timeout
-        print("[Antigravity] Starting Cloud Code API fetch")
         return try await withThrowingTaskGroup(of: UsageSnapshot.self) { group in
             group.addTask {
                 var snapshot = UsageSnapshot()
@@ -434,29 +394,19 @@ models.append(ModelUsage(model: spec.modelLabel, totals: UsageTotals(
 
                 // Try quota summary first (authoritative)
                 for baseURL in baseURLs {
-                    print("[Antigravity] Trying Cloud Code \(baseURL)/retrieveUserQuotaSummary")
                     if let data = try await self.cloudCodeCall(path: "/v1internal:retrieveUserQuotaSummary", baseURL: baseURL, token: token) {
-                        print("[Antigravity] retrieveUserQuotaSummary returned data")
                         if let parsed = self.parseQuotaSummary(data, now: now) {
-                            print("[Antigravity] retrieveUserQuotaSummary parsed successfully")
                             return parsed
                         }
-                    } else {
-                        print("[Antigravity] retrieveUserQuotaSummary returned nil for \(baseURL)")
                     }
                 }
 
                 // Fall back to fetchAvailableModels
                 for baseURL in baseURLs {
-                    print("[Antigravity] Trying Cloud Code \(baseURL)/fetchAvailableModels")
                     if let data = try await self.cloudCodeCall(path: "/v1internal:fetchAvailableModels", baseURL: baseURL, token: token) {
-                        print("[Antigravity] fetchAvailableModels returned data")
                         if let snapshot = self.parseCloudCodeModels(data, now: now) {
-                            print("[Antigravity] fetchAvailableModels parsed successfully")
                             return snapshot
                         }
-                    } else {
-                        print("[Antigravity] fetchAvailableModels returned nil for \(baseURL)")
                     }
                 }
 
@@ -468,25 +418,15 @@ models.append(ModelUsage(model: spec.modelLabel, totals: UsageTotals(
                 throw TimeoutError()
             }
 
-            do {
-                let result = try await group.next()!
-                group.cancelAll()
-                print("[Antigravity] Cloud Code API completed successfully")
-                return result
-            } catch is TimeoutError {
-                group.cancelAll()
-                print("[Antigravity] Cloud Code API timeout")
-                throw UsageError.notConfigured("Antigravity request timed out")
-            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
         }
     }
 
     private func cloudCodeCall(path: String, baseURL: String, token: AntigravityKeychainToken) async throws -> Data? {
         guard let accessToken = token.accessToken,
-              let url = URL(string: baseURL + path) else { 
-            print("[Antigravity] cloudCodeCall: missing token or invalid URL")
-            return nil 
-        }
+              let url = URL(string: baseURL + path) else { return nil }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -496,24 +436,16 @@ models.append(ModelUsage(model: spec.modelLabel, totals: UsageTotals(
         request.httpBody = "{}".data(using: .utf8)
         request.timeoutInterval = 8
 
-        print("[Antigravity] Calling \(path) at \(baseURL)")
         do {
             let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else { 
-                print("[Antigravity] Non-HTTP response")
-                return nil 
-            }
-            print("[Antigravity] HTTP \(http.statusCode) for \(path) at \(baseURL)")
+            guard let http = response as? HTTPURLResponse else { return nil }
             if http.statusCode == 401 || http.statusCode == 403 {
-                print("[Antigravity] Auth expired (401/403)")
                 throw UsageError.notConfigured("Antigravity auth expired")
             }
             if (200..<300).contains(http.statusCode) {
                 return data
             }
-            print("[Antigravity] Unexpected status \(http.statusCode), response: \(String(data: data, encoding: .utf8) ?? "nil")")
         } catch {
-            print("[Antigravity] Request error for \(path): \(error)")
         }
         return nil
     }
@@ -537,10 +469,10 @@ models.append(ModelUsage(model: spec.modelLabel, totals: UsageTotals(
             configs.append(AntigravityModelConfig(label: label, modelID: modelID, remainingFraction: remainingFraction, resetTime: resetTime))
         }
 
-        return buildSnapshot(from: configs, plan: nil as String?, now: now)
+        return buildSnapshot(from: configs, now: now)
     }
 
-    private func buildSnapshot(from configs: [AntigravityModelConfig], plan: String?, now: Date) -> UsageSnapshot {
+    private func buildSnapshot(from configs: [AntigravityModelConfig], now: Date) -> UsageSnapshot {
         var snapshot = UsageSnapshot()
         snapshot.lastUpdated = now
 
@@ -604,4 +536,3 @@ struct AntigravityModelConfig {
 }
 
 private struct TimeoutError: Error {}
-private struct NotFoundError: Error {}

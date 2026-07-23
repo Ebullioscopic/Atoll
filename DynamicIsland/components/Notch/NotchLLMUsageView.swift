@@ -95,11 +95,10 @@ struct NotchLLMUsageView: View {
     private func antigravitySuccess(_ snap: UsageSnapshot) -> some View {
         let isGemini = antigravityPool == .gemini
         
-        // For Antigravity, fraction is stored in costUSD
-        let geminiSession = snap.models.first { $0.model == "Gemini Session" }
-        let geminiWeekly = snap.models.first { $0.model == "Gemini Weekly" }
-        let claudeSession = snap.models.first { $0.model == "Claude Session" }
-        let claudeWeekly = snap.models.first { $0.model == "Claude Weekly" }
+        // Model identifiers are "Session" and "Weekly" for both pools
+        // Use hasUnpricedModel to distinguish pools: false=gemini, true=claude
+        let sessionModel = snap.models.first { $0.model == "Session" && $0.totals.hasUnpricedModel == (!isGemini) }
+        let weeklyModel = snap.models.first { $0.model == "Weekly" && $0.totals.hasUnpricedModel == (!isGemini) }
         
         // Helper to create UsageLimit from model
         func limitFromModel(_ model: ModelUsage?) -> UsageLimit? {
@@ -109,27 +108,18 @@ struct NotchLLMUsageView: View {
             return UsageLimit(used: usedPct, limit: 100, resetsAt: nil)
         }
         
-        let poolName = isGemini ? "Gemini" : "Claude"
-        
         return VStack(alignment: .leading, spacing: 6) {
-            if isGemini {
-                if let limit = snap.sessionLimit { quotaGauge("\(poolName) 5h", limit) }
-                if let limit = snap.weekLimit { quotaGauge("\(poolName) Weekly", limit) }
-            } else {
-                // For Claude, use the fraction stored in models
-                if let limit = limitFromModel(claudeSession) {
-                    quotaGauge("\(poolName) 5h", limit)
-                }
-                if let limit = limitFromModel(claudeWeekly) {
-                    quotaGauge("\(poolName) Weekly", limit)
-                }
-                if claudeSession == nil && claudeWeekly == nil {
-                    Text("No data for \(poolName) pool").font(.caption).foregroundStyle(.secondary)
-                }
+            // Use model data for both pools (more reliable than snap limits which get overwritten)
+            if let limit = limitFromModel(snap.models.first { $0.model == "Session" && $0.totals.hasUnpricedModel == (!isGemini) }) {
+                quotaGauge("Session", limit)
             }
+            if let limit = limitFromModel(snap.models.first { $0.model == "Weekly" && $0.totals.hasUnpricedModel == (!isGemini) }) {
+                quotaGauge("Weekly", limit)
+            }
+            
             // Show model breakdown for the selected pool
             let poolModels = snap.models.filter { model in
-                let isGeminiModel = !model.totals.hasUnpricedModel // false = gemini, true = claude
+                let isGeminiModel = !model.totals.hasUnpricedModel
                 return isGemini == isGeminiModel
             }
             if !poolModels.isEmpty {
