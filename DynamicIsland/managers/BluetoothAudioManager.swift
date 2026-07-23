@@ -31,7 +31,13 @@ class BluetoothAudioManager: ObservableObject {
     
     // MARK: - Published Properties
     @Published var lastConnectedDevice: BluetoothAudioDevice?
-    @Published var connectedDevices: [BluetoothAudioDevice] = []
+    @Published var connectedDevices: [BluetoothAudioDevice] = [] {
+        didSet {
+            // Tie the AirPods listening-mode log stream to device lifecycle:
+            // only keep it running while an AirPods device is actually connected.
+            reconcileListeningModeLogObserverForConnectedDevices()
+        }
+    }
     @Published var isBluetoothAudioConnected: Bool = false
     @Published private(set) var activeListeningModeEvent: AirPodsListeningModeEvent?
     
@@ -190,32 +196,56 @@ class BluetoothAudioManager: ObservableObject {
             }
         }
 
-        if Defaults[.showAirPodsListeningModeChanges] {
-            listeningModeLogObserver.start()
-        }
+        reconcileListeningModeLogObserverForConnectedDevices()
 
         Defaults.publisher(.showAirPodsListeningModeChanges, options: [])
-            .sink { [weak self] change in
-                if change.newValue {
-                    self?.listeningModeLogObserver.start()
-                } else {
-                    self?.listeningModeLogObserver.stop()
-                }
+            .sink { [weak self] _ in
+                self?.reconcileListeningModeLogObserverForConnectedDevices()
             }
             .store(in: &cancellables)
     }
+
+    /// Starts the AirPods listening-mode log stream only when the feature is
+    /// enabled AND at least one AirPods device is connected; stops it otherwise.
+    /// Idempotent (start/stop are internally guarded), so it is safe to call
+    /// from `connectedDevices.didSet` and the Defaults publisher.
+    private func reconcileListeningModeLogObserverForConnectedDevices() {
+        guard Defaults[.showAirPodsListeningModeChanges] else {
+            listeningModeLogObserver.stop()
+            return
+        }
+
+        if connectedDevices.contains(where: { $0.deviceType.isAirPods }) {
+            listeningModeLogObserver.start()
+        } else {
+            listeningModeLogObserver.stop()
+        }
+    }
     
-    /// Starts polling for device connection changes (fallback mechanism)
+    /// Starts a low-frequency watchdog poll for device connection changes.
+    /// The event-driven DistributedNotificationCenter observers are the primary
+    /// source of truth; this poll is only a safety net, so a coarse 30s interval
+    /// (with tolerance for coalescing/power efficiency) is sufficient.
     private func startPollingForChanges() {
-        print("🎧 [BluetoothAudioManager] Starting polling timer (3s interval)...")
-        
-        pollingTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+        print("🎧 [BluetoothAudioManager] Starting fallback watchdog timer (30s interval)...")
+
+        let timer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
             self?.checkForDeviceChanges()
         }
+        timer.tolerance = 5.0
+        pollingTimer = timer
     }
     
     /// Checks for device connection/disconnection changes
     private func checkForDeviceChanges() {
+        // Perf: skip the fallback watchdog scan while the display is asleep.
+        // Event-driven observers still deliver connect/disconnect while awake,
+        // and a wake will resume this poll. (Behavioral stand-in for
+        // ActivityGate.shared.shouldSuspendBackgroundWork, which is not present
+        // on this branch — swap to that once available.)
+        guard CGDisplayIsAsleep(CGMainDisplayID()) == 0 else { return }
+
+        // Item 3: skip the scan entirely when Bluetooth is powered off.
         // Check if Bluetooth is powered on
         guard IOBluetoothHostController.default()?.powerState == kBluetoothHCIPowerStateON else {
             // Bluetooth is off - clear connected devices if any
