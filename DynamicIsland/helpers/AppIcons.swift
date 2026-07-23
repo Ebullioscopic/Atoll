@@ -29,11 +29,21 @@ import Defaults
 private let appIconPathCache = NSCache<NSString, NSImage>()
 
 private func cachedIcon(forFile path: String) -> NSImage {
-    if let cached = appIconPathCache.object(forKey: path as NSString) {
+    // Fold the file's modification date into the cache key. Keying on the path
+    // alone would return a stale icon forever if the app at that path is updated
+    // or replaced while this process keeps running (the key never changes, so the
+    // cache never re-resolves). When the bundle changes, its mtime changes, the
+    // key changes, and we resolve a fresh icon. stat() is far cheaper than
+    // icon(forFile:), so the cache still saves the expensive NSWorkspace lookup.
+    let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+    let modStamp = (attrs?[.modificationDate] as? Date)?.timeIntervalSinceReferenceDate ?? 0
+    let key = "\(path)@\(modStamp)" as NSString
+
+    if let cached = appIconPathCache.object(forKey: key) {
         return cached
     }
     let icon = NSWorkspace.shared.icon(forFile: path)
-    appIconPathCache.setObject(icon, forKey: path as NSString)
+    appIconPathCache.setObject(icon, forKey: key)
     return icon
 }
 
