@@ -1,21 +1,36 @@
 import Foundation
 import Darwin
 
+public enum ConversationTurnStatus: Equatable, Sendable {
+    case processing
+    case idle
+}
+
 /// A delta emitted by `JSONLTailer` whenever the watched transcript grows.
 public struct ConversationTailDelta: Equatable, Sendable {
     public let sessionId: String
     public let lastUserPrompt: String?
     public let lastAssistantMessage: String?
+    public let turnStatus: ConversationTurnStatus?
+    public let hasActivity: Bool
 
-    public init(sessionId: String, lastUserPrompt: String?, lastAssistantMessage: String?) {
+    public init(
+        sessionId: String,
+        lastUserPrompt: String?,
+        lastAssistantMessage: String?,
+        turnStatus: ConversationTurnStatus? = nil,
+        hasActivity: Bool = false
+    ) {
         self.sessionId = sessionId
         self.lastUserPrompt = lastUserPrompt
         self.lastAssistantMessage = lastAssistantMessage
+        self.turnStatus = turnStatus
+        self.hasActivity = hasActivity
     }
 
     /// A delta only carries signal when at least one field is non-nil.
     public var isEmpty: Bool {
-        lastUserPrompt == nil && lastAssistantMessage == nil
+        lastUserPrompt == nil && lastAssistantMessage == nil && turnStatus == nil && !hasActivity
     }
 }
 
@@ -187,7 +202,9 @@ public final class JSONLTailer: @unchecked Sendable {
             let delta = ConversationTailDelta(
                 sessionId: watch.sessionId,
                 lastUserPrompt: scan.delta.lastUserPrompt,
-                lastAssistantMessage: scan.delta.lastAssistantMessage
+                lastAssistantMessage: scan.delta.lastAssistantMessage,
+                turnStatus: scan.delta.turnStatus,
+                hasActivity: scan.delta.hasActivity
             )
             onDelta(delta)
         }
@@ -220,7 +237,11 @@ public final class JSONLTailer: @unchecked Sendable {
         public struct Delta: Equatable {
             public var lastUserPrompt: String?
             public var lastAssistantMessage: String?
-            public var isEmpty: Bool { lastUserPrompt == nil && lastAssistantMessage == nil }
+            public var turnStatus: ConversationTurnStatus?
+            public var hasActivity = false
+            public var isEmpty: Bool {
+                lastUserPrompt == nil && lastAssistantMessage == nil && turnStatus == nil && !hasActivity
+            }
         }
         public let delta: Delta
         public let trailingFragment: Data
@@ -248,6 +269,11 @@ public final class JSONLTailer: @unchecked Sendable {
 
         let fragment = Data(data[lineStart..<data.endIndex])
         return ScanResult(delta: delta, trailingFragment: fragment)
+    }
+
+    /// Return the most recent Codex turn state in a transcript blob.
+    public static func latestTurnStatus(in data: Data) -> ConversationTurnStatus? {
+        scanLines(data).delta.turnStatus
     }
 
     private static func apply(line: Data.SubSequence, into delta: inout ScanResult.Delta) {
@@ -285,6 +311,18 @@ public final class JSONLTailer: @unchecked Sendable {
                     delta.lastAssistantMessage = trimmed
                 }
             }
+        case "event_msg":
+            delta.hasActivity = true
+            guard let payload = json["payload"] as? [String: Any],
+                  let eventType = payload["type"] as? String else { return }
+            switch eventType {
+            case "task_started":
+                delta.turnStatus = .processing
+            case "task_complete", "turn_aborted", "turn_failed":
+                delta.turnStatus = .idle
+            default:
+                break
+            }
         default:
             break
         }
@@ -296,6 +334,7 @@ public final class JSONLTailer: @unchecked Sendable {
     enum QuickTypeKind: Equatable {
         case user
         case assistant
+        case codexEvent
         case irrelevant
     }
 
@@ -348,6 +387,10 @@ public final class JSONLTailer: @unchecked Sendable {
                             if hasExactValue(ptr, at: valueStart, total: total, expect: plannerResponseBytes) {
                                 return .assistant
                             }
+                        case 0x65:  // 'e'
+                            if hasExactValue(ptr, at: valueStart, total: total, expect: eventMsgBytes) {
+                                return .codexEvent
+                            }
                         default:
                             break
                         }
@@ -370,6 +413,8 @@ public final class JSONLTailer: @unchecked Sendable {
     private static let assistantBytes: [UInt8] = Array(#"assistant""#.utf8)
     private static let userInputBytes: [UInt8] = Array(#"USER_INPUT""#.utf8)
     private static let plannerResponseBytes: [UInt8] = Array(#"PLANNER_RESPONSE""#.utf8)
+
+    private static let eventMsgBytes: [UInt8] = Array(#"event_msg""#.utf8)
 
     private static func hasExactValue(
         _ ptr: UnsafePointer<UInt8>,

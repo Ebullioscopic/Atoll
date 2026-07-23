@@ -23,7 +23,53 @@ extension AppState {
             sessions[sessionId] = session
         }
 
+        if sessions[sessionId]?.source == "codex",
+           let turnStatus = Self.latestCodexTurnStatus(path: path),
+           var session = sessions[sessionId] {
+            switch turnStatus {
+            case .processing:
+                session.status = .processing
+                session.interrupted = false
+                session.taskRoundEnded = false
+            case .idle:
+                session.status = .idle
+                session.currentTool = nil
+                session.toolDescription = nil
+            }
+            if let modifiedAt = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date {
+                session.lastActivity = modifiedAt
+            }
+            sessions[sessionId] = session
+        }
+
         transcriptTailer.attach(sessionId: sessionId, filePath: path)
+    }
+
+    private nonisolated static func latestCodexTurnStatus(path: String) -> ConversationTurnStatus? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { handle.closeFile() }
+
+        // A long Codex turn can place its task_started event well before the
+        // final 128 KB after emitting large reasoning/tool rows. Scan in chunks
+        // so startup state recovery remains bounded in memory without missing
+        // that event.
+        handle.seek(toFileOffset: 0)
+        let chunkSize = 64 * 1024
+        var pendingFragment = Data()
+        var latestStatus: ConversationTurnStatus?
+
+        while true {
+            let chunk = handle.readData(ofLength: chunkSize)
+            if chunk.isEmpty { break }
+
+            let result = JSONLTailer.scanLines(pendingFragment + chunk)
+            pendingFragment = result.trailingFragment
+            if let turnStatus = result.delta.turnStatus {
+                latestStatus = turnStatus
+            }
+        }
+
+        return latestStatus
     }
 
     /// Stop watching a session's transcript. Called when the session is removed or
@@ -37,6 +83,28 @@ extension AppState {
     func applyTranscriptDelta(_ delta: ConversationTailDelta) {
         guard var session = sessions[delta.sessionId] else { return }
         var mutated = false
+
+        if delta.hasActivity {
+            session.lastActivity = Date()
+            mutated = true
+        }
+
+        if let turnStatus = delta.turnStatus {
+            switch turnStatus {
+            case .processing:
+                session.status = .processing
+                session.interrupted = false
+                session.taskRoundEnded = false
+            case .idle:
+                session.status = .idle
+                session.currentTool = nil
+                session.toolDescription = nil
+            }
+            // A status-only event is still activity. This matters for a long Codex
+            // turn whose transcript has not emitted a message yet.
+            session.lastActivity = Date()
+            mutated = true
+        }
 
         if let prompt = delta.lastUserPrompt, session.lastUserPrompt != prompt {
             session.lastUserPrompt = prompt

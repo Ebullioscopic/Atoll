@@ -1071,6 +1071,17 @@ final class AppState {
             return
         }
 
+        let source = event.rawJSON["_source"] as? String
+        let hasTranscriptPath = (event.rawJSON["transcript_path"] as? String)
+            .map { !$0.isEmpty } ?? false
+        if Self.isCodexPlaceholderHook(
+            source: source,
+            cwd: event.rawJSON["cwd"] as? String,
+            hasTranscriptPath: hasTranscriptPath
+        ) {
+            return
+        }
+
         let sessionId = event.sessionId ?? "default"
 
         // Skip Codex APP internal sessions (title generation, etc.) — they have no transcript
@@ -2436,6 +2447,10 @@ final class AppState {
                 if backfillSessionMessages(sessionId: info.sessionId, from: info) {
                     didMutate = true
                 }
+                if sessions[info.sessionId]?.cwd != info.cwd {
+                    sessions[info.sessionId]?.cwd = info.cwd
+                    didMutate = true
+                }
                 if let path = info.transcriptPath, sessions[info.sessionId]?.transcriptPath != path {
                     sessions[info.sessionId]?.transcriptPath = path
                     didMutate = true
@@ -2487,6 +2502,10 @@ final class AppState {
                     }
                 }
                 if backfillSessionMessages(sessionId: existingKey, from: info) {
+                    didMutate = true
+                }
+                if sessions[existingKey]?.cwd != info.cwd {
+                    sessions[existingKey]?.cwd = info.cwd
                     didMutate = true
                 }
                 if let path = info.transcriptPath, sessions[existingKey]?.transcriptPath != path {
@@ -4118,6 +4137,49 @@ final class AppState {
 
     /// Find running Codex processes.
     /// Checks both executable path (Desktop app) and command-line args (npm/Homebrew: node script).
+    nonisolated static func isCodexExecutablePath(_ path: String) -> Bool {
+        let executableURL = URL(fileURLWithPath: path).standardizedFileURL
+        let lowerPath = executableURL.path.lowercased()
+        let resourceSuffix = "/contents/resources/codex"
+        guard lowerPath.hasSuffix(resourceSuffix) else { return false }
+
+        // Since Codex was folded into ChatGPT Desktop, the same com.openai.codex
+        // bundle can now be installed as ChatGPT.app instead of Codex.app. Read
+        // the bundle identifier first so future app renames continue to work.
+        let appURL = executableURL
+            .deletingLastPathComponent() // Resources
+            .deletingLastPathComponent() // Contents
+            .deletingLastPathComponent() // *.app
+        if Bundle(url: appURL)?.bundleIdentifier == AppState.codexAppBundleId {
+            return true
+        }
+
+        // Keep the legacy path check for synthetic/test bundles without an
+        // Info.plist and for older installations whose bundle cannot be read.
+        let appName = appURL.deletingPathExtension().lastPathComponent.lowercased()
+        return appName == "codex" || appName == "chatgpt"
+    }
+
+    /// Codex Desktop's shared app-server is launched with `/` as its cwd. Its
+    /// rollout metadata contains the project cwd, so desktop discovery must
+    /// use that value instead of comparing every transcript to `/`.
+    nonisolated static func codexDiscoveryUsesTranscriptCwd(processCwd: String?) -> Bool {
+        guard let processCwd, !processCwd.isEmpty else { return true }
+        return processCwd == "/"
+    }
+
+    /// Codex Desktop currently invokes some hooks without a payload, or with
+    /// the shared app-server's root cwd. Those events contain no session data
+    /// and would overwrite a session discovered from its rollout transcript.
+    nonisolated static func isCodexPlaceholderHook(
+        source: String?,
+        cwd: String?,
+        hasTranscriptPath: Bool
+    ) -> Bool {
+        guard source?.lowercased() == "codex", !hasTranscriptPath else { return false }
+        return cwd == nil || cwd?.trimmingCharacters(in: .whitespacesAndNewlines) == "/"
+    }
+
     private nonisolated static func findCodexPids(candidatePids: [pid_t]? = nil) -> [pid_t] {
         var codexPids: [pid_t] = []
 
@@ -4125,8 +4187,9 @@ final class AppState {
             guard let path = executablePath(for: pid) else { continue }
             let pathLower = path.lowercased()
 
-            // Match 1: Codex Desktop app (native binary)
-            if pathLower.contains("codex.app/contents/") && pathLower.hasSuffix("/codex") {
+            // Match 1: Codex Desktop app (native binary). The executable may
+            // live under Codex.app or ChatGPT.app depending on the release.
+            if isCodexExecutablePath(path) {
                 codexPids.append(pid)
                 continue
             }
@@ -4191,50 +4254,66 @@ final class AppState {
         var seenSessionIds: Set<String> = []
 
         for pid in codexPids {
-            guard let cwd = getCwd(for: pid), !cwd.isEmpty, !isSubagentWorktree(cwd) else {
-                // getCwd failed
+            let processCwd = getCwd(for: pid)
+            let useTranscriptCwd = codexDiscoveryUsesTranscriptCwd(processCwd: processCwd)
+            if !useTranscriptCwd,
+               let processCwd,
+               isSubagentWorktree(processCwd) {
                 continue
             }
-            // pid found
+
             let processStart = getProcessStartTime(pid)
 
-            // Codex stores sessions in date-based dirs: ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
-            // Scan recent directories for matching session files
-            guard let bestFile = findRecentCodexSession(base: sessionsBase, cwd: cwd, after: processStart, fm: fm) else {
-                // no session file found
-                continue
+            // Codex stores sessions in date-based dirs: ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl.
+            // A terminal process maps to one cwd; the shared Desktop app-server
+            // may own several sessions, so inspect all fresh rollouts instead.
+            let files: [String]
+            if useTranscriptCwd {
+                files = findRecentCodexSessions(base: sessionsBase, after: processStart, fm: fm)
+            } else if let processCwd,
+                      let bestFile = findRecentCodexSession(
+                        base: sessionsBase,
+                        cwd: processCwd,
+                        after: processStart,
+                        fm: fm
+                      ) {
+                files = [bestFile]
+            } else {
+                files = []
             }
 
-            // Extract session ID from filename: rollout-{date}-{uuid}.jsonl
-            let fileName = (bestFile as NSString).lastPathComponent
-            let sessionId = extractCodexSessionId(from: fileName)
-            guard !sessionId.isEmpty, !seenSessionIds.contains(sessionId) else { continue }
-            seenSessionIds.insert(sessionId)
+            for file in files {
+                let fileName = (file as NSString).lastPathComponent
+                let sessionId = extractCodexSessionId(from: fileName)
+                guard !sessionId.isEmpty, !seenSessionIds.contains(sessionId) else { continue }
+                seenSessionIds.insert(sessionId)
 
-            let modifiedAt = (try? fm.attributesOfItem(atPath: bestFile))?[.modificationDate] as? Date ?? Date()
+                let modifiedAt = (try? fm.attributesOfItem(atPath: file))?[.modificationDate] as? Date ?? Date()
+                let codexFreshnessLimit: TimeInterval = processStart != nil ? -300 : -30
+                if modifiedAt.timeIntervalSinceNow < codexFreshnessLimit { continue }
 
-            // Skip stale transcripts: tighter window when processStart is unknown
-            let codexFreshnessLimit: TimeInterval = processStart != nil ? -300 : -30
-            if modifiedAt.timeIntervalSinceNow < codexFreshnessLimit { continue }
+                let sessionCwd = codexSessionCwd(path: file) ?? processCwd
+                guard let sessionCwd, !sessionCwd.isEmpty, !isSubagentWorktree(sessionCwd) else { continue }
 
-            let (model, messages) = readRecentFromCodexTranscript(path: bestFile)
-            let subagentMetadata = codexSubagentMetadata(inTranscriptPath: bestFile)
+                let (model, messages) = readRecentFromCodexTranscript(path: file)
+                let subagentMetadata = codexSubagentMetadata(inTranscriptPath: file)
 
-            results.append(DiscoveredSession(
-                sessionId: sessionId,
-                cwd: cwd,
-                tty: nil,
-                model: model,
-                pid: pid,
-                modifiedAt: modifiedAt,
-                recentMessages: messages,
-                source: "codex",
-                transcriptPath: bestFile,
-                parentSessionId: subagentMetadata?.parentThreadId,
-                subagentStatus: codexThreadSpawnStatus(childThreadId: sessionId),
-                agentType: subagentMetadata?.agentType,
-                agentNickname: subagentMetadata?.agentNickname
-            ))
+                results.append(DiscoveredSession(
+                    sessionId: sessionId,
+                    cwd: sessionCwd,
+                    tty: nil,
+                    model: model,
+                    pid: pid,
+                    modifiedAt: modifiedAt,
+                    recentMessages: messages,
+                    source: "codex",
+                    transcriptPath: file,
+                    parentSessionId: subagentMetadata?.parentThreadId,
+                    subagentStatus: codexThreadSpawnStatus(childThreadId: sessionId),
+                    agentType: subagentMetadata?.agentType,
+                    agentNickname: subagentMetadata?.agentNickname
+                ))
+            }
         }
         return results
     }
@@ -4374,6 +4453,11 @@ final class AppState {
     /// Find the most recent Codex session file matching a CWD
     /// Scans back up to 7 days to cover long-running sessions that span day boundaries
     private nonisolated static func findRecentCodexSession(base: String, cwd: String, after: Date?, fm: FileManager) -> String? {
+        findRecentCodexSessions(base: base, after: after, fm: fm)
+            .first(where: { codexSessionMatchesCwd(path: $0, cwd: cwd) })
+    }
+
+    private nonisolated static func findRecentCodexSessions(base: String, after: Date?, fm: FileManager) -> [String] {
         let cal = Calendar.current
         let now = Date()
         var dirs: [String] = []
@@ -4387,11 +4471,12 @@ final class AppState {
                 dirs.append(dir)
             }
         }
-        guard !dirs.isEmpty else { return nil }
-        return scanCodexDir(dirs: dirs, cwd: cwd, after: after, fm: fm)
+        guard !dirs.isEmpty else { return [] }
+        return scanCodexDir(dirs: dirs, after: after, fm: fm)
     }
 
-    private nonisolated static func scanCodexDir(dirs: [String], cwd: String, after: Date?, fm: FileManager) -> String? {
+    private nonisolated static func scanCodexDir(dirs: [String], after: Date?, fm: FileManager) -> [String] {
+        var results: [String] = []
         for dir in dirs {
             guard let files = try? fm.contentsOfDirectory(atPath: dir) else { continue }
             // Sort descending to check newest first
@@ -4405,26 +4490,24 @@ final class AppState {
                    modified < start.addingTimeInterval(-10) {
                     continue
                 }
-                if codexSessionMatchesCwd(path: fullPath, cwd: cwd) {
-                    return fullPath
-                }
+                results.append(fullPath)
             }
         }
-        return nil
+        return results
     }
 
     /// Check if a Codex session file's CWD matches the target
     private nonisolated static func codexSessionMatchesCwd(path: String, cwd: String) -> Bool {
-        guard let handle = FileHandle(forReadingAtPath: path) else { return false }
-        defer { handle.closeFile() }
-        let data = handle.readData(ofLength: 4096) // First line is enough
-        guard let text = String(data: data, encoding: .utf8),
-              let firstLine = text.components(separatedBy: "\n").first,
+        codexSessionCwd(path: path) == cwd
+    }
+
+    nonisolated static func codexSessionCwd(path: String) -> String? {
+        guard let firstLine = readFirstLine(path: path),
               let lineData = firstLine.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
               let payload = json["payload"] as? [String: Any],
-              let sessionCwd = payload["cwd"] as? String else { return false }
-        return sessionCwd == cwd
+              let sessionCwd = payload["cwd"] as? String else { return nil }
+        return sessionCwd
     }
 
     /// Extract session ID from Codex filename: rollout-2026-04-04T20-54-48-{uuid}.jsonl

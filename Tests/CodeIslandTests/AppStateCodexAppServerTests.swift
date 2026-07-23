@@ -4,6 +4,69 @@ import XCTest
 
 @MainActor
 final class AppStateCodexAppServerTests: XCTestCase {
+    func testCodexExecutablePathRecognizesChatGPTDesktopBundle() {
+        XCTAssertTrue(AppState.isCodexExecutablePath(
+            "/Applications/ChatGPT.app/Contents/Resources/codex"
+        ))
+    }
+
+    func testCodexExecutablePathRejectsUnrelatedResourceBinary() {
+        XCTAssertFalse(AppState.isCodexExecutablePath(
+            "/Applications/OtherAgent.app/Contents/Resources/codex"
+        ))
+    }
+
+    func testCodexDiscoveryUsesTranscriptCwdForDesktopProcess() {
+        XCTAssertTrue(AppState.codexDiscoveryUsesTranscriptCwd(processCwd: nil))
+        XCTAssertTrue(AppState.codexDiscoveryUsesTranscriptCwd(processCwd: "/"))
+        XCTAssertFalse(AppState.codexDiscoveryUsesTranscriptCwd(
+            processCwd: "/Users/haoo/Documents/project"
+        ))
+    }
+
+    func testCodexPlaceholderHookIsIgnoredButProjectHookIsKept() {
+        XCTAssertTrue(AppState.isCodexPlaceholderHook(
+            source: "codex",
+            cwd: "/",
+            hasTranscriptPath: false
+        ))
+        XCTAssertTrue(AppState.isCodexPlaceholderHook(
+            source: "codex",
+            cwd: nil,
+            hasTranscriptPath: false
+        ))
+        XCTAssertFalse(AppState.isCodexPlaceholderHook(
+            source: "codex",
+            cwd: "/Users/haoo/Documents/project",
+            hasTranscriptPath: false
+        ))
+        XCTAssertFalse(AppState.isCodexPlaceholderHook(
+            source: "codex",
+            cwd: "/",
+            hasTranscriptPath: true
+        ))
+    }
+
+    func testCodexTranscriptCwdReadsLargeSessionMetaLine() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codeisland-codex-meta-(UUID().uuidString).jsonl")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let payload: [String: Any] = [
+            "cwd": "/Users/haoo/Documents/project",
+            "instructions": String(repeating: "x", count: 10_000),
+        ]
+        let object: [String: Any] = ["type": "session_meta", "payload": payload]
+        var data = try JSONSerialization.data(withJSONObject: object)
+        data.append(0x0A)
+        try data.write(to: url)
+
+        XCTAssertEqual(
+            AppState.codexSessionCwd(path: url.path),
+            "/Users/haoo/Documents/project"
+        )
+    }
+
     func testCodexAppServerExecutablePrefersRunningBundlePath() throws {
         let fm = FileManager.default
         let tempDir = fm.temporaryDirectory.appendingPathComponent("codeisland-codex-app-\(UUID().uuidString)")

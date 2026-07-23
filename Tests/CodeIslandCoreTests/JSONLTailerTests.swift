@@ -104,6 +104,43 @@ final class JSONLTailerTests: XCTestCase {
         XCTAssertNil(result.delta.lastUserPrompt)
     }
 
+    func testScanLinesExtractsCodexTaskStartedAsProcessing() {
+        let line = #"{"type":"event_msg","payload":{"type":"task_started","turn_id":"turn-1"}}"#
+        let result = JSONLTailer.scanLines(Data((line + "\n").utf8))
+
+        XCTAssertEqual(result.delta.turnStatus, .processing)
+        XCTAssertFalse(result.delta.isEmpty)
+    }
+
+    func testScanLinesExtractsCodexTerminalTurnEventsAsIdle() {
+        let lines = [
+            #"{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}"#,
+            #"{"type":"event_msg","payload":{"type":"turn_aborted","reason":"interrupted"}}"#,
+            #"{"type":"event_msg","payload":{"type":"turn_failed","reason":"tool_error"}}"#
+        ].joined(separator: "\n")
+        let result = JSONLTailer.scanLines(Data((lines + "\n").utf8))
+
+        XCTAssertEqual(result.delta.turnStatus, .idle)
+        XCTAssertFalse(result.delta.isEmpty)
+    }
+
+    func testLatestTurnStatusUsesMostRecentCodexTurnEvent() {
+        let lines = [
+            #"{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}"#,
+            #"{"type":"event_msg","payload":{"type":"task_started","turn_id":"turn-2"}}"#
+        ].joined(separator: "\n")
+
+        XCTAssertEqual(JSONLTailer.latestTurnStatus(in: Data((lines + "\n").utf8)), .processing)
+    }
+
+    func testScanLinesTreatsCodexEventMessagesAsActivity() {
+        let line = #"{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{}}}}"#
+        let result = JSONLTailer.scanLines(Data((line + "\n").utf8))
+
+        XCTAssertTrue(result.delta.hasActivity)
+        XCTAssertFalse(result.delta.isEmpty)
+    }
+
     // MARK: - extractText
 
     func testExtractTextFromPlainString() {
