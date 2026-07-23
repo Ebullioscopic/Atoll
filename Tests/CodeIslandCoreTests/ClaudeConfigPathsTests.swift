@@ -42,6 +42,16 @@ final class ClaudeConfigPathsTests: XCTestCase {
         XCTAssertEqual(result, "/Users/tester/.config/claude-code")
     }
 
+    /// Both XDG spellings exist in the wild; ~/.config/claude (the ccusage-style
+    /// default) is probed first and wins when both are populated.
+    func testProbesConfigClaudeSpellingFirst() {
+        let result = ClaudeConfigPaths.resolve(
+            preference: nil, environment: nil, homeDir: home,
+            directoryExists: { $0 == "/Users/tester/.config/claude/projects"
+                       || $0 == "/Users/tester/.config/claude-code/projects" })
+        XCTAssertEqual(result, "/Users/tester/.config/claude")
+    }
+
     /// An empty ~/.config/claude-code (created by some other tool) must not shadow
     /// a real ~/.claude.
     func testEmptyXDGDirectoryDoesNotShadowDotClaude() {

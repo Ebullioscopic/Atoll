@@ -318,6 +318,8 @@ public final class JSONLTailer: @unchecked Sendable {
             switch eventType {
             case "task_started":
                 delta.turnStatus = .processing
+            // "turn_failed" is not in today's codex EventMsg enum — kept as a
+            // forward-compatible guess at the obvious name for a failed turn.
             case "task_complete", "turn_aborted", "turn_failed":
                 delta.turnStatus = .idle
             default:

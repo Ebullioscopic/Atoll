@@ -2815,6 +2815,7 @@ private let cliIconFiles: [String: String] = [
     "trae": "trae",
     "traecn": "trae",
     "traecli": "trae",
+    "traecli-next": "trae",
     "copilot": "copilot",
     "qoder": "qoder",
     "qoder-cli": "qoder",

@@ -49,7 +49,7 @@ final class AppStateCodexAppServerTests: XCTestCase {
 
     func testCodexTranscriptCwdReadsLargeSessionMetaLine() throws {
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("codeisland-codex-meta-(UUID().uuidString).jsonl")
+            .appendingPathComponent("codeisland-codex-meta-\(UUID().uuidString).jsonl")
         defer { try? FileManager.default.removeItem(at: url) }
 
         let payload: [String: Any] = [

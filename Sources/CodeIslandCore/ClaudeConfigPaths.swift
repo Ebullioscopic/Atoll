@@ -12,7 +12,7 @@ import Foundation
 ///   1. `claude_config_dir` user preference (Settings → set explicitly)
 ///   2. `$CLAUDE_CONFIG_DIR` (present when launched from a shell)
 ///   3. `~/.claude`, when populated — Claude Code's own default must not be shadowed
-///   4. `~/.config/claude-code`, when populated
+///   4. `~/.config/claude` then `~/.config/claude-code`, when populated
 ///   5. `~/.claude`
 ///
 /// Rungs 3–4 test for `projects/` specifically; see `isLiveConfigDir`.
@@ -107,8 +107,11 @@ public enum ClaudeConfigPaths {
         let dotClaude = homeDir + "/.claude"
         if isLiveConfigDir(dotClaude, directoryExists: directoryExists) { return dotClaude }
 
-        let xdg = homeDir + "/.config/claude-code"
-        if isLiveConfigDir(xdg, directoryExists: directoryExists) { return xdg }
+        // Both spellings exist in the wild: ccusage & co. default to
+        // ~/.config/claude, older setups used ~/.config/claude-code.
+        for xdg in [homeDir + "/.config/claude", homeDir + "/.config/claude-code"] {
+            if isLiveConfigDir(xdg, directoryExists: directoryExists) { return xdg }
+        }
 
         return dotClaude
     }
