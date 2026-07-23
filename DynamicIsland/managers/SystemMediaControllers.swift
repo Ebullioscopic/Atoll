@@ -529,7 +529,13 @@ final class SystemBrightnessController {
     private var pendingAdjustTarget: Float?
     private let coreBrightnessClient = CoreBrightnessDisplayClient.shared
     private var pollTimer: Timer?
+    // Fast, self-terminating poll used only inside the user-initiated window
+    // (after a brightness key press) to capture the settled value.
     private let pollInterval: TimeInterval = 0.15
+    // Slower continuous poll used only as a fallback when CoreBrightness
+    // notifications are unavailable. Gated by ActivityGate per tick.
+    private let fallbackPollInterval: TimeInterval = 0.5
+    private var continuousFallbackPolling = false
     private let pollChangeThreshold: Float = 0.005
 
     // MARK: - User-initiated brightness gate
@@ -557,11 +563,14 @@ final class SystemBrightnessController {
             NSLog("⚠️ SystemBrightnessController: CoreBrightnessDisplayClient unavailable; will rely on DisplayServices / IODisplay + polling fallback")
         }
         notifyCurrentBrightness()
-        // Only start polling as a fallback when CoreBrightness notifications
-        // are unavailable.  When CoreBrightness IS available the distributed
-        // notifications (registerExternalNotifications) handle detection.
+        // Only start continuous polling as a fallback when CoreBrightness
+        // notifications are unavailable.  When CoreBrightness IS available the
+        // distributed notifications (registerExternalNotifications) handle
+        // detection and we stay fully event-driven — a short windowed poll is
+        // started on demand from markUserInitiated() after a key press.
         if !coreBrightnessClient.isAvailable {
-            startPolling()
+            continuousFallbackPolling = true
+            startPolling(interval: fallbackPollInterval)
         }
     }
 
@@ -574,6 +583,7 @@ final class SystemBrightnessController {
         userInitiatedResetTimer?.invalidate()
         userInitiatedResetTimer = nil
         userInitiatedBrightnessChange = false
+        continuousFallbackPolling = false
         pendingAdjustTarget = nil
     }
 
@@ -609,9 +619,23 @@ final class SystemBrightnessController {
     /// Automatically resets after `userInitiatedWindow` seconds.
     private func markUserInitiated() {
         userInitiatedBrightnessChange = true
+        // In the event-driven (CoreBrightness) path we normally never poll.
+        // Run a short, self-terminating poll during the user window so the
+        // brightness the display settles on is still captured for the HUD,
+        // then stop again. The continuous fallback poll (if active) is left
+        // untouched.
+        if !continuousFallbackPolling {
+            startPolling(interval: pollInterval)
+        }
         userInitiatedResetTimer?.invalidate()
         userInitiatedResetTimer = Timer.scheduledTimer(withTimeInterval: userInitiatedWindow, repeats: false) { [weak self] _ in
-            self?.userInitiatedBrightnessChange = false
+            guard let self else { return }
+            self.userInitiatedBrightnessChange = false
+            // Tear down the windowed poll; keep the continuous fallback running.
+            if !self.continuousFallbackPolling {
+                self.pollTimer?.invalidate()
+                self.pollTimer = nil
+            }
         }
     }
 
@@ -822,11 +846,14 @@ final class SystemBrightnessController {
         notificationsInstalled = true
     }
 
-    private func startPolling() {
+    private func startPolling(interval: TimeInterval) {
         guard pollTimer == nil else { return }
-        NSLog("ℹ️ SystemBrightnessController: Starting polling-driven brightness detection as fallback (interval: %.2fs)", pollInterval)
-        pollTimer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
+        NSLog("ℹ️ SystemBrightnessController: Starting %@ brightness polling (interval: %.2fs)",
+              continuousFallbackPolling ? "fallback" : "windowed", interval)
+        let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             guard let self else { return }
+            // Energy gate: skip ticks while the screen/system is asleep.
+            if MainActor.assumeIsolated({ ActivityGate.shared.shouldSuspendBackgroundWork }) { return }
             // Skip polling while an animation is actively running — the
             // animation timer already handles emission during key presses.
             guard self.brightnessAnimationTimer == nil else { return }
@@ -836,7 +863,7 @@ final class SystemBrightnessController {
             if self.userInitiatedBrightnessChange {
                 // User recently pressed a brightness key — show the HUD.
                 if !self.didLogPollingFallback {
-                    NSLog("ℹ️ SystemBrightnessController: Brightness change detected via polling fallback (value: %.3f)", system)
+                    NSLog("ℹ️ SystemBrightnessController: Brightness change detected via polling (value: %.3f)", system)
                     self.didLogPollingFallback = true
                 }
                 self.emitBrightnessChange(value: system)
@@ -845,6 +872,8 @@ final class SystemBrightnessController {
                 self.lastEmittedBrightness = max(0, min(1, system))
             }
         }
+        timer.tolerance = interval * 0.2
+        pollTimer = timer
     }
 
     deinit {

@@ -175,6 +175,17 @@ class ClipboardManager: ObservableObject {
     
     private var timer: Timer?
     private var lastChangeCount: Int = 0
+
+    // Polling cadence for pasteboard change detection. 1s (with tolerance) is
+    // ample for clipboard capture while being far cheaper than sub-second polls.
+    private let pollInterval: TimeInterval = 1.0
+
+    // Debounced persistence: coalesce rapid history mutations into a single
+    // JSON encode + UserDefaults write instead of writing the whole history
+    // on every change.
+    private var saveHistoryDebounceTimer: Timer?
+    private let saveHistoryDebounceInterval: TimeInterval = 0.75
+    private var didRegisterTerminationFlush = false
     
     // Use configurable history size from settings
     private var maxHistoryItems: Int {
@@ -215,17 +226,38 @@ class ClipboardManager: ObservableObject {
     
     func startMonitoring() {
         guard !isMonitoring else { return }
-        
+
         isMonitoring = true
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkClipboard()
+        registerTerminationFlush()
+        let timer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            // Energy gate: skip ticks while the screen/system is asleep.
+            if MainActor.assumeIsolated({ ActivityGate.shared.shouldSuspendBackgroundWork }) { return }
+            self.checkClipboard()
         }
+        timer.tolerance = pollInterval * 0.2
+        self.timer = timer
     }
-    
+
     func stopMonitoring() {
         isMonitoring = false
         timer?.invalidate()
         timer = nil
+        // Flush any pending debounced history write so nothing is lost.
+        persistHistoryNow()
+    }
+
+    /// Flush a pending debounced history write before the app terminates.
+    private func registerTerminationFlush() {
+        guard !didRegisterTerminationFlush else { return }
+        didRegisterTerminationFlush = true
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.persistHistoryNow()
+        }
     }
     
     func copyToClipboard(_ item: ClipboardItem) {
@@ -517,6 +549,20 @@ class ClipboardManager: ObservableObject {
     // MARK: - Persistence
     
     private func saveHistoryToDefaults() {
+        // Debounce: many mutations can arrive in a burst (e.g. dedup + trim on a
+        // single copy). Coalesce them into one encode + write after a short quiet
+        // period instead of serializing the whole history on every change.
+        saveHistoryDebounceTimer?.invalidate()
+        saveHistoryDebounceTimer = Timer.scheduledTimer(withTimeInterval: saveHistoryDebounceInterval, repeats: false) { [weak self] _ in
+            self?.persistHistoryNow()
+        }
+    }
+
+    /// Immediately encode and persist the clipboard history, cancelling any
+    /// pending debounced write.
+    private func persistHistoryNow() {
+        saveHistoryDebounceTimer?.invalidate()
+        saveHistoryDebounceTimer = nil
         if let encoded = try? JSONEncoder().encode(clipboardHistory) {
             UserDefaults.standard.set(encoded, forKey: "ClipboardHistory")
         }
