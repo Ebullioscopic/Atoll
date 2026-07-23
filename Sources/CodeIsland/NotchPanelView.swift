@@ -2,7 +2,7 @@ import SwiftUI
 import CodeIslandCore
 
 /// Shared bounds for the collapsed-width scale setting — keeps the settings
-/// slider and the width math in lockstep. Percent of the simulated notch width.
+/// slider and the width math in lockstep. Percent of the (simulated) notch width.
 enum NotchWidthScale {
     static let min = 50
     static let max = 150
@@ -10,10 +10,13 @@ enum NotchWidthScale {
 }
 
 enum NotchWidthMetrics {
+    /// On notched displays the island can grow beyond the physical notch but never
+    /// shrink under it — narrower would expose the bare hardware cutout (#268).
     static func effectiveNotchWidth(notchW: CGFloat, collapsedWidthScale: Int, hasNotch: Bool) -> CGFloat {
-        if hasNotch { return notchW }
         let clampedScale = Swift.max(NotchWidthScale.min, Swift.min(collapsedWidthScale, NotchWidthScale.max))
-        return notchW * CGFloat(clampedScale) / 100.0
+        let scaled = notchW * CGFloat(clampedScale) / 100.0
+        if hasNotch { return Swift.max(notchW, scaled) }
+        return scaled
     }
 }
 
@@ -134,7 +137,7 @@ struct NotchPanelView: View {
     /// Minimum wing width needed to display compact bar content
     private var compactWingWidth: CGFloat { mascotSize + 14 }
 
-    /// Effective island width — scale only applies to simulated notches on non-notch screens.
+    /// Effective island width — on notched screens the scale can only widen past the notch.
     private var effectiveNotchW: CGFloat {
         NotchWidthMetrics.effectiveNotchWidth(
             notchW: notchW,

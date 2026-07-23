@@ -15,15 +15,23 @@ final class NotchPanelViewTests: XCTestCase {
         )
     }
 
-    func testEffectiveNotchWidthIgnoresCollapsedWidthScaleOnNotchScreens() {
+    func testEffectiveNotchWidthNeverShrinksUnderPhysicalNotch() {
         XCTAssertEqual(
             NotchWidthMetrics.effectiveNotchWidth(notchW: 200, collapsedWidthScale: 50, hasNotch: true),
             200,
             accuracy: 0.001
         )
         XCTAssertEqual(
-            NotchWidthMetrics.effectiveNotchWidth(notchW: 200, collapsedWidthScale: 150, hasNotch: true),
+            NotchWidthMetrics.effectiveNotchWidth(notchW: 200, collapsedWidthScale: 100, hasNotch: true),
             200,
+            accuracy: 0.001
+        )
+    }
+
+    func testEffectiveNotchWidthWidensBeyondPhysicalNotch() {
+        XCTAssertEqual(
+            NotchWidthMetrics.effectiveNotchWidth(notchW: 200, collapsedWidthScale: 150, hasNotch: true),
+            300,
             accuracy: 0.001
         )
     }
