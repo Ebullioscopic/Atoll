@@ -44,7 +44,13 @@ struct ContentView: View {
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var reminderManager = ReminderLiveActivityManager.shared
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
-    @ObservedObject var statsManager = StatsManager.shared
+    // NOTE: Intentionally NOT @ObservedObject. `StatsManager` publishes every ~1s,
+    // and observing it here invalidated the entire ContentView body on every tick.
+    // ContentView only uses it for imperative `updateMonitoringState(...)` calls and
+    // for `statsRowCount()` (which reads @Default flags, not published stats values).
+    // The live stats UI (`NotchStatsView`) owns its own @ObservedObject StatsManager,
+    // so reactivity for the stats display is preserved and now scoped to that leaf.
+    let statsManager = StatsManager.shared
     @ObservedObject var recordingManager = ScreenRecordingManager.shared
     @ObservedObject var privacyManager = PrivacyIndicatorManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
@@ -211,6 +217,11 @@ struct ContentView: View {
     @State private var stickyTerminalClickMonitor: Any?
     @State private var hiddenEdgeHoverPollingTask: Task<Void, Never>?
     @State private var isHoveringClosedMusicWaveformControl: Bool = false
+
+    /// Cached result of the `NSScreen.screens` notch scan (see `isNonNotchScreen`).
+    /// Defaults to `true`, matching the original "screen not found" fallback, and
+    /// is refreshed on appear / screen-parameter change / selected-screen change.
+    @State private var cachedIsNonNotchScreen: Bool = true
 
     @State private var gestureProgress: CGFloat = .zero
     @State private var skipGestureActiveDirection: MusicManager.SkipDirection?
@@ -384,11 +395,32 @@ struct ContentView: View {
     }
 
     /// Whether the current screen lacks a physical notch.
+    ///
+    /// Reads a cached value instead of scanning `NSScreen.screens` on every body
+    /// evaluation. The cache is recomputed only when its inputs can change:
+    /// on appear, when the screen configuration changes
+    /// (`didChangeScreenParametersNotification`), or when the selected screen
+    /// name changes. Behaviour is identical to the previous inline scan.
     private var isNonNotchScreen: Bool {
+        cachedIsNonNotchScreen
+    }
+
+    /// Performs the actual `NSScreen.screens` scan that backs `isNonNotchScreen`.
+    /// Kept behaviour-identical to the original computed property (including the
+    /// `true` fallback when no matching screen is found).
+    private func computeIsNonNotchScreen() -> Bool {
         guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
             return true
         }
         return screen.safeAreaInsets.top <= 0
+    }
+
+    /// Refreshes `cachedIsNonNotchScreen` if the scan result has changed.
+    private func refreshIsNonNotchScreenCache() {
+        let value = computeIsNonNotchScreen()
+        if value != cachedIsNonNotchScreen {
+            cachedIsNonNotchScreen = value
+        }
     }
 
     /// Whether the global sneak peek is visible on this specific screen.
@@ -741,6 +773,7 @@ struct ContentView: View {
     private func installPrimaryRootLifecycleHandlers<Content: View>(on view: Content) -> some View {
         view
             .onAppear {
+                refreshIsNonNotchScreenCache()
                 isMusicControlWindowSuppressed = vm.notchState != .closed
                     || lockScreenManager.isLocked
                     || isMusicHUDDeferredAfterUnlock
@@ -857,6 +890,12 @@ struct ContentView: View {
                 if shouldShowMusicControlWindow() {
                     enqueueMusicControlWindowSync(forceRefresh: true)
                 }
+            }
+            .onChange(of: currentScreenName) { _, _ in
+                refreshIsNonNotchScreenCache()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+                refreshIsNonNotchScreenCache()
             }
             .onDisappear {
                 performViewTeardown()
