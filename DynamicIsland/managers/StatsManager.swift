@@ -688,7 +688,12 @@ class StatsManager: ObservableObject {
 
         // Calculate network speeds (single getifaddrs walk feeds both totals and per-interface metrics)
         let networkSnapshots = snapshotNetworkInterfaces()
-        let currentNetworkStats = aggregateNetworkStats(from: networkSnapshots)
+        // On a getifaddrs failure (nil snapshot) preserve the prior baseline
+        // instead of collapsing to (0,0), which would both fake a speed dip and
+        // wipe previousNetworkStats when it is assigned below.
+        let currentNetworkStats = networkSnapshots != nil
+            ? aggregateNetworkStats(from: networkSnapshots)
+            : previousNetworkStats
         let currentTime = Date()
         let timeInterval = currentTime.timeIntervalSince(previousTimestamp)
 

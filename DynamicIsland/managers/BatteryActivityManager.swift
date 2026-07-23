@@ -322,7 +322,9 @@ class BatteryActivityManager {
     private func notifyObservers(event: BatteryEvent) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            for observer in self.observers.values {
+            // Snapshot before invoking: an observer may add/remove observers
+            // from inside its callback, which would mutate `observers` mid-iteration.
+            for observer in Array(self.observers.values) {
                 observer(event)
             }
         }

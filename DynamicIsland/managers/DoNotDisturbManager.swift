@@ -583,27 +583,35 @@ private extension DoNotDisturbManager {
     }
 
     func startAssertionsPolling() {
-        stopAssertionsPolling()
-        lastAssertionsModificationDate = nil
-
-        // Watch the Assertions.json file for filesystem events instead of waking every 2s to
-        // compare its modification date. This yields zero wake-ups while idle and reacts the
-        // instant Focus state is written. A directory-watch fallback re-arms the file watch if
-        // the file is currently absent or gets rotated away.
-        beginWatchingAssertionsFile()
-
-        // Read the current state immediately so an already-active Focus is reflected on start.
+        // Confine all dispatch-source lifecycle to `pollingQueue`: the source event
+        // handlers run there and re-arm the watch, so start/stop must run there too —
+        // otherwise the `assertions*Source` vars race between the main thread and
+        // `pollingQueue`. Watching the file via filesystem events (instead of a 2s
+        // mtime poll) yields zero idle wake-ups; a directory-watch fallback re-arms
+        // the file watch if the file is absent or gets rotated away.
         pollingQueue.async { [weak self] in
-            self?.pollAssertionsState()
+            guard let self else { return }
+            self.tearDownAssertionSources()
+            self.lastAssertionsModificationDate = nil
+            self.beginWatchingAssertionsFile()
+            // Read current state immediately so an already-active Focus shows on start.
+            self.pollAssertionsState()
         }
     }
 
     func stopAssertionsPolling() {
+        pollingQueue.async { [weak self] in
+            self?.tearDownAssertionSources()
+            self?.lastAssertionsModificationDate = nil
+        }
+    }
+
+    /// Cancels and clears the assertion filesystem sources. Must run on `pollingQueue`.
+    private func tearDownAssertionSources() {
         assertionsFileSource?.cancel()
         assertionsFileSource = nil
         assertionsDirSource?.cancel()
         assertionsDirSource = nil
-        lastAssertionsModificationDate = nil
     }
 
     /// Arms a filesystem-object watch on `Assertions.json`. If the file doesn't exist yet, falls

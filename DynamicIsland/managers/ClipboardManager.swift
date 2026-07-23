@@ -224,15 +224,27 @@ class ClipboardManager: ObservableObject {
     
     // MARK: - Public Methods
     
+    private var backgroundWorkSuspended = false
+    private var gateCancellable: AnyCancellable?
+
     func startMonitoring() {
         guard !isMonitoring else { return }
 
         isMonitoring = true
         registerTerminationFlush()
+        // Observe the energy gate on the main actor and cache it, so the timer
+        // tick reads a plain Bool thread-safely instead of `MainActor.assumeIsolated`,
+        // which would trap if the timer ever fired off the main thread. The gate's
+        // published projection is @MainActor, so subscribe inside a main-actor task.
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.gateCancellable = ActivityGate.shared.$shouldSuspendBackgroundWork
+                .sink { [weak self] suspended in self?.backgroundWorkSuspended = suspended }
+        }
         let timer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
             guard let self else { return }
             // Energy gate: skip ticks while the screen/system is asleep.
-            if MainActor.assumeIsolated({ ActivityGate.shared.shouldSuspendBackgroundWork }) { return }
+            if self.backgroundWorkSuspended { return }
             self.checkClipboard()
         }
         timer.tolerance = pollInterval * 0.2
@@ -241,6 +253,8 @@ class ClipboardManager: ObservableObject {
 
     func stopMonitoring() {
         isMonitoring = false
+        gateCancellable?.cancel()
+        gateCancellable = nil
         timer?.invalidate()
         timer = nil
         // Flush any pending debounced history write so nothing is lost.
