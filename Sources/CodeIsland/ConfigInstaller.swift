@@ -57,11 +57,13 @@ enum HookFormat {
     case antigravityNamed
     /// ZCode (Z.ai) Electron desktop app — user-level ~/.zcode/cli/config.json
     /// wrapping hooks in `{enabled: Bool, events: {EventName: [{hooks:[{type,
-    /// command}]}]}}`. Event names use a STRICT 7-name schema (SessionStart,
-    /// UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse,
-    /// PostToolUseFailure, Stop) — any other key silently drops the whole
-    /// `hooks` config on load. `hooks.enabled` must be explicit; no hot-reload,
-    /// so edits require a ZCode restart (#245).
+    /// command, timeout?}]}]}}`. Event names use a STRICT 7-name schema
+    /// (SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest,
+    /// PostToolUse, PostToolUseFailure, Stop) — any other key silently drops
+    /// the whole `hooks` config on load. `hooks.enabled` must be explicit; no
+    /// hot-reload, so edits require a ZCode restart (#245). PermissionRequest
+    /// is a blocking approval hook: its stdout decision resolves ZCode's
+    /// permission dialog (#258).
     case zcode
 
     var storageValue: String {
@@ -686,14 +688,21 @@ struct ConfigInstaller {
                 ("Stop", 5, false),
             ]
         case .zcode:
-            // ZCode's 7-name schema legally includes PermissionRequest, but its
-            // approve/deny decision-response semantics are unconfirmed — a
-            // long-timeout blocking hook there risks stalling the user's agent.
-            // MVP registers only status-observation events (#245).
+            // All 7 events of ZCode's strict schema, including PermissionRequest.
+            // Its decision contract was confirmed against the shipped agent
+            // kernel (ZCode.app/Contents/Resources/glm/zcode.cjs, #258):
+            // stdout `{hookSpecificOutput: {hookEventName: "PermissionRequest",
+            // decision: {behavior: "allow"|"deny", permissionUpdates?}}}`
+            // resolves the approval; empty stdout, timeout, or schema failure
+            // all fall back to ZCode's own permission dialog. Timeouts are in
+            // seconds; only values above ZCode's 60s per-hook default are
+            // written into config.json (see mergeZcodeHooks) so a pending
+            // approval can wait on the island for as long as Claude's does.
             return [
                 ("SessionStart", 5, false),
                 ("UserPromptSubmit", 5, true),
                 ("PreToolUse", 5, false),
+                ("PermissionRequest", 86400, false),
                 ("PostToolUse", 5, true),
                 ("PostToolUseFailure", 5, true),
                 ("Stop", 5, true),
@@ -2185,17 +2194,23 @@ struct ConfigInstaller {
         return removeManagedHermesHooks(from: normalized) != normalized
     }
 
-    // MARK: - ZCode config.json (#245)
+    // MARK: - ZCode config.json (#245, #258)
     //
     // ZCode (Z.ai) is an Electron desktop app — NOT a Claude Code fork. Hooks
     // live under `hooks: {enabled, events}`, where `events` maps event names
-    // to Claude/nested-shaped entries ({hooks: [{type, command}]}) — the same
-    // shape `containsOurHook` / `removeManagedHookEntries` already understand,
-    // so those generic helpers apply unchanged to the `events` sub-dict. The
-    // event-name schema is STRICT: any key outside `zcodeAllowedEvents`
-    // silently drops the WHOLE `hooks` config on load — never write outside
-    // that whitelist. No hot-reload; a ZCode restart is required after any
-    // config.json edit.
+    // to Claude/nested-shaped entries ({hooks: [{type, command, timeout?}]}) —
+    // the same shape `containsOurHook` / `removeManagedHookEntries` already
+    // understand, so those generic helpers apply unchanged to the `events`
+    // sub-dict. The event-name schema is STRICT: any key outside
+    // `zcodeAllowedEvents` silently drops the WHOLE `hooks` config on load —
+    // never write outside that whitelist. Hook OUTPUT is equally strict
+    // (Zod .strict() in the kernel): a PermissionRequest decision must be
+    // exactly {behavior, permissionUpdates?/updatedInput?} or
+    // {behavior: "deny", interrupt?, message?} — Claude's
+    // `updatedPermissions`/`destination` keys fail validation and the whole
+    // decision is discarded (ZCode then shows its own dialog). See
+    // AppState.zcodeAlwaysAllowResponse for the always-allow shape. No
+    // hot-reload; a ZCode restart is required after any config.json edit.
 
     /// The only 7 event names ZCode's schema accepts. Writing anything else
     /// causes the entire `hooks` config to be silently discarded on load —
@@ -2233,9 +2248,18 @@ struct ConfigInstaller {
         var events = removeManagedHookEntries(from: hooksRoot["events"] as? [String: Any] ?? [:])
 
         let command = zcodeInjectedCommand()
-        for (event, _, _) in defaultEvents(for: .zcode) where zcodeAllowedEvents.contains(event) {
+        for (event, timeout, _) in defaultEvents(for: .zcode) where zcodeAllowedEvents.contains(event) {
             var entries = events[event] as? [[String: Any]] ?? []
-            entries.append(["hooks": [["type": "command", "command": command] as [String: Any]]])
+            var hook: [String: Any] = ["type": "command", "command": command]
+            // ZCode's per-hook default timeout is 60s. Status hooks keep that
+            // default (the bridge self-limits far below it); blocking hooks
+            // (PermissionRequest) must override it or ZCode would abandon the
+            // approval after a minute and pop its own dialog. `timeout` is
+            // ZCode-native seconds (its kernel converts to ms internally).
+            if timeout > 60 {
+                hook["timeout"] = timeout
+            }
+            entries.append(["hooks": [hook]])
             events[event] = entries
         }
 

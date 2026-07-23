@@ -1335,6 +1335,8 @@ final class AppState {
             _ = CodexPermissionRules().persistAlwaysAllowRule(for: pending.event)
             let response = #"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}"#
             responseData = Data(response.utf8)
+        } else if always, Self.isZcodeEvent(pending.event) {
+            responseData = Self.zcodeAlwaysAllowResponse(toolName: pending.event.toolName)
         } else if always {
             let toolName = pending.event.toolName ?? ""
             // MCP tools (`mcp__server__tool`) don't accept a rule specifier — the
@@ -1377,6 +1379,41 @@ final class AppState {
 
         showNextPending()
         refreshDerivedState()
+    }
+
+    nonisolated static func isZcodeEvent(_ event: HookEvent) -> Bool {
+        SessionSnapshot.normalizedSupportedSource(event.rawJSON["_source"] as? String) == "zcode"
+    }
+
+    /// "Always allow" response for a ZCode PermissionRequest hook (#258).
+    ///
+    /// ZCode validates hook stdout with a STRICT schema (unknown keys void the
+    /// whole decision, and ZCode falls back to its own dialog). Persistent
+    /// rules therefore go in `permissionUpdates` — NOT Claude's
+    /// `updatedPermissions` — and there is no `destination` key. A rule with a
+    /// bare `toolName` (no `ruleContent`) matches every future call of that
+    /// tool, which is exactly the "always allow this tool" semantic; a
+    /// `ruleContent` of "*" would instead be compared against the call's
+    /// command/path subject and never match. Events without a tool name can't
+    /// form a valid rule (toolName must be non-empty), so they degrade to a
+    /// plain one-time allow.
+    nonisolated static func zcodeAlwaysAllowResponse(toolName: String?) -> Data {
+        let plainAllow = Data(#"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}"#.utf8)
+        guard let toolName, !toolName.isEmpty else { return plainAllow }
+        let obj: [String: Any] = [
+            "hookSpecificOutput": [
+                "hookEventName": "PermissionRequest",
+                "decision": [
+                    "behavior": "allow",
+                    "permissionUpdates": [[
+                        "type": "addRules",
+                        "behavior": "allow",
+                        "rules": [["toolName": toolName]],
+                    ] as [String: Any]]
+                ] as [String: Any]
+            ] as [String: Any]
+        ]
+        return (try? JSONSerialization.data(withJSONObject: obj)) ?? plainAllow
     }
 
     func handleBuddyControlCommand(_ command: BuddyControlCommand) {

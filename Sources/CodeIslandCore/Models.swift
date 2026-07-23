@@ -171,7 +171,11 @@ public struct HookEvent {
         self.toolName = HookEvent.firstString(in: json, keys: ["tool_name", "toolName", "tool", "name"])
             ?? HookEvent.firstString(inNestedDictionary: json, containerKeys: ["tool", "payload", "data"], keys: ["name", "tool_name", "toolName"])
             ?? HookEvent.firstString(inNestedDictionary: json, containerKeys: ["toolCall"], keys: ["name"])
-        self.toolUseId = HookEvent.firstString(in: json, keys: ["tool_use_id", "toolUseId"])
+        // `toolCallId` is ZCode's flat spelling of the same invocation id (its
+        // kernel emits {toolCallId, toolName, toolInput} on every tool event).
+        // Parsing it keeps zcode permission requests correlated by id so they
+        // are never mistaken for orphans and auto-resolved on session activity.
+        self.toolUseId = HookEvent.firstString(in: json, keys: ["tool_use_id", "toolUseId", "toolCallId"])
             ?? HookEvent.firstString(inNestedDictionary: json, containerKeys: ["tool", "tool_use", "toolUse", "payload", "data"], keys: ["id", "tool_use_id", "toolUseId"])
         self.toolInput = HookEvent.firstDictionary(in: json, keys: ["tool_input", "toolInput", "input", "arguments", "args", "params"])
             ?? HookEvent.firstDictionary(inNestedDictionary: json, containerKeys: ["tool", "payload", "data"], keys: ["input", "tool_input", "toolInput", "arguments", "args", "params"])

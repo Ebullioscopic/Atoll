@@ -376,6 +376,68 @@ final class AppStatePermissionFlowTests: XCTestCase {
         XCTAssertEqual(rule["ruleContent"] as? String, "*")
     }
 
+    /// #258: ZCode validates hook stdout with a STRICT schema — "always allow"
+    /// must ship the rule in `permissionUpdates` (bare toolName, no
+    /// `destination`), never Claude's `updatedPermissions` shape, or the whole
+    /// decision is silently voided and ZCode re-prompts in its own dialog.
+    func testZcodeAlwaysAllowEmitsPermissionUpdatesNotUpdatedPermissions() async throws {
+        let appState = AppState()
+        let event = try makePermissionRequestEvent(
+            sessionId: "s-zcode-always",
+            toolName: "Bash",
+            toolInput: ["command": "npm run build"],
+            source: "zcode"
+        )
+
+        let responseTask = Task<Data, Never> {
+            await withCheckedContinuation { continuation in
+                appState.handlePermissionRequest(event, continuation: continuation)
+            }
+        }
+
+        await Task.yield()
+        appState.approvePermission(always: true)
+
+        let decision = try extractPermissionDecision(from: await responseTask.value)
+        XCTAssertEqual(decision["behavior"] as? String, "allow")
+        XCTAssertNil(decision["updatedPermissions"])
+
+        let updates = try XCTUnwrap(decision["permissionUpdates"] as? [[String: Any]])
+        let update = try XCTUnwrap(updates.first)
+        XCTAssertEqual(update["type"] as? String, "addRules")
+        XCTAssertEqual(update["behavior"] as? String, "allow")
+        XCTAssertNil(update["destination"])
+        let rules = try XCTUnwrap(update["rules"] as? [[String: Any]])
+        XCTAssertEqual(rules.first?["toolName"] as? String, "Bash")
+        XCTAssertNil(rules.first?["ruleContent"])
+    }
+
+    /// Plain (one-time) allow and deny for ZCode use the shared minimal shape,
+    /// which is already strict-schema-valid — lock that in so a future refactor
+    /// doesn't leak Claude-only keys into zcode responses.
+    func testZcodeSingleAllowStaysMinimal() async throws {
+        let appState = AppState()
+        let event = try makePermissionRequestEvent(
+            sessionId: "s-zcode-once",
+            toolName: "Bash",
+            source: "zcode"
+        )
+
+        let responseTask = Task<Data, Never> {
+            await withCheckedContinuation { continuation in
+                appState.handlePermissionRequest(event, continuation: continuation)
+            }
+        }
+
+        await Task.yield()
+        appState.approvePermission()
+
+        let decision = try extractPermissionDecision(from: await responseTask.value)
+        XCTAssertEqual(decision["behavior"] as? String, "allow")
+        XCTAssertNil(decision["permissionUpdates"])
+        XCTAssertNil(decision["updatedPermissions"])
+    }
+
     func testCodexAlwaysAllowDoesNotDuplicateExistingCodeIslandRule() throws {
         let codexHome = makeTemporaryCodexHome()
         defer { try? FileManager.default.removeItem(at: codexHome) }
