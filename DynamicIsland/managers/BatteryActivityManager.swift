@@ -37,7 +37,8 @@ class BatteryActivityManager {
     var onTimeToFullChargeChange: ((Int) -> Void)?
 
     private var batterySource: CFRunLoopSource?
-    private var observers: [(BatteryEvent) -> Void] = []
+    private var observers: [Int: (BatteryEvent) -> Void] = [:]
+    private var nextObserverToken: Int = 0
     private var previousBatteryInfo: BatteryInfo?
     private var notificationQueue: [BatteryEvent] = []
     private var isProcessingNotifications = false
@@ -304,15 +305,16 @@ class BatteryActivityManager {
     /// - Parameter observer: The observer closure to be called on battery events
     /// - Returns: The ID of the observer for later removal
     func addObserver(_ observer: @escaping (BatteryEvent) -> Void) -> Int {
-        observers.append(observer)
-        return observers.count - 1
+        let token = nextObserverToken
+        nextObserverToken += 1
+        observers[token] = observer
+        return token
     }
 
     /// Removes an observer by its ID
     /// - Parameter id: The ID of the observer to be removed
     func removeObserver(byId id: Int) {
-        guard id >= 0 && id < observers.count else { return }
-        observers.remove(at: id)
+        observers.removeValue(forKey: id)
     }
     
     /// Notifies all observers of a battery event
@@ -320,7 +322,7 @@ class BatteryActivityManager {
     private func notifyObservers(event: BatteryEvent) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            for observer in self.observers {
+            for observer in self.observers.values {
                 observer(event)
             }
         }

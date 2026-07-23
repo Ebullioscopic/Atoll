@@ -162,7 +162,10 @@ class AppleMusicController: MediaControllerProtocol {
         }
 
         updatedState.lastUpdated = Date()
-        self.playbackState = updatedState
+        let finalState = updatedState
+        await MainActor.run { [weak self] in
+            self?.playbackState = finalState
+        }
     }
 
     // MARK: - Private Methods
