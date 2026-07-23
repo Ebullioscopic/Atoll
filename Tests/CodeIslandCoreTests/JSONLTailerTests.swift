@@ -251,6 +251,119 @@ final class JSONLTailerTests: XCTestCase {
         XCTAssertEqual(callCount.value, 1)
     }
 
+    // MARK: - Integration: offset accounting across partial writes (#278)
+
+    /// A JSONL line flushed in two chunks (no newline in the first) must be
+    /// joined from the in-memory fragment + the second chunk exactly once.
+    /// The pre-fix code re-read the fragment's bytes from disk AND prepended
+    /// the stored fragment, corrupting the joined line so its delta was lost.
+    func testPartialLineSplitAcrossWritesDeliversJoinedMessage() throws {
+        let url = temporaryFileURL()
+        try Data("".utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let joined = self.expectation(description: "joined line delta delivered")
+        let tailer = JSONLTailer(
+            queue: DispatchQueue(label: "tailer-test"),
+            onDelta: { delta in
+                if delta.lastAssistantMessage == "split-reply" {
+                    joined.fulfill()
+                }
+            }
+        )
+        tailer.attach(sessionId: "s1", filePath: url.path)
+        Thread.sleep(forTimeInterval: 0.15)
+
+        let full = assistantLine(text: "split-reply") + "\n"
+        let cut = full.index(full.startIndex, offsetBy: full.count / 2)
+
+        // First chunk carries no newline — the tailer must stash it as a fragment.
+        try appendToFile(url: url, content: String(full[full.startIndex..<cut]))
+        // Let the dispatch source observe the partial write before completing the line.
+        Thread.sleep(forTimeInterval: 0.4)
+        try appendToFile(url: url, content: String(full[cut...]))
+
+        wait(for: [joined], timeout: 2)
+        tailer.detach(sessionId: "s1")
+    }
+
+    /// After a fragment episode the read offset must keep pointing inside the
+    /// file. The pre-fix code drifted the offset past EOF, so the next small
+    /// append looked like a truncation and re-scanned the whole file from 0 —
+    /// on overnight multi-MB transcripts that full rescan ran for nearly every
+    /// append, pinning one core (#278). The whole-file rescan is observable
+    /// here: it would resurface the pre-attach user prompt in the delta.
+    func testSmallAppendAfterFragmentDoesNotRescanWholeFile() throws {
+        let url = temporaryFileURL()
+        // Pre-existing content from before attach — must never re-surface.
+        try Data((userLine(text: "old-question") + "\n").utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let wrapDelta = self.expectation(description: "delta for final small append")
+        let captured = LockedValue<ConversationTailDelta?>(nil)
+        let tailer = JSONLTailer(
+            queue: DispatchQueue(label: "tailer-test"),
+            onDelta: { delta in
+                if delta.lastAssistantMessage == "wrap" {
+                    captured.set(delta)
+                    wrapDelta.fulfill()
+                }
+            }
+        )
+        tailer.attach(sessionId: "s1", filePath: url.path)
+        Thread.sleep(forTimeInterval: 0.15)
+
+        // Fragment episode: a long line flushed in two chunks. The first chunk
+        // is deliberately longer than the final "wrap" line so any offset drift
+        // (old fragment length) exceeds the size of the final append.
+        let full = assistantLine(text: String(repeating: "x", count: 200)) + "\n"
+        let cut = full.index(full.startIndex, offsetBy: full.count - 20)
+        try appendToFile(url: url, content: String(full[full.startIndex..<cut]))
+        Thread.sleep(forTimeInterval: 0.4)
+        try appendToFile(url: url, content: String(full[cut...]))
+        Thread.sleep(forTimeInterval: 0.4)
+
+        // Small append: with a drifted offset this used to trip the truncation
+        // check (size < offset) and re-read the file from byte 0.
+        try appendToFile(url: url, content: assistantLine(text: "wrap") + "\n")
+
+        wait(for: [wrapDelta], timeout: 2)
+        XCTAssertNil(
+            captured.value?.lastUserPrompt,
+            "pre-attach content resurfaced — tailer re-scanned the whole file from offset 0"
+        )
+        tailer.detach(sessionId: "s1")
+    }
+
+    /// Real truncation (size genuinely shrinks) must still rewind and pick up
+    /// the fresh content — guards the rewind path the offset fix keeps.
+    func testRealTruncationRewindsAndPicksUpFreshContent() throws {
+        let url = temporaryFileURL()
+        let pre = assistantLine(text: "long original content that will be truncated away") + "\n"
+        try Data(pre.utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let fresh = self.expectation(description: "delta after truncation")
+        let tailer = JSONLTailer(
+            queue: DispatchQueue(label: "tailer-test"),
+            onDelta: { delta in
+                if delta.lastAssistantMessage == "fresh-after-truncate" {
+                    fresh.fulfill()
+                }
+            }
+        )
+        tailer.attach(sessionId: "s1", filePath: url.path)
+        Thread.sleep(forTimeInterval: 0.15)
+
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data((assistantLine(text: "fresh-after-truncate") + "\n").utf8))
+        try handle.close()
+
+        wait(for: [fresh], timeout: 2)
+        tailer.detach(sessionId: "s1")
+    }
+
     // MARK: - Fixtures
 
     private func assistantLine(text: String) -> String {

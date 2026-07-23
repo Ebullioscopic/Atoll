@@ -196,7 +196,14 @@ public final class JSONLTailer: @unchecked Sendable {
 
         let scan = JSONLTailer.scanLines(combined)
         watch.pendingFragment = scan.trailingFragment
-        watch.offset += off_t(combined.count - scan.trailingFragment.count)
+        // Advance by the bytes actually read from disk — the trailing fragment is
+        // carried purely in memory and its file bytes are already consumed here.
+        // Mixing the fragment into the offset math (the previous
+        // `combined.count - trailingFragment.count`) drifted the offset past EOF
+        // after every fragment episode; the next small append then looked like a
+        // truncation and re-scanned the whole file from byte 0 on each event,
+        // pinning a core on overnight-grown transcripts (#278).
+        watch.offset += off_t(appended.count)
 
         if !scan.delta.isEmpty {
             let delta = ConversationTailDelta(
