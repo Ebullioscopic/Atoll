@@ -28,7 +28,7 @@ final class WatchConnection: NSObject, ObservableObject {
         super.init()
 
         guard WCSession.isSupported() else {
-            lastError = "这台设备不支持与 iPhone 同步"
+            lastError = L10n.t(zh: "这台设备不支持与 iPhone 同步", en: "This device can't sync with iPhone")
             return
         }
 
@@ -62,7 +62,7 @@ final class WatchConnection: NSObject, ObservableObject {
         WKInterfaceDevice.current().play(.click)
 
         guard WCSession.default.isReachable else {
-            lastError = "iPhone 暂不可达"
+            lastError = L10n.t(zh: "iPhone 暂不可达", en: "iPhone isn't reachable right now")
             WKInterfaceDevice.current().play(.failure)
             return
         }
@@ -137,7 +137,7 @@ final class WatchConnection: NSObject, ObservableObject {
         lastNotificationSequence = next.sequence
 
         let content = UNMutableNotificationContent()
-        content.title = "\(CompanionDisplayText.source(next.source)) 需要处理"
+        content.title = "\(CompanionDisplayText.source(next.source)) \(L10n.t(zh: "需要处理", en: "needs your attention"))"
         content.body = next.question?.question
             ?? CompanionDisplayText.message(next.messages.last?.text)
             ?? next.status.label
@@ -175,14 +175,19 @@ final class WatchConnection: NSObject, ObservableObject {
                 toolName: "AskUserQuestion",
                 workspaceName: "fengye",
                 messages: [
-                    CompanionMessagePreview(role: .user, text: "帮我写一篇长篇小说"),
-                    CompanionMessagePreview(role: .assistant, text: "我需要先确认小说类型和基调。")
+                    CompanionMessagePreview(role: .user, text: L10n.t(zh: "帮我写一篇长篇小说", en: "Help me write a full-length novel")),
+                    CompanionMessagePreview(role: .assistant, text: L10n.t(zh: "我需要先确认小说类型和基调。", en: "I need to confirm the genre and tone first."))
                 ],
                 pendingAction: .question,
                 question: CompanionQuestionPayload(
-                    header: "小说类型",
-                    question: "你想写什么类型的小说？",
-                    options: ["科幻", "悬疑推理", "都市现实", "奇幻冒险"],
+                    header: L10n.t(zh: "小说类型", en: "Novel Genre"),
+                    question: L10n.t(zh: "你想写什么类型的小说？", en: "What genre of novel do you want to write?"),
+                    options: [
+                        L10n.t(zh: "科幻", en: "Sci-Fi"),
+                        L10n.t(zh: "悬疑推理", en: "Mystery/Thriller"),
+                        L10n.t(zh: "都市现实", en: "Urban Realism"),
+                        L10n.t(zh: "奇幻冒险", en: "Fantasy Adventure")
+                    ],
                     descriptions: [],
                     index: 0,
                     total: 3,
@@ -200,9 +205,18 @@ final class WatchConnection: NSObject, ObservableObject {
                 toolName: "WebSearch",
                 workspaceName: "workspace",
                 messages: [
-                    CompanionMessagePreview(role: .user, text: "重点测试退到后台之后灵动岛和手表还能不能收到新消息"),
-                    CompanionMessagePreview(role: .assistant, text: "我会先用模拟器验证 UI 和本地同步路径，再把真机 BLE 后台唤醒列成单独验收项。"),
-                    CompanionMessagePreview(role: .assistant, text: "这是一条较长的 watch 动态内容，用来确认滚动页面不会被底部按钮或系统区域裁掉。")
+                    CompanionMessagePreview(role: .user, text: L10n.t(
+                        zh: "重点测试退到后台之后灵动岛和手表还能不能收到新消息",
+                        en: "Specifically testing whether the Dynamic Island and Watch still receive new messages after backgrounding"
+                    )),
+                    CompanionMessagePreview(role: .assistant, text: L10n.t(
+                        zh: "我会先用模拟器验证 UI 和本地同步路径，再把真机 BLE 后台唤醒列成单独验收项。",
+                        en: "I'll verify the UI and local sync path in the simulator first, then list real-device BLE background wake as a separate acceptance item."
+                    )),
+                    CompanionMessagePreview(role: .assistant, text: L10n.t(
+                        zh: "这是一条较长的 watch 动态内容，用来确认滚动页面不会被底部按钮或系统区域裁掉。",
+                        en: "This is a longer watch activity entry, to confirm the scroll page isn't clipped by the bottom button or system regions."
+                    ))
                 ],
                 pendingAction: nil,
                 question: nil,

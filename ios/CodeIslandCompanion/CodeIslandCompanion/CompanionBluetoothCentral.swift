@@ -127,18 +127,18 @@ extension CompanionBluetoothCentral: CBCentralManagerDelegate {
             case .poweredOff:
                 self.scanning = false
                 self.connectedPeripheralName = nil
-                self.lastError = "蓝牙已关闭"
+                self.lastError = L10n.t(zh: "蓝牙已关闭", en: "Bluetooth is off")
             case .unauthorized:
                 self.scanning = false
                 self.connectedPeripheralName = nil
-                self.lastError = "蓝牙权限未授权"
+                self.lastError = L10n.t(zh: "蓝牙权限未授权", en: "Bluetooth permission denied")
             case .unsupported:
                 self.scanning = false
                 self.connectedPeripheralName = nil
-                self.lastError = "这台 iPhone 不支持蓝牙"
+                self.lastError = L10n.t(zh: "这台 iPhone 不支持蓝牙", en: "This iPhone doesn't support Bluetooth")
             case .resetting:
                 self.scanning = false
-                self.lastError = "蓝牙正在重置"
+                self.lastError = L10n.t(zh: "蓝牙正在重置", en: "Bluetooth is resetting")
             case .unknown:
                 self.scanning = false
             @unknown default:
@@ -193,7 +193,7 @@ extension CompanionBluetoothCentral: CBCentralManagerDelegate {
 
     nonisolated func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         Task { @MainActor in
-            self.lastError = error?.localizedDescription ?? "无法连接 Mac 蓝牙摘要通道"
+            self.lastError = error?.localizedDescription ?? L10n.t(zh: "无法连接 Mac 蓝牙摘要通道", en: "Couldn't connect to the Mac's Bluetooth summary channel")
             self.peripheral = nil
             self.notifyCharacteristic = nil
             self.connectedPeripheralName = nil
@@ -222,7 +222,7 @@ extension CompanionBluetoothCentral: CBPeripheralDelegate {
             }
 
             guard let service = peripheral.services?.first(where: { $0.uuid == Self.serviceUUID }) else {
-                self.lastError = "没有找到 CodeIsland 蓝牙服务"
+                self.lastError = L10n.t(zh: "没有找到 CodeIsland 蓝牙服务", en: "Couldn't find the CodeIsland Bluetooth service")
                 return
             }
 
@@ -242,7 +242,7 @@ extension CompanionBluetoothCentral: CBPeripheralDelegate {
             }
 
             guard let characteristic = service.characteristics?.first(where: { $0.uuid == Self.notifyCharacteristicUUID }) else {
-                self.lastError = "没有找到 CodeIsland 蓝牙通知通道"
+                self.lastError = L10n.t(zh: "没有找到 CodeIsland 蓝牙通知通道", en: "Couldn't find the CodeIsland Bluetooth notification channel")
                 return
             }
 

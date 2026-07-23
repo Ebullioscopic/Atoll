@@ -7,7 +7,7 @@ struct CodeIslandWatchStatusWidget: Widget {
             CodeIslandWatchWidgetView(entry: entry)
         }
         .configurationDisplayName("Code Island")
-        .description("显示当前 Mac 会话状态。")
+        .description(L10n.t(zh: "显示当前 Mac 会话状态。", en: "Shows the current Mac session status."))
         .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }
@@ -56,7 +56,7 @@ private struct CircularWidgetView: View {
     var body: some View {
         VStack(spacing: 2) {
             SharedMascotView(source: state?.source ?? "codex", status: status, size: 24)
-            Text(state?.status.shortLabel ?? "等待")
+            Text(state?.status.shortLabel ?? L10n.t(zh: "等待", en: "Wait"))
                 .font(.system(size: 10, weight: .black, design: .rounded))
                 .lineLimit(1)
         }
@@ -108,7 +108,9 @@ private struct RectangularWidgetView: View {
         if let message = CompanionDisplayText.message(state?.messages.last?.text) {
             return message
         }
-        return state == nil ? "等待同步" : "当前没有新的消息"
+        return state == nil
+            ? L10n.t(zh: "等待同步", en: "Waiting to sync")
+            : L10n.t(zh: "当前没有新的消息", en: "No new messages")
     }
 
     private var status: MascotAgentStatus {
@@ -120,7 +122,7 @@ private struct InlineWidgetView: View {
     let state: CompanionStatePayload?
 
     var body: some View {
-        Text("\(CompanionDisplayText.source(state?.source)) \(state?.status.shortLabel ?? "等待同步")")
+        Text("\(CompanionDisplayText.source(state?.source)) \(state?.status.shortLabel ?? L10n.t(zh: "等待同步", en: "Waiting"))")
             .containerBackground(.fill.tertiary, for: .widget)
     }
 }

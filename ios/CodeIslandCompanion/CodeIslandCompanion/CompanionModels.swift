@@ -18,21 +18,21 @@ enum CompanionStatus: String, Codable, Hashable {
 
     var label: String {
         switch self {
-        case .idle: return "空闲"
-        case .processing: return "处理中"
-        case .running: return "运行中"
-        case .waitingApproval: return "等待批准"
-        case .waitingQuestion: return "等待回答"
+        case .idle: return L10n.t(zh: "空闲", en: "Idle")
+        case .processing: return L10n.t(zh: "处理中", en: "Processing")
+        case .running: return L10n.t(zh: "运行中", en: "Running")
+        case .waitingApproval: return L10n.t(zh: "等待批准", en: "Waiting Approval")
+        case .waitingQuestion: return L10n.t(zh: "等待回答", en: "Waiting Answer")
         }
     }
 
     var shortLabel: String {
         switch self {
-        case .idle: return "空闲"
-        case .processing: return "处理"
-        case .running: return "运行"
-        case .waitingApproval: return "批准"
-        case .waitingQuestion: return "问题"
+        case .idle: return L10n.t(zh: "空闲", en: "Idle")
+        case .processing: return L10n.t(zh: "处理", en: "Working")
+        case .running: return L10n.t(zh: "运行", en: "Running")
+        case .waitingApproval: return L10n.t(zh: "批准", en: "Approve")
+        case .waitingQuestion: return L10n.t(zh: "问题", en: "Question")
         }
     }
 
@@ -65,8 +65,8 @@ enum CompanionMessageRole: String, Codable {
 
     var label: String {
         switch self {
-        case .user: return "你"
-        case .assistant: return "助手"
+        case .user: return L10n.t(zh: "你", en: "You")
+        case .assistant: return L10n.t(zh: "助手", en: "Assistant")
         }
     }
 }

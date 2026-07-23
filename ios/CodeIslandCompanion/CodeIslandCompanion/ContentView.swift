@@ -121,7 +121,7 @@ private struct PrimaryMessageView: View {
     var body: some View {
         let text = state.question?.question
             ?? CompanionDisplayText.message(state.messages.last?.text)
-            ?? "当前没有新的消息"
+            ?? L10n.t(zh: "当前没有新的消息", en: "No new messages")
 
         MorphText(
             text: text,
@@ -175,8 +175,8 @@ private struct QuestionOptionsView: View {
         if question.options.isEmpty {
             // 纯文本题：直接输入并提交
             VStack(spacing: 8) {
-                answerField(placeholder: "输入你的回答")
-                submitButton(title: "提交回答", enabled: !trimmed.isEmpty) {
+                answerField(placeholder: L10n.t(zh: "输入你的回答", en: "Type your answer"))
+                submitButton(title: L10n.t(zh: "提交回答", en: "Submit Answer"), enabled: !trimmed.isEmpty) {
                     connection.sendAnswer(trimmed)
                 }
             }
@@ -187,9 +187,9 @@ private struct QuestionOptionsView: View {
                 }
                 otherToggleRow
                 if showOther {
-                    answerField(placeholder: "其他（请输入）")
+                    answerField(placeholder: L10n.t(zh: "其他（请输入）", en: "Other (type here)"))
                 }
-                submitButton(title: "提交所选", enabled: canSubmitMulti) {
+                submitButton(title: L10n.t(zh: "提交所选", en: "Submit Selection"), enabled: canSubmitMulti) {
                     connection.sendAnswer(multiAnswer)
                 }
             }
@@ -201,8 +201,8 @@ private struct QuestionOptionsView: View {
                 otherToggleRow
                 if showOther {
                     VStack(spacing: 8) {
-                        answerField(placeholder: "其他（请输入）")
-                        submitButton(title: "提交", enabled: !trimmed.isEmpty) {
+                        answerField(placeholder: L10n.t(zh: "其他（请输入）", en: "Other (type here)"))
+                        submitButton(title: L10n.t(zh: "提交", en: "Submit"), enabled: !trimmed.isEmpty) {
                             connection.sendAnswer(trimmed)
                         }
                     }
@@ -286,7 +286,7 @@ private struct QuestionOptionsView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(accent)
                     .frame(width: 24, alignment: .leading)
-                Text("其他…")
+                Text(L10n.t(zh: "其他…", en: "Other…"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.ciForeground.opacity(0.7))
                 Spacer(minLength: 0)
@@ -334,14 +334,17 @@ private struct DiscoveryFill: View {
             DividerLine()
                 .padding(.top, 2)
 
-            Text("保持 iPhone 与 Mac 在同一网络，CodeIsland 会持续同步当前状态。")
+            Text(L10n.t(
+                zh: "保持 iPhone 与 Mac 在同一网络，CodeIsland 会持续同步当前状态。",
+                en: "Keep your iPhone and Mac on the same network — CodeIsland will keep syncing the current status."
+            ))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.ciForeground.opacity(0.42))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 18)
 
             IslandButton(
-                title: "进入演示模式",
+                title: L10n.t(zh: "进入演示模式", en: "Enter Demo Mode"),
                 icon: "play.rectangle.fill",
                 tint: Color(red: 0.25, green: 0.76, blue: 1.0),
                 accessibilityIdentifier: "companion.enterDemoMode"
@@ -391,7 +394,7 @@ private struct CompactIslandBar: View {
                     .background(Color.ciForeground.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(connection.browsing ? "停止搜索 Mac" : "搜索 Mac")
+            .accessibilityLabel(connection.browsing ? L10n.t(zh: "停止搜索 Mac", en: "Stop Searching for Mac") : L10n.t(zh: "搜索 Mac", en: "Search for Mac"))
             .accessibilityIdentifier("companion.search.toggle")
 
             AppearanceMenu()
@@ -420,7 +423,7 @@ private struct CompactIslandBar: View {
         if let peer = connection.connectedPeer {
             return peer.displayName
         }
-        return connection.browsing ? "搜索中" : "离线"
+        return connection.browsing ? L10n.t(zh: "搜索中", en: "Searching") : L10n.t(zh: "离线", en: "Offline")
     }
 }
 
@@ -442,7 +445,7 @@ private struct LiveIslandCard: View {
                         text: CompanionDisplayText.subtitle(
                             workspaceName: state.workspaceName,
                             toolName: state.toolName,
-                            fallback: "Mac 已连接"
+                            fallback: L10n.t(zh: "Mac 已连接", en: "Mac Connected")
                         ),
                         font: .system(size: 12, weight: .medium),
                         color: .ciForeground.opacity(0.58)
@@ -486,7 +489,7 @@ private struct LiveIslandCard: View {
         .background(IslandShellShape().fill(Color.ciSurface))
         .overlay(IslandShellShape().stroke(pendingTint ?? Color.ciForeground.opacity(0.08), lineWidth: pendingTint == nil ? 1 : 1.5))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("CodeIsland 状态")
+        .accessibilityLabel(L10n.t(zh: "CodeIsland 状态", en: "CodeIsland Status"))
         .accessibilityIdentifier("companion.statusCard")
     }
 
@@ -553,7 +556,7 @@ private struct DiscoveryIsland: View {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     MorphText(
-                        text: connection.connectedPeer == nil ? "等待 Mac" : "已连接 Mac",
+                        text: connection.connectedPeer == nil ? L10n.t(zh: "等待 Mac", en: "Waiting for Mac") : L10n.t(zh: "已连接 Mac", en: "Mac Connected"),
                         font: .system(size: 15, weight: .bold, design: .rounded),
                         color: .ciForeground
                     )
@@ -581,7 +584,7 @@ private struct DiscoveryIsland: View {
                     HStack(spacing: 10) {
                         ProgressView()
                             .tint(.green)
-                        Text(connection.browsing ? "正在搜索附近的 CodeIsland" : "搜索已停止")
+                        Text(connection.browsing ? L10n.t(zh: "正在搜索附近的 CodeIsland", en: "Searching for nearby CodeIsland") : L10n.t(zh: "搜索已停止", en: "Search stopped"))
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.ciForeground.opacity(0.72))
                         Spacer()
@@ -626,9 +629,9 @@ private struct DiscoveryIsland: View {
             return peer.displayName
         }
         if connection.discoveredPeers.isEmpty {
-            return connection.browsing ? "广播握手中" : "点右上角继续搜索"
+            return connection.browsing ? L10n.t(zh: "广播握手中", en: "Broadcasting handshake") : L10n.t(zh: "点右上角继续搜索", en: "Tap the top-right icon to search again")
         }
-        return "发现 \(connection.discoveredPeers.count) 台设备"
+        return L10n.t(zh: "发现 \(connection.discoveredPeers.count) 台设备", en: "Found \(connection.discoveredPeers.count) device(s)")
     }
 }
 
@@ -642,7 +645,7 @@ private struct CommandRow: View {
             if connection.isDemoMode {
                 HStack(spacing: 8) {
                     IslandButton(
-                        title: "切换演示状态",
+                        title: L10n.t(zh: "切换演示状态", en: "Cycle Demo State"),
                         icon: "arrow.triangle.2.circlepath",
                         tint: Color(red: 0.25, green: 0.76, blue: 1.0),
                         accessibilityIdentifier: "companion.demo.nextState"
@@ -650,7 +653,7 @@ private struct CommandRow: View {
                         connection.cycleDemoState()
                     }
                     IslandButton(
-                        title: "退出演示",
+                        title: L10n.t(zh: "退出演示", en: "Exit Demo"),
                         icon: "xmark",
                         tint: .red,
                         accessibilityIdentifier: "companion.demo.exit"
@@ -663,7 +666,7 @@ private struct CommandRow: View {
             if state.pendingAction == .question {
                 HStack(spacing: 8) {
                     IslandButton(
-                        title: "在 Mac 回答",
+                        title: L10n.t(zh: "在 Mac 回答", en: "Answer on Mac"),
                         icon: "arrow.up.forward.app.fill",
                         tint: Color(red: 0.35, green: 0.85, blue: 0.45),
                         accessibilityIdentifier: "companion.command.focus"
@@ -671,7 +674,7 @@ private struct CommandRow: View {
                         connection.send(.focus)
                     }
                     IslandButton(
-                        title: "跳过",
+                        title: L10n.t(zh: "跳过", en: "Skip"),
                         icon: "forward.fill",
                         tint: .orange,
                         accessibilityIdentifier: "companion.command.skip"
@@ -685,7 +688,7 @@ private struct CommandRow: View {
             } else {
                 HStack(spacing: 8) {
                     IslandButton(
-                        title: "打开 Mac 会话",
+                        title: L10n.t(zh: "打开 Mac 会话", en: "Open Mac Session"),
                         icon: "arrow.up.forward.app.fill",
                         tint: Color(red: 0.35, green: 0.85, blue: 0.45),
                         accessibilityIdentifier: "companion.command.focus"
@@ -694,7 +697,7 @@ private struct CommandRow: View {
                     }
 
                     IslandButton(
-                        title: liveActivity.isRunning ? "更新实时活动" : "开启实时活动",
+                        title: liveActivity.isRunning ? L10n.t(zh: "更新实时活动", en: "Update Live Activity") : L10n.t(zh: "开启实时活动", en: "Start Live Activity"),
                         icon: liveActivity.isRunning ? "arrow.clockwise" : "bolt.horizontal.fill",
                         tint: Color(red: 0.25, green: 0.76, blue: 1.0),
                         accessibilityIdentifier: "companion.liveActivity.primaryButton"
@@ -705,10 +708,10 @@ private struct CommandRow: View {
 
                 if state.pendingAction == .approval {
                     HStack(spacing: 8) {
-                        IslandButton(title: "批准", icon: "checkmark", tint: .orange, accessibilityIdentifier: "companion.command.approve") {
+                        IslandButton(title: L10n.t(zh: "批准", en: "Approve"), icon: "checkmark", tint: .orange, accessibilityIdentifier: "companion.command.approve") {
                             connection.send(.approveCurrentPermission)
                         }
-                        IslandButton(title: "拒绝", icon: "xmark", tint: .red, accessibilityIdentifier: "companion.command.deny") {
+                        IslandButton(title: L10n.t(zh: "拒绝", en: "Deny"), icon: "xmark", tint: .red, accessibilityIdentifier: "companion.command.deny") {
                             connection.send(.denyCurrentPermission)
                         }
                     }
@@ -736,7 +739,7 @@ private struct LiveActivityInlineButton: View {
             }
         } label: {
             Label(
-                liveActivity.isRunning ? "停止实时活动" : "同步到实时活动",
+                liveActivity.isRunning ? L10n.t(zh: "停止实时活动", en: "Stop Live Activity") : L10n.t(zh: "同步到实时活动", en: "Sync to Live Activity"),
                 systemImage: liveActivity.isRunning ? "stop.circle.fill" : "bolt.horizontal.fill"
             )
             .font(.caption.weight(.semibold))
@@ -754,7 +757,7 @@ private struct MessageStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                    Text("最近动态")
+                    Text(L10n.t(zh: "最近动态", en: "Recent Activity"))
                     .font(.system(size: 13, weight: .bold, design: .monospaced))
                     .foregroundStyle(.ciForeground.opacity(0.45))
                     .textCase(.uppercase)
@@ -766,7 +769,7 @@ private struct MessageStrip: View {
             if messages.isEmpty {
                 HStack(spacing: 8) {
                     PulseDot(status: .idle)
-                    Text("等待下一条同步消息")
+                    Text(L10n.t(zh: "等待下一条同步消息", en: "Waiting for the next synced message"))
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.ciForeground.opacity(0.5))
                     Spacer(minLength: 0)
@@ -863,7 +866,7 @@ private struct StandByIsland: View {
                             color: .ciForeground
                         )
                         MorphText(
-                            text: sessions.count > 1 ? "\(sessions.count) 个会话 · \(activeCount) 个活跃" : state.status.label,
+                            text: sessions.count > 1 ? L10n.t(zh: "\(sessions.count) 个会话 · \(activeCount) 个活跃", en: "\(sessions.count) sessions · \(activeCount) active") : state.status.label,
                             font: .system(size: 22, weight: .semibold, design: .rounded),
                             color: activeCount > 0 ? .green : statusColor(state.status)
                         )
@@ -879,7 +882,7 @@ private struct StandByIsland: View {
                     HeroTranscript(messages: state.messages)
                 } else {
                     MorphText(
-                        text: CompanionDisplayText.workspace(state.workspaceName) ?? "CodeIsland 已连接",
+                        text: CompanionDisplayText.workspace(state.workspaceName) ?? L10n.t(zh: "CodeIsland 已连接", en: "CodeIsland Connected"),
                         font: .system(size: 24, weight: .medium, design: .rounded),
                         color: .ciForeground.opacity(0.82),
                         lineLimit: 4
@@ -938,9 +941,9 @@ private enum StandByGrouping: CaseIterable {
 
     var label: String {
         switch self {
-        case .none: return "全部"
-        case .status: return "按状态"
-        case .cli: return "按 CLI"
+        case .none: return L10n.t(zh: "全部", en: "All")
+        case .status: return L10n.t(zh: "按状态", en: "By Status")
+        case .cli: return L10n.t(zh: "按 CLI", en: "By CLI")
         }
     }
 
@@ -990,7 +993,7 @@ private struct StandBySessionBoard: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Text("会话")
+            Text(L10n.t(zh: "会话", en: "Sessions"))
                 .font(.system(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(.ciForeground)
             StandByCountBadge(count: sessions.count, activeCount: activeCount)
@@ -1016,7 +1019,7 @@ private struct StandBySessionBoard: View {
     private var groupedSessions: [StandByGroup] {
         switch grouping {
         case .none:
-            return [StandByGroup(id: "全部", items: sessions)]
+            return [StandByGroup(id: L10n.t(zh: "全部", en: "All"), items: sessions)]
         case .status:
             let order: [CompanionStatus] = [.waitingApproval, .waitingQuestion, .running, .processing, .idle]
             return order.compactMap { status in
@@ -1235,7 +1238,7 @@ private struct StandByCountBadge: View {
     let activeCount: Int
 
     var body: some View {
-        Text(activeCount > 0 ? "\(activeCount) 活跃" : "\(count) 总计")
+        Text(activeCount > 0 ? L10n.t(zh: "\(activeCount) 活跃", en: "\(activeCount) active") : L10n.t(zh: "\(count) 总计", en: "\(count) total"))
             .font(.system(size: 12, weight: .black, design: .rounded))
             .foregroundStyle(activeCount > 0 ? .green : .ciForeground.opacity(0.64))
             .padding(.horizontal, 9)
@@ -1273,7 +1276,7 @@ private struct AppearanceMenu: View {
 
     var body: some View {
         Menu {
-            Picker("外观", selection: $appearanceRaw) {
+            Picker(L10n.t(zh: "外观", en: "Appearance"), selection: $appearanceRaw) {
                 ForEach(AppAppearance.allCases) { mode in
                     Label(mode.label, systemImage: mode.icon).tag(mode.rawValue)
                 }
@@ -1286,7 +1289,7 @@ private struct AppearanceMenu: View {
                 .background(Color.ciForeground.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("外观")
+        .accessibilityLabel(L10n.t(zh: "外观", en: "Appearance"))
         .accessibilityIdentifier("companion.appearance.menu")
     }
 }
@@ -1428,7 +1431,7 @@ private struct ConnectionDot: View {
         PulseDot(status: active ? .running : (browsing ? .processing : .idle))
         .frame(width: 30, height: 30)
         .background(Color.ciForeground.opacity(0.08), in: Capsule())
-        .accessibilityLabel(active ? "Mac 已连接" : (browsing ? "正在搜索 Mac" : "Mac 未连接"))
+        .accessibilityLabel(active ? L10n.t(zh: "Mac 已连接", en: "Mac Connected") : (browsing ? L10n.t(zh: "正在搜索 Mac", en: "Searching for Mac") : L10n.t(zh: "Mac 未连接", en: "Mac Not Connected")))
     }
 }
 
@@ -1533,7 +1536,7 @@ private struct LiveActivityDiagnosticStrip: View {
             Button {
                 liveActivity.stopAll()
             } label: {
-                Label("清理已有实时活动后重试", systemImage: "trash")
+                Label(L10n.t(zh: "清理已有实时活动后重试", en: "Clear existing Live Activities and retry"), systemImage: "trash")
                     .font(.caption.weight(.bold))
                     // 这张通知卡固定为深蓝底（两个主题一致），内部文字保持浅色以保证对比。
                     .foregroundStyle(.white.opacity(0.82))
@@ -1593,9 +1596,9 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .system: return "跟随系统"
-        case .light: return "浅色"
-        case .dark: return "深色"
+        case .system: return L10n.t(zh: "跟随系统", en: "System")
+        case .light: return L10n.t(zh: "浅色", en: "Light")
+        case .dark: return L10n.t(zh: "深色", en: "Dark")
         }
     }
 

@@ -16,11 +16,11 @@ struct CodeIslandSessionActivityPreview: Codable, Hashable, Identifiable {
 
     var statusLabel: String {
         switch status {
-        case "processing": return "处理"
-        case "running": return "运行"
-        case "waitingApproval": return "待批准"
-        case "waitingQuestion": return "待回答"
-        default: return "空闲"
+        case "processing": return L10n.t(zh: "处理", en: "Working")
+        case "running": return L10n.t(zh: "运行", en: "Running")
+        case "waitingApproval": return L10n.t(zh: "待批准", en: "Needs Approval")
+        case "waitingQuestion": return L10n.t(zh: "待回答", en: "Needs Answer")
+        default: return L10n.t(zh: "空闲", en: "Idle")
         }
     }
 
@@ -46,11 +46,11 @@ struct CodeIslandActivityAttributes: ActivityAttributes {
 
         var statusLabel: String {
             switch status {
-            case "processing": return "处理中"
-            case "running": return "运行中"
-            case "waitingApproval": return "待批准"
-            case "waitingQuestion": return "待回答"
-            default: return "空闲"
+            case "processing": return L10n.t(zh: "处理中", en: "Processing")
+            case "running": return L10n.t(zh: "运行中", en: "Running")
+            case "waitingApproval": return L10n.t(zh: "待批准", en: "Needs Approval")
+            case "waitingQuestion": return L10n.t(zh: "待回答", en: "Needs Answer")
+            default: return L10n.t(zh: "空闲", en: "Idle")
             }
         }
 
@@ -60,11 +60,11 @@ struct CodeIslandActivityAttributes: ActivityAttributes {
 
         var compactStatusLabel: String {
             switch status {
-            case "waitingApproval": return "待批"
-            case "waitingQuestion": return "待答"
-            case "processing": return "处理"
-            case "running": return "运行"
-            default: return "空闲"
+            case "waitingApproval": return L10n.t(zh: "待批", en: "OK?")
+            case "waitingQuestion": return L10n.t(zh: "待答", en: "Q?")
+            case "processing": return L10n.t(zh: "处理", en: "Busy")
+            case "running": return L10n.t(zh: "运行", en: "Run")
+            default: return L10n.t(zh: "空闲", en: "Idle")
             }
         }
 

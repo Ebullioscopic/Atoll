@@ -42,7 +42,7 @@ final class LiveActivityController: ObservableObject {
 
     func startOrUpdate(with payload: CompanionStatePayload) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            lastError = "这台 iPhone 没有开启实时活动。"
+            lastError = L10n.t(zh: "这台 iPhone 没有开启实时活动。", en: "Live Activities are turned off on this iPhone.")
             return
         }
 
