@@ -55,14 +55,15 @@ struct JSONLUsageParser {
         let weekStart = now.addingTimeInterval(-7 * 86400)
 
         for file in files {
-            guard let content = try? String(contentsOf: file, encoding: .utf8) else { continue }
-            for line in content.split(separator: "\n") {
-                guard let rec = parseLine(String(line)) else { continue }
+            // Stream the file line-by-line instead of loading the whole JSONL log
+            // (potentially many MB) into a String plus a full array of substrings.
+            enumerateLines(of: file) { line in
+                guard let rec = parseLine(line) else { return }
                 if let key = rec.dedupKey {
-                    if seen.contains(key) { continue }
+                    if seen.contains(key) { return }
                     seen.insert(key)
                 }
-                guard rec.timestamp >= weekStart else { continue }
+                guard rec.timestamp >= weekStart else { return }
                 let cost = ModelPricing.cost(model: rec.model, inputTokens: rec.inputTokens, outputTokens: rec.outputTokens)
                 func add(_ t: inout UsageTotals) {
                     t.inputTokens += rec.inputTokens
@@ -82,5 +83,32 @@ struct JSONLUsageParser {
             .sorted { $0.totals.costUSD > $1.totals.costUSD }
         snapshot.lastUpdated = now
         return snapshot
+    }
+
+    /// Reads a file in fixed-size chunks and invokes `handler` once per non-empty
+    /// line, without ever holding the entire file in memory. Runs synchronously on
+    /// the caller's thread (aggregation already happens off the main thread).
+    private static func enumerateLines(of file: URL, _ handler: (String) -> Void) {
+        guard let fh = try? FileHandle(forReadingFrom: file) else { return }
+        defer { try? fh.close() }
+
+        let chunkSize = 1 << 16 // 64 KB
+        let newline = UInt8(0x0A)
+        var buffer = Data()
+
+        while let chunk = try? fh.read(upToCount: chunkSize), !chunk.isEmpty {
+            buffer.append(chunk)
+            while let newlineIndex = buffer.firstIndex(of: newline) {
+                let lineData = buffer.subdata(in: buffer.startIndex..<newlineIndex)
+                buffer.removeSubrange(buffer.startIndex...newlineIndex)
+                if !lineData.isEmpty, let line = String(data: lineData, encoding: .utf8) {
+                    handler(line)
+                }
+            }
+        }
+
+        if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) {
+            handler(line)
+        }
     }
 }
