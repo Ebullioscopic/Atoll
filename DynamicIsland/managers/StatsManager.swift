@@ -478,7 +478,7 @@ class StatsManager: ObservableObject {
         diskWriteHistory = Array(repeating: 0.0, count: maxHistoryPoints)
         
         // Initialize baseline network stats
-        let initialStats = getNetworkStats()
+        let initialStats = aggregateNetworkStats(from: snapshotNetworkInterfaces())
         previousNetworkStats = initialStats
         previousTimestamp = Date()
         
@@ -554,7 +554,7 @@ class StatsManager: ObservableObject {
         print("StatsManager: Starting monitoring...")
         
         // Reset baseline for accurate measurement
-        let initialStats = getNetworkStats()
+        let initialStats = aggregateNetworkStats(from: snapshotNetworkInterfaces())
         previousNetworkStats = initialStats
         
         let initialDiskStats = getDiskStats()
@@ -672,8 +672,9 @@ class StatsManager: ObservableObject {
         let newGpuUsage = gpuSnapshot.usage
         let coreUsage = collectCPUCoreUsage()
         
-        // Calculate network speeds
-        let currentNetworkStats = getNetworkStats()
+        // Calculate network speeds (single getifaddrs walk feeds both totals and per-interface metrics)
+        let networkSnapshots = snapshotNetworkInterfaces()
+        let currentNetworkStats = aggregateNetworkStats(from: networkSnapshots)
         let currentTime = Date()
         let timeInterval = currentTime.timeIntervalSince(previousTimestamp)
         
@@ -771,9 +772,11 @@ class StatsManager: ObservableObject {
         previousNetworkStats = currentNetworkStats
         previousDiskStats = currentDiskStats
         previousTimestamp = currentTime
-        networkInterfaces = collectNetworkInterfaces(deltaTime: timeInterval)
+        networkInterfaces = collectNetworkInterfaces(from: networkSnapshots, deltaTime: timeInterval)
         diskDevices = collectDiskDevices()
-        refreshProcessStatsIfNeeded(force: true)
+        // Periodic path: honor the throttle so /bin/ps runs at the intended 0.5Hz, not ~1Hz.
+        // force: true is reserved for explicit user-triggered manual refreshes.
+        refreshProcessStatsIfNeeded(force: false)
     }
     
     private func updateHistory(value: Double, history: inout [Double]) {
@@ -1027,26 +1030,29 @@ class StatsManager: ObservableObject {
         return usages
     }
 
-    private func collectNetworkInterfaces(deltaTime: TimeInterval) -> [NetworkInterfaceMetrics] {
+    private struct NetworkInterfaceSnapshot {
+        var name: String
+        var flags: UInt32
+        var bytesIn: UInt64
+        var bytesOut: UInt64
+        var ipv4: String?
+        var ipv6: String?
+    }
+
+    /// Performs a single `getifaddrs` walk and accumulates per-interface counters/addresses.
+    /// Returns `nil` if the syscall fails so callers can preserve prior state.
+    private func snapshotNetworkInterfaces() -> [NetworkInterfaceSnapshot]? {
         var interfacesPointer: UnsafeMutablePointer<ifaddrs>? = nil
         guard getifaddrs(&interfacesPointer) == 0, let startPointer = interfacesPointer else {
-            return networkInterfaces
+            return nil
         }
         defer { freeifaddrs(startPointer) }
-        struct InterfaceAccumulator {
-            var name: String
-            var flags: UInt32
-            var bytesIn: UInt64
-            var bytesOut: UInt64
-            var ipv4: String?
-            var ipv6: String?
-        }
-        var accumulators: [String: InterfaceAccumulator] = [:]
+        var accumulators: [String: NetworkInterfaceSnapshot] = [:]
         var pointer: UnsafeMutablePointer<ifaddrs>? = startPointer
         while let current = pointer {
             let interface = current.pointee
             let name = String(cString: interface.ifa_name)
-            var accumulator = accumulators[name] ?? InterfaceAccumulator(name: name, flags: interface.ifa_flags, bytesIn: 0, bytesOut: 0, ipv4: nil, ipv6: nil)
+            var accumulator = accumulators[name] ?? NetworkInterfaceSnapshot(name: name, flags: interface.ifa_flags, bytesIn: 0, bytesOut: 0, ipv4: nil, ipv6: nil)
             if let addr = interface.ifa_addr {
                 switch Int32(addr.pointee.sa_family) {
                 case AF_LINK:
@@ -1065,9 +1071,40 @@ class StatsManager: ObservableObject {
             accumulators[name] = accumulator
             pointer = interface.ifa_next
         }
+        return Array(accumulators.values)
+    }
+
+    /// Aggregates total in/out bytes across physical (en*/Wi-Fi) interfaces from a snapshot.
+    private func aggregateNetworkStats(from snapshots: [NetworkInterfaceSnapshot]?) -> (bytesIn: UInt64, bytesOut: UInt64) {
+        var totalBytesIn: UInt64 = 0
+        var totalBytesOut: UInt64 = 0
+        guard let snapshots else { return (totalBytesIn, totalBytesOut) }
+        for snapshot in snapshots {
+            let name = snapshot.name
+            // Skip loopback and virtual interfaces, but include en0, en1, etc. and Wi-Fi interfaces
+            guard !name.hasPrefix("lo") &&
+                  !name.hasPrefix("gif") &&
+                  !name.hasPrefix("stf") &&
+                  !name.hasPrefix("bridge") &&
+                  !name.hasPrefix("utun") &&
+                  !name.hasPrefix("awdl") else {
+                continue
+            }
+            if name.hasPrefix("en") || name.contains("Wi-Fi") {
+                totalBytesIn += snapshot.bytesIn
+                totalBytesOut += snapshot.bytesOut
+            }
+        }
+        return (totalBytesIn, totalBytesOut)
+    }
+
+    private func collectNetworkInterfaces(from snapshots: [NetworkInterfaceSnapshot]?, deltaTime: TimeInterval) -> [NetworkInterfaceMetrics] {
+        guard let snapshots else {
+            return networkInterfaces
+        }
         var results: [NetworkInterfaceMetrics] = []
         var updatedCounters: [String: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
-        for accumulator in accumulators.values {
+        for accumulator in snapshots {
             guard shouldIncludeInterface(name: accumulator.name) else { continue }
             let previous = previousInterfaceCounters[accumulator.name] ?? (accumulator.bytesIn, accumulator.bytesOut)
             let deltaIn = accumulator.bytesIn >= previous.bytesIn ? accumulator.bytesIn - previous.bytesIn : 0
@@ -1249,50 +1286,6 @@ class StatsManager: ObservableObject {
         case .loopback:
             return 4
         }
-    }
-    
-    private func getNetworkStats() -> (bytesIn: UInt64, bytesOut: UInt64) {
-        // Use BSD sockets to get network interface statistics
-        var totalBytesIn: UInt64 = 0
-        var totalBytesOut: UInt64 = 0
-        
-        var ifaddrs: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&ifaddrs) == 0 else {
-            return (totalBytesIn, totalBytesOut)
-        }
-        
-        defer { freeifaddrs(ifaddrs) }
-        
-        var ptr = ifaddrs
-        while ptr != nil {
-            defer { ptr = ptr?.pointee.ifa_next }
-            
-            guard let interface = ptr?.pointee,
-                  interface.ifa_addr.pointee.sa_family == UInt8(AF_LINK) else {
-                continue
-            }
-            
-            let name = String(cString: interface.ifa_name)
-            // Skip loopback and virtual interfaces, but include en0, en1, etc. and Wi-Fi interfaces
-            guard !name.hasPrefix("lo") && 
-                  !name.hasPrefix("gif") && 
-                  !name.hasPrefix("stf") && 
-                  !name.hasPrefix("bridge") &&
-                  !name.hasPrefix("utun") &&
-                  !name.hasPrefix("awdl") else {
-                continue
-            }
-            
-            // Only count active interfaces (en0, en1, etc.)
-            if name.hasPrefix("en") || name.contains("Wi-Fi") {
-                if let data = interface.ifa_data?.assumingMemoryBound(to: if_data.self) {
-                    totalBytesIn += UInt64(data.pointee.ifi_ibytes)
-                    totalBytesOut += UInt64(data.pointee.ifi_obytes)
-                }
-            }
-        }
-        
-        return (totalBytesIn, totalBytesOut)
     }
     
     private func getDiskStats() -> (bytesRead: UInt64, bytesWritten: UInt64) {
