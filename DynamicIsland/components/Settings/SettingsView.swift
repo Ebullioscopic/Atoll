@@ -3763,6 +3763,10 @@ private extension DevicesSettingsView {
                 case .threeD:
                     if let url = Bundle.main.url(
                         forResource: BluetoothAudioDeviceType.airpods.inlineHUDAnimationBaseName,
+                        withExtension: "mov",
+                        subdirectory: "BluetoothHUDAnimations"
+                    ) ?? Bundle.main.url(
+                        forResource: BluetoothAudioDeviceType.airpods.inlineHUDAnimationBaseName,
                         withExtension: "mov"
                     ) {
                         SettingsLoopingVideoIcon(url: url, size: CGSize(width: 28, height: 28))
