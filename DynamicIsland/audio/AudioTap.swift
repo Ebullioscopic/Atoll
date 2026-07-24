@@ -172,8 +172,21 @@ class AudioTap: NSObject {
         let runningApps = NSWorkspace.shared.runningApplications
         var targetPIDs: [AudioDeviceID] = []
 
+        // AirPods/Bluetooth output + Spotify don't mix: process-tapping Spotify into our
+        // private aggregate device disturbs the system Now Playing / AVRCP session, so the
+        // AirPods pause gesture finds no target and macOS falls back to Siri. Spotify is
+        // controlled via AppleScript and registers weakly with MediaRemote, which is why
+        // only it is affected (Apple Music etc. stay registered). While a Bluetooth route is
+        // active, skip tapping Spotify to preserve media control — the visualizer stays live
+        // for Spotify on wired/built-in output and for every other app on any output.
+        let bluetoothOutputActive = AudioRouteManager.shared.isDefaultOutputBluetooth()
+
         for app in runningApps {
             if let bundleID = app.bundleIdentifier, targetBundleIDs.contains(bundleID) {
+                if bundleID == SpotifyController.bundleIdentifier, bluetoothOutputActive {
+                    print("⏭️ [AudioTap] Bluetooth output active — skipping Spotify tap to preserve AirPods media control")
+                    continue
+                }
                 if let deviceID = getAudioObjectID(for: app.processIdentifier) {
                     targetPIDs.append(deviceID)
                     print("🎯 [AudioTap] Found \(app.localizedName ?? "App") with PID: \(app.processIdentifier), AudioObjectID: \(deviceID)")

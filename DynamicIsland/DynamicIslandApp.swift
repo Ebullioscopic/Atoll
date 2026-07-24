@@ -237,6 +237,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 AudioTap.shared.restartCapture()
             }
         }
+
+        // Restart capture when the audio output route changes (e.g. AirPods connect/
+        // disconnect). AudioTap skips Spotify while a Bluetooth route is active to keep the
+        // AirPods pause gesture working, so the tap must be rebuilt to re-include or exclude
+        // Spotify whenever the route flips.
+        NotificationCenter.default.addObserver(
+            forName: .systemAudioRouteDidChange,
+            object: nil,
+            queue: .main
+        ) { _ in
+            if Defaults[.enableRealTimeWaveform] {
+                print("🔀 [AudioTap] Audio route changed, restarting capture...")
+                AudioTap.shared.restartCapture()
+            }
+        }
     }
     
     func applicationWillTerminate(_ notification: Notification) {
