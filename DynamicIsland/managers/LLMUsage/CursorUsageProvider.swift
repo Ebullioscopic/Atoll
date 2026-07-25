@@ -13,12 +13,12 @@ struct CursorUsageProvider: UsageProvider {
     func fetchSnapshot(now: Date) async throws -> UsageSnapshot {
         let quota = await quotaClient.fetchLimits()
         guard let cookie = CursorTokenStore.sessionCookie() else {
-            guard quota.session != nil || quota.week != nil else {
+            guard !quota.isEmpty else {
                 throw UsageError.notConfigured("Cursor not signed in")
             }
             var snapshot = UsageSnapshot()
-            snapshot.sessionLimit = quota.session
-            snapshot.weekLimit = quota.week
+            snapshot.sessionLimit = quota.cursorModels
+            snapshot.weekLimit = quota.otherModels
             snapshot.lastUpdated = now
             return snapshot
         }
@@ -31,8 +31,8 @@ struct CursorUsageProvider: UsageProvider {
             throw UsageError.notConfigured("Cursor usage request failed")
         }
         var snapshot = try decode(data, now: now)
-        snapshot.sessionLimit = snapshot.sessionLimit ?? quota.session
-        snapshot.weekLimit = snapshot.weekLimit ?? quota.week
+        snapshot.sessionLimit = snapshot.sessionLimit ?? quota.cursorModels
+        snapshot.weekLimit = snapshot.weekLimit ?? quota.otherModels
         return snapshot
     }
 
