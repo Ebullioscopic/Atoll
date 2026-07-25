@@ -580,7 +580,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1122;
+				CURRENT_PROJECT_VERSION = 1160;
 				DEVELOPMENT_ASSET_PATHS = "\"DynamicIsland/Preview Content\"";
 				DEVELOPMENT_TEAM = 9Y64TRM77N;
 				ENABLE_APP_SANDBOX = NO;
@@ -615,14 +615,14 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Atoll needs Reminders access to show your reminders";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 2.3.0;
+				MARKETING_VERSION = 2.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Ebullioscopic.Atoll.dev;
 				PRODUCT_NAME = Atoll;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -653,7 +653,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1122;
+				CURRENT_PROJECT_VERSION = 1160;
 				DEVELOPMENT_ASSET_PATHS = "\"DynamicIsland/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = 9Y64TRM77N;
@@ -689,14 +689,14 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Atoll needs Reminders access to show your reminders";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
-				MARKETING_VERSION = 2.3.0;
+				MARKETING_VERSION = 2.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Ebullioscopic.Atoll;
 				PRODUCT_NAME = Atoll;
 				PROVISIONING_PROFILE_SPECIFIER = "";
