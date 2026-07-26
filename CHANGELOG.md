@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
-- Improved the Dutch localization with missing translations, corrected terminology, and wording aligned with Apple's Dutch macOS conventions.
+- Improved the Dutch localization by adding missing translations, corrected terminology, and wording aligned with Apple's Dutch macOS conventions.
 
 ### Fixed
 - Fixed an issue where `BluetoothHUDAnimations` (.mov files) were missing in release builds.
