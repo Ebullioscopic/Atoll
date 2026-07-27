@@ -58,7 +58,7 @@
 
 /* Begin PBXFileReference section */
 		0796C681D7B557C0110EC381 /* DynamicIslandTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicIslandTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		47C39E67B09152F6665ED683 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		47C39E67B09152F6665ED683 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		4A9C58195E197C19F691DA62 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		54078F29304A9DBBEFBDF932 /* DynamicIslandUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DynamicIslandUITests.swift; sourceTree = "<group>"; };
 		7E25ECA02E6C6C3800700E72 /* CoreBrightness.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBrightness.framework; path = /System/Library/PrivateFrameworks/CoreBrightness.framework; sourceTree = "<absolute>"; };
