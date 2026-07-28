@@ -63,7 +63,7 @@ struct CursorQuotaClient {
             UsageLimit(used: displayPercent($0), limit: 100, resetsAt: payload.resetsAt)
         }
         let otherModels = payload.otherModelsUsedPercent.map {
-            UsageLimit(used: $0, limit: 100, resetsAt: payload.resetsAt)
+            UsageLimit(used: displayPercent($0), limit: 100, resetsAt: payload.resetsAt)
         }
         if cursorModels == nil, otherModels == nil, let combined = payload.combinedUsedPercent {
             return CursorQuotaLimits(
