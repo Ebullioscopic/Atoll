@@ -58,7 +58,13 @@ final class ShelfItemViewModel: ObservableObject {
         let bookmark = Bookmark(data: bookmarkData)
         let (url, _) = await bookmark.resolveAsync()
         guard let resolvedURL = url else { return }
-        
+
+        // Self-healing: refresh the cached path in case the file moved since it
+        // was dropped. No-op when unchanged, so it won't churn persistence.
+        let itemID = item.id
+        let resolvedPath = resolvedURL.standardizedFileURL.path
+        await MainActor.run { ShelfStateViewModel.shared.applyCachedPaths([itemID: resolvedPath]) }
+
         // Load display name
         let name = await loadDisplayNameFromURL(resolvedURL)
         await MainActor.run { self.displayName = name }
@@ -693,7 +699,11 @@ final class ShelfItemViewModel: ObservableObject {
                             await TemporaryFileStorageService.shared.createZip(from: urls)
                         }) {
                             if let bookmark = try? Bookmark(url: zipTempURL) {
-                                let newItem = ShelfItem(kind: .file(bookmark: bookmark.data), isTemporary: true)
+                                let newItem = ShelfItem(
+                                    kind: .file(bookmark: bookmark.data),
+                                    isTemporary: true,
+                                    cachedPath: zipTempURL.standardizedFileURL.path
+                                )
                                 ShelfStateViewModel.shared.add([newItem])
                             } else {
                                 // Fallback: reveal the temporary file in Finder
@@ -900,7 +910,11 @@ final class ShelfItemViewModel: ObservableObject {
                                     try FileManager.default.moveItem(at: fileURL, to: newURL)
 
                                     if let newBookmark = try? Bookmark(url: newURL) {
-                                        ShelfStateViewModel.shared.updateBookmark(for: item, bookmark: newBookmark.data)
+                                        ShelfStateViewModel.shared.updateBookmark(
+                                            for: item,
+                                            bookmark: newBookmark.data,
+                                            path: newURL.standardizedFileURL.path
+                                        )
                                     }
                                 } catch {
                                     print("❌ Failed to rename file: \(error.localizedDescription)")

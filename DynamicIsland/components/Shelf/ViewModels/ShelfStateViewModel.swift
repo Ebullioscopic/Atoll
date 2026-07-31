@@ -39,7 +39,7 @@ final class ShelfStateViewModel: ObservableObject {
     var isEmpty: Bool { items.isEmpty }
 
     // Queue for deferred bookmark updates to avoid publishing during view updates
-    private var pendingBookmarkUpdates: [ShelfItem.ID: Data] = [:]
+    private var pendingBookmarkUpdates: [ShelfItem.ID: (bookmark: Data, path: String?)] = [:]
     private var updateTask: Task<Void, Never>?
     
     // Cache for URL-to-item mapping to avoid resolving all bookmarks for lookup
@@ -48,8 +48,48 @@ final class ShelfStateViewModel: ObservableObject {
 
     private init() {
         items = ShelfPersistenceService.shared.load()
+        backfillCachedPaths()
     }
 
+    /// Resolves `cachedPath` for items persisted before the path cache existed,
+    /// off the main actor. Once this lands, `identityKey` and `resolvedFileURL`
+    /// never touch the disk on the main actor — which is what keeps an
+    /// unreachable network mount from stalling the UI.
+    private func backfillCachedPaths() {
+        let pending: [(ShelfItem.ID, Data)] = items.compactMap { item in
+            guard item.cachedPath == nil, case .file(let data) = item.kind else { return nil }
+            return (item.id, data)
+        }
+        guard !pending.isEmpty else { return }
+
+        Task.detached(priority: .utility) {
+            var resolved: [ShelfItem.ID: String] = [:]
+            for (itemID, data) in pending {
+                if let url = Bookmark(data: data).resolve().url {
+                    resolved[itemID] = url.standardizedFileURL.path
+                }
+            }
+            guard !resolved.isEmpty else { return }
+            await MainActor.run { ShelfStateViewModel.shared.applyCachedPaths(resolved) }
+        }
+    }
+
+    /// Applies resolved paths in a single mutation — writing `items[idx]` inside
+    /// a loop would fire `didSet` (and a full JSON save) once per item.
+    func applyCachedPaths(_ paths: [ShelfItem.ID: String]) {
+        guard !paths.isEmpty else { return }
+        var updated = items
+        var changed = false
+        for idx in updated.indices {
+            guard let path = paths[updated[idx].id], updated[idx].cachedPath != path else { continue }
+            updated[idx].cachedPath = path
+            changed = true
+        }
+        if changed {
+            items = updated
+            invalidateURLCache()
+        }
+    }
 
     func add(_ newItems: [ShelfItem]) {
         guard !newItems.isEmpty else { return }
@@ -57,19 +97,15 @@ final class ShelfStateViewModel: ObservableObject {
         // Deduplicate by identityKey while preserving order (existing first)
         var seen: Set<String> = Set(merged.map { $0.identityKey })
         var addedIDs: [String] = []
-        for it in newItems {
-            let key = it.identityKey
-            if !seen.contains(key) {
-                merged.append(it)
-                seen.insert(key)
-                addedIDs.append(it.id.uuidString)
-            }
+        for it in newItems where seen.insert(it.identityKey).inserted {
+            merged.append(it)
+            addedIDs.append(it.id.uuidString)
         }
+        // Every duplicate-only drop would otherwise trigger a save and a publish.
+        guard !addedIDs.isEmpty else { return }
         items = merged
         invalidateURLCache()
-        if !addedIDs.isEmpty {
-            ExtensionRPCServer.shared.notifyShelfItemsChanged(itemIDs: addedIDs, action: "added")
-        }
+        ExtensionRPCServer.shared.notifyShelfItemsChanged(itemIDs: addedIDs, action: "added")
     }
 
     func remove(_ item: ShelfItem) {
@@ -79,32 +115,37 @@ final class ShelfStateViewModel: ObservableObject {
         ExtensionRPCServer.shared.notifyShelfItemsChanged(itemIDs: [item.id.uuidString], action: "removed")
     }
 
-    func updateBookmark(for item: ShelfItem, bookmark: Data) {
+    /// Pass `path` whenever the caller already resolved the new bookmark —
+    /// leaving `cachedPath` pointing at the old location would make dedup treat
+    /// a renamed file as a new one.
+    func updateBookmark(for item: ShelfItem, bookmark: Data, path: String? = nil) {
         guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
-        if case .file = items[idx].kind {
-            items[idx].kind = .file(bookmark: bookmark)
-        }
+        guard case .file = items[idx].kind else { return }
+        items[idx].kind = .file(bookmark: bookmark)
+        items[idx].cachedPath = path ?? Bookmark(data: bookmark).resolveWithoutMounting()?.standardizedFileURL.path
         invalidateURLCache()
     }
 
-    private func scheduleDeferredBookmarkUpdate(for item: ShelfItem, bookmark: Data) {
-        pendingBookmarkUpdates[item.id] = bookmark
-        
+    private func scheduleDeferredBookmarkUpdate(for item: ShelfItem, bookmark: Data, path: String?) {
+        pendingBookmarkUpdates[item.id] = (bookmark, path)
+
         // Cancel existing task and schedule a new one
         updateTask?.cancel()
         updateTask = Task { @MainActor [weak self] in
             await Task.yield()
-            
+
             guard let self = self else { return }
-            
-            for (itemID, bookmarkData) in self.pendingBookmarkUpdates {
+
+            for (itemID, update) in self.pendingBookmarkUpdates {
                 if let idx = self.items.firstIndex(where: { $0.id == itemID }),
                    case .file = self.items[idx].kind {
-                    self.items[idx].kind = .file(bookmark: bookmarkData)
+                    self.items[idx].kind = .file(bookmark: update.bookmark)
+                    if let path = update.path { self.items[idx].cachedPath = path }
                 }
             }
-            
+
             self.pendingBookmarkUpdates.removeAll()
+            self.invalidateURLCache()
         }
     }
 
@@ -147,9 +188,13 @@ final class ShelfStateViewModel: ObservableObject {
         guard case .file(let bookmarkData) = item.kind else { return nil }
         let bookmark = Bookmark(data: bookmarkData)
         let result = await bookmark.resolveAsync()
+        let path = result.url?.standardizedFileURL.path
         if let refreshed = result.refreshedData, refreshed != bookmarkData {
             NSLog("Bookmark for \(item) stale; refreshing")
-            await MainActor.run { scheduleDeferredBookmarkUpdate(for: item, bookmark: refreshed) }
+            await MainActor.run { scheduleDeferredBookmarkUpdate(for: item, bookmark: refreshed, path: path) }
+        } else if let path {
+            // Self-healing: the file may have moved since the path was cached.
+            await MainActor.run { applyCachedPaths([item.id: path]) }
         }
         return result.url
     }
@@ -159,9 +204,12 @@ final class ShelfStateViewModel: ObservableObject {
         guard case .file(let bookmarkData) = item.kind else { return nil }
         let bookmark = Bookmark(data: bookmarkData)
         let result = await bookmark.resolveAsync()
+        let path = result.url?.standardizedFileURL.path
         if let refreshed = result.refreshedData, refreshed != bookmarkData {
             NSLog("Bookmark for \(item) stale; refreshing")
-            await MainActor.run { updateBookmark(for: item, bookmark: refreshed) }
+            await MainActor.run { updateBookmark(for: item, bookmark: refreshed, path: path) }
+        } else if let path {
+            await MainActor.run { applyCachedPaths([item.id: path]) }
         }
         return result.url
     }
@@ -188,19 +236,6 @@ final class ShelfStateViewModel: ObservableObject {
         return nil
     }
 
-    // Sync wrapper for backward compatibility
-    func findItemSync(by url: URL) -> ShelfItem? {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: ShelfItem?
-        Task.detached { [weak self] in
-            guard let self = self else { return }
-            result = await self.findItem(by: url)
-            semaphore.signal()
-        }
-        _ = semaphore.wait(timeout: .now() + 5.0)
-        return result
-    }
-    
     private func rebuildURLCache() async {
         urlToItemCache.removeAll()
         for item in items {
@@ -226,18 +261,5 @@ final class ShelfStateViewModel: ObservableObject {
             if let u = await resolveFileURLAsync(for: it) { urls.append(u) }
         }
         return urls
-    }
-
-    // Sync wrapper for backward compatibility - resolves on background thread with timeout
-    func resolveFileURLs(for items: [ShelfItem]) -> [URL] {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: [URL] = []
-        Task.detached { [weak self] in
-            guard let self = self else { return }
-            result = await self.resolveFileURLsAsync(for: items)
-            semaphore.signal()
-        }
-        _ = semaphore.wait(timeout: .now() + 10.0)
-        return result
     }
 }
