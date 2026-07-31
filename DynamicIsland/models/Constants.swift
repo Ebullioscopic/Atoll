@@ -1082,6 +1082,10 @@ extension Defaults.Keys {
         static let localSendDevicePickerGlassMode = Key<LockScreenGlassCustomizationMode>("localSendDevicePickerGlassMode", default: .standard)
         static let localSendDevicePickerLiquidGlassVariant = Key<LiquidGlassVariant>("localSendDevicePickerLiquidGlassVariant", default: .v11)
         static let copyOnDrag = Key<Bool>("copyOnDrag", default: false)
+        // Off by default: offering `.move` to another app lets Finder move the
+        // original out from under the user when the destination is on the same
+        // volume, which reads as data loss.
+        static let allowMoveOnDrag = Key<Bool>("allowMoveOnDrag", default: false)
         static let autoRemoveShelfItems = Key<Bool>("autoRemoveShelfItems", default: false)
         static let expandedDragDetection = Key<Bool>("expandedDragDetection", default: true)
     
