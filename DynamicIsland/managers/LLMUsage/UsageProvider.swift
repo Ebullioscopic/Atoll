@@ -27,12 +27,14 @@ struct UsageTotals: Equatable {
     var outputTokens: Int = 0
     var costUSD: Double = 0
     var hasUnpricedModel: Bool = false
+    var isPercentage: Bool = false
     var totalTokens: Int { inputTokens + outputTokens }
 }
 
 struct ModelUsage: Equatable, Identifiable {
     let model: String
     let totals: UsageTotals
+    let pool: String? // "gemini" or "claude" for Antigravity
     var id: String { model }
 }
 

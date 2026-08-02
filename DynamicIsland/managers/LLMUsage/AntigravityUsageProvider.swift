@@ -299,14 +299,12 @@ struct AntigravityUsageProvider: UsageProvider {
                 pooled[id] = (fraction, resetTime)
 
                 let usedPct = (1 - max(0, min(1, fraction))) * 100
-                let limit = UsageLimit(used: usedPct, limit: 100, resetsAt: resetTime)
-                // Use hasUnpricedModel to encode pool: true = claude, false = gemini
                 models.append(ModelUsage(model: spec.label, totals: UsageTotals(
-                    inputTokens: Int(usedPct), // Store used percentage here
+                    inputTokens: Int(usedPct),
                     outputTokens: 0,
-                    costUSD: fraction, // Store fraction for cost
-                    hasUnpricedModel: spec.pool == "claude" // true = claude, false = gemini
-                )))
+                    costUSD: fraction,
+                    isPercentage: true
+                ), pool: spec.pool))
             }
         }
 
@@ -314,20 +312,12 @@ struct AntigravityUsageProvider: UsageProvider {
         snapshot.lastUpdated = now
         snapshot.models = models
 
-        // Populate limits for BOTH pools
+        // Populate limits for gemini pool (primary); claude pool limits would overwrite so skip
         if let entry = pooled["gemini-5h"] {
             let usedPct = (1 - max(0, min(1, entry.fraction))) * 100
             snapshot.sessionLimit = UsageLimit(used: usedPct, limit: 100, resetsAt: entry.resetTime)
         }
         if let entry = pooled["gemini-weekly"] {
-            let usedPct = (1 - max(0, min(1, entry.fraction))) * 100
-            snapshot.weekLimit = UsageLimit(used: usedPct, limit: 100, resetsAt: entry.resetTime)
-        }
-        if let entry = pooled["3p-5h"] {
-            let usedPct = (1 - max(0, min(1, entry.fraction))) * 100
-            snapshot.sessionLimit = UsageLimit(used: usedPct, limit: 100, resetsAt: entry.resetTime)
-        }
-        if let entry = pooled["3p-weekly"] {
             let usedPct = (1 - max(0, min(1, entry.fraction))) * 100
             snapshot.weekLimit = UsageLimit(used: usedPct, limit: 100, resetsAt: entry.resetTime)
         }
@@ -482,6 +472,8 @@ struct AntigravityUsageProvider: UsageProvider {
         var claudeFraction: Double = 1
         var claudeReset: Date?
 
+        var models: [ModelUsage] = []
+
         for config in configs {
             let normalized = config.label
                 .replacingOccurrences(of: #"\s*\([^)]*\)\s*$"#, with: "", options: .regularExpression)
@@ -502,7 +494,18 @@ struct AntigravityUsageProvider: UsageProvider {
                     claudeReset = config.resetTime
                 }
             }
+
+            // Create model usage entry with pool info
+            let usedPct = (1 - fraction) * 100
+            models.append(ModelUsage(model: config.label, totals: UsageTotals(
+                inputTokens: Int(usedPct),
+                outputTokens: 0,
+                costUSD: fraction,
+                isPercentage: true
+            ), pool: pool))
         }
+
+        snapshot.models = models
 
         if geminiFraction < 1 {
             let used = (1 - geminiFraction) * 100
@@ -510,7 +513,6 @@ struct AntigravityUsageProvider: UsageProvider {
         }
         if claudeFraction < 1 {
             let used = (1 - claudeFraction) * 100
-            // Legacy endpoints only provide 5h data
             if snapshot.sessionLimit == nil {
                 snapshot.sessionLimit = UsageLimit(used: used, limit: 100, resetsAt: claudeReset)
             }

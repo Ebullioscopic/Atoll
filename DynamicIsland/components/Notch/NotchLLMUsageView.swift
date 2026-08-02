@@ -94,11 +94,11 @@ struct NotchLLMUsageView: View {
 
     private func antigravitySuccess(_ snap: UsageSnapshot) -> some View {
         let isGemini = antigravityPool == .gemini
+        let targetPool = isGemini ? "gemini" : "claude"
         
-        // Model identifiers are "Session" and "Weekly" for both pools
-        // Use hasUnpricedModel to distinguish pools: false=gemini, true=claude
-        let sessionModel = snap.models.first { $0.model == "Session" && $0.totals.hasUnpricedModel == (!isGemini) }
-        let weeklyModel = snap.models.first { $0.model == "Weekly" && $0.totals.hasUnpricedModel == (!isGemini) }
+        // Filter models by pool
+        let sessionModel = snap.models.first { $0.model == "Session" && $0.pool == targetPool }
+        let weeklyModel = snap.models.first { $0.model == "Weekly" && $0.pool == targetPool }
         
         // Helper to create UsageLimit from model
         func limitFromModel(_ model: ModelUsage?) -> UsageLimit? {
@@ -109,19 +109,15 @@ struct NotchLLMUsageView: View {
         }
         
         return VStack(alignment: .leading, spacing: 6) {
-            // Use model data for both pools (more reliable than snap limits which get overwritten)
-            if let limit = limitFromModel(snap.models.first { $0.model == "Session" && $0.totals.hasUnpricedModel == (!isGemini) }) {
+            if let limit = limitFromModel(sessionModel) {
                 quotaGauge("Session", limit)
             }
-            if let limit = limitFromModel(snap.models.first { $0.model == "Weekly" && $0.totals.hasUnpricedModel == (!isGemini) }) {
+            if let limit = limitFromModel(weeklyModel) {
                 quotaGauge("Weekly", limit)
             }
             
             // Show model breakdown for the selected pool
-            let poolModels = snap.models.filter { model in
-                let isGeminiModel = !model.totals.hasUnpricedModel
-                return isGemini == isGeminiModel
-            }
+            let poolModels = snap.models.filter { $0.pool == targetPool }
             if !poolModels.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(poolModels) { model in
@@ -176,8 +172,7 @@ struct NotchLLMUsageView: View {
 
     private func window(_ label: String, _ totals: UsageTotals, prominent: Bool = false, compact: Bool = false) -> some View {
         let displayValue: String
-        if totals.totalTokens <= 100 && totals.hasUnpricedModel == (totals.totalTokens > 0) {
-            // Antigravity model: totalTokens is percentage
+        if totals.isPercentage {
             displayValue = "\(totals.totalTokens)%"
         } else {
             displayValue = tokens(totals.totalTokens)
