@@ -1103,6 +1103,40 @@ struct GeneralSettings: View {
             }
 
             Section {
+                Defaults.Toggle(key: .showKeepScreenAwakeIcon) {
+                    Text("Keep screen awake")
+                }
+                .settingsHighlight(id: highlightID("Keep screen awake"))
+
+                Defaults.Toggle(key: .showPreventLidSleepIcon) {
+                    Text("Stay awake with the lid closed")
+                }
+                .settingsHighlight(id: highlightID("Stay awake with the lid closed"))
+
+                Text("Closing the lid while this is on keeps the Mac running. Do not put it in a bag - it can overheat.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Defaults.Toggle(key: .showScreenCleaningIcon) {
+                    Text("Clean screen")
+                }
+                .settingsHighlight(id: highlightID("Clean screen"))
+
+                Defaults.Toggle(key: .showKeyboardCleaningIcon) {
+                    Text("Clean keyboard")
+                }
+                .settingsHighlight(id: highlightID("Clean keyboard"))
+
+                Text("Cleaning the keyboard blocks key presses and needs Accessibility permission. Click anywhere to finish; it also stops on its own after two minutes.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Power & cleaning")
+            } footer: {
+                Text("These toggles appear in the notch header. They are never restored after a restart.")
+            }
+
+            Section {
                 Defaults.Toggle(key: .menubarIcon) {
                     Text("Menubar icon")
                 }

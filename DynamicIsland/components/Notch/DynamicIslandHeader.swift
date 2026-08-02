@@ -28,6 +28,9 @@ struct DynamicIslandHeader: View {
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
+    @ObservedObject var powerManager = PowerManagementManager.shared
+    @ObservedObject var screenCleaningManager = ScreenCleaningManager.shared
+    @ObservedObject var keyboardCleaningManager = KeyboardCleaningManager.shared
     @State private var showClipboardPopover = false
     @State private var showColorPickerPopover = false
     @State private var showTimerPopover = false
@@ -205,6 +208,47 @@ struct DynamicIslandHeader: View {
                         }
                     }
                     
+                    // 电源与清洁快捷开关
+                    if Defaults[.showKeepScreenAwakeIcon] {
+                        QuickToggleButton(
+                            icon: "lock.open.laptopcomputer",
+                            isActive: powerManager.isKeepingScreenAwake,
+                            help: "Keep screen awake"
+                        ) {
+                            powerManager.toggleKeepScreenAwake()
+                        }
+                    }
+
+                    if Defaults[.showPreventLidSleepIcon] {
+                        QuickToggleButton(
+                            icon: "cup.and.saucer.fill",
+                            isActive: powerManager.isPreventingLidSleep,
+                            help: "Stay awake with the lid closed"
+                        ) {
+                            powerManager.togglePreventLidSleep()
+                        }
+                    }
+
+                    if Defaults[.showScreenCleaningIcon] {
+                        QuickToggleButton(
+                            icon: "sparkles.tv.fill",
+                            isActive: screenCleaningManager.isActive,
+                            help: "Clean screen"
+                        ) {
+                            screenCleaningManager.toggle()
+                        }
+                    }
+
+                    if Defaults[.showKeyboardCleaningIcon] {
+                        QuickToggleButton(
+                            icon: "keyboard.badge.eye",
+                            isActive: keyboardCleaningManager.isActive,
+                            help: "Clean keyboard"
+                        ) {
+                            keyboardCleaningManager.toggle()
+                        }
+                    }
+
                     if Defaults[.settingsIconInNotch] {
                         Button(action: {
                             SettingsWindowController.shared.showWindow()
@@ -333,6 +377,31 @@ private extension DynamicIslandHeader {
             && Defaults[.showClipboardIcon]
             && Defaults[.showColorPickerIcon]
             && Defaults[.enableTimerFeature]
+    }
+}
+
+/// 刘海里的快捷开关按钮：跟既有的摄像头/剪贴板/取色器按钮同一套胶囊造型，
+/// 只是多了「生效中」的高亮态。
+private struct QuickToggleButton: View {
+    let icon: String
+    let isActive: Bool
+    let help: LocalizedStringKey
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Capsule()
+                .fill(.black)
+                .frame(width: 30, height: 30)
+                .overlay {
+                    Image(systemName: icon)
+                        .foregroundColor(isActive ? .accentColor : .white)
+                        .padding()
+                        .imageScale(.medium)
+                }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help(help)
     }
 }
 

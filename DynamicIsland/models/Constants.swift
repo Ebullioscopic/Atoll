@@ -1199,6 +1199,14 @@ extension Defaults.Keys {
     static let showClipboardIcon = Key<Bool>("showClipboardIcon", default: true)
     static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .panel)
     
+    // MARK: Power & Cleaning Toggles
+    // 只控制图标在刘海里显不显示。四个开关的「当前是否生效」是运行时状态，
+    // 故意不持久化：合盖不休眠重启后自动恢复有过热风险，清洁模式更没有恢复的道理。
+    static let showKeepScreenAwakeIcon = Key<Bool>("showKeepScreenAwakeIcon", default: true)
+    static let showPreventLidSleepIcon = Key<Bool>("showPreventLidSleepIcon", default: true)
+    static let showScreenCleaningIcon = Key<Bool>("showScreenCleaningIcon", default: true)
+    static let showKeyboardCleaningIcon = Key<Bool>("showKeyboardCleaningIcon", default: true)
+
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)
     static let screenAssistantDisplayMode = Key<ScreenAssistantDisplayMode>("screenAssistantDisplayMode", default: .panel)

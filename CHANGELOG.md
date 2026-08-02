@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Draggable clipboard tab**: A `.notchTab` clipboard display mode shows clipboard history as a card grid inside the notch whose text, image, and single-file entries can be dragged straight out to Finder or other apps (drag = copy), with a hover × to delete a single item (#698).
 - **Shelf marquee selection**: Dragging on empty space in the Shelf now draws a rubber-band rectangle that selects every item it touches, matching Finder. Holding Shift unions the marquee with the existing selection instead of replacing it (#682).
 - **Shelf drag-out move toggle**: A new "Allow moving files when dragging out" setting (off by default) keeps drag-out copy-only. Offering a move operation previously let the receiving app relocate the original file out from under the user when the destination was on the same volume (#682).
+- Added four quick toggles to the notch header: **Keep screen awake**, **Stay awake with the lid closed**, **Clean screen** and **Clean keyboard**. Each can be hidden individually from Settings → General → Power & cleaning.
+- Keep screen awake holds a `PreventUserIdleDisplaySleep` power assertion, released automatically when Atoll quits.
+- Stay awake with the lid closed disables clamshell sleep through the `IOPMrootDomain` user client. It needs no elevated privileges, no privileged helper and no `pmset disablesleep`. Because this is global kernel state, it is restored on quit and unconditionally reset at launch so a crash cannot leave the machine unable to sleep.
+- Clean screen blacks out every display so smudges are visible, and rebuilds its overlays when displays are attached, detached or rearranged.
+- Clean keyboard swallows key events while you wipe the keyboard, including the function row's brightness, volume and playback keys. It requires Accessibility permission, is dismissed by clicking anywhere, and stops on its own after two minutes as a failsafe.
 
 ### Changed
 - Improved the Dutch localization by adding missing translations, corrected terminology, and wording aligned with Apple's Dutch macOS conventions.
