@@ -77,16 +77,23 @@ struct NotchLLMUsageView: View {
             if provider == .antigravity {
                 antigravitySuccess(snap)
             } else if snap.sessionLimit == nil && snap.weekLimit == nil {
-                window("Today", snap.today, prominent: true)
-                window("Week", snap.week)
-                window("Session", snap.session)
+                if provider != .cursor {
+                    window("Today", snap.today, prominent: true)
+                    window("Week", snap.week)
+                    window("Session", snap.session)
+                }
                 Text("quota unavailable").font(.caption2).foregroundStyle(.secondary.opacity(0.7))
             } else {
-                if let limit = snap.sessionLimit { quotaGauge("Session", limit) }
-                if let limit = snap.weekLimit { quotaGauge("Week", limit) }
-                VStack(alignment: .leading, spacing: 2) {
-                    window("Today", snap.today, compact: true)
-                    window("Week", snap.week, compact: true)
+                if provider == .cursor {
+                    if let limit = snap.sessionLimit { quotaGauge("Cursor Models", limit) }
+                    if let limit = snap.weekLimit { quotaGauge("Other Models", limit) }
+                } else {
+                    if let limit = snap.sessionLimit { quotaGauge("Session", limit) }
+                    if let limit = snap.weekLimit { quotaGauge("Week", limit) }
+                    VStack(alignment: .leading, spacing: 2) {
+                        window("Today", snap.today, compact: true)
+                        window("Week", snap.week, compact: true)
+                    }
                 }
             }
         }
@@ -165,8 +172,12 @@ struct NotchLLMUsageView: View {
         guard let date else { return nil }
         let seconds = Int(date.timeIntervalSinceNow)
         guard seconds > 0 else { return nil }
+        let days = seconds / 86_400
         let hours = seconds / 3600
         let minutes = (seconds % 3600) / 60
+        if days > 0 {
+            return "resets in \(days)d \(hours % 24)h \(minutes)m"
+        }
         return hours > 0 ? "resets in \(hours)h \(minutes)m" : "resets in \(minutes)m"
     }
 
