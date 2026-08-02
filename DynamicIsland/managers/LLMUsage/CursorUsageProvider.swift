@@ -57,7 +57,7 @@ struct CursorUsageProvider: UsageProvider {
             } else {
                 modelTotals.hasUnpricedModel = true
             }
-            models.append(ModelUsage(model: model, totals: modelTotals))
+            models.append(ModelUsage(model: model, totals: modelTotals, pool: nil))
             week.inputTokens += tokens
             if let cost {
                 week.costUSD += cost

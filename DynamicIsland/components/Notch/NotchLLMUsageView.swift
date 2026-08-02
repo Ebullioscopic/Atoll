@@ -19,8 +19,14 @@
 import SwiftUI
 import Defaults
 
+enum AntigravityPool: String, CaseIterable {
+    case gemini = "Gemini"
+    case claude = "Claude"
+}
+
 struct NotchLLMUsageView: View {
     @ObservedObject private var manager = LLMUsageManager.shared
+    @State private var antigravityPool: AntigravityPool = .gemini
 
     private func isEnabled(_ provider: ProviderID) -> Bool { Defaults[provider.enabledKey] }
 
@@ -38,14 +44,26 @@ struct NotchLLMUsageView: View {
     @ViewBuilder
     private func card(for provider: ProviderID) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(provider.displayName).font(.headline)
+            HStack {
+                Text(provider.displayName).font(.headline)
+                Spacer()
+                if provider == .antigravity {
+                    Picker("", selection: $antigravityPool) {
+                        Text("Gemini").tag(AntigravityPool.gemini)
+                        Text("Claude").tag(AntigravityPool.claude)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 120)
+                    .controlSize(.mini)
+                }
+            }
             switch manager.results[provider] ?? .loading {
             case .loading:
                 ProgressView().controlSize(.small)
             case .failure(let reason):
                 Text(reason).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             case .success(let snap):
-                success(snap)
+                success(snap, provider: provider)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -54,9 +72,11 @@ struct NotchLLMUsageView: View {
     }
 
     @ViewBuilder
-    private func success(_ snap: UsageSnapshot) -> some View {
+    private func success(_ snap: UsageSnapshot, provider: ProviderID) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            if snap.sessionLimit == nil && snap.weekLimit == nil {
+            if provider == .antigravity {
+                antigravitySuccess(snap)
+            } else if snap.sessionLimit == nil && snap.weekLimit == nil {
                 window("Today", snap.today, prominent: true)
                 window("Week", snap.week)
                 window("Session", snap.session)
@@ -67,6 +87,42 @@ struct NotchLLMUsageView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     window("Today", snap.today, compact: true)
                     window("Week", snap.week, compact: true)
+                }
+            }
+        }
+    }
+
+    private func antigravitySuccess(_ snap: UsageSnapshot) -> some View {
+        let isGemini = antigravityPool == .gemini
+        let targetPool = isGemini ? "gemini" : "claude"
+        
+        // Filter models by pool
+        let sessionModel = snap.models.first { $0.model == "Session" && $0.pool == targetPool }
+        let weeklyModel = snap.models.first { $0.model == "Weekly" && $0.pool == targetPool }
+        
+        // Helper to create UsageLimit from model
+        func limitFromModel(_ model: ModelUsage?) -> UsageLimit? {
+            guard let model = model else { return nil }
+            let fraction = model.totals.costUSD
+            let usedPct = (1 - max(0, min(1, fraction))) * 100
+            return UsageLimit(used: usedPct, limit: 100, resetsAt: nil)
+        }
+        
+        return VStack(alignment: .leading, spacing: 6) {
+            if let limit = limitFromModel(sessionModel) {
+                quotaGauge("Session", limit)
+            }
+            if let limit = limitFromModel(weeklyModel) {
+                quotaGauge("Weekly", limit)
+            }
+            
+            // Show model breakdown for the selected pool
+            let poolModels = snap.models.filter { $0.pool == targetPool }
+            if !poolModels.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(poolModels) { model in
+                        window(model.model, model.totals, compact: true)
+                    }
                 }
             }
         }
@@ -115,9 +171,21 @@ struct NotchLLMUsageView: View {
     }
 
     private func window(_ label: String, _ totals: UsageTotals, prominent: Bool = false, compact: Bool = false) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(label).font(.caption2).foregroundStyle(.secondary).frame(width: compact ? 34 : 48, alignment: .leading)
-            Text(tokens(totals.totalTokens))
+        let displayValue: String
+        if totals.isPercentage {
+            displayValue = "\(totals.totalTokens)%"
+        } else {
+            displayValue = tokens(totals.totalTokens)
+        }
+        
+        return HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: compact ? 56 : 48, alignment: .leading)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Text(displayValue)
                 .font(.system(size: compact ? 11 : (prominent ? 17 : 13), weight: prominent ? .bold : .semibold, design: .rounded))
                 .monospacedDigit()
             Spacer(minLength: 4)
