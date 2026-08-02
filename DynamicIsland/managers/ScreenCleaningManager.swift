@@ -41,6 +41,10 @@ final class ScreenCleaningManager: ObservableObject {
     func start() {
         guard !isActive else { return }
 
+        // 两种清洁模式互斥：都用同层全屏黑遮罩，同时开会叠在一起，
+        // 点一下只关掉最上面那层，另一层黑屏无提示、无从退出。
+        KeyboardCleaningManager.shared.stop()
+
         isActive = true
         buildOverlays()
 

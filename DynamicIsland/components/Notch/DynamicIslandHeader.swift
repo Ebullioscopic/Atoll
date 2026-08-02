@@ -402,6 +402,8 @@ private struct QuickToggleButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .help(help)
+        // 生效态只靠图标颜色表达，VoiceOver 听不到；补一个 selected trait 让它能播报开关状态。
+        .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 }
 

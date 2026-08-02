@@ -74,9 +74,25 @@ final class KeyboardCleaningManager: ObservableObject {
             return false
         }
 
+        // 两种清洁模式互斥：都用同层全屏黑遮罩，同时开会叠在一起，
+        // 点一下只关掉最上面那层，另一层黑屏无提示、无从退出。
+        ScreenCleaningManager.shared.stop()
+
         isActive = true
         buildOverlays()
         startFailsafeTimer()
+
+        // observer 只在 start() 注册一次；放进 buildOverlays() 会在它自己的回调里
+        // 被反复注册 —— 每次屏幕变更 observer 数量翻倍，进程级泄漏（对齐 ScreenCleaningManager）。
+        screenChangeObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, self.isActive else { return }
+            self.tearDownOverlays()
+            self.buildOverlays()
+        }
 
         NSLog("✅ [KeyboardCleaning] 清洁键盘已开启")
         return true
@@ -194,16 +210,6 @@ final class KeyboardCleaningManager: ObservableObject {
             }
             window.orderFrontRegardless()
             return window
-        }
-
-        screenChangeObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.didChangeScreenParametersNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self, self.isActive else { return }
-            self.tearDownOverlays()
-            self.buildOverlays()
         }
     }
 

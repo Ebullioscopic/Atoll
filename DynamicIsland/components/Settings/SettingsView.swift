@@ -1060,6 +1060,8 @@ struct GeneralSettings: View {
     @Default(.openNotchOnHover) var openNotchOnHover
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
+    @Default(.showKeepScreenAwakeIcon) var showKeepScreenAwakeIcon
+    @Default(.showPreventLidSleepIcon) var showPreventLidSleepIcon
     @Default(.enableHorizontalMusicGestures) var enableHorizontalMusicGestures
     @Default(.musicGestureBehavior) var musicGestureBehavior
     @Default(.reverseSwipeGestures) var reverseSwipeGestures
@@ -1106,10 +1108,22 @@ struct GeneralSettings: View {
                 Defaults.Toggle(key: .showKeepScreenAwakeIcon) {
                     Text("Keep screen awake")
                 }
+                // 藏掉图标就没了从刘海关闭它的入口，功能却还开着 —— 顺手停掉底层断言。
+                .onChange(of: showKeepScreenAwakeIcon) {
+                    if !showKeepScreenAwakeIcon {
+                        PowerManagementManager.shared.setKeepScreenAwake(false)
+                    }
+                }
                 .settingsHighlight(id: highlightID("Keep screen awake"))
 
                 Defaults.Toggle(key: .showPreventLidSleepIcon) {
                     Text("Stay awake with the lid closed")
+                }
+                // 同理：藏掉图标同时撤销合盖不休眠，别把机器留在「合盖不睡」状态。
+                .onChange(of: showPreventLidSleepIcon) {
+                    if !showPreventLidSleepIcon {
+                        PowerManagementManager.shared.setPreventLidSleep(false)
+                    }
                 }
                 .settingsHighlight(id: highlightID("Stay awake with the lid closed"))
 

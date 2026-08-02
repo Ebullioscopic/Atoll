@@ -92,9 +92,13 @@ final class PowerManagementManager: ObservableObject {
     /// 会给用户留下一台「合盖再也不睡」的机器。这个开关本来就不跨启动保持，
     /// 所以启动时直接复位，把上一次的残留一并清掉。
     func resetClamshellStateOnLaunch() {
-        setClamshellSleepDisabled(false)
+        // 记实际结果，不能无条件报成功 —— 这条诊断日志存在的意义正是在无其它可见
+        // 指示时捕获失败；内核调用失败却记「已恢复」会把这唯一的信号也抹掉。
+        let succeeded = setClamshellSleepDisabled(false)
         Diagnostics.setActive(false)
-        Diagnostics.log("启动复位：clamshell 睡眠已恢复系统默认")
+        Diagnostics.log(succeeded
+            ? "启动复位：clamshell 睡眠已恢复系统默认"
+            : "启动复位失败：clamshell 睡眠状态复位调用未成功")
     }
 
     // MARK: - 屏幕常亮
