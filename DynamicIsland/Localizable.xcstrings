@@ -1124,6 +1124,12 @@
             "value" : "%@-kanaal"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ kanalı"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1152,6 +1158,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ left"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ kaldı"
           }
         },
         "zh-Hans" : {
@@ -2446,6 +2458,12 @@
             "value" : "%lld%% over"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% kaldı"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2462,6 +2480,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld%% gebruikt"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% kullanıldı"
           }
         },
         "zh-Hant" : {
@@ -2814,6 +2838,12 @@
           }
         },
         "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%llds"
+          }
+        },
+        "tr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%llds"
@@ -3967,6 +3997,12 @@
             "value" : "1. เปิด Spotify ในเบราว์เซอร์แล้วเข้าสู่ระบบ"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1. Spotify'ı bir tarayıcıda açıp giriş yapın"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4148,6 +4184,12 @@
             "value" : "2. Developer Tools -> Application/Storage -> Cookies -> https://open.spotify.com"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2. Geliştirici Araçları -> Application/Storage -> Cookies -> https://open.spotify.com"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4243,6 +4285,12 @@
             "value" : "3. คัดลอกค่า `sp_dc` แล้ววางที่นี่"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3. `sp_dc` değerini kopyalayıp buraya yapıştırın"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4267,6 +4315,12 @@
           }
         },
         "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3D"
+          }
+        },
+        "tr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "3D"
@@ -5235,6 +5289,12 @@
             "value" : "Er is een nieuwe versie van Atoll beschikbaar!"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll'un yeni bir sürümü mevcut!"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5338,7 +5398,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Hakkında"
           }
         },
@@ -5678,7 +5738,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Erişim Reddedildi"
           }
         },
@@ -5776,6 +5836,12 @@
             "value" : "Разрешение «Универсальный доступ» позволяет Dynamic Island заменять системные индикаторы громкости, яркости и клавиатуры."
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erişilebilirlik izni, Dynamic Island'ın yerleşik ses, parlaklık ve klavye HUD'larını değiştirmesine olanak tanır."
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5803,6 +5869,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Требуется разрешение «Универсальный доступ»"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erişilebilirlik izni gerekli"
           }
         },
         "zh-Hant" : {
@@ -6421,7 +6493,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Ekle"
           }
         },
@@ -6770,8 +6842,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Manuel ekle"
+            "state" : "translated",
+            "value" : "Elle ekle"
           }
         },
         "uk" : {
@@ -6949,7 +7021,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Yeni görselleştirici ekle"
           }
         },
@@ -7122,7 +7194,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Ek özellikler"
           }
         },
@@ -8081,7 +8153,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "AirDrop hizmeti kullanılamıyor"
           }
         },
@@ -8345,8 +8417,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Gün boyu"
+            "state" : "translated",
+            "value" : "Tüm gün"
           }
         },
         "uk" : {
@@ -8517,8 +8589,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Erişime izin ver"
+            "state" : "translated",
+            "value" : "Erişime İzin Ver"
           }
         },
         "uk" : {
@@ -8555,6 +8627,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Разрешите Atoll доступ к заметкам: «Настройки системы» → «Конфиденциальность и безопасность» → «Автоматизация»."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll'un Notlar'ı denetlemesine System Settings → Privacy & Security → Automation üzerinden izin verin."
           }
         },
         "zh-Hans" : {
@@ -9048,8 +9126,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Tam ekranda daima gizle"
+            "state" : "translated",
+            "value" : "Tam ekranda her zaman gizle"
           }
         },
         "uk" : {
@@ -9167,8 +9245,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Sekmeleri daima göster"
+            "state" : "translated",
+            "value" : "Sekmeleri her zaman göster"
           }
         },
         "uk" : {
@@ -9595,7 +9673,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Uygulama simgesi"
           }
         },
@@ -9767,8 +9845,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Belirme"
+            "state" : "translated",
+            "value" : "Görünüm"
           }
         },
         "uk" : {
@@ -9854,6 +9932,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple Заметки"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Notlar"
           }
         },
         "zh-Hans" : {
@@ -10261,6 +10345,12 @@
             "state" : "translated",
             "value" : "Atoll %@"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll %@"
+          }
         }
       }
     },
@@ -10539,6 +10629,12 @@
             "value" : "Atoll ใช้คุกกี้ `sp_dc` ในเครื่องเพื่อขอโทเค็น Spotify web-player และดึง Canvas ที่ตรงกันสำหรับแทร็กปัจจุบันเท่านั้น"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll, yerel `sp_dc` çerezini yalnızca Spotify'ın dahili web oynatıcı jetonunu istemek ve geçerli parça için eşleşen Canvas'ı almak amacıyla kullanır."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10561,6 +10657,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll controleert regelmatig automatisch op updates."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll, güncellemeleri düzenli aralıklarla otomatik denetleyecek."
           }
         },
         "zh-Hant" : {
@@ -11033,8 +11135,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Güncellemeleri otomatik kontrol et"
+            "state" : "translated",
+            "value" : "Güncellemeleri otomatik denetle"
           }
         },
         "uk" : {
@@ -11151,7 +11253,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Güncellemeleri otomatik indir"
           }
         },
@@ -11570,7 +11672,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Pil"
           }
         },
@@ -11666,6 +11768,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Battery at %d percent, charging on hold"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pil yüzde %d, şarj beklemede"
           }
         },
         "zh-Hans" : {
@@ -11861,6 +11969,12 @@
             "value" : "HUD แบตเตอรี่"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pil HUD'ları"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12029,8 +12143,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Pil bilgisi"
+            "state" : "translated",
+            "value" : "Pil Bilgisi"
           }
         },
         "uk" : {
@@ -12147,8 +12261,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Pil ayarları"
+            "state" : "translated",
+            "value" : "Pil Ayarları"
           }
         },
         "uk" : {
@@ -12317,8 +12431,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Pil durumu"
+            "state" : "translated",
+            "value" : "Pil Durumu"
           }
         },
         "uk" : {
@@ -12860,8 +12974,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Pano Yöneticisiyle üretkenliğinizi arttırın"
+            "state" : "translated",
+            "value" : "Pano Yöneticisi ile verimliliğinizi artırın"
           }
         },
         "uk" : {
@@ -13178,6 +13292,12 @@
             "value" : "ขั้นละเอียดความสว่าง"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parlaklık ince adımı"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -13322,6 +13442,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ขั้นความสว่าง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parlaklık adımı"
           }
         },
         "zh-Hans" : {
@@ -13708,7 +13834,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Takvim"
           }
         },
@@ -13827,8 +13953,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Takvim erişimi reddedildi. Lütfen Sistem Ayarlarından aktifleştiriniz."
+            "state" : "translated",
+            "value" : "Takvim erişimi reddedildi. Lütfen System Settings'ten etkinleştirin."
           }
         },
         "uk" : {
@@ -14396,8 +14522,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "İptal et"
+            "state" : "translated",
+            "value" : "İptal"
           }
         },
         "uk" : {
@@ -14577,6 +14703,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Цельсий"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Santigrat"
           }
         },
         "zh-Hans" : {
@@ -14857,7 +14989,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Şarj oluyor"
           }
         },
@@ -14949,6 +15081,12 @@
             "value" : "ระยะเวลาชาร์จ"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şarj süresi"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -14981,6 +15119,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "HUD การชาร์จ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şarj HUD'u"
           }
         },
         "zh-Hans" : {
@@ -15016,6 +15160,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ชาร์จระงับไว้"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şarj beklemede"
           }
         },
         "zh-Hans" : {
@@ -15126,8 +15276,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Şarj beklemede: Masaüstü Modu"
+            "state" : "translated",
+            "value" : "Şarj Beklemede: Masaüstü Modu"
           }
         },
         "uk" : {
@@ -15244,8 +15394,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Güncellemeleri Kontrol et…"
+            "state" : "translated",
+            "value" : "Güncellemeleri Denetle…"
           }
         },
         "uk" : {
@@ -15276,6 +15426,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zoeken naar updates…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncellemeler denetleniyor…"
           }
         },
         "zh-Hant" : {
@@ -15499,8 +15655,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Müzik kaynağı seç"
+            "state" : "translated",
+            "value" : "Bir Müzik Kaynağı Seçin"
           }
         },
         "uk" : {
@@ -15828,6 +15984,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kies welke AI-aanbieders op het tabblad Gebruik worden weergegeven."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kullanım sekmesinde hangi yapay zekâ sağlayıcılarının görüneceğini seçin."
           }
         },
         "zh-Hant" : {
@@ -16443,6 +16605,12 @@
     "Claude" : {
       "localizations" : {
         "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude"
+          }
+        },
+        "tr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Claude"
@@ -17898,6 +18066,12 @@
             "value" : "Ширина закрытого выреза"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kapalı notch / kapsül genişliği"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -17963,6 +18137,12 @@
     "Codex" : {
       "localizations" : {
         "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex"
+          }
+        },
+        "tr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Codex"
@@ -18100,6 +18280,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Извлечение цвета"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renk çıkarımı"
           }
         },
         "zh-Hant" : {
@@ -18963,8 +19149,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Çok yakında geliyor"
+            "state" : "translated",
+            "value" : "Yakında"
           }
         },
         "uk" : {
@@ -19008,6 +19194,12 @@
             "value" : "Компактный"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kompakt"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -19034,6 +19226,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Compact แสดงการแจ้งเตือนแบบอินไลน์ Standard ใช้ HUD ชาร์จเต็มที่สูงกว่าพร้อมแอนิเมชันการชาร์จ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kompakt, uyarıyı satır içinde tutar. Standart ise şarj animasyonlu, daha uzun tam şarj HUD'unu kullanır."
           }
         },
         "zh-Hans" : {
@@ -19068,6 +19266,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Compact ตรงกับ HUD การชาร์จ Standard ใช้การ์ดสไตล์ DynamicNotch แบบขยาย"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kompakt, şarj HUD'una uyar. Standart ise genişletilmiş DynamicNotch tarzı kartı kullanır."
           }
         },
         "zh-Hans" : {
@@ -19527,6 +19731,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "เชื่อมต่อ Spotify"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify'ı Bağla"
           }
         },
         "zh-Hans" : {
@@ -21050,6 +21260,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Huidige build: %@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geçerli yapı: %@"
           }
         },
         "zh-Hant" : {
@@ -22643,6 +22859,12 @@
             "value" : "Стиль таймера"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Özel zamanlayıcı stili"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -23075,6 +23297,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ширина выреза"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fiziksel notch genişliğini özelleştir"
           }
         },
         "zh-Hans" : {
@@ -24792,6 +25020,12 @@
             "value" : "ปิดใช้ขณะการผสานรวมความสว่างจอภายนอกทำงานอยู่"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Harici ekran parlaklık entegrasyonu etkinken devre dışıdır."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -24870,6 +25104,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ปิดใช้ขณะการผสานรวมระดับเสียงจอภายนอกทำงานอยู่"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Harici ekran ses entegrasyonu etkinken devre dışıdır."
           }
         },
         "zh-Hans" : {
@@ -25204,6 +25444,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sluit"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kapat"
           }
         },
         "zh-Hant" : {
@@ -25887,7 +26133,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "İndir"
           }
         },
@@ -26300,7 +26546,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "İndirilenler"
           }
         },
@@ -26627,8 +26873,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Doslayarı buraya bırak"
+            "state" : "translated",
+            "value" : "Dosyaları buraya bırakın"
           }
         },
         "uk" : {
@@ -27263,8 +27509,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Yerleşimi düzenle"
+            "state" : "translated",
+            "value" : "Düzeni düzenle"
           }
         },
         "uk" : {
@@ -29272,6 +29518,12 @@
             "value" : "Bewaak LLM-gebruik"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LLM Kullanım İzleyicisini etkinleştir"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -31128,8 +31380,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Kıymetli vaktinizin keyfini çıkarın!"
+            "state" : "translated",
+            "value" : "Boş zamanınızın tadını çıkarın!"
           }
         },
         "uk" : {
@@ -31305,7 +31557,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Hata"
           }
         },
@@ -31584,8 +31836,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Çıkış yap"
+            "state" : "translated",
+            "value" : "Çık"
           }
         },
         "uk" : {
@@ -31783,6 +32035,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Расширенная настройка ширины доступна только для стандартного выреза. Отключите минималистичный интерфейс."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Genişletilmiş genişlik ayarları yalnızca standart notch düzenine uygulanır. Bu değeri düzenlemek için Minimalist Arayüzü devre dışı bırakın."
           }
         },
         "zh-Hans" : {
@@ -31994,8 +32252,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Genişletmeler"
+            "state" : "translated",
+            "value" : "Uzantılar"
           }
         },
         "uk" : {
@@ -32138,6 +32396,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Фаренгейт"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fahrenheit"
           }
         },
         "zh-Hans" : {
@@ -33429,6 +33693,12 @@
             "value" : "แบตเตอรี่เต็ม"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tam Pil"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -33463,6 +33733,12 @@
             "value" : "ระยะเวลาแบตเตอรี่เต็ม"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tam pil süresi"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -33495,6 +33771,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "สไตล์แบตเตอรี่เต็ม"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tam pil stili"
           }
         },
         "zh-Hans" : {
@@ -33577,6 +33859,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ขีดเริ่มชาร์จเต็ม"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tam şarj eşiği"
           }
         },
         "zh-Hans" : {
@@ -33712,6 +34000,12 @@
             "value" : "ปกอัลบั้มเต็มจอเมื่อคลิกขวา"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sağ tıklamada tam ekran kapak görseli"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -33797,6 +34091,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "HUD ชาร์จเต็ม"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tam şarj HUD'u"
           }
         },
         "zh-Hans" : {
@@ -34417,6 +34717,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "รับคุกกี้ด้วยตนเอง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çerezi elle alın"
           }
         },
         "zh-Hans" : {
@@ -35949,6 +36255,12 @@
             "value" : "Verberg versie-informatie"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sürüm Notlarını Gizle"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -36680,6 +36992,12 @@
             "value" : "ระยะเวลา HUD"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HUD Süresi"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -36930,6 +37248,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ทดสอบ HUD"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HUD Testleri"
           }
         },
         "zh-Hans" : {
@@ -37534,6 +37858,12 @@
             "value" : "in %@"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ içinde"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -37568,6 +37898,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "in %lld"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld içinde"
           }
         },
         "zh-Hans" : {
@@ -37986,6 +38322,12 @@
             "value" : "Installeer en start opnieuw"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kur ve Yeniden Başlat"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -38002,6 +38344,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Installeer update"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncellemeyi Kur"
           }
         },
         "zh-Hant" : {
@@ -38604,6 +38952,12 @@
             "value" : "แสดงปกอัลบั้มต่อไประหว่างปกเต็มจอ"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tam ekran kapak görseli sırasında albüm kapağını görünür tut"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -38956,6 +39310,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Последняя синхронизация"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Son eşitleme"
           }
         },
         "zh-Hans" : {
@@ -39405,6 +39765,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Классический"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eski"
           }
         },
         "zh-Hant" : {
@@ -40210,6 +40576,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LLM-aanbieders"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LLM Sağlayıcıları"
           }
         },
         "zh-Hant" : {
@@ -41108,6 +41480,12 @@
             "value" : "Zoeken naar een nieuwe versie van Atoll"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll'un yeni sürümü aranıyor"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -41473,6 +41851,12 @@
             "value" : "แบตเตอรี่ต่ำ"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Düşük Pil"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -41505,6 +41889,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ระยะเวลาแบตเตอรี่ต่ำ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Düşük pil süresi"
           }
         },
         "zh-Hans" : {
@@ -41541,6 +41931,12 @@
             "value" : "HUD แบตเตอรี่ต่ำ"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Düşük pil HUD'u"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -41575,6 +41971,12 @@
             "value" : "สไตล์แบตเตอรี่ต่ำ"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Düşük pil stili"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -41607,6 +42009,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ขีดเริ่มแบตเตอรี่ต่ำ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Düşük pil eşiği"
           }
         },
         "zh-Hans" : {
@@ -41717,7 +42125,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Düşük Güç Modu"
           }
         },
@@ -42160,6 +42568,12 @@
             "value" : "Вручную"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -42296,6 +42710,12 @@
             "value" : "Соответствовать обложке"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Albüm kapağıyla eşleştir"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -42404,8 +42824,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Menubar yüksekliğini eşle"
+            "state" : "translated",
+            "value" : "Menü çubuğu yüksekliğiyle eşleştir"
           }
         },
         "uk" : {
@@ -42522,8 +42942,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Gerçek çentik boyutunu eşle"
+            "state" : "translated",
+            "value" : "Gerçek notch boyutuyla eşleştir"
           }
         },
         "uk" : {
@@ -42903,7 +43323,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Medya"
           }
         },
@@ -43754,8 +44174,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Medya kaynağı"
+            "state" : "translated",
+            "value" : "Medya Kaynağı"
           }
         },
         "uk" : {
@@ -44434,6 +44854,12 @@
             "value" : "แหล่งวิธีการ"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yöntem kaynağı"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45074,6 +45500,12 @@
             "value" : "นาที"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dk"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -45235,8 +45667,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Minimum asılı kalma süresi"
+            "state" : "translated",
+            "value" : "Minimum hover süresi"
           }
         },
         "uk" : {
@@ -45405,7 +45837,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Ayna"
           }
         },
@@ -45617,7 +46049,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Ayna şekli"
           }
         },
@@ -46427,8 +46859,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Müzik kaynağı"
+            "state" : "translated",
+            "value" : "Müzik Kaynağı"
           }
         },
         "uk" : {
@@ -46591,8 +47023,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "susturuldu"
+            "state" : "translated",
+            "value" : "sessiz"
           }
         },
         "uk" : {
@@ -46769,8 +47201,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "İsim"
+            "state" : "translated",
+            "value" : "Ad"
           }
         },
         "uk" : {
@@ -47319,7 +47751,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Asla gizleme"
           }
         },
@@ -49417,7 +49849,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Şimdi Değil"
           }
         },
@@ -49907,8 +50339,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Çentik yüksekliği"
+            "state" : "translated",
+            "value" : "Notch Yüksekliği"
           }
         },
         "uk" : {
@@ -50055,6 +50487,12 @@
             "value" : "Заметки вернули пустой ответ."
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notlar boş bir yanıt döndürdü."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -50083,6 +50521,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Скрипт заметок не вернул результат."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notlar betiği sonuç döndürmedi."
           }
         },
         "zh-Hans" : {
@@ -50223,6 +50667,12 @@
             "value" : "now"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "şimdi"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -50340,6 +50790,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "van %@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "/ %@"
           }
         },
         "zh-Hant" : {
@@ -50584,6 +51040,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "รอสาย"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beklemede"
           }
         },
         "zh-Hans" : {
@@ -50994,6 +51456,12 @@
             "value" : "เปิดในเบราว์เซอร์"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarayıcıda Aç"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -51227,6 +51695,12 @@
             "value" : "Открыть настройки"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ayarları Aç"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -51301,6 +51775,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "เปิด Spotify Web Player"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify Web Oynatıcıyı Aç"
           }
         },
         "zh-Hans" : {
@@ -52192,6 +52672,12 @@
             "value" : "วางจากคลิปบอร์ด"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panodan Yapıştır"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -52267,6 +52753,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "หยุดชั่วคราว"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duraklatıldı"
           }
         },
         "zh-Hans" : {
@@ -52447,6 +52939,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "เปอร์เซ็นต์เปลี่ยนต่อการกดปุ่ม ขั้นละเอียดใช้เมื่อกด Shift+Option ค้าง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Her tuşa basışta yüzde değişimi. İnce adım, Shift+Option basılıyken uygulanır."
           }
         },
         "zh-Hans" : {
@@ -54529,6 +55027,12 @@
             "value" : "Voortgang"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İlerleme"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -55105,7 +55609,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Çık"
           }
         },
@@ -55223,8 +55727,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Uygulamadan Çık"
+            "state" : "translated",
+            "value" : "Uygulamadan çık"
           }
         },
         "uk" : {
@@ -55314,6 +55818,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "quotum niet beschikbaar"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kota kullanılamıyor"
           }
         },
         "zh-Hant" : {
@@ -56365,6 +56875,12 @@
             "value" : "Herinner me later"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonra Hatırlat"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -56691,6 +57207,18 @@
         }
       }
     },
+    "Remove from Shelf" : {
+      "comment" : "A hint for the user that describes the action of removing an item from the shelf.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raftan Kaldır"
+          }
+        }
+      }
+    },
     "Remove from shelf after dragging" : {
       "localizations" : {
         "ko" : {
@@ -56945,6 +57473,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "แทนที่กรอเฟิอแบนด์ด้วย Canvas สดเมื่อแอปปัจจุบันมีให้ และนำ Canvas เคลื่อนไหวนั้นมาใช้ใหม่สำหรับเอฟเฟกต์แสงรอบๆ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geçerli uygulama canlı bir Canvas sağladığında kapak görseli döşemesini onunla değiştirir ve o hareketli Canvas'ı çevredeki ışık efekti için yeniden kullanır."
           }
         },
         "zh-Hans" : {
@@ -57659,6 +58193,12 @@
             "value" : "รีเซ็ตเซสชัน"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oturumu Sıfırla"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -58072,8 +58612,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Yeniden başlat"
+            "state" : "translated",
+            "value" : "Yeniden Başlat"
           }
         },
         "uk" : {
@@ -58876,6 +59416,12 @@
             "value" : "คลิกขวาที่ปกอัลบั้มบนหน้าจอล็อกเพื่อตั้งเป็นวอลเปเปอร์ คลิกขวาอีกครั้งหรือคลิกพื้นหลังเพื่อกู้คืนวอลเปเปอร์เดิม หากมี Canvas Atoll สามารถคงปกอัลบั้ม + เลย์เอาต์เครื่องเล่นเดิมไว้บน Canvas สด"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duvar kâğıdı olarak ayarlamak için kilit ekranındaki albüm kapağına sağ tıklayın. Orijinal duvar kâğıdını geri yüklemek için tekrar sağ tıklayın veya arka plana tıklayın. Bir Canvas mevcutsa Atoll, aynı albüm kapağı + oynatıcı düzenini canlı Canvas'ın üzerinde de tutabilir."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -59006,6 +59552,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Линейка"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cetvel"
           }
         },
         "zh-Hans" : {
@@ -59152,6 +59704,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "รันแอนิเมชันรอยบากจริงบนจอเป้าหมายปัจจุบัน หากจอภายนอกใช้โหมดไดนามิกไอแลนด์ HUD แบตเตอรี่จะถูกส่งไปที่นั่นก่อน"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gerçek notch animasyonunu geçerli hedef ekranda çalıştırır. Harici bir ekran Dynamic Island modunu kullanıyorsa pil HUD'u önce oraya gönderilir."
           }
         },
         "zh-Hans" : {
@@ -60239,6 +60797,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Realtimegolfvorm waarin je kunt scrubben"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gezinilebilir gerçek zamanlı dalga formu"
           }
         },
         "zh-Hant" : {
@@ -61900,7 +62464,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Ayarlar"
           }
         },
@@ -62331,8 +62895,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Kestirmeler"
+            "state" : "translated",
+            "value" : "Kısayollar"
           }
         },
         "uk" : {
@@ -62425,6 +62989,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Показывать смену режимов прослушивания AirPods"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AirPods dinleme modu değişikliklerini göster"
           }
         },
         "zh-Hant" : {
@@ -62711,6 +63281,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "แสดงเปอร์เซ็นต์แบตเตอรี่ในไอคอน"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pil yüzdesini simgenin içinde göster"
           }
         },
         "zh-Hans" : {
@@ -64226,6 +64802,12 @@
             "value" : "แสดง Canvas สดในไดนามิกไอแลนด์"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dynamic Island'da canlı Canvas'ı göster"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -65334,6 +65916,12 @@
             "value" : "Toon versie-informatie"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sürüm Notlarını Göster"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -65534,6 +66122,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "แสดงชื่อเพลงและศิลปินบนจอที่ไม่ใช่รอยบาก"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notch'suz ekranlarda şarkı adını ve sanatçıyı göster"
           }
         },
         "zh-Hans" : {
@@ -66168,6 +66762,12 @@
             "value" : "เข้าสู่ระบบ Spotify เพื่อจับคุกกี้ `sp_dc` อัตโนมัติ หรือวางด้านล่าง"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "`sp_dc` çerezini otomatik yakalamak için Spotify'a giriş yapın veya aşağıya yapıştırın."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -66202,6 +66802,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "เข้าสู่ระบบด้วย Spotify"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify ile Giriş Yap"
           }
         },
         "zh-Hans" : {
@@ -66480,6 +67086,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sla deze versie over"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu Sürümü Atla"
           }
         },
         "zh-Hant" : {
@@ -67199,7 +67811,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Yazılım güncellemeleri"
           }
         },
@@ -67296,6 +67908,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "คุกกี้ sp_dc"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sp_dc çerezi"
           }
         },
         "zh-Hans" : {
@@ -67554,6 +68172,12 @@
             "value" : "เซสชัน Spotify Canvas"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify Canvas Oturumu"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -67588,6 +68212,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spotify มักบล็อกการเข้าสู่ระบบในแอป เข้าสู่ระบบผ่านเบราว์เซอร์ปกติ แล้ววาง sp_dc ในการตั้งค่า"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify çoğu zaman uygulama içi girişleri engeller. Normal tarayıcınızdan giriş yapın, ardından sp_dc'yi Ayarlar'a yapıştırın."
           }
         },
         "zh-Hans" : {
@@ -68474,6 +69104,12 @@
             "value" : "Запустить таймер"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zamanlayıcıyı Başlat"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -69254,6 +69890,12 @@
             "value" : "ขนาดขั้น"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adım boyutu"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -69901,8 +70543,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Bizi Destekle"
+            "state" : "translated",
+            "value" : "Bize Destek Olun"
           }
         },
         "uk" : {
@@ -70113,6 +70755,12 @@
             "value" : "Символ"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sembol"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -70135,6 +70783,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Синхронизировать"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şimdi Eşitle"
           }
         },
         "zh-Hans" : {
@@ -70163,6 +70817,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Синхронизация с Заметками"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Notlar ile eşitle"
           }
         },
         "zh-Hans" : {
@@ -70333,7 +70993,7 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Sistem özellikleri"
           }
         },
@@ -70951,6 +71611,12 @@
             "value" : "ทดสอบ HUD การชาร์จ"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şarj HUD'unu test et"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -70985,6 +71651,12 @@
             "value" : "ทดสอบ HUD แบตเตอรี่เต็ม"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tam pil HUD'unu test et"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -71017,6 +71689,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ทดสอบ HUD แบตเตอรี่ต่ำ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Düşük pil HUD'unu test et"
           }
         },
         "zh-Hans" : {
@@ -71290,6 +71968,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "HUD ชั่วคราวเหล่านี้สร้างการแจ้งเตือนรอยบากการชาร์จ แบตเตอรี่ต่ำ และแบตเตอรี่เต็มใหม่"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu geçici HUD'lar şarj, düşük pil ve tam pil notch uyarılarını yeniden oluşturur."
           }
         },
         "zh-Hans" : {
@@ -73361,6 +74045,12 @@
             "value" : "Probeer opnieuw"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tekrar Dene"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -73715,6 +74405,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Двусторонняя синхронизация с Apple Заметками. Заметки Atoll появляются в папке Atoll, а существующие заметки импортируются в вырез. При запросе предоставьте разрешение на автоматизацию для Заметок."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS Notlar uygulamasıyla iki yönlü eşitleme. Atoll'da oluşturulan notlar Notlar'daki Atoll klasöründe görünür ve mevcut Apple Notlarınız notch'a aktarılır. İstendiğinde Notlar için Otomasyon iznini verin."
           }
         },
         "zh-Hans" : {
@@ -74258,6 +74954,12 @@
             "value" : "Без названия"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adsız Not"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -74328,6 +75030,12 @@
             "value" : "Updatekanaal"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncelleme kanalı"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -74344,6 +75052,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bijwerken mislukt"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncelleme Başarısız"
           }
         },
         "zh-Hant" : {
@@ -74559,8 +75273,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Pro sürümüne Yükselt"
+            "state" : "translated",
+            "value" : "Pro'ya Yükselt"
           }
         },
         "uk" : {
@@ -75014,6 +75728,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ใช้เลย์เอาต์ปกอัลบั้มแทน Canvas เต็มจอ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tam ekran Canvas üzerinde albüm kapağı düzenini kullan"
           }
         },
         "zh-Hans" : {
@@ -75804,6 +76524,12 @@
             "value" : "Gebruikt 'Huidig onderdeel' van macOS wanneer Cider de actieve mediabron is. De afspeelregelaars volgen het systeemdoel 'Huidig onderdeel'."
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cider etkin medya kaynağıyken macOS Now Playing'i kullanır. Oynatma denetimleri sistem Now Playing hedefini izler."
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -76085,6 +76811,12 @@
             "value" : "ตรวจสอบคุกกี้"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çerezi Doğrula"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -76119,6 +76851,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "กำลังตรวจสอบ..."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Doğrulanıyor..."
           }
         },
         "zh-Hans" : {
@@ -76277,8 +77015,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Versiyon"
+            "state" : "translated",
+            "value" : "Sürüm"
           }
         },
         "uk" : {
@@ -76395,8 +77133,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Versiyon bilgisi"
+            "state" : "translated",
+            "value" : "Sürüm bilgisi"
           }
         },
         "uk" : {
@@ -76583,6 +77321,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Яркий"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canlı"
           }
         },
         "zh-Hant" : {
@@ -76777,6 +77521,12 @@
             "value" : "Столбцы визуализатора"
           }
         },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Görselleştirici çubukları"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -76857,6 +77607,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ขั้นละเอียดระดับเสียง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ses ince adımı"
           }
         },
         "zh-Hans" : {
@@ -77003,6 +77759,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ขั้นระดับเสียง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ses adımı"
           }
         },
         "zh-Hans" : {
@@ -77485,8 +78247,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Hoş geldiniz"
+            "state" : "translated",
+            "value" : "Hoş Geldiniz"
           }
         },
         "uk" : {
@@ -77644,8 +78406,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Neler Yeni"
+            "state" : "translated",
+            "value" : "Yenilikler"
           }
         },
         "uk" : {
@@ -78117,6 +78879,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Als deze optie is ingeschakeld, toont het tabblad Statistieken realtimegrafieken van de systeemprestaties. Voor deze functie zijn systeemmachtigingen vereist en wordt mogelijk extra energie verbruikt. Als je LLM-gebruik bewaakt, wordt het tabblad Gebruik toegevoegd. Hierop worden het tokengebruik en de kosten van je geconfigureerde AI-aanbieders bijgehouden."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Etkinleştirildiğinde, İstatistikler sekmesi gerçek zamanlı sistem performansı grafikleri gösterir. Bu özellik sistem izinleri gerektirir ve ek pil kullanabilir. LLM Kullanım İzleyicisini etkinleştirmek, yapılandırdığınız yapay zekâ sağlayıcılarındaki jeton kullanımını ve harcamayı izleyen bir Kullanım sekmesi ekler."
           }
         },
         "zh-Hant" : {
@@ -78953,8 +79721,8 @@
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Tamamen Hazırsın!"
+            "state" : "translated",
+            "value" : "Her Şey Hazır!"
           }
         },
         "uk" : {
@@ -78985,6 +79753,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll is up-to-date!"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncelsiniz!"
           }
         },
         "zh-Hant" : {
