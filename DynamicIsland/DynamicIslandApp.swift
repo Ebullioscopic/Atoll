@@ -294,6 +294,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // synchronously here so it is never left frozen. (See issue #568.)
         SystemOSDManager.resumeOSDUIHelperForTermination()
 
+        // 释放电源断言与合盖睡眠否决，并退出清洁模式 ——
+        // 尤其是清洁键盘，绝不能让进程带着 event tap 死掉把键盘锁住。
+        PowerManagementManager.shared.shutdown()
+        KeyboardCleaningManager.shared.stop()
+        ScreenCleaningManager.shared.stop()
+
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
@@ -628,6 +634,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             userInfo: userInfo,
             deliverImmediately: true
         )
+
+        // 清掉上次异常退出可能残留的「合盖不休眠」内核状态（见 resetClamshellStateOnLaunch）。
+        PowerManagementManager.shared.resetClamshellStateOnLaunch()
 
         LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
         LockScreenManager.shared.configure(viewModel: vm)
