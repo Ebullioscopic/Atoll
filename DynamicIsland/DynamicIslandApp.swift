@@ -130,6 +130,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
+
+    // Block-based AudioTap observers, kept with their center so they can be removed by token
+    private var audioTapObserverTokens: [(center: NotificationCenter, token: NSObjectProtocol)] = []
 //    let calendarManager = CalendarManager.shared
 //    let webcamManager = WebcamManager.shared
 //    var closeNotchWorkItem: DispatchWorkItem?
@@ -187,6 +190,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Setup observers for music player state changes to restart AudioTap capture
     private func setupAudioTapMusicObservers() {
+        // Registration is additive and this runs again every time the waveform setting is
+        // switched back on, so drop the previous generation instead of stacking duplicates.
+        // Block-based observers are only removable through the token they return, which is
+        // why they are retained in `audioTapObserverTokens`.
+        tearDownAudioTapMusicObservers()
+
         // Listen for app launches to restart capture when music apps are opened
         let targetBundleIDs = [
             "com.apple.Music",
@@ -202,7 +211,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "com.coppertino.Vox",
         ]
         
-        NSWorkspace.shared.notificationCenter.addObserver(
+        let launchToken = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification,
             object: nil,
             queue: .main
@@ -222,7 +231,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Also observe app terminations to restart capture
-        NSWorkspace.shared.notificationCenter.addObserver(
+        let terminateToken = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification,
             object: nil,
             queue: .main
@@ -242,7 +251,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // disconnect). AudioTap skips Spotify while a Bluetooth route is active to keep the
         // AirPods pause gesture working, so the tap must be rebuilt to re-include or exclude
         // Spotify whenever the route flips.
-        NotificationCenter.default.addObserver(
+        let routeToken = NotificationCenter.default.addObserver(
             forName: .systemAudioRouteDidChange,
             object: nil,
             queue: .main
@@ -252,8 +261,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 AudioTap.shared.restartCapture()
             }
         }
+
+        audioTapObserverTokens = [
+            (NSWorkspace.shared.notificationCenter, launchToken),
+            (NSWorkspace.shared.notificationCenter, terminateToken),
+            (NotificationCenter.default, routeToken),
+        ]
     }
-    
+
+    /// Removes the AudioTap observers registered by `setupAudioTapMusicObservers()`.
+    private func tearDownAudioTapMusicObservers() {
+        for (center, token) in audioTapObserverTokens {
+            center.removeObserver(token)
+        }
+        audioTapObserverTokens.removeAll()
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
@@ -680,6 +703,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.setupAudioTapMusicObservers()
                 } else {
                     AudioTap.shared.stopCapture()
+                    self?.tearDownAudioTapMusicObservers()
                 }
             }
             .store(in: &cancellables)

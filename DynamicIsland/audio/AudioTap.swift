@@ -23,6 +23,7 @@
 import AppKit
 import AudioToolbox
 import CoreAudio
+import Defaults
 import simd
 import os.log
 
@@ -315,6 +316,13 @@ class AudioTap: NSObject {
                 self?.stopCaptureSync()
                 // Small delay to let CoreAudio fully release resources
                 Thread.sleep(forTimeInterval: 0.1)
+                // Re-read the setting instead of trusting the state at scheduling time: the
+                // waveform can be switched off during the debounce window, and a stale
+                // restart must not bring capture back up behind the user's back.
+                guard Defaults[.enableRealTimeWaveform] else {
+                    print("⏹️ [AudioTap] Waveform disabled during restart, staying stopped")
+                    return
+                }
                 self?.startCaptureSync()
             }
         }
@@ -323,6 +331,11 @@ class AudioTap: NSObject {
     }
 
     func stopCapture() {
+        // Drop a queued restart first, otherwise a debounced route/app change can resurrect
+        // capture right after the caller asked us to stop.
+        pendingRestartWorkItem?.cancel()
+        pendingRestartWorkItem = nil
+
         audioQueue.sync { [weak self] in
             self?.stopCaptureSync()
         }
