@@ -103,8 +103,9 @@ final class PowerManagementManager: ObservableObject {
 
     // MARK: - 屏幕常亮
 
-    func setKeepScreenAwake(_ enabled: Bool) {
-        guard enabled != isKeepingScreenAwake else { return }
+    @discardableResult
+    func setKeepScreenAwake(_ enabled: Bool) -> Bool {
+        guard enabled != isKeepingScreenAwake else { return true }
 
         if enabled {
             var assertionID = IOPMAssertionID(0)
@@ -119,35 +120,44 @@ final class PowerManagementManager: ObservableObject {
 
             guard result == kIOReturnSuccess else {
                 Diagnostics.log("屏幕常亮断言创建失败: \(result)")
-                return
+                return false
             }
 
             displayAssertionID = assertionID
             isKeepingScreenAwake = true
             Diagnostics.log("屏幕常亮已开启")
+            return true
         } else {
+            // 释放可能失败（ID 失效等），据实返回；调用方（如隐藏图标的 onChange）才能知道
+            // 系统断言是否真的撤下，而不是只看被无条件置 false 的 isKeepingScreenAwake。
+            var released = true
             if displayAssertionID != IOPMAssertionID(0) {
-                IOPMAssertionRelease(displayAssertionID)
+                let result = IOPMAssertionRelease(displayAssertionID)
+                released = (result == kIOReturnSuccess)
+                if !released { Diagnostics.log("屏幕常亮断言释放失败: \(result)") }
                 displayAssertionID = IOPMAssertionID(0)
             }
             isKeepingScreenAwake = false
             Diagnostics.log("屏幕常亮已关闭")
+            return released
         }
     }
 
     // MARK: - 合盖不休眠
 
-    func setPreventLidSleep(_ enabled: Bool) {
-        guard enabled != isPreventingLidSleep else { return }
+    @discardableResult
+    func setPreventLidSleep(_ enabled: Bool) -> Bool {
+        guard enabled != isPreventingLidSleep else { return true }
 
         guard setClamshellSleepDisabled(enabled) else {
             Diagnostics.log("设置 clamshell 睡眠状态失败，合盖不休眠未生效")
-            return
+            return false
         }
 
         isPreventingLidSleep = enabled
         Diagnostics.setActive(enabled)
         Diagnostics.log("合盖不休眠已\(enabled ? "开启" : "关闭")")
+        return true
     }
 
     /// 直接设置内核里的 clamshell 睡眠开关。
