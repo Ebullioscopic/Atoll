@@ -35,8 +35,13 @@ struct Bookmark: Sendable, Equatable, Codable {
             throw NSError(domain: "Bookmark", code: 1, userInfo: [NSLocalizedDescriptionKey: "Not a valid file URL or file does not exist at \(url.path)"])
         }
         do {
+            // Atoll is not sandboxed (ENABLE_APP_SANDBOX = NO), so it already has
+            // full file access and cannot create security-scoped bookmarks:
+            // `.withSecurityScope` requires the App Sandbox entitlement and throws
+            // on macOS 26 (Tahoe), which silently dropped every shelf drop (#461/#646).
+            // Plain bookmarks are sufficient and correct for a non-sandboxed app.
             let bookmark = try url.bookmarkData(
-                options: .withSecurityScope,
+                options: [],
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
@@ -55,11 +60,11 @@ struct Bookmark: Sendable, Equatable, Codable {
             do {
                 let url = try URL(
                     resolvingBookmarkData: data,
-                    options: [.withSecurityScope],
+                    options: [],
                     relativeTo: nil,
                     bookmarkDataIsStale: &isStale
                 )
-                if isStale, let newData = try? url.bookmarkData(options: [.withSecurityScope]) {
+                if isStale, let newData = try? url.bookmarkData(options: []) {
                     NSLog("⚠️ Bookmark was stale for \(url.path), refreshed")
                     return (url, newData)
                 }
@@ -81,11 +86,11 @@ struct Bookmark: Sendable, Equatable, Codable {
         do {
             let url = try URL(
                 resolvingBookmarkData: data,
-                options: [.withSecurityScope],
+                options: [],
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
             )
-            if isStale, let newData = try? url.bookmarkData(options: [.withSecurityScope]) {
+            if isStale, let newData = try? url.bookmarkData(options: []) {
                 NSLog("⚠️ Bookmark was stale for \(url.path), refreshed")
                 return (url, newData)
             }
