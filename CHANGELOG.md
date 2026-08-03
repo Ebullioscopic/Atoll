@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Improved the Dutch localization by adding missing translations, corrected terminology, and wording aligned with Apple's Dutch macOS conventions.
+- **Performance (phase 3)**: Moved the heavy 1 Hz stats collection (GPU, disk, temperature, frequency) to a background actor, gated the music visualizers on visibility so they no longer drive the run loop off-screen, made the now-playing helper process start on demand instead of at launch, and pushed icon/drag-preview rendering and LLM-usage file reads off the main thread.
 - **Performance (phase 2)**: Background work now pauses while the display or system is asleep and slows down under low-power/thermal pressure. Bluetooth, brightness, and clipboard polling became event-driven or far less frequent, Do Not Disturb detection switched from a 2 s poll to filesystem events, and the global media-key tap is only installed when an interception feature is actually enabled.
 
 ### Fixed
