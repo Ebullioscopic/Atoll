@@ -120,6 +120,20 @@ final class AudioRouteManager: ObservableObject {
         }
     }
 
+    /// Whether the current system default output device is a Bluetooth route (e.g. AirPods).
+    /// Queried synchronously against CoreAudio so callers on background queues get a fresh value
+    /// rather than the async-updated `activeDevice` snapshot.
+    func isDefaultOutputBluetooth() -> Bool {
+        let deviceID = fetchDefaultOutputDevice()
+        guard deviceID != 0 else { return false }
+        switch transportType(for: deviceID) {
+        case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE:
+            return true
+        default:
+            return false
+        }
+    }
+
     // MARK: - Private
 
     @objc private func handleRouteChange() {
