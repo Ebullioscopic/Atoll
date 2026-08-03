@@ -78,7 +78,7 @@ struct JSONLUsageParser {
             }
         }
         snapshot.models = perModel
-            .map { ModelUsage(model: $0.key, totals: $0.value) }
+            .map { ModelUsage(model: $0.key, totals: $0.value, pool: nil) }
             .sorted { $0.totals.costUSD > $1.totals.costUSD }
         snapshot.lastUpdated = now
         return snapshot
