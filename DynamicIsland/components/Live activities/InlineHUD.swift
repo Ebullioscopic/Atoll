@@ -278,7 +278,8 @@ struct InlineHUD: View {
                                     .frame(width: 20, height: 15, alignment: .center)
                             } else if useBluetoothHUD3DIcon,
                                let deviceType = bluetoothManager.lastConnectedDevice?.deviceType,
-                               let url = Bundle.main.url(forResource: deviceType.inlineHUDAnimationBaseName, withExtension: "mov") {
+                               let url = Bundle.main.url(forResource: deviceType.inlineHUDAnimationBaseName, withExtension: "mov", subdirectory: "BluetoothHUDAnimations")
+                                      ?? Bundle.main.url(forResource: deviceType.inlineHUDAnimationBaseName, withExtension: "mov") {
                                 LoopingVideoIcon(url: url, size: CGSize(width: 20, height: 20))
                                     .frame(width: 20, height: 20, alignment: .center)
                             } else {
