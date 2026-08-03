@@ -47,6 +47,9 @@ struct ShelfItemView: View {
     @EnvironmentObject private var quickLookService: QuickLookService
     @State private var showStack = false
     @State private var cachedPreviewImage: NSImage?
+    /// Whether `cachedPreviewImage` was composed from a real thumbnail rather than the
+    /// generic icon fallback. Gates the single re-render once the thumbnail resolves.
+    @State private var renderedWithRealThumbnail = false
     @State private var debouncedDropTarget = false
     @State private var isHovering = false
 
@@ -129,11 +132,22 @@ struct ShelfItemView: View {
             // critical path (deferred, low priority, and only produced once).
             Task(priority: .utility) {
                 if cachedPreviewImage == nil {
+                    renderedWithRealThumbnail = viewModel.thumbnail != nil
                     cachedPreviewImage = await renderDragPreview()
                 }
             }
             viewModel.onQuickLookRequest = { urls in
                 quickLookService.show(urls: urls, selectFirst: true)
+            }
+        }
+        .onChange(of: viewModel.thumbnail) { _, newThumbnail in
+            // `loadMetadata()` is async, so a slow QuickLook generation can land after the
+            // onAppear render — which would leave the composed preview stuck on the generic
+            // icon. Re-compose exactly once, when the real thumbnail arrives.
+            guard newThumbnail != nil, !renderedWithRealThumbnail else { return }
+            renderedWithRealThumbnail = true
+            Task(priority: .utility) {
+                cachedPreviewImage = await renderDragPreview()
             }
         }
         .quickLookPresenter(using: quickLookService)
