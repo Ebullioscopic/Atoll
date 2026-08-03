@@ -9,9 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **AntiGravity Usage Tracking**: Track how much of Antigravity usage is left in the LLM Usage Monitor tab (both Gemini and Claude models)
+
 ### Changed
+- Improved the Dutch localization by adding missing translations, corrected terminology, and wording aligned with Apple's Dutch macOS conventions.
+- **Performance (phase 3)**: Moved the heavy 1 Hz stats collection (GPU, disk, temperature, frequency) to a background actor, gated the music visualizers on visibility so they no longer drive the run loop off-screen, made the now-playing helper process start on demand instead of at launch, and pushed icon/drag-preview rendering and LLM-usage file reads off the main thread.
+- **Performance (phase 2)**: Background work now pauses while the display or system is asleep and slows down under low-power/thermal pressure. Bluetooth, brightness, and clipboard polling became event-driven or far less frequent, Do Not Disturb detection switched from a 2 s poll to filesystem events, and the global media-key tap is only installed when an interception feature is actually enabled.
 
 ### Fixed
+- Fixed an issue where `BluetoothHUDAnimations` (.mov files) were missing in release builds.
+- Improved the GitHub Actions release workflow to use a monotonic build number allocator and automated patch versioning for stable releases.
+- Fixed Cursor quota parsing and display to show the current Cursor Models and Other Models billing buckets with readable long reset durations.
+- **Performance (phase 1)**: Plugged a CoreAudio property-listener leak on every output-device change, bounded the Shelf thumbnail cache (200 items / 64 MB) so long sessions stop growing, moved all media `playbackState` publishing onto the main actor, and fixed the battery observer ids shifting on removal.
 
 ### Removed
 
