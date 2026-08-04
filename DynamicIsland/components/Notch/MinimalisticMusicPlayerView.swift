@@ -1065,16 +1065,16 @@ private struct MinimalisticReminderDetailsView: View {
                 enableLyrics.toggle()
             }
         case .likeTrack:
-            controlButton(
-                icon: musicManager.isCurrentTrackLiked == true ? "heart.fill" : "heart",
-                isActive: musicManager.isCurrentTrackLiked == true,
-                activeColor: brandAccentColor,
-                symbolEffect: .replace
-            ) {
-                musicManager.toggleLike()
+            LikeTrackControl { presentation, toggle in
+                controlButton(
+                    icon: presentation.iconName,
+                    isActive: presentation.isActive,
+                    activeColor: brandAccentColor,
+                    symbolEffect: .replace
+                ) {
+                    toggle()
+                }
             }
-            .disabled(musicManager.isCurrentTrackLiked == nil)
-            .opacity(musicManager.isCurrentTrackLiked == nil ? 0.4 : 1)
         }
     }
 

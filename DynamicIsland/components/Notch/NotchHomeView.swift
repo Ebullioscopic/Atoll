@@ -634,15 +634,15 @@ struct MusicControlsView: View {
                 enableLyrics.toggle()
             }
         case .likeTrack:
-            HoverButton(
-                icon: musicManager.isCurrentTrackLiked == true ? "heart.fill" : "heart",
-                iconColor: musicManager.isCurrentTrackLiked == true ? brandAccentColor : .white,
-                scale: .medium
-            ) {
-                MusicManager.shared.toggleLike()
+            LikeTrackControl { presentation, toggle in
+                HoverButton(
+                    icon: presentation.iconName,
+                    iconColor: presentation.isActive ? brandAccentColor : .white,
+                    scale: .medium
+                ) {
+                    toggle()
+                }
             }
-            .disabled(musicManager.isCurrentTrackLiked == nil)
-            .opacity(musicManager.isCurrentTrackLiked == nil ? 0.4 : 1)
         }
     }
 

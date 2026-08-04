@@ -741,17 +741,17 @@ struct LockScreenMusicPanel: View {
                 }
             }
         case .likeTrack:
-            controlButton(
-                icon: musicManager.isCurrentTrackLiked == true ? "heart.fill" : "heart",
-                size: 18,
-                isActive: musicManager.isCurrentTrackLiked == true,
-                activeColor: brandAccentColor,
-                symbolEffect: .replace
-            ) {
-                musicManager.toggleLike()
+            LikeTrackControl { presentation, toggle in
+                controlButton(
+                    icon: presentation.iconName,
+                    size: 18,
+                    isActive: presentation.isActive,
+                    activeColor: brandAccentColor,
+                    symbolEffect: .replace
+                ) {
+                    toggle()
+                }
             }
-            .disabled(musicManager.isCurrentTrackLiked == nil)
-            .opacity(musicManager.isCurrentTrackLiked == nil ? 0.4 : 1)
         }
     }
 
