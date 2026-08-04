@@ -477,8 +477,11 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
             beginDraggingSession(with: draggingItems, event: event, source: self)
         }
 
-        /// Zero blocking work: `resolvedFileURL` reads the path captured at drop
-        /// time, falling back to a plain synchronous bookmark resolve.
+        /// `resolvedFileURL` reads the path captured at drop time, which is the
+        /// path every item dropped or backfilled since launch has. Only when that
+        /// is missing does it fall back to a synchronous `resolveWithoutMounting()`
+        /// — still a main-actor bookmark resolve that can block, just bounded away
+        /// from mounting an absent volume.
         ///
         /// This used to build an `NSPasteboardItem` by hand after a 5s
         /// semaphore wait that always deadlocked, so it fell through to writing

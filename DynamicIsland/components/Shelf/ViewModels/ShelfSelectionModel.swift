@@ -103,8 +103,10 @@ final class ShelfSelectionModel: ObservableObject {
         }
 
         // An item removed mid-marquee would otherwise linger in the base set and
-        // get re-added by the next `updateMarquee`.
+        // get re-added by the next `updateMarquee`, or come back as part of the
+        // selection `cancelMarquee` restores.
         marqueeBaseSelection.formIntersection(validIDs)
+        marqueePreviousSelection.formIntersection(validIDs)
         if let first = marqueeFirstHitID, !validIDs.contains(first) {
             marqueeFirstHitID = nil
         }
@@ -141,7 +143,13 @@ final class ShelfSelectionModel: ObservableObject {
         case toggle    // Command
     }
 
+    /// What `updateMarquee` unions/toggles the hit set against — empty in
+    /// `.replace` mode, since the band there defines the whole selection.
     private var marqueeBaseSelection: Set<UUID> = []
+    /// What was selected before the band started. Distinct from the base set,
+    /// which `.replace` deliberately empties, and which therefore cannot serve
+    /// as the thing `cancelMarquee` restores.
+    private var marqueePreviousSelection: Set<UUID> = []
     private var marqueeMode: MarqueeMode = .replace
     private var marqueeFirstHitID: UUID?
 
@@ -149,6 +157,7 @@ final class ShelfSelectionModel: ObservableObject {
         isMarqueeSelecting = true
         marqueeMode = mode
         marqueeFirstHitID = nil
+        marqueePreviousSelection = selectedIDs
         marqueeBaseSelection = (mode == .replace) ? [] : selectedIDs
         if mode == .replace && !selectedIDs.isEmpty {
             selectedIDs = []
@@ -177,6 +186,7 @@ final class ShelfSelectionModel: ObservableObject {
         guard isMarqueeSelecting else { return }
         isMarqueeSelecting = false
         marqueeBaseSelection = []
+        marqueePreviousSelection = []
         // Anchor a following Shift-click somewhere sensible.
         if let first = marqueeFirstHitID, selectedIDs.contains(first) {
             lastAnchorID = first
@@ -193,8 +203,9 @@ final class ShelfSelectionModel: ObservableObject {
     func cancelMarquee() {
         guard isMarqueeSelecting else { return }
         isMarqueeSelecting = false
-        if selectedIDs != marqueeBaseSelection { selectedIDs = marqueeBaseSelection }
+        if selectedIDs != marqueePreviousSelection { selectedIDs = marqueePreviousSelection }
         marqueeBaseSelection = []
+        marqueePreviousSelection = []
         marqueeFirstHitID = nil
     }
 }

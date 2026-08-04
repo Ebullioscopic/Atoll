@@ -64,24 +64,38 @@ final class ShelfStateViewModel: ObservableObject {
 
         Task.detached(priority: .utility) {
             var resolved: [ShelfItem.ID: String] = [:]
+            var sources: [ShelfItem.ID: Data] = [:]
             for (itemID, data) in pending {
                 if let url = Bookmark(data: data).resolve().url {
                     resolved[itemID] = url.standardizedFileURL.path
+                    sources[itemID] = data
                 }
             }
             guard !resolved.isEmpty else { return }
-            await MainActor.run { ShelfStateViewModel.shared.applyCachedPaths(resolved) }
+            await MainActor.run {
+                ShelfStateViewModel.shared.applyCachedPaths(resolved, resolvedFrom: sources)
+            }
         }
     }
 
     /// Applies resolved paths in a single mutation — writing `items[idx]` inside
     /// a loop would fire `didSet` (and a full JSON save) once per item.
-    func applyCachedPaths(_ paths: [ShelfItem.ID: String]) {
+    ///
+    /// `sources` carries the bookmark each path was resolved from, and an entry
+    /// only lands while the item still holds that bookmark. Every caller resolves
+    /// off the main actor, so a resolve that started before a rename can finish
+    /// *after* `updateBookmark` recorded the new bookmark and path; without the
+    /// check it would put the pre-rename path back, and `resolvedFileURL` prefers
+    /// `cachedPath` — so drag-out and the context menu would target the old
+    /// location.
+    func applyCachedPaths(_ paths: [ShelfItem.ID: String], resolvedFrom sources: [ShelfItem.ID: Data]) {
         guard !paths.isEmpty else { return }
         var updated = items
         var changed = false
         for idx in updated.indices {
-            guard let path = paths[updated[idx].id], updated[idx].cachedPath != path else { continue }
+            let id = updated[idx].id
+            guard let path = paths[id], updated[idx].cachedPath != path else { continue }
+            guard case .file(let current) = updated[idx].kind, current == sources[id] else { continue }
             updated[idx].cachedPath = path
             changed = true
         }
@@ -89,6 +103,10 @@ final class ShelfStateViewModel: ObservableObject {
             items = updated
             invalidateURLCache()
         }
+    }
+
+    func applyCachedPath(_ path: String, for itemID: ShelfItem.ID, resolvedFrom source: Data) {
+        applyCachedPaths([itemID: path], resolvedFrom: [itemID: source])
     }
 
     func add(_ newItems: [ShelfItem]) {
@@ -121,8 +139,14 @@ final class ShelfStateViewModel: ObservableObject {
     func updateBookmark(for item: ShelfItem, bookmark: Data, path: String? = nil) {
         guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
         guard case .file = items[idx].kind else { return }
-        items[idx].kind = .file(bookmark: bookmark)
-        items[idx].cachedPath = path ?? Bookmark(data: bookmark).resolveWithoutMounting()?.standardizedFileURL.path
+        let newPath = path ?? Bookmark(data: bookmark).resolveWithoutMounting()?.standardizedFileURL.path
+        // `items.didSet` writes the whole shelf JSON, so mutating `kind` and
+        // `cachedPath` as two statements saves twice and — in between — persists
+        // the new bookmark paired with the old path.
+        var updated = items
+        updated[idx].kind = .file(bookmark: bookmark)
+        updated[idx].cachedPath = newPath
+        items = updated
         invalidateURLCache()
     }
 
@@ -136,15 +160,24 @@ final class ShelfStateViewModel: ObservableObject {
 
             guard let self = self else { return }
 
-            for (itemID, update) in self.pendingBookmarkUpdates {
-                if let idx = self.items.firstIndex(where: { $0.id == itemID }),
-                   case .file = self.items[idx].kind {
-                    self.items[idx].kind = .file(bookmark: update.bookmark)
-                    if let path = update.path { self.items[idx].cachedPath = path }
-                }
+            let updates = self.pendingBookmarkUpdates
+            self.pendingBookmarkUpdates.removeAll()
+            guard !updates.isEmpty else { return }
+
+            // Same reason as `updateBookmark`: one assignment, so the coalesced
+            // batch costs a single save instead of two per item.
+            var updated = self.items
+            var changed = false
+            for (itemID, update) in updates {
+                guard let idx = updated.firstIndex(where: { $0.id == itemID }),
+                      case .file = updated[idx].kind else { continue }
+                updated[idx].kind = .file(bookmark: update.bookmark)
+                if let path = update.path { updated[idx].cachedPath = path }
+                changed = true
             }
 
-            self.pendingBookmarkUpdates.removeAll()
+            guard changed else { return }
+            self.items = updated
             self.invalidateURLCache()
         }
     }
@@ -194,7 +227,7 @@ final class ShelfStateViewModel: ObservableObject {
             await MainActor.run { scheduleDeferredBookmarkUpdate(for: item, bookmark: refreshed, path: path) }
         } else if let path {
             // Self-healing: the file may have moved since the path was cached.
-            await MainActor.run { applyCachedPaths([item.id: path]) }
+            await MainActor.run { applyCachedPath(path, for: item.id, resolvedFrom: bookmarkData) }
         }
         return result.url
     }
@@ -209,7 +242,7 @@ final class ShelfStateViewModel: ObservableObject {
             NSLog("Bookmark for \(item) stale; refreshing")
             await MainActor.run { updateBookmark(for: item, bookmark: refreshed, path: path) }
         } else if let path {
-            await MainActor.run { applyCachedPaths([item.id: path]) }
+            await MainActor.run { applyCachedPath(path, for: item.id, resolvedFrom: bookmarkData) }
         }
         return result.url
     }

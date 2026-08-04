@@ -63,7 +63,9 @@ final class ShelfItemViewModel: ObservableObject {
         // was dropped. No-op when unchanged, so it won't churn persistence.
         let itemID = item.id
         let resolvedPath = resolvedURL.standardizedFileURL.path
-        await MainActor.run { ShelfStateViewModel.shared.applyCachedPaths([itemID: resolvedPath]) }
+        await MainActor.run {
+            ShelfStateViewModel.shared.applyCachedPath(resolvedPath, for: itemID, resolvedFrom: bookmarkData)
+        }
 
         // Load display name
         let name = await loadDisplayNameFromURL(resolvedURL)
