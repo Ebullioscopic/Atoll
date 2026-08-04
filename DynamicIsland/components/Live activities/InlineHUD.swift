@@ -364,30 +364,25 @@ struct InlineHUD: View {
                     if let listeningMode {
                         let listeningModeTextWidth: CGFloat = enableMinimalisticUI ? 96 : 124
 
-                        HStack(spacing: 0) {
-                            Spacer(minLength: 0)
-                            if listeningMode == .off || listeningMode == .transparency {
-                                Text(listeningMode.displayName)
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
-                                    .allowsTightening(true)
-                                    .frame(
-                                        width: min(max(trailingWidth - 44, 64), listeningModeTextWidth),
-                                        alignment: .trailing
-                                    )
-                            } else {
-                                MarqueeText(
-                                    .constant(listeningMode.displayName),
-                                    font: .caption.weight(.medium),
-                                    nsFont: .caption1,
-                                    textColor: .white,
-                                    minDuration: 0.6,
-                                    frameWidth: min(max(trailingWidth - 44, 64), listeningModeTextWidth)
-                                )
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        // Render every mode label with a trailing-aligned Text.
+                        // The previous MarqueeText path is `.leading`-aligned
+                        // internally, so the longer modes (Noise Cancellation /
+                        // Adaptive Audio / Conversation Awareness) hugged the notch
+                        // edge and were clipped behind it — only the short,
+                        // trailing-aligned modes (Transparency / Off) stayed
+                        // visible. A scaling Text keeps every mode on screen.
+                        Text(listeningMode.displayName)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .truncationMode(.tail)
+                            .allowsTightening(true)
+                            .frame(
+                                width: min(max(trailingWidth - 44, 64), listeningModeTextWidth),
+                                alignment: .trailing
+                            )
+                            .frame(maxWidth: .infinity, alignment: .trailing)
                     } else if hasBatteryLevel {
                         let indicatorSpacing: CGFloat = {
                             if useCircularIndicator {

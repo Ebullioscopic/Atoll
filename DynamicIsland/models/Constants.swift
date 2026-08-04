@@ -626,6 +626,33 @@ enum FocusMonitoringMode: String, CaseIterable, Identifiable, Defaults.Serializa
     }
 }
 
+enum SiriResponsivenessMode: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case automatic
+    case highPerformance
+    case balanced
+    case powerSaver
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .automatic: return String(localized: "Automatic")
+        case .highPerformance: return String(localized: "High Performance")
+        case .balanced: return String(localized: "Balanced")
+        case .powerSaver: return String(localized: "Power Saver")
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .automatic: return String(localized: "Adapts based on power source and battery level.")
+        case .highPerformance: return String(localized: "Ultra-fast detection (30Hz) for near-instant hiding.")
+        case .balanced: return String(localized: "Standard detection (16Hz) for smooth responsiveness.")
+        case .powerSaver: return String(localized: "Slower detection (4Hz) to maximize battery life.")
+        }
+    }
+}
+
 enum ReminderPresentationStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
     case ringCountdown = "Ring"
     case digital = "Digital"
@@ -935,6 +962,7 @@ extension Defaults.Keys {
     static let enableLockScreenMediaWidget = Key<Bool>("enableLockScreenMediaWidget", default: true)
     static let enableLockScreenWeatherWidget = Key<Bool>("enableLockScreenWeatherWidget", default: true)
     static let enableLockScreenFocusWidget = Key<Bool>("enableLockScreenFocusWidget", default: true)
+    static let siriResponsivenessMode = Key<SiriResponsivenessMode>("siriResponsivenessMode", default: .automatic)
     static let enableLockScreenReminderWidget = Key<Bool>("enableLockScreenReminderWidget", default: true)
     static let enableLockScreenTimerWidget = Key<Bool>("enableLockScreenTimerWidget", default: true)
     static let lockScreenWeatherRefreshInterval = Key<TimeInterval>("lockScreenWeatherRefreshInterval", default: 30 * 60)
