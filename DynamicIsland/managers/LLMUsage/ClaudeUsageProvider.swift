@@ -38,9 +38,16 @@ struct ClaudeUsageProvider: UsageProvider {
         guard let data = try? Data(contentsOf: url),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let account = obj["oauthAccount"] as? [String: Any] else { return nil }
-        let raw = (account["organizationRateLimitTier"] as? String)
-            ?? (account["organizationType"] as? String)
-        return raw.map(prettyPlan)
+        // Prefer the rate-limit tier, but fall back to organizationType when it is
+        // absent OR blank/whitespace (a present-but-empty string must not short-circuit
+        // the fallback). Return nil if neither yields a non-empty label so the badge
+        // isn't rendered as an empty capsule.
+        let raw = [account["organizationRateLimitTier"], account["organizationType"]]
+            .compactMap { ($0 as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+        guard let raw else { return nil }
+        let label = prettyPlan(raw)
+        return label.isEmpty ? nil : label
     }
 
     /// "default_claude_max_5x" → "Max 5x"; "claude_max" → "Max"; "claude_pro" → "Pro".
