@@ -64,7 +64,7 @@ struct JSONLUsageParser {
         // Token-count events have no stable identifier and are written once per session log.
         let input = usage["input_tokens"] as? Int ?? 0
         let output = usage["output_tokens"] as? Int ?? 0
-        guard input + output > 0 else { return nil }
+        guard input >= 0, output >= 0, (input > 0 || output > 0) else { return nil }
 
         return UsageRecord(
             timestamp: date,
