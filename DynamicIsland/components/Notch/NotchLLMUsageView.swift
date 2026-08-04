@@ -217,7 +217,7 @@ struct NotchLLMUsageView: View {
 
     private func costHelp(_ totals: UsageTotals) -> String {
         if totals.hasUnpricedModel {
-            return "Estimated API-equivalent cost from local token counts (not your subscription bill). Some models used aren't in the pricing table, so this is partial or unavailable."
+            return "Estimated API-equivalent cost from local token counts (not your subscription bill). Some models used do not have usable pricing, so this is partial or unavailable."
         }
         return "Estimated API-equivalent cost from local token counts, not your subscription bill."
     }

@@ -133,10 +133,12 @@ class ModelPricingManager: ObservableObject {
             guard let model = models.first(where: { $0.id.lowercased() == key }) else { continue }
             let prompt = model.pricing.promptPrice
             let completion = model.pricing.completionPrice
-            // Skip placeholder rows whose rates are blank/zero (present in the sparse
-            // bundled fallback): a genuine Claude price is never 0 for both fields, and
-            // treating them as priced would report a false "$0.00".
-            if prompt > 0 || completion > 0 { return (prompt, completion) }
+            // Skip placeholder/incomplete rows (present in the sparse bundled fallback):
+            // a genuine Claude price has both a prompt and a completion rate, so require
+            // both to be positive. A row with only one side set is treated as unpriced —
+            // keep scanning candidates rather than report a half or false "$0.00" price.
+            guard prompt > 0, completion > 0 else { continue }
+            return (prompt, completion)
         }
         return nil
     }
