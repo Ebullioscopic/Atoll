@@ -17,6 +17,7 @@
  */
 
 import Defaults
+import Security
 import XCTest
 @testable import Atoll
 
@@ -30,9 +31,21 @@ final class SpotifyLibraryTests: XCTestCase {
 
     private final class FakeTokenStore: SpotifyTokenStoring, @unchecked Sendable {
         var storage: [SpotifyTokenAccount: String] = [:]
+        /// When non-nil, write() reports this status and stores nothing, so tests
+        /// can exercise the failed-Keychain-write path.
+        var writeFailure: OSStatus?
         func read(_ account: SpotifyTokenAccount) -> String? { storage[account] }
-        func write(_ value: String, account: SpotifyTokenAccount) { storage[account] = value }
-        func delete(_ account: SpotifyTokenAccount) { storage[account] = nil }
+        @discardableResult
+        func write(_ value: String, account: SpotifyTokenAccount) -> OSStatus {
+            if let writeFailure { return writeFailure }
+            storage[account] = value
+            return errSecSuccess
+        }
+        @discardableResult
+        func delete(_ account: SpotifyTokenAccount) -> OSStatus {
+            storage[account] = nil
+            return errSecSuccess
+        }
     }
 
     private final class FakeHTTPClient: SpotifyHTTPClient, @unchecked Sendable {
@@ -187,5 +200,42 @@ final class SpotifyLibraryTests: XCTestCase {
         func authenticate(url: URL, callbackURLScheme: String) async throws -> URL {
             throw SpotifyLibraryError.canceled
         }
+    }
+
+    // MARK: - Legacy migration (item 2: no data loss on a failed Keychain write)
+
+    func testMigrationKeepsDefaultsWhenKeychainWriteFails() {
+        Defaults[.spotifyLibraryAccessToken] = "legacy-access"
+        Defaults[.spotifyLibraryRefreshToken] = "legacy-refresh"
+        let store = FakeTokenStore()
+        store.writeFailure = errSecIO  // simulate the Keychain rejecting the write
+
+        _ = SpotifyLibraryManager(
+            tokenStore: store,
+            httpClient: FakeHTTPClient(),
+            authSession: NoopAuthSession()
+        )
+
+        XCTAssertEqual(Defaults[.spotifyLibraryAccessToken], "legacy-access",
+                       "A failed Keychain write must not drop the only copy of the token")
+        XCTAssertEqual(Defaults[.spotifyLibraryRefreshToken], "legacy-refresh")
+    }
+
+    func testMigrationClearsDefaultsOnSuccessfulWrite() {
+        Defaults[.spotifyLibraryAccessToken] = "legacy-access"
+        Defaults[.spotifyLibraryRefreshToken] = "legacy-refresh"
+        let store = FakeTokenStore()
+
+        _ = SpotifyLibraryManager(
+            tokenStore: store,
+            httpClient: FakeHTTPClient(),
+            authSession: NoopAuthSession()
+        )
+
+        XCTAssertEqual(store.storage[.accessToken], "legacy-access")
+        XCTAssertEqual(store.storage[.refreshToken], "legacy-refresh")
+        XCTAssertEqual(Defaults[.spotifyLibraryAccessToken], "",
+                       "A confirmed write should clear the legacy Defaults copy")
+        XCTAssertEqual(Defaults[.spotifyLibraryRefreshToken], "")
     }
 }

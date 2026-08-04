@@ -18,6 +18,7 @@
 
 import Defaults
 import Foundation
+import Security
 
 /// Official Spotify Web API access via OAuth 2.0 PKCE, scoped to the user's
 /// Liked Songs (user-library-read / user-library-modify). Independent from
@@ -64,15 +65,17 @@ final class SpotifyLibraryManager: ObservableObject {
     }
 
     /// Tokens were briefly stored in Defaults; move them into the Keychain once.
+    /// The Defaults copy is only cleared once the Keychain write is confirmed,
+    /// so a failed write can never lose the token.
     private func migrateLegacyTokensIfNeeded() {
         let legacyAccessToken = Defaults[.spotifyLibraryAccessToken]
-        if !legacyAccessToken.isEmpty {
-            tokenStore.write(legacyAccessToken, account: .accessToken)
+        if !legacyAccessToken.isEmpty,
+           tokenStore.write(legacyAccessToken, account: .accessToken) == errSecSuccess {
             Defaults[.spotifyLibraryAccessToken] = ""
         }
         let legacyRefreshToken = Defaults[.spotifyLibraryRefreshToken]
-        if !legacyRefreshToken.isEmpty {
-            tokenStore.write(legacyRefreshToken, account: .refreshToken)
+        if !legacyRefreshToken.isEmpty,
+           tokenStore.write(legacyRefreshToken, account: .refreshToken) == errSecSuccess {
             Defaults[.spotifyLibraryRefreshToken] = ""
         }
     }

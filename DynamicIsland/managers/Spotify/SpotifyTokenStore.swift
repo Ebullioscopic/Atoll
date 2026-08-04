@@ -26,8 +26,11 @@ enum SpotifyTokenAccount: String {
 
 protocol SpotifyTokenStoring: Sendable {
     func read(_ account: SpotifyTokenAccount) -> String?
-    func write(_ value: String, account: SpotifyTokenAccount)
-    func delete(_ account: SpotifyTokenAccount)
+    /// Returns the Keychain status; `errSecSuccess` means the value is stored.
+    /// Callers that then discard the source (e.g. the Defaults migration) must
+    /// check this before dropping the only remaining copy of the token.
+    @discardableResult func write(_ value: String, account: SpotifyTokenAccount) -> OSStatus
+    @discardableResult func delete(_ account: SpotifyTokenAccount) -> OSStatus
 }
 
 /// Keychain-backed storage for the OAuth token pair. The client ID and token
@@ -55,19 +58,24 @@ struct KeychainSpotifyTokenStore: SpotifyTokenStoring {
         return String(data: data, encoding: .utf8)
     }
 
-    func write(_ value: String, account: SpotifyTokenAccount) {
+    @discardableResult
+    func write(_ value: String, account: SpotifyTokenAccount) -> OSStatus {
         let data = Data(value.utf8)
         let update = [kSecValueData as String: data]
         let status = SecItemUpdate(baseQuery(for: account) as CFDictionary, update as CFDictionary)
-        if status == errSecItemNotFound {
-            var attributes = baseQuery(for: account)
-            attributes[kSecValueData as String] = data
-            attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-            SecItemAdd(attributes as CFDictionary, nil)
+        guard status == errSecItemNotFound else {
+            return status
         }
+        var attributes = baseQuery(for: account)
+        attributes[kSecValueData as String] = data
+        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        return SecItemAdd(attributes as CFDictionary, nil)
     }
 
-    func delete(_ account: SpotifyTokenAccount) {
-        SecItemDelete(baseQuery(for: account) as CFDictionary)
+    @discardableResult
+    func delete(_ account: SpotifyTokenAccount) -> OSStatus {
+        let status = SecItemDelete(baseQuery(for: account) as CFDictionary)
+        // Nothing stored is a successful end state for a delete.
+        return status == errSecItemNotFound ? errSecSuccess : status
     }
 }
