@@ -39,7 +39,7 @@ final class ShelfStateViewModel: ObservableObject {
     var isEmpty: Bool { items.isEmpty }
 
     // Queue for deferred bookmark updates to avoid publishing during view updates
-    private var pendingBookmarkUpdates: [ShelfItem.ID: (bookmark: Data, path: String?)] = [:]
+    private var pendingBookmarkUpdates: [ShelfItem.ID: (bookmark: Data, path: String?, source: Data)] = [:]
     private var updateTask: Task<Void, Never>?
     
     // Cache for URL-to-item mapping to avoid resolving all bookmarks for lookup
@@ -72,8 +72,12 @@ final class ShelfStateViewModel: ObservableObject {
                 }
             }
             guard !resolved.isEmpty else { return }
+            // Hand the closure immutable copies: capturing the `var`s directly is
+            // already a warning and becomes an error in the Swift 6 language mode.
+            let paths = resolved
+            let bookmarks = sources
             await MainActor.run {
-                ShelfStateViewModel.shared.applyCachedPaths(resolved, resolvedFrom: sources)
+                ShelfStateViewModel.shared.applyCachedPaths(paths, resolvedFrom: bookmarks)
             }
         }
     }
@@ -136,9 +140,19 @@ final class ShelfStateViewModel: ObservableObject {
     /// Pass `path` whenever the caller already resolved the new bookmark —
     /// leaving `cachedPath` pointing at the old location would make dedup treat
     /// a renamed file as a new one.
-    func updateBookmark(for item: ShelfItem, bookmark: Data, path: String? = nil) {
+    ///
+    /// Pass `resolvedFrom` when `bookmark` is the *refreshed form of an older
+    /// bookmark* obtained off the main actor: the write is then skipped unless the
+    /// item still holds that older bookmark, so a resolve that began before a
+    /// rename cannot put the pre-rename bookmark and path back. Omit it for
+    /// authoritative writes — the rename flow has already moved the file on disk,
+    /// and its data is by definition the freshest, so discarding that write
+    /// because something else refreshed the bookmark while the save panel was
+    /// open would lose the rename instead of protecting it.
+    func updateBookmark(for item: ShelfItem, bookmark: Data, path: String? = nil, resolvedFrom source: Data? = nil) {
         guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
-        guard case .file = items[idx].kind else { return }
+        guard case .file(let current) = items[idx].kind else { return }
+        if let source, current != source { return }
         let newPath = path ?? Bookmark(data: bookmark).resolveWithoutMounting()?.standardizedFileURL.path
         // `items.didSet` writes the whole shelf JSON, so mutating `kind` and
         // `cachedPath` as two statements saves twice and — in between — persists
@@ -150,8 +164,8 @@ final class ShelfStateViewModel: ObservableObject {
         invalidateURLCache()
     }
 
-    private func scheduleDeferredBookmarkUpdate(for item: ShelfItem, bookmark: Data, path: String?) {
-        pendingBookmarkUpdates[item.id] = (bookmark, path)
+    private func scheduleDeferredBookmarkUpdate(for item: ShelfItem, bookmark: Data, path: String?, resolvedFrom source: Data) {
+        pendingBookmarkUpdates[item.id] = (bookmark, path, source)
 
         // Cancel existing task and schedule a new one
         updateTask?.cancel()
@@ -170,7 +184,11 @@ final class ShelfStateViewModel: ObservableObject {
             var changed = false
             for (itemID, update) in updates {
                 guard let idx = updated.firstIndex(where: { $0.id == itemID }),
-                      case .file = updated[idx].kind else { continue }
+                      case .file(let current) = updated[idx].kind else { continue }
+                // Revalidated after the suspension above, not just at schedule
+                // time: the item may have been renamed while this was queued, in
+                // which case the refresh is a resolve of the pre-rename bookmark.
+                guard current == update.source else { continue }
                 updated[idx].kind = .file(bookmark: update.bookmark)
                 if let path = update.path { updated[idx].cachedPath = path }
                 changed = true
@@ -224,7 +242,9 @@ final class ShelfStateViewModel: ObservableObject {
         let path = result.url?.standardizedFileURL.path
         if let refreshed = result.refreshedData, refreshed != bookmarkData {
             NSLog("Bookmark for \(item) stale; refreshing")
-            await MainActor.run { scheduleDeferredBookmarkUpdate(for: item, bookmark: refreshed, path: path) }
+            await MainActor.run {
+                scheduleDeferredBookmarkUpdate(for: item, bookmark: refreshed, path: path, resolvedFrom: bookmarkData)
+            }
         } else if let path {
             // Self-healing: the file may have moved since the path was cached.
             await MainActor.run { applyCachedPath(path, for: item.id, resolvedFrom: bookmarkData) }
@@ -240,7 +260,9 @@ final class ShelfStateViewModel: ObservableObject {
         let path = result.url?.standardizedFileURL.path
         if let refreshed = result.refreshedData, refreshed != bookmarkData {
             NSLog("Bookmark for \(item) stale; refreshing")
-            await MainActor.run { updateBookmark(for: item, bookmark: refreshed, path: path) }
+            await MainActor.run {
+                updateBookmark(for: item, bookmark: refreshed, path: path, resolvedFrom: bookmarkData)
+            }
         } else if let path {
             await MainActor.run { applyCachedPath(path, for: item.id, resolvedFrom: bookmarkData) }
         }
