@@ -31,7 +31,7 @@
 		7EF19C172F577040005B9929 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 7EF19C162F577040005B9929 /* SwiftTerm */; };
 		A3C83CAF84544DCE386C3BB8 /* DynamicIslandUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54078F29304A9DBBEFBDF932 /* DynamicIslandUITests.swift */; };
 		B4777BB9FE29243B253B8306 /* SpotifyLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */; };
-		F910B9C812C7AEFE2293F7D2 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4A9C58195E197C19F691DA62 /* Cocoa.framework */; };
+		F910B9C812C7AEFE2293F7D2 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 47C39E67B09152F6665ED683 /* Cocoa.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,7 +59,6 @@
 /* Begin PBXFileReference section */
 		0796C681D7B557C0110EC381 /* DynamicIslandTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicIslandTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		47C39E67B09152F6665ED683 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
-		4A9C58195E197C19F691DA62 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		54078F29304A9DBBEFBDF932 /* DynamicIslandUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DynamicIslandUITests.swift; sourceTree = "<group>"; };
 		7E25ECA02E6C6C3800700E72 /* CoreBrightness.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBrightness.framework; path = /System/Library/PrivateFrameworks/CoreBrightness.framework; sourceTree = "<absolute>"; };
 		7E25ECA22E6C6E2600700E72 /* OSD.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OSD.framework; path = /System/Library/PrivateFrameworks/OSD.framework; sourceTree = "<absolute>"; };
@@ -172,7 +171,6 @@
 		2402D98A7C199588E79096D5 /* OS X */ = {
 			isa = PBXGroup;
 			children = (
-				4A9C58195E197C19F691DA62 /* Cocoa.framework */,
 				47C39E67B09152F6665ED683 /* Cocoa.framework */,
 			);
 			name = "OS X";
