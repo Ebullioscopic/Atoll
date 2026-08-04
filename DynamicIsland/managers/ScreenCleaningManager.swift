@@ -19,11 +19,12 @@
 import AppKit
 import Combine
 
-/// 清洁屏幕：把所有显示器涂黑，方便看清污渍擦拭。
+/// Clean screen: black out every display so smudges are easy to see and wipe.
 ///
-/// 纯 AppKit 覆盖窗口，不需要任何权限。
-/// 监听 `didChangeScreenParametersNotification` 以应对清洁期间插拔显示器、
-/// 改分辨率、改排列 —— 否则新接的屏幕会露出桌面。
+/// A pure AppKit overlay window that needs no permissions.
+/// Observes `didChangeScreenParametersNotification` to handle displays being plugged/unplugged,
+/// resolution changes, or rearrangement during cleaning — otherwise a newly attached screen
+/// would expose the desktop.
 final class ScreenCleaningManager: ObservableObject {
     static let shared = ScreenCleaningManager()
 
@@ -41,8 +42,9 @@ final class ScreenCleaningManager: ObservableObject {
     func start() {
         guard !isActive else { return }
 
-        // 两种清洁模式互斥：都用同层全屏黑遮罩，同时开会叠在一起，
-        // 点一下只关掉最上面那层，另一层黑屏无提示、无从退出。
+        // The two cleaning modes are mutually exclusive: both use a same-layer full-screen black
+        // overlay, so enabling both stacks them — a single click only closes the topmost layer,
+        // leaving the other as a black screen with no hint and no way out.
         KeyboardCleaningManager.shared.stop()
 
         isActive = true
@@ -54,12 +56,13 @@ final class ScreenCleaningManager: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             guard let self, self.isActive else { return }
-            // 显示器拓扑变了，整套重建最省事也最不容易漏屏。
+            // The display topology changed; a full rebuild is both the simplest and the least
+            // likely to miss a screen.
             self.tearDownOverlays()
             self.buildOverlays()
         }
 
-        NSLog("✅ [ScreenCleaning] 清洁屏幕已开启（\(overlayWindows.count) 块屏幕）")
+        NSLog("✅ [ScreenCleaning] Clean screen enabled (\(overlayWindows.count) screen(s))")
     }
 
     func stop() {
@@ -72,15 +75,15 @@ final class ScreenCleaningManager: ObservableObject {
 
         tearDownOverlays()
         isActive = false
-        NSLog("✅ [ScreenCleaning] 清洁屏幕已关闭")
+        NSLog("✅ [ScreenCleaning] Clean screen disabled")
     }
 
-    // MARK: - 覆盖窗口
+    // MARK: - Overlay windows
 
     private func buildOverlays() {
         let hint = String(
             localized: "Click anywhere or press Esc to finish cleaning",
-            comment: "清洁屏幕覆盖层上的退出提示"
+            comment: "Exit hint shown on the clean-screen overlay"
         )
 
         overlayWindows = NSScreen.screens.map { screen in
@@ -95,7 +98,7 @@ final class ScreenCleaningManager: ObservableObject {
             return window
         }
 
-        // 只让第一块屏的窗口成为 key，负责收 ESC。
+        // Only the first screen's window becomes key, responsible for receiving ESC.
         overlayWindows.first?.makeKey()
         fadeOutHints()
     }
@@ -105,7 +108,7 @@ final class ScreenCleaningManager: ObservableObject {
         overlayWindows.removeAll()
     }
 
-    /// 提示文案 3 秒后淡出 —— 留着会挡住要擦的那块区域。
+    /// The hint text fades out after 3 seconds — leaving it up would block the very area being wiped.
     private func fadeOutHints() {
         let labels = overlayWindows.compactMap { window in
             window.contentView?.subviews.first as? NSTextField

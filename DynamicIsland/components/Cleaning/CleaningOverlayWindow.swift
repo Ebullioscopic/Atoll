@@ -18,23 +18,23 @@
 
 import AppKit
 
-/// 清洁模式用的全屏覆盖窗口（清洁屏幕 / 清洁键盘共用）。
+/// Full-screen overlay window used by cleaning mode (shared by clean-screen / clean-keyboard).
 ///
-/// 必须能成为 key window，否则收不到 ESC。
+/// Must be able to become the key window, otherwise it won't receive ESC.
 final class CleaningOverlayWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 }
 
-/// 覆盖层内容视图：负责接收退出手势并画提示文案。
+/// Overlay content view: receives the dismiss gesture and draws the hint text.
 final class CleaningOverlayView: NSView {
-    /// 用户要求退出清洁模式时回调。
+    /// Called back when the user asks to exit cleaning mode.
     var onDismiss: (() -> Void)?
 
-    /// 是否允许键盘（ESC）退出。
+    /// Whether keyboard (ESC) dismissal is allowed.
     ///
-    /// 清洁键盘模式下按键会被 event tap 吞掉，根本传不到这里，
-    /// 所以那种场景只能靠鼠标点击退出 —— 提示文案也要相应改写。
+    /// In clean-keyboard mode key events are swallowed by the event tap and never reach here, so
+    /// that scenario can only be exited by mouse click — and the hint text is worded accordingly.
     var allowsKeyboardDismiss = true
 
     override var acceptsFirstResponder: Bool { true }
@@ -57,7 +57,7 @@ final class CleaningOverlayView: NSView {
 }
 
 extension CleaningOverlayWindow {
-    /// 在指定屏幕上建一个铺满的黑色覆盖窗口。
+    /// Build a full-bleed black overlay window on the given screen.
     static func make(for screen: NSScreen, hint: String, allowsKeyboardDismiss: Bool, onDismiss: @escaping () -> Void) -> CleaningOverlayWindow {
         let window = CleaningOverlayWindow(
             contentRect: screen.frame,
@@ -72,7 +72,7 @@ extension CleaningOverlayWindow {
         window.hasShadow = false
         window.ignoresMouseEvents = false
         window.isReleasedWhenClosed = false
-        // 盖住菜单栏、Dock 和全屏 App。
+        // Cover the menu bar, Dock, and full-screen apps.
         window.level = .screenSaver
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 

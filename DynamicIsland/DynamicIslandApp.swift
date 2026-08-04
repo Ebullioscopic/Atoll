@@ -294,8 +294,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // synchronously here so it is never left frozen. (See issue #568.)
         SystemOSDManager.resumeOSDUIHelperForTermination()
 
-        // 释放电源断言与合盖睡眠否决，并退出清洁模式 ——
-        // 尤其是清洁键盘，绝不能让进程带着 event tap 死掉把键盘锁住。
+        // Release the power assertions and the lid-sleep override, and exit cleaning mode —
+        // clean-keyboard especially, so the process can never die holding the event tap and
+        // lock the keyboard.
         PowerManagementManager.shared.shutdown()
         KeyboardCleaningManager.shared.stop()
         ScreenCleaningManager.shared.stop()
@@ -635,7 +636,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             deliverImmediately: true
         )
 
-        // 清掉上次异常退出可能残留的「合盖不休眠」内核状态（见 resetClamshellStateOnLaunch）。
+        // Clear any "stay awake with lid closed" kernel state that may have leaked from an
+        // abnormal exit last time (see resetClamshellStateOnLaunch).
         PowerManagementManager.shared.resetClamshellStateOnLaunch()
 
         LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)

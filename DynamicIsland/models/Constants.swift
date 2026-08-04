@@ -1200,8 +1200,10 @@ extension Defaults.Keys {
     static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .panel)
     
     // MARK: Power & Cleaning Toggles
-    // 只控制图标在刘海里显不显示。四个开关的「当前是否生效」是运行时状态，
-    // 故意不持久化：合盖不休眠重启后自动恢复有过热风险，清洁模式更没有恢复的道理。
+    // These only control whether the icons show in the notch. Whether each of the four toggles
+    // is currently active is runtime state, intentionally not persisted: auto-restoring
+    // stay-awake-with-lid-closed after a reboot risks overheating, and the cleaning modes have
+    // even less reason to be restored.
     static let showKeepScreenAwakeIcon = Key<Bool>("showKeepScreenAwakeIcon", default: true)
     static let showPreventLidSleepIcon = Key<Bool>("showPreventLidSleepIcon", default: true)
     static let showScreenCleaningIcon = Key<Bool>("showScreenCleaningIcon", default: true)

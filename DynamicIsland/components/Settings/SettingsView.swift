@@ -1108,7 +1108,8 @@ struct GeneralSettings: View {
                 Defaults.Toggle(key: .showKeepScreenAwakeIcon) {
                     Text("Keep screen awake")
                 }
-                // 藏掉图标就没了从刘海关闭它的入口，功能却还开着 —— 顺手停掉底层断言。
+                // Hiding the icon removes its off-switch in the notch while the feature stays on —
+                // so drop the underlying assertion at the same time.
                 .onChange(of: showKeepScreenAwakeIcon) {
                     if !showKeepScreenAwakeIcon {
                         PowerManagementManager.shared.setKeepScreenAwake(false)
@@ -1119,7 +1120,8 @@ struct GeneralSettings: View {
                 Defaults.Toggle(key: .showPreventLidSleepIcon) {
                     Text("Stay awake with the lid closed")
                 }
-                // 同理：藏掉图标同时撤销合盖不休眠，别把机器留在「合盖不睡」状态。
+                // Likewise: hiding the icon also revokes stay-awake-with-lid-closed, so the machine
+                // isn't left in a "won't sleep on lid close" state.
                 .onChange(of: showPreventLidSleepIcon) {
                     if !showPreventLidSleepIcon {
                         PowerManagementManager.shared.setPreventLidSleep(false)

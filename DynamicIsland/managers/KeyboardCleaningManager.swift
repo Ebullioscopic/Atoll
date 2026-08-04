@@ -21,23 +21,27 @@ import ApplicationServices
 import Combine
 import CoreGraphics
 
-/// 系统定义事件（功能键行的亮度/音量/播放控制走这个类型）。
-/// `CGEventType` 没有对应的 Swift case，只能按原始值写，与 MediaKeyInterceptor 一致。
+/// System-defined event (the function-key row's brightness/volume/playback controls use this
+/// type). `CGEventType` has no matching Swift case, so it must be written by raw value, matching
+/// MediaKeyInterceptor.
 private let NX_SYSDEFINED_EVENT_TYPE: UInt32 = 14
 
-/// 清洁键盘：临时吞掉所有键盘事件，擦键盘时不会误触发。
+/// Clean keyboard: temporarily swallow all keyboard events so wiping the keyboard doesn't
+/// trigger anything by accident.
 ///
-/// 用 `CGEvent.tapCreate` 以 `.defaultTap` 模式拦截 `keyDown` / `keyUp` / `flagsChanged`
-/// 并返回 `nil` 吞掉，需要**辅助功能权限**。
+/// Uses `CGEvent.tapCreate` in `.defaultTap` mode to intercept `keyDown` / `keyUp` /
+/// `flagsChanged` and returns `nil` to swallow them. Requires **Accessibility permission**.
 ///
-/// 已知边界（做不到的部分，不是 bug）：
-/// - **电源键 / Touch ID 吞不掉** —— 它们不走 CGEvent 通道。
-/// - **secure input 期间 tap 整体失效** —— 例如密码输入框处于激活状态时。
-/// - 退出只能靠**鼠标点击**（按键全被吞了，ESC 传不到覆盖层），另有超时兜底。
+/// Known limitations (things it can't do — not bugs):
+/// - **Power key / Touch ID can't be swallowed** — they don't go through the CGEvent pipeline.
+/// - **The tap is disabled entirely during secure input** — e.g. while a password field is focused.
+/// - Exiting is only possible via **mouse click** (all keys are swallowed, so ESC can't reach
+///   the overlay); a timeout failsafe backs this up.
 final class KeyboardCleaningManager: ObservableObject {
     static let shared = KeyboardCleaningManager()
 
-    /// 兜底自动退出时间。万一鼠标也出问题，不至于把键盘永久锁死。
+    /// Failsafe auto-exit time. In case the mouse also fails, this keeps the keyboard from being
+    /// locked forever.
     private static let failsafeTimeout: TimeInterval = 120
 
     @Published private(set) var isActive = false
@@ -65,25 +69,27 @@ final class KeyboardCleaningManager: ObservableObject {
         guard !isActive else { return true }
 
         guard requestAccessibilityPermissionIfNeeded() else {
-            NSLog("⚠️ [KeyboardCleaning] 缺少辅助功能权限，无法拦截键盘")
+            NSLog("⚠️ [KeyboardCleaning] Missing Accessibility permission, cannot intercept the keyboard")
             return false
         }
 
         guard installEventTap() else {
-            NSLog("❌ [KeyboardCleaning] 创建键盘 event tap 失败")
+            NSLog("❌ [KeyboardCleaning] Failed to create the keyboard event tap")
             return false
         }
 
-        // 两种清洁模式互斥：都用同层全屏黑遮罩，同时开会叠在一起，
-        // 点一下只关掉最上面那层，另一层黑屏无提示、无从退出。
+        // The two cleaning modes are mutually exclusive: both use a same-layer full-screen black
+        // overlay, so enabling both stacks them — a single click only closes the topmost layer,
+        // leaving the other as a black screen with no hint and no way out.
         ScreenCleaningManager.shared.stop()
 
         isActive = true
         buildOverlays()
         startFailsafeTimer()
 
-        // observer 只在 start() 注册一次；放进 buildOverlays() 会在它自己的回调里
-        // 被反复注册 —— 每次屏幕变更 observer 数量翻倍，进程级泄漏（对齐 ScreenCleaningManager）。
+        // The observer is registered exactly once in start(); putting it inside buildOverlays()
+        // would re-register it from its own callback — doubling the observer count on every screen
+        // change, a process-level leak (matches ScreenCleaningManager).
         screenChangeObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,
@@ -94,7 +100,7 @@ final class KeyboardCleaningManager: ObservableObject {
             self.buildOverlays()
         }
 
-        NSLog("✅ [KeyboardCleaning] 清洁键盘已开启")
+        NSLog("✅ [KeyboardCleaning] Clean keyboard enabled")
         return true
     }
 
@@ -113,15 +119,17 @@ final class KeyboardCleaningManager: ObservableObject {
         tearDownOverlays()
         isActive = false
 
-        NSLog("✅ [KeyboardCleaning] 清洁键盘已关闭")
+        NSLog("✅ [KeyboardCleaning] Clean keyboard disabled")
     }
 
     // MARK: - Event tap
 
     private func installEventTap() -> Bool {
-        // 光挂 keyDown/keyUp/flagsChanged 是不够的：功能键行（亮度、音量、播放控制）
-        // 走的是 NX_SYSDEFINED 系统定义事件，不在这三类里 —— 漏了它，擦键盘时按到
-        // F1/F2 照样调亮度、F8 照样暂停音乐。参见 MediaKeyInterceptor，它处理的正是这类事件。
+        // Hooking only keyDown/keyUp/flagsChanged is not enough: the function-key row
+        // (brightness, volume, playback controls) travels as NX_SYSDEFINED system-defined events,
+        // which are not in those three categories — miss it and, while wiping the keyboard, F1/F2
+        // still change brightness and F8 still pauses music. See MediaKeyInterceptor, which
+        // handles exactly this kind of event.
         let mask = (CGEventMask(1) << CGEventType.keyDown.rawValue)
             | (CGEventMask(1) << CGEventType.keyUp.rawValue)
             | (CGEventMask(1) << CGEventType.flagsChanged.rawValue)
@@ -174,36 +182,37 @@ final class KeyboardCleaningManager: ObservableObject {
     }
 
     private func handleEvent(cgEvent: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
-        // 系统会在 tap 处理超时或用户输入时把它禁掉，必须重新打开，
-        // 否则清洁模式看着还开着，键盘却已经放行了。
+        // The system disables the tap on processing timeout or user input, so it must be
+        // re-enabled; otherwise cleaning mode still looks active while the keyboard has already
+        // been let through.
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if isActive, let eventTap {
                 CGEvent.tapEnable(tap: eventTap, enable: true)
                 NSLog(
-                    "[KeyboardCleaning] event tap 被%@禁用，已重新启用",
-                    type == .tapDisabledByTimeout ? "超时" : "用户输入"
+                    "[KeyboardCleaning] event tap disabled by %@, re-enabled",
+                    type == .tapDisabledByTimeout ? "timeout" : "user input"
                 )
             }
             return Unmanaged.passUnretained(cgEvent)
         }
 
-        // 吞掉。
+        // Swallow it.
         return nil
     }
 
-    // MARK: - 覆盖层
+    // MARK: - Overlays
 
     private func buildOverlays() {
         let hint = String(
             localized: "Keyboard is locked for cleaning — click anywhere to finish",
-            comment: "清洁键盘覆盖层上的退出提示"
+            comment: "Exit hint shown on the clean-keyboard overlay"
         )
 
         overlayWindows = NSScreen.screens.map { screen in
             let window = CleaningOverlayWindow.make(
                 for: screen,
                 hint: hint,
-                // 按键全被吞了，ESC 到不了这里，只能靠鼠标。
+                // All keys are swallowed, so ESC can't reach here; only the mouse works.
                 allowsKeyboardDismiss: false
             ) { [weak self] in
                 self?.stop()
@@ -224,12 +233,12 @@ final class KeyboardCleaningManager: ObservableObject {
             withTimeInterval: Self.failsafeTimeout,
             repeats: false
         ) { [weak self] _ in
-            NSLog("[KeyboardCleaning] 达到兜底超时，自动退出清洁模式")
+            NSLog("[KeyboardCleaning] Failsafe timeout reached, exiting cleaning mode automatically")
             self?.stop()
         }
     }
 
-    // MARK: - 权限
+    // MARK: - Permission
 
     @discardableResult
     private func requestAccessibilityPermissionIfNeeded() -> Bool {

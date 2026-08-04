@@ -21,55 +21,60 @@ import Foundation
 import IOKit
 import IOKit.pwr_mgt
 
-/// 电源管理：屏幕常亮 + 合盖不休眠。
+/// Power management: keep screen awake + stay awake with the lid closed.
 ///
-/// 两个功能机制完全不同，别混：
+/// The two features work through completely different mechanisms — don't conflate them:
 ///
-/// - **屏幕常亮** 走 `IOPMAssertionCreateWithName` + `PreventUserIdleDisplaySleep`。
-///   标准的闲置断言，只挡「闲置导致的显示器休眠」，**挡不住合盖**。断言活在进程内，
-///   进程退出即自动释放。
+/// - **Keep screen awake** uses `IOPMAssertionCreateWithName` + `PreventUserIdleDisplaySleep`.
+///   A standard idle assertion: it only blocks "idle-triggered display sleep" and **cannot
+///   block lid-close sleep**. The assertion lives inside the process and is released
+///   automatically once the process exits.
 ///
-/// - **合盖不休眠** 走 `IOPMFindPowerManagement` 取 `IOPMrootDomain` 用户客户端连接，
-///   再用 `IOConnectCallScalarMethod` 调**选择子 12**（设置 clamshell 睡眠状态），
-///   传 `1` 禁用合盖睡眠、传 `0` 恢复默认。零权限、纯用户态、沙盒内也能用。
+/// - **Stay awake with the lid closed** obtains the `IOPMrootDomain` user-client connection
+///   via `IOPMFindPowerManagement`, then calls **selector 12** (set clamshell sleep state)
+///   through `IOConnectCallScalarMethod`, passing `1` to disable lid-close sleep and `0` to
+///   restore the default. No privileges, pure user space, works inside the sandbox too.
 ///
-/// ## 走过的弯路（别再重来一遍）
+/// ## Dead ends already explored (don't redo them)
 ///
-/// 一开始以为能靠 `IORegisterForSystemPower` + `IOCancelPowerChange` 拦下来，
-/// 三轮实测全部失败，日志（`Diagnostics.logURL`）给出的事实是：
+/// The first attempt assumed `IORegisterForSystemPower` + `IOCancelPowerChange` could catch
+/// it. Three rounds of real-world testing all failed; the log (`Diagnostics.logURL`) showed:
 ///
-/// 1. 合盖**只发** `kIOMessageSystemWillSleep`(0xE0000280)，
-///    从不发文档中「可否决」的 `kIOMessageCanSystemSleep`(0xE0000270)；
-/// 2. 对 `kIOMessageSystemWillSleep` 调 `IOCancelPowerChange` **无效** ——
-///    调用照发，5 秒后系统照睡。Apple 文档在这点上是对的。
+/// 1. Lid close **only sends** `kIOMessageSystemWillSleep` (0xE0000280) and never the
+///    documented "vetoable" `kIOMessageCanSystemSleep` (0xE0000270);
+/// 2. Calling `IOCancelPowerChange` on `kIOMessageSystemWillSleep` **does nothing** — the
+///    call goes through and the system sleeps 5 seconds later regardless. Apple's docs are
+///    correct on this point.
 ///
-/// 正确解法是反汇编 State.app 得到的（它的 `IOPMFindPowerManagement` →
-/// `IOConnectCallScalarMethod(conn, 12, [!enabled], 1, NULL, 0)` → `IOServiceClose`）。
+/// The correct solution came from disassembling State.app (its `IOPMFindPowerManagement` →
+/// `IOConnectCallScalarMethod(conn, 12, [!enabled], 1, NULL, 0)` → `IOServiceClose`).
 ///
-/// ⚠️ **这个开关是内核全局状态，不随进程退出自动恢复**（跟 `pmset disablesleep` 同一性质，
-/// 区别是重启会清）。所以 `applicationWillTerminate` 里必须调 `shutdown()` 复原，
-/// 否则 Atoll 崩了会留下「合盖再也不睡」的系统。
+/// ⚠️ **This switch is global kernel state and is NOT restored automatically when the process
+/// exits** (same nature as `pmset disablesleep`, except a reboot clears it). So
+/// `applicationWillTerminate` must call `shutdown()` to restore it; otherwise a crash of Atoll
+/// leaves behind a system that "never sleeps on lid close".
 final class PowerManagementManager: ObservableObject {
     static let shared = PowerManagementManager()
 
-    /// `IOPMrootDomain` 用户客户端里「设置 clamshell 睡眠状态」的选择子。
+    /// Selector for "set clamshell sleep state" in the `IOPMrootDomain` user client.
     ///
-    /// 数值 **12** 来自反汇编 State.app 的实际调用（`mov w1, #0xc`），不是照搬
-    /// 网上流传的 `kPMSetClamshellSleepState = 11` —— 那个枚举跟本机实际对不上。
-    /// 属未公开接口，将来系统版本可能变，故失败时不静默吞掉。
+    /// The value **12** comes from the actual call in disassembled State.app (`mov w1, #0xc`),
+    /// not from the widely-circulated `kPMSetClamshellSleepState = 11` — that enum doesn't match
+    /// this machine. It's a private interface that may change in future OS versions, so failures
+    /// are never swallowed silently.
     private static let clamshellSleepStateSelector: UInt32 = 12
 
-    /// 屏幕常亮是否生效。
+    /// Whether keep-screen-awake is active.
     @Published private(set) var isKeepingScreenAwake = false
 
-    /// 合盖不休眠是否生效。
+    /// Whether stay-awake-with-lid-closed is active.
     @Published private(set) var isPreventingLidSleep = false
 
     private var displayAssertionID = IOPMAssertionID(0)
 
     private init() {}
 
-    // MARK: - 对外接口
+    // MARK: - Public interface
 
     func toggleKeepScreenAwake() {
         setKeepScreenAwake(!isKeepingScreenAwake)
@@ -79,29 +84,32 @@ final class PowerManagementManager: ObservableObject {
         setPreventLidSleep(!isPreventingLidSleep)
     }
 
-    /// 退出前调用：释放断言并**恢复合盖睡眠**。后者尤其不能省。
+    /// Call before quitting: release the assertion and **restore lid-close sleep**. The latter
+    /// especially must not be skipped.
     func shutdown() {
         setKeepScreenAwake(false)
         setPreventLidSleep(false)
     }
 
-    /// 启动时无条件把 clamshell 睡眠复位成系统默认。
+    /// Unconditionally reset clamshell sleep to the system default at launch.
     ///
-    /// 合盖不休眠改的是**内核全局状态**，不随进程退出自动恢复。正常退出走
-    /// `shutdown()` 能复原，但崩溃或被强杀时 `applicationWillTerminate` 不会执行，
-    /// 会给用户留下一台「合盖再也不睡」的机器。这个开关本来就不跨启动保持，
-    /// 所以启动时直接复位，把上一次的残留一并清掉。
+    /// Stay-awake-with-lid-closed changes **global kernel state** that is not restored
+    /// automatically when the process exits. A normal quit restores it via `shutdown()`, but on
+    /// a crash or force-kill `applicationWillTerminate` never runs, leaving the user with a
+    /// machine that "never sleeps on lid close". This switch is not meant to persist across
+    /// launches anyway, so reset it at launch to clear any leftover from last time.
     func resetClamshellStateOnLaunch() {
-        // 记实际结果，不能无条件报成功 —— 这条诊断日志存在的意义正是在无其它可见
-        // 指示时捕获失败；内核调用失败却记「已恢复」会把这唯一的信号也抹掉。
+        // Log the actual result; never report success unconditionally — the whole point of this
+        // diagnostic line is to capture failures when there is no other visible indication. A
+        // failed kernel call that logs "restored" would wipe out that one signal.
         let succeeded = setClamshellSleepDisabled(false)
         Diagnostics.setActive(false)
         Diagnostics.log(succeeded
-            ? "启动复位：clamshell 睡眠已恢复系统默认"
-            : "启动复位失败：clamshell 睡眠状态复位调用未成功")
+            ? "Launch reset: clamshell sleep restored to system default"
+            : "Launch reset failed: clamshell sleep-state reset call did not succeed")
     }
 
-    // MARK: - 屏幕常亮
+    // MARK: - Keep screen awake
 
     @discardableResult
     func setKeepScreenAwake(_ enabled: Bool) -> Bool {
@@ -112,68 +120,71 @@ final class PowerManagementManager: ObservableObject {
             let result = IOPMAssertionCreateWithName(
                 kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
                 IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                // 断言名会出现在 `pmset -g assertions` 等系统诊断输出里，
-                // 那里对非 ASCII 处理不可靠（破折号会显示成乱码），故只用 ASCII。
+                // The assertion name shows up in system diagnostics like `pmset -g assertions`,
+                // which handle non-ASCII unreliably (an em dash renders as garbage), so ASCII only.
                 "Atoll: keep screen awake" as CFString,
                 &assertionID
             )
 
             guard result == kIOReturnSuccess else {
-                Diagnostics.log("屏幕常亮断言创建失败: \(result)")
+                Diagnostics.log("Failed to create keep-screen-awake assertion: \(result)")
                 return false
             }
 
             displayAssertionID = assertionID
             isKeepingScreenAwake = true
-            Diagnostics.log("屏幕常亮已开启")
+            Diagnostics.log("Keep screen awake enabled")
             return true
         } else {
-            // 释放可能失败（ID 失效等），据实返回；调用方（如隐藏图标的 onChange）才能知道
-            // 系统断言是否真的撤下，而不是只看被无条件置 false 的 isKeepingScreenAwake。
+            // The release can fail (stale ID, etc.); return the real result so the caller (e.g.
+            // the icon-hiding onChange) can tell whether the system assertion was actually
+            // dropped, instead of only seeing isKeepingScreenAwake forced to false.
             var released = true
             if displayAssertionID != IOPMAssertionID(0) {
                 let result = IOPMAssertionRelease(displayAssertionID)
                 released = (result == kIOReturnSuccess)
-                if !released { Diagnostics.log("屏幕常亮断言释放失败: \(result)") }
+                if !released { Diagnostics.log("Failed to release keep-screen-awake assertion: \(result)") }
                 displayAssertionID = IOPMAssertionID(0)
             }
             isKeepingScreenAwake = false
-            Diagnostics.log("屏幕常亮已关闭")
+            Diagnostics.log("Keep screen awake disabled")
             return released
         }
     }
 
-    // MARK: - 合盖不休眠
+    // MARK: - Stay awake with lid closed
 
     @discardableResult
     func setPreventLidSleep(_ enabled: Bool) -> Bool {
         guard enabled != isPreventingLidSleep else { return true }
 
         guard setClamshellSleepDisabled(enabled) else {
-            Diagnostics.log("设置 clamshell 睡眠状态失败，合盖不休眠未生效")
+            Diagnostics.log("Failed to set clamshell sleep state; stay-awake-with-lid-closed not applied")
             return false
         }
 
         isPreventingLidSleep = enabled
         Diagnostics.setActive(enabled)
-        Diagnostics.log("合盖不休眠已\(enabled ? "开启" : "关闭")")
+        Diagnostics.log("Stay awake with lid closed \(enabled ? "enabled" : "disabled")")
         return true
     }
 
-    /// 直接设置内核里的 clamshell 睡眠开关。
+    /// Set the kernel's clamshell sleep switch directly.
     ///
-    /// - Parameter disabled: `true` = **禁用**合盖睡眠（合盖不休眠生效），
-    ///   `false` = 恢复系统默认（合盖照常睡）。
+    /// - Parameter disabled: `true` = **disable** lid-close sleep (stay-awake-with-lid-closed
+    ///   takes effect), `false` = restore the system default (lid close sleeps as usual).
     ///
-    /// 方向别搞反 —— 传反了表现为「开了等于没开」，很难察觉。这个语义由两条独立
-    /// 推理交叉确认：① State 的 `-[… setClamshellCausingSleep:]` 把实参异或 1 后
-    /// 才传给内核（`eor w8, w20, #0x1`），即 `causingSleep=NO` → `input=1`；
-    /// ② 该选择子在内核侧对应 `setClamShellSleepDisable(bool)`，是「禁用」语义。
+    /// Don't invert the direction — a flipped value manifests as "turning it on does nothing",
+    /// which is very hard to spot. This semantic is cross-confirmed by two independent lines of
+    /// reasoning: ① State's `-[… setClamshellCausingSleep:]` XORs the argument with 1 before
+    /// passing it to the kernel (`eor w8, w20, #0x1`), i.e. `causingSleep=NO` → `input=1`;
+    /// ② the selector maps to `setClamShellSleepDisable(bool)` on the kernel side, which is a
+    /// "disable" semantic.
     @discardableResult
     private func setClamshellSleepDisabled(_ disabled: Bool) -> Bool {
         let connection = IOPMFindPowerManagement(0)
         guard connection != 0 else {
-            Diagnostics.log("IOPMFindPowerManagement 返回 0")
+            Diagnostics.log("IOPMFindPowerManagement returned 0")
             return false
         }
         defer { IOServiceClose(connection) }
@@ -197,12 +208,13 @@ final class PowerManagementManager: ObservableObject {
 
 }
 
-// MARK: - 诊断
+// MARK: - Diagnostics
 
 extension PowerManagementManager {
-    /// 合盖不休眠不产生任何 IOPM 断言，`pmset -g assertions` 看不到它；
-    /// 合盖期间又看不到屏幕，NSLog 在 `open` 启动的 GUI 进程里也抓不到。
-    /// 所以单独落一份日志，出问题时才有抓手。
+    /// Stay-awake-with-lid-closed produces no IOPM assertion, so `pmset -g assertions` can't see
+    /// it; and during lid close the screen is invisible while NSLog can't be captured from a GUI
+    /// process launched via `open`. So write a dedicated log to have something to grab onto when
+    /// things go wrong.
     enum Diagnostics {
         static let logURL = FileManager.default
             .homeDirectoryForCurrentUser

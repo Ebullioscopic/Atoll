@@ -208,7 +208,7 @@ struct DynamicIslandHeader: View {
                         }
                     }
                     
-                    // 电源与清洁快捷开关
+                    // Power and cleaning quick toggles
                     if Defaults[.showKeepScreenAwakeIcon] {
                         QuickToggleButton(
                             icon: "lock.open.laptopcomputer",
@@ -380,8 +380,8 @@ private extension DynamicIslandHeader {
     }
 }
 
-/// 刘海里的快捷开关按钮：跟既有的摄像头/剪贴板/取色器按钮同一套胶囊造型，
-/// 只是多了「生效中」的高亮态。
+/// Quick toggle button in the notch: same capsule styling as the existing camera/clipboard/color-picker
+/// buttons, just with an added "active" highlight state.
 private struct QuickToggleButton: View {
     let icon: String
     let isActive: Bool
@@ -402,7 +402,8 @@ private struct QuickToggleButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .help(help)
-        // 生效态只靠图标颜色表达，VoiceOver 听不到；补一个 selected trait 让它能播报开关状态。
+        // The active state is conveyed only by icon color, which VoiceOver can't hear; add a
+        // selected trait so it announces the toggle state.
         .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 }
