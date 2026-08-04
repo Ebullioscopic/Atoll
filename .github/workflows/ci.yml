@@ -45,6 +45,12 @@ jobs:
       - name: Validate timer lifecycle cleanup
         run: python3 -m unittest tests.test_timer_lifecycle
 
+      - name: Validate Code Island package boundary
+        run: python3 -m unittest tests.test_code_island_package_boundary
+
+      - name: Test Code Island package
+        run: swift test --package-path Packages/CodeIsland
+
       - name: Download Metal Toolchain
         # The downloadable Metal Toolchain is an Xcode 26+ (macOS 26) component; older Xcode ships metal.
         run: |

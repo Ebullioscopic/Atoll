@@ -4,28 +4,29 @@ import PackageDescription
 let package = Package(
     name: "CodeIsland",
     platforms: [.macOS(.v14)],
-    dependencies: [
-        // Sparkle — auto-update framework. Pinned to 2.6+ for stable
-        // SPUStandardUpdaterController + ed25519 signature verification.
-        .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.6.0"),
-        .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.0"),
+    products: [
+        .library(name: "CodeIslandCore", targets: ["CodeIslandCore"]),
+        .library(name: "CodeIslandRuntime", targets: ["CodeIslandRuntime"]),
+        .library(name: "CodeIslandUI", targets: ["CodeIslandUI"]),
+        .executable(name: "codeisland-bridge", targets: ["codeisland-bridge"]),
     ],
+    dependencies: [],
     targets: [
         .target(
             name: "CodeIslandCore",
             path: "Sources/CodeIslandCore"
         ),
-        .executableTarget(
-            name: "CodeIsland",
-            dependencies: [
-                "CodeIslandCore",
-                .product(name: "Sparkle", package: "Sparkle"),
-                .product(name: "Yams", package: "Yams"),
-            ],
-            path: "Sources/CodeIsland",
-            resources: [
-                .copy("Resources")
-            ]
+        .target(
+            name: "CodeIslandRuntime",
+            dependencies: ["CodeIslandCore"],
+            path: "Sources/CodeIslandRuntime",
+            exclude: ["Upstream"]
+        ),
+        .target(
+            name: "CodeIslandUI",
+            dependencies: ["CodeIslandCore"],
+            path: "Sources/CodeIslandUI",
+            exclude: ["Upstream"]
         ),
         .executableTarget(
             name: "codeisland-bridge",
@@ -38,12 +39,9 @@ let package = Package(
             path: "Tests/CodeIslandCoreTests"
         ),
         .testTarget(
-            name: "CodeIslandTests",
-            dependencies: [
-                "CodeIsland",
-                .product(name: "Yams", package: "Yams"),
-            ],
-            path: "Tests/CodeIslandTests"
+            name: "CodeIslandRuntimeTests",
+            dependencies: ["CodeIslandRuntime"],
+            path: "Tests/CodeIslandRuntimeTests"
         ),
     ]
 )

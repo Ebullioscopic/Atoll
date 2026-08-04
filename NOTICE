@@ -5,3 +5,10 @@ modified and adapted for Atoll (DynamicIsland). The boring.notch project
 is licensed under the GNU General Public License v3.0.
 
 See the LICENSE file for the full GPL v3 text.
+
+This product also includes software derived from CodeIsland:
+https://github.com/wxtsky/CodeIsland
+
+CodeIsland is Copyright (c) 2026 wxtsky and is licensed under the MIT
+License. The complete license text is preserved at
+Packages/CodeIsland/LICENSE.
