@@ -7,6 +7,14 @@ actor ClaudeCredentialStore {
     fileprivate func get() -> ClaudeQuotaClient.CredentialFile.OAuth? { cached }
     fileprivate func set(_ creds: ClaudeQuotaClient.CredentialFile.OAuth) { cached = creds }
     fileprivate func clear() { cached = nil }
+
+    // Atomically replace the cache with a fresh load from source. Running the load
+    // inside the actor closes the window where a concurrent reader could slot a stale
+    // credential in between a separate clear() and set().
+    fileprivate func reload(from load: @Sendable () -> ClaudeQuotaClient.CredentialFile.OAuth?) -> ClaudeQuotaClient.CredentialFile.OAuth? {
+        cached = load()
+        return cached
+    }
 }
 
 struct ClaudeQuotaClient {
@@ -115,11 +123,9 @@ struct ClaudeQuotaClient {
 
     // Force a re-read from source, bypassing the in-memory cache. Called after an auth
     // failure so a token rotated by Claude Code is picked up without an app restart.
+    // The invalidate-and-reload is a single atomic actor operation (see reload(from:)).
     private func reloadCredentials() async -> CredentialFile.OAuth? {
-        await ClaudeCredentialStore.shared.clear()
-        guard let loaded = Self.loadCredentialsFromSource() else { return nil }
-        await ClaudeCredentialStore.shared.set(loaded)
-        return loaded
+        await ClaudeCredentialStore.shared.reload(from: { Self.loadCredentialsFromSource() })
     }
 
     // File first never prompts; Keychain only as fallback.
@@ -149,11 +155,14 @@ struct ClaudeQuotaClient {
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         guard let (data, response) = try? await session.data(for: request),
               let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            return creds.accessToken
+            // Refresh failed. Report the token as invalid (nil) so the caller classifies
+            // this as an auth failure and reloads credentials from source, instead of
+            // proceeding with an access token we already know is stale.
+            return nil
         }
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        guard let refreshed = try? decoder.decode(RefreshResponse.self, from: data) else { return creds.accessToken }
+        guard let refreshed = try? decoder.decode(RefreshResponse.self, from: data) else { return nil }
         let expiresAt = nowMs + Int64(refreshed.expiresIn) * 1000
         let updated = CredentialFile.OAuth(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, expiresAt: expiresAt)
         await ClaudeCredentialStore.shared.set(updated)
