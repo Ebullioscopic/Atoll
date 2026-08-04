@@ -29,6 +29,11 @@ struct JSONLUsageParser {
     static func parseLine(_ line: String) -> UsageRecord? {
         guard let data = line.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+
+        if let codexRecord = parseCodexTokenCount(obj) {
+            return codexRecord
+        }
+
         let message = obj["message"] as? [String: Any]
         let usage = (message?["usage"] as? [String: Any]) ?? (obj["usage"] as? [String: Any])
         guard let usage else { return nil }
@@ -44,6 +49,30 @@ struct JSONLUsageParser {
         let requestId = (obj["requestId"] as? String) ?? (obj["request_id"] as? String)
         let dedupKey = (messageId != nil || requestId != nil) ? "\(messageId ?? "")-\(requestId ?? "")" : nil
         return UsageRecord(timestamp: ts, model: model, inputTokens: input, outputTokens: output, dedupKey: dedupKey)
+    }
+
+    private static func parseCodexTokenCount(_ obj: [String: Any]) -> UsageRecord? {
+        guard obj["type"] as? String == "event_msg",
+              let payload = obj["payload"] as? [String: Any],
+              payload["type"] as? String == "token_count",
+              let info = payload["info"] as? [String: Any],
+              let usage = info["last_token_usage"] as? [String: Any],
+              let timestamp = obj["timestamp"] as? String,
+              let date = parseDate(timestamp) else { return nil }
+
+        // Codex emits a per-event delta and a session cumulative total. Only the delta is additive.
+        // Token-count events have no stable identifier and are written once per session log.
+        let input = usage["input_tokens"] as? Int ?? 0
+        let output = usage["output_tokens"] as? Int ?? 0
+        guard input + output > 0 else { return nil }
+
+        return UsageRecord(
+            timestamp: date,
+            model: "codex",
+            inputTokens: input,
+            outputTokens: output,
+            dedupKey: nil
+        )
     }
 
     static func aggregate(files: [URL], now: Date) -> UsageSnapshot {
