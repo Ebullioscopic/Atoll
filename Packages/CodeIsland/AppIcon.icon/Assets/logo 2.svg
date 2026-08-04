@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="512" height="512">
+  <g shape-rendering="crispEdges">
+    <!-- Dynamic Island (notch pill shape) -->
+    <rect x="3" y="6" width="10" height="4" rx="2" fill="#1a1a1a"/>
+    <!-- Eyes -->
+    <rect x="5" y="7" width="2" height="2" fill="#f5a623"/>
+    <rect x="9" y="7" width="2" height="2" fill="#f5a623"/>
+    <!-- Pupils -->
+    <rect x="6" y="7" width="1" height="1" fill="#ffffff"/>
+    <rect x="10" y="7" width="1" height="1" fill="#ffffff"/>
+    <!-- Highlight dots -->
+    <rect x="6" y="7" width="0.5" height="0.5" fill="#fff" opacity="0.9"/>
+    <rect x="10" y="7" width="0.5" height="0.5" fill="#fff" opacity="0.9"/>
+  </g>
+</svg>

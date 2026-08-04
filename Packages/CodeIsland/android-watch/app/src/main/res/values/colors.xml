@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="buddy_body">#6C4DFF</color>
+    <color name="buddy_body_dark">#583ED3</color>
+    <color name="buddy_glow">#32E6B9</color>
+    <color name="buddy_visor">#2E274D</color>
+    <color name="ic_launcher_background">#0B1020</color>
+    <color name="watch_background">#0B1020</color>
+</resources>

@@ -1,0 +1,76 @@
+# Build artifacts
+.build/
+.swiftpm/
+
+# Superpowers artifacts
+.superpowers/
+HANDOFF.md
+docs/superpowers/
+
+# macOS system files
+.DS_Store
+
+# IDE vscode/cursor
+.vscode/
+.cursor/
+xcuserdata/
+*.xcuserstate
+
+# Tmp files
+*.log
+*.tmp
+dev.sh
+
+# Android watch app
+android-watch/.gradle/
+android-watch/local.properties
+android-watch/**/build/
+
+# Code agents config files
+.adal/
+.aider-desk/
+.agents/
+.augment/
+.bob/
+.claude/
+.codeartsdoer/
+.codebuddy/
+.codemaker/
+.codestudio/
+.commandcode/
+.continue/
+.cortex/
+.crush/
+.devin/
+.factory/
+.forge/
+.goose/
+.hermes/
+.iflow/
+.junie/
+.kilocode/
+.kiro/
+.kode/
+.mcpjam/
+.mux/
+.neovate/
+.openhands/
+.pi/
+.pochi/
+.qoder/
+.qwen/
+.roo/
+.rovodev/
+.tabnine/
+.trae/
+.vibe/
+.windsurf/
+.zencoder/
+skills/
+skills-lock.json
+CLAUDE.md
+build-dir/
+
+# Python bytecode from local syntax checks
+__pycache__/
+*.pyc

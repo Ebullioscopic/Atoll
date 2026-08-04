@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="watch_content_padding_horizontal">20dp</dimen>
+    <dimen name="watch_content_padding_top">20dp</dimen>
+    <dimen name="watch_content_padding_bottom">20dp</dimen>
+    <dimen name="watch_badge_size">116dp</dimen>
+    <dimen name="watch_badge_text_size">32sp</dimen>
+    <dimen name="watch_title_text_size">22sp</dimen>
+    <dimen name="watch_chip_text_size">12sp</dimen>
+    <dimen name="watch_tool_text_size">14sp</dimen>
+    <dimen name="watch_message_text_size">13sp</dimen>
+    <dimen name="watch_hint_text_size">12sp</dimen>
+    <dimen name="watch_diagnostic_text_size">10sp</dimen>
+    <dimen name="watch_status_title_text_size">20sp</dimen>
+    <dimen name="watch_status_detail_text_size">14sp</dimen>
+    <dimen name="watch_gap_small">14dp</dimen>
+    <dimen name="watch_gap_medium">12dp</dimen>
+    <dimen name="watch_gap_large">18dp</dimen>
+    <dimen name="watch_chip_padding_horizontal">12dp</dimen>
+    <dimen name="watch_chip_padding_vertical">6dp</dimen>
+    <dimen name="watch_tool_padding_horizontal">12dp</dimen>
+    <dimen name="watch_tool_padding_vertical">8dp</dimen>
+    <dimen name="watch_status_card_padding_horizontal">14dp</dimen>
+    <dimen name="watch_status_card_padding_vertical">12dp</dimen>
+    <dimen name="watch_status_detail_min_height">92dp</dimen>
+    <dimen name="watch_diagnostic_min_height">92dp</dimen>
+</resources>

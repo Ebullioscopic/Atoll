@@ -1,0 +1,14 @@
+{
+  "id": "codeisland",
+  "name": "CodeIsland",
+  "description": "Bridges OpenClaw agent activity into the CodeIsland macOS notch panel.",
+  "version": "1.0.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "activation": {
+    "onStartup": true
+  }
+}

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/"
+     version="2.0">
+  <channel>
+    <title>CodeIsland</title>
+    <link>https://raw.githubusercontent.com/wxtsky/CodeIsland/main/appcast.xml</link>
+    <description>Most recent CodeIsland updates</description>
+    <language>en</language>
+    <item>
+      <title>Version 1.0.31</title>
+      <link>https://github.com/wxtsky/CodeIsland/releases/tag/v1.0.31</link>
+      <sparkle:version>1.0.31</sparkle:version>
+      <sparkle:shortVersionString>1.0.31</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Thu, 23 Jul 2026 05:23:20 +0000</pubDate>
+      <enclosure
+        url="https://github.com/wxtsky/CodeIsland/releases/download/v1.0.31/CodeIsland.dmg"
+        sparkle:edSignature="jeG9IHMqRxLmm7zcyrbJ8E7Bw3mmcYQ6ZxMKE49nPf8czjhVW8rSMIxf1scb6CU7necd1NSigCJGLUnHXlBoBA=="
+        length="10142063"
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Version 1.0.30</title>
+      <link>https://github.com/wxtsky/CodeIsland/releases/tag/v1.0.30</link>
+      <sparkle:version>1.0.30</sparkle:version>
+      <sparkle:shortVersionString>1.0.30</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Fri, 10 Jul 2026 03:00:03 +0000</pubDate>
+      <enclosure
+        url="https://github.com/wxtsky/CodeIsland/releases/download/v1.0.30/CodeIsland.dmg"
+        sparkle:edSignature="3H12QBkwqigGYj8WLweowVEu85Ks3WYzKHFEvaq9dj+H0zN2dCcM8vU+hzId91PbEDtjdf3EIL2McPOzcZMODg=="
+        length="9961309"
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Version 1.0.29</title>
+      <link>https://github.com/wxtsky/CodeIsland/releases/tag/v1.0.29</link>
+      <sparkle:version>1.0.29</sparkle:version>
+      <sparkle:shortVersionString>1.0.29</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Mon, 06 Jul 2026 02:28:42 +0000</pubDate>
+      <enclosure
+        url="https://github.com/wxtsky/CodeIsland/releases/download/v1.0.29/CodeIsland.dmg"
+        sparkle:edSignature="rd+Njt5LA/ejxHf2uYziCqNWedjcH9Ej3+QTzgZHUyGomRN7ae0gi7FAP2wkLYEHgEU9oLAA9Vu891dodzYgCQ=="
+        length="9759841"
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Version 1.0.28</title>
+      <link>https://github.com/wxtsky/CodeIsland/releases/tag/v1.0.28</link>
+      <sparkle:version>1.0.28</sparkle:version>
+      <sparkle:shortVersionString>1.0.28</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Mon, 15 Jun 2026 14:32:15 +0000</pubDate>
+      <enclosure
+        url="https://github.com/wxtsky/CodeIsland/releases/download/v1.0.28/CodeIsland.dmg"
+        sparkle:edSignature="eNnuOubl06v8WiRTq0WIgBnd27CUuj4HC66M+ouy6b9PUwKRvgMCmoPa+3E+N2KnQ9j5hn+bVId6gp3dIzuQDQ=="
+        length="9623498"
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Version 1.0.27</title>
+      <link>https://github.com/wxtsky/CodeIsland/releases/tag/v1.0.27</link>
+      <sparkle:version>1.0.27</sparkle:version>
+      <sparkle:shortVersionString>1.0.27</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Sat, 30 May 2026 02:54:21 +0000</pubDate>
+      <enclosure
+        url="https://github.com/wxtsky/CodeIsland/releases/download/v1.0.27/CodeIsland.dmg"
+        sparkle:edSignature="c/MSeHA/8frRqN/zc5hOuZb1Os96Hk1C+XKd+DEn52U1AZmu7bo4TuBGMmwpxtTI2fQvU5gaRQ6xNOo7RaViBQ=="
+        length="9164399"
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Version 1.0.26</title>
+      <link>https://github.com/wxtsky/CodeIsland/releases/tag/v1.0.26</link>
+      <sparkle:version>1.0.26</sparkle:version>
+      <sparkle:shortVersionString>1.0.26</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Sat, 30 May 2026 02:17:38 +0000</pubDate>
+      <enclosure
+        url="https://github.com/wxtsky/CodeIsland/releases/download/v1.0.26/CodeIsland.dmg"
+        sparkle:edSignature="rOHbkxAG26AdwYcyIYcBJFB4OIxXhWxXx1H+rbca5ySYinbOXQI5lyCJnhMWxXE7+VLxCQR50oKiOF+4OHMzBg=="
+        length="9159465"
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Version 1.0.25</title>
+      <link>https://github.com/wxtsky/CodeIsland/releases/tag/v1.0.25</link>
+      <sparkle:version>1.0.25</sparkle:version>
+      <sparkle:shortVersionString>1.0.25</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 26 May 2026 02:44:58 +0000</pubDate>
+      <enclosure
+        url="https://github.com/wxtsky/CodeIsland/releases/download/v1.0.25/CodeIsland.dmg"
+        sparkle:edSignature="ZxwlINogOKOlqtmbFS5PhEtrnWyAhv90iLROoKGK2ZXmtGEeOFUgUlXaKklBo4i4yjiKhiLj+CnXaJ0DoMcwBw=="
+        length="9141141"
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Version 1.0.24</title>
+      <link>https://github.com/wxtsky/CodeIsland/releases/tag/v1.0.24</link>
+      <sparkle:version>1.0.24</sparkle:version>
+      <sparkle:shortVersionString>1.0.24</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Wed, 29 Apr 2026 07:38:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/wxtsky/CodeIsland/releases/download/v1.0.24/CodeIsland.dmg"
+        sparkle:edSignature="ZCrbOQeANXx1kdBGZZMaR0tFbka+w/tkqLeiMX+1FgKqlQHxSOuk6md4wZ32dCv76aMYH1fwf+Fmo27dRGoWBw=="
+        length="8858042"
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Version 1.0.23</title>
+      <link>https://github.com/wxtsky/CodeIsland/releases/tag/v1.0.23</link>
+      <sparkle:version>1.0.23</sparkle:version>
+      <sparkle:shortVersionString>1.0.23</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Sat, 25 Apr 2026 14:13:53 +0000</pubDate>
+      <enclosure
+        url="https://github.com/wxtsky/CodeIsland/releases/download/v1.0.23/CodeIsland.dmg"
+        sparkle:edSignature="jMNt1QZMeUkFboQD5INwXuZ0HwLQBNqW+BDZHnc1iH8RynwYcz0gjp0lUuzOyoOhdjYVzUgS7XB24w+4tEUZCA=="
+        length="8749671"
+        type="application/octet-stream" />
+    </item>
+    <item>
+      <title>Version 1.0.22</title>
+      <link>https://github.com/wxtsky/CodeIsland/releases/tag/v1.0.22</link>
+      <sparkle:version>1.0.22</sparkle:version>
+      <sparkle:shortVersionString>1.0.22</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Thu, 23 Apr 2026 06:30:09 +0000</pubDate>
+      <enclosure
+        url="https://github.com/wxtsky/CodeIsland/releases/download/v1.0.22/CodeIsland.dmg"
+        sparkle:edSignature="eHIbcCSFOXYH5OfG6TDu6xfP1lU2zpGo8Y83shiLLn1P1bBNG0gOfzL78GG9URyWbiW9e/ekjtzMKjdrdfMkBQ=="
+        length="7778448"
+        type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>

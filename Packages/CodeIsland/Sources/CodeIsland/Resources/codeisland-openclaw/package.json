@@ -1,0 +1,10 @@
+{
+  "name": "codeisland",
+  "version": "1.0.0",
+  "description": "CodeIsland bridge plugin for OpenClaw",
+  "private": true,
+  "type": "module",
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  }
+}

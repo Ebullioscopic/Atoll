@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- macOS icon: 824x824 content centered on 1024x1024 canvas -->
+  <rect x="100" y="100" width="824" height="824" rx="180" fill="#ffffff"/>
+  <g transform="translate(100,100)">
+    <!-- Dynamic Island (notch pill shape) -->
+    <rect x="154.5" y="309" width="515" height="206" rx="103" fill="#1a1a1a"/>
+    <!-- Eyes -->
+    <rect x="257.5" y="360.5" width="103" height="103" rx="8" fill="#f5a623"/>
+    <rect x="463" y="360.5" width="103" height="103" rx="8" fill="#f5a623"/>
+    <!-- Pupils -->
+    <rect x="309" y="360.5" width="51.5" height="51.5" rx="4" fill="#ffffff"/>
+    <rect x="514.5" y="360.5" width="51.5" height="51.5" rx="4" fill="#ffffff"/>
+  </g>
+</svg>

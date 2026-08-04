@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/watch_background"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:id="@+id/rootContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/watch_background"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/watch_content_padding_horizontal"
+        android:paddingTop="@dimen/watch_content_padding_top"
+        android:paddingEnd="@dimen/watch_content_padding_horizontal"
+        android:paddingBottom="@dimen/watch_content_padding_bottom">
+
+        <View
+            android:id="@+id/statusIndicator"
+            android:layout_width="18dp"
+            android:layout_height="6dp"
+            android:background="@drawable/bg_chip" />
+
+        <TextView
+            android:id="@+id/sceneChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_small"
+            android:background="@drawable/bg_chip"
+            android:paddingStart="@dimen/watch_chip_padding_horizontal"
+            android:paddingTop="@dimen/watch_chip_padding_vertical"
+            android:paddingEnd="@dimen/watch_chip_padding_horizontal"
+            android:paddingBottom="@dimen/watch_chip_padding_vertical"
+            android:text="DEMO"
+            android:textColor="@android:color/white"
+            android:textSize="@dimen/watch_chip_text_size"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/statusTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_large"
+            android:gravity="center"
+            android:text="Buddy"
+            android:textColor="@android:color/white"
+            android:textSize="@dimen/watch_status_title_text_size"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/statusDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_small"
+            android:gravity="center"
+            android:lineSpacingExtra="2dp"
+            android:text="Android Watch"
+            android:textColor="#78C8FF"
+            android:textSize="@dimen/watch_chip_text_size" />
+
+        <TextView
+            android:id="@+id/diagnosticText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_medium"
+            android:gravity="center"
+            android:lineSpacingExtra="2dp"
+            android:text="Open CodeIsland&#10;Settings &gt; Buddy&#10;Connect by Bluetooth"
+            android:textColor="#A0A0AA"
+            android:textSize="@dimen/watch_status_detail_text_size" />
+
+        <TextView
+            android:id="@+id/connectionChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_large"
+            android:background="@drawable/bg_chip"
+            android:paddingStart="@dimen/watch_chip_padding_horizontal"
+            android:paddingTop="@dimen/watch_chip_padding_vertical"
+            android:paddingEnd="@dimen/watch_chip_padding_horizontal"
+            android:paddingBottom="@dimen/watch_chip_padding_vertical"
+            android:text="Waiting for Buddy..."
+            android:textColor="@android:color/white"
+            android:textSize="@dimen/watch_chip_text_size"
+            android:textStyle="bold" />
+
+        <com.codeisland.buddywatch.BuddyMascotView
+            android:id="@+id/mascotView"
+            android:layout_width="@dimen/watch_badge_size"
+            android:layout_height="@dimen/watch_badge_size"
+            android:layout_marginTop="@dimen/watch_gap_large"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/mascotName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_small"
+            android:gravity="center"
+            android:text="Codex"
+            android:textColor="#A0A0AA"
+            android:textSize="@dimen/watch_title_text_size"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/workspaceName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_small"
+            android:background="@drawable/bg_chip"
+            android:paddingStart="@dimen/watch_chip_padding_horizontal"
+            android:paddingTop="@dimen/watch_chip_padding_vertical"
+            android:paddingEnd="@dimen/watch_chip_padding_horizontal"
+            android:paddingBottom="@dimen/watch_chip_padding_vertical"
+            android:text="CodeIsland"
+            android:textColor="@android:color/white"
+            android:textSize="@dimen/watch_chip_text_size"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/toolName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_medium"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="2"
+            android:text="Read src/app.ts"
+            android:textColor="#787882"
+            android:textSize="@dimen/watch_tool_text_size"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/messageRoleChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_medium"
+            android:background="@drawable/bg_chip"
+            android:paddingStart="@dimen/watch_chip_padding_horizontal"
+            android:paddingTop="@dimen/watch_chip_padding_vertical"
+            android:paddingEnd="@dimen/watch_chip_padding_horizontal"
+            android:paddingBottom="@dimen/watch_chip_padding_vertical"
+            android:text="CODEX"
+            android:textColor="@android:color/white"
+            android:textSize="@dimen/watch_chip_text_size"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/messageText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_small"
+            android:gravity="center"
+            android:lineSpacingExtra="2dp"
+            android:text="最近一条消息预览"
+            android:textColor="@android:color/white"
+            android:textSize="@dimen/watch_message_text_size"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/messagePager"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_small"
+            android:background="@drawable/bg_chip"
+            android:paddingStart="@dimen/watch_chip_padding_horizontal"
+            android:paddingTop="@dimen/watch_chip_padding_vertical"
+            android:paddingEnd="@dimen/watch_chip_padding_horizontal"
+            android:paddingBottom="@dimen/watch_chip_padding_vertical"
+            android:text="1 / 3"
+            android:textColor="#A0A0AA"
+            android:textSize="@dimen/watch_hint_text_size"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/actionRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_medium"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/actionPrimary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:minHeight="40dp"
+                android:paddingStart="@dimen/watch_chip_padding_horizontal"
+                android:paddingTop="@dimen/watch_chip_padding_vertical"
+                android:paddingEnd="@dimen/watch_chip_padding_horizontal"
+                android:paddingBottom="@dimen/watch_chip_padding_vertical"
+                android:text="允许"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/watch_chip_text_size"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/actionSecondary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:minHeight="40dp"
+                android:paddingStart="@dimen/watch_chip_padding_horizontal"
+                android:paddingTop="@dimen/watch_chip_padding_vertical"
+                android:paddingEnd="@dimen/watch_chip_padding_horizontal"
+                android:paddingBottom="@dimen/watch_chip_padding_vertical"
+                android:text="拒绝"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/watch_chip_text_size"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/hintText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/watch_gap_large"
+            android:gravity="center"
+            android:text="Long press: demo"
+            android:textColor="#505060"
+            android:textSize="@dimen/watch_hint_text_size" />
+
+    </LinearLayout>
+</ScrollView>

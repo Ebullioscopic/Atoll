@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CodeIsland Buddy Watch</string>
+    <string name="notification_channel_name">Buddy 后台连接</string>
+    <string name="notification_alert_channel_name">Buddy 审批提醒</string>
+    <string name="notification_alert_channel_description">当 CodeIsland 进入审批或提问状态时提醒手表用户</string>
+    <string name="notification_title">CodeIsland Buddy Watch</string>
+    <string name="notification_waiting">等待 CodeIsland 连接</string>
+    <string name="notification_attention_title_approval">CodeIsland 等待审批</string>
+    <string name="notification_attention_title_question">CodeIsland 等待回复</string>
+    <string name="notification_attention_fallback_message">打开手表查看并回到 CodeIsland 处理</string>
+    <string name="notification_action_approve">允许</string>
+    <string name="notification_action_deny">拒绝</string>
+    <string name="notification_action_skip">跳过</string>
+    <string name="notification_action_open">打开</string>
+</resources>

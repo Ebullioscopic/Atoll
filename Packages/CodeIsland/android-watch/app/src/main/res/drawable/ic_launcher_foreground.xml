@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:fillColor="@color/buddy_body"
+        android:pathData="M24,32h18l6,-8l6,8h22a10,10 0 0 1 10,10v20a10,10 0 0 1 -10,10H24a10,10 0 0 1 -10,-10V42a10,10 0 0 1 10,-10z" />
+    <path
+        android:fillColor="@color/buddy_body_dark"
+        android:pathData="M28,74h44a4,4 0 0 1 4,4v2H24v-2a4,4 0 0 1 4,-4z" />
+    <path
+        android:fillColor="@color/buddy_glow"
+        android:pathData="M32,41h36a8,8 0 0 1 8,8v10a8,8 0 0 1 -8,8H32a8,8 0 0 1 -8,-8V49a8,8 0 0 1 8,-8z" />
+    <path
+        android:fillColor="@color/buddy_visor"
+        android:pathData="M34,44h32a6,6 0 0 1 6,6v8a6,6 0 0 1 -6,6H34a6,6 0 0 1 -6,-6V50a6,6 0 0 1 6,-6z" />
+    <path
+        android:fillColor="@color/buddy_glow"
+        android:pathData="M39,49h7a2,2 0 0 1 2,2v5a2,2 0 0 1 -2,2h-7a2,2 0 0 1 -2,-2v-5a2,2 0 0 1 2,-2z" />
+    <path
+        android:fillColor="@color/buddy_glow"
+        android:pathData="M54,49h7a2,2 0 0 1 2,2v5a2,2 0 0 1 -2,2h-7a2,2 0 0 1 -2,-2v-5a2,2 0 0 1 2,-2z" />
+    <path
+        android:fillColor="@color/buddy_glow"
+        android:pathData="M48,60h4a1.5,1.5 0 0 1 1.5,1.5V63h-7v-1.5A1.5,1.5 0 0 1 48,60z" />
+    <path
+        android:fillColor="@android:color/white"
+        android:fillAlpha="0.18"
+        android:pathData="M35,45h13a2,2 0 0 1 2,2v3H35a2,2 0 0 1 -2,-2v-1a2,2 0 0 1 2,-2z" />
+</vector>
