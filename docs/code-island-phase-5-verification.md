@@ -129,10 +129,7 @@ When the selected SDK requires it, use explicit writable module caches, a
 scratch path, and the matching macOS target triple as recorded in this phase's
 local build invocation.
 
-## Phase 6 authorization gate
+## Phase 6 historical gate
 
-Phase 6 is not authorized. The package now emits sanitized session projections
-and presentation intents, but this phase does not add the multi-session list,
-compact agent activity, original-CodeIsland-styled pop-outs, origin activation,
-priority arbitration, or exact-origin suppression. Those behaviors remain the
-next separately approved presentation slice.
+Phase 6 was subsequently authorized and completed. See
+[Code Island Phase 6 Verification](code-island-phase-6-verification.md).

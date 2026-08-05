@@ -20,7 +20,7 @@ git subtree add --prefix=Packages/CodeIsland ../CodeIsland main
 
 ## Atoll-only changes
 
-Phases 1 through 5 intentionally replace the imported application and provider
+Phases 1 through 6 intentionally replace the imported application and provider
 boundaries:
 
 - Replaces the standalone `CodeIsland` application product with internal
@@ -37,8 +37,14 @@ boundaries:
 - Links the three library products and embeds the signed helper inside the one
   Atoll application. Atoll remains the only application lifecycle and window,
   settings, and update owner.
-- Adds content-free activity intents and an Atoll-native setup/idle dashboard.
-  Imported rich views remain quarantined until the presentation phase.
+- Adds content-free activity intents, an urgency-ordered metadata dashboard,
+  and a pure Atoll-occupancy presentation policy.
+- Extracts the Codex Dex mascot into a payload-free reusable SwiftUI component.
+  Atoll supplies geometry, timing, queueing, tab selection, and origin actions;
+  the imported panel/window shell and rich session views remain quarantined.
+- Replaces the broad upstream terminal helpers with a conservative Atoll host
+  adapter. Exact suppression is currently positive only for Terminal.app TTY
+  or iTerm2 session-ID matches; application-only visibility remains uncertain.
 - Replaces the upstream install-on-launch behavior with Codex-only read-only
   discovery, explicit plan-bound consent, listener-before-installer ordering,
   exact ownership receipts, receipt-gated restart and repair, digest-verified
@@ -53,8 +59,8 @@ boundaries:
 | Upstream area | Current disposition | Earliest remaining migration phase |
 |---|---|---|
 | Rich Core models, normalizers, transcript readers, provider scanners, and retained upstream tests | `Sources/CodeIslandCore/Upstream`; excluded from SwiftPM. New sanitized Phase 2 contracts are active beside the quarantine. | Provider-neutral pieces only when their metadata boundary is proven |
-| `HookServer`, `ConfigInstaller`, provider resources, and origin helpers | `Sources/CodeIslandRuntime/Upstream`; excluded from SwiftPM. Focused Codex discovery, metadata transport, activation, preflight, receipt, repair, and managed installer implementations are active beside the quarantine. | Additional providers require their own verified rollout; origin presentation remains Phase 6 |
-| Mascots, sounds, icons, and reusable visual candidates | `Sources/CodeIslandUI/Upstream`; excluded from SwiftPM | Phase 6, after Atoll-host adaptation |
+| `HookServer`, `ConfigInstaller`, provider resources, and origin helpers | `Sources/CodeIslandRuntime/Upstream`; excluded from SwiftPM. Focused Codex discovery, metadata transport, activation, preflight, receipt, repair, managed installer, presentation policy, and Atoll-owned origin adapter implementations replace them. | Additional providers require their own verified rollout |
+| Mascots, sounds, icons, and reusable visual candidates | `Sources/CodeIslandUI/Upstream`; excluded from SwiftPM. A focused, payload-free Dex mascot is active beside the quarantine; unused mascots, sounds, and application-oriented views remain excluded. | Migrate only individually adapted resources with an Atoll-owned presentation contract |
 
 Core migration staging is deliberate: the imported `SessionSnapshot`, hook
 models, `JSONLTailer`, and provider scanners expose rich or provider-specific
@@ -118,6 +124,7 @@ python3 -m unittest tests.test_code_island_phase_three_dashboard \
   tests.test_code_island_phase_three_settings
 python3 -m unittest tests.test_code_island_phase_four_contracts
 python3 -m unittest tests.test_code_island_phase_five_contracts
+python3 -m unittest tests.test_code_island_phase_six_presentation
 python3 -m unittest tests.test_privacy_configuration
 python3 -m unittest tests.test_timer_lifecycle
 swift test --package-path Packages/CodeIsland

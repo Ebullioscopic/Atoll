@@ -66,6 +66,9 @@ jobs:
           CODEISLAND_REQUIRE_LIVE_SOCKET: 1
         run: python3 -m unittest tests.test_code_island_phase_five_contracts
 
+      - name: Validate Code Island Phase 6 presentation contracts
+        run: python3 -m unittest tests.test_code_island_phase_six_presentation
+
       - name: Test Code Island package
         run: swift test --package-path Packages/CodeIsland
 

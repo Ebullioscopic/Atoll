@@ -25,6 +25,7 @@ import Combine
 import Defaults
 import Foundation
 import KeyboardShortcuts
+import CodeIslandRuntime
 import SwiftUI
 import SwiftUIIntrospect
 import AtollExtensionKit
@@ -52,6 +53,7 @@ struct ContentView: View {
     @ObservedObject var capsLockManager = CapsLockManager.shared
     @ObservedObject var extensionLiveActivityManager = ExtensionLiveActivityManager.shared
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
+    @ObservedObject var codeIslandHost = CodeIslandHost.shared
     @ObservedObject var localSendService = LocalSendService.shared
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
@@ -423,6 +425,131 @@ struct ContentView: View {
         if case .failed = localSendService.transferState { return true }
         if case .rejected = localSendService.transferState { return true }
         return false
+    }
+
+    /// Atoll's single occupancy projection consumed by Code Island's pure
+    /// presentation policy. Provider/runtime code never reaches into these
+    /// feature managers directly.
+    private var codeIslandArbitrationSnapshot: CodeIslandArbitrationSnapshot {
+        if codeIslandProtectedActivityActive {
+            return CodeIslandArbitrationSnapshot(
+                occupancy: .systemOrPrivacy,
+                supportsSecondaryIndicator: false
+            )
+        }
+        if codeIslandNoncriticalActivityActive {
+            return CodeIslandArbitrationSnapshot(
+                occupancy: .noncritical,
+                supportsSecondaryIndicator: codeIslandCanPairWithMusic
+            )
+        }
+        return CodeIslandArbitrationSnapshot(
+            occupancy: .available,
+            supportsSecondaryIndicator: false
+        )
+    }
+
+    private var codeIslandProtectedActivityActive: Bool {
+        isBatteryHUDVisibleOnCurrentScreen
+            || isProtectedCodeIslandSneakPeek
+            || (capsLockManager.isCapsLockActive && enableCapsLockIndicator)
+            || ((lockScreenManager.isLocked || !lockScreenManager.isLockIdle)
+                && Defaults[.enableLockScreenLiveActivity])
+            || (privacyManager.hasAnyIndicator
+                && (Defaults[.enableCameraDetection] || Defaults[.enableMicrophoneDetection]))
+            || (enableDoNotDisturbDetection
+                && showDoNotDisturbIndicator
+                && (doNotDisturbManager.isDoNotDisturbActive
+                    || doNotDisturbManager.isFocusToastDismissing))
+    }
+
+    private var isProtectedCodeIslandSneakPeek: Bool {
+        guard isSneakPeekVisibleOnCurrentScreen else { return false }
+        switch coordinator.sneakPeek.type {
+        case .brightness, .volume, .backlight, .mic, .battery, .doNotDisturb,
+             .bluetoothAudio, .privacy, .lockScreen, .capsLock:
+            return true
+        case .music, .timer, .reminder, .recording, .download,
+             .extensionLiveActivity:
+            return false
+        }
+    }
+
+    private var codeIslandHasActiveMusic: Bool {
+        if musicManager.isPlaying { return true }
+        let hasMetadata = !musicManager.songTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !musicManager.artistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return !musicManager.isPlayerIdle && hasMetadata
+    }
+
+    private var codeIslandCanPairWithMusic: Bool {
+        codeIslandMusicPresentationActive
+            && !isSneakPeekVisibleOnCurrentScreen
+            && !isCurrentScreenExpansionVisible
+            && !(coordinator.timerLiveActivityEnabled && timerManager.isTimerActive)
+            && !(enableReminderLiveActivity && reminderManager.isActive)
+            && !(enableScreenRecordingDetection
+                && (recordingManager.isRecording || !recordingManager.isRecorderIdle))
+            && !(Defaults[.enableDownloadListener] && downloadManager.isDownloading)
+            && !localSendLiveActivityActive
+            && !(enableExtensionLiveActivities
+                && !extensionLiveActivityManager.activeActivities.isEmpty)
+            && (shelfState.isEmpty || enableMinimalisticUI)
+    }
+
+    private var codeIslandMusicPresentationActive: Bool {
+        codeIslandHasActiveMusic
+            && coordinator.musicLiveActivityEnabled
+            && closedMusicContentEnabled
+            && !vm.hideOnClosed
+            && !lockScreenManager.isLocked
+            && !isMusicHUDDeferredAfterUnlock
+    }
+
+    private var codeIslandNoncriticalActivityActive: Bool {
+        let hasNonprotectedSneakPeek = isSneakPeekVisibleOnCurrentScreen
+            && !isProtectedCodeIslandSneakPeek
+        return hasNonprotectedSneakPeek
+            || coordinator.expandingView.show
+            || codeIslandMusicPresentationActive
+            || (coordinator.timerLiveActivityEnabled && timerManager.isTimerActive)
+            || (enableReminderLiveActivity && reminderManager.isActive)
+            || (enableScreenRecordingDetection
+                && (recordingManager.isRecording || !recordingManager.isRecorderIdle))
+            || (Defaults[.enableDownloadListener] && downloadManager.isDownloading)
+            || localSendLiveActivityActive
+            || (enableExtensionLiveActivities && !extensionLiveActivityManager.activeActivities.isEmpty)
+            || (!shelfState.isEmpty && !enableMinimalisticUI)
+    }
+
+    private var codeIslandStandalonePresentation: CodeIslandHostPresentation? {
+        guard vm.notchState == .closed,
+              !vm.hideOnClosed,
+              codeIslandArbitrationSnapshot.occupancy != .systemOrPrivacy else {
+            return nil
+        }
+        if let active = codeIslandHost.activePresentation {
+            if active.isAttention || codeIslandArbitrationSnapshot.occupancy == .available {
+                return active
+            }
+        }
+        guard codeIslandArbitrationSnapshot.occupancy == .available else { return nil }
+        return codeIslandHost.compactPresentation
+    }
+
+    private var codeIslandActivityWidth: CGFloat {
+        if isDynamicIslandMode {
+            return max(270, vm.closedNotchSize.width + 145)
+        }
+        return max(390, vm.closedNotchSize.width + 190)
+    }
+
+    private func syncCodeIslandPresentationEnvironment() {
+        let snapshot = codeIslandArbitrationSnapshot
+        codeIslandHost.updatePresentationEnvironment(
+            occupancy: snapshot.occupancy,
+            supportsSecondaryIndicator: snapshot.supportsSecondaryIndicator
+        )
     }
 
     /// Pill shape for Dynamic Island mode with animated corner radius transitions.
@@ -826,6 +953,12 @@ struct ContentView: View {
 
     private func installSecondaryRootLifecycleHandlers<Content: View>(on view: Content) -> some View {
         view
+            .onAppear {
+                syncCodeIslandPresentationEnvironment()
+            }
+            .onChange(of: codeIslandArbitrationSnapshot) { _, _ in
+                syncCodeIslandPresentationEnvironment()
+            }
             .onChange(of: showStandardMediaControls) { _, _ in
                 handleStandardMediaControlsAvailabilityChange()
             }
@@ -901,6 +1034,8 @@ struct ContentView: View {
                               return false
                           case .extensionPayload:
                               return false
+                          case .codeIsland:
+                              return false
                           case .shelf:
                               return false
                           }
@@ -938,6 +1073,16 @@ struct ContentView: View {
                       } else if vm.notchState == .closed && capsLockManager.isCapsLockActive && Defaults[.enableCapsLockIndicator] && !vm.hideOnClosed && !lockScreenManager.isLocked {
                           InlineHUD(type: .constant(.capsLock), value: .constant(1.0), icon: .constant(""), hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
+                      } else if let codeIslandPresentation = codeIslandStandalonePresentation {
+                          NotchCodeIslandActivityView(
+                              presentation: codeIslandPresentation,
+                              centerWidth: vm.closedNotchSize.width,
+                              height: max(34, vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0)),
+                              isDynamicIslandMode: isDynamicIslandMode
+                          )
+                          .frame(width: codeIslandActivityWidth)
+                          .id(codeIslandPresentation.id)
+                          .transition(closedLiveActivitySwapTransition)
                       } else if canShowMusicDuringExpansion && musicPairingEligible {
                           MusicLiveActivity(secondary: musicSecondary)
                               .id("closed-music-live-activity")
@@ -1332,6 +1477,12 @@ struct ContentView: View {
             return .extensionPayload(extensionPayload)
         }
 
+        if let presentation = codeIslandHost.compactPresentation,
+           case .compact(let isSecondary) = presentation.style,
+           isSecondary {
+            return .codeIsland(presentation)
+        }
+
         // Shelf: show file count as lowest-priority secondary
         if !shelfState.isEmpty && !lockScreenManager.isLocked && !enableMinimalisticUI {
             return .shelf(count: shelfState.items.count)
@@ -1357,6 +1508,8 @@ struct ContentView: View {
         case .extensionPayload(let payload):
             let maxWidth = baseWidth + centerBaseWidth * 0.6
             return ExtensionLayoutMetrics.trailingWidth(for: payload, baseWidth: baseWidth, maxWidth: maxWidth)
+        case .codeIsland:
+            return baseWidth
         case .shelf:
             return baseWidth
         }
@@ -1461,6 +1614,8 @@ struct ContentView: View {
                         accent: payload.descriptor.accentColor.swiftUIColor,
                         size: badgeSize
                     )
+                case .codeIsland(let presentation):
+                    NotchCodeIslandSecondaryActivityView(presentation: presentation)
                 case .shelf:
                     Image(systemName: "tray.and.arrow.down.fill")
                         .font(.system(size: badgeSize * 0.50, weight: .semibold))
@@ -1523,6 +1678,8 @@ struct ContentView: View {
             spectrumView(forceSpectrum: true, trailingInset: 6)
         case .extensionPayload(let payload):
             ExtensionMusicWingView(payload: payload, notchHeight: notchHeight, trailingWidth: trailingWidth)
+        case .codeIsland(let presentation):
+            NotchCodeIslandSecondaryActivityView(presentation: presentation)
         case .shelf(let count):
             // File count badge: bold white number, like a minimal pill
             Text("\(count)")
@@ -2661,6 +2818,11 @@ struct ContentView: View {
     }
 }
 
+private struct CodeIslandArbitrationSnapshot: Equatable {
+    let occupancy: CodeIslandNotchOccupancy
+    let supportsSecondaryIndicator: Bool
+}
+
 private enum MusicSecondaryLiveActivity: Equatable {
     case timer
     case reminder(ReminderLiveActivityManager.ReminderEntry)
@@ -2668,6 +2830,7 @@ private enum MusicSecondaryLiveActivity: Equatable {
     case focus(FocusModeType)
     case capsLock(showLabel: Bool)
     case extensionPayload(ExtensionLiveActivityPayload)
+    case codeIsland(CodeIslandHostPresentation)
     case shelf(count: Int)
 
     var id: String {
@@ -2684,6 +2847,8 @@ private enum MusicSecondaryLiveActivity: Equatable {
             return showLabel ? "caps-lock-label" : "caps-lock-icon"
         case .extensionPayload(let payload):
             return "extension-\(payload.id)"
+        case .codeIsland(let presentation):
+            return "code-island-\(presentation.id)"
         case .shelf(let count):
             return "shelf-\(count)"
         }

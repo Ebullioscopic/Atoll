@@ -28,6 +28,40 @@ enum CodeIslandHostOperationState: Equatable {
     case failed(String)
 }
 
+/// One Atoll-selected Code Island presentation. It contains only the sanitized
+/// subject and content-free style emitted across the package boundary.
+struct CodeIslandHostPresentation: Equatable, Identifiable {
+    var id: String {
+        "\(intent.subject.provider.rawValue):\(intent.subject.sessionID.rawValue):\(intent.occurredAt.timeIntervalSince1970):\(style.identity)"
+    }
+
+    let style: CodeIslandPresentationStyle
+    let intent: CodeIslandActivityIntent
+
+    var subject: CodeIslandActivitySubject { intent.subject }
+    var isAttention: Bool {
+        if case .attention = style { return true }
+        return false
+    }
+    var isCompact: Bool {
+        if case .compact = style { return true }
+        return false
+    }
+}
+
+private extension CodeIslandPresentationStyle {
+    var identity: String {
+        switch self {
+        case .compact(let isSecondary): return isSecondary ? "compact-secondary" : "compact"
+        case .sessionStarted: return "started"
+        case .attention(.approval): return "attention-approval"
+        case .attention(.question): return "attention-question"
+        case .completed: return "completed"
+        case .failed: return "failed"
+        }
+    }
+}
+
 /// Owns the Code Island feature shell and explicit provider activation in Atoll.
 @MainActor
 final class CodeIslandHost: ObservableObject {
@@ -36,11 +70,21 @@ final class CodeIslandHost: ObservableObject {
     @Published private(set) var lifecycleState: CodeIslandHostLifecycleState = .stopped
     @Published private(set) var dashboardState: CodeIslandDashboardState = .setupRequired(provider: .codex)
     @Published private(set) var pendingActivityIntent: CodeIslandActivityIntent?
+    @Published private(set) var activePresentation: CodeIslandHostPresentation?
+    @Published private(set) var compactPresentation: CodeIslandHostPresentation?
+    @Published private(set) var queuedPresentationCount = 0
     @Published private(set) var discoveryAssessment: CodeIslandAdoptionAssessment?
     @Published private(set) var operationState: CodeIslandHostOperationState = .idle
 
     private let activityIntentAdapter: CodeIslandActivityIntentAdapter
+    private let presentationPolicy: CodeIslandPresentationPolicy
     private let discovery: CodeIslandReadOnlyDiscovery
+    private let originAdapter: CodeIslandOriginAdapter
+    private var occupancy: CodeIslandNotchOccupancy = .available
+    private var supportsSecondaryIndicator = false
+    private var queuedIntents: [CodeIslandActivityIntent] = []
+    private var presentationExpirationTask: Task<Void, Never>?
+    private var evaluationTokens: [String: Int] = [:]
     private lazy var runtime: CodeIslandRuntime = CodeIslandRuntime.live {
         [weak self] current, previous in
         DispatchQueue.main.async { [weak self] in
@@ -50,10 +94,13 @@ final class CodeIslandHost: ObservableObject {
 
     private init(
         activityIntentAdapter: CodeIslandActivityIntentAdapter = CodeIslandActivityIntentAdapter(),
+        presentationPolicy: CodeIslandPresentationPolicy = CodeIslandPresentationPolicy(),
         discovery: CodeIslandReadOnlyDiscovery = CodeIslandReadOnlyDiscovery()
     ) {
         self.activityIntentAdapter = activityIntentAdapter
+        self.presentationPolicy = presentationPolicy
         self.discovery = discovery
+        originAdapter = CodeIslandOriginAdapter()
     }
 
     var isActivated: Bool { runtime.isRunning }
@@ -75,6 +122,7 @@ final class CodeIslandHost: ObservableObject {
             operationState = .failed(message(for: error))
         }
         updateDashboardState()
+        refreshCompactPresentation()
     }
 
     /// Refreshes provider and standalone-CodeIsland state without mutating it.
@@ -100,6 +148,7 @@ final class CodeIslandHost: ObservableObject {
             try runtime.activate(plan: plan, consent: consent)
             operationState = .idle
             updateDashboardState()
+            refreshCompactPresentation()
             refreshDiscovery()
         } catch {
             operationState = .failed(message(for: error))
@@ -115,10 +164,12 @@ final class CodeIslandHost: ObservableObject {
         do {
             try runtime.deactivate()
             operationState = .idle
+            resetPresentationState()
         } catch {
             operationState = .failed(message(for: error))
         }
         updateDashboardState()
+        refreshCompactPresentation()
         refreshDiscovery()
     }
 
@@ -134,37 +185,272 @@ final class CodeIslandHost: ObservableObject {
             operationState = .failed(message(for: error))
         }
         updateDashboardState()
+        refreshCompactPresentation()
         refreshDiscovery()
     }
 
     /// Clears transient host state during Atoll shutdown.
     func stop() {
         runtime.shutdown()
-        pendingActivityIntent = nil
+        resetPresentationState()
         discoveryAssessment = nil
         operationState = .idle
         dashboardState = .setupRequired(provider: .codex)
         lifecycleState = .stopped
     }
 
+    private func resetPresentationState() {
+        presentationExpirationTask?.cancel()
+        presentationExpirationTask = nil
+        queuedIntents.removeAll()
+        evaluationTokens.removeAll()
+        pendingActivityIntent = nil
+        activePresentation = nil
+        compactPresentation = nil
+        queuedPresentationCount = 0
+    }
+
     /// Accepts only the sanitized projection emitted by the active listener.
-    /// Presentation remains an Atoll-owned decision deferred to Phase 6.
     func consumeSanitizedSession(
         _ current: SessionMetadata,
         previous: SessionMetadata?
     ) {
         guard lifecycleState == .running else { return }
+        updateDashboardState()
+        refreshCompactPresentation()
         guard let intent = activityIntentAdapter.intent(
             for: current,
             previous: previous
         ) else { return }
         pendingActivityIntent = intent
+        evaluate(intent)
+    }
+
+    /// Receives Atoll's current notch occupancy. Code Island never infers
+    /// priority by reaching into another feature manager from its runtime.
+    func updatePresentationEnvironment(
+        occupancy: CodeIslandNotchOccupancy,
+        supportsSecondaryIndicator: Bool
+    ) {
+        let occupancyChanged = self.occupancy != occupancy
+            || self.supportsSecondaryIndicator != supportsSecondaryIndicator
+        self.occupancy = occupancy
+        self.supportsSecondaryIndicator = supportsSecondaryIndicator
+        guard occupancyChanged else { return }
+
+        if let activePresentation,
+           !activePresentation.isAttention,
+           !activePresentation.isCompact,
+           occupancy != .available {
+            enqueue(activePresentation.intent)
+            clearActivePresentation()
+        }
+
+        refreshCompactPresentation()
+        drainQueueIfPossible()
+    }
+
+    /// Atoll-owned handoff action used by dashboard rows and attention cards.
+    func openOrigin(_ origin: OriginNavigation?) {
+        originAdapter.open(origin)
+    }
+
+    /// User-initiated navigation from the compact activity into the dashboard.
+    func showDashboard() {
+        originAdapter.presentAttentionHandoff()
     }
 
     private func updateDashboardState() {
-        dashboardState = runtime.isRunning
+        guard runtime.isRunning else {
+            dashboardState = .setupRequired(provider: .codex)
+            return
+        }
+
+        let projection = CodeIslandDashboardProjection(sessions: runtime.sessions)
+        dashboardState = projection.items.isEmpty
             ? .idle(provider: .codex)
-            : .setupRequired(provider: .codex)
+            : .sessions(provider: .codex, items: projection.items)
+    }
+
+    private func evaluate(_ intent: CodeIslandActivityIntent) {
+        let key = sessionKey(intent.subject)
+        evaluationTokens[key, default: 0] += 1
+        let token = evaluationTokens[key] ?? 0
+        discardQueuedIntents(for: intent.subject)
+
+        if case .dismissed = intent.kind {
+            dismissPresentations(for: intent.subject)
+            return
+        }
+
+        if activePresentation?.subject.provider == intent.subject.provider,
+           activePresentation?.subject.sessionID == intent.subject.sessionID,
+           activePresentation?.isAttention == true {
+            clearActivePresentation()
+        }
+
+        switch intent.kind {
+        case .attentionRequired, .completed, .failed:
+            Task { [weak self] in
+                guard let self else { return }
+                let match = await originAdapter.exactMatch(for: intent.subject.origin)
+                guard evaluationTokens[key] == token else { return }
+                apply(intent, originMatch: match)
+            }
+        case .sessionStarted, .processing:
+            apply(intent, originMatch: .unknown)
+        case .dismissed:
+            break
+        }
+    }
+
+    private func apply(
+        _ intent: CodeIslandActivityIntent,
+        originMatch: CodeIslandExactOriginMatch
+    ) {
+        let context = CodeIslandPresentationContext(
+            occupancy: occupancy,
+            supportsSecondaryIndicator: supportsSecondaryIndicator,
+            originMatch: originMatch
+        )
+
+        switch presentationPolicy.disposition(for: intent, context: context) {
+        case .present(let style):
+            if case .compact = style {
+                refreshCompactPresentation()
+                return
+            }
+
+            if let activePresentation {
+                if case .attention = style, !activePresentation.isAttention {
+                    enqueue(activePresentation.intent)
+                    clearActivePresentation()
+                } else {
+                    enqueue(intent)
+                    return
+                }
+            }
+            present(style: style, intent: intent)
+
+        case .enqueue:
+            enqueue(intent)
+        case .suppress, .stateOnly:
+            drainQueueIfPossible()
+        case .dismiss:
+            dismissPresentations(for: intent.subject)
+        }
+    }
+
+    private func present(
+        style: CodeIslandPresentationStyle,
+        intent: CodeIslandActivityIntent
+    ) {
+        activePresentation = CodeIslandHostPresentation(style: style, intent: intent)
+        presentationExpirationTask?.cancel()
+        presentationExpirationTask = nil
+
+        switch style {
+        case .attention:
+            originAdapter.presentAttentionHandoff()
+        case .sessionStarted:
+            schedulePresentationExpiration(after: 2.0)
+        case .completed:
+            schedulePresentationExpiration(after: 5.0)
+        case .failed:
+            schedulePresentationExpiration(after: 4.0)
+        case .compact:
+            break
+        }
+    }
+
+    private func schedulePresentationExpiration(after duration: TimeInterval) {
+        presentationExpirationTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard let self, !Task.isCancelled else { return }
+            clearActivePresentation()
+            drainQueueIfPossible()
+        }
+    }
+
+    private func clearActivePresentation() {
+        presentationExpirationTask?.cancel()
+        presentationExpirationTask = nil
+        activePresentation = nil
+    }
+
+    private func enqueue(_ intent: CodeIslandActivityIntent) {
+        discardQueuedIntents(for: intent.subject)
+        queuedIntents.append(intent)
+        queuedIntents = presentationPolicy.orderedQueue(queuedIntents)
+        queuedPresentationCount = queuedIntents.count
+    }
+
+    /// A newer transition for one session always supersedes its deferred UI.
+    private func discardQueuedIntents(for subject: CodeIslandActivitySubject) {
+        queuedIntents.removeAll { queued in
+            queued.subject.provider == subject.provider
+                && queued.subject.sessionID == subject.sessionID
+        }
+        queuedPresentationCount = queuedIntents.count
+    }
+
+    private func drainQueueIfPossible() {
+        guard activePresentation == nil, !queuedIntents.isEmpty else { return }
+        let next = queuedIntents.removeFirst()
+        queuedPresentationCount = queuedIntents.count
+        evaluate(next)
+    }
+
+    private func dismissPresentations(for subject: CodeIslandActivitySubject) {
+        let key = sessionKey(subject)
+        evaluationTokens[key, default: 0] += 1
+        discardQueuedIntents(for: subject)
+        if activePresentation?.subject.provider == subject.provider,
+           activePresentation?.subject.sessionID == subject.sessionID {
+            clearActivePresentation()
+        }
+        refreshCompactPresentation()
+        drainQueueIfPossible()
+    }
+
+    private func refreshCompactPresentation() {
+        guard runtime.isRunning else {
+            compactPresentation = nil
+            return
+        }
+        let workingSessions = runtime.sessions
+            .filter { $0.state == .working }
+            .sorted {
+                if $0.updatedAt != $1.updatedAt { return $0.updatedAt > $1.updatedAt }
+                return $0.sessionID.rawValue < $1.sessionID.rawValue
+            }
+        guard let metadata = workingSessions.first else {
+            compactPresentation = nil
+            return
+        }
+
+        let intent = CodeIslandActivityIntent(
+            kind: .processing,
+            subject: CodeIslandActivitySubject(metadata: metadata),
+            occurredAt: metadata.updatedAt
+        )
+        let disposition = presentationPolicy.disposition(
+            for: intent,
+            context: CodeIslandPresentationContext(
+                occupancy: occupancy,
+                supportsSecondaryIndicator: supportsSecondaryIndicator,
+                originMatch: .unknown
+            )
+        )
+        if case .present(let style) = disposition {
+            compactPresentation = CodeIslandHostPresentation(style: style, intent: intent)
+        } else {
+            compactPresentation = nil
+        }
+    }
+
+    private func sessionKey(_ subject: CodeIslandActivitySubject) -> String {
+        "\(subject.provider.rawValue):\(subject.sessionID.rawValue)"
     }
 
     private func message(for error: Error) -> String {

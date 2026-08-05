@@ -6,6 +6,17 @@ import CodeIslandRuntime
 // derives a sanitized observation locally, and always yields native control.
 signal(SIGPIPE, SIG_IGN)
 
+/// Resolves the provider process's controlling terminal even though Codex
+/// supplies the hook payload through stdin. This is a navigation handle only;
+/// the helper never reads terminal contents.
+private func currentControllingTTY() -> String? {
+    let descriptor = Darwin.open("/dev/tty", O_RDONLY | O_CLOEXEC)
+    guard descriptor >= 0 else { return nil }
+    defer { Darwin.close(descriptor) }
+    guard let name = Darwin.ttyname(descriptor) else { return nil }
+    return String(cString: name)
+}
+
 let arguments = CommandLine.arguments
 guard let sourceIndex = arguments.firstIndex(of: "--source"),
       arguments.indices.contains(sourceIndex + 1),
@@ -54,8 +65,12 @@ while payload.count < 1_048_576 {
         break
     }
 }
+var bridgeEnvironment = ProcessInfo.processInfo.environment
+if bridgeEnvironment["TTY"] == nil, let tty = currentControllingTTY() {
+    bridgeEnvironment["TTY"] = tty
+}
 let context = CodexHookContext(
-    environment: ProcessInfo.processInfo.environment,
+    environment: bridgeEnvironment,
     currentDirectory: FileManager.default.currentDirectoryPath
 )
 let evaluation = CodexHookAdapter().evaluate(

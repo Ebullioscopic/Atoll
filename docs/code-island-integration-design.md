@@ -1,6 +1,6 @@
 # Code Island in Atoll: Integration Design
 
-**Status:** Frozen; Phases 1-5 complete, Phase 6 not authorized
+**Status:** Frozen; Phases 1-6 complete, Phase 7 not authorized
 
 **Date:** 2026-08-04
 
@@ -26,11 +26,15 @@
 
 **Phase 5 completed:** 2026-08-04
 
+**Phase 6 authorized:** 2026-08-04 by user approval
+
+**Phase 6 completed:** 2026-08-04
+
 **Atoll baseline:** `dev` at `d4685ec18a7a6d1310e0ac081ce1a3cb4ccb7f87`
 
 **CodeIsland baseline:** `main` at `9e3a1eb1844f0b8bf05193228a6ffa41a013dec2`
 
-Material changes to the frozen product contract require explicit user approval and an ADR amendment or new ADR. Implementation is authorized one phase at a time; Phases 1 through 5 have been authorized and completed.
+Material changes to the frozen product contract require explicit user approval and an ADR amendment or new ADR. Implementation is authorized one phase at a time; Phases 1 through 6 have been authorized and completed.
 
 Confirmed implementation choices:
 
@@ -43,6 +47,10 @@ Confirmed implementation choices:
   remain on the excluded active-responder app-server path, and tool-failure
   observation remains gated because the documented hook payload has no stable
   success bit. Codex is therefore not promoted to Native attention.
+- Phase 6 uses an urgency-ordered metadata dashboard and a pure presentation
+  policy. Atoll owns queueing, duration, tab selection, notch placement, and
+  origin activation. Exact-origin suppression requires a positive Terminal TTY
+  or iTerm session-ID match; application-only and uncertain matches present.
 
 ## Outcome
 

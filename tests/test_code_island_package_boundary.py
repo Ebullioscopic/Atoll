@@ -134,6 +134,7 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
         self.assertEqual(
             [
                 "CodeIslandCore.swift",
+                "DashboardProjection.swift",
                 "SessionMetadata.swift",
                 "SessionProjection.swift",
             ],
@@ -156,6 +157,7 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
                 "CodexHookAdapter.swift",
                 "CodexManagedInstallation.swift",
                 "NonOwningHookCompletion.swift",
+                "PresentationPolicy.swift",
                 "ProviderCapabilities.swift",
                 "SessionMetadataStore.swift",
             ],
@@ -166,7 +168,10 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
             path.name
             for path in (PACKAGE / "Sources/CodeIslandUI").glob("*.swift")
         )
-        self.assertEqual(["CodeIslandUI.swift"], active_ui_sources)
+        self.assertEqual(
+            ["CodeIslandMascot.swift", "CodeIslandUI.swift"],
+            active_ui_sources,
+        )
 
     def test_standalone_distribution_artifacts_are_absent(self):
         forbidden_paths = (
@@ -199,6 +204,7 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
         ):
             self.assertIn(phase_three_test, workflow)
         self.assertIn("tests.test_code_island_phase_four_contracts", workflow)
+        self.assertIn("tests.test_code_island_phase_six_presentation", workflow)
         self.assertIn("swift test --package-path Packages/CodeIsland", workflow)
 
     def test_phase_three_modules_are_linked_without_a_second_executable(self):
