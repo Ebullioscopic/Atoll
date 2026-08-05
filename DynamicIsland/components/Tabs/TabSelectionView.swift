@@ -60,7 +60,17 @@ struct TabSelectionView: View {
     @Default(.showMirror) private var showMirror
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
+    @Default(.tabBarPosition) private var tabBarPosition
+    @Default(.tabSwitchOnHover) private var tabSwitchOnHover
     @Namespace var animation
+
+    /// Which tab the pointer is currently resting on, when hover switching is on.
+    @State private var hoveredTabID: String?
+
+    /// Long enough that a pointer crossing the rail on its way elsewhere does not
+    /// drag the selection with it, short enough that a deliberate hover still
+    /// feels immediate.
+    private let hoverDwell = Duration.milliseconds(150)
     
     private var tabs: [TabModel] {
         var tabsArray: [TabModel] = []
@@ -113,20 +123,35 @@ struct TabSelectionView: View {
         }
         return tabsArray
     }
+    @ViewBuilder
     var body: some View {
-        HStack(spacing: 24) {
+        if tabBarPosition == .left {
+            tabStack(vertical: true)
+        } else {
+            // Clipping a column to a capsule would cut the first and last icon,
+            // so the shape stays with the row it was drawn for.
+            tabStack(vertical: false)
+                .clipShape(Capsule())
+        }
+    }
+
+    private func tabStack(vertical: Bool) -> some View {
+        // A layout rather than two stacks, so switching position moves the
+        // icons instead of tearing the view down and building it again.
+        let layout = vertical
+            ? AnyLayout(VStackLayout(spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 24))
+
+        let stack = layout {
             ForEach(Array(tabs.enumerated()), id: \.element.id) { idx, tab in
                 let isSelected = isSelected(tab)
                 let activeAccent = tab.accentColor ?? .white
 
                 // Render the tab button
                 TabButton(label: tab.label, icon: tab.icon, selected: isSelected) {
-                    if tab.view == .extensionExperience {
-                        coordinator.selectedExtensionExperienceID = tab.experienceID
-                    }
-                    coordinator.currentView = tab.view
+                    select(tab)
                 }
-                .frame(height: 26)
+                .frame(width: vertical ? 30 : nil, height: 26)
                 .foregroundStyle(isSelected ? activeAccent : .gray)
                 .background {
                     if isSelected {
@@ -141,14 +166,52 @@ struct TabSelectionView: View {
                             .hidden()
                     }
                 }
-
-                
+                .onHover { inside in
+                    guard tabSwitchOnHover else { return }
+                    if inside {
+                        hoveredTabID = tab.id
+                    } else if hoveredTabID == tab.id {
+                        hoveredTabID = nil
+                    }
+                }
             }
         }
-        .clipShape(Capsule())
+
+        return Group {
+            if vertical {
+                // Enough tabs to outrun the open notch's height would otherwise
+                // be clipped; scrolling keeps the last of them reachable, and
+                // stays inert while they all fit.
+                ScrollView(.vertical, showsIndicators: false) { stack }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .frame(width: 30)
+            } else {
+                stack
+            }
+        }
         .onAppear {
             ensureValidSelection(with: tabs)
         }
+        // Moving on to another icon cancels the pending switch along with the
+        // task, so only the icon actually rested on ever wins.
+        .task(id: hoveredTabID) {
+            guard tabSwitchOnHover,
+                  let hoveredTabID,
+                  let tab = tabs.first(where: { $0.id == hoveredTabID }),
+                  !isSelected(tab)
+            else { return }
+
+            try? await Task.sleep(for: hoverDwell)
+            guard !Task.isCancelled else { return }
+            select(tab)
+        }
+    }
+
+    private func select(_ tab: TabModel) {
+        if tab.view == .extensionExperience {
+            coordinator.selectedExtensionExperienceID = tab.experienceID
+        }
+        coordinator.currentView = tab.view
     }
 
     private var extensionTabsEnabled: Bool {

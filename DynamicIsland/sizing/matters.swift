@@ -95,8 +95,15 @@ func enabledStandardTabCount() -> Int {
     return count
 }
 
+/// Width the leading tab rail occupies: the icons plus the gap to the content.
+let tabRailWidth: CGFloat = 42
+
 /// Returns the recommended minimum notch width for the given tab count.
 func recommendedMinimumNotchWidth(forTabCount count: Int) -> CGFloat {
+    // A rail spends height per tab rather than width, so the count stops driving
+    // how wide the notch has to be — only the rail itself does. That is why the
+    // leading position leaves the notch narrower once there are five or more tabs.
+    if Defaults[.tabBarPosition] == .left { return 640 + tabRailWidth }
     if count >= 6 { return 770 }
     if count >= 5 { return 690 }
     return 640

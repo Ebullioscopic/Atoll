@@ -56,6 +56,7 @@ struct ContentView: View {
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     
+    @Default(.tabBarPosition) var tabBarPosition
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
     @Default(.showMemoryGraph) var showMemoryGraph
@@ -1087,36 +1088,45 @@ struct ContentView: View {
               
               ZStack {
                   if vm.notchState == .open {
-                      Group {
-                          switch coordinator.currentView {
-                              case .home:
-                                  NotchHomeView(albumArtNamespace: albumArtNamespace)
-                              case .shelf:
-                                  NotchShelfView()
-                              case .timer:
-                                  NotchTimerView()
-                              case .stats:
-                                  NotchStatsView()
-                              case .llmUsage:
-                                  NotchLLMUsageView()
-                              case .colorPicker:
-                                  NotchColorPickerView()
-                            case .notes:
-                                NotchNotesView()
-                            case .clipboard:
-                                NotchClipboardView()
-                            case .terminal:
-                                NotchTerminalView()
-                            case .extensionExperience:
-                                if let payload = currentExtensionTabPayload() {
-                                    ExtensionNotchExperienceTabView(payload: payload)
-                                } else {
-                                    NotchHomeView(albumArtNamespace: albumArtNamespace)
-                                }
+                      HStack(spacing: 0) {
+                          // The tab rail, when the tab bar is set to the leading
+                          // edge rather than the header.
+                          if tabBarPosition == .left {
+                              TabSelectionView()
+                                  .padding(.trailing, 12)
                           }
+
+                          Group {
+                              switch coordinator.currentView {
+                                  case .home:
+                                      NotchHomeView(albumArtNamespace: albumArtNamespace)
+                                  case .shelf:
+                                      NotchShelfView()
+                                  case .timer:
+                                      NotchTimerView()
+                                  case .stats:
+                                      NotchStatsView()
+                                  case .llmUsage:
+                                      NotchLLMUsageView()
+                                  case .colorPicker:
+                                      NotchColorPickerView()
+                                case .notes:
+                                    NotchNotesView()
+                                case .clipboard:
+                                    NotchClipboardView()
+                                case .terminal:
+                                    NotchTerminalView()
+                                case .extensionExperience:
+                                    if let payload = currentExtensionTabPayload() {
+                                        ExtensionNotchExperienceTabView(payload: payload)
+                                    } else {
+                                        NotchHomeView(albumArtNamespace: albumArtNamespace)
+                                    }
+                              }
+                          }
+                          .id(coordinator.currentView)
+                          .transition(tabSwitchTransition)
                       }
-                      .id(coordinator.currentView)
-                      .transition(tabSwitchTransition)
                   }
               }
               .zIndex(1)

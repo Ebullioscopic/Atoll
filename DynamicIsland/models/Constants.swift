@@ -137,6 +137,28 @@ enum AnimationSource: Codable, Hashable, Equatable {
     }
 }
 
+// MARK: - Tab Bar Models
+
+/// Where the notch tab switcher sits once the notch is open.
+enum TabBarPosition: String, CaseIterable, Codable, Defaults.Serializable {
+    case top = "top"   // A row in the header, beside the notch cutout
+    case left = "left" // A rail down the leading edge, beside the content
+
+    var displayName: String {
+        switch self {
+        case .top: return String(localized: "Top")
+        case .left: return String(localized: "Left")
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .top: return String(localized: "Icons sit in a row above the content")
+        case .left: return String(localized: "Icons sit in a column beside the content, leaving the notch narrower")
+        }
+    }
+}
+
 // MARK: - Extension Authorization Models
 
 enum ExtensionPermissionScope: String, CaseIterable, Codable, Defaults.Serializable {
@@ -1164,6 +1186,10 @@ extension Defaults.Keys {
     static let terminalCursorColor = Key<Color>("terminalCursorColor", default: Color(.selectedControlColor))
     static let terminalStickyMode = Key<Bool>("terminalStickyMode", default: false)
     
+    // MARK: Tab Bar
+    static let tabBarPosition = Key<TabBarPosition>("tabBarPosition", default: .top)
+    static let tabSwitchOnHover = Key<Bool>("tabSwitchOnHover", default: false)
+
     // MARK: Timer Feature
     static let enableTimerFeature = Key<Bool>("enableTimerFeature", default: true)
     static let timerDisplayMode = Key<TimerDisplayMode>("timerDisplayMode", default: .tab)

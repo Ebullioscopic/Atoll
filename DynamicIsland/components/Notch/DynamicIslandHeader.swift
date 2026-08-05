@@ -40,11 +40,14 @@ struct DynamicIslandHeader: View {
     @Default(.showBatteryPercentInside) var showBatteryPercentInside
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
-    
+    @Default(.tabBarPosition) var tabBarPosition
+
     var body: some View {
         HStack(spacing: 0) {
             HStack {
-                if !enableMinimalisticUI {
+                // With the tab bar on the left it is drawn beside the content
+                // instead, so the header keeps only its trailing controls.
+                if !enableMinimalisticUI && tabBarPosition == .top {
                     let shouldShowTabs = coordinator.alwaysShowTabs || vm.notchState == .open || !shelfState.items.isEmpty
                     if shouldShowTabs {
                         TabSelectionView()
