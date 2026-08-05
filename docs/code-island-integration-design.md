@@ -1,6 +1,6 @@
 # Code Island in Atoll: Integration Design
 
-**Status:** Frozen; Phases 1-4 complete, Phase 5 not authorized
+**Status:** Frozen; Phases 1-5 complete, Phase 6 not authorized
 
 **Date:** 2026-08-04
 
@@ -22,21 +22,27 @@
 
 **Phase 4 completed:** 2026-08-04
 
+**Phase 5 authorized:** 2026-08-04 by user approval
+
+**Phase 5 completed:** 2026-08-04
+
 **Atoll baseline:** `dev` at `d4685ec18a7a6d1310e0ac081ce1a3cb4ccb7f87`
 
 **CodeIsland baseline:** `main` at `9e3a1eb1844f0b8bf05193228a6ffa41a013dec2`
 
-Material changes to the frozen product contract require explicit user approval and an ADR amendment or new ADR. Implementation is authorized one phase at a time; Phases 1 through 4 have been authorized and completed.
+Material changes to the frozen product contract require explicit user approval and an ADR amendment or new ADR. Implementation is authorized one phase at a time; Phases 1 through 5 have been authorized and completed.
 
 Confirmed implementation choices:
 
 - The first provider verification cohort is Codex only.
 - The Code Island tab sits immediately before Atoll's Terminal tab.
 - The history-preserving source import uses `git subtree`.
-- The Phase 2 Codex profile remains **Monitoring**. Lifecycle hooks now have a
-  tested non-owning completion contract, while interactive questions remain on
-  the excluded active-responder app-server path. Tool-failure observation is
-  also gated off because the documented hook payload has no stable success bit.
+- The Phase 5 Codex profile is **Monitoring** and is available only after the
+  user reviews and confirms the current installation plan. The metadata-only
+  bridge has a tested non-owning completion contract. Interactive questions
+  remain on the excluded active-responder app-server path, and tool-failure
+  observation remains gated because the documented hook payload has no stable
+  success bit. Codex is therefore not promoted to Native attention.
 
 ## Outcome
 

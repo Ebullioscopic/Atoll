@@ -18,21 +18,23 @@ public enum ObservationDeliveryOutcome: String, CaseIterable, Codable, Sendable 
     case hostShuttingDown
 }
 
-/// The only completion a provider hook can obtain from the Phase 2 runtime.
+/// The only completion a provider hook can obtain from the runtime.
 ///
-/// The initializer is intentionally not public: callers cannot construct a
-/// completion carrying provider control output.
+/// The initializer is intentionally not public. The sole non-empty output is
+/// Codex's required no-op JSON for `Stop`; no decision can be represented.
 public struct ProviderHookCompletion: Equatable, Sendable {
     /// Successful process status that leaves the provider in control.
     public let exitStatus: Int32
 
-    /// Always-empty output; no provider decision can be encoded here.
+    /// Empty pass-through output, or `{}` when Codex requires valid JSON.
     public let standardOutput: Data
 
-    static let continueInOrigin = ProviderHookCompletion(
-        exitStatus: 0,
-        standardOutput: Data()
-    )
+    static func continueInOrigin(for event: CodexManagedHookEvent?) -> ProviderHookCompletion {
+        ProviderHookCompletion(
+            exitStatus: 0,
+            standardOutput: event == .stop ? Data("{}".utf8) : Data()
+        )
+    }
 }
 
 /// Makes observation delivery irrelevant to the provider's native flow.
@@ -40,9 +42,18 @@ public struct NonOwningHookCompletionPolicy: Sendable {
     /// Creates the stateless completion policy.
     public init() {}
 
+    /// Returns the event-specific no-op completion for every delivery outcome.
+    public func completion(
+        for event: CodexManagedHookEvent?,
+        after outcome: ObservationDeliveryOutcome
+    ) -> ProviderHookCompletion {
+        _ = outcome
+        return .continueInOrigin(for: event)
+    }
+
+    /// Retains the Phase 2 unknown-event behavior for historical callers.
     /// Returns the same origin-owned completion for every delivery outcome.
     public func completion(after outcome: ObservationDeliveryOutcome) -> ProviderHookCompletion {
-        _ = outcome
-        return .continueInOrigin
+        completion(for: nil, after: outcome)
     }
 }

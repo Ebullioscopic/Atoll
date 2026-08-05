@@ -68,12 +68,16 @@ public struct CodexHookEvaluation: Equatable, Sendable {
     /// Sanitized lifecycle observation, or `nil` for invalid/unsupported input.
     public let observation: SessionObservation?
 
+    /// Recognized Codex hook event used only to select a native no-op response.
+    public let hookEvent: CodexManagedHookEvent?
+
     /// Immediate completion that leaves Codex's origin flow authoritative.
     public let completion: ProviderHookCompletion
 
-    init(observation: SessionObservation?) {
+    init(observation: SessionObservation?, hookEvent: CodexManagedHookEvent?) {
         self.observation = observation
-        self.completion = .continueInOrigin
+        self.hookEvent = hookEvent
+        self.completion = .continueInOrigin(for: hookEvent)
     }
 }
 
@@ -91,16 +95,22 @@ public struct CodexHookAdapter: Sendable {
         context: CodexHookContext,
         observedAt: Date
     ) -> CodexHookEvaluation {
-        CodexHookEvaluation(
-            observation: observation(from: payload, context: context, observedAt: observedAt)
+        let parsed = parsedObservation(
+            from: payload,
+            context: context,
+            observedAt: observedAt
+        )
+        return CodexHookEvaluation(
+            observation: parsed?.observation,
+            hookEvent: parsed?.hookEvent
         )
     }
 
-    private func observation(
+    private func parsedObservation(
         from payload: Data,
         context: CodexHookContext,
         observedAt: Date
-    ) -> SessionObservation? {
+    ) -> (observation: SessionObservation, hookEvent: CodexManagedHookEvent?)? {
         guard payload.count <= Self.maximumPayloadSize,
               let raw = try? JSONSerialization.jsonObject(with: payload) as? [String: Any],
               let rawSessionID = safeString(raw["session_id"], maximumUTF8Count: 256),
@@ -115,13 +125,16 @@ public struct CodexHookAdapter: Sendable {
         let project = workingDirectory.flatMap(ProjectIdentity.init(workingDirectory:))
         let origin = origin(from: raw, fallback: context.origin)
 
-        return SessionObservation(
-            provider: .codex,
-            sessionID: sessionID,
-            project: project,
-            origin: origin,
-            transition: transition,
-            observedAt: observedAt
+        return (
+            SessionObservation(
+                provider: .codex,
+                sessionID: sessionID,
+                project: project,
+                origin: origin,
+                transition: transition,
+                observedAt: observedAt
+            ),
+            CodexManagedHookEvent(rawValue: eventName)
         )
     }
 

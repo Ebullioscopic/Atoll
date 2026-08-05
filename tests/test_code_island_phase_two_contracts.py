@@ -47,8 +47,12 @@ class CodeIslandPhaseTwoContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, combined)
 
-        self.assertNotIn("FileHandle.standardOutput.write", bridge)
+        self.assertIn(
+            "FileHandle.standardOutput.write(completion.standardOutput)",
+            bridge,
+        )
         self.assertNotIn("hookSpecificOutput", bridge)
+        self.assertNotIn("FileHandle.standardOutput.write(payload", bridge)
         self.assertIn("Packages/CodeIsland", project)
         self.assertIn("CodeIslandRuntime", project)
         self.assertNotIn("codeisland-bridge in Frameworks", project)

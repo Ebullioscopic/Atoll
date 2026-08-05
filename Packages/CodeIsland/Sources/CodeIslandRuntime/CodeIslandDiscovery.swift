@@ -106,6 +106,7 @@ public enum CodeIslandAdoptionBlocker: String, Hashable, Sendable {
 /// The exact kind of path mutation disclosed by an activation plan.
 public enum CodeIslandConfigurationChangeKind: String, Codable, Sendable {
     case modifyProviderHooks
+    case replaceLegacyProviderHooks
     case installManagedBridge
     case writeManagedReceipt
     case createListenerSocket
@@ -139,7 +140,7 @@ public struct CodeIslandInstallationPlan: Equatable, Sendable {
         bundledBridgeURL: URL,
         changes: [CodeIslandConfigurationChange],
         blockers: Set<CodeIslandAdoptionBlocker>,
-        hookEvents: [CodexManagedHookEvent] = CodexManagedHookEvent.phaseFourMonitoringEvents
+        hookEvents: [CodexManagedHookEvent] = CodexManagedHookEvent.phaseFiveMonitoringEvents
     ) {
         self.id = id
         self.provider = provider
@@ -434,12 +435,21 @@ public struct CodeIslandReadOnlyDiscovery {
         case .absent:
             socketChangeKind = .createListenerSocket
         }
-        let changes = [
+        var changes = [
             CodeIslandConfigurationChange(kind: .modifyProviderHooks, url: paths.codexHooksURL),
             CodeIslandConfigurationChange(kind: .installManagedBridge, url: paths.managedBridgeURL),
             CodeIslandConfigurationChange(kind: .writeManagedReceipt, url: paths.managedReceiptURL),
             CodeIslandConfigurationChange(kind: socketChangeKind, url: paths.legacySocketURL),
         ]
+        if case .readable(_, let legacyCount) = hookState, legacyCount > 0 {
+            changes.insert(
+                CodeIslandConfigurationChange(
+                    kind: .replaceLegacyProviderHooks,
+                    url: paths.codexHooksURL
+                ),
+                at: 1
+            )
+        }
         let plan = CodeIslandInstallationPlan(
             provider: .codex,
             bundledBridgeURL: paths.bundledBridgeURL,

@@ -1,5 +1,8 @@
 # Code Island Phase 4 Verification
 
+> Historical Phase 4 record. Phase 5 was subsequently authorized and
+> completed; see [Code Island Phase 5 Verification](code-island-phase-5-verification.md).
+
 **Status:** Complete
 
 **Date:** 2026-08-04

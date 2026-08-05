@@ -122,7 +122,17 @@ struct CodeIslandPhaseFourDiscoveryRegression {
         )
         precondition(
             assessment.installationPlan.changes.map(\.url)
-                == [hooks, managedBridge, managedReceipt, socket]
+                == [hooks, hooks, managedBridge, managedReceipt, socket]
+        )
+        precondition(
+            assessment.installationPlan.changes.map(\.kind)
+                == [
+                    .modifyProviderHooks,
+                    .replaceLegacyProviderHooks,
+                    .installManagedBridge,
+                    .writeManagedReceipt,
+                    .resolveLegacySocketConflict,
+                ]
         )
 
         let finalHookData = try Data(contentsOf: hooks)

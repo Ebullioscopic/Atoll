@@ -6,7 +6,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class CodeIslandPhaseThreeSettingsTests(unittest.TestCase):
-    def test_read_only_settings_destination_is_wired(self):
+    def test_settings_destination_remains_wired_after_provider_rollout(self):
         settings = (
             ROOT / "DynamicIsland" / "components" / "Settings" / "SettingsView.swift"
         ).read_text()
@@ -39,7 +39,7 @@ class CodeIslandPhaseThreeSettingsTests(unittest.TestCase):
         self.assertIn("SettingsDestination", controller)
         self.assertIn("destination: .codeIsland", notch)
 
-        self.assertIn("ProviderCapabilityRegistry.phaseTwo", settings_page)
+        self.assertIn("ProviderCapabilityRegistry.phaseFive", settings_page)
         self.assertIn("Monitoring", settings_page)
         self.assertIn("Not connected", settings_page)
         self.assertIn("Questions and approvals stay in Codex", settings_page)

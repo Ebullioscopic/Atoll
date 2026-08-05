@@ -314,6 +314,12 @@ jobs:
             -exportPath build/export \
             -exportOptionsPlist ExportOptions.plist
 
+      - name: Verify Code Island Helper
+        run: |
+          HELPER="build/export/${APP_NAME}.app/Contents/Helpers/codeisland-bridge"
+          test -x "$HELPER"
+          codesign --verify --strict --verbose=2 "$HELPER"
+
       # ─────────────────────────────────────────────────────────────────
       # 12b. Ensure BluetoothHUDAnimations are in the app bundle
       # ─────────────────────────────────────────────────────────────────

@@ -33,7 +33,7 @@ struct CodeIslandPhaseFourInstallerRegression {
             commandCount(
                 "/Users/example/.codeisland/codeisland-bridge --source codex",
                 in: installedRoot
-            ) == 1
+            ) == 0
         )
 
         let secondReceipt = try installer.install(plan: fixture.plan)
@@ -184,6 +184,7 @@ private final class Fixture {
             bundledBridgeURL: bundledBridge,
             changes: [
                 CodeIslandConfigurationChange(kind: .modifyProviderHooks, url: hooks),
+                CodeIslandConfigurationChange(kind: .replaceLegacyProviderHooks, url: hooks),
                 CodeIslandConfigurationChange(kind: .installManagedBridge, url: managedBridge),
                 CodeIslandConfigurationChange(kind: .writeManagedReceipt, url: managedReceipt),
                 CodeIslandConfigurationChange(kind: .createListenerSocket, url: socket),

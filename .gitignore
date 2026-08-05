@@ -146,6 +146,8 @@ PrivateWorks
 !tests/test_code_island_phase_three_activity.py
 !tests/test_code_island_phase_three_dashboard.py
 !tests/test_code_island_phase_three_settings.py
+!tests/test_code_island_phase_four_contracts.py
+!tests/test_code_island_phase_five_contracts.py
 *.sh
 comparison_report.json
 *.txt

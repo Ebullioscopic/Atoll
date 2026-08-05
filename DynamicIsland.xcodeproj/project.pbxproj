@@ -10,6 +10,7 @@
 		C01A00012F90000100000001 /* CodeIslandUI in Frameworks */ = {isa = PBXBuildFile; productRef = C01A00032F90000100000003 /* CodeIslandUI */; };
 		C01A00042F90000100000004 /* CodeIslandCore in Frameworks */ = {isa = PBXBuildFile; productRef = C01A00052F90000100000005 /* CodeIslandCore */; };
 		C01A00062F90000100000006 /* CodeIslandRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = C01A00072F90000100000007 /* CodeIslandRuntime */; };
+		C01A00082F90000100000008 /* codeisland-bridge in Embed Code Island Helper */ = {isa = PBXBuildFile; productRef = C01A00092F90000100000009 /* codeisland-bridge */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		7E1ADF1D2EA209B1001DA867 /* SkyLightWindow in Frameworks */ = {isa = PBXBuildFile; productRef = 7E61181E2E24071E0050006C /* SkyLightWindow */; };
 		7E288D122F1659EF0020C117 /* AtollExtensionKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7E288D112F1659EF0020C117 /* AtollExtensionKit */; };
 		7E6118142E24071E0050006C /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = 14D032192C68F32E0096E6A1 /* LaunchAtLogin */; };
@@ -44,6 +45,17 @@
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 1;
+		};
+		C01A000A2F9000010000000A /* Embed Code Island Helper */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 1;
+			files = (
+				C01A00082F90000100000008 /* codeisland-bridge in Embed Code Island Helper */,
+			);
+			name = "Embed Code Island Helper";
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
@@ -256,6 +268,7 @@
 				F54406E42CD4987A00C7AFD9 /* Frameworks */,
 				F54406E52CD4987A00C7AFD9 /* Resources */,
 				7EA69B1B2F5AE13500EB2D16 /* CopyFiles */,
+				C01A000A2F9000010000000A /* Embed Code Island Helper */,
 				7EFAA8AA2F6F12F3000A99E8 /* ShellScript */,
 			);
 			buildRules = (
@@ -271,6 +284,7 @@
 				C01A00052F90000100000005 /* CodeIslandCore */,
 				C01A00072F90000100000007 /* CodeIslandRuntime */,
 				C01A00032F90000100000003 /* CodeIslandUI */,
+				C01A00092F90000100000009 /* codeisland-bridge */,
 				14D032192C68F32E0096E6A1 /* LaunchAtLogin */,
 				14D0321C2C68F3350096E6A1 /* Sparkle */,
 				B18654382C6F4990000B926A /* KeyboardShortcuts */,
@@ -887,6 +901,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C01A00022F90000100000002 /* XCLocalSwiftPackageReference "CodeIsland" */;
 			productName = CodeIslandRuntime;
+		};
+		C01A00092F90000100000009 /* codeisland-bridge */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C01A00022F90000100000002 /* XCLocalSwiftPackageReference "CodeIsland" */;
+			productName = codeisland-bridge;
 		};
 		146BC4362D366E9B0047C66A /* MacroVisionKit */ = {
 			isa = XCSwiftPackageProductDependency;

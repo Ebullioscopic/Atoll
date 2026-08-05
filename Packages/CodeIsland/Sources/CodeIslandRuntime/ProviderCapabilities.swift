@@ -80,4 +80,18 @@ public struct ProviderCapabilityRegistry: Sendable {
             ]
         ),
     ])
+
+    /// Phase 5 enables the verified Codex Monitoring path while retaining the
+    /// question and tool-failure limits that prevent a Native-attention claim.
+    public static let phaseFive = ProviderCapabilityRegistry(profiles: [
+        ProviderCapabilityProfile(
+            provider: .codex,
+            verifiedCapability: .monitoring,
+            isActivationAvailable: true,
+            limitations: [
+                .interactiveQuestionObservationUnavailable,
+                .toolFailureObservationUnavailable,
+            ]
+        ),
+    ])
 }

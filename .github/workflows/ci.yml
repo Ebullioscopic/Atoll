@@ -61,6 +61,11 @@ jobs:
       - name: Validate Code Island Phase 4 contracts
         run: python3 -m unittest tests.test_code_island_phase_four_contracts
 
+      - name: Validate Code Island Phase 5 contracts
+        env:
+          CODEISLAND_REQUIRE_LIVE_SOCKET: 1
+        run: python3 -m unittest tests.test_code_island_phase_five_contracts
+
       - name: Test Code Island package
         run: swift test --package-path Packages/CodeIsland
 
@@ -103,11 +108,16 @@ jobs:
             -project DynamicIsland.xcodeproj \
             -scheme DynamicIsland \
             -destination "platform=macOS" \
+            -derivedDataPath "$RUNNER_TEMP/AtollDerivedData" \
             -resultBundlePath BuildResults.xcresult \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=YES \
             CODE_SIGN_INJECT_BASE_ENTITLEMENTS=YES
+
+          HELPER="$RUNNER_TEMP/AtollDerivedData/Build/Products/Debug/Atoll.app/Contents/Helpers/codeisland-bridge"
+          test -x "$HELPER"
+          codesign --verify --strict --verbose=2 "$HELPER"
 
       - name: Surface Failure Diagnostics
         if: failure()

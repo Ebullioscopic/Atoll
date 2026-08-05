@@ -125,7 +125,11 @@ final class CodeIslandRuntimeTests: XCTestCase {
                 expected.state,
                 expected.event
             )
-            XCTAssertTrue(evaluation.completion.standardOutput.isEmpty, expected.event)
+            if expected.event == "Stop" {
+                XCTAssertEqual(evaluation.completion.standardOutput, Data("{}".utf8), expected.event)
+            } else {
+                XCTAssertTrue(evaluation.completion.standardOutput.isEmpty, expected.event)
+            }
         }
     }
 

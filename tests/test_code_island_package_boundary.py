@@ -150,6 +150,8 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
                 "CodeIslandActivationCoordinator.swift",
                 "CodeIslandAdoptionPreflight.swift",
                 "CodeIslandDiscovery.swift",
+                "CodeIslandObservationTransport.swift",
+                "CodeIslandObservationWire.swift",
                 "CodeIslandRuntime.swift",
                 "CodexHookAdapter.swift",
                 "CodexManagedInstallation.swift",

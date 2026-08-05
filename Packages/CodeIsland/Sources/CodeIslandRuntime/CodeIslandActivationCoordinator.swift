@@ -1,10 +1,7 @@
 import CodeIslandCore
 import Foundation
 
-/// Codex lifecycle events proposed by the Phase 4 installation machinery.
-///
-/// Activation remains unavailable until Phase 5 verifies the complete bridge
-/// and listener path for each event.
+/// Codex lifecycle events verified for the Phase 5 Monitoring rollout.
 public enum CodexManagedHookEvent: String, Codable, CaseIterable, Sendable {
     case sessionStart = "SessionStart"
     case sessionEnd = "SessionEnd"
@@ -14,7 +11,7 @@ public enum CodexManagedHookEvent: String, Codable, CaseIterable, Sendable {
     case permissionRequest = "PermissionRequest"
     case stop = "Stop"
 
-    public static let phaseFourMonitoringEvents: [CodexManagedHookEvent] = [
+    public static let phaseFiveMonitoringEvents: [CodexManagedHookEvent] = [
         .sessionStart,
         .sessionEnd,
         .userPromptSubmit,
@@ -49,6 +46,13 @@ public struct CodeIslandManagedInstallationReceipt: Codable, Equatable, Sendable
     public let createdHookConfiguration: Bool
     public let createdManagedBridge: Bool
 
+    /// Exact socket path disclosed for this installed helper.
+    public let listenerSocketURL: URL?
+
+    /// Semantic backup of only the legacy CodeIsland handlers replaced during
+    /// adoption. It contains provider configuration, never session content.
+    public let legacyHookBackup: Data?
+
     public init(
         planID: UUID,
         provider: AgentProvider,
@@ -59,7 +63,9 @@ public struct CodeIslandManagedInstallationReceipt: Codable, Equatable, Sendable
         hookEvents: [CodexManagedHookEvent],
         bridgeDigest: String,
         createdHookConfiguration: Bool = false,
-        createdManagedBridge: Bool = false
+        createdManagedBridge: Bool = false,
+        listenerSocketURL: URL? = nil,
+        legacyHookBackup: Data? = nil
     ) {
         self.planID = planID
         self.provider = provider
@@ -71,6 +77,8 @@ public struct CodeIslandManagedInstallationReceipt: Codable, Equatable, Sendable
         self.bridgeDigest = bridgeDigest
         self.createdHookConfiguration = createdHookConfiguration
         self.createdManagedBridge = createdManagedBridge
+        self.listenerSocketURL = listenerSocketURL
+        self.legacyHookBackup = legacyHookBackup
     }
 }
 
@@ -99,22 +107,41 @@ public protocol CodeIslandListenerControlling {
 
 /// Provider-configuration boundary. A throwing install must roll back its writes.
 public protocol CodeIslandManagedInstalling {
+    func loadManagedReceipt() throws -> CodeIslandManagedInstallationReceipt?
     func install(plan: CodeIslandInstallationPlan) throws -> CodeIslandManagedInstallationReceipt
     func verify(receipt: CodeIslandManagedInstallationReceipt) throws
+    func repair(
+        receipt: CodeIslandManagedInstallationReceipt,
+        plan: CodeIslandInstallationPlan
+    ) throws -> CodeIslandManagedInstallationReceipt
     func remove(receipt: CodeIslandManagedInstallationReceipt) throws
+}
+
+public extension CodeIslandManagedInstalling {
+    /// Test and pre-rollout adapters have no durable activation by default.
+    func loadManagedReceipt() throws -> CodeIslandManagedInstallationReceipt? { nil }
+
+    /// Adapters without repair support may prove the existing receipt only.
+    func repair(
+        receipt: CodeIslandManagedInstallationReceipt,
+        plan: CodeIslandInstallationPlan
+    ) throws -> CodeIslandManagedInstallationReceipt {
+        _ = plan
+        try verify(receipt: receipt)
+        return receipt
+    }
 }
 
 /// Orders one explicit activation transaction across its system boundaries.
 ///
 /// The Atoll host owns this coordinator on one serialized execution context.
-/// It deliberately has no default live adapters while provider rollout remains
-/// gated in Phase 4.
+/// Live adapters are supplied only by the explicit Phase 5 runtime factory.
 public final class CodeIslandActivationCoordinator {
     private let preflight: any CodeIslandActivationPreflighting
     private let listener: any CodeIslandListenerControlling
     private let installer: any CodeIslandManagedInstalling
     private let drainTimeout: TimeInterval
-    private var activeReceipt: CodeIslandManagedInstallationReceipt?
+    public private(set) var activeReceipt: CodeIslandManagedInstallationReceipt?
 
     public init(
         preflight: any CodeIslandActivationPreflighting,
@@ -166,6 +193,47 @@ public final class CodeIslandActivationCoordinator {
         }
     }
 
+    /// Restarts a previously consented installation without rewriting it.
+    /// The listener is ready before exact receipt verification runs.
+    public func resume(
+        plan: CodeIslandInstallationPlan
+    ) throws -> CodeIslandManagedInstallationReceipt? {
+        guard activeReceipt == nil else { throw CodeIslandActivationError.alreadyActive }
+        guard let receipt = try installer.loadManagedReceipt() else { return nil }
+        guard receipt.provider == plan.provider,
+              receipt.hookConfigurationURL.standardizedFileURL
+                == plan.url(for: .modifyProviderHooks)?.standardizedFileURL,
+              receipt.managedBridgeURL.standardizedFileURL
+                == plan.url(for: .installManagedBridge)?.standardizedFileURL,
+              receipt.managedReceiptURL.standardizedFileURL
+                == plan.url(for: .writeManagedReceipt)?.standardizedFileURL,
+              receipt.hookEvents == plan.hookEvents,
+              let socketURL = receipt.listenerSocketURL?.standardizedFileURL,
+              socketURL == plan.listenerSocketURL?.standardizedFileURL else {
+            throw CodeIslandActivationError.invalidPlan
+        }
+
+        try preflight.validate(plan: plan)
+        try listener.start(at: socketURL)
+        do {
+            let active: CodeIslandManagedInstallationReceipt
+            do {
+                try installer.verify(receipt: receipt)
+                active = receipt
+            } catch {
+                active = try installer.repair(receipt: receipt, plan: plan)
+                try installer.verify(receipt: active)
+            }
+            activeReceipt = active
+            return active
+        } catch {
+            listener.enterPassThrough()
+            listener.drain(timeout: drainTimeout)
+            listener.stop()
+            throw error
+        }
+    }
+
     /// Enters pass-through before removing only the receipt-owned installation.
     public func deactivate(receipt: CodeIslandManagedInstallationReceipt) throws {
         guard activeReceipt == receipt else { throw CodeIslandActivationError.notActive }
@@ -175,9 +243,30 @@ public final class CodeIslandActivationCoordinator {
         listener.stop()
         activeReceipt = nil
     }
+
+    /// Verifies and repairs only the already-active receipt-owned integration.
+    @discardableResult
+    public func repairActive(
+        plan: CodeIslandInstallationPlan
+    ) throws -> CodeIslandManagedInstallationReceipt {
+        guard let receipt = activeReceipt else { throw CodeIslandActivationError.notActive }
+        let repaired = try installer.repair(receipt: receipt, plan: plan)
+        try installer.verify(receipt: repaired)
+        activeReceipt = repaired
+        return repaired
+    }
+
+    /// Stops Atoll's endpoint while preserving the user's activated hooks.
+    public func shutdown() {
+        guard activeReceipt != nil else { return }
+        listener.enterPassThrough()
+        listener.drain(timeout: drainTimeout)
+        listener.stop()
+        activeReceipt = nil
+    }
 }
 
-private extension CodeIslandInstallationPlan {
+extension CodeIslandInstallationPlan {
     var listenerSocketURL: URL? {
         let socketKinds: Set<CodeIslandConfigurationChangeKind> = [
             .createListenerSocket,

@@ -20,36 +20,40 @@ git subtree add --prefix=Packages/CodeIsland ../CodeIsland main
 
 ## Atoll-only changes
 
-Phases 1 through 4 intentionally change the imported source boundary before
-any provider integration is activated:
+Phases 1 through 5 intentionally replace the imported application and provider
+boundaries:
 
 - Replaces the standalone `CodeIsland` application product with internal
   `CodeIslandCore`, `CodeIslandRuntime`, and `CodeIslandUI` libraries.
 - Replaces the blocking upstream bridge with a Codex-only, deadline-bounded
-  helper whose sole completion is status 0 with empty output. It has no socket
-  transport or listener in Phase 2 and is not installed or invoked by Atoll.
+  helper. It reduces raw provider input locally, sends only the strict metadata
+  wire to Atoll, emits `{}` only for Codex `Stop`, and emits no approval or
+  question decision.
 - Introduces new metadata-only Core projection, archive, file store, capability
   registry, and Codex lifecycle adapter rather than activating rich upstream
   equivalents. The adapter recognizes only documented Codex lifecycle events,
   treats compact SessionStart as continuity, and does not inspect arbitrary
   tool output to manufacture a failure signal.
-- Links the three library products into Atoll in Phase 3 while leaving the
-  helper executable unlinked. The Atoll-owned host starts only an inert shell;
-  it cannot start a listener, install hooks, or mutate provider configuration.
+- Links the three library products and embeds the signed helper inside the one
+  Atoll application. Atoll remains the only application lifecycle and window,
+  settings, and update owner.
 - Adds content-free activity intents and an Atoll-native setup/idle dashboard.
   Imported rich views remain quarantined until the presentation phase.
 - Replaces the upstream install-on-launch behavior with Codex-only read-only
-  discovery, a plan-bound consent token, listener-before-installer coordination,
-  exact ownership receipts, digest-verified helper removal, and conservative
-  stale-socket reclamation. These adapters are tested against temporary paths
-  but remain unreachable from production activation until Phase 5.
+  discovery, explicit plan-bound consent, listener-before-installer ordering,
+  exact ownership receipts, receipt-gated restart and repair, digest-verified
+  helper removal, and conservative stale-socket reclamation.
+- Replaces recognized legacy CodeIsland hook handlers only after consent,
+  stores their semantic backup in Atoll's receipt, prevents duplicate legacy
+  raw delivery, and restores the handlers on deactivation while preserving
+  unrelated and concurrently added hooks.
 
 ### Migration staging
 
 | Upstream area | Current disposition | Earliest remaining migration phase |
 |---|---|---|
 | Rich Core models, normalizers, transcript readers, provider scanners, and retained upstream tests | `Sources/CodeIslandCore/Upstream`; excluded from SwiftPM. New sanitized Phase 2 contracts are active beside the quarantine. | Provider-neutral pieces only when their metadata boundary is proven |
-| `HookServer`, `ConfigInstaller`, provider resources, and origin helpers | `Sources/CodeIslandRuntime/Upstream`; excluded from SwiftPM. New Codex-only discovery, activation coordination, socket preflight, and managed installer contracts are active beside the quarantine. | Phase 5 for the live listener, bundled bridge delivery, repair loop, and provider rollout |
+| `HookServer`, `ConfigInstaller`, provider resources, and origin helpers | `Sources/CodeIslandRuntime/Upstream`; excluded from SwiftPM. Focused Codex discovery, metadata transport, activation, preflight, receipt, repair, and managed installer implementations are active beside the quarantine. | Additional providers require their own verified rollout; origin presentation remains Phase 6 |
 | Mascots, sounds, icons, and reusable visual candidates | `Sources/CodeIslandUI/Upstream`; excluded from SwiftPM | Phase 6, after Atoll-host adaptation |
 
 Core migration staging is deliberate: the imported `SessionSnapshot`, hook
@@ -113,6 +117,7 @@ python3 -m unittest tests.test_code_island_phase_three_dashboard \
   tests.test_code_island_phase_three_activity \
   tests.test_code_island_phase_three_settings
 python3 -m unittest tests.test_code_island_phase_four_contracts
+python3 -m unittest tests.test_code_island_phase_five_contracts
 python3 -m unittest tests.test_privacy_configuration
 python3 -m unittest tests.test_timer_lifecycle
 swift test --package-path Packages/CodeIsland

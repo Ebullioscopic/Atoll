@@ -51,7 +51,7 @@ class CodeIslandPhaseFourContractTests(unittest.TestCase):
                 )
                 subprocess.run([str(regression)], check=True, cwd=ROOT, env=environment)
 
-    def test_host_and_settings_expose_read_only_adoption_state(self):
+    def test_read_only_adoption_preview_survives_phase_five_activation(self):
         host = (
             ROOT / "DynamicIsland" / "components" / "CodeIsland" / "CodeIslandHost.swift"
         ).read_text()
@@ -82,19 +82,20 @@ class CodeIslandPhaseFourContractTests(unittest.TestCase):
         self.assertIn("Existing CodeIsland", settings)
         self.assertIn("Quit CodeIsland before setup", settings)
         self.assertIn("Questions and approvals stay in Codex", settings)
-        self.assertIn("Provider rollout remains gated", settings)
-        self.assertIn("ProviderCapabilityRegistry.phaseTwo", settings)
+        self.assertIn("ProviderCapabilityRegistry.phaseFive", settings)
+        self.assertIn("Confirm Codex Monitoring", settings)
 
         for forbidden in (
             "Toggle(",
             "CodeIslandActivationCoordinator",
             "CodexManagedInstallation",
-            ".consent(",
+            "Always Allow",
         ):
             self.assertNotIn(forbidden, settings)
 
-        self.assertIn("public var isRunning: Bool { false }", runtime)
-        self.assertNotIn("codeisland-bridge in Copy Files", project)
+        self.assertIn("public static let isEnabledByDefault = false", runtime)
+        self.assertIn("CodeIslandRuntime.live", host)
+        self.assertIn("codeisland-bridge in Embed Code Island Helper", project)
 
     @staticmethod
     def _compile_module(module_name, temporary_path, environment):
