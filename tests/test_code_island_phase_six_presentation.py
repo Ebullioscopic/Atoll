@@ -72,7 +72,9 @@ class CodeIslandPhaseSixPresentationTests(unittest.TestCase):
         self.assertIn("discardQueuedIntents(for: intent.subject)", host)
         self.assertIn("originAdapter.exactMatch", host)
         self.assertIn("schedulePresentationExpiration(after: 2.0)", host)
-        self.assertIn("schedulePresentationExpiration(after: 5.0)", host)
+        self.assertIn("presentation.completionPresentation == .glance", host)
+        self.assertIn("? 2.0", host)
+        self.assertIn(": 5.0", host)
         self.assertIn("schedulePresentationExpiration(after: 4.0)", host)
 
         self.assertIn("CodeIslandExactOriginMatcher", origin)

@@ -69,6 +69,12 @@ jobs:
       - name: Validate Code Island Phase 6 presentation contracts
         run: python3 -m unittest tests.test_code_island_phase_six_presentation
 
+      - name: Validate Code Island Phase 7 release contracts
+        run: >-
+          python3 -m unittest
+          tests.test_code_island_phase_seven_release
+          tests.test_code_island_phase_seven_bundle
+
       - name: Test Code Island package
         run: swift test --package-path Packages/CodeIsland
 
@@ -121,6 +127,8 @@ jobs:
           HELPER="$RUNNER_TEMP/AtollDerivedData/Build/Products/Debug/Atoll.app/Contents/Helpers/codeisland-bridge"
           test -x "$HELPER"
           codesign --verify --strict --verbose=2 "$HELPER"
+          scripts/verify-code-island-bundle.sh \
+            "$RUNNER_TEMP/AtollDerivedData/Build/Products/Debug/Atoll.app"
 
       - name: Surface Failure Diagnostics
         if: failure()

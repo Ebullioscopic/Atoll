@@ -1,6 +1,6 @@
 # Code Island in Atoll: Integration Design
 
-**Status:** Frozen; Phases 1-6 complete, Phase 7 not authorized
+**Status:** Frozen; Phases 1-7 implementation complete; signed/notarized artifact execution pending release CI
 
 **Date:** 2026-08-04
 
@@ -30,11 +30,15 @@
 
 **Phase 6 completed:** 2026-08-04
 
+**Phase 7 authorized:** 2026-08-04 by user approval
+
+**Phase 7 implementation completed:** 2026-08-04
+
 **Atoll baseline:** `dev` at `d4685ec18a7a6d1310e0ac081ce1a3cb4ccb7f87`
 
 **CodeIsland baseline:** `main` at `9e3a1eb1844f0b8bf05193228a6ffa41a013dec2`
 
-Material changes to the frozen product contract require explicit user approval and an ADR amendment or new ADR. Implementation is authorized one phase at a time; Phases 1 through 6 have been authorized and completed.
+Material changes to the frozen product contract require explicit user approval and an ADR amendment or new ADR. Implementation is authorized one phase at a time; Phases 1 through 7 have been authorized and implemented. The credentialed signed/notarized artifact gates run in release CI and remain distinct from local implementation completion.
 
 Confirmed implementation choices:
 
@@ -51,6 +55,12 @@ Confirmed implementation choices:
   policy. Atoll owns queueing, duration, tab selection, notch placement, and
   origin activation. Exact-origin suppression requires a positive Terminal TTY
   or iTerm session-ID match; application-only and uncertain matches present.
+- Phase 7 keeps feature preferences in Atoll's namespace, imports only an
+  explicitly selected content-free legacy subset, ships four audited upstream
+  sounds and the full MIT notice, and verifies that release artifacts contain
+  one Atoll app, one signed bridge, and no standalone CodeIsland lifecycle.
+  Its dedicated string catalog currently provides an audited English source
+  and fallback; additional language translations remain future work.
 
 ## Outcome
 

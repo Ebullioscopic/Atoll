@@ -139,9 +139,10 @@ On a Command Line Tools installation with the newer default SDK/compiler
 mismatch, select a compatible SDK and set writable module, cache, and scratch
 paths as in the recorded local build invocation.
 
-## Phase 7 authorization gate
+## Phase 7 supersession
 
-Phase 7 is not authorized. This phase does not claim complete application
-regression, visual/accessibility/localization QA, sound/resource packaging,
-helper embedding/signing in a newly built app, notarization, upgrade, or
-rollback verification.
+Phase 7 was subsequently authorized and implemented. Its accessibility,
+localization, resource, upgrade/rollback, and release-artifact gates are
+recorded in [Code Island Phase 7 Verification](code-island-phase-7-verification.md).
+Credentialed signing and notarization remain release-workflow gates rather than
+claims made by this historical Phase 6 record.

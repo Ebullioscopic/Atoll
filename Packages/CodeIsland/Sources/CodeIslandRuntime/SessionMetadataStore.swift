@@ -7,6 +7,43 @@ public enum SessionMetadataArchiveError: Error, Equatable {
     case unsupportedSchemaVersion(Int)
 }
 
+/// Applies Atoll's user-selected retention window to sanitized metadata only.
+public struct SessionMetadataRetentionPolicy: Equatable, Sendable {
+    public let retentionMinutes: Int
+
+    public init(retentionMinutes: Int) {
+        self.retentionMinutes = max(0, retentionMinutes)
+    }
+
+    /// Keeps every active session. A zero-minute window disables automatic
+    /// cleanup; otherwise only expired terminal projections are removed.
+    public func retainedSessions(
+        from sessions: [SessionMetadata],
+        now: Date = Date()
+    ) -> [SessionMetadata] {
+        guard retentionMinutes > 0 else { return sessions }
+        let cutoff = now.addingTimeInterval(-TimeInterval(retentionMinutes) * 60)
+        return sessions.filter { session in
+            guard session.state.isTerminal else { return true }
+            return (session.endedAt ?? session.updatedAt) > cutoff
+        }
+    }
+
+    /// Returns the first time a terminal projection becomes eligible for
+    /// cleanup. Active sessions never schedule expiry, and zero means the user
+    /// asked Atoll to retain terminal metadata indefinitely.
+    public func nextExpirationDate(
+        for sessions: [SessionMetadata]
+    ) -> Date? {
+        guard retentionMinutes > 0 else { return nil }
+        let retentionInterval = TimeInterval(retentionMinutes) * 60
+        return sessions.lazy
+            .filter { $0.state.isTerminal }
+            .map { ($0.endedAt ?? $0.updatedAt).addingTimeInterval(retentionInterval) }
+            .min()
+    }
+}
+
 /// A single codec shared by persistence and future user-initiated diagnostics.
 public struct SessionMetadataArchiveCodec: Sendable {
     /// Schema written and accepted by this codec.

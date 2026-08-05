@@ -16,16 +16,29 @@ public enum CodeIslandMascotState: Equatable, Sendable {
 public struct CodeIslandCodexMascotView: View {
     private let state: CodeIslandMascotState
     private let size: CGFloat
+    private let animationSpeed: Double
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    public init(state: CodeIslandMascotState, size: CGFloat = 30) {
+    public init(
+        state: CodeIslandMascotState,
+        size: CGFloat = 30,
+        animationSpeed: Double = 1
+    ) {
         self.state = state
         self.size = size
+        self.animationSpeed = min(max(animationSpeed, 0), 3)
     }
 
     public var body: some View {
-        TimelineView(.animation(minimumInterval: 0.05, paused: reduceMotion)) { context in
-            mascotFrame(time: context.date.timeIntervalSinceReferenceDate)
+        TimelineView(
+            .animation(
+                minimumInterval: 0.05,
+                paused: reduceMotion || animationSpeed == 0
+            )
+        ) { context in
+            mascotFrame(
+                time: context.date.timeIntervalSinceReferenceDate * animationSpeed
+            )
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)

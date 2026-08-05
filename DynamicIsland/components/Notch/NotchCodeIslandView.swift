@@ -14,10 +14,12 @@ import SwiftUI
 /// The Atoll-owned notch route for the persistent Code Island tab.
 struct NotchCodeIslandView: View {
     @ObservedObject private var host = CodeIslandHost.shared
+    @ObservedObject private var featurePreferences = CodeIslandFeaturePreferenceStore.shared
 
     var body: some View {
         CodeIslandDashboardView(
             state: host.dashboardState,
+            grouping: featurePreferences.snapshot.dashboardGrouping,
             openSettings: {
                 SettingsWindowController.shared.showWindow(destination: .codeIsland)
             },
@@ -41,14 +43,14 @@ struct NotchCodeIslandActivityView: View {
         HStack(spacing: 9) {
             Button(action: host.showDashboard) {
                 HStack(spacing: 7) {
-                    CodeIslandCodexMascotView(state: mascotState, size: max(28, height - 10))
-                    Text("Codex")
+                    CodeIslandAgentGraphic(state: mascotState, size: max(28, height - 10))
+                    Text(ci("Codex"))
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white.opacity(0.92))
                 }
             }
             .buttonStyle(.plain)
-            .help("Open the Code Island dashboard")
+            .help(ci("Open the Code Island dashboard"))
 
             if !isDynamicIslandMode {
                 Color.clear
@@ -83,8 +85,8 @@ struct NotchCodeIslandActivityView: View {
                             .background(accentColor.opacity(0.23), in: RoundedRectangle(cornerRadius: 7))
                     }
                     .buttonStyle(.plain)
-                    .help("Open in origin")
-                    .accessibilityLabel("Open in origin")
+                    .help(ci("Open in origin"))
+                    .accessibilityLabel(ci("Open in origin"))
                 }
             }
         }
@@ -111,17 +113,17 @@ struct NotchCodeIslandActivityView: View {
     private var statusText: String {
         switch presentation.style {
         case .compact:
-            return "Working"
+            return ci("Working")
         case .sessionStarted:
-            return "Session started"
+            return ci("Session started")
         case .attention(.approval):
-            return "Approval in origin"
+            return ci("Approval in origin")
         case .attention(.question):
-            return "Input in origin"
+            return ci("Input in origin")
         case .completed:
-            return "Completed"
+            return ci("Completed")
         case .failed:
-            return "Failed"
+            return ci("Failed")
         }
     }
 
@@ -140,7 +142,7 @@ struct NotchCodeIslandActivityView: View {
 
     private var accessibilityText: String {
         let project = presentation.subject.projectDisplayName.map { ", \($0)" } ?? ""
-        return "Codex, \(statusText)\(project)"
+        return "\(ci("Codex")), \(statusText)\(project)"
     }
 }
 
@@ -150,10 +152,49 @@ struct NotchCodeIslandSecondaryActivityView: View {
 
     var body: some View {
         ZStack {
-            CodeIslandCodexMascotView(state: .working, size: 24)
+            CodeIslandAgentGraphic(state: .working, size: 24)
         }
-        .help("Codex is working\(presentation.subject.projectDisplayName.map { " in \($0)" } ?? "")")
+        .help(workingHelp)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Codex is working")
+        .accessibilityLabel(ci("Codex is working"))
+    }
+
+    private var workingHelp: String {
+        guard let project = presentation.subject.projectDisplayName else {
+            return ci("Codex is working")
+        }
+        return "\(ci("Codex is working")) \(ci("in")) \(project)"
+    }
+}
+
+private func ci(_ key: String.LocalizationValue) -> String {
+    CodeIslandLocalization.string(key)
+}
+
+/// Preference-aware identity graphic shared by primary and secondary layouts.
+private struct CodeIslandAgentGraphic: View {
+    @ObservedObject private var featurePreferences = CodeIslandFeaturePreferenceStore.shared
+
+    let state: CodeIslandMascotState
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if featurePreferences.snapshot.mascotsEnabled {
+                CodeIslandCodexMascotView(
+                    state: state,
+                    size: size,
+                    animationSpeed: Double(
+                        featurePreferences.snapshot.mascotSpeedPercent
+                    ) / 100
+                )
+            } else {
+                Image(systemName: "terminal.fill")
+                    .font(.system(size: size * 0.46, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .frame(width: size, height: size)
+                    .accessibilityHidden(true)
+            }
+        }
     }
 }

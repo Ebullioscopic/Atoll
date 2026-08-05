@@ -80,10 +80,12 @@ final class CodeIslandHost: ObservableObject {
     private let presentationPolicy: CodeIslandPresentationPolicy
     private let discovery: CodeIslandReadOnlyDiscovery
     private let originAdapter: CodeIslandOriginAdapter
+    private let featurePreferences: CodeIslandFeaturePreferenceStore
     private var occupancy: CodeIslandNotchOccupancy = .available
     private var supportsSecondaryIndicator = false
     private var queuedIntents: [CodeIslandActivityIntent] = []
     private var presentationExpirationTask: Task<Void, Never>?
+    private var retentionExpirationTask: Task<Void, Never>?
     private var evaluationTokens: [String: Int] = [:]
     private lazy var runtime: CodeIslandRuntime = CodeIslandRuntime.live {
         [weak self] current, previous in
@@ -95,11 +97,13 @@ final class CodeIslandHost: ObservableObject {
     private init(
         activityIntentAdapter: CodeIslandActivityIntentAdapter = CodeIslandActivityIntentAdapter(),
         presentationPolicy: CodeIslandPresentationPolicy = CodeIslandPresentationPolicy(),
-        discovery: CodeIslandReadOnlyDiscovery = CodeIslandReadOnlyDiscovery()
+        discovery: CodeIslandReadOnlyDiscovery = CodeIslandReadOnlyDiscovery(),
+        featurePreferences: CodeIslandFeaturePreferenceStore? = nil
     ) {
         self.activityIntentAdapter = activityIntentAdapter
         self.presentationPolicy = presentationPolicy
         self.discovery = discovery
+        self.featurePreferences = featurePreferences ?? CodeIslandFeaturePreferenceStore.shared
         originAdapter = CodeIslandOriginAdapter()
     }
 
@@ -116,6 +120,7 @@ final class CodeIslandHost: ObservableObject {
         }
         do {
             try runtime.start(plan: plan)
+            applyRetentionAndScheduleNextCleanup()
             operationState = .idle
         } catch {
             runtime.shutdown()
@@ -130,22 +135,47 @@ final class CodeIslandHost: ObservableObject {
         discoveryAssessment = discovery.assessCodex()
     }
 
+    /// Applies local feature changes immediately without altering provider
+    /// activation or configuration. This is primarily observable for retention
+    /// and compact-presentation preferences.
+    func refreshFeaturePreferences() {
+        applyRetentionAndScheduleNextCleanup()
+        updateDashboardState()
+        refreshCompactPresentation()
+    }
+
     /// Activates only the exact plan the user reviewed in the confirmation UI.
-    func activateCodex(planID: UUID) {
+    func activateCodex(
+        planID: UUID,
+        importCompatiblePreferences: Bool = false
+    ) {
         guard lifecycleState == .running,
               !runtime.isRunning,
               ProviderCapabilityRegistry.phaseFive.profile(for: .codex)?.isActivationAvailable == true,
-              let plan = discoveryAssessment?.installationPlan,
-              plan.id == planID,
+              let assessment = discoveryAssessment else {
+            operationState = .failed(ci("Refresh Code Island setup and review the current plan again."))
+            return
+        }
+        let plan = assessment.installationPlan
+        guard plan.id == planID,
               plan.blockers.isEmpty,
               let consent = plan.consent(confirmedByUser: true) else {
-            operationState = .failed("Refresh Code Island setup and review the current plan again.")
+            operationState = .failed(ci("Refresh Code Island setup and review the current plan again."))
             return
         }
 
         operationState = .activating
         do {
             try runtime.activate(plan: plan, consent: consent)
+            if importCompatiblePreferences,
+               assessment.compatiblePreferences.hasImportableFeaturePreferences {
+                featurePreferences.replace(
+                    with: featurePreferences.snapshot.importing(
+                        assessment.compatiblePreferences
+                    )
+                )
+            }
+            applyRetentionAndScheduleNextCleanup()
             operationState = .idle
             updateDashboardState()
             refreshCompactPresentation()
@@ -202,6 +232,8 @@ final class CodeIslandHost: ObservableObject {
     private func resetPresentationState() {
         presentationExpirationTask?.cancel()
         presentationExpirationTask = nil
+        retentionExpirationTask?.cancel()
+        retentionExpirationTask = nil
         queuedIntents.removeAll()
         evaluationTokens.removeAll()
         pendingActivityIntent = nil
@@ -216,8 +248,12 @@ final class CodeIslandHost: ObservableObject {
         previous: SessionMetadata?
     ) {
         guard lifecycleState == .running else { return }
+        applyRetentionAndScheduleNextCleanup()
         updateDashboardState()
         refreshCompactPresentation()
+        guard runtime.sessions.contains(where: {
+            $0.provider == current.provider && $0.sessionID == current.sessionID
+        }) else { return }
         guard let intent = activityIntentAdapter.intent(
             for: current,
             previous: previous
@@ -272,6 +308,69 @@ final class CodeIslandHost: ObservableObject {
             : .sessions(provider: .codex, items: projection.items)
     }
 
+    /// Retention must advance even when the provider becomes quiet. A failed
+    /// archive replacement is retried later without dropping the in-memory
+    /// projection or spinning on an already-expired timestamp.
+    private func applyRetentionAndScheduleNextCleanup() {
+        retentionExpirationTask?.cancel()
+        retentionExpirationTask = nil
+        guard runtime.isRunning else { return }
+
+        let retentionMinutes = featurePreferences.snapshot.retentionMinutes
+        let policy = SessionMetadataRetentionPolicy(
+            retentionMinutes: retentionMinutes
+        )
+        guard runtime.applyRetentionPolicy(
+            retentionMinutes: retentionMinutes
+        ) else {
+            scheduleRetentionCleanup(after: 60)
+            return
+        }
+
+        discardExpiredPresentationState()
+        guard let expirationDate = policy.nextExpirationDate(for: runtime.sessions) else {
+            return
+        }
+        scheduleRetentionCleanup(
+            after: max(0, expirationDate.timeIntervalSinceNow)
+        )
+    }
+
+    private func scheduleRetentionCleanup(after duration: TimeInterval) {
+        retentionExpirationTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard let self, !Task.isCancelled else { return }
+            retentionExpirationTask = nil
+            applyRetentionAndScheduleNextCleanup()
+            updateDashboardState()
+            refreshCompactPresentation()
+        }
+    }
+
+    private func discardExpiredPresentationState() {
+        let retainedKeys = Set(runtime.sessions.map {
+            "\($0.provider.rawValue):\($0.sessionID.rawValue)"
+        })
+        queuedIntents.removeAll { !retainedKeys.contains(sessionKey($0.subject)) }
+        queuedPresentationCount = queuedIntents.count
+        if let pendingActivityIntent,
+           !retainedKeys.contains(sessionKey(pendingActivityIntent.subject)) {
+            self.pendingActivityIntent = nil
+        }
+        let didClearActivePresentation: Bool
+        if let activePresentation,
+           !retainedKeys.contains(sessionKey(activePresentation.subject)) {
+            clearActivePresentation()
+            didClearActivePresentation = true
+        } else {
+            didClearActivePresentation = false
+        }
+        evaluationTokens = evaluationTokens.filter { retainedKeys.contains($0.key) }
+        if didClearActivePresentation {
+            drainQueueIfPossible()
+        }
+    }
+
     private func evaluate(_ intent: CodeIslandActivityIntent) {
         let key = sessionKey(intent.subject)
         evaluationTokens[key, default: 0] += 1
@@ -314,7 +413,11 @@ final class CodeIslandHost: ObservableObject {
             originMatch: originMatch
         )
 
-        switch presentationPolicy.disposition(for: intent, context: context) {
+        switch presentationPolicy.disposition(
+            for: intent,
+            context: context,
+            preferences: featurePreferences.snapshot.presentation
+        ) {
         case .present(let style):
             if case .compact = style {
                 refreshCompactPresentation()
@@ -346,6 +449,7 @@ final class CodeIslandHost: ObservableObject {
         intent: CodeIslandActivityIntent
     ) {
         activePresentation = CodeIslandHostPresentation(style: style, intent: intent)
+        playSoundIfEnabled(for: style)
         presentationExpirationTask?.cancel()
         presentationExpirationTask = nil
 
@@ -355,7 +459,10 @@ final class CodeIslandHost: ObservableObject {
         case .sessionStarted:
             schedulePresentationExpiration(after: 2.0)
         case .completed:
-            schedulePresentationExpiration(after: 5.0)
+            let duration = featurePreferences.snapshot.presentation.completionPresentation == .glance
+                ? 2.0
+                : 5.0
+            schedulePresentationExpiration(after: duration)
         case .failed:
             schedulePresentationExpiration(after: 4.0)
         case .compact:
@@ -440,7 +547,8 @@ final class CodeIslandHost: ObservableObject {
                 occupancy: occupancy,
                 supportsSecondaryIndicator: supportsSecondaryIndicator,
                 originMatch: .unknown
-            )
+            ),
+            preferences: featurePreferences.snapshot.presentation
         )
         if case .present(let style) = disposition {
             compactPresentation = CodeIslandHostPresentation(style: style, intent: intent)
@@ -453,41 +561,71 @@ final class CodeIslandHost: ObservableObject {
         "\(subject.provider.rawValue):\(subject.sessionID.rawValue)"
     }
 
+    private func playSoundIfEnabled(for style: CodeIslandPresentationStyle) {
+        let preferences = featurePreferences.snapshot
+        guard preferences.soundEffectsEnabled else { return }
+
+        let effect: CodeIslandSoundEffect?
+        switch style {
+        case .sessionStarted where preferences.sessionStartSoundEnabled:
+            effect = .sessionStarted
+        case .attention where preferences.attentionSoundEnabled:
+            effect = .attentionRequired
+        case .completed where preferences.completionSoundEnabled:
+            effect = .completed
+        case .failed where preferences.failureSoundEnabled:
+            effect = .failed
+        case .compact, .sessionStarted, .attention, .completed, .failed:
+            effect = nil
+        }
+
+        if let effect {
+            CodeIslandSoundPlayer.shared.play(
+                effect,
+                volumePercent: preferences.soundVolumePercent
+            )
+        }
+    }
+
     private func message(for error: Error) -> String {
         if let activationError = error as? CodeIslandActivationError {
             switch activationError {
             case .consentRequired, .staleConsent:
-                return "The setup plan changed. Refresh and review it again."
+                return ci("The setup plan changed. Refresh and review it again.")
             case .blocked:
-                return "Resolve the listed CodeIsland or Codex conflict, then refresh."
+                return ci("Resolve the listed CodeIsland or Codex conflict, then refresh.")
             case .invalidPlan:
-                return "The disclosed setup paths no longer match. Refresh before retrying."
+                return ci("The disclosed setup paths no longer match. Refresh before retrying.")
             case .alreadyActive:
-                return "Codex Monitoring is already active."
+                return ci("Codex Monitoring is already active.")
             case .notActive:
-                return "Codex Monitoring is not active."
+                return ci("Codex Monitoring is not active.")
             }
         }
         if let preflightError = error as? CodeIslandActivationPreflightError {
             switch preflightError {
             case .legacyApplicationRunning:
-                return "Quit the standalone CodeIsland app, then refresh."
+                return ci("Quit the standalone CodeIsland app, then refresh.")
             case .legacySocketOccupied:
-                return "The legacy CodeIsland listener is still running. Quit it, then refresh."
+                return ci("The legacy CodeIsland listener is still running. Quit it, then refresh.")
             default:
-                return "The listener path changed or is unsafe. Refresh before retrying."
+                return ci("The listener path changed or is unsafe. Refresh before retrying.")
             }
         }
         if let installationError = error as? CodexManagedInstallationError {
             switch installationError {
             case .bundledBridgeMissing, .bundledBridgeNotExecutable:
-                return "Atoll's signed Code Island helper is unavailable. Reinstall Atoll."
+                return ci("Atoll's signed Code Island helper is unavailable. Reinstall Atoll.")
             case .managedBridgeModified, .managedBridgeConflict, .managedReceiptConflict:
-                return "Atoll's managed Code Island files need attention before setup can continue."
+                return ci("Atoll's managed Code Island files need attention before setup can continue.")
             default:
-                return "Codex Monitoring could not be verified. No provider decision was taken over."
+                return ci("Codex Monitoring could not be verified. No provider decision was taken over.")
             }
         }
-        return "Code Island could not complete this operation safely."
+        return ci("Code Island could not complete this operation safely.")
     }
+}
+
+private func ci(_ key: String.LocalizationValue) -> String {
+    CodeIslandLocalization.string(key)
 }

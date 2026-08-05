@@ -27,7 +27,12 @@ let package = Package(
             name: "CodeIslandUI",
             dependencies: ["CodeIslandCore"],
             path: "Sources/CodeIslandUI",
-            exclude: ["Upstream"]
+            exclude: ["Upstream"],
+            resources: [
+                .copy("Resources/Sounds"),
+                .copy("Resources/ThirdPartyNotices"),
+                .process("Resources/CodeIsland.xcstrings"),
+            ]
         ),
         .executableTarget(
             name: "codeisland-bridge",
@@ -36,7 +41,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CodeIslandRuntimeTests",
-            dependencies: ["CodeIslandCore", "CodeIslandRuntime"],
+            dependencies: ["CodeIslandCore", "CodeIslandRuntime", "CodeIslandUI"],
             path: "Tests/CodeIslandRuntimeTests",
             resources: [.copy("Fixtures")]
         ),

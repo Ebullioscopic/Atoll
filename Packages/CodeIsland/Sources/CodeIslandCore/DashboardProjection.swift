@@ -1,5 +1,17 @@
 import Foundation
 
+/// User-facing ways Atoll can group the same urgency-ordered dashboard rows.
+public enum CodeIslandDashboardGrouping: String, Codable, CaseIterable, Hashable, Sendable {
+    /// Show one urgency-ordered list without section headers.
+    case all
+
+    /// Group rows into waiting, working, and recent sections.
+    case status
+
+    /// Group rows by provider while preserving urgency order within each group.
+    case provider
+}
+
 /// Stable dashboard groups ordered by user urgency.
 public enum CodeIslandDashboardSection: Int, Equatable, Sendable {
     /// The provider is blocked at its own origin surface.

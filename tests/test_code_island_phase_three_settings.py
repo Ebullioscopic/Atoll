@@ -43,8 +43,11 @@ class CodeIslandPhaseThreeSettingsTests(unittest.TestCase):
         self.assertIn("Monitoring", settings_page)
         self.assertIn("Not connected", settings_page)
         self.assertIn("Questions and approvals stay in Codex", settings_page)
-        for forbidden in ("Toggle(", "Defaults", ".save(", "ConfigInstaller", "HookServer"):
+        for forbidden in ("Defaults", ".save(", "ConfigInstaller", "HookServer"):
             self.assertNotIn(forbidden, settings_page)
+
+        self.assertIn("CodeIslandFeaturePreferenceStore.shared", settings_page)
+        self.assertNotIn("com.codeisland.app", settings_page)
 
 
 if __name__ == "__main__":

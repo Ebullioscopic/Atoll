@@ -386,6 +386,10 @@ jobs:
           # Verify
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
+          scripts/verify-code-island-bundle.sh \
+            "$APP_PATH" \
+            --require-signature
+
           # Confirm the shipped app still contains the privacy capabilities
           # required by the features it exposes. This catches any future
           # signing change that would silently strip the app's entitlements.
@@ -444,6 +448,8 @@ jobs:
 
           xcrun stapler staple "$DMG_PATH"
           xcrun stapler validate "$DMG_PATH"
+          spctl --assess --type open --context context:primary-signature \
+            --verbose=3 "$DMG_PATH"
 
       # ─────────────────────────────────────────────────────────────────
       # 17. Generate Sparkle appcast

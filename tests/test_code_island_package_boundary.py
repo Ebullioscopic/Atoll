@@ -156,6 +156,7 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
                 "CodeIslandRuntime.swift",
                 "CodexHookAdapter.swift",
                 "CodexManagedInstallation.swift",
+                "FeaturePreferences.swift",
                 "NonOwningHookCompletion.swift",
                 "PresentationPolicy.swift",
                 "ProviderCapabilities.swift",
@@ -169,8 +170,31 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
             for path in (PACKAGE / "Sources/CodeIslandUI").glob("*.swift")
         )
         self.assertEqual(
-            ["CodeIslandMascot.swift", "CodeIslandUI.swift"],
+            [
+                "CodeIslandDashboardLayout.swift",
+                "CodeIslandLocalization.swift",
+                "CodeIslandMascot.swift",
+                "CodeIslandSound.swift",
+                "CodeIslandUI.swift",
+            ],
             active_ui_sources,
+        )
+
+        active_resources = sorted(
+            str(path.relative_to(PACKAGE / "Sources/CodeIslandUI/Resources"))
+            for path in (PACKAGE / "Sources/CodeIslandUI/Resources").rglob("*")
+            if path.is_file()
+        )
+        self.assertEqual(
+            [
+                "CodeIsland.xcstrings",
+                "Sounds/8bit_approval.wav",
+                "Sounds/8bit_complete.wav",
+                "Sounds/8bit_error.wav",
+                "Sounds/8bit_start.wav",
+                "ThirdPartyNotices/CodeIsland-LICENSE.txt",
+            ],
+            active_resources,
         )
 
     def test_standalone_distribution_artifacts_are_absent(self):

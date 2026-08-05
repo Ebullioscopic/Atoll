@@ -42,6 +42,7 @@ public enum CodeIslandDashboardState: Equatable, Sendable {
 /// Atoll. This reusable view only renders a sanitized dashboard state.
 public struct CodeIslandDashboardView: View {
     private let state: CodeIslandDashboardState
+    private let grouping: CodeIslandDashboardGrouping
     private let openSettings: (() -> Void)?
     private let openOrigin: ((CodeIslandDashboardItem) -> Void)?
 
@@ -51,10 +52,12 @@ public struct CodeIslandDashboardView: View {
     ///   - openSettings: Optional Atoll-owned settings navigation action.
     public init(
         state: CodeIslandDashboardState,
+        grouping: CodeIslandDashboardGrouping = .status,
         openSettings: (() -> Void)? = nil,
         openOrigin: ((CodeIslandDashboardItem) -> Void)? = nil
     ) {
         self.state = state
+        self.grouping = grouping
         self.openSettings = openSettings
         self.openOrigin = openOrigin
     }
@@ -81,7 +84,11 @@ public struct CodeIslandDashboardView: View {
                 .accessibilityHidden(true)
 
             VStack(spacing: 5) {
-                Text(state.requiresActivation ? "Set up Code Island" : "No active sessions")
+                Text(
+                    state.requiresActivation
+                        ? ci("Set up Code Island")
+                        : ci("No active sessions")
+                )
                     .font(.headline)
 
                 Text(detailText)
@@ -92,7 +99,7 @@ public struct CodeIslandDashboardView: View {
             }
 
             if state.requiresActivation, let openSettings {
-                Button("Open Code Island Settings", action: openSettings)
+                Button(ci("Open Code Island Settings"), action: openSettings)
                     .buttonStyle(.bordered)
                     .controlSize(.small)
             }
@@ -102,12 +109,15 @@ public struct CodeIslandDashboardView: View {
     }
 
     private func sessionDashboard(_ items: [CodeIslandDashboardItem]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let layout = CodeIslandDashboardLayout(items: items, grouping: grouping)
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Agent sessions")
+                    Text(ci("Agent sessions"))
                         .font(.headline)
-                    Text("\(items.count) \(items.count == 1 ? "session" : "sessions")")
+                    Text(
+                        "\(items.count) \(items.count == 1 ? ci("session") : ci("sessions"))"
+                    )
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -120,22 +130,17 @@ public struct CodeIslandDashboardView: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach([
-                        CodeIslandDashboardSection.waiting,
-                        .working,
-                        .recent,
-                    ], id: \.rawValue) { section in
-                        let sectionItems = items.filter { $0.section == section }
-                        if !sectionItems.isEmpty {
-                            Text(sectionTitle(section))
+                    ForEach(layout.groups) { group in
+                        if let title = groupTitle(group.label) {
+                            Text(title)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .textCase(.uppercase)
-                                .padding(.top, section == .waiting ? 0 : 3)
+                                .padding(.top, group.id == layout.groups.first?.id ? 0 : 3)
+                        }
 
-                            ForEach(sectionItems) { item in
-                                sessionRow(item)
-                            }
+                        ForEach(group.items) { item in
+                            sessionRow(item)
                         }
                     }
                 }
@@ -154,14 +159,14 @@ public struct CodeIslandDashboardView: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.projectDisplayName ?? "Codex session")
+                Text(item.projectDisplayName ?? ci("Codex session"))
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                 HStack(spacing: 5) {
-                    Text("Codex")
-                    Text("·")
+                    Text(ci("Codex"))
+                    Text(verbatim: "·")
                     Text(statusText(item.state))
-                    Text("·")
+                    Text(verbatim: "·")
                     Text(item.updatedAt, style: .relative)
                 }
                 .font(.caption)
@@ -172,25 +177,26 @@ public struct CodeIslandDashboardView: View {
             Spacer(minLength: 8)
 
             if item.origin != nil, let openOrigin {
-                Button("Open in origin") { openOrigin(item) }
+                Button(ci("Open in origin")) { openOrigin(item) }
                     .buttonStyle(.bordered)
                     .controlSize(.mini)
-                    .help("Return to this session in Codex or its terminal")
+                    .help(ci("Return to this session in Codex or its terminal"))
+                    .accessibilityLabel(ci("Open in origin"))
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 9))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(item.projectDisplayName ?? "Codex session"), \(statusText(item.state))")
+        .accessibilityLabel("\(item.projectDisplayName ?? ci("Codex session")), \(statusText(item.state))")
     }
 
     private var detailText: String {
         switch state {
         case .setupRequired:
-            return "Code Island is built into Atoll. Review Codex availability in Settings; no coding-tool configuration has been changed."
+            return ci("Code Island is built into Atoll. Review Codex availability in Settings; no coding-tool configuration has been changed.")
         case .idle:
-            return "Connected Codex sessions will appear here when they become active."
+            return ci("Connected Codex sessions will appear here when they become active.")
         case .sessions:
             return ""
         }
@@ -198,21 +204,29 @@ public struct CodeIslandDashboardView: View {
 
     private func sectionTitle(_ section: CodeIslandDashboardSection) -> String {
         switch section {
-        case .waiting: return "Waiting"
-        case .working: return "Working"
-        case .recent: return "Recent"
+        case .waiting: return ci("Waiting")
+        case .working: return ci("Working")
+        case .recent: return ci("Recent")
+        }
+    }
+
+    private func groupTitle(_ label: CodeIslandDashboardGroupLabel) -> String? {
+        switch label {
+        case .none: return nil
+        case .status(let section): return sectionTitle(section)
+        case .provider(.codex): return ci("Codex")
         }
     }
 
     private func statusText(_ state: SessionState) -> String {
         switch state {
-        case .working: return "Working"
-        case .waitingForApproval: return "Needs approval in origin"
-        case .waitingForQuestion: return "Needs input in origin"
-        case .recentlyCompleted: return "Completed"
-        case .failed: return "Failed"
-        case .cancelled: return "Cancelled"
-        case .ended: return "Ended"
+        case .working: return ci("Working")
+        case .waitingForApproval: return ci("Needs approval in origin")
+        case .waitingForQuestion: return ci("Needs input in origin")
+        case .recentlyCompleted: return ci("Completed")
+        case .failed: return ci("Failed")
+        case .cancelled: return ci("Cancelled")
+        case .ended: return ci("Ended")
         }
     }
 
@@ -235,4 +249,8 @@ public struct CodeIslandDashboardView: View {
         case .cancelled, .ended: return .secondary
         }
     }
+}
+
+private func ci(_ key: String.LocalizationValue) -> String {
+    CodeIslandLocalization.string(key)
 }

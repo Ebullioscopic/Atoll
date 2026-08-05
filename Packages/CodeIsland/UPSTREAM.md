@@ -20,7 +20,7 @@ git subtree add --prefix=Packages/CodeIsland ../CodeIsland main
 
 ## Atoll-only changes
 
-Phases 1 through 6 intentionally replace the imported application and provider
+Phases 1 through 7 intentionally replace the imported application and provider
 boundaries:
 
 - Replaces the standalone `CodeIsland` application product with internal
@@ -53,6 +53,14 @@ boundaries:
   stores their semantic backup in Atoll's receipt, prevents duplicate legacy
   raw delivery, and restores the handlers on deactivation while preserving
   unrelated and concurrently added hooks.
+- Adds an Atoll-owned, content-free feature-preference snapshot and a
+  default-off guided import of only the legacy values the merged product can
+  apply. Provider, security, responder, lifecycle, remote, and webhook settings
+  remain outside the import boundary.
+- Packages exactly four individually audited upstream sound assets, a dedicated
+  Code Island string catalog, and the complete MIT license in the active
+  `CodeIslandUI` resource bundle. A release verifier rejects modified resources,
+  missing attribution, duplicate helpers, and standalone CodeIsland products.
 
 ### Migration staging
 
@@ -60,7 +68,7 @@ boundaries:
 |---|---|---|
 | Rich Core models, normalizers, transcript readers, provider scanners, and retained upstream tests | `Sources/CodeIslandCore/Upstream`; excluded from SwiftPM. New sanitized Phase 2 contracts are active beside the quarantine. | Provider-neutral pieces only when their metadata boundary is proven |
 | `HookServer`, `ConfigInstaller`, provider resources, and origin helpers | `Sources/CodeIslandRuntime/Upstream`; excluded from SwiftPM. Focused Codex discovery, metadata transport, activation, preflight, receipt, repair, managed installer, presentation policy, and Atoll-owned origin adapter implementations replace them. | Additional providers require their own verified rollout |
-| Mascots, sounds, icons, and reusable visual candidates | `Sources/CodeIslandUI/Upstream`; excluded from SwiftPM. A focused, payload-free Dex mascot is active beside the quarantine; unused mascots, sounds, and application-oriented views remain excluded. | Migrate only individually adapted resources with an Atoll-owned presentation contract |
+| Mascots, sounds, icons, and reusable visual candidates | `Sources/CodeIslandUI/Upstream`; excluded from SwiftPM. A focused, payload-free Dex mascot and four hash-audited sound effects are active beside the quarantine; unused mascots, sounds, icons, and application-oriented views remain excluded. | Migrate only individually adapted resources with an Atoll-owned presentation contract |
 
 Core migration staging is deliberate: the imported `SessionSnapshot`, hook
 models, `JSONLTailer`, and provider scanners expose rich or provider-specific
@@ -125,9 +133,13 @@ python3 -m unittest tests.test_code_island_phase_three_dashboard \
 python3 -m unittest tests.test_code_island_phase_four_contracts
 python3 -m unittest tests.test_code_island_phase_five_contracts
 python3 -m unittest tests.test_code_island_phase_six_presentation
+python3 -m unittest \
+  tests.test_code_island_phase_seven_release \
+  tests.test_code_island_phase_seven_bundle
 python3 -m unittest tests.test_privacy_configuration
 python3 -m unittest tests.test_timer_lifecycle
 swift test --package-path Packages/CodeIsland
+scripts/verify-code-island-bundle.sh /path/to/Atoll.app
 ```
 
 Swift validation requires a selected Xcode or Command Line Tools installation

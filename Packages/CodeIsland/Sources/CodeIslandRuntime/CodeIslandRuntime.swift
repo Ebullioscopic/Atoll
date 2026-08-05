@@ -156,6 +156,36 @@ public final class CodeIslandRuntime: @unchecked Sendable {
         onSessionProjection(current, previous)
     }
 
+    /// Applies Atoll's retention preference to terminal metadata. Active
+    /// sessions are never removed. If the archive cannot be replaced, the
+    /// in-memory projection is left unchanged so both views stay consistent.
+    @discardableResult
+    public func applyRetentionPolicy(
+        retentionMinutes: Int,
+        now: Date = Date()
+    ) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let current = sortedSessions(Array(projections.values))
+        let retained = SessionMetadataRetentionPolicy(
+            retentionMinutes: retentionMinutes
+        ).retainedSessions(from: current, now: now)
+        guard retained != current else { return true }
+        do {
+            try metadataStore.save(retained)
+        } catch {
+            return false
+        }
+
+        projections = Dictionary(
+            uniqueKeysWithValues: retained.map {
+                (Self.key(provider: $0.provider, sessionID: $0.sessionID), $0)
+            }
+        )
+        return true
+    }
+
     /// Enters pass-through, drains bounded work, and stops without uninstalling.
     public func shutdown() {
         coordinator.shutdown()

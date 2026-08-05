@@ -86,12 +86,14 @@ class CodeIslandPhaseFourContractTests(unittest.TestCase):
         self.assertIn("Confirm Codex Monitoring", settings)
 
         for forbidden in (
-            "Toggle(",
             "CodeIslandActivationCoordinator",
             "CodexManagedInstallation",
             "Always Allow",
         ):
             self.assertNotIn(forbidden, settings)
+
+        self.assertNotIn('Toggle(ci("Activate Codex Monitoring")', settings)
+        self.assertIn('Button(ci("Activate Codex Monitoring")', settings)
 
         self.assertIn("public static let isEnabledByDefault = false", runtime)
         self.assertIn("CodeIslandRuntime.live", host)

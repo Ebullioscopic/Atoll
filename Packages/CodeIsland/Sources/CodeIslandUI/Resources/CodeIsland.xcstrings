@@ -1,0 +1,1606 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "1 hour": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 hour"
+          }
+        }
+      }
+    },
+    "10 minutes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "10 minutes"
+          }
+        }
+      }
+    },
+    "2 hours": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 hours"
+          }
+        }
+      }
+    },
+    "30 minutes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 minutes"
+          }
+        }
+      }
+    },
+    "Activate Codex Monitoring": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activate Codex Monitoring"
+          }
+        }
+      }
+    },
+    "Activating Codex Monitoring…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activating Codex Monitoring…"
+          }
+        }
+      }
+    },
+    "Agent sessions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent sessions"
+          }
+        }
+      }
+    },
+    "All sessions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All sessions"
+          }
+        }
+      }
+    },
+    "Animation speed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Animation speed"
+          }
+        }
+      }
+    },
+    "Approval in origin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approval in origin"
+          }
+        }
+      }
+    },
+    "Approval needed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approval needed"
+          }
+        }
+      }
+    },
+    "Atoll host": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atoll host"
+          }
+        }
+      }
+    },
+    "Atoll never quits or deletes the old app. Unrelated Codex hooks and security-sensitive standalone settings are not imported.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atoll never quits or deletes the old app. Unrelated Codex hooks and security-sensitive standalone settings are not imported."
+          }
+        }
+      }
+    },
+    "Atoll stores only session metadata": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atoll stores only session metadata"
+          }
+        }
+      }
+    },
+    "Atoll will observe lifecycle metadata only. Questions, approvals, and all decisions remain in Codex.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atoll will observe lifecycle metadata only. Questions, approvals, and all decisions remain in Codex."
+          }
+        }
+      }
+    },
+    "Atoll will remove only its managed helper and hooks, restore adopted legacy CodeIsland hooks, and leave unrelated Codex configuration unchanged.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atoll will remove only its managed helper and hooks, restore adopted legacy CodeIsland hooks, and leave unrelated Codex configuration unchanged."
+          }
+        }
+      }
+    },
+    "Atoll's managed Code Island files need attention before setup can continue.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atoll's managed Code Island files need attention before setup can continue."
+          }
+        }
+      }
+    },
+    "Atoll's signed Code Island helper is unavailable. Reinstall Atoll.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atoll's signed Code Island helper is unavailable. Reinstall Atoll."
+          }
+        }
+      }
+    },
+    "Boundaries": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boundaries"
+          }
+        }
+      }
+    },
+    "By provider": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "By provider"
+          }
+        }
+      }
+    },
+    "By status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "By status"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
+    "Cancelled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelled"
+          }
+        }
+      }
+    },
+    "Cannot inspect": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cannot inspect"
+          }
+        }
+      }
+    },
+    "Checking…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking…"
+          }
+        }
+      }
+    },
+    "Clear": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear"
+          }
+        }
+      }
+    },
+    "Code Island": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code Island"
+          }
+        }
+      }
+    },
+    "Code Island could not complete this operation safely.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code Island could not complete this operation safely."
+          }
+        }
+      }
+    },
+    "Code Island is built into Atoll. Review Codex availability in Settings; no coding-tool configuration has been changed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code Island is built into Atoll. Review Codex availability in Settings; no coding-tool configuration has been changed."
+          }
+        }
+      }
+    },
+    "Code Island is part of Atoll. It runs no provider listener and changes no Codex configuration until you confirm setup.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code Island is part of Atoll. It runs no provider listener and changes no Codex configuration until you confirm setup."
+          }
+        }
+      }
+    },
+    "Code Island status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code Island status"
+          }
+        }
+      }
+    },
+    "Codex": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex"
+          }
+        }
+      }
+    },
+    "Codex capability": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex capability"
+          }
+        }
+      }
+    },
+    "Codex hooks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex hooks"
+          }
+        }
+      }
+    },
+    "Codex is working": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex is working"
+          }
+        }
+      }
+    },
+    "Codex Monitoring could not be verified. No provider decision was taken over.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex Monitoring could not be verified. No provider decision was taken over."
+          }
+        }
+      }
+    },
+    "Codex Monitoring is already active.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex Monitoring is already active."
+          }
+        }
+      }
+    },
+    "Codex Monitoring is inactive": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex Monitoring is inactive"
+          }
+        }
+      }
+    },
+    "Codex Monitoring is not active.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex Monitoring is not active."
+          }
+        }
+      }
+    },
+    "Codex session": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex session"
+          }
+        }
+      }
+    },
+    "Compatible preferences": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compatible preferences"
+          }
+        }
+      }
+    },
+    "Completed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completed"
+          }
+        }
+      }
+    },
+    "Completion": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completion"
+          }
+        }
+      }
+    },
+    "Completion pop-out": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completion pop-out"
+          }
+        }
+      }
+    },
+    "Confirm Codex Monitoring": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm Codex Monitoring"
+          }
+        }
+      }
+    },
+    "Connected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected"
+          }
+        }
+      }
+    },
+    "Connected Codex sessions will appear here when they become active.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected Codex sessions will appear here when they become active."
+          }
+        }
+      }
+    },
+    "Create listener socket": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create listener socket"
+          }
+        }
+      }
+    },
+    "Current": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current"
+          }
+        }
+      }
+    },
+    "Deactivate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deactivate"
+          }
+        }
+      }
+    },
+    "Deactivate Codex Monitoring?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deactivate Codex Monitoring?"
+          }
+        }
+      }
+    },
+    "Deactivating Codex Monitoring…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deactivating Codex Monitoring…"
+          }
+        }
+      }
+    },
+    "Deactivation targets only the receipt-owned entries shown here.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deactivation targets only the receipt-owned entries shown here."
+          }
+        }
+      }
+    },
+    "Detected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detected"
+          }
+        }
+      }
+    },
+    "Discovery": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discovery"
+          }
+        }
+      }
+    },
+    "Enable feature sounds": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable feature sounds"
+          }
+        }
+      }
+    },
+    "Ended": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ended"
+          }
+        }
+      }
+    },
+    "Exact changes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exact changes"
+          }
+        }
+      }
+    },
+    "Existing CodeIsland": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing CodeIsland"
+          }
+        }
+      }
+    },
+    "Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed"
+          }
+        }
+      }
+    },
+    "Failure (when supported)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failure (when supported)"
+          }
+        }
+      }
+    },
+    "Feature sounds": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feature sounds"
+          }
+        }
+      }
+    },
+    "Full": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full"
+          }
+        }
+      }
+    },
+    "Glance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Glance"
+          }
+        }
+      }
+    },
+    "Grouping": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grouping"
+          }
+        }
+      }
+    },
+    "Hook state": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hook state"
+          }
+        }
+      }
+    },
+    "Import compatible feature preferences": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import compatible feature preferences"
+          }
+        }
+      }
+    },
+    "in": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "in"
+          }
+        }
+      }
+    },
+    "In use": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In use"
+          }
+        }
+      }
+    },
+    "Input in origin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Input in origin"
+          }
+        }
+      }
+    },
+    "Install Atoll-managed bridge": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install Atoll-managed bridge"
+          }
+        }
+      }
+    },
+    "Interactive question observation is unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interactive question observation is unavailable"
+          }
+        }
+      }
+    },
+    "Interactive questions are not observed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interactive questions are not observed"
+          }
+        }
+      }
+    },
+    "Keep completed sessions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep completed sessions"
+          }
+        }
+      }
+    },
+    "legacy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "legacy"
+          }
+        }
+      }
+    },
+    "Legacy artifacts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legacy artifacts"
+          }
+        }
+      }
+    },
+    "Listener socket": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listener socket"
+          }
+        }
+      }
+    },
+    "Managed paths": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Managed paths"
+          }
+        }
+      }
+    },
+    "Mascot": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mascot"
+          }
+        }
+      }
+    },
+    "Modify Codex hooks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modify Codex hooks"
+          }
+        }
+      }
+    },
+    "Monitoring": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitoring"
+          }
+        }
+      }
+    },
+    "Monitoring covers lifecycle and meaningful state changes. It does not move questions or decisions into Atoll.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitoring covers lifecycle and meaningful state changes. It does not move questions or decisions into Atoll."
+          }
+        }
+      }
+    },
+    "Native attention": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Native attention"
+          }
+        }
+      }
+    },
+    "Needs approval in origin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs approval in origin"
+          }
+        }
+      }
+    },
+    "Needs attention": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs attention"
+          }
+        }
+      }
+    },
+    "Needs input in origin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs input in origin"
+          }
+        }
+      }
+    },
+    "No active sessions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No active sessions"
+          }
+        }
+      }
+    },
+    "No Code Island hooks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Code Island hooks"
+          }
+        }
+      }
+    },
+    "No hooks.json": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hooks.json"
+          }
+        }
+      }
+    },
+    "None found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None found"
+          }
+        }
+      }
+    },
+    "Not connected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not connected"
+          }
+        }
+      }
+    },
+    "Not found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not found"
+          }
+        }
+      }
+    },
+    "Not running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not running"
+          }
+        }
+      }
+    },
+    "off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "off"
+          }
+        }
+      }
+    },
+    "Off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off"
+          }
+        }
+      }
+    },
+    "on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "on"
+          }
+        }
+      }
+    },
+    "Only grouping, smart suppression, completion style, mascot speed, sound enablement, and sound volume are eligible.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only grouping, smart suppression, completion style, mascot speed, sound enablement, and sound volume are eligible."
+          }
+        }
+      }
+    },
+    "Open Code Island Settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Code Island Settings"
+          }
+        }
+      }
+    },
+    "Open in origin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in origin"
+          }
+        }
+      }
+    },
+    "Open the Code Island dashboard": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the Code Island dashboard"
+          }
+        }
+      }
+    },
+    "Owned by Atoll": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Owned by Atoll"
+          }
+        }
+      }
+    },
+    "Paths setup would change": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paths setup would change"
+          }
+        }
+      }
+    },
+    "Pending": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pending"
+          }
+        }
+      }
+    },
+    "preferences": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "preferences"
+          }
+        }
+      }
+    },
+    "Preview": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview"
+          }
+        }
+      }
+    },
+    "Provider": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provider"
+          }
+        }
+      }
+    },
+    "Questions and approvals stay in Codex": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questions and approvals stay in Codex"
+          }
+        }
+      }
+    },
+    "Quit CodeIsland before setup": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit CodeIsland before setup"
+          }
+        }
+      }
+    },
+    "Quit the standalone CodeIsland app, then refresh.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit the standalone CodeIsland app, then refresh."
+          }
+        }
+      }
+    },
+    "Ready": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready"
+          }
+        }
+      }
+    },
+    "Recent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent"
+          }
+        }
+      }
+    },
+    "Recognized legacy CodeIsland commands will be backed up in Atoll's ownership receipt, replaced to prevent duplicate raw delivery, and restored on deactivation.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognized legacy CodeIsland commands will be backed up in Atoll's ownership receipt, replaced to prevent duplicate raw delivery, and restored on deactivation."
+          }
+        }
+      }
+    },
+    "Reduce Motion always pauses mascot animation, regardless of this speed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reduce Motion always pauses mascot animation, regardless of this speed."
+          }
+        }
+      }
+    },
+    "Refresh after CodeIsland releases its socket": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh after CodeIsland releases its socket"
+          }
+        }
+      }
+    },
+    "Refresh Code Island discovery": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Code Island discovery"
+          }
+        }
+      }
+    },
+    "Refresh Code Island setup and review the current plan again.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Code Island setup and review the current plan again."
+          }
+        }
+      }
+    },
+    "Repair hooks.json before setup": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repair hooks.json before setup"
+          }
+        }
+      }
+    },
+    "Replace legacy CodeIsland hooks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace legacy CodeIsland hooks"
+          }
+        }
+      }
+    },
+    "Replace stale listener socket": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace stale listener socket"
+          }
+        }
+      }
+    },
+    "Resolve legacy socket conflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resolve legacy socket conflict"
+          }
+        }
+      }
+    },
+    "Resolve the listed CodeIsland or Codex conflict, then refresh.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resolve the listed CodeIsland or Codex conflict, then refresh."
+          }
+        }
+      }
+    },
+    "Return to this session in Codex or its terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Return to this session in Codex or its terminal"
+          }
+        }
+      }
+    },
+    "Run /hooks in Codex after activation to review and trust the Atoll-managed command.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run /hooks in Codex after activation to review and trust the Atoll-managed command."
+          }
+        }
+      }
+    },
+    "Run /hooks in Codex to review and trust Atoll's command": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run /hooks in Codex to review and trust Atoll's command"
+          }
+        }
+      }
+    },
+    "Running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running"
+          }
+        }
+      }
+    },
+    "session": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "session"
+          }
+        }
+      }
+    },
+    "Session behavior": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session behavior"
+          }
+        }
+      }
+    },
+    "Session grouping": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session grouping"
+          }
+        }
+      }
+    },
+    "Session started": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session started"
+          }
+        }
+      }
+    },
+    "sessions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sessions"
+          }
+        }
+      }
+    },
+    "Set up Code Island": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up Code Island"
+          }
+        }
+      }
+    },
+    "Setup will replace and reversibly back up recognized legacy hooks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setup will replace and reversibly back up recognized legacy hooks"
+          }
+        }
+      }
+    },
+    "Show Dex mascot": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Dex mascot"
+          }
+        }
+      }
+    },
+    "Smart suppression": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smart suppression"
+          }
+        }
+      }
+    },
+    "sound": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sound"
+          }
+        }
+      }
+    },
+    "Sound": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound"
+          }
+        }
+      }
+    },
+    "Sounds play only for an Atoll-selected presentation; suppressed and routine events stay silent.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sounds play only for an Atoll-selected presentation; suppressed and routine events stay silent."
+          }
+        }
+      }
+    },
+    "Stale; reclaimable after consent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stale; reclaimable after consent"
+          }
+        }
+      }
+    },
+    "Standalone app": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standalone app"
+          }
+        }
+      }
+    },
+    "Status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        }
+      }
+    },
+    "Stopped": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped"
+          }
+        }
+      }
+    },
+    "support directory": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "support directory"
+          }
+        }
+      }
+    },
+    "Suppress a pop-out only after Atoll positively matches the exact visible origin session.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suppress a pop-out only after Atoll positively matches the exact visible origin session."
+          }
+        }
+      }
+    },
+    "The confirmation sheet repeats this exact plan before any write occurs.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The confirmation sheet repeats this exact plan before any write occurs."
+          }
+        }
+      }
+    },
+    "The disclosed setup paths no longer match. Refresh before retrying.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The disclosed setup paths no longer match. Refresh before retrying."
+          }
+        }
+      }
+    },
+    "The legacy CodeIsland listener is still running. Quit it, then refresh.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The legacy CodeIsland listener is still running. Quit it, then refresh."
+          }
+        }
+      }
+    },
+    "The listener path changed or is unsafe. Refresh before retrying.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The listener path changed or is unsafe. Refresh before retrying."
+          }
+        }
+      }
+    },
+    "The setup plan changed. Refresh and review it again.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The setup plan changed. Refresh and review it again."
+          }
+        }
+      }
+    },
+    "Tool failure observation is unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tool failure observation is unavailable"
+          }
+        }
+      }
+    },
+    "Tool failures are not inferred from rich output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tool failures are not inferred from rich output"
+          }
+        }
+      }
+    },
+    "Unexpected file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unexpected file"
+          }
+        }
+      }
+    },
+    "Until removed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Until removed"
+          }
+        }
+      }
+    },
+    "Unverified": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unverified"
+          }
+        }
+      }
+    },
+    "Verified capability": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verified capability"
+          }
+        }
+      }
+    },
+    "Verify & Repair": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verify & Repair"
+          }
+        }
+      }
+    },
+    "Verifying Codex Monitoring…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifying Codex Monitoring…"
+          }
+        }
+      }
+    },
+    "Volume": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volume"
+          }
+        }
+      }
+    },
+    "Waiting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting"
+          }
+        }
+      }
+    },
+    "Working": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working"
+          }
+        }
+      }
+    },
+    "Write ownership receipt and adoption backup": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Write ownership receipt and adoption backup"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

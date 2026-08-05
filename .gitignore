@@ -149,9 +149,13 @@ PrivateWorks
 !tests/test_code_island_phase_four_contracts.py
 !tests/test_code_island_phase_five_contracts.py
 !tests/test_code_island_phase_six_presentation.py
+!tests/test_code_island_phase_seven_release.py
+!tests/test_code_island_phase_seven_bundle.py
 *.sh
+!scripts/verify-code-island-bundle.sh
 comparison_report.json
 *.txt
+!Packages/CodeIsland/Sources/CodeIslandUI/Resources/ThirdPartyNotices/CodeIsland-LICENSE.txt
 ANIMATION_DEBUG_GUIDE.md
 MIGRATION_SUMMARY.md
 ONBOARDING_ENHANCEMENT.md

@@ -7,6 +7,7 @@
 import AppKit
 import AVFoundation
 import Combine
+import CodeIslandUI
 import Defaults
 import EventKit
 import KeyboardShortcuts
@@ -107,7 +108,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shelf: return String(localized: "Shelf")
         case .shortcuts: return String(localized: "Shortcuts")
         case .notes: return String(localized: "Notes")
-        case .codeIsland: return String(localized: "Code Island")
+        case .codeIsland: return CodeIslandLocalization.string("Code Island")
         case .terminal: return String(localized: "Terminal")
         case .about: return String(localized: "About")
         }
@@ -931,8 +932,8 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .colorPicker, title: "Show All Color Formats", keywords: ["hex", "hsl", "color formats"], highlightID: SettingsTab.colorPicker.highlightID(for: "Show All Color Formats")),
 
             // Code Island
-            SettingsSearchEntry(tab: .codeIsland, title: "Code Island status", keywords: ["code island", "codex", "agent", "provider", "monitoring"], highlightID: nil),
-            SettingsSearchEntry(tab: .codeIsland, title: "Codex capability", keywords: ["code island", "codex", "capability", "activation", "questions", "approvals"], highlightID: nil),
+            SettingsSearchEntry(tab: .codeIsland, title: CodeIslandLocalization.string("Code Island status"), keywords: ["code island", "codex", "agent", "provider", "monitoring"], highlightID: nil),
+            SettingsSearchEntry(tab: .codeIsland, title: CodeIslandLocalization.string("Codex capability"), keywords: ["code island", "codex", "capability", "activation", "questions", "approvals"], highlightID: nil),
 
             // Terminal
             SettingsSearchEntry(tab: .terminal, title: "Enable terminal", keywords: ["terminal", "guake", "shell"], highlightID: SettingsTab.terminal.highlightID(for: "Enable terminal")),

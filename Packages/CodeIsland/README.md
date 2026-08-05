@@ -4,7 +4,7 @@ Code Island is an internal Swift package for Atoll. It is not a standalone
 application. Atoll links its three library products and remains the only app,
 window owner, settings owner, and update lifecycle.
 
-Phases 1 through 6 establish four products:
+Phases 1 through 7 establish four products:
 
 - `CodeIslandCore` for provider-neutral, sanitized session metadata.
 - `CodeIslandRuntime` for metadata storage, capability gating, read-only tool
@@ -33,6 +33,16 @@ The runtime emits sanitized intents while Atoll exclusively owns live-activity
 priority, queued start/completion/failure pop-outs, timing, tab selection, and
 origin activation. Exact-origin suppression requires a positive terminal TTY
 or iTerm session-ID match; a frontmost application alone is never sufficient.
+
+Phase 7 adds Atoll-owned grouping, terminal-metadata retention, presentation,
+mascot, and sound preferences without creating a second settings lifecycle.
+Retention advances on its own timer, active sessions never expire, and legacy
+feature preferences remain read-only unless the user selects the default-off
+import during activation. `CodeIslandUI` packages a dedicated English source
+catalog, four audited upstream WAV effects, and the complete upstream MIT
+license. CI and release workflows verify the single-app resource/helper shape;
+the credentialed release path additionally verifies Developer ID signing,
+notarization stapling, and Gatekeeper assessment.
 
 Imported source and test candidates live under `Upstream` directories excluded
 by SwiftPM. New focused implementations sit beside that quarantine; the

@@ -157,6 +157,32 @@ public enum CodeIslandPresentationDisposition: Equatable, Sendable {
     case dismiss
 }
 
+/// Atoll-owned completion treatments that still fit the shared notch lifecycle.
+public enum CodeIslandCompletionPresentation: String, Codable, CaseIterable, Hashable, Sendable {
+    /// Use the full five-second Code Island completion pop-out.
+    case expand
+
+    /// Use the same content-free treatment for a shorter glance.
+    case glance
+
+    /// Update dashboard state without presenting a completion pop-out.
+    case off
+}
+
+/// User-controlled inputs accepted by the otherwise pure presentation policy.
+public struct CodeIslandPresentationPreferences: Equatable, Sendable {
+    public var smartSuppressionEnabled: Bool
+    public var completionPresentation: CodeIslandCompletionPresentation
+
+    public init(
+        smartSuppressionEnabled: Bool = true,
+        completionPresentation: CodeIslandCompletionPresentation = .expand
+    ) {
+        self.smartSuppressionEnabled = smartSuppressionEnabled
+        self.completionPresentation = completionPresentation
+    }
+}
+
 /// Deterministic, provider-neutral presentation policy.
 ///
 /// It accepts sanitized intents and Atoll occupancy facts only. It cannot open
@@ -166,7 +192,8 @@ public struct CodeIslandPresentationPolicy: Sendable {
 
     public func disposition(
         for intent: CodeIslandActivityIntent,
-        context: CodeIslandPresentationContext
+        context: CodeIslandPresentationContext,
+        preferences: CodeIslandPresentationPreferences = CodeIslandPresentationPreferences()
     ) -> CodeIslandPresentationDisposition {
         switch intent.kind {
         case .processing:
@@ -185,19 +212,23 @@ public struct CodeIslandPresentationPolicy: Sendable {
                 : .enqueue
 
         case .attentionRequired(let reason):
-            guard context.originMatch != .exactSession else { return .suppress }
+            guard !preferences.smartSuppressionEnabled
+                    || context.originMatch != .exactSession else { return .suppress }
             return context.occupancy == .systemOrPrivacy
                 ? .enqueue
                 : .present(.attention(reason))
 
         case .completed:
-            guard context.originMatch != .exactSession else { return .suppress }
+            guard preferences.completionPresentation != .off else { return .stateOnly }
+            guard !preferences.smartSuppressionEnabled
+                    || context.originMatch != .exactSession else { return .suppress }
             return context.occupancy == .available
                 ? .present(.completed)
                 : .enqueue
 
         case .failed:
-            guard context.originMatch != .exactSession else { return .suppress }
+            guard !preferences.smartSuppressionEnabled
+                    || context.originMatch != .exactSession else { return .suppress }
             return context.occupancy == .available
                 ? .present(.failed)
                 : .enqueue
