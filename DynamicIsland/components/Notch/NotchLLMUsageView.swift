@@ -44,8 +44,17 @@ struct NotchLLMUsageView: View {
     @ViewBuilder
     private func card(for provider: ProviderID) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
+            HStack(spacing: 6) {
                 Text(provider.displayName).font(.headline)
+                // Subscription plan badge (e.g. "Max 5x"). Only set for Claude; nil elsewhere.
+                if case .success(let snap) = manager.results[provider] ?? .loading, let plan = snap.plan {
+                    Text(plan)
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.white.opacity(0.12), in: Capsule())
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 if provider == .antigravity {
                     Picker("", selection: $antigravityPool) {
