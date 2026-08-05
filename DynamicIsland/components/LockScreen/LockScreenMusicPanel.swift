@@ -71,6 +71,7 @@ struct LockScreenMusicPanel: View {
     @Default(.lockScreenMusicFullscreenArtworkEnabled) private var fullscreenArtworkEnabled
     @Default(.lockScreenKeepAlbumArtVisibleDuringFullscreenArtwork) private var keepAlbumArtVisibleDuringFullscreenArtwork
     @Default(.lockScreenMusicFullscreenVideoArtwork) private var fullscreenVideoArtwork
+    @Default(.lockScreenWidgetAppearance) private var widgetAppearance
 
     init(animator: LockScreenPanelAnimator) {
         _animator = ObservedObject(wrappedValue: animator)
@@ -322,14 +323,16 @@ struct LockScreenMusicPanel: View {
                         isExplicit: !musicManager.songTitle.isEmpty && musicManager.isCurrentTrackExplicit,
                         font: .system(size: 12, weight: .semibold),
                         nsFont: .subheadline,
-                        textColor: .white,
+                        textColor: widgetAppearance.primary(),
                         minDuration: 0.45,
                         frameWidth: geo.size.width,
                         badgeSpacing: 5,
                         badgeLabel: "E",
                         badgeHeight: 13,
-                        badgeForegroundColor: Color.black.opacity(0.72),
-                        badgeBackgroundColor: Color.white.opacity(0.46),
+                        badgeForegroundColor: widgetAppearance.usesLightGlyphs
+                            ? Color.black.opacity(0.72)
+                            : Color.white.opacity(0.85),
+                        badgeBackgroundColor: widgetAppearance.primary(opacity: 0.46),
                         badgeHorizontalPadding: 4,
                         badgeMinWidth: 14,
                         badgeCornerRadius: 4
@@ -337,7 +340,7 @@ struct LockScreenMusicPanel: View {
 
                     Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
                         .font(.system(size: 10, weight: .regular))
-                        .foregroundColor(Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .gray)
+                        .foregroundColor(artistLabelColor(factor: 0.6))
                         .lineLimit(1)
                 }
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
@@ -358,14 +361,16 @@ struct LockScreenMusicPanel: View {
                         isExplicit: !musicManager.songTitle.isEmpty && musicManager.isCurrentTrackExplicit,
                         font: .system(size: 18, weight: .semibold),
                         nsFont: .title3,
-                        textColor: .white,
+                        textColor: widgetAppearance.primary(),
                         minDuration: 0.55,
                         frameWidth: geo.size.width,
                         badgeSpacing: 6,
                         badgeLabel: "E",
                         badgeHeight: 16,
-                        badgeForegroundColor: Color.black.opacity(0.74),
-                        badgeBackgroundColor: Color.white.opacity(0.5),
+                        badgeForegroundColor: widgetAppearance.usesLightGlyphs
+                            ? Color.black.opacity(0.74)
+                            : Color.white.opacity(0.88),
+                        badgeBackgroundColor: widgetAppearance.primary(opacity: 0.5),
                         badgeHorizontalPadding: 5,
                         badgeMinWidth: 17,
                         badgeCornerRadius: 5
@@ -373,7 +378,7 @@ struct LockScreenMusicPanel: View {
 
                     Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.7) : .gray)
+                        .foregroundColor(artistLabelColor(factor: 0.7))
                         .lineLimit(2)
                 }
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
@@ -560,7 +565,8 @@ struct LockScreenMusicPanel: View {
                 labelLayout: .inline,
                 trailingLabel: .remaining,
                 restingTrackHeight: 7,
-                draggingTrackHeight: 11
+                draggingTrackHeight: 11,
+                tintOverride: progressSliderTint
             )
         }
         .onAppear {
@@ -577,12 +583,19 @@ struct LockScreenMusicPanel: View {
     private var sliderColor: Color {
         switch Defaults[.sliderColor] {
         case .white:
-            return .white
+            return widgetAppearance.primary()
         case .albumArt:
-            return Color(nsColor: musicManager.avgColor)
+            let base = Color(nsColor: musicManager.avgColor)
+            return widgetAppearance.usesLightGlyphs
+                ? base.ensureMinimumBrightness(factor: 0.6)
+                : base
         case .accent:
             return .accentColor
         }
+    }
+
+    private var progressSliderTint: Color {
+        sliderColor
     }
 
     private var brandAccentColor: Color {
@@ -749,7 +762,7 @@ struct LockScreenMusicPanel: View {
 
         return HoverButton(
             icon: iconName,
-            iconColor: .white,
+            iconColor: widgetAppearance.primary(),
             scale: .large,
             pressEffect: nil
         ) {
@@ -771,7 +784,7 @@ struct LockScreenMusicPanel: View {
         let resolvedActiveColor = activeColor ?? brandAccentColor
         let frameSize: CGFloat = isExpanded ? 56 : 32
         let iconSize: CGFloat = isExpanded ? max(size, 24) : size
-        let iconColor = isActive ? resolvedActiveColor : .white.opacity(0.8)
+        let iconColor = isActive ? resolvedActiveColor : widgetAppearance.primary(opacity: 0.8)
         let backgroundOpacity: Double = isActive ? 0.22 : 0.0
 
         return PanelControlButton(
@@ -796,7 +809,7 @@ struct LockScreenMusicPanel: View {
             icon: mediaOutputIcon,
             frameSize: frameSize,
             iconSize: iconSize,
-            iconColor: shouldShowVolumeSlider ? .accentColor : .white.opacity(0.8),
+            iconColor: shouldShowVolumeSlider ? .accentColor : widgetAppearance.primary(opacity: 0.8),
             backgroundOpacity: shouldShowVolumeSlider ? 0.22 : 0.0,
             interaction: .none,
             symbolEffect: .replace,
@@ -813,7 +826,7 @@ struct LockScreenMusicPanel: View {
             icon: "airplayaudio",
             frameSize: frameSize,
             iconSize: iconSize,
-            iconColor: isAirPlayPopoverPresented ? .accentColor : .white.opacity(0.8),
+            iconColor: isAirPlayPopoverPresented ? .accentColor : widgetAppearance.primary(opacity: 0.8),
             backgroundOpacity: isAirPlayPopoverPresented ? 0.22 : 0.0,
             interaction: .none,
             symbolEffect: .replace
@@ -845,12 +858,12 @@ struct LockScreenMusicPanel: View {
             if !line.isEmpty {
                 Image(systemName: "music.note")
                     .font(.system(size: isExpanded ? 14 : 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(widgetAppearance.primary(opacity: 0.7))
                     .symbolRenderingMode(.monochrome)
 
                 Text(line)
                     .font(.system(size: isExpanded ? 14 : 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.88))
+                    .foregroundColor(widgetAppearance.primary(opacity: 0.88))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -881,7 +894,7 @@ struct LockScreenMusicPanel: View {
         HStack(spacing: 14) {
             Image(systemName: volumeIconName)
                 .font(.system(size: isExpanded ? 16 : 14, weight: .semibold))
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(widgetAppearance.primary(opacity: 0.8))
 
             Slider(
                 value: Binding(
@@ -897,7 +910,7 @@ struct LockScreenMusicPanel: View {
 
             Text(volumePercentage)
                 .font(.system(size: isExpanded ? 12 : 11, weight: .medium, design: .monospaced))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(widgetAppearance.primary(opacity: 0.7))
                 .frame(width: 48, alignment: .trailing)
         }
         .padding(.vertical, 8)
@@ -913,7 +926,7 @@ struct LockScreenMusicPanel: View {
             if airPlayManager.devices.isEmpty {
                 Text("No AirPlay outputs available")
                     .font(.system(size: isExpanded ? 13 : 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.68))
+                    .foregroundColor(widgetAppearance.primary(opacity: 0.68))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
@@ -929,10 +942,10 @@ struct LockScreenMusicPanel: View {
                                     HStack(spacing: 8) {
                                         Image(systemName: device.iconName)
                                             .font(.system(size: isExpanded ? 14 : 12, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.8))
+                                            .foregroundColor(widgetAppearance.primary(opacity: 0.8))
                                         Text(device.name)
                                             .font(.system(size: isExpanded ? 13 : 11, weight: .medium))
-                                            .foregroundColor(.white)
+                                            .foregroundColor(widgetAppearance.primary())
                                             .lineLimit(1)
                                         Spacer()
                                         if device.isSelected {
@@ -969,7 +982,7 @@ struct LockScreenMusicPanel: View {
             if routeManager.devices.isEmpty {
                 Text("No audio outputs available")
                     .font(.system(size: isExpanded ? 13 : 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.68))
+                    .foregroundColor(widgetAppearance.primary(opacity: 0.68))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 8)
                     .padding(.horizontal, 12)
@@ -984,10 +997,10 @@ struct LockScreenMusicPanel: View {
                                 HStack(spacing: 8) {
                                     Image(systemName: device.iconName)
                                         .font(.system(size: isExpanded ? 14 : 12, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.82))
+                                        .foregroundColor(widgetAppearance.primary(opacity: 0.82))
                                     Text(device.name)
                                         .font(.system(size: isExpanded ? 13 : 11, weight: .medium))
-                                        .foregroundColor(.white)
+                                        .foregroundColor(widgetAppearance.primary())
                                         .lineLimit(1)
                                     Spacer()
                                     if device.id == routeManager.activeDeviceID {
@@ -1019,10 +1032,19 @@ struct LockScreenMusicPanel: View {
     }
 
     private var sliderBackgroundFill: Color {
-        if usesLiquidGlass {
-            return Color.white.opacity(0.05)
+        widgetAppearance.primary(opacity: usesLiquidGlass ? 0.05 : 0.08)
+    }
+
+    private func artistLabelColor(factor: CGFloat) -> Color {
+        if Defaults[.playerColorTinting] {
+            let base = Color(nsColor: musicManager.avgColor)
+            return widgetAppearance.usesLightGlyphs
+                ? base.ensureMinimumBrightness(factor: factor)
+                : base
         }
-        return Color.white.opacity(0.08)
+        return widgetAppearance.usesLightGlyphs
+            ? .gray
+            : Color.black.opacity(0.55)
     }
 
     private var isAppleMusicActive: Bool {
@@ -1143,23 +1165,25 @@ struct LockScreenMusicPanel: View {
 
     @ViewBuilder
     private var panelBackgroundLayer: some View {
-        if usesSpotifyCanvasFallbackContentPresentation {
-            canvasFallbackScrim
-        } else if usesCustomLiquidGlass {
-            customLiquidPanelBackdrop
-        } else if usesStandardLiquidGlass {
-            standardLiquidPanelBackdrop
-        } else if shouldUseFrostedBlur {
-            frostedPanelBackground
-        } else {
-            opaquePanelBackground
+        Group {
+            if usesSpotifyCanvasFallbackContentPresentation {
+                canvasFallbackScrim
+            } else if usesCustomLiquidGlass {
+                customLiquidPanelBackdrop
+            } else if usesStandardLiquidGlass {
+                standardLiquidPanelBackdrop
+            } else if shouldUseFrostedBlur {
+                frostedPanelBackground
+            } else {
+                opaquePanelBackground
+            }
         }
+        .environment(\.colorScheme, widgetAppearance.materialColorScheme)
     }
 
     private var canvasFallbackScrim: some View {
         RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
             .fill(.ultraThinMaterial)
-            .environment(\.colorScheme, .dark)
             .overlay {
                 LinearGradient(
                     colors: [
@@ -1211,7 +1235,7 @@ struct LockScreenMusicPanel: View {
 
     private var opaquePanelBackground: some View {
         RoundedRectangle(cornerRadius: panelCornerRadius)
-            .fill(Color.black.opacity(0.45))
+            .fill(widgetAppearance.usesLightGlyphs ? Color.black.opacity(0.45) : Color.white.opacity(0.55))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
@@ -1397,6 +1421,7 @@ private struct PanelControlButton: View {
     let symbolEffect: SymbolEffectStyle
     let action: () -> Void
 
+    @Default(.lockScreenWidgetAppearance) private var appearance
     @State private var isHovering = false
     @State private var pressOffset: CGFloat = 0
     @State private var rotationAngle: Double = 0
@@ -1427,7 +1452,7 @@ private struct PanelControlButton: View {
     private var backgroundColor: Color {
         let hoveredOpacity = max(backgroundOpacity + 0.08, 0.18)
         let appliedOpacity = isHovering ? hoveredOpacity : backgroundOpacity
-        return Color.white.opacity(min(appliedOpacity, 0.32))
+        return appearance.primary(opacity: min(appliedOpacity, 0.32))
     }
 
     private func triggerPressEffect() {

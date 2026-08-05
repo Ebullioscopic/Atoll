@@ -980,6 +980,7 @@ extension Defaults.Keys {
     static let lockScreenMusicAlbumParallaxEnabled = Key<Bool>("lockScreenMusicAlbumParallaxEnabled", default: false)
     static let lockScreenTimerVerticalOffset = Key<Double>("lockScreenTimerVerticalOffset", default: 0)
     static let lockScreenTimerWidgetWidth = Key<Double>("lockScreenTimerWidgetWidth", default: 350)
+    static let lockScreenWidgetAppearance = Key<LockScreenWidgetAppearance>("lockScreenWidgetAppearance", default: .dark)
     static let lockScreenGlassStyle = Key<LockScreenGlassStyle>("lockScreenGlassStyle", default: .liquid)
     static let lockScreenGlassCustomizationMode = Key<LockScreenGlassCustomizationMode>(
         "lockScreenGlassCustomizationMode",

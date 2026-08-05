@@ -779,6 +779,8 @@ struct MusicSliderView: View {
     var trailingLabel: TrailingLabel = .duration
     var restingTrackHeight: CGFloat = 8
     var draggingTrackHeight: CGFloat = 14
+    /// When set, bypasses Defaults[.sliderColor] (used by lock screen appearance).
+    var tintOverride: Color? = nil
 
     enum TimeLabelLayout {
         case stacked
@@ -904,7 +906,10 @@ struct MusicSliderView: View {
         )
     }
 
-    private var sliderTint: Color {//
+    private var sliderTint: Color {
+        if let tintOverride {
+            return tintOverride
+        }
         switch Defaults[.sliderColor] {
         case .albumArt:
             return Color(nsColor: color).ensureMinimumBrightness(factor: 0.6)
