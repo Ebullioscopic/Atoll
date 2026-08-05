@@ -2,9 +2,9 @@ import CodeIslandCore
 
 /// Atoll-owned Code Island runtime boundary.
 ///
-/// Phases 2 and 3 provide pure adapters, persistence contracts, and an Atoll
-/// host seam while retaining an inert provider lifecycle. Discovery and
-/// activation arrive in later phases.
+/// Phase 4 adds read-only discovery and consent-bound activation machinery,
+/// while retaining an inert provider lifecycle. No live listener or installer
+/// is constructed until a provider completes the Phase 5 rollout gate.
 public final class CodeIslandRuntime: @unchecked Sendable {
     /// Code Island never activates a provider without explicit user consent.
     public static let isEnabledByDefault = false
@@ -12,6 +12,6 @@ public final class CodeIslandRuntime: @unchecked Sendable {
     /// Whether any provider listener or monitoring service is currently active.
     public var isRunning: Bool { false }
 
-    /// Creates the inert Phase 2 runtime boundary without starting services.
+    /// Creates the inert runtime boundary without starting services.
     public init() {}
 }

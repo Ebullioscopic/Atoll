@@ -19,27 +19,30 @@ enum CodeIslandHostLifecycleState: Equatable {
     case running
 }
 
-/// Owns the inert Code Island feature lifecycle inside the Atoll process.
+/// Owns the Code Island feature shell and read-only discovery inside Atoll.
 ///
-/// Phase 3 starts only this host shell. The contained runtime remains disabled,
-/// and this type performs no discovery, listener startup, persistence, or tool
-/// configuration writes.
+/// Phase 4 may inspect provider and adoption state. The contained runtime stays
+/// disabled and this host starts no listener, installer, repair, or persistence.
 final class CodeIslandHost: ObservableObject {
     static let shared = CodeIslandHost()
 
     @Published private(set) var lifecycleState: CodeIslandHostLifecycleState = .stopped
     @Published private(set) var dashboardState: CodeIslandDashboardState = .setupRequired(provider: .codex)
     @Published private(set) var pendingActivityIntent: CodeIslandActivityIntent?
+    @Published private(set) var discoveryAssessment: CodeIslandAdoptionAssessment?
 
     private let runtime: CodeIslandRuntime
     private let activityIntentAdapter: CodeIslandActivityIntentAdapter
+    private let discovery: CodeIslandReadOnlyDiscovery
 
     private init(
         runtime: CodeIslandRuntime = CodeIslandRuntime(),
-        activityIntentAdapter: CodeIslandActivityIntentAdapter = CodeIslandActivityIntentAdapter()
+        activityIntentAdapter: CodeIslandActivityIntentAdapter = CodeIslandActivityIntentAdapter(),
+        discovery: CodeIslandReadOnlyDiscovery = CodeIslandReadOnlyDiscovery()
     ) {
         self.runtime = runtime
         self.activityIntentAdapter = activityIntentAdapter
+        self.discovery = discovery
     }
 
     /// Starts the Atoll-owned shell without activating the provider runtime.
@@ -49,11 +52,18 @@ final class CodeIslandHost: ObservableObject {
         dashboardState = runtime.isRunning
             ? .idle(provider: .codex)
             : .setupRequired(provider: .codex)
+        refreshDiscovery()
+    }
+
+    /// Refreshes provider and standalone-CodeIsland state without mutating it.
+    func refreshDiscovery() {
+        discoveryAssessment = discovery.assessCodex()
     }
 
     /// Clears transient host state during Atoll shutdown.
     func stop() {
         pendingActivityIntent = nil
+        discoveryAssessment = nil
         lifecycleState = .stopped
     }
 

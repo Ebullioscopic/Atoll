@@ -20,7 +20,7 @@ git subtree add --prefix=Packages/CodeIsland ../CodeIsland main
 
 ## Atoll-only changes
 
-Phases 1 through 3 intentionally change the imported source boundary before
+Phases 1 through 4 intentionally change the imported source boundary before
 any provider integration is activated:
 
 - Replaces the standalone `CodeIsland` application product with internal
@@ -38,13 +38,18 @@ any provider integration is activated:
   it cannot start a listener, install hooks, or mutate provider configuration.
 - Adds content-free activity intents and an Atoll-native setup/idle dashboard.
   Imported rich views remain quarantined until the presentation phase.
+- Replaces the upstream install-on-launch behavior with Codex-only read-only
+  discovery, a plan-bound consent token, listener-before-installer coordination,
+  exact ownership receipts, digest-verified helper removal, and conservative
+  stale-socket reclamation. These adapters are tested against temporary paths
+  but remain unreachable from production activation until Phase 5.
 
 ### Migration staging
 
 | Upstream area | Current disposition | Earliest remaining migration phase |
 |---|---|---|
 | Rich Core models, normalizers, transcript readers, provider scanners, and retained upstream tests | `Sources/CodeIslandCore/Upstream`; excluded from SwiftPM. New sanitized Phase 2 contracts are active beside the quarantine. | Provider-neutral pieces only when their metadata boundary is proven |
-| `HookServer`, `ConfigInstaller`, provider resources, and origin helpers | `Sources/CodeIslandRuntime/Upstream`; excluded from SwiftPM. A new Codex-only adapter and metadata store are active beside the quarantine. | Phases 4 and 5 as activation and provider contracts are proven |
+| `HookServer`, `ConfigInstaller`, provider resources, and origin helpers | `Sources/CodeIslandRuntime/Upstream`; excluded from SwiftPM. New Codex-only discovery, activation coordination, socket preflight, and managed installer contracts are active beside the quarantine. | Phase 5 for the live listener, bundled bridge delivery, repair loop, and provider rollout |
 | Mascots, sounds, icons, and reusable visual candidates | `Sources/CodeIslandUI/Upstream`; excluded from SwiftPM | Phase 6, after Atoll-host adaptation |
 
 Core migration staging is deliberate: the imported `SessionSnapshot`, hook
@@ -107,6 +112,7 @@ python3 -m unittest tests.test_code_island_phase_two_contracts
 python3 -m unittest tests.test_code_island_phase_three_dashboard \
   tests.test_code_island_phase_three_activity \
   tests.test_code_island_phase_three_settings
+python3 -m unittest tests.test_code_island_phase_four_contracts
 python3 -m unittest tests.test_privacy_configuration
 python3 -m unittest tests.test_timer_lifecycle
 swift test --package-path Packages/CodeIsland

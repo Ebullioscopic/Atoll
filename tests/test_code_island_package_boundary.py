@@ -147,8 +147,12 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
         self.assertEqual(
             [
                 "ActivityIntent.swift",
+                "CodeIslandActivationCoordinator.swift",
+                "CodeIslandAdoptionPreflight.swift",
+                "CodeIslandDiscovery.swift",
                 "CodeIslandRuntime.swift",
                 "CodexHookAdapter.swift",
+                "CodexManagedInstallation.swift",
                 "NonOwningHookCompletion.swift",
                 "ProviderCapabilities.swift",
                 "SessionMetadataStore.swift",
@@ -192,6 +196,7 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
             "tests.test_code_island_phase_three_settings",
         ):
             self.assertIn(phase_three_test, workflow)
+        self.assertIn("tests.test_code_island_phase_four_contracts", workflow)
         self.assertIn("swift test --package-path Packages/CodeIsland", workflow)
 
     def test_phase_three_modules_are_linked_without_a_second_executable(self):
