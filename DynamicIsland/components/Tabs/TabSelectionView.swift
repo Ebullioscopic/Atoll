@@ -67,10 +67,19 @@ struct TabSelectionView: View {
     /// Which tab the pointer is currently resting on, when hover switching is on.
     @State private var hoveredTabID: String?
 
+    /// Whether hover switching may act yet. The tab bar is built when the notch
+    /// opens, and the notch opens under a pointer that is already sitting there,
+    /// so the first hover it reports belongs to the pointer that opened the notch
+    /// rather than to a choice. Acting on that switches tabs on its own.
+    @State private var hoverArmed = false
+
     /// Long enough that a pointer crossing the rail on its way elsewhere does not
     /// drag the selection with it, short enough that a deliberate hover still
     /// feels immediate.
     private let hoverDwell = Duration.milliseconds(150)
+
+    /// Time the notch is given to finish opening before a hover counts as intent.
+    private let hoverArmingDelay = Duration.milliseconds(500)
     
     private var tabs: [TabModel] {
         var tabsArray: [TabModel] = []
@@ -194,8 +203,16 @@ struct TabSelectionView: View {
         }
         // Moving on to another icon cancels the pending switch along with the
         // task, so only the icon actually rested on ever wins.
+        // Arms hover switching once, a beat after the bar appears.
+        .task {
+            hoverArmed = false
+            try? await Task.sleep(for: hoverArmingDelay)
+            guard !Task.isCancelled else { return }
+            hoverArmed = true
+        }
         .task(id: hoveredTabID) {
             guard tabSwitchOnHover,
+                  hoverArmed,
                   let hoveredTabID,
                   let tab = tabs.first(where: { $0.id == hoveredTabID }),
                   !isSelected(tab)
