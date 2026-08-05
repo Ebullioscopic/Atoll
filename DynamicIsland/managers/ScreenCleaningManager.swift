@@ -99,7 +99,11 @@ final class ScreenCleaningManager: ObservableObject {
         }
 
         // Only the first screen's window becomes key, responsible for receiving ESC.
-        overlayWindows.first?.makeKey()
+        if let keyWindow = overlayWindows.first {
+            keyWindow.makeKey()
+            // Route key events to the overlay view so `keyDown` actually sees ESC.
+            keyWindow.makeFirstResponder(keyWindow.contentView)
+        }
         fadeOutHints()
     }
 

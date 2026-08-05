@@ -40,6 +40,13 @@ final class CleaningOverlayView: NSView {
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { true }
 
+    /// Accept the very first click even when the overlay's window is inactive.
+    ///
+    /// The overlay is shown with `orderFrontRegardless()` above the front app. Only the first
+    /// screen's window is made key; on secondary displays the window stays inactive, so without
+    /// this the first click there is consumed just to activate the window instead of dismissing.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     override func mouseDown(with event: NSEvent) {
         onDismiss?()
     }
