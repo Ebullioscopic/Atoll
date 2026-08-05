@@ -122,6 +122,9 @@ class TimerManager: ObservableObject {
         }
     }
     
+    /// Wall-clock time when the current manual timer started (cleared on reset).
+    private(set) var startedAt: Date? = nil
+
     private var timerInstance: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var soundPlayer: AVAudioPlayer?
@@ -177,7 +180,8 @@ class TimerManager: ObservableObject {
         lastUpdated = Date()
 
         activePresetId = preset?.id
-        
+        startedAt = Date()
+
         // Start countdown timer
         timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
@@ -370,6 +374,51 @@ class TimerManager: ObservableObject {
         resetTimer()
     }
     
+    /// Starts a 24-hour stopwatch pre-seeded with `elapsed` seconds already counted.
+    /// Used when syncing a running Toggl entry — the original Toggl start is stored
+    /// separately in TogglManager.syncedOriginalStart for the eventual POST.
+    func startTimerFromOffset(_ elapsed: TimeInterval, name: String) {
+        if activeSource == .external { endExternalTimer(triggerSmoothClose: false) }
+        timerInstance?.invalidate()
+
+        let duration: TimeInterval = 86400
+        withAnimation(.smooth) { isTimerActive = true }
+        activeSource = .manual
+        isFinished = false
+        // Offsets at or past the 24h ceiling start directly in overtime.
+        isOvertime = elapsed >= duration
+        timerName = name.isEmpty ? "Timer" : name
+        totalDuration = duration
+        remainingTime = duration - elapsed
+        elapsedTime = elapsed
+        isPaused = false
+        startedAt = Date()
+        lastUpdated = Date()
+        activePresetId = nil
+
+        timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                if !self.isPaused {
+                    if self.remainingTime > 0 {
+                        self.remainingTime -= 1
+                        self.elapsedTime = self.totalDuration - self.remainingTime
+                        self.lastUpdated = Date()
+                    } else if self.remainingTime == 0 {
+                        self.isFinished = true
+                        self.isOvertime = true
+                        self.playTimerSound()
+                        self.remainingTime = -1
+                        self.lastUpdated = Date()
+                    } else {
+                        self.remainingTime -= 1
+                        self.lastUpdated = Date()
+                    }
+                }
+            }
+        }
+    }
+
     private func resetTimer() {
         endTimerSession()
         withAnimation(.smooth) {
@@ -384,6 +433,7 @@ class TimerManager: ObservableObject {
         isOvertime = false
         activePresetId = nil
         activeSource = .none
+        startedAt = nil
     }
 
     // MARK: - Derived State

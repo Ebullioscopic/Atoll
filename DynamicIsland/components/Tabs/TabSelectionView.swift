@@ -53,6 +53,8 @@ struct TabSelectionView: View {
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.enableColorPickerFeature) var enableColorPickerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
+    @Default(.togglEnabled) private var togglEnabled
+    @ObservedObject private var togglManager = TogglManager.shared
     @Default(.enableThirdPartyExtensions) private var enableThirdPartyExtensions
     @Default(.enableExtensionNotchExperiences) private var enableExtensionNotchExperiences
     @Default(.enableExtensionNotchTabs) private var enableExtensionNotchTabs
@@ -75,6 +77,10 @@ struct TabSelectionView: View {
         
         if enableTimerFeature && timerDisplayMode == .tab {
             tabsArray.append(TabModel(label: "Timer", icon: "timer", view: .timer))
+        }
+
+        if togglEnabled && togglManager.isReady {
+            tabsArray.append(TabModel(label: "Toggl", icon: "clock.arrow.trianglehead.counterclockwise.rotate.90", view: .toggl))
         }
 
         // Stats tab only shown when stats feature is enabled
@@ -147,6 +153,14 @@ struct TabSelectionView: View {
         }
         .clipShape(Capsule())
         .onAppear {
+            ensureValidSelection(with: tabs)
+        }
+        // Re-validate when Toggl availability changes so a selected .toggl tab
+        // moves to a remaining tab the moment it disappears from the tab list.
+        .onChange(of: togglEnabled) { _, _ in
+            ensureValidSelection(with: tabs)
+        }
+        .onChange(of: togglManager.isReady) { _, _ in
             ensureValidSelection(with: tabs)
         }
     }

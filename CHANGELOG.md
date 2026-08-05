@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Toggl Integration**: Toggl Track time tracking as a dedicated notch tab — start/stop entries with description and project, sync a running Toggl timer into the notch, recent-entry quick start, closed-notch live activity with elapsed time, and offline retry for failed saves (#530)
 
 - Show the current Claude subscription plan (e.g. `Max 5x`) as a badge next to the Claude card title in the LLM Usage view (#684).
 - **AntiGravity Usage Tracking**: Track how much of Antigravity usage is left in the LLM Usage Monitor tab (both Gemini and Claude models)

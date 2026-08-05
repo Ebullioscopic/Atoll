@@ -53,6 +53,7 @@ struct ContentView: View {
     @ObservedObject var extensionLiveActivityManager = ExtensionLiveActivityManager.shared
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @ObservedObject var localSendService = LocalSendService.shared
+    @ObservedObject var togglManager = TogglManager.shared
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     
@@ -891,6 +892,8 @@ struct ContentView: View {
                           switch musicSecondary {
                           case .timer:
                               return currentScreenExpansionType == .timer
+                          case .toggl:
+                              return false
                           case .reminder:
                               return currentScreenExpansionType == .reminder
                           case .recording:
@@ -944,6 +947,8 @@ struct ContentView: View {
                               .transition(closedLiveActivitySwapTransition)
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .timer) && vm.notchState == .closed && timerManager.isTimerActive && coordinator.timerLiveActivityEnabled && !vm.hideOnClosed {
                           TimerLiveActivity()
+                      } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && togglManager.isRunning && !vm.hideOnClosed {
+                          TogglLiveActivity()
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .reminder) && vm.notchState == .closed && reminderManager.isActive && enableReminderLiveActivity && !vm.hideOnClosed {
                           ReminderLiveActivity()
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording) && vm.notchState == .closed && (recordingManager.isRecording || !recordingManager.isRecorderIdle) && Defaults[.enableScreenRecordingDetection] && !vm.hideOnClosed && !musicPairingEligible {
@@ -1088,6 +1093,8 @@ struct ContentView: View {
                                   NotchShelfView()
                               case .timer:
                                   NotchTimerView()
+                              case .toggl:
+                                  NotchTogglView()
                               case .stats:
                                   NotchStatsView()
                               case .llmUsage:
@@ -1309,6 +1316,10 @@ struct ContentView: View {
             return .timer
         }
 
+        if togglManager.isRunning {
+            return .toggl
+        }
+
         if enableReminderLiveActivity, reminderManager.isActive, let reminder = reminderManager.activeReminder {
             return .reminder(reminder)
         }
@@ -1344,6 +1355,11 @@ struct ContentView: View {
         switch secondary {
         case .timer:
             return timerRightWingWidth(baseWidth: baseWidth, centerBaseWidth: centerBaseWidth)
+        case .toggl:
+            let elapsedText = TogglSupplementMetrics.formattedElapsed(for: togglManager.elapsed)
+            let width = TogglSupplementMetrics.elapsedFrameWidth(for: elapsedText)
+            let padding: CGFloat = 18
+            return max(baseWidth, padding + width)
         case .reminder(let entry):
             return reminderRightWingWidth(for: entry, baseWidth: baseWidth, notchHeight: notchHeight, now: reminderManager.currentDate)
         case .capsLock(let showLabel):
@@ -1434,6 +1450,10 @@ struct ContentView: View {
                     Image(systemName: "timer")
                         .font(.system(size: badgeSize * 0.55, weight: .semibold))
                         .foregroundStyle(timerAccentColor)
+                case .toggl:
+                    Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                        .font(.system(size: badgeSize * 0.55, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.87, green: 0.36, blue: 0.22))
                 case .reminder(let entry):
                     let accent = reminderColor(for: entry, now: reminderManager.currentDate)
                     Image(systemName: "clock")
@@ -1499,6 +1519,11 @@ struct ContentView: View {
                 showsCountdown: timerShowsCountdown,
                 showsProgress: timerShowsProgress,
                 progressStyle: timerProgressStyle,
+                notchHeight: notchHeight
+            )
+        case .toggl:
+            MusicTogglSupplementView(
+                togglManager: togglManager,
                 notchHeight: notchHeight
             )
         case .reminder(let entry):
@@ -2661,6 +2686,7 @@ struct ContentView: View {
 
 private enum MusicSecondaryLiveActivity: Equatable {
     case timer
+    case toggl
     case reminder(ReminderLiveActivityManager.ReminderEntry)
     case recording
     case focus(FocusModeType)
@@ -2672,6 +2698,8 @@ private enum MusicSecondaryLiveActivity: Equatable {
         switch self {
         case .timer:
             return "timer"
+        case .toggl:
+            return "toggl"
         case .reminder(let entry):
             return "reminder-\(entry.id)"
         case .recording:
@@ -2805,6 +2833,34 @@ private struct MusicTimerSupplementView: View {
 
 }
 
+private struct MusicTogglSupplementView: View {
+    @ObservedObject var togglManager: TogglManager
+    let notchHeight: CGFloat
+
+    private var wingPadding: CGFloat { 22 }
+
+    private var formattedElapsed: String {
+        TogglSupplementMetrics.formattedElapsed(for: togglManager.elapsed)
+    }
+
+    private var elapsedFrameWidth: CGFloat {
+        TogglSupplementMetrics.elapsedFrameWidth(for: formattedElapsed)
+    }
+
+    var body: some View {
+        Text(formattedElapsed)
+            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            // Tight trailing (~2px) to match the timer supplement — hour-format
+            // elapsed stays flush-right when paired with music.
+            .padding(.trailing, 2)
+            .frame(width: elapsedFrameWidth, height: notchHeight, alignment: .trailing)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+}
+
 private struct MusicReminderSupplementView: View {
     let entry: ReminderLiveActivityManager.ReminderEntry
     let now: Date
@@ -2920,6 +2976,27 @@ private enum TimerSupplementMetrics {
         guard !text.isEmpty else { return 64 }
         let width = musicMeasureText(text, font: MusicSupplementFont.systemFont(ofSize: 12, weight: .medium))
         return max(width + 14, 64)
+    }
+}
+
+enum TogglSupplementMetrics {
+    static func formattedElapsed(for elapsed: TimeInterval) -> String {
+        let total = Int(elapsed)
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        return h > 0
+            ? String(format: "%d:%02d:%02d", h, m, s)
+            : String(format: "%d:%02d", m, s)
+    }
+
+    static func elapsedTextWidth(for text: String) -> CGFloat {
+        // Fully monospaced to match the `.monospaced` render so hour-format elapsed isn't clipped.
+        musicMeasureText(text, font: MusicSupplementFont.monospacedSystemFont(ofSize: 13, weight: .semibold))
+    }
+
+    static func elapsedFrameWidth(for text: String) -> CGFloat {
+        max(elapsedTextWidth(for: text) + 16, 72)
     }
 }
 
