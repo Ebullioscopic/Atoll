@@ -20,8 +20,8 @@ git subtree add --prefix=Packages/CodeIsland ../CodeIsland main
 
 ## Atoll-only changes
 
-Phases 1 and 2 intentionally change the imported source boundary before
-anything is linked into Atoll:
+Phases 1 through 3 intentionally change the imported source boundary before
+any provider integration is activated:
 
 - Replaces the standalone `CodeIsland` application product with internal
   `CodeIslandCore`, `CodeIslandRuntime`, and `CodeIslandUI` libraries.
@@ -33,8 +33,11 @@ anything is linked into Atoll:
   equivalents. The adapter recognizes only documented Codex lifecycle events,
   treats compact SessionStart as continuity, and does not inspect arbitrary
   tool output to manufacture a failure signal.
-- Leaves Atoll's Xcode target unlinked through Phase 2, so the imported source
-  cannot start a listener, install hooks, or mutate provider configuration.
+- Links the three library products into Atoll in Phase 3 while leaving the
+  helper executable unlinked. The Atoll-owned host starts only an inert shell;
+  it cannot start a listener, install hooks, or mutate provider configuration.
+- Adds content-free activity intents and an Atoll-native setup/idle dashboard.
+  Imported rich views remain quarantined until the presentation phase.
 
 ### Migration staging
 
@@ -101,6 +104,9 @@ Run from the Atoll repository root:
 ```sh
 python3 -m unittest tests.test_code_island_package_boundary
 python3 -m unittest tests.test_code_island_phase_two_contracts
+python3 -m unittest tests.test_code_island_phase_three_dashboard \
+  tests.test_code_island_phase_three_activity \
+  tests.test_code_island_phase_three_settings
 python3 -m unittest tests.test_privacy_configuration
 python3 -m unittest tests.test_timer_lifecycle
 swift test --package-path Packages/CodeIsland

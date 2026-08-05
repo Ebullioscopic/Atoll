@@ -118,7 +118,7 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
         self.assertIn("CodeIsland", notice)
         self.assertIn("Packages/CodeIsland/LICENSE", notice)
 
-    def test_only_phase_two_sources_are_active_outside_quarantine(self):
+    def test_only_authorized_sources_are_active_outside_quarantine(self):
         manifest = (PACKAGE / "Package.swift").read_text()
 
         self.assertFalse((PACKAGE / "Sources/CodeIsland").exists())
@@ -146,6 +146,7 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(
             [
+                "ActivityIntent.swift",
                 "CodeIslandRuntime.swift",
                 "CodexHookAdapter.swift",
                 "NonOwningHookCompletion.swift",
@@ -154,6 +155,12 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
             ],
             active_runtime_sources,
         )
+
+        active_ui_sources = sorted(
+            path.name
+            for path in (PACKAGE / "Sources/CodeIslandUI").glob("*.swift")
+        )
+        self.assertEqual(["CodeIslandUI.swift"], active_ui_sources)
 
     def test_standalone_distribution_artifacts_are_absent(self):
         forbidden_paths = (
@@ -179,14 +186,22 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
             "python3 -m unittest tests.test_code_island_package_boundary",
             workflow,
         )
+        for phase_three_test in (
+            "tests.test_code_island_phase_three_dashboard",
+            "tests.test_code_island_phase_three_activity",
+            "tests.test_code_island_phase_three_settings",
+        ):
+            self.assertIn(phase_three_test, workflow)
         self.assertIn("swift test --package-path Packages/CodeIsland", workflow)
 
-    def test_phase_two_package_is_not_linked_into_atoll(self):
+    def test_phase_three_modules_are_linked_without_a_second_executable(self):
         project = ATOLL_PROJECT.read_text()
 
-        self.assertNotIn("Packages/CodeIsland", project)
-        self.assertNotIn("CodeIslandRuntime", project)
-        self.assertNotIn("CodeIslandUI", project)
+        self.assertIn("Packages/CodeIsland", project)
+        self.assertIn("CodeIslandCore", project)
+        self.assertIn("CodeIslandRuntime", project)
+        self.assertIn("CodeIslandUI", project)
+        self.assertNotIn("codeisland-bridge in Frameworks", project)
 
 
 if __name__ == "__main__":

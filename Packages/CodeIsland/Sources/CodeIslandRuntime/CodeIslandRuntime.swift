@@ -2,8 +2,9 @@ import CodeIslandCore
 
 /// Atoll-owned Code Island runtime boundary.
 ///
-/// Phase 2 provides pure adapters and persistence contracts while retaining an
-/// inert lifecycle. Provider discovery and activation arrive in later phases.
+/// Phases 2 and 3 provide pure adapters, persistence contracts, and an Atoll
+/// host seam while retaining an inert provider lifecycle. Discovery and
+/// activation arrive in later phases.
 public final class CodeIslandRuntime: @unchecked Sendable {
     /// Code Island never activates a provider without explicit user consent.
     public static let isEnabledByDefault = false

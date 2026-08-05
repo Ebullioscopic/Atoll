@@ -65,6 +65,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case shelf
     case shortcuts
     case notes
+    case codeIsland
     case terminal
     case about
 
@@ -79,7 +80,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .timer, .calendar, .notes:                                      return .productivity
         case .clipboard, .screenAssistant, .colorPicker, .shelf,
              .downloads, .shortcuts:                                         return .utilities
-        case .stats, .terminal:                                              return .developer
+        case .stats, .codeIsland, .terminal:                                 return .developer
         case .extensions:                                                    return .integrations
         case .about:                                                         return .info
         }
@@ -106,6 +107,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shelf: return String(localized: "Shelf")
         case .shortcuts: return String(localized: "Shortcuts")
         case .notes: return String(localized: "Notes")
+        case .codeIsland: return String(localized: "Code Island")
         case .terminal: return String(localized: "Terminal")
         case .about: return String(localized: "About")
         }
@@ -132,6 +134,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shelf: return "books.vertical"
         case .shortcuts: return "keyboard"
         case .notes: return "note.text"
+        case .codeIsland: return "chevron.left.forwardslash.chevron.right"
         case .terminal: return "apple.terminal"
         case .about: return "info.circle"
         }
@@ -158,6 +161,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shelf: return .brown
         case .shortcuts: return .orange
         case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
+        case .codeIsland: return .indigo
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
         case .about: return .secondary
         }
@@ -296,6 +300,7 @@ struct SettingsView: View {
     @State private var selectedTab: SettingsTab = .general
     @State private var searchText: String = ""
     @StateObject private var highlightCoordinator = SettingsHighlightCoordinator()
+    @ObservedObject private var navigationCoordinator = SettingsNavigationCoordinator.shared
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
 
     let updaterController: SPUStandardUpdaterController?
@@ -357,6 +362,14 @@ struct SettingsView: View {
             if !matches.contains(resolvedSelection) {
                 selectedTab = firstMatch
             }
+        }
+        .onReceive(navigationCoordinator.$pendingDestination.compactMap { $0 }) { destination in
+            switch destination {
+            case .codeIsland:
+                searchText = ""
+                selectedTab = .codeIsland
+            }
+            navigationCoordinator.consume(destination)
         }
         .background {
             Group {
@@ -506,6 +519,7 @@ struct SettingsView: View {
             .shortcuts,
             // Developer
             .stats,
+            .codeIsland,
             .terminal,
             // Integrations
             .extensions,
@@ -916,6 +930,10 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .colorPicker, title: "History Size", keywords: ["color history"], highlightID: SettingsTab.colorPicker.highlightID(for: "History Size")),
             SettingsSearchEntry(tab: .colorPicker, title: "Show All Color Formats", keywords: ["hex", "hsl", "color formats"], highlightID: SettingsTab.colorPicker.highlightID(for: "Show All Color Formats")),
 
+            // Code Island
+            SettingsSearchEntry(tab: .codeIsland, title: "Code Island status", keywords: ["code island", "codex", "agent", "provider", "monitoring"], highlightID: nil),
+            SettingsSearchEntry(tab: .codeIsland, title: "Codex capability", keywords: ["code island", "codex", "capability", "activation", "questions", "approvals"], highlightID: nil),
+
             // Terminal
             SettingsSearchEntry(tab: .terminal, title: "Enable terminal", keywords: ["terminal", "guake", "shell"], highlightID: SettingsTab.terminal.highlightID(for: "Enable terminal")),
             SettingsSearchEntry(tab: .terminal, title: "Shell path", keywords: ["shell", "zsh", "bash", "terminal"], highlightID: SettingsTab.terminal.highlightID(for: "Shell path")),
@@ -1020,6 +1038,10 @@ struct SettingsView: View {
         case .notes:
             SettingsForm(tab: .notes) {
                 NotesSettingsView()
+            }
+        case .codeIsland:
+            SettingsForm(tab: .codeIsland) {
+                CodeIslandSettings()
             }
         case .terminal:
             SettingsForm(tab: .terminal) {

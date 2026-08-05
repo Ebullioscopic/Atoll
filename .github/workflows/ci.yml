@@ -51,6 +51,13 @@ jobs:
       - name: Validate Code Island Phase 2 contracts
         run: python3 -m unittest tests.test_code_island_phase_two_contracts
 
+      - name: Validate Code Island Phase 3 contracts
+        run: >-
+          python3 -m unittest
+          tests.test_code_island_phase_three_dashboard
+          tests.test_code_island_phase_three_activity
+          tests.test_code_island_phase_three_settings
+
       - name: Test Code Island package
         run: swift test --package-path Packages/CodeIsland
 

@@ -92,6 +92,13 @@ struct TabSelectionView: View {
             let icon = Defaults[.enableNotes] ? "note.text" : "doc.on.clipboard"
             tabsArray.append(TabModel(label: label, icon: icon, view: .notes))
         }
+        tabsArray.append(
+            TabModel(
+                label: "Code Island",
+                icon: "chevron.left.forwardslash.chevron.right",
+                view: .codeIsland
+            )
+        )
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
@@ -127,6 +134,7 @@ struct TabSelectionView: View {
                     coordinator.currentView = tab.view
                 }
                 .frame(height: 26)
+                .accessibilityLabel(tab.label)
                 .foregroundStyle(isSelected ? activeAccent : .gray)
                 .background {
                     if isSelected {

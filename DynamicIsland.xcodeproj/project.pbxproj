@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C01A00012F90000100000001 /* CodeIslandUI in Frameworks */ = {isa = PBXBuildFile; productRef = C01A00032F90000100000003 /* CodeIslandUI */; };
+		C01A00042F90000100000004 /* CodeIslandCore in Frameworks */ = {isa = PBXBuildFile; productRef = C01A00052F90000100000005 /* CodeIslandCore */; };
+		C01A00062F90000100000006 /* CodeIslandRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = C01A00072F90000100000007 /* CodeIslandRuntime */; };
 		7E1ADF1D2EA209B1001DA867 /* SkyLightWindow in Frameworks */ = {isa = PBXBuildFile; productRef = 7E61181E2E24071E0050006C /* SkyLightWindow */; };
 		7E288D122F1659EF0020C117 /* AtollExtensionKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7E288D112F1659EF0020C117 /* AtollExtensionKit */; };
 		7E6118142E24071E0050006C /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = 14D032192C68F32E0096E6A1 /* LaunchAtLogin */; };
@@ -128,6 +131,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C01A00062F90000100000006 /* CodeIslandRuntime in Frameworks */,
+				C01A00042F90000100000004 /* CodeIslandCore in Frameworks */,
+				C01A00012F90000100000001 /* CodeIslandUI in Frameworks */,
 				7EF19C172F577040005B9929 /* SwiftTerm in Frameworks */,
 				7EF10C122F817ECF004229A0 /* Accelerate.framework in Frameworks */,
 				7E1ADF1D2EA209B1001DA867 /* SkyLightWindow in Frameworks */,
@@ -262,6 +268,9 @@
 			);
 			name = DynamicIsland;
 			packageProductDependencies = (
+				C01A00052F90000100000005 /* CodeIslandCore */,
+				C01A00072F90000100000007 /* CodeIslandRuntime */,
+				C01A00032F90000100000003 /* CodeIslandUI */,
 				14D032192C68F32E0096E6A1 /* LaunchAtLogin */,
 				14D0321C2C68F3350096E6A1 /* Sparkle */,
 				B18654382C6F4990000B926A /* KeyboardShortcuts */,
@@ -308,6 +317,7 @@
 			mainGroup = F54406DE2CD4987A00C7AFD9;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				C01A00022F90000100000002 /* XCLocalSwiftPackageReference "CodeIsland" */,
 				F54407082CD4A23F00C7AFD9 /* XCRemoteSwiftPackageReference "swift-collections" */,
 				14D032182C68F32E0096E6A1 /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
 				14D0321B2C68F3350096E6A1 /* XCRemoteSwiftPackageReference "Sparkle" */,
@@ -748,6 +758,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		C01A00022F90000100000002 /* XCLocalSwiftPackageReference "CodeIsland" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/CodeIsland;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		146BC4352D366E9B0047C66A /* XCRemoteSwiftPackageReference "MacroVisionKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -856,6 +873,21 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		C01A00032F90000100000003 /* CodeIslandUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C01A00022F90000100000002 /* XCLocalSwiftPackageReference "CodeIsland" */;
+			productName = CodeIslandUI;
+		};
+		C01A00052F90000100000005 /* CodeIslandCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C01A00022F90000100000002 /* XCLocalSwiftPackageReference "CodeIsland" */;
+			productName = CodeIslandCore;
+		};
+		C01A00072F90000100000007 /* CodeIslandRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C01A00022F90000100000002 /* XCLocalSwiftPackageReference "CodeIsland" */;
+			productName = CodeIslandRuntime;
+		};
 		146BC4362D366E9B0047C66A /* MacroVisionKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 146BC4352D366E9B0047C66A /* XCRemoteSwiftPackageReference "MacroVisionKit" */;

@@ -1,11 +1,15 @@
 # Code Island Phase 2 Verification
 
-**Status:** Complete
+**Status:** Complete; historical Phase 2 snapshot
 
 **Date:** 2026-08-04
 
 **Scope:** Codex safety-first runtime only; no Atoll host linkage or provider
 activation
+
+Phase 3 subsequently linked the internal modules into Atoll. Statements below
+about an unlinked Xcode target describe the Phase 2 completion boundary, not
+the current repository state.
 
 ## Verified contract
 

@@ -87,6 +87,9 @@ func enabledStandardTabCount() -> Int {
         count += 1
     }
 
+    // Code Island is a persistent built-in tab, including before activation.
+    count += 1
+
     // Terminal tab
     if Defaults[.enableTerminalFeature] {
         count += 1

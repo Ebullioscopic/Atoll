@@ -21,8 +21,30 @@
  */
 
 import AppKit
+import Combine
 import SwiftUI
 import Sparkle
+
+enum SettingsDestination: Equatable {
+    case codeIsland
+}
+
+final class SettingsNavigationCoordinator: ObservableObject {
+    static let shared = SettingsNavigationCoordinator()
+
+    @Published private(set) var pendingDestination: SettingsDestination?
+
+    private init() {}
+
+    func request(_ destination: SettingsDestination) {
+        pendingDestination = destination
+    }
+
+    func consume(_ destination: SettingsDestination) {
+        guard pendingDestination == destination else { return }
+        pendingDestination = nil
+    }
+}
 
 class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
@@ -83,7 +105,11 @@ class SettingsWindowController: NSWindowController {
         ScreenCaptureVisibilityManager.shared.register(window, scope: .panelsOnly)
     }
     
-    func showWindow() {
+    func showWindow(destination: SettingsDestination? = nil) {
+        if let destination {
+            SettingsNavigationCoordinator.shared.request(destination)
+        }
+
         // Ensure window exists
         _ = window
 

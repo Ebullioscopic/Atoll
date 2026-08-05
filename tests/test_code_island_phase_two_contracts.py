@@ -49,8 +49,9 @@ class CodeIslandPhaseTwoContractTests(unittest.TestCase):
 
         self.assertNotIn("FileHandle.standardOutput.write", bridge)
         self.assertNotIn("hookSpecificOutput", bridge)
-        self.assertNotIn("Packages/CodeIsland", project)
-        self.assertNotIn("CodeIslandRuntime", project)
+        self.assertIn("Packages/CodeIsland", project)
+        self.assertIn("CodeIslandRuntime", project)
+        self.assertNotIn("codeisland-bridge in Frameworks", project)
 
     @staticmethod
     def _swift_environment(temporary_path):
