@@ -20,22 +20,28 @@ git subtree add --prefix=Packages/CodeIsland ../CodeIsland main
 
 ## Atoll-only changes
 
-Phase 1 intentionally changes the imported source boundary before anything is
-linked into Atoll:
+Phases 1 and 2 intentionally change the imported source boundary before
+anything is linked into Atoll:
 
 - Replaces the standalone `CodeIsland` application product with internal
   `CodeIslandCore`, `CodeIslandRuntime`, and `CodeIslandUI` libraries.
-- Keeps the bridge executable inert until its provider-specific pass-through
-  behavior is implemented and verified.
-- Leaves Atoll's Xcode target unlinked during Phase 1, so importing the source
+- Replaces the blocking upstream bridge with a Codex-only, deadline-bounded
+  helper whose sole completion is status 0 with empty output. It has no socket
+  transport or listener in Phase 2 and is not installed or invoked by Atoll.
+- Introduces new metadata-only Core projection, archive, file store, capability
+  registry, and Codex lifecycle adapter rather than activating rich upstream
+  equivalents. The adapter recognizes only documented Codex lifecycle events,
+  treats compact SessionStart as continuity, and does not inspect arbitrary
+  tool output to manufacture a failure signal.
+- Leaves Atoll's Xcode target unlinked through Phase 2, so the imported source
   cannot start a listener, install hooks, or mutate provider configuration.
 
 ### Migration staging
 
-| Upstream area | Phase 1 disposition | Earliest migration phase |
+| Upstream area | Current disposition | Earliest remaining migration phase |
 |---|---|---|
-| Core models, normalizers, transcript readers, provider scanners, and their retained tests | `Sources/CodeIslandCore/Upstream`; excluded from SwiftPM | Phase 2, after metadata-only redesign |
-| `HookServer`, `ConfigInstaller`, provider resources, and origin helpers | `Sources/CodeIslandRuntime/Upstream`; excluded from SwiftPM | Phases 2, 4, and 5 as their safety contracts are proven |
+| Rich Core models, normalizers, transcript readers, provider scanners, and retained upstream tests | `Sources/CodeIslandCore/Upstream`; excluded from SwiftPM. New sanitized Phase 2 contracts are active beside the quarantine. | Provider-neutral pieces only when their metadata boundary is proven |
+| `HookServer`, `ConfigInstaller`, provider resources, and origin helpers | `Sources/CodeIslandRuntime/Upstream`; excluded from SwiftPM. A new Codex-only adapter and metadata store are active beside the quarantine. | Phases 4 and 5 as activation and provider contracts are proven |
 | Mascots, sounds, icons, and reusable visual candidates | `Sources/CodeIslandUI/Upstream`; excluded from SwiftPM | Phase 6, after Atoll-host adaptation |
 
 Core migration staging is deliberate: the imported `SessionSnapshot`, hook
@@ -52,11 +58,14 @@ data and therefore do not satisfy Atoll's public Core contract unchanged.
   display/window helpers, and debug harnesses. These are replaced by focused
   Atoll host adapters and sanitized package APIs rather than migrated wholesale.
 - Rich persistence and diagnostics: `SessionPersistence`,
-  `DiagnosticsExporter`, and transcript-backed application state. Phase 2 must
-  introduce new metadata-only equivalents.
+  `DiagnosticsExporter`, and transcript-backed application state. Phase 2
+  introduced a new typed metadata archive and file store; none of the rich
+  upstream persistence is compiled.
 - Active Codex response ownership: `CodexAppServerClient`,
   `AppState+CodexAppServer`, and the original blocking bridge implementation.
-  Codex remains monitoring-only until observer/pass-through behavior is proven.
+  The replacement lifecycle-hook bridge cannot produce provider control output.
+  The app-server question path remains excluded, so Codex is still labeled
+  Monitoring.
 - Deferred services and platforms: remote hosts, SSH, Buddy, Bluetooth, ESP32,
   Android, iPhone, and Apple Watch sources and resources.
 - Obsolete application tests: `CodeIslandTests` depended on the removed
@@ -91,6 +100,7 @@ Run from the Atoll repository root:
 
 ```sh
 python3 -m unittest tests.test_code_island_package_boundary
+python3 -m unittest tests.test_code_island_phase_two_contracts
 python3 -m unittest tests.test_privacy_configuration
 python3 -m unittest tests.test_timer_lifecycle
 swift test --package-path Packages/CodeIsland

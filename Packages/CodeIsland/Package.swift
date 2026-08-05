@@ -31,13 +31,14 @@ let package = Package(
         ),
         .executableTarget(
             name: "codeisland-bridge",
-            dependencies: ["CodeIslandCore"],
+            dependencies: ["CodeIslandRuntime"],
             path: "Sources/CodeIslandBridge"
         ),
         .testTarget(
             name: "CodeIslandRuntimeTests",
-            dependencies: ["CodeIslandRuntime"],
-            path: "Tests/CodeIslandRuntimeTests"
+            dependencies: ["CodeIslandCore", "CodeIslandRuntime"],
+            path: "Tests/CodeIslandRuntimeTests",
+            resources: [.copy("Fixtures")]
         ),
     ]
 )

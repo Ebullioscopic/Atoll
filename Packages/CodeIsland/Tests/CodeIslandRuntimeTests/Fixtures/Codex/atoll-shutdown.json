@@ -1,0 +1,15 @@
+{
+  "scenario": "atoll-shutdown",
+  "inputMode": "complete",
+  "deliveryOutcome": "hostShuttingDown",
+  "expectedState": "waitingForApproval",
+  "payload": {
+    "session_id": "thr_atoll_shutdown",
+    "cwd": "/workspace/shutdown-project",
+    "hook_event_name": "PermissionRequest",
+    "tool_name": "mcp__example__private_tool",
+    "tool_input": {
+      "secret": "private tool input"
+    }
+  }
+}

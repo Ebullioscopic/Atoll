@@ -1,0 +1,16 @@
+{
+  "scenario": "origin-cancels",
+  "inputMode": "complete",
+  "originOutcome": "cancelled",
+  "deliveryOutcome": "cancelled",
+  "expectedState": "waitingForApproval",
+  "payload": {
+    "session_id": "thr_origin_cancels",
+    "cwd": "/workspace/cancelled-project",
+    "hook_event_name": "PermissionRequest",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "printf private-cancel-case"
+    }
+  }
+}

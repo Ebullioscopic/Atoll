@@ -1,8 +1,6 @@
-/// Phase 1 boundary for provider-neutral, sanitized Code Island state.
-///
-/// The imported upstream models remain quarantined until the safety-first
-/// runtime phase replaces their rich payload and provider-specific fields.
+/// Boundary marker for provider-neutral, sanitized Code Island state.
 public enum CodeIslandCoreBoundary {
-    /// Whether the Core API is ready to be linked into the Atoll host.
-    public static let isReadyForHostIntegration = false
+    /// Phase 2 exposes only metadata-safe contracts and is ready for the host
+    /// shell to consume in Phase 3. This does not activate any provider.
+    public static let isReadyForHostIntegration = true
 }

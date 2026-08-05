@@ -1,6 +1,6 @@
 # Code Island in Atoll: Integration Design
 
-**Status:** Frozen; Phase 1 complete, Phase 2 not authorized
+**Status:** Frozen; Phases 1-2 complete, Phase 3 not authorized
 
 **Date:** 2026-08-04
 
@@ -10,17 +10,25 @@
 
 **Phase 1 completed:** 2026-08-04
 
+**Phase 2 authorized:** 2026-08-04 by user approval
+
+**Phase 2 completed:** 2026-08-04
+
 **Atoll baseline:** `dev` at `d4685ec18a7a6d1310e0ac081ce1a3cb4ccb7f87`
 
 **CodeIsland baseline:** `main` at `9e3a1eb1844f0b8bf05193228a6ffa41a013dec2`
 
-Material changes to the frozen product contract require explicit user approval and an ADR amendment or new ADR. Implementation is authorized one phase at a time; only Phase 1 has been authorized and completed.
+Material changes to the frozen product contract require explicit user approval and an ADR amendment or new ADR. Implementation is authorized one phase at a time; Phases 1 and 2 have been authorized and completed.
 
 Confirmed implementation choices:
 
 - The first provider verification cohort is Codex only.
 - The Code Island tab sits immediately before Atoll's Terminal tab.
 - The history-preserving source import uses `git subtree`.
+- The Phase 2 Codex profile remains **Monitoring**. Lifecycle hooks now have a
+  tested non-owning completion contract, while interactive questions remain on
+  the excluded active-responder app-server path. Tool-failure observation is
+  also gated off because the documented hook payload has no stable success bit.
 
 ## Outcome
 

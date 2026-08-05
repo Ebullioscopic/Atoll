@@ -142,6 +142,7 @@ PrivateWorks
 !tests/test_privacy_configuration.py
 !tests/test_timer_lifecycle.py
 !tests/test_code_island_package_boundary.py
+!tests/test_code_island_phase_two_contracts.py
 *.sh
 comparison_report.json
 *.txt

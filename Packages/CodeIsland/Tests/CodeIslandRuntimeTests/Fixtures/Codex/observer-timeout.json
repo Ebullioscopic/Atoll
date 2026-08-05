@@ -1,0 +1,15 @@
+{
+  "scenario": "observer-timeout",
+  "inputMode": "stalled",
+  "deliveryOutcome": "timedOut",
+  "expectedState": "waitingForApproval",
+  "payload": {
+    "session_id": "thr_observer_timeout",
+    "cwd": "/workspace/timeout-project",
+    "hook_event_name": "PermissionRequest",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "private patch content"
+    }
+  }
+}

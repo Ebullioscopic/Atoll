@@ -48,6 +48,9 @@ jobs:
       - name: Validate Code Island package boundary
         run: python3 -m unittest tests.test_code_island_package_boundary
 
+      - name: Validate Code Island Phase 2 contracts
+        run: python3 -m unittest tests.test_code_island_phase_two_contracts
+
       - name: Test Code Island package
         run: swift test --package-path Packages/CodeIsland
 

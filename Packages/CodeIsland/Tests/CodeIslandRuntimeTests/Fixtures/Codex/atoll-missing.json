@@ -1,0 +1,12 @@
+{
+  "scenario": "atoll-missing",
+  "inputMode": "complete",
+  "deliveryOutcome": "hostUnavailable",
+  "expectedState": "working",
+  "payload": {
+    "session_id": "thr_atoll_missing",
+    "cwd": "/workspace/missing-atoll-project",
+    "hook_event_name": "SessionStart",
+    "source": "startup"
+  }
+}

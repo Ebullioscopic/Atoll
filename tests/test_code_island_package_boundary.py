@@ -118,7 +118,7 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
         self.assertIn("CodeIsland", notice)
         self.assertIn("Packages/CodeIsland/LICENSE", notice)
 
-    def test_unmigrated_sources_are_quarantined_from_package_products(self):
+    def test_only_phase_two_sources_are_active_outside_quarantine(self):
         manifest = (PACKAGE / "Package.swift").read_text()
 
         self.assertFalse((PACKAGE / "Sources/CodeIsland").exists())
@@ -131,7 +131,29 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
             path.name
             for path in (PACKAGE / "Sources/CodeIslandCore").glob("*.swift")
         )
-        self.assertEqual(["CodeIslandCore.swift"], active_core_sources)
+        self.assertEqual(
+            [
+                "CodeIslandCore.swift",
+                "SessionMetadata.swift",
+                "SessionProjection.swift",
+            ],
+            active_core_sources,
+        )
+
+        active_runtime_sources = sorted(
+            path.name
+            for path in (PACKAGE / "Sources/CodeIslandRuntime").glob("*.swift")
+        )
+        self.assertEqual(
+            [
+                "CodeIslandRuntime.swift",
+                "CodexHookAdapter.swift",
+                "NonOwningHookCompletion.swift",
+                "ProviderCapabilities.swift",
+                "SessionMetadataStore.swift",
+            ],
+            active_runtime_sources,
+        )
 
     def test_standalone_distribution_artifacts_are_absent(self):
         forbidden_paths = (
@@ -159,7 +181,7 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
         )
         self.assertIn("swift test --package-path Packages/CodeIsland", workflow)
 
-    def test_phase_one_package_is_not_linked_into_atoll(self):
+    def test_phase_two_package_is_not_linked_into_atoll(self):
         project = ATOLL_PROJECT.read_text()
 
         self.assertNotIn("Packages/CodeIsland", project)

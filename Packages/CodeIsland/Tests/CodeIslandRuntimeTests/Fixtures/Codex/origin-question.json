@@ -1,0 +1,23 @@
+{
+  "scenario": "origin-question",
+  "inputMode": "complete",
+  "originOutcome": "answered",
+  "deliveryOutcome": "delivered",
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": "request-1",
+    "method": "item/tool/requestUserInput",
+    "params": {
+      "threadId": "thr_question",
+      "questions": [
+        {
+          "id": "q1",
+          "question": "private question content",
+          "options": [
+            {"label": "private option"}
+          ]
+        }
+      ]
+    }
+  }
+}
