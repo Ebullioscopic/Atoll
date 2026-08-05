@@ -14,7 +14,8 @@ let package = Package(
     targets: [
         .target(
             name: "CodeIslandCore",
-            path: "Sources/CodeIslandCore"
+            path: "Sources/CodeIslandCore",
+            exclude: ["Upstream"]
         ),
         .target(
             name: "CodeIslandRuntime",
@@ -32,11 +33,6 @@ let package = Package(
             name: "codeisland-bridge",
             dependencies: ["CodeIslandCore"],
             path: "Sources/CodeIslandBridge"
-        ),
-        .testTarget(
-            name: "CodeIslandCoreTests",
-            dependencies: ["CodeIslandCore"],
-            path: "Tests/CodeIslandCoreTests"
         ),
         .testTarget(
             name: "CodeIslandRuntimeTests",

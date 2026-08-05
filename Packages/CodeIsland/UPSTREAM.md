@@ -25,17 +25,49 @@ linked into Atoll:
 
 - Replaces the standalone `CodeIsland` application product with internal
   `CodeIslandCore`, `CodeIslandRuntime`, and `CodeIslandUI` libraries.
-- Removes CodeIsland's application delegate, app/window controllers, status
-  item, settings window, updater, and Sparkle dependency.
-- Excludes remote hosts, SSH, Buddy companions, Bluetooth, ESP32, Android, and
-  Apple companion code from the first merged release.
 - Keeps the bridge executable inert until its provider-specific pass-through
   behavior is implemented and verified.
 - Leaves Atoll's Xcode target unlinked during Phase 1, so importing the source
   cannot start a listener, install hooks, or mutate provider configuration.
 
-Removed source remains available through the subtree parent commit above. It
-must be migrated selectively; an upstream refresh must not reintroduce a second
+### Migration staging
+
+| Upstream area | Phase 1 disposition | Earliest migration phase |
+|---|---|---|
+| Core models, normalizers, transcript readers, provider scanners, and their retained tests | `Sources/CodeIslandCore/Upstream`; excluded from SwiftPM | Phase 2, after metadata-only redesign |
+| `HookServer`, `ConfigInstaller`, provider resources, and origin helpers | `Sources/CodeIslandRuntime/Upstream`; excluded from SwiftPM | Phases 2, 4, and 5 as their safety contracts are proven |
+| Mascots, sounds, icons, and reusable visual candidates | `Sources/CodeIslandUI/Upstream`; excluded from SwiftPM | Phase 6, after Atoll-host adaptation |
+
+Core migration staging is deliberate: the imported `SessionSnapshot`, hook
+models, `JSONLTailer`, and provider scanners expose rich or provider-specific
+data and therefore do not satisfy Atoll's public Core contract unchanged.
+
+### Deliberately removed areas
+
+- Application ownership: `CodeIslandApp`, `AppDelegate`, panel/settings/status
+  controllers, `UpdateChecker`, Sparkle, app entitlements, app icons, appcast,
+  build/release scripts, and standalone documentation.
+- Monolithic application state and responder UI: `AppState` and its extensions,
+  application `Models`, `NotchPanelView`, settings views, global hotkeys,
+  display/window helpers, and debug harnesses. These are replaced by focused
+  Atoll host adapters and sanitized package APIs rather than migrated wholesale.
+- Rich persistence and diagnostics: `SessionPersistence`,
+  `DiagnosticsExporter`, and transcript-backed application state. Phase 2 must
+  introduce new metadata-only equivalents.
+- Active Codex response ownership: `CodexAppServerClient`,
+  `AppState+CodexAppServer`, and the original blocking bridge implementation.
+  Codex remains monitoring-only until observer/pass-through behavior is proven.
+- Deferred services and platforms: remote hosts, SSH, Buddy, Bluetooth, ESP32,
+  Android, iPhone, and Apple Watch sources and resources.
+- Obsolete application tests: `CodeIslandTests` depended on the removed
+  executable and app monolith. Relevant behaviors must return as focused tests
+  when their replacement Runtime, UI, or Atoll host seam is implemented.
+  Upstream Core tests are retained beside their quarantined sources; removed
+  responder, companion, ESP32, and performance tests remain recoverable from
+  the subtree parent and must be reconsidered with the matching migration.
+
+Every removed file remains available through the subtree parent commit above.
+An upstream refresh must follow this mapping and must not reintroduce a second
 application lifecycle, responder UI, remote/Buddy code, or rich persistence.
 
 ## Refresh procedure
@@ -48,8 +80,8 @@ application lifecycle, responder UI, remote/Buddy code, or rich persistence.
      https://github.com/wxtsky/CodeIsland.git main
    ```
 
-3. Resolve the expected conflicts at `Package.swift` and deliberately excluded
-   paths; never accept those areas wholesale.
+3. Resolve the expected conflicts at `Package.swift`, migration-staging paths,
+   and deliberately removed areas; never accept those areas wholesale.
 4. Update the imported commit, date, Atoll-only patch list, and verification
    evidence in this ledger.
 

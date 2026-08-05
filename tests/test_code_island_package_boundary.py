@@ -109,6 +109,11 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
         self.assertIn("9e3a1eb1844f0b8bf05193228a6ffa41a013dec2", ledger)
         self.assertIn("git subtree", ledger)
         self.assertIn("2026-08-04", ledger)
+        self.assertIn("Core migration staging", ledger)
+        self.assertIn("AppState", ledger)
+        self.assertIn("DiagnosticsExporter", ledger)
+        self.assertIn("CodeIslandTests", ledger)
+        self.assertIn("SessionPersistence", ledger)
         self.assertTrue((PACKAGE / "LICENSE").exists())
         self.assertIn("CodeIsland", notice)
         self.assertIn("Packages/CodeIsland/LICENSE", notice)
@@ -117,9 +122,16 @@ class CodeIslandPackageBoundaryTests(unittest.TestCase):
         manifest = (PACKAGE / "Package.swift").read_text()
 
         self.assertFalse((PACKAGE / "Sources/CodeIsland").exists())
+        self.assertTrue((PACKAGE / "Sources/CodeIslandCore/Upstream").is_dir())
         self.assertTrue((PACKAGE / "Sources/CodeIslandRuntime/Upstream").is_dir())
         self.assertTrue((PACKAGE / "Sources/CodeIslandUI/Upstream").is_dir())
-        self.assertGreaterEqual(manifest.count('exclude: ["Upstream"]'), 2)
+        self.assertGreaterEqual(manifest.count('exclude: ["Upstream"]'), 3)
+
+        active_core_sources = sorted(
+            path.name
+            for path in (PACKAGE / "Sources/CodeIslandCore").glob("*.swift")
+        )
+        self.assertEqual(["CodeIslandCore.swift"], active_core_sources)
 
     def test_standalone_distribution_artifacts_are_absent(self):
         forbidden_paths = (

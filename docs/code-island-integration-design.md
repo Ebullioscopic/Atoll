@@ -1,6 +1,6 @@
 # Code Island in Atoll: Integration Design
 
-**Status:** Frozen; Phase 1 implementation authorized
+**Status:** Frozen; Phase 1 complete, Phase 2 not authorized
 
 **Date:** 2026-08-04
 
@@ -8,11 +8,13 @@
 
 **Phase 1 authorized:** 2026-08-04 by user approval
 
+**Phase 1 completed:** 2026-08-04
+
 **Atoll baseline:** `dev` at `d4685ec18a7a6d1310e0ac081ce1a3cb4ccb7f87`
 
 **CodeIsland baseline:** `main` at `9e3a1eb1844f0b8bf05193228a6ffa41a013dec2`
 
-Material changes to the frozen product contract require explicit user approval and an ADR amendment or new ADR. Implementation is authorized one phase at a time; the current authorization covers Phase 1 only.
+Material changes to the frozen product contract require explicit user approval and an ADR amendment or new ADR. Implementation is authorized one phase at a time; only Phase 1 has been authorized and completed.
 
 Confirmed implementation choices:
 
