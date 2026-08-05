@@ -44,8 +44,17 @@ struct NotchLLMUsageView: View {
     @ViewBuilder
     private func card(for provider: ProviderID) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
+            HStack(spacing: 6) {
                 Text(provider.displayName).font(.headline)
+                // Subscription plan badge (e.g. "Max 5x"). Only set for Claude; nil elsewhere.
+                if case .success(let snap) = manager.results[provider] ?? .loading, let plan = snap.plan {
+                    Text(plan)
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.white.opacity(0.12), in: Capsule())
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 if provider == .antigravity {
                     Picker("", selection: $antigravityPool) {
@@ -200,9 +209,26 @@ struct NotchLLMUsageView: View {
                 .font(.system(size: compact ? 11 : (prominent ? 17 : 13), weight: prominent ? .bold : .semibold, design: .rounded))
                 .monospacedDigit()
             Spacer(minLength: 4)
-            Text(totals.hasUnpricedModel ? money(totals.costUSD) + "+" : money(totals.costUSD))
+            Text(costLabel(totals))
                 .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                .help(costHelp(totals))
         }
+    }
+
+    /// Cost is an estimate computed from local token counts against the API price
+    /// table — not a subscription bill. When some models used have no entry in the
+    /// table we cannot price them: show "\(money)+" when a partial amount is known,
+    /// and an explicit "est. n/a" instead of a misleading "$0.00+" when nothing is.
+    private func costLabel(_ totals: UsageTotals) -> String {
+        guard totals.hasUnpricedModel else { return money(totals.costUSD) }
+        return totals.costUSD > 0 ? money(totals.costUSD) + "+" : "est. n/a"
+    }
+
+    private func costHelp(_ totals: UsageTotals) -> String {
+        if totals.hasUnpricedModel {
+            return "Estimated API-equivalent cost from local token counts (not your subscription bill). Some models used do not have usable pricing, so this is partial or unavailable."
+        }
+        return "Estimated API-equivalent cost from local token counts, not your subscription bill."
     }
 
     private func tokens(_ n: Int) -> String {

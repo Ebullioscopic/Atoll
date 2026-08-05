@@ -114,11 +114,70 @@ class ModelPricingManager: ObservableObject {
         }
     }
     
-    /// Resolves pricing for a specific model ID
+    /// Resolves pricing for a specific model ID.
+    ///
+    /// Usage logs from Claude Code carry native Anthropic ids such as
+    /// "claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5-20251001", or
+    /// occasionally a provider-prefixed "anthropic/claude-4.8-opus-20260528". The
+    /// dynamic pricing table, however, is keyed OpenRouter-style
+    /// ("anthropic/claude-3-5-sonnet"). A strict `id == modelId` compare therefore
+    /// misses models that ARE in the table but written in a different form, leaving
+    /// their cost at 0. We reconcile the purely cosmetic differences — provider
+    /// prefix, trailing date stamp, family/version word order, and dot-vs-dash minor
+    /// versions — before giving up. This never fabricates a price for a model the
+    /// table has no entry for; those stay unpriced and are surfaced explicitly in the
+    /// UI rather than shown as a misleading "$0.00".
     func getPricing(for modelId: String) -> (prompt: Double, completion: Double)? {
-        guard let model = pricingData?.models.first(where: { $0.id == modelId }) else {
-            return nil
+        guard let models = pricingData?.models else { return nil }
+        for key in Self.pricingKeyCandidates(for: modelId) {
+            guard let model = models.first(where: { $0.id.lowercased() == key }) else { continue }
+            let prompt = model.pricing.promptPrice
+            let completion = model.pricing.completionPrice
+            // Skip placeholder/incomplete rows (present in the sparse bundled fallback):
+            // a genuine Claude price has both a prompt and a completion rate, so require
+            // both to be positive. A row with only one side set is treated as unpriced —
+            // keep scanning candidates rather than report a half or false "$0.00" price.
+            guard prompt > 0, completion > 0 else { continue }
+            return (prompt, completion)
         }
-        return (model.pricing.promptPrice, model.pricing.completionPrice)
+        return nil
+    }
+
+    /// Ordered, de-duplicated list of lower-cased table keys to try for a raw log id.
+    /// OpenRouter's own Claude naming is inconsistent (version-first "claude-3-5-sonnet"
+    /// for 3.x, family-first "claude-opus-4" for 4.x), so rather than assume one canonical
+    /// form we emit both word orders, each with and without the "anthropic/" prefix, and
+    /// let the first that exists in the table win.
+    static func pricingKeyCandidates(for raw: String) -> [String] {
+        var out: [String] = []
+        func push(_ s: String) {
+            guard !s.isEmpty else { return }
+            for form in [s, "anthropic/\(s)"] where !out.contains(form) { out.append(form) }
+        }
+
+        var s = raw.lowercased()
+        if let slash = s.lastIndex(of: "/") { s = String(s[s.index(after: slash)...]) } // drop provider prefix
+        push(s)
+
+        // Drop a trailing date stamp like "-20260528".
+        let noDate = s.replacingOccurrences(of: #"-\d{6,}$"#, with: "", options: .regularExpression)
+        push(noDate)
+
+        // Treat dotted minor versions ("4.8") the same as dashed ("4-8").
+        let dashed = noDate.replacingOccurrences(of: ".", with: "-")
+        push(dashed)
+
+        // Reconcile family/version word order around the "claude-" stem.
+        let families = ["opus", "sonnet", "haiku"]
+        var tokens = dashed.split(separator: "-").map(String.init)
+        if tokens.first == "claude", let famIdx = tokens.firstIndex(where: { families.contains($0) }) {
+            let family = tokens.remove(at: famIdx)
+            let version = Array(tokens.dropFirst()) // everything after "claude" minus the family token
+            if !version.isEmpty {
+                push((["claude", family] + version).joined(separator: "-")) // family-first
+                push((["claude"] + version + [family]).joined(separator: "-")) // version-first
+            }
+        }
+        return out
     }
 }
