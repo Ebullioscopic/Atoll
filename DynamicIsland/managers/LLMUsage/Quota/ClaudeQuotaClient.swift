@@ -6,6 +6,15 @@ actor ClaudeCredentialStore {
 
     fileprivate func get() -> ClaudeQuotaClient.CredentialFile.OAuth? { cached }
     fileprivate func set(_ creds: ClaudeQuotaClient.CredentialFile.OAuth) { cached = creds }
+    fileprivate func clear() { cached = nil }
+
+    // Atomically replace the cache with a fresh load from source. Running the load
+    // inside the actor closes the window where a concurrent reader could slot a stale
+    // credential in between a separate clear() and set().
+    fileprivate func reload(from load: @Sendable () -> ClaudeQuotaClient.CredentialFile.OAuth?) -> ClaudeQuotaClient.CredentialFile.OAuth? {
+        cached = load()
+        return cached
+    }
 }
 
 struct ClaudeQuotaClient {
@@ -57,9 +66,32 @@ struct ClaudeQuotaClient {
         let sevenDay: Window?
     }
 
+    private enum FetchOutcome {
+        case success((session: UsageLimit?, week: UsageLimit?))
+        case authFailure // 401/403: the access token is no longer accepted.
+        case otherFailure // network/decoding/5xx: reloading credentials would not help.
+    }
+
     func fetchLimits() async -> (session: UsageLimit?, week: UsageLimit?) {
         guard let creds = await currentCredentials() else { return (nil, nil) }
-        guard let token = await validAccessToken(creds) else { return (nil, nil) }
+        switch await attemptFetch(creds) {
+        case .success(let limits):
+            return limits
+        case .authFailure:
+            // Claude Code likely rotated the OAuth token out from under our cache
+            // (revoked access token, or a refresh token it already consumed). Drop the
+            // cached copy, re-read from source (file → Keychain, which CC has updated),
+            // and retry exactly once. No retry on non-auth failures.
+            guard let fresh = await reloadCredentials() else { return (nil, nil) }
+            if case .success(let limits) = await attemptFetch(fresh) { return limits }
+            return (nil, nil)
+        case .otherFailure:
+            return (nil, nil)
+        }
+    }
+
+    private func attemptFetch(_ creds: CredentialFile.OAuth) async -> FetchOutcome {
+        guard let token = await validAccessToken(creds) else { return .authFailure }
         var request = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -68,15 +100,17 @@ struct ClaudeQuotaClient {
         request.setValue("claude-code/2.1.69", forHTTPHeaderField: "User-Agent")
         do {
             let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return (nil, nil) }
+            guard let http = response as? HTTPURLResponse else { return .otherFailure }
+            if http.statusCode == 401 || http.statusCode == 403 { return .authFailure }
+            guard (200..<300).contains(http.statusCode) else { return .otherFailure }
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             let decoded = try decoder.decode(UsageResponse.self, from: data)
             let sessionLimit = decoded.fiveHour.map { UsageLimit(used: $0.utilization, limit: 100, resetsAt: $0.resetsAt.date) }
             let weekLimit = decoded.sevenDay.map { UsageLimit(used: $0.utilization, limit: 100, resetsAt: $0.resetsAt.date) }
-            return (sessionLimit, weekLimit)
+            return .success((sessionLimit, weekLimit))
         } catch {
-            return (nil, nil)
+            return .otherFailure
         }
     }
 
@@ -85,6 +119,13 @@ struct ClaudeQuotaClient {
         guard let loaded = Self.loadCredentialsFromSource() else { return nil }
         await ClaudeCredentialStore.shared.set(loaded)
         return loaded
+    }
+
+    // Force a re-read from source, bypassing the in-memory cache. Called after an auth
+    // failure so a token rotated by Claude Code is picked up without an app restart.
+    // The invalidate-and-reload is a single atomic actor operation (see reload(from:)).
+    private func reloadCredentials() async -> CredentialFile.OAuth? {
+        await ClaudeCredentialStore.shared.reload(from: { Self.loadCredentialsFromSource() })
     }
 
     // File first never prompts; Keychain only as fallback.
@@ -114,11 +155,14 @@ struct ClaudeQuotaClient {
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         guard let (data, response) = try? await session.data(for: request),
               let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            return creds.accessToken
+            // Refresh failed. Report the token as invalid (nil) so the caller classifies
+            // this as an auth failure and reloads credentials from source, instead of
+            // proceeding with an access token we already know is stale.
+            return nil
         }
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        guard let refreshed = try? decoder.decode(RefreshResponse.self, from: data) else { return creds.accessToken }
+        guard let refreshed = try? decoder.decode(RefreshResponse.self, from: data) else { return nil }
         let expiresAt = nowMs + Int64(refreshed.expiresIn) * 1000
         let updated = CredentialFile.OAuth(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, expiresAt: expiresAt)
         await ClaudeCredentialStore.shared.set(updated)
