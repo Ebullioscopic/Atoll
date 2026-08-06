@@ -275,8 +275,12 @@ class PrivacyIndicatorManager: ObservableObject {
     }
     
     /// Toggle monitoring state
+    ///
+    /// Asked against the request rather than the running monitors: with both
+    /// detection settings off a session is open with nothing in it, and reading
+    /// the monitors there would take the toggle for off and start one.
     func toggleMonitoring() {
-        if cameraMonitor.isMonitoring || microphoneMonitor.isMonitoring {
+        if monitoringRequested {
             stopMonitoring()
         } else {
             startMonitoring()
