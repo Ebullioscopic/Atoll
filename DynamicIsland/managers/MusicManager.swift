@@ -514,6 +514,10 @@ class MusicManager: ObservableObject {
     private var lyricSyncTask: Task<Void, Never>?
     private var lyricsFetchTask: Task<Void, Never>?
     private var lyricsFetchKey: LyricsLookupKey?
+    // Identity of the fetch that is allowed to write lyrics state. A cancelled
+    // task can still reach its completion handler, and the key alone does not
+    // tell it apart from a newer fetch for the same track.
+    private var lyricsFetchID: UUID?
     private var activeLyricsKey: LyricsLookupKey?
     private var lyricsCache: [LyricsLookupKey: [LyricLine]] = [:]
     // Bounded, insertion-order eviction so the cache cannot grow unboundedly.
@@ -1329,7 +1333,7 @@ class MusicManager: ObservableObject {
         if isEnabled {
             prepareLyricsForCurrentTrack(prioritizeVisibleResult: true)
         } else {
-            stopLyricSync()
+            discardLyrics()
         }
     }
 
@@ -1337,6 +1341,7 @@ class MusicManager: ObservableObject {
     private func discardLyrics() {
         activeLyricsKey = nil
         lyricsFetchKey = nil
+        lyricsFetchID = nil
         lyricsFetchTask?.cancel()
         lyricsFetchTask = nil
         syncedLyrics = []
@@ -1386,6 +1391,8 @@ class MusicManager: ObservableObject {
 
         lyricsFetchTask?.cancel()
         lyricsFetchKey = key
+        let fetchID = UUID()
+        lyricsFetchID = fetchID
 
         if shouldShowLoading || syncedLyrics.isEmpty {
             currentLyrics = "Loading lyrics..."
@@ -1407,17 +1414,19 @@ class MusicManager: ObservableObject {
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    guard self.activeLyricsKey == key else { return }
+                    guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
                     self.storeLyricsInCache(lyrics, for: key)
                     self.lyricsFetchKey = nil
+                    self.lyricsFetchID = nil
                     self.lyricsFetchTask = nil
                     self.applyLyricsToDisplay(lyrics)
                 }
             } catch {
                 print("Failed to fetch lyrics: \(error)")
                 await MainActor.run {
-                    guard self.activeLyricsKey == key else { return }
+                    guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
                     self.lyricsFetchKey = nil
+                    self.lyricsFetchID = nil
                     self.lyricsFetchTask = nil
                     self.syncedLyrics = []
                     self.currentLyricIndex = -1
