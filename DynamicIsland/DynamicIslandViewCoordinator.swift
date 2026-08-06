@@ -176,16 +176,17 @@ class DynamicIslandViewCoordinator: ObservableObject {
 
     @Published var selectedScreen: String = NSScreen.main?.localizedName ?? "Unknown"
 
-    /// The display the user picked in Settings, matched by stable display ID first
-    /// (identical monitors share a localized name), falling back to the legacy name.
+    /// The display the user picked in Settings, matched by stable display ID
+    /// (identical monitors share a localized name). The legacy name lookup only
+    /// applies when no ID was stored yet — with an ID set, falling back to the
+    /// name could silently pick the wrong one of two identical displays.
     func preferredNSScreen() -> NSScreen? {
-        if preferredScreenID != 0,
-           let match = NSScreen.screens.first(where: {
-               $0.displayID == CGDirectDisplayID(preferredScreenID)
-           }) {
-            return match
+        guard preferredScreenID != 0 else {
+            return NSScreen.screens.first(where: { $0.localizedName == preferredScreen })
         }
-        return NSScreen.screens.first(where: { $0.localizedName == preferredScreen })
+        return NSScreen.screens.first(where: {
+            $0.displayID == CGDirectDisplayID(preferredScreenID)
+        })
     }
 
     /// Legacy installs only stored the preferred display's name; backfill its ID.
