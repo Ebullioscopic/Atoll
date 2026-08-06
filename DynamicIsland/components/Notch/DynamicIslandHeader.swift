@@ -100,6 +100,8 @@ struct DynamicIslandHeader: View {
                                 showClipboardPopover.toggle()
                             case .separateTab:
                                 coordinator.currentView = .notes
+                            case .notchTab:
+                                coordinator.currentView = .clipboard
                             }
                         }) {
                             Capsule()
@@ -286,6 +288,12 @@ struct DynamicIslandHeader: View {
                         coordinator.currentView = .home
                     } else {
                         coordinator.currentView = .notes
+                    }
+                case .notchTab:
+                    if coordinator.currentView == .clipboard {
+                        coordinator.currentView = .home
+                    } else {
+                        coordinator.currentView = .clipboard
                     }
                 }
             }

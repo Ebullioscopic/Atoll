@@ -1293,6 +1293,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         coordinator.currentView = .notes
                     }
                 }
+            case .notchTab:
+                if vm.notchState == .closed {
+                    vm.open()
+                    coordinator.currentView = .clipboard
+                } else {
+                    if coordinator.currentView == .clipboard {
+                        vm.close()
+                    } else {
+                        coordinator.currentView = .clipboard
+                    }
+                }
             }
         }
 
