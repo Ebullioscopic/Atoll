@@ -1182,14 +1182,17 @@ struct LockScreenMusicPanel: View {
     }
 
     private var canvasFallbackScrim: some View {
+        let scrimColor = widgetAppearance.usesLightGlyphs ? Color.black : Color.white
+        let borderColor = widgetAppearance.primary(opacity: 0.10)
+
         RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
             .fill(.ultraThinMaterial)
             .overlay {
                 LinearGradient(
                     colors: [
-                        Color.black.opacity(0.32),
-                        Color.black.opacity(0.18),
-                        Color.black.opacity(0.32)
+                        scrimColor.opacity(0.32),
+                        scrimColor.opacity(0.18),
+                        scrimColor.opacity(0.32)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -1198,7 +1201,7 @@ struct LockScreenMusicPanel: View {
             }
             .overlay {
                 RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 0.6)
+                    .stroke(borderColor, lineWidth: 0.6)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .allowsHitTesting(false)
