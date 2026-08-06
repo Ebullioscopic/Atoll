@@ -1297,6 +1297,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             case .notchTab:
+                // Cancel any pending auto-close armed by toggleNotchOpen, so it can't fire
+                // and close the notch a few seconds after this shortcut opens/switches to it.
+                closeNotchWorkItem?.cancel()
+                closeNotchWorkItem = nil
                 if vm.notchState == .closed {
                     vm.open()
                     coordinator.currentView = .clipboard
