@@ -1185,7 +1185,7 @@ struct LockScreenMusicPanel: View {
         let scrimColor = widgetAppearance.usesLightGlyphs ? Color.black : Color.white
         let borderColor = widgetAppearance.primary(opacity: 0.10)
 
-        RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
+        return RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous)
             .fill(.ultraThinMaterial)
             .overlay {
                 LinearGradient(
