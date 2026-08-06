@@ -33,6 +33,7 @@ class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
     private var updaterController: SPUStandardUpdaterController?
     private var focusRetryWorkItem: DispatchWorkItem?
+    private var pendingPresentationWorkItem: DispatchWorkItem?
     
     private init() {
         super.init(window: nil)
@@ -104,14 +105,17 @@ class SettingsWindowController: NSWindowController {
     
     func showWindow() {
         focusRetryWorkItem?.cancel()
+        pendingPresentationWorkItem?.cancel()
 
         // The app normally runs as an accessory app. Switch to regular before
         // requesting focus so AppKit can make the settings window key/main.
         NSApp.setActivationPolicy(.regular)
 
-        DispatchQueue.main.async { [weak self] in
+        let present = DispatchWorkItem { [weak self] in
             self?.presentSettingsWindow()
         }
+        pendingPresentationWorkItem = present
+        DispatchQueue.main.async(execute: present)
     }
 
     private func presentSettingsWindow() {
@@ -151,12 +155,14 @@ class SettingsWindowController: NSWindowController {
     
     override func close() {
         focusRetryWorkItem?.cancel()
+        pendingPresentationWorkItem?.cancel()
         super.close()
         relinquishFocus()
     }
-    
+
     private func relinquishFocus() {
         focusRetryWorkItem?.cancel()
+        pendingPresentationWorkItem?.cancel()
         window?.orderOut(nil)
         
         // Set app back to accessory mode immediately

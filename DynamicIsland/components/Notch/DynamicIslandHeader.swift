@@ -320,8 +320,11 @@ private extension DynamicIslandHeader {
         shouldShowSettingsIcon
             && Defaults[.enableClipboardManager]
             && Defaults[.showClipboardIcon]
+            && clipboardDisplayMode != .separateTab
+            && Defaults[.enableColorPickerFeature]
             && Defaults[.showColorPickerIcon]
             && Defaults[.enableTimerFeature]
+            && timerDisplayMode == .popover
     }
 }
 

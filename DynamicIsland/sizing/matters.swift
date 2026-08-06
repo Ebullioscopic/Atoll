@@ -311,8 +311,10 @@ func standardMusicLyricsOpenHeightAffectsLayout(
     isMinimalistic: Bool = Defaults[.enableMinimalisticUI],
     standardMediaControlsEnabled: Bool = Defaults[.showStandardMediaControls]
 ) -> Bool {
+    // .extensionExperience falls back to rendering NotchHomeView when no
+    // extension payload is available, so it needs the same reserved lyric area.
     !isMinimalistic
-        && currentView == .home
+        && (currentView == .home || currentView == .extensionExperience)
         && standardMediaControlsEnabled
 }
 
