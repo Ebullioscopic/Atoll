@@ -866,6 +866,9 @@ extension Defaults.Keys {
     static let automaticallySwitchDisplay = Key<Bool>("automaticallySwitchDisplay", default: true)
     static let releaseName = Key<String>("releaseName", default: "Kaafu")
     static let hideDynamicIslandFromScreenCapture = Key<Bool>("hideDynamicIslandFromScreenCapture", default: false)
+    /// UI language override; "system" follows macOS. Anything else is written to
+    /// the app's `AppleLanguages` and takes effect on the next launch.
+    static let appLanguage = Key<String>("appLanguage", default: "system")
     
         // MARK: Behavior
     static let minimumHoverDuration = Key<TimeInterval>("minimumHoverDuration", default: 0.3)

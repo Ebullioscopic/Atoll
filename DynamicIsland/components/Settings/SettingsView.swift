@@ -1065,9 +1065,49 @@ struct GeneralSettings: View {
     @Default(.reverseScrollGestures) var reverseScrollGestures
     @Default(.externalDisplayStyle) var externalDisplayStyle
     @Default(.hideNonNotchUntilHover) var hideNonNotchUntilHover
+    @Default(.appLanguage) var appLanguage
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.general.highlightID(for: title)
+    }
+
+    /// Languages shipped in the app bundle, shown with their native names.
+    private var availableLanguages: [String] {
+        Bundle.main.localizations
+            .filter { $0 != "Base" }
+            .sorted { Self.languageName(for: $0) < Self.languageName(for: $1) }
+    }
+
+    private static func languageName(for code: String) -> String {
+        Locale(identifier: code).localizedString(forLanguageCode: code)?.capitalized ?? code
+    }
+
+    /// Bridges the picker to UserDefaults: anything but "system" is written as the
+    /// app's `AppleLanguages` override (the same mechanism System Settings uses for
+    /// per-app languages) and applies on the next launch.
+    private var languageBinding: Binding<String> {
+        Binding(
+            get: { appLanguage },
+            set: { newValue in
+                appLanguage = newValue
+                if newValue == "system" {
+                    UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+                } else {
+                    UserDefaults.standard.set([newValue], forKey: "AppleLanguages")
+                }
+            }
+        )
+    }
+
+    /// Adopts an `AppleLanguages` override set outside the app (System Settings or
+    /// `defaults write`) so the picker reflects it.
+    private func adoptExternalLanguageOverride() {
+        guard appLanguage == "system",
+              let bundleID = Bundle.main.bundleIdentifier,
+              let override = UserDefaults.standard.persistentDomain(forName: bundleID)?["AppleLanguages"] as? [String],
+              let language = override.first, !language.isEmpty
+        else { return }
+        appLanguage = language
     }
 
     var body: some View {
@@ -1141,6 +1181,19 @@ struct GeneralSettings: View {
                 .settingsHighlight(id: highlightID("Hide Dynamic Island during screenshots & recordings"))
             } header: {
                 Text("System features")
+            }
+
+            Section {
+                Picker("Language", selection: languageBinding) {
+                    Text("System").tag("system")
+                    ForEach(availableLanguages, id: \.self) { code in
+                        Text(Self.languageName(for: code)).tag(code)
+                    }
+                }
+                .onAppear(perform: adoptExternalLanguageOverride)
+                .settingsHighlight(id: highlightID("Language"))
+            } footer: {
+                Text("Language changes take effect after restarting Atoll.")
             }
 
             Section {
