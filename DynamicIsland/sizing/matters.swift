@@ -100,9 +100,11 @@ let tabRailWidth: CGFloat = 42
 
 /// Returns the recommended minimum notch width for the given tab count.
 func recommendedMinimumNotchWidth(forTabCount count: Int) -> CGFloat {
-    // A rail spends height per tab rather than width, so the count stops driving
-    // how wide the notch has to be — only the rail itself does. That is why the
-    // leading position leaves the notch narrower once there are five or more tabs.
+    // A rail spends height per tab rather than width, so the tab count stops
+    // driving the width. What the leading position still needs is the 640pt of
+    // content a header of up to four tabs leaves, plus the width the rail takes
+    // out of it — a constant 682pt, under the 690 and 770 a header row asks for
+    // at five and six tabs.
     if Defaults[.tabBarPosition] == .left { return 640 + tabRailWidth }
     if count >= 6 { return 770 }
     if count >= 5 { return 690 }
