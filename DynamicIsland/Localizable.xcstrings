@@ -1130,6 +1130,12 @@
             "value" : "%@ kanalı"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 频道"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2464,6 +2470,12 @@
             "value" : "%lld%% kaldı"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余 %lld%%"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2486,6 +2498,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld%% kullanıldı"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已使用 %lld%%"
           }
         },
         "zh-Hant" : {
@@ -2563,6 +2581,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld дн. назад"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天前"
           }
         },
         "zh-Hant" : {
@@ -2690,6 +2714,12 @@
             "value" : "%lld ч. назад"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 小时前"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2813,6 +2843,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld мин. назад"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分钟前"
           }
         },
         "zh-Hant" : {
@@ -4325,6 +4361,12 @@
             "state" : "translated",
             "value" : "3D"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3D"
+          }
         }
       }
     },
@@ -4335,12 +4377,24 @@
             "state" : "translated",
             "value" : "4"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4"
+          }
         }
       }
     },
     "5" : {
       "localizations" : {
         "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "5"
@@ -4561,6 +4615,12 @@
     "6" : {
       "localizations" : {
         "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "6"
@@ -5295,6 +5355,12 @@
             "value" : "Atoll'un yeni bir sürümü mevcut!"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll 有新版本可用！"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5842,6 +5908,12 @@
             "value" : "Erişilebilirlik izni, Dynamic Island'ın yerleşik ses, parlaklık ve klavye HUD'larını değiştirmesine olanak tanır."
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "辅助功能权限允许 Dynamic Island 替换系统原生的音量、亮度和键盘 HUD。"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5875,6 +5947,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Erişilebilirlik izni gerekli"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要辅助功能权限"
           }
         },
         "zh-Hant" : {
@@ -9295,6 +9373,12 @@
             "state" : "translated",
             "value" : "Amazon Music"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amazon Music"
+          }
         }
       }
     },
@@ -10397,6 +10481,12 @@
             "state" : "translated",
             "value" : "Atoll %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll %@"
+          }
         }
       }
     },
@@ -10709,6 +10799,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll, güncellemeleri düzenli aralıklarla otomatik denetleyecek."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll 会定期自动检查更新。"
           }
         },
         "zh-Hant" : {
@@ -13142,6 +13238,12 @@
             "value" : "İkisi de etkin"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两者都在使用"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -14402,6 +14504,12 @@
             "value" : "Yalnızca kamera"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅摄像头"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15480,6 +15588,12 @@
             "value" : "Güncellemeler denetleniyor…"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查更新…"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16036,6 +16150,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kullanım sekmesinde hangi yapay zekâ sağlayıcılarının görüneceğini seçin."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择要在“用量”标签页中显示的 AI 提供商。"
           }
         },
         "zh-Hant" : {
@@ -16657,6 +16777,12 @@
           }
         },
         "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Claude"
@@ -18193,6 +18319,12 @@
             "state" : "translated",
             "value" : "Codex"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex"
+          }
         }
       }
     },
@@ -18332,6 +18464,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Renk çıkarımı"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "颜色提取"
           }
         },
         "zh-Hant" : {
@@ -19244,6 +19382,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kompakt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "紧凑"
           }
         },
         "zh-Hant" : {
@@ -21312,6 +21456,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Geçerli yapı: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前构建版本：%@"
           }
         },
         "zh-Hant" : {
@@ -25498,6 +25648,12 @@
             "value" : "Kapat"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -27393,6 +27549,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Düzenle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑"
           }
         },
         "zh-Hant" : {
@@ -29568,6 +29730,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LLM Kullanım İzleyicisini etkinleştir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用 LLM 用量监控"
           }
         },
         "zh-Hant" : {
@@ -34161,7 +34329,15 @@
     },
     "Gemini" : {
       "comment" : "A label for a segment in a picker that lets the user select an Antigravity pool.",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini"
+          }
+        }
+      }
     },
     "Gemini API Key" : {
       "localizations" : {
@@ -35760,6 +35936,12 @@
             "value" : "Merhaba, cam!"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你好，玻璃！"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -36309,6 +36491,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sürüm Notlarını Gizle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏更新说明"
           }
         },
         "zh-Hant" : {
@@ -38378,6 +38566,12 @@
             "value" : "Kur ve Yeniden Başlat"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装并重新启动"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -38400,6 +38594,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Güncellemeyi Kur"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装更新"
           }
         },
         "zh-Hant" : {
@@ -39823,6 +40023,12 @@
             "value" : "Eski"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "旧版"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -40632,6 +40838,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LLM Sağlayıcıları"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LLM 提供商"
           }
         },
         "zh-Hant" : {
@@ -41534,6 +41746,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll'un yeni sürümü aranıyor"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在查找 Atoll 的新版本"
           }
         },
         "zh-Hant" : {
@@ -45348,6 +45566,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Yalnızca mikrofon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅麦克风"
           }
         },
         "zh-Hant" : {
@@ -49999,6 +50223,12 @@
             "value" : "Kayıt yok"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未在录制"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -50891,6 +51121,12 @@
             "value" : "/ %@"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共 %@"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -51312,6 +51548,12 @@
             "value" : "Yalnızca uygulama simgesi"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅应用图标"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -51465,6 +51707,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Yalnızca indir simgesi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅下载图标"
           }
         },
         "zh-Hant" : {
@@ -51792,6 +52040,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ayarları Aç"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开设置"
           }
         },
         "zh-Hant" : {
@@ -55059,6 +55313,12 @@
             "state" : "translated",
             "value" : "PRO"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRO"
+          }
         }
       }
     },
@@ -55124,6 +55384,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "İlerleme"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进度"
           }
         },
         "zh-Hant" : {
@@ -55919,6 +56185,12 @@
             "value" : "kota kullanılamıyor"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配额不可用"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -56454,6 +56726,12 @@
             "value" : "Kayıt etkin"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在录制"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -56974,6 +57252,12 @@
             "value" : "Sonra Hatırlat"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稍后提醒我"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -57308,6 +57592,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Raftan Kaldır"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从置物架移除"
           }
         }
       }
@@ -60898,6 +61188,12 @@
             "value" : "Gezinilebilir gerçek zamanlı dalga formu"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可拖动的实时波形"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -63088,6 +63384,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AirPods dinleme modu değişikliklerini göster"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示 AirPods 聆听模式变化"
           }
         },
         "zh-Hant" : {
@@ -66015,6 +66317,12 @@
             "value" : "Sürüm Notlarını Göster"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示更新说明"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -67185,6 +67493,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bu Sürümü Atla"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过此版本"
           }
         },
         "zh-Hant" : {
@@ -70854,6 +71168,12 @@
             "value" : "Sembol"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "符号"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -74144,6 +74464,12 @@
             "value" : "Tekrar Dene"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -75129,6 +75455,12 @@
             "value" : "Güncelleme kanalı"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新频道"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -75151,6 +75483,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Güncelleme Başarısız"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新失败"
           }
         },
         "zh-Hant" : {
@@ -76623,6 +76961,12 @@
             "value" : "Cider etkin medya kaynağıyken macOS Now Playing'i kullanır. Oynatma denetimleri sistem Now Playing hedefini izler."
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当 Cider 为当前媒体来源时，使用 macOS 的“正在播放”。播放控制将跟随系统的“正在播放”目标。"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -77422,6 +77766,12 @@
             "value" : "Canlı"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鲜艳"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -77618,6 +77968,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Görselleştirici çubukları"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蜡烛图可视化"
           }
         },
         "zh-Hant" : {
@@ -78397,6 +78753,12 @@
             "value" : "Karşılama penceresi"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "欢迎窗口"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -78978,6 +79340,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Etkinleştirildiğinde, İstatistikler sekmesi gerçek zamanlı sistem performansı grafikleri gösterir. Bu özellik sistem izinleri gerektirir ve ek pil kullanabilir. LLM Kullanım İzleyicisini etkinleştirmek, yapılandırdığınız yapay zekâ sağlayıcılarındaki jeton kullanımını ve harcamayı izleyen bir Kullanım sekmesi ekler."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用后，“统计”标签页会显示实时系统性能图表。此功能需要系统权限，并可能增加耗电量。启用 LLM 用量监控会添加一个“用量”标签页，用于跟踪已配置的各 AI 提供商的 token 用量和费用。"
           }
         },
         "zh-Hant" : {
@@ -79852,6 +80220,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Güncelsiniz!"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已是最新版本！"
           }
         },
         "zh-Hant" : {
