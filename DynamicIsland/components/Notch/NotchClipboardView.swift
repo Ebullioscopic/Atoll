@@ -66,17 +66,18 @@ struct NotchClipboardView: View {
                             .contentShape(Rectangle())
                             .clipboardDraggable(item)
                             .onHover { hovering in
-                                hoveredItemId = hovering ? item.id : nil
+                                // Only clear on exit if the id still refers to this card:
+                                // entering the next card can fire `true` before this card's
+                                // `false`, and an unconditional nil would wipe that entry.
+                                if hovering { hoveredItemId = item.id }
+                                else if hoveredItemId == item.id { hoveredItemId = nil }
                             }
-                            .onTapGesture {
-                                clipboardManager.copyToClipboard(item)
-                                withAnimation { justCopiedId = item.id }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                    if justCopiedId == item.id {
-                                        withAnimation { justCopiedId = nil }
-                                    }
-                                }
-                            }
+                            .onTapGesture { copy(item) }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("\(item.type.displayName): \(item.preview)")
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityAction { copy(item) }
+                            .accessibilityAction(named: Text("Delete")) { clipboardManager.deleteItem(item) }
                         }
                     }
                     .padding(.horizontal, 20)
@@ -86,7 +87,12 @@ struct NotchClipboardView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onHover { updateSuppression(for: $0) }
-        .onDisappear { updateSuppression(for: false) }
+        .onDisappear {
+            updateSuppression(for: false)
+            // Release the alert-driven suppression too: if the view is torn down while
+            // the clear-history alert is open, onChange never fires false and it leaks.
+            vm.setAutoCloseSuppression(false, token: autoCloseToken)
+        }
         .alert("Clear Clipboard History?", isPresented: $showClearHistoryAlert) {
             Button("Clear History", role: .destructive) { clipboardManager.clearHistory() }
             Button("Cancel", role: .cancel) {}
@@ -139,6 +145,16 @@ struct NotchClipboardView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.vertical, 30)
+    }
+
+    private func copy(_ item: ClipboardItem) {
+        clipboardManager.copyToClipboard(item)
+        withAnimation { justCopiedId = item.id }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            if justCopiedId == item.id {
+                withAnimation { justCopiedId = nil }
+            }
+        }
     }
 
     private func updateSuppression(for hovering: Bool) {

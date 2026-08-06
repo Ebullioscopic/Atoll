@@ -161,9 +161,16 @@ struct ContentView: View {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
         }
         
-        if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
+        if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
             let resolvedHeight = max(baseSize.height, preferredHeight)
+            return CGSize(width: baseSize.width, height: resolvedHeight)
+        }
+
+        if coordinator.currentView == .clipboard {
+            // Clipboard has its own fixed height source; don't inherit whatever notes
+            // layout state happens to be set.
+            let resolvedHeight = max(baseSize.height, NotesLayoutState.list.preferredHeight)
             return CGSize(width: baseSize.width, height: resolvedHeight)
         }
 

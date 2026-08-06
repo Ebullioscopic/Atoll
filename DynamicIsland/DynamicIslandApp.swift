@@ -535,9 +535,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Use a consistent height for different view types
         if coordinator.currentView == .timer {
             baseSize.height = 250 // Extra space for timer presets
-        } else if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
+        } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
             baseSize.height = max(baseSize.height, preferredHeight)
+        } else if coordinator.currentView == .clipboard {
+            // Clipboard has its own fixed height source; don't inherit the notes layout state.
+            baseSize.height = max(baseSize.height, NotesLayoutState.list.preferredHeight)
         } else if coordinator.currentView == .terminal {
             let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
             let maxFraction = Defaults[.terminalMaxHeightFraction]
