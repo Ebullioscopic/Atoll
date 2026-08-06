@@ -517,6 +517,10 @@ class MusicManager: ObservableObject {
     private var lyricSyncTask: Task<Void, Never>?
     private var lyricsFetchTask: Task<Void, Never>?
     private var lyricsFetchKey: LyricsLookupKey?
+    // Identity of the fetch that is allowed to write lyrics state. A cancelled
+    // task can still reach its completion handler, and the key alone does not
+    // tell it apart from a newer fetch for the same track.
+    private var lyricsFetchID: UUID?
     private var activeLyricsKey: LyricsLookupKey?
     private var lyricsCache: [LyricsLookupKey: [LyricLine]] = [:]
     // Bounded, insertion-order eviction so the cache cannot grow unboundedly.
@@ -1395,26 +1399,40 @@ class MusicManager: ObservableObject {
         if isEnabled {
             prepareLyricsForCurrentTrack(prioritizeVisibleResult: true)
         } else {
-            stopLyricSync()
+            discardLyrics()
         }
     }
 
+    /// Drops any lyrics state and stops an in-flight fetch.
+    private func discardLyrics() {
+        activeLyricsKey = nil
+        lyricsFetchKey = nil
+        lyricsFetchID = nil
+        lyricsFetchTask?.cancel()
+        lyricsFetchTask = nil
+        syncedLyrics = []
+        currentLyrics = ""
+        currentLyricIndex = -1
+        stopLyricSync()
+    }
+
     private func prepareLyricsForCurrentTrack(forceFetch: Bool = false, prioritizeVisibleResult: Bool = false) {
+        // `enableLyrics` reached only as far as the display: with lyrics switched
+        // off the placeholder was suppressed, but the track title and artist were
+        // still sent to LRCLIB on every track change, and nothing consumed the
+        // reply. Stop before the request rather than after it.
+        guard Defaults[.enableLyrics] else {
+            discardLyrics()
+            return
+        }
+
         guard let lookup = currentLyricsLookupContext() else {
-            activeLyricsKey = nil
-            lyricsFetchKey = nil
-            lyricsFetchTask?.cancel()
-            lyricsFetchTask = nil
-            syncedLyrics = []
-            currentLyrics = ""
-            currentLyricIndex = -1
-            stopLyricSync()
+            discardLyrics()
             return
         }
 
         let key = lookup.key
-        let lyricsEnabled = Defaults[.enableLyrics]
-        let shouldShowLoading = lyricsEnabled && prioritizeVisibleResult
+        let shouldShowLoading = prioritizeVisibleResult
         let trackChanged = activeLyricsKey != key
         activeLyricsKey = key
 
@@ -1439,8 +1457,10 @@ class MusicManager: ObservableObject {
 
         lyricsFetchTask?.cancel()
         lyricsFetchKey = key
+        let fetchID = UUID()
+        lyricsFetchID = fetchID
 
-        if shouldShowLoading || (lyricsEnabled && syncedLyrics.isEmpty) {
+        if shouldShowLoading || syncedLyrics.isEmpty {
             currentLyrics = "Loading lyrics..."
         }
 
@@ -1460,21 +1480,23 @@ class MusicManager: ObservableObject {
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    guard self.activeLyricsKey == key else { return }
+                    guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
                     self.storeLyricsInCache(lyrics, for: key)
                     self.lyricsFetchKey = nil
+                    self.lyricsFetchID = nil
                     self.lyricsFetchTask = nil
                     self.applyLyricsToDisplay(lyrics)
                 }
             } catch {
                 print("Failed to fetch lyrics: \(error)")
                 await MainActor.run {
-                    guard self.activeLyricsKey == key else { return }
+                    guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
                     self.lyricsFetchKey = nil
+                    self.lyricsFetchID = nil
                     self.lyricsFetchTask = nil
                     self.syncedLyrics = []
                     self.currentLyricIndex = -1
-                    self.currentLyrics = lyricsEnabled ? "No lyrics found" : ""
+                    self.currentLyrics = "No lyrics found"
                     self.stopLyricSync()
                 }
             }
