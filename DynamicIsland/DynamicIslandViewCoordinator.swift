@@ -164,14 +164,45 @@ class DynamicIslandViewCoordinator: ObservableObject {
             NotificationCenter.default.post(name: Notification.Name.selectedScreenChanged, object: nil)
         }
     }
-    
+
+    /// `CGDirectDisplayID` of the preferred display. Unlike `preferredScreen` (the
+    /// display's localized name), the ID tells identical monitors apart and survives
+    /// display renames. `0` means "not set" (legacy installs only stored the name).
+    @AppStorage("preferred_screen_id") var preferredScreenID: Int = 0 {
+        didSet {
+            NotificationCenter.default.post(name: Notification.Name.selectedScreenChanged, object: nil)
+        }
+    }
+
     @Published var selectedScreen: String = NSScreen.main?.localizedName ?? "Unknown"
+
+    /// The display the user picked in Settings, matched by stable display ID first
+    /// (identical monitors share a localized name), falling back to the legacy name.
+    func preferredNSScreen() -> NSScreen? {
+        if preferredScreenID != 0,
+           let match = NSScreen.screens.first(where: {
+               $0.displayID == CGDirectDisplayID(preferredScreenID)
+           }) {
+            return match
+        }
+        return NSScreen.screens.first(where: { $0.localizedName == preferredScreen })
+    }
+
+    /// Legacy installs only stored the preferred display's name; backfill its ID.
+    private func migratePreferredScreenIDIfNeeded() {
+        guard preferredScreenID == 0,
+              let match = NSScreen.screens.first(where: { $0.localizedName == preferredScreen }),
+              let id = match.displayID
+        else { return }
+        preferredScreenID = Int(id)
+    }
 
     @Published var optionKeyPressed: Bool = true
     private let extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     
     private init() {
         selectedScreen = preferredScreen
+        migratePreferredScreenIDIfNeeded()
         Defaults.publisher(.timerDisplayMode)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in

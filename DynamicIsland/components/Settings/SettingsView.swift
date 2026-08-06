@@ -1041,7 +1041,7 @@ struct SettingsView: View {
 }
 
 struct GeneralSettings: View {
-    @State private var screens: [String] = NSScreen.screens.compactMap { $0.localizedName }
+    @State private var screens: [(id: CGDirectDisplayID, label: String)] = NSScreen.displayPickerItems()
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @Default(.mirrorShape) var mirrorShape
@@ -1069,6 +1069,20 @@ struct GeneralSettings: View {
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.general.highlightID(for: title)
+    }
+
+    /// Bridges the picker to the coordinator: persists the stable display ID and
+    /// keeps the legacy display-name preference in sync for downstream consumers.
+    private var preferredDisplayBinding: Binding<CGDirectDisplayID> {
+        Binding(
+            get: { CGDirectDisplayID(coordinator.preferredScreenID) },
+            set: { newID in
+                if let screen = NSScreen.screens.first(where: { $0.displayID == newID }) {
+                    coordinator.preferredScreen = screen.localizedName
+                }
+                coordinator.preferredScreenID = Int(newID)
+            }
+        )
     }
 
     var body: some View {
@@ -1118,13 +1132,13 @@ struct GeneralSettings: View {
                     NotificationCenter.default.post(name: Notification.Name.showOnAllDisplaysChanged, object: nil)
                 }
                 .settingsHighlight(id: highlightID("Show on all displays"))
-                Picker("Show on a specific display", selection: $coordinator.preferredScreen) {
-                    ForEach(screens, id: \.self) { screen in
-                        Text(screen)
+                Picker("Show on a specific display", selection: preferredDisplayBinding) {
+                    ForEach(screens, id: \.id) { screen in
+                        Text(screen.label).tag(screen.id)
                     }
                 }
                 .onChange(of: NSScreen.screens) {
-                    screens =  NSScreen.screens.compactMap({$0.localizedName})
+                    screens = NSScreen.displayPickerItems()
                 }
                 .disabled(showOnAllDisplays)
                 .settingsHighlight(id: highlightID("Show on a specific display"))
