@@ -2829,6 +2829,7 @@ struct Media: View {
 
             if mediaController == .spotify {
                 SpotifyAuthSettingsSection()
+                SpotifyLikeButtonSettingsSection()
             }
 
             Section {
