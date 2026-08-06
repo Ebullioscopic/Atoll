@@ -924,7 +924,7 @@ struct MusicSliderView: View {
         if let tintOverride {
             return tintOverride
         }
-        Defaults[.playerColorTinting]
+        return Defaults[.playerColorTinting]
             ? Color(nsColor: color).ensureMinimumBrightness(factor: 0.6)
             : .gray
     }
