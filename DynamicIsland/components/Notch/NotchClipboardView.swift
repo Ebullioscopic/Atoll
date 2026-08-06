@@ -18,6 +18,7 @@
 
 import SwiftUI
 import AppKit
+import Defaults
 
 /// Clipboard as a card grid, each card draggable out to other apps, tap to copy,
 /// hover to delete. Used both as the dedicated `.notchTab` view and, at a smaller
@@ -103,7 +104,9 @@ struct NotchClipboardView: View {
             vm.setAutoCloseSuppression(isShowing, token: autoCloseToken)
         }
         .onAppear {
-            if !clipboardManager.isMonitoring { clipboardManager.startMonitoring() }
+            if Defaults[.enableClipboardManager], !clipboardManager.isMonitoring {
+                clipboardManager.startMonitoring()
+            }
         }
     }
 
@@ -229,6 +232,16 @@ struct ClipboardGridCard: View {
                 .frame(width: 28, height: 28)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
+                .overlay {
+                    // Copy confirmation for image cards (the icon cards swap to a checkmark;
+                    // image cards keep their thumbnail, so badge the checkmark on top).
+                    if justCopied {
+                        RoundedRectangle(cornerRadius: 6).fill(.black.opacity(0.5))
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.green)
+                    }
+                }
         } else {
             Image(systemName: justCopied ? "checkmark.circle.fill" : item.type.icon)
                 .font(.system(size: 16))

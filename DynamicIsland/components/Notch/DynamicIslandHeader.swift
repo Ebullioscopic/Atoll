@@ -101,7 +101,8 @@ struct DynamicIslandHeader: View {
                             case .separateTab:
                                 coordinator.currentView = .notes
                             case .notchTab:
-                                coordinator.currentView = .clipboard
+                                // Toggle: a second tap on the clipboard button leaves the tab.
+                                coordinator.currentView = (coordinator.currentView == .clipboard) ? .home : .clipboard
                             }
                         }) {
                             Capsule()

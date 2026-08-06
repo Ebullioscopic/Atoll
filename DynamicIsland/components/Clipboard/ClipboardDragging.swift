@@ -48,7 +48,10 @@ extension ClipboardItem {
             if let first = fileURLs?.compactMap({ URL(string: $0) }).first,
                let provider = NSItemProvider(contentsOf: first) { return provider }
         }
-        return NSItemProvider()
+        // Fallback when a payload is unavailable (nil string, missing image file, unparsable
+        // URL): drag the preview text rather than an empty provider, so the drag isn't a
+        // no-op that follows the cursor and drops nothing.
+        return NSItemProvider(object: preview as NSString)
     }
 
     /// Copy the persisted PNG to a temporary file before handing it to the drag, so an
