@@ -128,14 +128,16 @@ struct ClaudeQuotaClient {
         await ClaudeCredentialStore.shared.reload(from: { Self.loadCredentialsFromSource() })
     }
 
-    // File first never prompts; Keychain only as fallback.
+    // File first never prompts; Keychain only as fallback. On the Keychain path, read the
+    // freshest "Claude Code-credentials*" item: newer Claude Code stores its token under a
+    // per-install hash suffix and no longer updates the un-suffixed item.
     private static func loadCredentialsFromSource() -> CredentialFile.OAuth? {
         let path = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/.credentials.json")
         if let data = try? Data(contentsOf: path),
            let parsed = try? JSONDecoder().decode(CredentialFile.self, from: data) {
             return parsed.claudeAiOauth
         }
-        guard let json = KeychainReader.genericPassword(service: "Claude Code-credentials"),
+        guard let json = KeychainReader.freshestGenericPassword(servicePrefix: "Claude Code-credentials"),
               let parsed = try? JSONDecoder().decode(CredentialFile.self, from: Data(json.utf8)) else { return nil }
         return parsed.claudeAiOauth
     }
