@@ -1099,15 +1099,15 @@ struct GeneralSettings: View {
         )
     }
 
-    /// Adopts an `AppleLanguages` override set outside the app (System Settings or
-    /// `defaults write`) so the picker reflects it.
+    /// Syncs the picker with an `AppleLanguages` override set outside the app
+    /// (System Settings or `defaults write`), including its later removal.
     private func adoptExternalLanguageOverride() {
-        guard appLanguage == "system",
-              let bundleID = Bundle.main.bundleIdentifier,
-              let override = UserDefaults.standard.persistentDomain(forName: bundleID)?["AppleLanguages"] as? [String],
-              let language = override.first, !language.isEmpty
-        else { return }
-        appLanguage = language
+        let override = Bundle.main.bundleIdentifier
+            .flatMap {
+                UserDefaults.standard.persistentDomain(forName: $0)?["AppleLanguages"] as? [String]
+            }?
+            .first { !$0.isEmpty }
+        appLanguage = override ?? "system"
     }
 
     var body: some View {
