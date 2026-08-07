@@ -1135,6 +1135,12 @@
             "state" : "translated",
             "value" : "%@ 通道"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 频道"
+          }
         }
       }
     },
@@ -2469,6 +2475,12 @@
             "state" : "translated",
             "value" : "剩餘 %lld%%"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余 %lld%%"
+          }
         }
       }
     },
@@ -2489,6 +2501,12 @@
           }
         },
         "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已使用 %lld%%"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "已使用 %lld%%"
@@ -2566,6 +2584,12 @@
           }
         },
         "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天前"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 天前"
@@ -2695,6 +2719,12 @@
             "state" : "translated",
             "value" : "%lld 小時前"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 小时前"
+          }
         }
       }
     },
@@ -2819,6 +2849,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 分鐘前"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分钟前"
           }
         }
       }
@@ -3066,8 +3102,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "• Bug 修复"
+            "state" : "translated",
+            "value" : "• 问题修复"
           }
         },
         "zh-Hant" : {
@@ -3422,8 +3458,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "• 新功能1"
+            "state" : "translated",
+            "value" : "• 新功能 1"
           }
         },
         "zh-Hant" : {
@@ -4325,6 +4361,12 @@
             "state" : "translated",
             "value" : "3D"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3D"
+          }
         }
       }
     },
@@ -4335,12 +4377,24 @@
             "state" : "translated",
             "value" : "4"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4"
+          }
         }
       }
     },
     "5" : {
       "localizations" : {
         "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "5"
@@ -4561,6 +4615,12 @@
     "6" : {
       "localizations" : {
         "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "6"
@@ -5300,6 +5360,12 @@
             "state" : "translated",
             "value" : "Atoll 有新版本可用！"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll 有新版本可用！"
+          }
         }
       }
     },
@@ -5750,8 +5816,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "被拒绝访问"
+            "state" : "translated",
+            "value" : "访问被拒绝"
           }
         },
         "zh-Hant" : {
@@ -5847,6 +5913,12 @@
             "state" : "translated",
             "value" : "輔助使用權限可讓動態島取代原生的音量、亮度和鍵盤 HUD。"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "辅助功能权限允许 Atoll 替代系统原生的音量、亮度和键盘亮度提示界面。"
+          }
         }
       }
     },
@@ -5881,6 +5953,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要輔助使用權限"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要辅助功能权限"
           }
         }
       }
@@ -9138,8 +9216,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "总是隐藏在全屏"
+            "state" : "translated",
+            "value" : "始终在全屏模式下隐藏"
           }
         },
         "zh-Hant" : {
@@ -9257,8 +9335,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "总是显示标签页"
+            "state" : "translated",
+            "value" : "始终显示标签页"
           }
         },
         "zh-Hant" : {
@@ -9291,6 +9369,12 @@
           }
         },
         "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amazon Music"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Amazon Music"
@@ -10397,6 +10481,12 @@
             "state" : "translated",
             "value" : "Atoll %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll %@"
+          }
         }
       }
     },
@@ -10715,6 +10805,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll 會定期自動檢查更新。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll 将定期自动检查更新。"
           }
         }
       }
@@ -13147,6 +13243,12 @@
             "state" : "translated",
             "value" : "兩者皆使用中"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "摄像头和麦克风均启用"
+          }
         }
       }
     },
@@ -14011,8 +14113,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "日历访问被拒绝。请在系统设置中启用它。"
+            "state" : "translated",
+            "value" : "日历访问权限被拒绝。请在“系统设置”中启用。"
           }
         },
         "zh-Hant" : {
@@ -14406,6 +14508,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "僅相機"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅摄像头"
           }
         }
       }
@@ -15334,8 +15442,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "暂停充电：桌面模式"
+            "state" : "translated",
+            "value" : "已暂停充电：桌面模式"
           }
         },
         "zh-Hant" : {
@@ -15484,6 +15592,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在檢查更新…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查更新…"
           }
         }
       }
@@ -16042,6 +16156,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選擇要顯示在用量分頁中的 AI 服務供應商。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择要在“用量”标签页中显示的 AI 服务提供商。"
           }
         }
       }
@@ -16657,6 +16777,12 @@
           }
         },
         "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Claude"
@@ -18193,6 +18319,12 @@
             "state" : "translated",
             "value" : "Codex"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex"
+          }
         }
       }
     },
@@ -18338,6 +18470,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "色彩擷取"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "颜色提取"
           }
         }
       }
@@ -19250,6 +19388,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "精簡"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "紧凑"
           }
         }
       }
@@ -21319,6 +21463,12 @@
             "state" : "translated",
             "value" : "目前版本號：%@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前构建版本：%@"
+          }
         }
       }
     },
@@ -22657,8 +22807,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "自定义Notch大小 - %.0f"
+            "state" : "translated",
+            "value" : "自定义刘海大小：%.0f"
           }
         },
         "zh-Hant" : {
@@ -25503,6 +25653,12 @@
             "state" : "translated",
             "value" : "關閉"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
         }
       }
     },
@@ -27399,6 +27555,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "編輯"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑"
           }
         }
       }
@@ -29379,8 +29541,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "启用触觉"
+            "state" : "translated",
+            "value" : "启用触觉反馈"
           }
         },
         "zh-Hant" : {
@@ -29574,6 +29736,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "啟用 LLM 用量監控"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用大语言模型用量监控"
           }
         }
       }
@@ -34161,7 +34329,15 @@
     },
     "Gemini" : {
       "comment" : "A label for a segment in a picker that lets the user select an Antigravity pool.",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini"
+          }
+        }
+      }
     },
     "Gemini API Key" : {
       "localizations" : {
@@ -35765,6 +35941,12 @@
             "state" : "translated",
             "value" : "哈囉，玻璃！"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你好，玻璃效果！"
+          }
         }
       }
     },
@@ -36283,8 +36465,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "仅在“当前播放”全屏时隐藏"
+            "state" : "translated",
+            "value" : "仅当“正在播放”的应用处于全屏模式时隐藏"
           }
         },
         "zh-Hant" : {
@@ -36315,6 +36497,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "隱藏版本說明"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏版本说明"
           }
         }
       }
@@ -38383,6 +38571,12 @@
             "state" : "translated",
             "value" : "安裝並重新啟動"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装并重新启动"
+          }
         }
       }
     },
@@ -38406,6 +38600,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "安裝更新"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装更新"
           }
         }
       }
@@ -39828,6 +40028,12 @@
             "state" : "translated",
             "value" : "舊版"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "经典"
+          }
         }
       }
     },
@@ -40638,6 +40844,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LLM 服務供應商"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大语言模型服务提供商"
           }
         }
       }
@@ -41540,6 +41752,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在尋找 Atoll 新版本"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在查找 Atoll 新版本"
           }
         }
       }
@@ -42886,8 +43104,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "匹配菜单栏高度"
+            "state" : "translated",
+            "value" : "与菜单栏高度一致"
           }
         },
         "zh-Hant" : {
@@ -43004,8 +43222,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "匹配Notch真实大小"
+            "state" : "translated",
+            "value" : "与实际刘海大小一致"
           }
         },
         "zh-Hant" : {
@@ -43553,8 +43771,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "横向手势改变媒体"
+            "state" : "translated",
+            "value" : "使用横向手势切换媒体"
           }
         },
         "zh-Hant" : {
@@ -43791,8 +44009,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "媒体非活动超时"
+            "state" : "translated",
+            "value" : "媒体空闲超时时间"
           }
         },
         "zh-Hant" : {
@@ -45355,6 +45573,12 @@
             "state" : "translated",
             "value" : "僅麥克風"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅麦克风"
+          }
         }
       }
     },
@@ -45729,8 +45953,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "悬停最短时长"
+            "state" : "translated",
+            "value" : "最短悬停时长"
           }
         },
         "zh-Hant" : {
@@ -49636,8 +49860,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "非Notch显示高度"
+            "state" : "translated",
+            "value" : "无刘海显示器上的高度"
           }
         },
         "zh-Hant" : {
@@ -50004,6 +50228,12 @@
             "state" : "translated",
             "value" : "未錄製"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未在录制"
+          }
         }
       }
     },
@@ -50165,8 +50395,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Notch行为"
+            "state" : "translated",
+            "value" : "刘海交互行为"
           }
         },
         "zh-Hant" : {
@@ -50283,8 +50513,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Notch显示高度"
+            "state" : "translated",
+            "value" : "刘海显示高度"
           }
         },
         "zh-Hant" : {
@@ -50444,8 +50674,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Notch高度"
+            "state" : "translated",
+            "value" : "刘海高度"
           }
         },
         "zh-Hant" : {
@@ -50896,6 +51126,12 @@
             "state" : "translated",
             "value" : "共 %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共 %@"
+          }
         }
       }
     },
@@ -51317,6 +51553,12 @@
             "state" : "translated",
             "value" : "僅 App 圖示"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅显示应用图标"
+          }
         }
       }
     },
@@ -51471,6 +51713,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "僅下載圖示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅显示下载图标"
           }
         }
       }
@@ -51798,6 +52046,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開啟設定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开设置"
           }
         }
       }
@@ -55059,6 +55313,12 @@
             "state" : "translated",
             "value" : "PRO"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRO"
+          }
         }
       }
     },
@@ -55130,6 +55390,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "進度"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进度"
           }
         }
       }
@@ -55924,6 +56190,12 @@
             "state" : "translated",
             "value" : "無法取得配額"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配额不可用"
+          }
         }
       }
     },
@@ -56459,6 +56731,12 @@
             "state" : "translated",
             "value" : "錄製中"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在录制"
+          }
         }
       }
     },
@@ -56979,6 +57257,12 @@
             "state" : "translated",
             "value" : "稍後提醒我"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稍后提醒我"
+          }
         }
       }
     },
@@ -57308,6 +57592,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Raftan Kaldır"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从暂存器中移除"
           }
         }
       }
@@ -60903,6 +61193,12 @@
             "state" : "translated",
             "value" : "可拖曳的即時波形"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可拖动定位的实时波形"
+          }
         }
       }
     },
@@ -63095,6 +63391,12 @@
             "state" : "translated",
             "value" : "顯示 AirPods 聆聽模式變更"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示 AirPods 聆听模式变化"
+          }
         }
       }
     },
@@ -64178,8 +64480,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "不活动时显示动画"
+            "state" : "translated",
+            "value" : "空闲时显示趣味表情动画"
           }
         },
         "zh-Hant" : {
@@ -66020,6 +66322,12 @@
             "state" : "translated",
             "value" : "顯示版本說明"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示版本说明"
+          }
         }
       }
     },
@@ -67191,6 +67499,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "略過此版本"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过此版本"
           }
         }
       }
@@ -70859,6 +71173,12 @@
             "state" : "translated",
             "value" : "符號"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "符号"
+          }
         }
       }
     },
@@ -72601,7 +72921,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "距离充满还需：%lld 分钟"
+            "value" : "距离充满：%lld 分钟"
           }
         },
         "zh-Hant" : {
@@ -73536,8 +73856,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "切换Notch："
+            "state" : "translated",
+            "value" : "切换刘海展开状态："
           }
         },
         "zh-Hant" : {
@@ -74149,6 +74469,12 @@
             "state" : "translated",
             "value" : "再試一次"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
+          }
         }
       }
     },
@@ -74472,8 +74798,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "在Notch里双指向上滑动以关闭。当**悬停在Notch时打开**选项禁用时，双指向下滑动即可打开"
+            "state" : "translated",
+            "value" : "在刘海区域双指上滑可关闭；禁用**悬停时打开刘海**后，双指下滑可打开"
           }
         },
         "zh-Hant" : {
@@ -75134,6 +75460,12 @@
             "state" : "translated",
             "value" : "更新通道"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新渠道"
+          }
         }
       }
     },
@@ -75157,6 +75489,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新失敗"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新失败"
           }
         }
       }
@@ -76628,6 +76966,12 @@
             "state" : "translated",
             "value" : "當 Cider 是使用中的媒體來源時，使用 macOS 正在播放。播放控制會遵循系統的正在播放目標。"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当 Cider 为当前媒体来源时，使用 macOS 的“正在播放”信息；播放控制会跟随系统当前的“正在播放”目标。"
+          }
         }
       }
     },
@@ -77427,6 +77771,12 @@
             "state" : "translated",
             "value" : "鮮明"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鲜明"
+          }
         }
       }
     },
@@ -77624,6 +77974,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "視覺化長條"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可视化蜡烛图"
           }
         }
       }
@@ -78402,6 +78758,12 @@
             "state" : "translated",
             "value" : "歡迎視窗"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "欢迎窗口"
+          }
         }
       }
     },
@@ -78984,6 +79346,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "啟用後，統計分頁會顯示即時系統效能圖表。此功能需要系統權限，並可能增加電量消耗。啟用 LLM 用量監控會新增用量分頁，追蹤你所設定的各 AI 服務供應商的 token 用量與花費。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用后，“统计”标签页将显示实时系统性能图表。此功能需要系统权限，并可能增加耗电量。启用大语言模型用量监控后，还会添加“用量”标签页，用于跟踪已配置 AI 服务提供商的令牌用量和费用。"
           }
         }
       }
@@ -79708,8 +80076,8 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "如果您想进一步调整内容，您可以随时访问设置。"
+            "state" : "translated",
+            "value" : "现在可以开始使用 Atoll 了。如需进一步调整，随时可以前往设置。"
           }
         },
         "zh-Hant" : {
@@ -79858,6 +80226,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你已是最新版本！"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已是最新版本！"
           }
         }
       }
