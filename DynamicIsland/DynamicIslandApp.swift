@@ -1256,6 +1256,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // Cancel the auto-close armed by `toggleNotchOpen`. Switching to the clipboard tab
+    // from the header only changes `coordinator.currentView`, so without this the notch
+    // can close mid-copy/drag a few seconds after it was opened.
+    func cancelPendingNotchAutoClose() {
+        closeNotchWorkItem?.cancel()
+        closeNotchWorkItem = nil
+    }
+
     private func registerOptionalShortcutHandlers() {
         guard !optionalShortcutHandlersRegistered else { return }
         optionalShortcutHandlersRegistered = true
@@ -1297,16 +1305,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             case .notchTab:
+                // Act on the notch under the cursor, matching toggleNotchOpen: with
+                // showOnAllDisplays the rendered windows use viewModels[screen], so mutating
+                // the primary vm could flip currentView without opening a visible notch.
+                var activeVM = vm
+                if Defaults[.showOnAllDisplays] {
+                    let mouseLocation = NSEvent.mouseLocation
+                    for screen in NSScreen.screens where screen.frame.contains(mouseLocation) {
+                        if let screenViewModel = viewModels[screen] {
+                            activeVM = screenViewModel
+                            break
+                        }
+                    }
+                }
                 // Cancel any pending auto-close armed by toggleNotchOpen, so it can't fire
                 // and close the notch a few seconds after this shortcut opens/switches to it.
-                closeNotchWorkItem?.cancel()
-                closeNotchWorkItem = nil
-                if vm.notchState == .closed {
-                    vm.open()
+                cancelPendingNotchAutoClose()
+                if activeVM.notchState == .closed {
+                    activeVM.open()
                     coordinator.currentView = .clipboard
                 } else {
                     if coordinator.currentView == .clipboard {
-                        vm.close()
+                        activeVM.close()
                     } else {
                         coordinator.currentView = .clipboard
                     }

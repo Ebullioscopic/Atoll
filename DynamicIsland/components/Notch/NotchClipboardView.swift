@@ -175,6 +175,11 @@ struct ClipboardGridCard: View {
     let justCopied: Bool
     let onDelete: () -> Void
 
+    // Decode the image once per item instead of on every render. `body` re-runs for hover
+    // and copy-feedback changes, and decoding the on-disk PNG on the main thread each time
+    // is wasteful; `.task(id:)` loads it once and refreshes only when the item changes.
+    @State private var cachedImage: NSImage?
+
     var body: some View {
         HStack(spacing: 10) {
             thumbnail
@@ -221,11 +226,16 @@ struct ClipboardGridCard: View {
             }
         }
         .animation(.easeInOut(duration: 0.12), value: isHovered)
+        .task(id: item.id) {
+            cachedImage = item.type == .image
+                ? item.getImageData().flatMap(NSImage.init(data:))
+                : nil
+        }
     }
 
     @ViewBuilder
     private var thumbnail: some View {
-        if item.type == .image, let data = item.getImageData(), let nsImage = NSImage(data: data) {
+        if item.type == .image, let nsImage = cachedImage {
             Image(nsImage: nsImage)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
