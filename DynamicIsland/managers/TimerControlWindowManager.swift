@@ -41,6 +41,7 @@ final class TimerControlWindowManager {
     private var autoHideTask: Task<Void, Never>?
     private var isEphemeral = false
     private var isPointerInside = false
+    private var hideGeneration = 0
 
     private init() {}
 
@@ -60,6 +61,7 @@ final class TimerControlWindowManager {
             return false
         }
 
+        hideGeneration &+= 1
         isEphemeral = autoHideAfter != nil
         isPointerInside = false
 
@@ -84,6 +86,8 @@ final class TimerControlWindowManager {
             SkyLightOperator.shared.delegateWindow(window)
             hasDelegated = true
         }
+
+        window.ignoresMouseEvents = false
 
         if window.alphaValue <= 0.01 {
             let startFrame = initialFrame(for: targetFrame, metrics: metrics)
@@ -142,8 +146,12 @@ final class TimerControlWindowManager {
         cancelAutoHide()
         isEphemeral = false
         isPointerInside = false
+        hideGeneration &+= 1
+        let generation = hideGeneration
 
         guard let window else { return }
+
+        window.ignoresMouseEvents = true
 
         guard animated, window.alphaValue > 0.01 else {
             window.orderOut(nil)
@@ -164,11 +172,12 @@ final class TimerControlWindowManager {
             window.animator().alphaValue = 0
         } completionHandler: { [weak self] in
             Task { @MainActor in
+                guard let self, self.hideGeneration == generation else { return }
                 window.setFrame(originalFrame, display: false)
                 window.orderOut(nil)
                 window.alphaValue = 0
                 if tearDown {
-                    self?.tearDownWindowResources(using: window)
+                    self.tearDownWindowResources(using: window)
                 }
             }
         }
@@ -203,8 +212,11 @@ final class TimerControlWindowManager {
         isEphemeral = false
         isPointerInside = false
         let targetWindow = window ?? self.window
-        targetWindow?.contentView = nil
-        targetWindow?.orderOut(nil)
+        if let targetWindow {
+            ScreenCaptureVisibilityManager.shared.unregister(targetWindow)
+            targetWindow.contentView = nil
+            targetWindow.orderOut(nil)
+        }
         hostingView = nil
         lastMetrics = nil
         self.window = nil

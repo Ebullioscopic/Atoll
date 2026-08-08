@@ -40,11 +40,12 @@ enum QuickTimerSlots {
     }
 
     static func label(for minutes: Int) -> String {
-        "\(minutes)m"
+        String(format: String(localized: "%dm"), minutes)
     }
 
     static func accessibilityLabel(for minutes: Int) -> String {
-        String(format: String(localized: "%d minute timer"), minutes)
+        let format = String(localized: "%lld minute timer")
+        return String.localizedStringWithFormat(format, minutes)
     }
 
     static func start(minutes: Int, presets: [TimerPreset] = Defaults[.timerPresets]) {
@@ -53,7 +54,7 @@ enum QuickTimerSlots {
         let matched = presets.first { Int($0.duration.rounded()) == Int(duration.rounded()) }
         TimerManager.shared.startTimer(
             duration: matched?.duration ?? duration,
-            name: matched?.name ?? String(format: String(localized: "%d min"), clamped),
+            name: matched?.name ?? String(format: String(localized: "%lld min"), clamped),
             preset: matched
         )
     }

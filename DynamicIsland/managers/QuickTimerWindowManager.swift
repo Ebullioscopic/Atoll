@@ -33,6 +33,7 @@ final class QuickTimerWindowManager {
     private var autoHideTask: Task<Void, Never>?
     private var collapseTask: Task<Void, Never>?
     private var isPointerInside = false
+    private var hideGeneration = 0
     private(set) var isVisible = false
 
     private init() {}
@@ -53,6 +54,7 @@ final class QuickTimerWindowManager {
             return false
         }
 
+        hideGeneration &+= 1
         collapseTask?.cancel()
         collapseTask = nil
         isPointerInside = false
@@ -86,6 +88,7 @@ final class QuickTimerWindowManager {
             hasDelegated = true
         }
 
+        window.ignoresMouseEvents = false
         window.setFrame(targetFrame, display: true)
         window.alphaValue = 1
         window.orderFrontRegardless()
@@ -108,11 +111,15 @@ final class QuickTimerWindowManager {
         collapseTask = nil
         isVisible = false
         isPointerInside = false
+        hideGeneration &+= 1
+        let generation = hideGeneration
 
         guard let window else {
             QuickTimerPresentationState.shared.reset()
             return
         }
+
+        window.ignoresMouseEvents = true
 
         guard animated, window.alphaValue > 0.01 else {
             QuickTimerPresentationState.shared.reset()
@@ -128,7 +135,7 @@ final class QuickTimerWindowManager {
 
         collapseTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(ClosedNotchSatelliteChrome.morphDuration))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, self.hideGeneration == generation else { return }
             window.orderOut(nil)
             window.alphaValue = 0
             if tearDown {
@@ -167,8 +174,11 @@ final class QuickTimerWindowManager {
     private func tearDownWindowResources(using window: NSPanel? = nil) {
         QuickTimerPresentationState.shared.reset()
         let targetWindow = window ?? self.window
-        targetWindow?.contentView = nil
-        targetWindow?.orderOut(nil)
+        if let targetWindow {
+            ScreenCaptureVisibilityManager.shared.unregister(targetWindow)
+            targetWindow.contentView = nil
+            targetWindow.orderOut(nil)
+        }
         hostingView = nil
         lastMetrics = nil
         self.window = nil

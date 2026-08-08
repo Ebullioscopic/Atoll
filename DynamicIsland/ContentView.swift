@@ -212,6 +212,7 @@ struct ContentView: View {
     @State private var hiddenEdgeHoverPollingTask: Task<Void, Never>?
     @State private var isHoveringClosedMusicWaveformControl: Bool = false
     @State private var quickTimerLongPressConsumed = false
+    @State private var lastQuickTimerActivationAt: Date?
     @Default(.enableQuickTimerFromClosedNotch) private var enableQuickTimerFromClosedNotch
 
     @State private var gestureProgress: CGFloat = .zero
@@ -591,7 +592,14 @@ struct ContentView: View {
                     .conditionalModifier(canUseClosedNotchLongPressQuickTimer) { view in
                         view.onLongPressGesture(minimumDuration: 0.45, maximumDistance: 12) {
                             quickTimerLongPressConsumed = true
-                            presentQuickTimerPresets()
+                            if canControlActiveClosedNotchTimer {
+                                presentActiveTimerControls()
+                            } else {
+                                presentQuickTimerPresets()
+                            }
+                            runAfter(0.4) {
+                                quickTimerLongPressConsumed = false
+                            }
                         }
                     }
                     .conditionalModifier(Defaults[.enableGestures]) { view in
@@ -1975,10 +1983,16 @@ struct ContentView: View {
 
     @discardableResult
     private func handleClosedQuickTimerActivationIfNeeded(preferOptionKey: Bool) -> Bool {
+        if let lastQuickTimerActivationAt,
+           Date().timeIntervalSince(lastQuickTimerActivationAt) < 0.3 {
+            return true
+        }
+
 #if os(macOS)
         if QuickTimerWindowManager.shared.isVisible {
             QuickTimerWindowManager.shared.hide(animated: true)
             coordinator.suppressHoverOpen(for: 0.45)
+            lastQuickTimerActivationAt = Date()
             return true
         }
 #endif
@@ -1987,10 +2001,12 @@ struct ContentView: View {
         }
         if canControlActiveClosedNotchTimer {
             presentActiveTimerControls()
+            lastQuickTimerActivationAt = Date()
             return true
         }
         guard canPresentQuickTimerPresets else { return false }
         presentQuickTimerPresets()
+        lastQuickTimerActivationAt = Date()
         return true
     }
 

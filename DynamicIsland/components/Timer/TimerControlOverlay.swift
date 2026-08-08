@@ -32,7 +32,9 @@ struct TimerControlOverlay: View {
     }
 
     private var pauseHelp: String {
-        timerManager.isPaused ? "Resume" : "Pause"
+        timerManager.isPaused
+            ? String(localized: "Resume")
+            : String(localized: "Pause")
     }
 
     private var stopIcon: String {
@@ -40,7 +42,9 @@ struct TimerControlOverlay: View {
     }
 
     private var stopHelp: String {
-        timerManager.isOvertime ? "Stop" : "Cancel"
+        timerManager.isOvertime
+            ? String(localized: "Stop")
+            : String(localized: "Cancel")
     }
 
     var body: some View {

@@ -6712,7 +6712,7 @@ struct TimerSettings: View {
             Defaults.Toggle(key: .enableQuickTimerFromClosedNotch) {
                 Text("Quick timer from closed notch")
             }
-            .help("⌥-click the closed notch for quick presets, or to show pause/stop while a timer runs. Long-press when Open on hover is off. Right-click also works.")
+            .help("⌥-click the closed notch for quick presets, or to show pause/cancel while a timer runs. Long-press when Open on hover is off. Right-click also works.")
             .settingsHighlight(id: highlightID("Quick timer from closed notch"))
 
             if enableQuickTimerFromClosedNotch {
