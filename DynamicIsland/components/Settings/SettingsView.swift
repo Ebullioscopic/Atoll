@@ -874,6 +874,8 @@ struct SettingsView: View {
 
             // Timer
             SettingsSearchEntry(tab: .timer, title: "Enable timer feature", keywords: ["timer", "enable"], highlightID: SettingsTab.timer.highlightID(for: "Enable timer feature")),
+            SettingsSearchEntry(tab: .timer, title: "Quick timer from closed notch", keywords: ["quick timer", "preset", "option", "long press"], highlightID: SettingsTab.timer.highlightID(for: "Quick timer from closed notch")),
+            SettingsSearchEntry(tab: .timer, title: "Quick timer presets", keywords: ["5", "15", "25", "minutes", "quick timer"], highlightID: SettingsTab.timer.highlightID(for: "Quick timer presets")),
             SettingsSearchEntry(tab: .timer, title: "Mirror macOS Clock timers", keywords: ["system timer", "clock app"], highlightID: SettingsTab.timer.highlightID(for: "Mirror macOS Clock timers")),
             SettingsSearchEntry(tab: .timer, title: "Show lock screen timer widget", keywords: ["lock screen", "timer widget"], highlightID: SettingsTab.timer.highlightID(for: "Show lock screen timer widget")),
             SettingsSearchEntry(tab: .timer, title: "Timer surface", keywords: ["timer glass", "classic", "blur"], highlightID: SettingsTab.timer.highlightID(for: "Timer surface")),
@@ -6616,6 +6618,8 @@ struct TimerSettings: View {
     @Default(.mirrorSystemTimer) private var mirrorSystemTimer
     @Default(.timerDisplayMode) private var timerDisplayMode
     @Default(.timerInputStyle) private var timerInputStyle
+    @Default(.enableQuickTimerFromClosedNotch) private var enableQuickTimerFromClosedNotch
+    @Default(.quickTimerMinutes) private var quickTimerMinutes
     @Default(.enableLockScreenTimerWidget) private var enableLockScreenTimerWidget
     @Default(.lockScreenTimerWidgetUsesBlur) private var timerGlassModeIsGlass
     @Default(.lockScreenTimerGlassStyle) private var lockScreenTimerGlassStyle
@@ -6676,6 +6680,7 @@ struct TimerSettings: View {
             if enableTimerFeature {
                 Toggle("Enable timer live activity", isOn: $coordinator.timerLiveActivityEnabled)
                     .animation(.easeInOut, value: coordinator.timerLiveActivityEnabled)
+
                 Defaults.Toggle(key: .mirrorSystemTimer) {
                     HStack(spacing: 8) {
                         Text("Mirror macOS Clock timers")
@@ -6702,8 +6707,64 @@ struct TimerSettings: View {
     }
 
     @ViewBuilder
+    private var quickTimerSection: some View {
+        Section {
+            Defaults.Toggle(key: .enableQuickTimerFromClosedNotch) {
+                Text("Quick timer from closed notch")
+            }
+            .help("⌥-click the closed notch for quick presets, or to show pause/stop while a timer runs. Long-press when Open on hover is off. Right-click also works.")
+            .settingsHighlight(id: highlightID("Quick timer from closed notch"))
+
+            if enableQuickTimerFromClosedNotch {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Spacer(minLength: 0)
+                        QuickTimerChipPreview(minutes: quickTimerMinutes)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.top, 2)
+
+                    HStack(spacing: 10) {
+                        ForEach(0..<QuickTimerSlots.count, id: \.self) { index in
+                            QuickTimerMinuteEditor(minutes: quickTimerSlotBinding(at: index))
+                        }
+                    }
+                    .settingsHighlight(id: highlightID("Quick timer presets"))
+
+                    Button("Reset to 5 / 15 / 25") {
+                        quickTimerMinutes = QuickTimerSlots.default
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .disabled(QuickTimerSlots.normalized(quickTimerMinutes) == QuickTimerSlots.default)
+                }
+                .padding(.vertical, 4)
+            }
+        } header: {
+            Text("Quick Timer")
+        } footer: {
+            Text("These three durations appear beside the closed notch. While a timer is running, ⌥-click or right-click to pause or cancel. Range is 1–180 minutes.")
+        }
+    }
+
+    private func quickTimerSlotBinding(at index: Int) -> Binding<Int> {
+        Binding(
+            get: {
+                QuickTimerSlots.normalized(quickTimerMinutes)[index]
+            },
+            set: { newValue in
+                var slots = QuickTimerSlots.normalized(quickTimerMinutes)
+                slots[index] = QuickTimerSlots.clamp(newValue)
+                quickTimerMinutes = slots
+            }
+        )
+    }
+
+    @ViewBuilder
     private var timerConfigurationSections: some View {
         Group {
+            quickTimerSection
             lockScreenIntegrationSection
             customTimerSection
             appearanceSection
@@ -6714,6 +6775,7 @@ struct TimerSettings: View {
             if showsLabel {
                 controlWindowEnabled = false
             }
+            quickTimerMinutes = QuickTimerSlots.normalized(quickTimerMinutes)
         }
         .onChange(of: showsLabel) { _, show in
             if show {

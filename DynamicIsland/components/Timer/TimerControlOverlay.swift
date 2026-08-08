@@ -21,72 +21,69 @@ import SwiftUI
 struct TimerControlOverlay: View {
     let notchHeight: CGFloat
     let cornerRadius: CGFloat
+    var tracksHoverForAutoHide: Bool = false
 
     @ObservedObject private var timerManager = TimerManager.shared
+
+    private var buttonHeight: CGFloat { ClosedNotchSatelliteChrome.buttonHeight(for: notchHeight) }
 
     private var pauseIcon: String {
         timerManager.isPaused ? "play.fill" : "pause.fill"
     }
 
-    private var pauseForeground: Color { .white }
-
-    private var helpText: String {
+    private var pauseHelp: String {
         timerManager.isPaused ? "Resume" : "Pause"
     }
 
-    private var secondaryIcon: String {
+    private var stopIcon: String {
         timerManager.isOvertime ? "stop.fill" : "xmark"
     }
 
-    private var secondaryHelp: String {
+    private var stopHelp: String {
         timerManager.isOvertime ? "Stop" : "Cancel"
     }
 
-    private var buttonSize: CGFloat {
-        max(notchHeight - 20, 22)
-    }
-
-    private var iconSize: CGFloat {
-        14
-    }
-
-    private var windowCornerRadius: CGFloat {
-        max(cornerRadius - 6, 12)
-    }
-
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 6) {
             if !timerManager.isOvertime {
-                ControlButton(
-                    icon: pauseIcon,
-                    foreground: pauseForeground,
-                    background: Color.white.opacity(0.14),
-                    help: helpText,
-                    action: togglePause
-                )
+                ClosedNotchChipButton(
+                    help: pauseHelp,
+                    height: buttonHeight
+                ) {
+                    Image(systemName: pauseIcon)
+                        .font(.system(size: 11, weight: .semibold))
+                } action: {
+                    togglePause()
+                }
                 .disabled(!timerManager.allowsManualInteraction)
             }
 
-            ControlButton(
-                icon: secondaryIcon,
-                foreground: timerManager.isOvertime ? Color.white : Color.white,
-                background: timerManager.isOvertime ? Color.red.opacity(0.24) : Color.white.opacity(0.14),
-                help: secondaryHelp,
-                action: stopTimer
-            )
+            ClosedNotchChipButton(
+                help: stopHelp,
+                height: buttonHeight,
+                emphasized: timerManager.isOvertime
+            ) {
+                Image(systemName: stopIcon)
+                    .font(.system(size: 11, weight: .semibold))
+            } action: {
+                stopTimer()
+            }
             .disabled(!timerManager.allowsManualInteraction)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10)
         .frame(height: notchHeight)
-        .frame(minWidth: buttonSize * 2 + 32)
-        .background {
-            RoundedRectangle(cornerRadius: windowCornerRadius, style: .continuous)
-                .fill(Color.black.opacity(0.9))
-        }
+        .background { ClosedNotchSatelliteChrome.pillBackground(cornerRadius: cornerRadius) }
+        .fixedSize(horizontal: true, vertical: false)
         .compositingGroup()
         .animation(.smooth(duration: 0.2), value: timerManager.isPaused)
         .animation(.smooth(duration: 0.2), value: timerManager.isFinished)
         .animation(.smooth(duration: 0.2), value: timerManager.isOvertime)
+        .onHover { hovering in
+#if os(macOS)
+            guard tracksHoverForAutoHide else { return }
+            TimerControlWindowManager.shared.notePointerHover(hovering)
+#endif
+        }
     }
 
     private func togglePause() {
@@ -107,31 +104,6 @@ struct TimerControlOverlay: View {
         TimerControlWindowManager.shared.hide(animated: true)
 #endif
         timerManager.stopTimer()
-    }
-}
-
-private struct ControlButton: View {
-    let icon: String
-    let foreground: Color
-    let background: Color
-    let help: String
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .frame(width: 32, height: 32)
-                .foregroundStyle(foreground)
-                .background(background.opacity(isHovering ? 1 : 0.7))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .help(help)
-        .onHover { hovering in isHovering = hovering }
     }
 }
 

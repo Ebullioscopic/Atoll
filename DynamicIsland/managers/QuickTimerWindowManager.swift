@@ -18,29 +18,22 @@
 
 #if os(macOS)
 import AppKit
-import SwiftUI
-import SkyLightWindow
 import QuartzCore
-
-struct TimerControlWindowMetrics: Equatable {
-    let notchHeight: CGFloat
-    let notchWidth: CGFloat
-    let rightWingWidth: CGFloat
-    let cornerRadius: CGFloat
-    let spacing: CGFloat
-}
+import SkyLightWindow
+import SwiftUI
 
 @MainActor
-final class TimerControlWindowManager {
-    static let shared = TimerControlWindowManager()
+final class QuickTimerWindowManager {
+    static let shared = QuickTimerWindowManager()
 
     private var window: NSPanel?
-    private var hostingView: NSHostingView<TimerControlOverlay>?
+    private var hostingView: NSHostingView<QuickTimerOverlay>?
     private var hasDelegated = false
     private var lastMetrics: TimerControlWindowMetrics?
     private var autoHideTask: Task<Void, Never>?
-    private var isEphemeral = false
+    private var collapseTask: Task<Void, Never>?
     private var isPointerInside = false
+    private(set) var isVisible = false
 
     private init() {}
 
@@ -48,7 +41,7 @@ final class TimerControlWindowManager {
     func present(
         using viewModel: DynamicIslandViewModel,
         metrics: TimerControlWindowMetrics,
-        autoHideAfter: TimeInterval? = nil
+        onStarted: (() -> Void)? = nil
     ) -> Bool {
         guard !LockScreenManager.shared.currentLockStatus else {
             hide(animated: false)
@@ -60,13 +53,21 @@ final class TimerControlWindowManager {
             return false
         }
 
-        isEphemeral = autoHideAfter != nil
+        collapseTask?.cancel()
+        collapseTask = nil
         isPointerInside = false
 
-        let overlay = TimerControlOverlay(
+        let presentation = QuickTimerPresentationState.shared
+        presentation.reset()
+
+        let overlay = QuickTimerOverlay(
             notchHeight: metrics.notchHeight,
             cornerRadius: metrics.cornerRadius,
-            tracksHoverForAutoHide: isEphemeral
+            appearToken: UUID(),
+            onStarted: { [weak self] in
+                self?.isVisible = false
+                onStarted?()
+            }
         )
         let hosting = ensureHostingView(with: overlay)
         let fittingSize = measuredSize(for: hosting)
@@ -85,67 +86,36 @@ final class TimerControlWindowManager {
             hasDelegated = true
         }
 
-        if window.alphaValue <= 0.01 {
-            let startFrame = initialFrame(for: targetFrame, metrics: metrics)
-            window.setFrame(startFrame, display: true)
-            window.alphaValue = 0
-            window.orderFrontRegardless()
+        window.setFrame(targetFrame, display: true)
+        window.alphaValue = 1
+        window.orderFrontRegardless()
 
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.24
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                window.animator().setFrame(targetFrame, display: true)
-                window.animator().alphaValue = 1
-            } completionHandler: {
-                window.setFrame(targetFrame, display: false)
-            }
-        } else {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.16
-                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                window.animator().setFrame(targetFrame, display: true)
-            } completionHandler: {
-                window.setFrame(targetFrame, display: false)
-            }
-            window.orderFrontRegardless()
-            window.alphaValue = 1
-        }
+        isVisible = true
+        scheduleAutoHide()
 
-        if let autoHideAfter {
-            scheduleAutoHide(after: autoHideAfter)
-        } else {
-            cancelAutoHide()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(16))
+            guard self.isVisible else { return }
+            presentation.expand()
         }
 
         return true
     }
 
-    @discardableResult
-    func refresh(using viewModel: DynamicIslandViewModel, metrics: TimerControlWindowMetrics) -> Bool {
-        // Persistent live-activity controls reclaim the panel from any ephemeral session.
-        isEphemeral = false
-        isPointerInside = false
-        cancelAutoHide()
-
-        guard window != nil else {
-            return present(using: viewModel, metrics: metrics)
-        }
-
-        if let lastMetrics, lastMetrics == metrics {
-            return true
-        }
-
-        return present(using: viewModel, metrics: metrics)
-    }
-
     func hide(animated: Bool = true, tearDown: Bool = true) {
         cancelAutoHide()
-        isEphemeral = false
+        collapseTask?.cancel()
+        collapseTask = nil
+        isVisible = false
         isPointerInside = false
 
-        guard let window else { return }
+        guard let window else {
+            QuickTimerPresentationState.shared.reset()
+            return
+        }
 
         guard animated, window.alphaValue > 0.01 else {
+            QuickTimerPresentationState.shared.reset()
             window.orderOut(nil)
             window.alphaValue = 0
             if tearDown {
@@ -154,42 +124,38 @@ final class TimerControlWindowManager {
             return
         }
 
-        let retreatFrame = notchRetreatFrame(from: window.frame)
-        let originalFrame = window.frame
+        QuickTimerPresentationState.shared.collapse()
 
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.18
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            window.animator().setFrame(retreatFrame, display: true)
-            window.animator().alphaValue = 0
-        } completionHandler: { [weak self] in
-            Task { @MainActor in
-                window.setFrame(originalFrame, display: false)
-                window.orderOut(nil)
-                window.alphaValue = 0
-                if tearDown {
-                    self?.tearDownWindowResources(using: window)
-                }
+        collapseTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(ClosedNotchSatelliteChrome.morphDuration))
+            guard !Task.isCancelled else { return }
+            window.orderOut(nil)
+            window.alphaValue = 0
+            if tearDown {
+                self.tearDownWindowResources(using: window)
             }
         }
     }
 
     func notePointerHover(_ hovering: Bool) {
-        guard isEphemeral, window != nil else { return }
+        guard isVisible else { return }
         isPointerInside = hovering
         if hovering {
             cancelAutoHide()
         } else {
-            scheduleAutoHide(after: ClosedNotchSatelliteChrome.autoHideDelay)
+            scheduleAutoHide()
         }
     }
 
-    private func scheduleAutoHide(after delay: TimeInterval) {
+    private func scheduleAutoHide() {
         cancelAutoHide()
         autoHideTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled, self.isEphemeral, !self.isPointerInside else { return }
-            self.hide(animated: true)
+            // Wait for the open morph, then the idle delay.
+            try? await Task.sleep(for: .seconds(ClosedNotchSatelliteChrome.morphDuration))
+            guard !Task.isCancelled, self.isVisible, !self.isPointerInside else { return }
+            try? await Task.sleep(for: .seconds(ClosedNotchSatelliteChrome.autoHideDelay))
+            guard !Task.isCancelled, self.isVisible, !self.isPointerInside else { return }
+            hide(animated: true)
         }
     }
 
@@ -199,9 +165,7 @@ final class TimerControlWindowManager {
     }
 
     private func tearDownWindowResources(using window: NSPanel? = nil) {
-        cancelAutoHide()
-        isEphemeral = false
-        isPointerInside = false
+        QuickTimerPresentationState.shared.reset()
         let targetWindow = window ?? self.window
         targetWindow?.contentView = nil
         targetWindow?.orderOut(nil)
@@ -209,9 +173,10 @@ final class TimerControlWindowManager {
         lastMetrics = nil
         self.window = nil
         hasDelegated = false
+        isVisible = false
     }
 
-    private func ensureHostingView(with overlay: TimerControlOverlay) -> NSHostingView<TimerControlOverlay> {
+    private func ensureHostingView(with overlay: QuickTimerOverlay) -> NSHostingView<QuickTimerOverlay> {
         if let hostingView {
             hostingView.rootView = overlay
             return hostingView
@@ -232,7 +197,6 @@ final class TimerControlWindowManager {
             backing: .buffered,
             defer: false
         )
-
         window.isReleasedWhenClosed = false
         window.isOpaque = false
         window.backgroundColor = .clear
@@ -250,7 +214,7 @@ final class TimerControlWindowManager {
         return window
     }
 
-    private func measuredSize(for hosting: NSHostingView<TimerControlOverlay>) -> CGSize {
+    private func measuredSize(for hosting: NSHostingView<QuickTimerOverlay>) -> CGSize {
         let size = hosting.fittingSize
         return CGSize(width: ceil(size.width), height: ceil(size.height))
     }
@@ -263,14 +227,17 @@ final class TimerControlWindowManager {
         return NSScreen.main
     }
 
-    private func frame(for size: CGSize, viewModel: DynamicIslandViewModel, screen: NSScreen, metrics: TimerControlWindowMetrics) -> NSRect {
+    private func frame(
+        for size: CGSize,
+        viewModel: DynamicIslandViewModel,
+        screen: NSScreen,
+        metrics: TimerControlWindowMetrics
+    ) -> NSRect {
         let screenFrame = screen.frame
         let notchOriginX = screenFrame.midX - (metrics.notchWidth / 2)
         let originY = screenFrame.maxY - size.height
-
         let rightEdge = notchOriginX + metrics.notchWidth + metrics.rightWingWidth
         let rawOriginX = rightEdge + metrics.spacing
-
         let clampedOriginX = max(screenFrame.minX + 8, min(rawOriginX, screenFrame.maxX - size.width - 8))
 
         return NSRect(
@@ -279,24 +246,6 @@ final class TimerControlWindowManager {
             width: size.width.rounded(),
             height: size.height.rounded()
         )
-    }
-
-    private func initialFrame(for targetFrame: NSRect, metrics: TimerControlWindowMetrics) -> NSRect {
-        var frame = targetFrame
-        let notchRightEdge = targetFrame.minX - metrics.spacing
-        frame.origin.x = notchRightEdge - targetFrame.width
-        return frame
-    }
-
-    private func notchRetreatFrame(from currentFrame: NSRect) -> NSRect {
-        guard let metrics = lastMetrics else {
-            return currentFrame.offsetBy(dx: -currentFrame.width * 0.75, dy: 0)
-        }
-
-        let notchRightEdge = currentFrame.minX - metrics.spacing
-        var frame = currentFrame
-        frame.origin.x = notchRightEdge - currentFrame.width
-        return frame
     }
 }
 
