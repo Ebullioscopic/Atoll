@@ -40,12 +40,11 @@ enum QuickTimerSlots {
     }
 
     static func label(for minutes: Int) -> String {
-        String(format: String(localized: "%dm"), minutes)
+        String(format: String(localized: "%lldm"), Int64(minutes))
     }
 
     static func accessibilityLabel(for minutes: Int) -> String {
-        let format = String(localized: "%lld minute timer")
-        return String.localizedStringWithFormat(format, minutes)
+        String.localizedStringWithFormat(String(localized: "%d minute timer"), minutes)
     }
 
     static func start(minutes: Int, presets: [TimerPreset] = Defaults[.timerPresets]) {

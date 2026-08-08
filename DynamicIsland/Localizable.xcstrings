@@ -1553,7 +1553,26 @@
 
     },
     "%d minute timer" : {
-
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%d minute timer"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%d minute timers"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "%d%%" : {
       "localizations" : {
