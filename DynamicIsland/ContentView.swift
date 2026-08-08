@@ -211,6 +211,8 @@ struct ContentView: View {
     @State private var stickyTerminalClickMonitor: Any?
     @State private var hiddenEdgeHoverPollingTask: Task<Void, Never>?
     @State private var isHoveringClosedMusicWaveformControl: Bool = false
+    @State private var quickTimerLongPressConsumed = false
+    @Default(.enableQuickTimerFromClosedNotch) private var enableQuickTimerFromClosedNotch
 
     @State private var gestureProgress: CGFloat = .zero
     @State private var skipGestureActiveDirection: MusicManager.SkipDirection?
@@ -571,13 +573,26 @@ struct ContentView: View {
                         handleHover(hovering)
                     }
                     .onTapGesture {
+                        if quickTimerLongPressConsumed {
+                            quickTimerLongPressConsumed = false
+                            return
+                        }
                         if handleClosedMusicWaveformTapIfNeeded() {
+                            return
+                        }
+                        if handleClosedQuickTimerActivationIfNeeded(preferOptionKey: true) {
                             return
                         }
                         if vm.notchState == .closed && Defaults[.enableHaptics] {
                             triggerHapticIfAllowed()
                         }
                         openNotch()
+                    }
+                    .conditionalModifier(canUseClosedNotchLongPressQuickTimer) { view in
+                        view.onLongPressGesture(minimumDuration: 0.45, maximumDistance: 12) {
+                            quickTimerLongPressConsumed = true
+                            presentQuickTimerPresets()
+                        }
                     }
                     .conditionalModifier(Defaults[.enableGestures]) { view in
                         view
@@ -646,6 +661,14 @@ struct ContentView: View {
                 #if os(macOS)
                 if newState == .open {
                     TimerControlWindowManager.shared.hide()
+                    QuickTimerWindowManager.shared.hide()
+                }
+                #endif
+            }
+            .onChange(of: timerManager.isTimerActive) { _, isActive in
+                #if os(macOS)
+                if isActive {
+                    QuickTimerWindowManager.shared.hide()
                 }
                 #endif
             }
@@ -700,19 +723,31 @@ struct ContentView: View {
             }
             .sensoryFeedback(.alignment, trigger: haptics)
             .contextMenu {
+                if canControlActiveClosedNotchTimer {
+                    if !timerManager.isOvertime {
+                        Button(timerManager.isPaused ? "Resume Timer" : "Pause Timer") {
+                            if timerManager.isPaused {
+                                timerManager.resumeTimer()
+                            } else {
+                                timerManager.pauseTimer()
+                            }
+                        }
+                    }
+                    Button("Cancel Timer", role: .destructive) {
+                        cancelActiveClosedNotchTimer()
+                    }
+                    Divider()
+                } else if canPresentQuickTimerPresets {
+                    ForEach(Array(QuickTimerSlots.normalized(Defaults[.quickTimerMinutes]).enumerated()), id: \.offset) { _, minutes in
+                        Button(QuickTimerSlots.accessibilityLabel(for: minutes)) {
+                            startQuickTimer(minutes: minutes)
+                        }
+                    }
+                    Divider()
+                }
                 Button("Settings") {
                     SettingsWindowController.shared.showWindow()
                 }
-//                Button("Edit") { // Doesnt work....
-//                    let dn = DynamicNotch(content: EditPanelView())
-//                    dn.toggle()
-//                }
-//                #if DEBUG
-//                .disabled(false)
-//                #else
-//                .disabled(true)
-//                #endif
-//                .keyboardShortcut("E", modifiers: .command)
             }
     }
 
@@ -1915,6 +1950,156 @@ struct ContentView: View {
         return true
     }
 
+    private var canManageClosedNotchTimer: Bool {
+        enableTimerFeature
+            && enableQuickTimerFromClosedNotch
+            && vm.notchState == .closed
+            && !vm.hideOnClosed
+            && !lockScreenManager.isLocked
+            && !coordinator.firstLaunch
+    }
+
+    private var canPresentQuickTimerPresets: Bool {
+        canManageClosedNotchTimer && !timerManager.isTimerActive
+    }
+
+    private var canControlActiveClosedNotchTimer: Bool {
+        canManageClosedNotchTimer
+            && timerManager.isTimerActive
+            && timerManager.allowsManualInteraction
+    }
+
+    private var canUseClosedNotchLongPressQuickTimer: Bool {
+        (canPresentQuickTimerPresets || canControlActiveClosedNotchTimer) && !Defaults[.openNotchOnHover]
+    }
+
+    @discardableResult
+    private func handleClosedQuickTimerActivationIfNeeded(preferOptionKey: Bool) -> Bool {
+#if os(macOS)
+        if QuickTimerWindowManager.shared.isVisible {
+            QuickTimerWindowManager.shared.hide(animated: true)
+            coordinator.suppressHoverOpen(for: 0.45)
+            return true
+        }
+#endif
+        if preferOptionKey && !NSEvent.modifierFlags.contains(.option) {
+            return false
+        }
+        if canControlActiveClosedNotchTimer {
+            presentActiveTimerControls()
+            return true
+        }
+        guard canPresentQuickTimerPresets else { return false }
+        presentQuickTimerPresets()
+        return true
+    }
+
+    private func presentQuickTimerPresets() {
+        guard canPresentQuickTimerPresets else { return }
+        hoverTask?.cancel()
+        coordinator.suppressHoverOpen(for: 1.2)
+        if Defaults[.enableHaptics] {
+            triggerHapticIfAllowed()
+        }
+#if os(macOS)
+        _ = QuickTimerWindowManager.shared.present(
+            using: vm,
+            metrics: currentQuickTimerWindowMetrics()
+        ) {
+            self.coordinator.suppressHoverOpen(for: 0.35)
+        }
+#endif
+    }
+
+    private func presentActiveTimerControls() {
+        guard canControlActiveClosedNotchTimer else { return }
+        hoverTask?.cancel()
+        coordinator.suppressHoverOpen(for: 1.2)
+        if Defaults[.enableHaptics] {
+            triggerHapticIfAllowed()
+        }
+#if os(macOS)
+        // Persistent floating controls already stay up; only auto-dismiss ephemeral Option-click panels.
+        let persistentControlsVisible = Defaults[.timerControlWindowEnabled] && !Defaults[.timerShowsLabel]
+        _ = TimerControlWindowManager.shared.present(
+            using: vm,
+            metrics: currentQuickTimerWindowMetrics(),
+            autoHideAfter: persistentControlsVisible ? nil : ClosedNotchSatelliteChrome.autoHideDelay
+        )
+#endif
+    }
+
+    private func cancelActiveClosedNotchTimer() {
+        guard timerManager.isTimerActive else { return }
+#if os(macOS)
+        TimerControlWindowManager.shared.hide(animated: true)
+        QuickTimerWindowManager.shared.hide(animated: true)
+#endif
+        if timerManager.allowsManualInteraction {
+            timerManager.stopTimer()
+        } else {
+            timerManager.endExternalTimer(triggerSmoothClose: true)
+        }
+        coordinator.suppressHoverOpen(for: 0.35)
+    }
+
+    private func currentQuickTimerWindowMetrics() -> TimerControlWindowMetrics {
+        let wingBase = max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12) + gestureProgress / 2)
+        let hasWingedLiveActivity = closedNotchUsesExpandedLiveActivityLayout
+        var spacing: CGFloat = hasWingedLiveActivity ? 36 : 6
+        if isMusicControlWindowVisible {
+            spacing += 72
+        }
+        return TimerControlWindowMetrics(
+            notchHeight: max(vm.closedNotchSize.height, vm.effectiveClosedNotchHeight),
+            notchWidth: vm.closedNotchSize.width + (isHovering ? 8 : 0),
+            rightWingWidth: hasWingedLiveActivity ? wingBase : 0,
+            cornerRadius: activeCornerRadiusInsets.closed.bottom,
+            spacing: spacing
+        )
+    }
+
+    private var closedNotchUsesExpandedLiveActivityLayout: Bool {
+        guard vm.notchState == .closed, !vm.hideOnClosed, !lockScreenManager.isLocked else {
+            return false
+        }
+        if isClosedMusicGestureContext { return true }
+        if timerManager.isTimerActive && coordinator.timerLiveActivityEnabled { return true }
+        if enableReminderLiveActivity && reminderManager.isActive { return true }
+        if enableScreenRecordingDetection
+            && (recordingManager.isRecording || !recordingManager.isRecorderIdle) {
+            return true
+        }
+        if Defaults[.enableDownloadListener] && downloadManager.isDownloading { return true }
+        if localSendLiveActivityActive { return true }
+        if enableDoNotDisturbDetection
+            && showDoNotDisturbIndicator
+            && (doNotDisturbManager.isDoNotDisturbActive || doNotDisturbManager.isFocusToastDismissing) {
+            return true
+        }
+        if privacyManager.hasAnyIndicator
+            && (Defaults[.enableCameraDetection] || Defaults[.enableMicrophoneDetection]) {
+            return true
+        }
+        if !shelfState.isEmpty && !enableMinimalisticUI { return true }
+        if Defaults[.showNotHumanFace], !musicManager.isPlaying, musicManager.isPlayerIdle {
+            return true
+        }
+        if isSneakPeekVisibleOnCurrentScreen || isBatteryHUDVisibleOnCurrentScreen {
+            return true
+        }
+        return false
+    }
+
+    private func startQuickTimer(minutes: Int) {
+        guard enableTimerFeature else { return }
+        QuickTimerSlots.start(minutes: minutes)
+#if os(macOS)
+        QuickTimerWindowManager.shared.hide(animated: true)
+#endif
+        coordinator.suppressHoverOpen(for: 0.35)
+    }
+
     private func hiddenHoverActivationContainsMouse(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
         guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
             return false
@@ -1985,6 +2170,9 @@ struct ContentView: View {
                 guard !self.coordinator.isHoverOpenSuppressed else { return }
                 guard self.isHovering else { return }
                 guard !self.handleClosedMusicWaveformTapIfNeeded() else { return }
+                if self.handleClosedQuickTimerActivationIfNeeded(preferOptionKey: true) {
+                    return
+                }
                 if Defaults[.enableHaptics] {
                     self.triggerHapticIfAllowed()
                 }
@@ -2090,7 +2278,7 @@ struct ContentView: View {
 
             guard vm.notchState == .closed,
                 !isSneakPeekVisibleOnCurrentScreen,
-                (Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
+                Defaults[.openNotchOnHover] else { return }
 
             hoverTask = Task {
                 try? await Task.sleep(for: .seconds(Defaults[.minimumHoverDuration]))
