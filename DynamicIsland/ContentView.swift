@@ -2162,8 +2162,10 @@ struct ContentView: View {
         guard isHovering || vm.notchState == .open else { return false }
         guard location.y >= screen.frame.maxY - 1.5 else { return false }
 
-        let halfWidth = max(vm.closedNotchSize.width + (isHovering ? 8 : 0), 96) / 2 + 28
-        return abs(location.x - screen.frame.midX) <= halfWidth
+        if vm.notchState == .open {
+            return isPointInsideNotchWindow(location)
+        }
+        return isMouseOverClosedNotchHitArea(location)
     }
 
     private func isMouseOverClosedNotchHitArea(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
