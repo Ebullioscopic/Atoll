@@ -1175,6 +1175,15 @@ extension Defaults.Keys {
     static let timerInputStyle = Key<TimerInputStyle>("timerInputStyle", default: .manual)
     
     
+    // MARK: Eye Break
+    static let enableEyeBreak = Key<Bool>("enableEyeBreak", default: false)
+    /// Minutes of work between breaks — the first 20 of the 20-20-20 rule.
+    static let eyeBreakWorkInterval = Key<Int>("eyeBreakWorkInterval", default: 20)
+    /// Seconds each break lasts — the last 20 of the rule.
+    static let eyeBreakRestDuration = Key<Int>("eyeBreakRestDuration", default: 20)
+    static let eyeBreakPlaySound = Key<Bool>("eyeBreakPlaySound", default: false)
+    static let eyeBreakPauseWhenLocked = Key<Bool>("eyeBreakPauseWhenLocked", default: true)
+
     // MARK: Reminder Live Activity
     static let enableReminderLiveActivity = Key<Bool>("enableReminderLiveActivity", default: true)
     static let reminderPresentationStyle = Key<ReminderPresentationStyle>("reminderPresentationStyle", default: .ringCountdown)

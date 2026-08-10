@@ -668,6 +668,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup SystemHUD Manager
         SystemHUDManager.shared.setup(coordinator: coordinator)
 
+        // Start the 20-20-20 eye break cycle
+        EyeBreakManager.shared.start()
+
         // Setup BetterDisplay integration
         BetterDisplayManager.shared.configure(coordinator: coordinator)
 
