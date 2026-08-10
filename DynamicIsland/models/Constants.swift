@@ -1089,7 +1089,13 @@ extension Defaults.Keys {
         static let autoRemoveShelfItems = Key<Bool>("autoRemoveShelfItems", default: false)
         static let expandedDragDetection = Key<Bool>("expandedDragDetection", default: true)
     
-        // MARK: Calendar
+        // MARK: Shelf Conversion
+    static let enableShelfConversion = Key<Bool>("enableShelfConversion", default: true)
+    /// When true the converted file takes the original's place on the Shelf; the
+    /// file on disk is never touched either way.
+    static let shelfConversionReplacesOriginalItem = Key<Bool>("shelfConversionReplacesOriginalItem", default: true)
+
+    // MARK: Calendar
     static let calendarSelectionState = Key<CalendarSelectionState>("calendarSelectionState", default: .all)
         static let showFullEventTitles = Key<Bool>("showFullEventTitles", default: false)
         static let autoScrollToNextEvent = Key<Bool>("autoScrollToNextEvent", default: true)
