@@ -101,6 +101,7 @@ struct JSONLUsageParser {
 
         var buffer = Data()
         let chunkSize = 64 * 1024 // 64 KB chunks
+        let maxRecordSize = 1024 * 1024 // 1 MB max per record
 
         func processRecord(_ rec: UsageRecord) {
             guard rec.timestamp >= weekStart else { return }
@@ -139,10 +140,19 @@ struct JSONLUsageParser {
                 guard let line = String(data: lineData, encoding: .utf8) else { continue }
                 processLine(line)
             }
+
+            // Bound buffer growth: if buffer exceeds maxRecordSize without a newline,
+            // discard data up to the next newline when it arrives
+            if buffer.count > maxRecordSize {
+                // Drop the oversized incomplete record; keep only bounded tail
+                buffer.removeFirst(buffer.count - maxRecordSize)
+            }
         }
 
         // Process any remaining data in buffer (last line without trailing newline)
-        if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) {
+        // but only if it's within the size limit
+        if !buffer.isEmpty && buffer.count <= maxRecordSize,
+           let line = String(data: buffer, encoding: .utf8) {
             processLine(line)
         }
     }
