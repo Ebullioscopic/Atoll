@@ -81,12 +81,13 @@ final class JSONLUsageParserTests: XCTestCase {
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let ts = iso.string(from: now.addingTimeInterval(-3600))
 
-        // Create a valid record followed by an oversized valid JSON record
-        // with leading whitespace, then a newline and another valid record.
-        // The oversized record should be excluded entirely; parsing should
-        // resume at the next newline and process the following record.
+        // Create a valid record followed by a valid JSON record padded
+        // beyond the size limit (with a large dummy field), then a newline
+        // and another valid record. The oversized record should be
+        // excluded; parsing should resume and process the following record.
         let validRecord = "{\"timestamp\": \"\(ts)\", \"message\": {\"id\": \"msg1\", \"model\": \"claude-3-opus\", \"usage\": {\"input_tokens\": 100, \"output_tokens\": 50}}}"
-        let oversizedRecord = "  " + String(repeating: "x", count: 1024 * 1024 + 100) // > 1 MB with leading whitespace
+        let padding = String(repeating: "x", count: 1024 * 1024 + 100)
+        let oversizedRecord = "{\"timestamp\": \"\(ts)\", \"message\": {\"id\": \"msgOversized\", \"model\": \"claude-3-opus\", \"usage\": {\"input_tokens\": 100, \"output_tokens\": 50}}, \"padding\": \"\(padding)\"}"
         let validRecord2 = "{\"timestamp\": \"\(ts)\", \"message\": {\"id\": \"msg2\", \"model\": \"claude-3-sonnet\", \"usage\": {\"input_tokens\": 200, \"output_tokens\": 100}}}"
         let content = validRecord + "\n" + oversizedRecord + "\n" + validRecord2
 

@@ -145,6 +145,11 @@ struct JSONLUsageParser {
                     continue
                 }
 
+                // Skip oversized terminated records before decoding
+                if lineData.count > maxRecordSize {
+                    continue
+                }
+
                 guard let line = String(data: lineData, encoding: .utf8) else { continue }
                 processLine(line)
             }
