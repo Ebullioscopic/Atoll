@@ -3861,6 +3861,7 @@ struct Shelf: View {
     @Default(.expandedDragDetection) var expandedDragDetection
     @Default(.copyOnDrag) var copyOnDrag
     @Default(.autoRemoveShelfItems) var autoRemoveShelfItems
+    @Default(.enableShelfConversion) var enableShelfConversion
     @StateObject private var quickShareService = QuickShareService.shared
     @ObservedObject private var fullDiskAccessPermission = FullDiskAccessPermissionStore.shared
     @ObservedObject private var shelfFolderAccessPermission = ShelfFolderAccessPermissionStore.shared
@@ -3990,6 +3991,26 @@ struct Shelf: View {
             
             if quickShareProvider == "LocalSend" {
                 LocalSendSettingsSection(highlightID: highlightID)
+            }
+
+            Section {
+                Defaults.Toggle(key: .enableShelfConversion) {
+                    Text("Enable File Conversion")
+                }
+                .settingsHighlight(id: highlightID("Enable File Conversion"))
+
+                if enableShelfConversion {
+                    Defaults.Toggle(key: .shelfConversionReplacesOriginalItem) {
+                        Text("Replace the Original Item")
+                    }
+                    .settingsHighlight(id: highlightID("Replace the Original Item"))
+                }
+            } header: {
+                Text("Convert")
+            } footer: {
+                Text("Adds a \"Convert To\" menu when you right-click a file on the shelf, offering only the formats that file can actually become. The file on disk is never modified or deleted.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .accentColor(.effectiveAccent)

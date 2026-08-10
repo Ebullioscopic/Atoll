@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shelf item removal**: Hovering a Shelf item now reveals a × button that removes just that item, with a VoiceOver-accessible "Remove from Shelf" action that works without hovering (#461).
 - **Draggable clipboard tab**: A `.notchTab` clipboard display mode shows clipboard history as a card grid inside the notch whose text, image, and single-file entries can be dragged straight out to Finder or other apps (drag = copy), with a hover × to delete a single item (#698).
 
+- **Convert files on the shelf**: Right-clicking a file on the shelf now offers a "Convert To" menu built from that file's own type — images between PNG, JPEG, HEIC, TIFF and PDF, videos between MP4 and MOV or down to just their audio, audio between M4A, WAV and AIFF, and rich text between RTF, HTML, plain text and PDF. The original file is never modified or deleted.
 ### Changed
 - Improved the Dutch localization by adding missing translations, corrected terminology, and wording aligned with Apple's Dutch macOS conventions.
 - Refreshing the LLM Usage card now skips session logs whose last write predates the seven-day window instead of re-reading the whole log history, and counts a repeated record when the copy inside the window would previously have been suppressed by a copy outside it (#691).
