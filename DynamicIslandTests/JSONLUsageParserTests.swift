@@ -28,8 +28,8 @@ final class JSONLUsageParserTests: XCTestCase {
         return file
     }
 
-    private func parseFile(_ file: URL) -> UsageSnapshot {
-        JSONLUsageParser.aggregate(files: [file], now: Date())
+    private func parseFile(_ file: URL, now: Date) -> UsageSnapshot {
+        JSONLUsageParser.aggregate(files: [file], now: now)
     }
 
     func testParseValidJSONLRecords() throws {
@@ -47,7 +47,7 @@ final class JSONLUsageParserTests: XCTestCase {
         let file = try makeTempFile(content: content)
         defer { try? FileManager.default.removeItem(at: file) }
 
-        let snapshot = parseFile(file)
+        let snapshot = parseFile(file, now: now)
 
         XCTAssertEqual(snapshot.session.inputTokens, 300)
         XCTAssertEqual(snapshot.session.outputTokens, 150)
@@ -68,7 +68,7 @@ final class JSONLUsageParserTests: XCTestCase {
         let file = try makeTempFile(content: content)
         defer { try? FileManager.default.removeItem(at: file) }
 
-        let snapshot = parseFile(file)
+        let snapshot = parseFile(file, now: now)
 
         XCTAssertEqual(snapshot.session.inputTokens, 100)
         XCTAssertEqual(snapshot.session.outputTokens, 50)
@@ -81,19 +81,23 @@ final class JSONLUsageParserTests: XCTestCase {
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let ts = iso.string(from: now.addingTimeInterval(-3600))
 
-        // Create a valid record followed by an oversized line without newline
+        // Create a valid record followed by an oversized line without newline,
+        // then a newline and another valid record to verify parsing resumes.
         let validRecord = "{\"timestamp\": \"\(ts)\", \"message\": {\"id\": \"msg1\", \"model\": \"claude-3-opus\", \"usage\": {\"input_tokens\": 100, \"output_tokens\": 50}}}"
         let oversizedLine = String(repeating: "x", count: 1024 * 1024 + 100) // > 1 MB
-        let content = validRecord + "\n" + oversizedLine
+        let validRecord2 = "{\"timestamp\": \"\(ts)\", \"message\": {\"id\": \"msg2\", \"model\": \"claude-3-sonnet\", \"usage\": {\"input_tokens\": 200, \"output_tokens\": 100}}}"
+        let content = validRecord + "\n" + oversizedLine + "\n" + validRecord2
 
         let file = try makeTempFile(content: content)
         defer { try? FileManager.default.removeItem(at: file) }
 
-        let snapshot = parseFile(file)
+        let snapshot = parseFile(file, now: now)
 
-        // The valid record should be parsed, the oversized line should be discarded
-        XCTAssertEqual(snapshot.session.inputTokens, 100)
-        XCTAssertEqual(snapshot.session.outputTokens, 50)
+        // The first valid record should be parsed, the oversized line should be
+        // discarded, and parsing should resume for the second valid record.
+        XCTAssertEqual(snapshot.session.inputTokens, 300)
+        XCTAssertEqual(snapshot.session.outputTokens, 150)
+        XCTAssertEqual(snapshot.models.count, 2)
     }
 
     func testParsesAllowedSizeUnterminatedFinalRecord() throws {
@@ -110,7 +114,7 @@ final class JSONLUsageParserTests: XCTestCase {
         let file = try makeTempFile(content: content)
         defer { try? FileManager.default.removeItem(at: file) }
 
-        let snapshot = parseFile(file)
+        let snapshot = parseFile(file, now: now)
 
         // Both records should be parsed
         XCTAssertEqual(snapshot.session.inputTokens, 300)
@@ -133,7 +137,7 @@ final class JSONLUsageParserTests: XCTestCase {
         let file = try makeTempFile(content: content)
         defer { try? FileManager.default.removeItem(at: file) }
 
-        let snapshot = parseFile(file)
+        let snapshot = parseFile(file, now: now)
 
         // Only the recent record should be counted
         XCTAssertEqual(snapshot.week.inputTokens, 200)
@@ -153,7 +157,7 @@ final class JSONLUsageParserTests: XCTestCase {
         let file = try makeTempFile(content: content)
         defer { try? FileManager.default.removeItem(at: file) }
 
-        let snapshot = parseFile(file)
+        let snapshot = parseFile(file, now: now)
 
         XCTAssertEqual(snapshot.session.inputTokens, 500)
         XCTAssertEqual(snapshot.session.outputTokens, 250)
