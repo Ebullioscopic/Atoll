@@ -1198,6 +1198,8 @@ extension Defaults.Keys {
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)
     static let screenAssistantDisplayMode = Key<ScreenAssistantDisplayMode>("screenAssistantDisplayMode", default: .panel)
+    // The provider API keys live in the Keychain (see KeychainAIKeyStore);
+    // these four keys remain only for the one-time migration of older builds.
     static let geminiApiKey = Key<String>("geminiApiKey", default: "")
     static let openaiApiKey = Key<String>("openaiApiKey", default: "")
     static let claudeApiKey = Key<String>("claudeApiKey", default: "")
@@ -1381,6 +1383,34 @@ extension Defaults.Keys {
         let legacyGreen = Defaults[.capsLockIndicatorUseGreenColor]
         Defaults[.capsLockIndicatorTintMode] = legacyGreen ? .green : .white
         Defaults[.didMigrateCapsLockTintMode] = true
+    }
+
+    /// The AI provider API keys were stored as plaintext in Defaults; move them
+    /// into the Keychain once. Each Defaults copy is cleared only after its
+    /// Keychain write is confirmed, so a failed write can never lose a key — the
+    /// next launch simply retries. No completion flag is needed: an already
+    /// emptied key has nothing left to migrate.
+    static func migrateAIProviderKeysToKeychain(store: AIKeyStoring = KeychainAIKeyStore.shared) {
+        let legacyKeys: [(Defaults.Key<String>, AIKeyAccount)] = [
+            (.geminiApiKey, .gemini),
+            (.openaiApiKey, .openai),
+            (.claudeApiKey, .claude),
+            (.groqApiKey, .groq)
+        ]
+
+        for (defaultsKey, account) in legacyKeys {
+            let legacyValue = Defaults[defaultsKey].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !legacyValue.isEmpty else { continue }
+
+            if store.write(legacyValue, account: account) == errSecSuccess {
+                Defaults[defaultsKey] = ""
+            } else {
+                Logger.log(
+                    "Could not move the \(account.rawValue) into the Keychain; keeping the Defaults copy and retrying next launch.",
+                    category: .warning
+                )
+            }
+        }
     }
 
     static func migrateMusicControlSlots() {

@@ -7690,7 +7690,10 @@ struct ScreenAssistantSettings: View {
     @ObservedObject var screenAssistantManager = ScreenAssistantManager.shared
     @Default(.enableScreenAssistant) var enableScreenAssistant
     @Default(.screenAssistantDisplayMode) var screenAssistantDisplayMode
-    @Default(.geminiApiKey) var geminiApiKey
+    /// The key itself lives in the Keychain, so only its presence is mirrored
+    /// into view state — the secret is never held longer than an edit.
+    private let keyStore: AIKeyStoring = KeychainAIKeyStore.shared
+    @State private var hasGeminiApiKey = KeychainAIKeyStore.shared.hasKey(.gemini)
     @State private var apiKeyText = ""
     @State private var showingApiKey = false
 
@@ -7716,24 +7719,25 @@ struct ScreenAssistantSettings: View {
                     HStack {
                         Text("Gemini API Key")
                         Spacer()
-                        if geminiApiKey.isEmpty {
-                            Text("Not Set")
-                                .foregroundColor(.red)
-                        } else {
+                        if hasGeminiApiKey {
                             Text("••••••••")
                                 .foregroundColor(.green)
+                        } else {
+                            Text("Not Set")
+                                .foregroundColor(.red)
                         }
 
-                        Button(showingApiKey ? "Hide" : (geminiApiKey.isEmpty ? "Set" : "Change")) {
+                        Button(showingApiKey ? "Hide" : (hasGeminiApiKey ? "Change" : "Set")) {
                             if showingApiKey {
                                 showingApiKey = false
                                 if !apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    Defaults[.geminiApiKey] = apiKeyText
+                                    keyStore.save(apiKeyText, account: .gemini)
+                                    hasGeminiApiKey = keyStore.hasKey(.gemini)
                                 }
                                 apiKeyText = ""
                             } else {
                                 showingApiKey = true
-                                apiKeyText = geminiApiKey
+                                apiKeyText = keyStore.value(.gemini)
                             }
                         }
                     }
@@ -7756,7 +7760,8 @@ struct ScreenAssistantSettings: View {
                                 Spacer()
 
                                 Button("Save") {
-                                    Defaults[.geminiApiKey] = apiKeyText
+                                    keyStore.save(apiKeyText, account: .gemini)
+                                    hasGeminiApiKey = keyStore.hasKey(.gemini)
                                     showingApiKey = false
                                     apiKeyText = ""
                                 }
@@ -7844,6 +7849,14 @@ struct ScreenAssistantSettings: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Screen Assistant")
+        // The Keychain is not observable, so pick up keys saved elsewhere (the
+        // model selection panel) instead of showing a stale "Not Set".
+        .onAppear {
+            hasGeminiApiKey = keyStore.hasKey(.gemini)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aiModelConfigurationChanged)) { _ in
+            hasGeminiApiKey = keyStore.hasKey(.gemini)
+        }
     }
 
     private func timeAgoString(from date: Date) -> String {

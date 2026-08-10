@@ -247,7 +247,7 @@ struct ApiKeyAlertView: View {
                 }
                 
                 Button("Save") {
-                    Defaults[.geminiApiKey] = apiKey
+                    KeychainAIKeyStore.shared.save(apiKey, account: .gemini)
                 }
                 .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }

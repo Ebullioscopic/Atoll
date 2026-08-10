@@ -122,12 +122,13 @@ struct ModelSelectionView: View {
     @State private var selectedModel: AIModel? = Defaults[.selectedAIModel]
     @State private var enableThinking: Bool = Defaults[.enableThinkingMode]
     
-    // API Keys
-    @State private var geminiApiKey: String = Defaults[.geminiApiKey]
-    @State private var openaiApiKey: String = Defaults[.openaiApiKey]
-    @State private var claudeApiKey: String = Defaults[.claudeApiKey]
+    // API Keys — held in the Keychain, read into local state only while editing
+    private let keyStore: AIKeyStoring = KeychainAIKeyStore.shared
+    @State private var geminiApiKey: String = KeychainAIKeyStore.shared.value(.gemini)
+    @State private var openaiApiKey: String = KeychainAIKeyStore.shared.value(.openai)
+    @State private var claudeApiKey: String = KeychainAIKeyStore.shared.value(.claude)
     @State private var localEndpoint: String = Defaults[.localModelEndpoint]
-    @State private var groqApiKey: String = Defaults[.groqApiKey]
+    @State private var groqApiKey: String = KeychainAIKeyStore.shared.value(.groq)
     
     @State private var showingApiKeyAlert = false
     
@@ -312,11 +313,11 @@ struct ModelSelectionView: View {
         ensureValidModelSelection()
         enableThinking = Defaults[.enableThinkingMode]
         
-        geminiApiKey = Defaults[.geminiApiKey]
-        openaiApiKey = Defaults[.openaiApiKey]
-        claudeApiKey = Defaults[.claudeApiKey]
+        geminiApiKey = keyStore.value(.gemini)
+        openaiApiKey = keyStore.value(.openai)
+        claudeApiKey = keyStore.value(.claude)
         localEndpoint = Defaults[.localModelEndpoint]
-        groqApiKey = Defaults[.groqApiKey]
+        groqApiKey = keyStore.value(.groq)
     }
     
     private func saveConfiguration() {
@@ -326,11 +327,11 @@ struct ModelSelectionView: View {
         Defaults[.selectedAIModel] = selectedModel
         Defaults[.enableThinkingMode] = enableThinking
         
-        Defaults[.geminiApiKey] = geminiApiKey
-        Defaults[.openaiApiKey] = openaiApiKey
-        Defaults[.claudeApiKey] = claudeApiKey
+        keyStore.save(geminiApiKey, account: .gemini)
+        keyStore.save(openaiApiKey, account: .openai)
+        keyStore.save(claudeApiKey, account: .claude)
         Defaults[.localModelEndpoint] = localEndpoint
-        Defaults[.groqApiKey] = groqApiKey
+        keyStore.save(groqApiKey, account: .groq)
         
         closePanel()
         
