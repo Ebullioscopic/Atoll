@@ -278,6 +278,13 @@ let dynamicIslandPillCornerRadiusInsets: (opened: CGFloat, closed: (standard: CG
     closed: (standard: 16, minimalistic: 16)
 )
 
+/// Extra window height past `screen.maxY` on physical-notch displays.
+let notchTopScreenBleedAmount: CGFloat = 4
+
+func notchTopScreenBleed(for screenName: String?) -> CGFloat {
+    shouldUseDynamicIslandMode(for: screenName) ? 0 : notchTopScreenBleedAmount
+}
+
 /// Vertical offset from the top screen edge for the Dynamic Island pill.
 /// Creates a visual gap so the pill floats below the menu bar, mimicking
 /// the iPhone's Dynamic Island detachment from the physical screen edge.
