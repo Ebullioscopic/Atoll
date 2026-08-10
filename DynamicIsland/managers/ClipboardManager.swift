@@ -432,29 +432,37 @@ class ClipboardManager: ObservableObject {
             }
         }
         
-        // Priority 3: Plain text (including copied text)
+        // Priority 3: Plain-text URLs stay typed as `.url` (address-bar copies carry no RTF).
+        // Checked before RTF so a bare URL isn't reclassified as rich text.
+        if let string = pasteboard.string(forType: .string), !string.isEmpty,
+           string.hasPrefix("http://") || string.hasPrefix("https://") {
+            return ClipboardItem(stringData: string, type: .url)
+        }
+
+        // Priority 4: Rich text. Must come before plain text: any rich copy also exposes a
+        // `.string` representation, so checking plain text first would shadow rich content and
+        // the item would lose its formatting at capture time. Capturing here keeps styled
+        // `rtfData` with a plain-text fallback, so both drag-out and copy-back preserve
+        // formatting. Prefer real RTF; otherwise synthesize it from HTML — browsers (GitHub,
+        // web pages) put `public.html` on the pasteboard but no `public.rtf`, so without this
+        // step the common "copy from a web page" case would still drop as plain text.
+        if let richText = pasteboard.rtfDataWithFallback() {
+            return ClipboardItem(rtfData: richText.rtf, plainText: richText.plain)
+        }
+
+        // Priority 5: Plain text
         if let string = pasteboard.string(forType: .string), !string.isEmpty {
-            // Determine if it's a URL
-            if string.hasPrefix("http://") || string.hasPrefix("https://") {
-                return ClipboardItem(stringData: string, type: .url)
-            }
             return ClipboardItem(stringData: string, type: .text)
         }
-        
-        // Priority 4: RTF
-        if let rtfData = pasteboard.data(forType: .rtf),
-           let rtfString = NSAttributedString(rtf: rtfData, documentAttributes: nil)?.string, !rtfString.isEmpty {
-            return ClipboardItem(rtfData: rtfData, plainText: rtfString)
-        }
-        
-        // Priority 5: If we have image data WITH file URLs (document thumbnails), 
+
+        // Priority 6: If we have image data WITH file URLs (document thumbnails),
         // this is likely a document with a preview - ignore the thumbnail and treat as unknown
         if hasImageData && hasFileURLs {
             // This is likely a document with a thumbnail preview - we don't want the thumbnail
             return nil
         }
-        
-        // Priority 6: URL strings
+
+        // Priority 7: URL strings
         if let url = pasteboard.string(forType: .URL) {
             return ClipboardItem(stringData: url, type: .url)
         }
@@ -561,5 +569,33 @@ class ClipboardManager: ObservableObject {
            let pinned = try? JSONDecoder().decode([ClipboardItem].self, from: data) {
             pinnedItems = pinned
         }
+    }
+}
+
+private extension NSPasteboard {
+    /// Extract rich text as RTF data plus a plain-text fallback, or `nil` when the pasteboard
+    /// holds no rich content. Prefers a real `public.rtf` representation; when only HTML is
+    /// present — browsers and sites like GitHub expose `public.html` but no `public.rtf` — the
+    /// HTML is parsed into an attributed string and re-encoded as RTF so the formatting is
+    /// captured instead of lost. Must be called on the main thread: HTML import spins up WebKit.
+    func rtfDataWithFallback() -> (rtf: Data, plain: String)? {
+        if let rtfData = data(forType: .rtf),
+           let string = NSAttributedString(rtf: rtfData, documentAttributes: nil)?.string,
+           !string.isEmpty {
+            return (rtfData, string)
+        }
+        if let htmlData = data(forType: .html),
+           let attributed = try? NSAttributedString(
+               data: htmlData,
+               options: [.documentType: NSAttributedString.DocumentType.html,
+                         .characterEncoding: String.Encoding.utf8.rawValue],
+               documentAttributes: nil),
+           !attributed.string.isEmpty,
+           let rtf = try? attributed.data(
+               from: NSRange(location: 0, length: attributed.length),
+               documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]) {
+            return (rtf, attributed.string)
+        }
+        return nil
     }
 }
