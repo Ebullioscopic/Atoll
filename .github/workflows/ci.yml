@@ -45,6 +45,9 @@ jobs:
       - name: Validate timer lifecycle cleanup
         run: python3 -m unittest tests.test_timer_lifecycle
 
+      - name: Validate notch hover geometry
+        run: python3 -m unittest tests.test_notch_hover_geometry
+
       - name: Download Metal Toolchain
         # The downloadable Metal Toolchain is an Xcode 26+ (macOS 26) component; older Xcode ships metal.
         run: |

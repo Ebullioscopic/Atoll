@@ -141,6 +141,7 @@ PrivateWorks
 *.py
 !tests/test_privacy_configuration.py
 !tests/test_timer_lifecycle.py
+!tests/test_notch_hover_geometry.py
 *.sh
 comparison_report.json
 *.txt

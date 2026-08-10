@@ -1920,18 +1920,12 @@ struct ContentView: View {
             return false
         }
 
-        let horizontalPadding: CGFloat = 8
-        let activationWidth = vm.closedNotchSize.width + horizontalPadding * 2
-        let activationHeight = max(vm.closedNotchSize.height + zeroHeightHoverPadding, 14)
-
-        let activationRect = CGRect(
-            x: screen.frame.midX - activationWidth / 2,
-            y: screen.frame.maxY - activationHeight,
-            width: activationWidth,
-            height: activationHeight
+        return NotchHoverGeometry.containsActivationPoint(
+            location,
+            screenFrame: screen.frame,
+            closedNotchSize: vm.closedNotchSize,
+            verticalPadding: zeroHeightHoverPadding
         )
-
-        return activationRect.contains(location)
     }
 
     /// Cancels every long-lived task / event monitor this view owns. Called from
@@ -2111,40 +2105,59 @@ struct ContentView: View {
                 }
             }
         } else {
-            hoverTask = Task {
+            hoverTask = Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(100))
                 guard !Task.isCancelled else { return }
 
-                await MainActor.run {
-                    withAnimation(.bouncy.speed(1.2)) {
-                        self.isHovering = false
-                    }
+                // SwiftUI can emit a transient hover exit while the notch window
+                // resizes under a fast cursor at the top screen edge. Keep checking
+                // the real pointer position until it actually leaves; a matching
+                // hover-enter event cancels this task immediately.
+                if self.shouldKeepNotchOpen(at: NSEvent.mouseLocation) {
+                    self.startHoverClickMonitor()
+                }
+                while self.shouldKeepNotchOpen(at: NSEvent.mouseLocation) {
+                    try? await Task.sleep(for: .milliseconds(50))
+                    guard !Task.isCancelled else { return }
+                }
+                self.stopHoverClickMonitor()
 
-                    if self.vm.notchState == .open && !self.shouldPreventAutoClose() {
-                        self.vm.close()
-                    } else if self.vm.notchState == .open
-                                && Defaults[.terminalStickyMode]
-                                && self.coordinator.currentView == .terminal {
-                        // Re-sync monitor state through one code path to avoid
-                        // monitor lifecycle races between hover and state updates.
-                        self.syncStickyTerminalOutsideClickMonitor()
-                    }
+                withAnimation(.bouncy.speed(1.2)) {
+                    self.isHovering = false
+                }
+
+                if self.vm.notchState == .open && !self.shouldPreventAutoClose() {
+                    self.vm.close()
+                } else if self.vm.notchState == .open
+                            && Defaults[.terminalStickyMode]
+                            && self.coordinator.currentView == .terminal {
+                    // Re-sync monitor state through one code path to avoid
+                    // monitor lifecycle races between hover and state updates.
+                    self.syncStickyTerminalOutsideClickMonitor()
                 }
             }
         }
     }
 
+    private func shouldKeepNotchOpen(at point: CGPoint) -> Bool {
+        hiddenHoverActivationContainsMouse(point) || isPointInsideNotchWindow(point)
+    }
+
     private func isPointInsideNotchWindow(_ point: CGPoint) -> Bool {
         if let appDelegate = AppDelegate.shared {
             if Defaults[.showOnAllDisplays] {
-                return appDelegate.windows.values.contains(where: { $0.frame.contains(point) })
+                return appDelegate.windows.values.contains(where: {
+                    NotchHoverGeometry.containsInclusive(point, in: $0.frame)
+                })
             }
             if let window = appDelegate.window {
-                return window.frame.contains(point)
+                return NotchHoverGeometry.containsInclusive(point, in: window.frame)
             }
         }
 
-        return NSApp.windows.contains(where: { $0.frame.contains(point) })
+        return NSApp.windows.contains(where: {
+            NotchHoverGeometry.containsInclusive(point, in: $0.frame)
+        })
     }
     
     // Helper function to check if any popovers are active
