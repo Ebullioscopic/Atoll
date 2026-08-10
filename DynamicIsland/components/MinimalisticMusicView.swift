@@ -81,7 +81,7 @@ struct MinimalisticMusicView: View {
             // (lyrics are displayed inline under the artist name)
         }
         // reserve extra height when lyrics are enabled
-        .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
+        .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .top)
         .onHover { hovering in
             isHovering = hovering
         }

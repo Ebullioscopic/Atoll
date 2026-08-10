@@ -831,6 +831,7 @@ struct SettingsView: View {
 
             // Lock Screen
             SettingsSearchEntry(tab: .lockScreen, title: "Preview lock screen widgets", keywords: ["preview", "lock screen", "widgets"], highlightID: SettingsTab.lockScreen.highlightID(for: "Preview lock screen widgets")),
+            SettingsSearchEntry(tab: .lockScreen, title: "Widget appearance", keywords: ["appearance", "theme", "dark", "light", "contrast", "wallpaper"], highlightID: SettingsTab.lockScreen.highlightID(for: "Widget appearance")),
             SettingsSearchEntry(tab: .lockScreen, title: "Enable lock screen live activity", keywords: ["lock screen", "live activity"], highlightID: SettingsTab.lockScreen.highlightID(for: "Enable lock screen live activity")),
             SettingsSearchEntry(tab: .lockScreen, title: "Play lock/unlock sounds", keywords: ["chime", "sound"], highlightID: SettingsTab.lockScreen.highlightID(for: "Play lock/unlock sounds")),
             SettingsSearchEntry(tab: .lockScreen, title: "Material", keywords: ["glass", "frosted", "liquid"], highlightID: SettingsTab.lockScreen.highlightID(for: "Material")),
@@ -2829,6 +2830,7 @@ struct Media: View {
 
             if mediaController == .spotify {
                 SpotifyAuthSettingsSection()
+                SpotifyLikeButtonSettingsSection()
             }
 
             Section {
@@ -5074,6 +5076,7 @@ struct LockScreenSettings: View {
     @Default(.lockScreenSelectedCalendarIDs) private var lockScreenSelectedCalendarIDs
     @Default(.lockScreenShowCalendarEventAfterStartEnabled) private var lockScreenShowCalendarEventAfterStartEnabled
     @Default(.lockScreenMusicMergedAirPlayOutput) private var lockScreenMusicMergedAirPlayOutput
+    @Default(.lockScreenWidgetAppearance) private var lockScreenWidgetAppearance
     @ObservedObject private var musicManager = MusicManager.shared
 
     private var isAppleMusicActive: Bool {
@@ -5202,6 +5205,20 @@ struct LockScreenSettings: View {
                 Text("Preview")
             } footer: {
                 Text("Opens a transparent preview window with mock data that mirrors the current lock screen widget configuration.")
+            }
+
+            Section {
+                Picker("Widget appearance", selection: $lockScreenWidgetAppearance) {
+                    ForEach(LockScreenWidgetAppearance.allCases) { appearance in
+                        Text(appearance.localizedName).tag(appearance)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .settingsHighlight(id: highlightID("Widget appearance"))
+            } header: {
+                Text("Appearance")
+            } footer: {
+                Text("Use Light when the wallpaper is bright so titles and labels stay readable.")
             }
 
             Section {
@@ -7595,6 +7612,8 @@ struct ClipboardSettings: View {
                         Text("Panel mode shows clipboard in a floating window near the notch.")
                     case .separateTab:
                         Text("Separate Tab mode integrates Copied Items and Notes into a single view. If both are enabled, Notes appear on the right and Clipboard on the left.")
+                    case .notchTab:
+                        Text("Notch Tab mode shows clipboard in its own tab inside the notch. Drag text, image, or single-file items straight out to Finder or another app.")
                     }
                 }
 
