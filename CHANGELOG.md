@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Noise Cancellation, Adaptive Audio, and Conversation Awareness labels being clipped behind the notch in the AirPods listening-mode HUD; every mode is now trailing-aligned and scales down instead of scrolling.
 - Fix crash when Apple Notes sync encounters duplicate remote note IDs
 - Stopped sending the track title and artist to LRCLIB on every track change while lyrics are switched off; the setting now gates the request, not just the placeholder text (#694).
+- Moved the Gemini, OpenAI, Claude, and Groq API keys out of plaintext preferences into the Keychain, migrating any key already saved on first launch.
 
 ### Removed
 
