@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- Dragging a rich-text clipboard entry out of the notch now preserves its formatting: the drag offers the styled RTF (with a plain-text fallback) instead of dropping plain text everywhere, so rich-text editors keep bold/color/font while plain-text fields still resolve the drop (#717, closes #712).
 - Fixed a hairline gap at the top of the notch during open animation, and hover-to-open flapping when the pointer sits on the top edge, on physical-notch Macs (#681).
 - Fixed lock-screen widget readability on bright wallpapers by adding a Dark/Light appearance mode for widget text and controls.
 - Fixed Codex Today and Week usage totals remaining at zero when parsing Codex session logs (#664).

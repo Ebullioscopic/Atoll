@@ -18,6 +18,7 @@
 
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 extension ClipboardItem {
     /// On-disk URL of the temporary PNG backing an image item (nil for other types).
@@ -37,8 +38,27 @@ extension ClipboardItem {
 
     func dragItemProvider() -> NSItemProvider {
         switch type {
-        case .text, .url, .unknown, .rtf:
-            // RTF drags as plain text for now; rich-text fidelity is a later refinement.
+        case .rtf:
+            // Offer the styled RTF alongside a plain-text fallback so a rich-text editor
+            // (TextEdit, Pages, Word…) keeps the formatting while a plain-text field still
+            // resolves the drop. RTF is registered first so it takes priority when the
+            // target supports both. Falls through to plain text if the RTF bytes are missing.
+            if let rtfData, let string = stringData {
+                let provider = NSItemProvider()
+                provider.registerDataRepresentation(forTypeIdentifier: UTType.rtf.identifier,
+                                                    visibility: .all) { completion in
+                    completion(rtfData, nil)
+                    return nil
+                }
+                provider.registerDataRepresentation(forTypeIdentifier: UTType.utf8PlainText.identifier,
+                                                    visibility: .all) { completion in
+                    completion(Data(string.utf8), nil)
+                    return nil
+                }
+                return provider
+            }
+            if let string = stringData { return NSItemProvider(object: string as NSString) }
+        case .text, .url, .unknown:
             if let string = stringData { return NSItemProvider(object: string as NSString) }
         case .image:
             if let provider = imageDragProvider() { return provider }
