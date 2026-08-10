@@ -432,9 +432,15 @@ class ClipboardManager: ObservableObject {
             }
         }
         
+        // Resolve any rich representation up front so the URL branch below can defer to it:
+        // a formatted URL selection (e.g. a link copied from a rich-text editor or web page)
+        // exposes an `https://` string *and* RTF/HTML, and must not be flattened to a bare URL.
+        let richText = pasteboard.rtfDataWithFallback()
+
         // Priority 3: Plain-text URLs stay typed as `.url` (address-bar copies carry no RTF).
-        // Checked before RTF so a bare URL isn't reclassified as rich text.
+        // Only when there is no usable rich representation — otherwise the formatting wins.
         if let string = pasteboard.string(forType: .string), !string.isEmpty,
+           richText == nil,
            string.hasPrefix("http://") || string.hasPrefix("https://") {
             return ClipboardItem(stringData: string, type: .url)
         }
@@ -446,7 +452,7 @@ class ClipboardManager: ObservableObject {
         // formatting. Prefer real RTF; otherwise synthesize it from HTML — browsers (GitHub,
         // web pages) put `public.html` on the pasteboard but no `public.rtf`, so without this
         // step the common "copy from a web page" case would still drop as plain text.
-        if let richText = pasteboard.rtfDataWithFallback() {
+        if let richText {
             return ClipboardItem(rtfData: richText.rtf, plainText: richText.plain)
         }
 
