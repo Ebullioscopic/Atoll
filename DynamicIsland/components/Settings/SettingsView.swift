@@ -54,6 +54,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case devices
     case extensions
     case timer
+    case eyeBreak
     case calendar
     case hudAndOSD
     case battery
@@ -76,7 +77,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .general, .appearance:                                          return .core
         case .media, .liveActivities, .lockScreen, .devices:                 return .mediaAndDisplay
         case .hudAndOSD, .battery:                                           return .system
-        case .timer, .calendar, .notes:                                      return .productivity
+        case .timer, .eyeBreak, .calendar, .notes:                            return .productivity
         case .clipboard, .screenAssistant, .colorPicker, .shelf,
              .downloads, .shortcuts:                                         return .utilities
         case .stats, .terminal:                                              return .developer
@@ -95,6 +96,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .devices: return String(localized: "Devices")
         case .extensions: return String(localized: "Extensions")
         case .timer: return String(localized: "Timer")
+        case .eyeBreak: return String(localized: "Eye Break")
         case .calendar: return String(localized: "Calendar")
         case .hudAndOSD: return String(localized: "Controls")
         case .battery: return String(localized: "Battery")
@@ -121,6 +123,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .devices: return "headphones"
         case .extensions: return "puzzlepiece.extension"
         case .timer: return "timer"
+        case .eyeBreak: return "eye"
         case .calendar: return "calendar"
         case .hudAndOSD: return "dial.medium.fill"
         case .battery: return "battery.100.bolt"
@@ -147,6 +150,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .devices: return Color(red: 0.1, green: 0.11, blue: 0.12)
         case .extensions: return Color(red: 0.557, green: 0.353, blue: 0.957)
         case .timer: return .red
+        case .eyeBreak: return Color(red: 0.353, green: 0.784, blue: 0.729)
         case .calendar: return .cyan
         case .hudAndOSD: return .indigo
         case .battery: return Color(red: 0.202, green: 0.783, blue: 0.348, opacity: 1.000)
@@ -977,6 +981,10 @@ struct SettingsView: View {
         case .timer:
             SettingsForm(tab: .timer) {
                 TimerSettings()
+            }
+        case .eyeBreak:
+            SettingsForm(tab: .eyeBreak) {
+                EyeBreakSettings()
             }
         case .calendar:
             SettingsForm(tab: .calendar) {
@@ -7683,6 +7691,77 @@ struct ClipboardSettings: View {
             let days = Int(interval / 86400)
             return "\(days)d ago"
         }
+    }
+}
+
+struct EyeBreakSettings: View {
+    @Default(.enableEyeBreak) var enableEyeBreak
+    @Default(.eyeBreakWorkInterval) var workInterval
+    @Default(.eyeBreakRestDuration) var restDuration
+
+    private func highlightID(_ title: String) -> String {
+        SettingsTab.eyeBreak.highlightID(for: title)
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Defaults.Toggle(key: .enableEyeBreak) {
+                    Text("Enable Eye Break")
+                }
+                .settingsHighlight(id: highlightID("Enable Eye Break"))
+            } header: {
+                Text("Eye Break")
+            } footer: {
+                Text("Follows the 20-20-20 rule: every 20 minutes, look at something about 20 feet away for 20 seconds. The reminder appears in the notch and needs no permissions.")
+            }
+
+            if enableEyeBreak {
+                Section {
+                    Stepper(value: $workInterval, in: 5...120, step: 5) {
+                        HStack {
+                            Text("Work Interval")
+                            Spacer()
+                            Text("\(workInterval) min")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: highlightID("Work Interval"))
+
+                    Stepper(value: $restDuration, in: 10...120, step: 5) {
+                        HStack {
+                            Text("Break Length")
+                            Spacer()
+                            Text("\(restDuration) sec")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: highlightID("Break Length"))
+                } header: {
+                    Text("Timing")
+                } footer: {
+                    Text("Changing the work interval restarts the current countdown so the new value takes effect right away.")
+                }
+
+                Section {
+                    Defaults.Toggle(key: .eyeBreakPauseWhenLocked) {
+                        Text("Pause While the Screen Is Locked")
+                    }
+                    .settingsHighlight(id: highlightID("Pause While the Screen Is Locked"))
+
+                    Defaults.Toggle(key: .eyeBreakPlaySound) {
+                        Text("Play a Sound When a Break Starts")
+                    }
+                    .settingsHighlight(id: highlightID("Play a Sound When a Break Starts"))
+                } header: {
+                    Text("Behaviour")
+                } footer: {
+                    Text("The countdown always pauses while the display is asleep. A break that falls due while you are away waits until you are back rather than being spent unseen.")
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Eye Break")
     }
 }
 

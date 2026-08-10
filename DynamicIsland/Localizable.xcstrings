@@ -291,6 +291,9 @@
         }
       }
     },
+    "%lld sec" : {
+
+    },
     "-%@" : {
       "comment" : "A label displaying the duration of the current song. The argument is the duration of the song in seconds.",
       "extractionState" : "stale",
@@ -345,6 +348,48 @@
           }
         }
       }
+    },
+    "Behaviour" : {
+
+    },
+    "Break Length" : {
+
+    },
+    "Changing the work interval restarts the current countdown so the new value takes effect right away." : {
+
+    },
+    "Enable Eye Break" : {
+
+    },
+    "Eye Break" : {
+
+    },
+    "Follows the 20-20-20 rule: every 20 minutes, look at something about 20 feet away for 20 seconds. The reminder appears in the notch and needs no permissions." : {
+
+    },
+    "Look about 20 feet away until the countdown ends" : {
+
+    },
+    "Pause While the Screen Is Locked" : {
+
+    },
+    "Play a Sound When a Break Starts" : {
+
+    },
+    "Skip" : {
+
+    },
+    "Skip eye break" : {
+
+    },
+    "The countdown always pauses while the display is asleep. A break that falls due while you are away waits until you are back rather than being spent unseen." : {
+
+    },
+    "Timing" : {
+
+    },
+    "Work Interval" : {
+
     },
     "—" : {
       "comment" : "A placeholder text used when GPU usage is not available.",
