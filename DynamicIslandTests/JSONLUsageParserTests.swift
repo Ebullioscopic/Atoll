@@ -81,20 +81,21 @@ final class JSONLUsageParserTests: XCTestCase {
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let ts = iso.string(from: now.addingTimeInterval(-3600))
 
-        // Create a valid record followed by an oversized line without newline,
-        // then a newline and another valid record to verify parsing resumes.
+        // Create a valid record followed by an oversized valid JSON record
+        // with leading whitespace, then a newline and another valid record.
+        // The oversized record should be excluded entirely; parsing should
+        // resume at the next newline and process the following record.
         let validRecord = "{\"timestamp\": \"\(ts)\", \"message\": {\"id\": \"msg1\", \"model\": \"claude-3-opus\", \"usage\": {\"input_tokens\": 100, \"output_tokens\": 50}}}"
-        let oversizedLine = String(repeating: "x", count: 1024 * 1024 + 100) // > 1 MB
+        let oversizedRecord = "  " + String(repeating: "x", count: 1024 * 1024 + 100) // > 1 MB with leading whitespace
         let validRecord2 = "{\"timestamp\": \"\(ts)\", \"message\": {\"id\": \"msg2\", \"model\": \"claude-3-sonnet\", \"usage\": {\"input_tokens\": 200, \"output_tokens\": 100}}}"
-        let content = validRecord + "\n" + oversizedLine + "\n" + validRecord2
+        let content = validRecord + "\n" + oversizedRecord + "\n" + validRecord2
 
         let file = try makeTempFile(content: content)
         defer { try? FileManager.default.removeItem(at: file) }
 
         let snapshot = parseFile(file, now: now)
 
-        // The first valid record should be parsed, the oversized line should be
-        // discarded, and parsing should resume for the second valid record.
+        // msg1 and msg2 should be parsed; the oversized record should be discarded entirely.
         XCTAssertEqual(snapshot.session.inputTokens, 300)
         XCTAssertEqual(snapshot.session.outputTokens, 150)
         XCTAssertEqual(snapshot.models.count, 2)

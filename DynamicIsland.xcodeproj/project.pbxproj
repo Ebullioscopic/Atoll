@@ -89,6 +89,7 @@
 		7EA69B1E2F5AE61200EB2D16 /* Exceptions for "Contents" folder in "DynamicIsland" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Helpers/NowPlayingTestClient,
 			);
 			target = F54406E62CD4987A00C7AFD9 /* DynamicIsland */;
 		};
