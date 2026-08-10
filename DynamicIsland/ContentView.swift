@@ -1977,11 +1977,21 @@ struct ContentView: View {
                     }
                 }
 
-                try? await Task.sleep(for: .milliseconds(50))
+                try? await Task.sleep(for: .milliseconds(self.hiddenEdgeHoverPollingIntervalMs()))
             }
 
             self.hiddenEdgeHoverPollingTask = nil
         }
+    }
+
+    private func hiddenEdgeHoverPollingIntervalMs() -> Int {
+        if shouldUseHiddenEdgeHoverPolling {
+            return 50
+        }
+        if isHovering && interactionsEnabled {
+            return 100
+        }
+        return 1_000
     }
 
     private func stopHiddenEdgeHoverPolling() {
