@@ -307,13 +307,15 @@ enum ThirdPartyCalendarApp: String, CaseIterable, Codable, Defaults.Serializable
 enum ClipboardDisplayMode: String, CaseIterable, Codable, Defaults.Serializable {
     case popover = "popover"     // Traditional popover attached to button
     case panel = "panel"         // Floating panel near notch
-    case separateTab = "separateTab" // Separate tab in Dynamic Island
-    
+    case separateTab = "separateTab" // Separate tab in Dynamic Island (merges with Notes)
+    case notchTab = "notchTab"   // Dedicated clipboard tab inside the notch (draggable items)
+
     var displayName: String {
         switch self {
         case .popover: return String(localized: "Popover")
         case .panel: return String(localized: "Panel")
         case .separateTab: return String(localized: "Separate Tab")
+        case .notchTab: return String(localized: "Notch Tab")
         }
     }
     
@@ -322,6 +324,7 @@ enum ClipboardDisplayMode: String, CaseIterable, Codable, Defaults.Serializable 
         case .popover: return "Shows clipboard as a dropdown attached to the clipboard button"
         case .panel: return "Shows clipboard in a floating panel near the notch"
         case .separateTab: return "Shows copied items in a separate tab within the Dynamic Island (merges with Notes if enabled)"
+        case .notchTab: return "Shows copied items in a dedicated clipboard tab inside the notch; drag items straight out to other apps"
         }
     }
 }

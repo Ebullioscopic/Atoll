@@ -172,7 +172,12 @@ class ClipboardManager: ObservableObject {
     @Published var pinnedItems: [ClipboardItem] = []
     @Published var isMonitoring: Bool = false
     @Published private(set) var lastCopiedItemDate: Date?
-    
+    /// True while a clipboard item is being dragged out; keeps the notch open
+    /// (see `shouldPreventAutoClose`). SwiftUI `.onDrag` has no drag-end callback,
+    /// so a bounded timeout releases it in case a drop is never observed.
+    @Published var isDraggingItem: Bool = false
+    private var dragResetWork: DispatchWorkItem?
+
     private var timer: Timer?
     private var lastChangeCount: Int = 0
     
@@ -228,6 +233,24 @@ class ClipboardManager: ObservableObject {
         timer = nil
     }
     
+    /// Mark a drag-out as in progress and arm a bounded safety reset. SwiftUI `.onDrag`
+    /// exposes no drag-end callback, so the notch is held open until this timeout fires;
+    /// a true completion callback would require an AppKit `NSDraggingSource` (intentionally
+    /// avoided here — see `ClipboardDragging.swift`).
+    ///
+    /// The window is a trade-off: too short and the notch closes mid-drag on a slow drag;
+    /// too long and it stays pinned open (a leak) if the drop never completes. 8s comfortably
+    /// covers a realistic drag-and-drop while keeping the worst-case leak short.
+    static let dragSafetyResetTimeout: TimeInterval = 8.0
+
+    func markDragStart() {
+        isDraggingItem = true
+        dragResetWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.isDraggingItem = false }
+        dragResetWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.dragSafetyResetTimeout, execute: work)
+    }
+
     func copyToClipboard(_ item: ClipboardItem) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
