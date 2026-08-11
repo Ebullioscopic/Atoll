@@ -161,9 +161,16 @@ struct ContentView: View {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
         }
         
-        if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
+        if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
             let resolvedHeight = max(baseSize.height, preferredHeight)
+            return CGSize(width: baseSize.width, height: resolvedHeight)
+        }
+
+        if coordinator.currentView == .clipboard {
+            // Clipboard has its own fixed height source; don't inherit whatever notes
+            // layout state happens to be set.
+            let resolvedHeight = max(baseSize.height, NotesLayoutState.list.preferredHeight)
             return CGSize(width: baseSize.width, height: resolvedHeight)
         }
 
@@ -526,6 +533,7 @@ struct ContentView: View {
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
+            .padding(.top, isIslandMode ? 0 : notchTopScreenBleedAmount)
             .background(.black)
             .clipShape(resolvedClipShape)
             .compositingGroup()
@@ -547,7 +555,7 @@ struct ContentView: View {
         mainLayoutBase
             .conditionalModifier(!useModernCloseAnimation) { view in
                 let hoverAnimation = Animation.bouncy.speed(1.2)
-                let notchStateAnimation = Animation.spring.speed(1.2)
+                let notchStateAnimation = Animation.spring(response: 0.42, dampingFraction: 1.0, blendDuration: 0)
                 return view
                     .animation(hoverAnimation, value: isHovering)
                     .animation(notchStateAnimation, value: vm.notchState)
@@ -556,7 +564,7 @@ struct ContentView: View {
             }
             .conditionalModifier(useModernCloseAnimation) { view in
                 let hoverAnimation = Animation.bouncy.speed(1.2)
-                let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
+                let openAnimation = Animation.spring(response: 0.42, dampingFraction: 1.0, blendDuration: 0)
                 let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
                 let notchAnimation = vm.notchState == .open ? openAnimation : closeAnimation
                 return view
@@ -610,9 +618,7 @@ struct ContentView: View {
                 if coordinator.firstLaunch {
                     // Single open during first launch; closeHello() handles the timed close.
                     runAfter(1) {
-                        withAnimation(vm.animation) {
-                            openNotch()
-                        }
+                        openNotch()
                     }
                 }
             })
@@ -722,9 +728,10 @@ struct ContentView: View {
         }
         .frame(
             maxWidth: (dynamicNotchSize.width + (vm.notchState == .open ? 24 : 0) + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)).rounded(),
-            maxHeight: (dynamicNotchSize.height + (vm.notchState == .open ? 12 : 0) + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)).rounded(),
+            maxHeight: (dynamicNotchSize.height + (vm.notchState == .open ? 12 : 0) + (isIslandMode ? 0 : notchTopScreenBleedAmount) + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)).rounded(),
             alignment: .top
         )
+        .animation(nil, value: vm.notchState)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environmentObject(privacyManager)
         .background(dragDetector)
@@ -1097,7 +1104,7 @@ struct ContentView: View {
                             case .notes:
                                 NotchNotesView()
                             case .clipboard:
-                                NotchNotesView()
+                                NotchClipboardView()
                             case .terminal:
                                 NotchTerminalView()
                             case .extensionExperience:
@@ -1182,14 +1189,16 @@ struct ContentView: View {
                 IdleAnimationView()
                     .frame(width: sideSize, height: sideSize)
             }
-        }.frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
+        }.frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .top)
     }
 
     @ViewBuilder
     private func MusicLiveActivity(secondary preResolvedSecondary: MusicSecondaryLiveActivity? = nil) -> some View {
         let secondary = preResolvedSecondary ?? resolveMusicSecondaryLiveActivity()
-        let notchContentHeight = max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12))
-        let wingBaseWidth = max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12) + gestureProgress / 2)
+        let closedHeight = vm.effectiveClosedNotchHeight
+        let outerHeight = closedHeight + (isHovering ? 8 : 0)
+        let notchContentHeight = isHovering ? outerHeight : max(0, closedHeight - 12)
+        let wingBaseWidth = max(0, notchContentHeight + gestureProgress / 2)
         let rawCenterBaseWidth = vm.closedNotchSize.width + (isHovering ? 8 : 0)
         let centerBaseWidth = max(rawCenterBaseWidth, 96)
         let inlineSneakPeekActive = (
@@ -1300,7 +1309,7 @@ struct ContentView: View {
                 .contentTransition(.symbolEffect(.replace))
         }
         .frame(width: notchWidth, height: notchContentHeight)
-        .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
+        .frame(height: outerHeight, alignment: .top)
         .animation(.smooth(duration: 0.25), value: secondary?.id)
     }
 
@@ -1880,9 +1889,7 @@ struct ContentView: View {
 
     // MARK: - Private Methods
     private func openNotch() {
-        withAnimation(.bouncy.speed(1.2)) {
-            vm.open()
-        }
+        vm.open()
     }
 
     private func shouldShowClosedMusicWaveformPlayPauseOverlay(for secondary: MusicSecondaryLiveActivity?) -> Bool {
@@ -1959,13 +1966,32 @@ struct ContentView: View {
                     if hovering != self.isHovering {
                         self.handleHover(hovering)
                     }
+                } else if self.isHovering && self.interactionsEnabled {
+                    let stillInside = self.vm.notchState == .open
+                        ? self.isPointInsideNotchWindow()
+                        : self.isMouseOverClosedNotchHitArea()
+                    if !stillInside {
+                        self.hoverTask?.cancel()
+                        self.stopHoverClickMonitor()
+                        self.finishHoverExit()
+                    }
                 }
 
-                try? await Task.sleep(for: .milliseconds(50))
+                try? await Task.sleep(for: .milliseconds(self.hiddenEdgeHoverPollingIntervalMs()))
             }
 
             self.hiddenEdgeHoverPollingTask = nil
         }
+    }
+
+    private func hiddenEdgeHoverPollingIntervalMs() -> Int {
+        if shouldUseHiddenEdgeHoverPolling {
+            return 50
+        }
+        if isHovering && interactionsEnabled {
+            return 100
+        }
+        return 1_000
     }
 
     private func stopHiddenEdgeHoverPolling() {
@@ -2063,6 +2089,11 @@ struct ContentView: View {
     
     /// Handle hover state changes with debouncing
     private func handleHover(_ hovering: Bool) {
+        // Ignore false hover-exit when the cursor is parked on the screen's top pixel.
+        if !hovering, shouldRetainHoverAtScreenTopEdge() {
+            return
+        }
+
         hoverTask?.cancel()
 
         if hovering {
@@ -2116,35 +2147,75 @@ struct ContentView: View {
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    withAnimation(.bouncy.speed(1.2)) {
-                        self.isHovering = false
+                    if self.shouldRetainHoverAtScreenTopEdge() {
+                        return
                     }
-
-                    if self.vm.notchState == .open && !self.shouldPreventAutoClose() {
-                        self.vm.close()
-                    } else if self.vm.notchState == .open
-                                && Defaults[.terminalStickyMode]
-                                && self.coordinator.currentView == .terminal {
-                        // Re-sync monitor state through one code path to avoid
-                        // monitor lifecycle races between hover and state updates.
-                        self.syncStickyTerminalOutsideClickMonitor()
-                    }
+                    self.finishHoverExit()
                 }
             }
         }
     }
 
-    private func isPointInsideNotchWindow(_ point: CGPoint) -> Bool {
+    private func finishHoverExit() {
+        withAnimation(.bouncy.speed(1.2)) {
+            isHovering = false
+        }
+
+        if vm.notchState == .open && !shouldPreventAutoClose() {
+            vm.close()
+        } else if vm.notchState == .open
+                    && Defaults[.terminalStickyMode]
+                    && coordinator.currentView == .terminal {
+            // Re-sync monitor state through one code path to avoid
+            // monitor lifecycle races between hover and state updates.
+            syncStickyTerminalOutsideClickMonitor()
+        }
+    }
+
+    private func shouldRetainHoverAtScreenTopEdge(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
+        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
+            return false
+        }
+        guard isHovering || vm.notchState == .open else { return false }
+        guard location.y >= screen.frame.maxY - 1.5 else { return false }
+
+        if vm.notchState == .open {
+            return isPointInsideNotchWindow(location)
+        }
+        return isMouseOverClosedNotchHitArea(location)
+    }
+
+    private func isMouseOverClosedNotchHitArea(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
+        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
+            return false
+        }
+
+        let height = vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0) + 6
+        let width = max(vm.closedNotchSize.width + (isHovering ? 8 : 0), 96) + 24
+        let minX = screen.frame.midX - width / 2
+        let minY = screen.frame.maxY - height
+
+        return location.x >= minX && location.x <= minX + width
+            && location.y >= minY && location.y <= screen.frame.maxY
+    }
+
+    private func isPointInsideNotchWindow(_ point: CGPoint = NSEvent.mouseLocation) -> Bool {
         if let appDelegate = AppDelegate.shared {
             if Defaults[.showOnAllDisplays] {
-                return appDelegate.windows.values.contains(where: { $0.frame.contains(point) })
+                return appDelegate.windows.values.contains(where: { frameContainsPointIncludingTopEdge($0.frame, point) })
             }
             if let window = appDelegate.window {
-                return window.frame.contains(point)
+                return frameContainsPointIncludingTopEdge(window.frame, point)
             }
         }
 
-        return NSApp.windows.contains(where: { $0.frame.contains(point) })
+        return NSApp.windows.contains(where: { frameContainsPointIncludingTopEdge($0.frame, point) })
+    }
+
+    /// `CGRect.contains` is half-open on max edges; the top pixel needs inclusive maxY.
+    private func frameContainsPointIncludingTopEdge(_ frame: CGRect, _ point: CGPoint) -> Bool {
+        point.x >= frame.minX && point.x <= frame.maxX
+            && point.y >= frame.minY && point.y <= frame.maxY
     }
     
     // Helper function to check if any popovers are active
@@ -2159,7 +2230,7 @@ struct ContentView: View {
     }
 
     private func shouldPreventAutoClose() -> Bool {
-        coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
+        coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || ClipboardManager.shared.isDraggingItem || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
     }
     
     // Helper to prevent rapid haptic feedback

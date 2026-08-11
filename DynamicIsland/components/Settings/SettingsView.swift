@@ -7607,6 +7607,8 @@ struct ClipboardSettings: View {
                         Text("Panel mode shows clipboard in a floating window near the notch.")
                     case .separateTab:
                         Text("Separate Tab mode integrates Copied Items and Notes into a single view. If both are enabled, Notes appear on the right and Clipboard on the left.")
+                    case .notchTab:
+                        Text("Notch Tab mode shows clipboard in its own tab inside the notch. Drag text, image, or single-file items straight out to Finder or another app.")
                     }
                 }
 
