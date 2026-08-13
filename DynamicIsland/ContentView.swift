@@ -1192,7 +1192,7 @@ struct ContentView: View {
         let secondary = preResolvedSecondary ?? resolveMusicSecondaryLiveActivity()
         let closedHeight = vm.effectiveClosedNotchHeight
         let outerHeight = closedHeight + (isHovering ? 8 : 0)
-        let notchContentHeight = isHovering ? outerHeight : max(0, closedHeight - 12)
+        let notchContentHeight = isHovering ? max(0, closedHeight) : max(0, closedHeight - 12)
         let wingBaseWidth = max(0, notchContentHeight + gestureProgress / 2)
         let rawCenterBaseWidth = vm.closedNotchSize.width + (isHovering ? 8 : 0)
         let centerBaseWidth = max(rawCenterBaseWidth, 96)
