@@ -116,7 +116,7 @@ struct TimerLiveActivity: View {
             width += ringWidth
         }
         if ringOnRight && showsCountdown {
-            width += 8
+            width += inlineControlSpacing
         }
         if showsCountdown {
             width += countdownWidth
@@ -455,16 +455,16 @@ struct TimerLiveActivity: View {
                     icon: timerManager.isPaused ? "play.fill" : "pause.fill",
                     foreground: .white,
                     background: Color.white.opacity(0.14),
-                    help: timerManager.isPaused ? "Resume" : "Pause",
+                    help: timerManager.isPaused ? String(localized: "Resume") : String(localized: "Pause"),
                     action: togglePause
                 )
             }
 
             inlineControlButton(
                 icon: timerManager.isOvertime ? "stop.fill" : "xmark",
-                foreground: timerManager.isOvertime ? Color.white : Color.white,
+                foreground: .white,
                 background: timerManager.isOvertime ? Color.red.opacity(0.24) : Color.white.opacity(0.14),
-                help: timerManager.isOvertime ? "Stop" : "Cancel",
+                help: timerManager.isOvertime ? String(localized: "Stop") : String(localized: "Cancel"),
                 action: stopTimer
             )
         }
@@ -489,6 +489,7 @@ struct TimerLiveActivity: View {
         }
         .buttonStyle(.plain)
         .help(help)
+        .accessibilityLabel(help)
     }
 
     private func togglePause() {

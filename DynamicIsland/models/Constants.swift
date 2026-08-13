@@ -1184,6 +1184,7 @@ extension Defaults.Keys {
     static let reminderPresentationStyle = Key<ReminderPresentationStyle>("reminderPresentationStyle", default: .ringCountdown)
     static let reminderLeadTime = Key<Int>("reminderLeadTime", default: 5)
     static let reminderSneakPeekDuration = Key<Double>("reminderSneakPeekDuration", default: 5)
+    // Legacy key name: the separate control window is gone, this now shows inline notch controls.
     static let timerControlWindowEnabled = Key<Bool>("timerControlWindowEnabled", default: true)
     
     // MARK: ColorPicker Feature

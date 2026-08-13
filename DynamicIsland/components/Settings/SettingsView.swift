@@ -6853,6 +6853,7 @@ struct TimerSettings: View {
 
             Toggle("Show pause/stop controls in the notch", isOn: $controlWindowEnabled)
                 .help("Pause and stop buttons appear inline inside the notch while a timer runs.")
+                .settingsHighlight(id: highlightID("Show pause/stop controls in the notch"))
 
             Picker("Progress style", selection: $progressStyle) {
                 ForEach(TimerProgressStyle.allCases) { style in
