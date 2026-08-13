@@ -45,13 +45,16 @@ struct AntigravityUsageProvider: UsageProvider {
         var snapshot = UsageSnapshot()
         snapshot.lastUpdated = now
 
+        // The language server path needs no keychain token, so try it first —
+        // reading the token item owned by the Gemini CLI otherwise triggers the
+        // login keychain password prompt on every refresh.
+        if let lsSnapshot = try await fetchFromLanguageServer(now: now) {
+            return lsSnapshot
+        }
+
         let token = try await loadKeychainToken()
         guard let token else {
             throw UsageError.notConfigured("Antigravity not signed in")
-        }
-
-        if let lsSnapshot = try await fetchFromLanguageServer(now: now) {
-            return lsSnapshot
         }
 
         return try await fetchFromCloudCode(token: token, now: now)
@@ -77,7 +80,58 @@ struct AntigravityUsageProvider: UsageProvider {
             return nil
         }
 
+        grantKeychainAccess(service: service, account: account)
         return extractToken(from: string)
+    }
+
+    /// Adds this app to the token item's access list so macOS stops prompting
+    /// for the login keychain password on every read. The item is owned by the
+    /// Gemini CLI, whose token rotation can reset the ACL, hence the re-grant.
+    private func grantKeychainAccess(service: String, account: String) {
+        var appRef: SecTrustedApplication?
+        guard SecTrustedApplicationCreateFromPath(nil, &appRef) == errSecSuccess,
+              let currentApp = appRef else { return }
+
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnAttributes as String: true
+        ]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let attrs = result as? [String: Any],
+              let access = attrs[kSecAttrAccess as String] as! SecAccess? else { return }
+
+        // Preserve the trusted apps already on the item so the CLI keeps working.
+        var apps: [SecTrustedApplication] = []
+        var aclList: CFArray?
+        if SecAccessCopyACLList(access, &aclList) == errSecSuccess,
+           let acls = aclList as? [SecACL] {
+            for acl in acls {
+                var appList: CFArray?
+                var description: CFString?
+                var prompt = SecKeychainPromptSelector(rawValue: 0)
+                if SecACLCopyContents(acl, &appList, &description, &prompt) == errSecSuccess,
+                   let list = appList as? [SecTrustedApplication] {
+                    apps.append(contentsOf: list)
+                }
+            }
+        }
+
+        if apps.contains(where: { CFEqual($0, currentApp) }) { return }
+
+        apps.append(currentApp)
+        var newAccess: SecAccess?
+        guard SecAccessCreate("Atoll" as CFString, apps as CFArray, &newAccess) == errSecSuccess,
+              let newAccess else { return }
+
+        let updateQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        SecItemUpdate(updateQuery as CFDictionary, [kSecAttrAccess as String: newAccess] as CFDictionary)
     }
 
     private func extractToken(from raw: String) -> AntigravityKeychainToken? {
