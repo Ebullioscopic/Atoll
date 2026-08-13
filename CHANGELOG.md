@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- Fixed the LLM Usage card prompting for the login keychain password on every refresh when the Gemini language server is down. The app now tries the language server first (no keychain needed), and otherwise grants itself access to the Gemini CLI's token item while preserving the CLI's own access.
+- Fixed the timer being clipped behind the notch after the layout changes, and made the boxes in StatsView uniformly sized.
 - Removed the separate floating timer control window; Pause/Stop buttons now render inline inside the notch, vertically centered with the timer countdown (#711).
 - Fixed excessive memory usage by streaming LLM usage JSONL files instead of loading them entirely into memory
 - Reduced idle CPU from always-on notch hover polling and OSDUIHelper process checks by backing off when the app is idle (#641).
