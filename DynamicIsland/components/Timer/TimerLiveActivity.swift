@@ -314,9 +314,8 @@ struct TimerLiveActivity: View {
                             .padding(.leading, (ringOnRight || showsCountdown) ? inlineControlSpacing : 0)
                     }
                 }
-                // Tighter trailing margin (~6px) so the countdown sits a little further
-                // right, keeping the leading hour digit clear of the notch region.
-                .padding(.trailing, wingPadding / 2 - 5)
+                // Tighter trailing margin so the countdown clears the notch region.
+                .padding(.trailing, wingPadding / 2 - 9)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
             }
     }

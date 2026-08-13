@@ -92,16 +92,21 @@ struct AntigravityUsageProvider: UsageProvider {
         guard SecTrustedApplicationCreateFromPath(nil, &appRef) == errSecSuccess,
               let currentApp = appRef else { return }
 
+        // The CLI creates this item via the legacy keychain API, so the ACL is
+        // not exposed through kSecAttrAccess in an attributes query. Reach it
+        // through the item ref instead, or the grant silently never runs.
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecReturnAttributes as String: true
+            kSecReturnRef as String: true
         ]
         var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let attrs = result as? [String: Any],
-              let access = attrs[kSecAttrAccess as String] as! SecAccess? else { return }
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return }
+        let item = unsafeBitCast(result, to: SecKeychainItem.self)
+        var accessRef: SecAccess?
+        guard SecKeychainItemCopyAccess(item, &accessRef) == errSecSuccess,
+              let access = accessRef else { return }
 
         // Preserve the trusted apps already on the item so the CLI keeps working.
         var apps: [SecTrustedApplication] = []
