@@ -55,6 +55,8 @@ struct TimerControlOverlay: View {
     }
 
     var body: some View {
+        let verticalPadding = max(8, notchHeight * 0.12)
+
         HStack(spacing: 12) {
             if !timerManager.isOvertime {
                 ControlButton(
@@ -76,6 +78,7 @@ struct TimerControlOverlay: View {
             )
             .disabled(!timerManager.allowsManualInteraction)
         }
+        .padding(.vertical, verticalPadding)
         .padding(.horizontal, 12)
         .frame(height: notchHeight)
         .frame(minWidth: buttonSize * 2 + 32)

@@ -210,8 +210,9 @@ final class TimerControlWindowManager {
 
     private func frame(for size: CGSize, viewModel: DynamicIslandViewModel, screen: NSScreen, metrics: TimerControlWindowMetrics) -> NSRect {
         let screenFrame = screen.frame
+        let visibleFrame = screen.visibleFrame
         let notchOriginX = screenFrame.midX - (metrics.notchWidth / 2)
-        let originY = screenFrame.maxY - size.height
+        let originY = visibleFrame.maxY - size.height
 
         let rightEdge = notchOriginX + metrics.notchWidth + metrics.rightWingWidth
         let rawOriginX = rightEdge + metrics.spacing
