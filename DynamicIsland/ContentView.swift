@@ -649,11 +649,6 @@ struct ContentView: View {
                     // tab already selected, where the cursor never enters the notch).
                     syncStickyTerminalOutsideClickMonitor()
                 }
-                #if os(macOS)
-                if newState == .open {
-                    TimerControlWindowManager.shared.hide()
-                }
-                #endif
             }
             .onChange(of: vm.isBatteryPopoverActive) { _, newPopoverState in
                 runAfter(0.1) {
@@ -1189,7 +1184,7 @@ struct ContentView: View {
                 IdleAnimationView()
                     .frame(width: sideSize, height: sideSize)
             }
-        }.frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .top)
+        }.frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
     }
 
     @ViewBuilder
@@ -1309,7 +1304,7 @@ struct ContentView: View {
                 .contentTransition(.symbolEffect(.replace))
         }
         .frame(width: notchWidth, height: notchContentHeight)
-        .frame(height: outerHeight, alignment: .top)
+        .frame(height: outerHeight, alignment: .center)
         .animation(.smooth(duration: 0.25), value: secondary?.id)
     }
 
