@@ -182,6 +182,14 @@ struct ContentView: View {
             return CGSize(width: baseSize.width, height: terminalHeight)
         }
 
+        if coordinator.currentView == .agentTower {
+            // Same screen-fraction approach as the terminal tab: a grid of session
+            // cards needs more room than the 200pt default.
+            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
+            let fraction = Defaults[.agentTowerMaxHeightFraction]
+            return CGSize(width: baseSize.width, height: max(280, screenHeight * fraction))
+        }
+
         if coordinator.currentView == .extensionExperience {
             if let preferredHeight = extensionTabPreferredHeight(baseSize: baseSize) {
                 return CGSize(width: baseSize.width, height: preferredHeight)
@@ -1107,6 +1115,8 @@ struct ContentView: View {
                                 NotchClipboardView()
                             case .terminal:
                                 NotchTerminalView()
+                            case .agentTower:
+                                NotchAgentTowerView()
                             case .extensionExperience:
                                 if let payload = currentExtensionTabPayload() {
                                     ExtensionNotchExperienceTabView(payload: payload)

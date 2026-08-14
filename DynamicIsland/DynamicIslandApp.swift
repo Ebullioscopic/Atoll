@@ -299,7 +299,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.removeObserver(self)
         extensionXPCServiceHost.stop()
         extensionRPCServer.stop()
-        
+        // Removes the heartbeat, which releases any hook that happens to be
+        // waiting instead of leaving it to time out.
+        AgentTowerManager.shared.shutdown()
+
         // Stop AudioTap capture
         AudioTap.shared.stopCapture()
 
@@ -545,6 +548,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
             let maxFraction = Defaults[.terminalMaxHeightFraction]
             baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
+        } else if coordinator.currentView == .agentTower {
+            // Must stay in step with the same branch in `ContentView`, or the
+            // window and its content disagree about how tall the tab is.
+            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
+            baseSize.height = max(280, screenHeight * Defaults[.agentTowerMaxHeightFraction])
         }
         
         let adjustedContentSize = statsAdjustedNotchSize(
@@ -633,7 +641,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         LockScreenManager.shared.configure(viewModel: vm)
         extensionXPCServiceHost.start()
         extensionRPCServer.start()
-        
+        // Started here rather than from the manager's `init()`: wiring Defaults
+        // publishers inside a shared manager's initialiser deadlocks launch.
+        AgentTowerManager.shared.start()
+
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()
         Defaults.Keys.migrateMusicAuxControls()

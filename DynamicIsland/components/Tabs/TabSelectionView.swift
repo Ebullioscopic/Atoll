@@ -95,6 +95,9 @@ struct TabSelectionView: View {
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
+        if Defaults[.enableAgentTower] {
+            tabsArray.append(TabModel(label: "Agents", icon: "sparkles.rectangle.stack", view: .agentTower))
+        }
         if extensionTabsEnabled {
             for payload in extensionTabPayloads {
                 guard let tab = payload.descriptor.tab else { continue }

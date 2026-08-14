@@ -36,6 +36,7 @@ enum LogCategory: String {
     case success = "✅"
     case debug = "🔍"
     case extensions = "🧩"
+    case agents = "🤖"
 
     var osCategoryName: String {
         switch self {
@@ -49,6 +50,7 @@ enum LogCategory: String {
         case .success: return "success"
         case .debug: return "debug"
         case .extensions: return "extensions"
+        case .agents: return "agents"
         }
     }
 
@@ -56,7 +58,7 @@ enum LogCategory: String {
         switch self {
         case .error: return .error
         case .warning: return .warning
-        case .success, .ui, .network, .lifecycle, .memory, .performance, .extensions: return .info
+        case .success, .ui, .network, .lifecycle, .memory, .performance, .extensions, .agents: return .info
         case .debug: return .debug
         }
     }

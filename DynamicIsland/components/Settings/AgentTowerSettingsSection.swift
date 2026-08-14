@@ -1,0 +1,257 @@
+/*
+ * Atoll (DynamicIsland)
+ * Copyright (C) 2024-2026 Atoll Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+import Defaults
+import SwiftUI
+
+/// Settings pane for Agent Tower.
+///
+/// Lives outside `SettingsView.swift` so the monolith does not grow; `SettingsView`
+/// only gains a tab case and one call site.
+///
+/// `SettingsTab` is file-private to `SettingsView.swift`, so the search-highlight
+/// id cannot be built here — the caller passes a builder instead.
+struct AgentTowerSettings: View {
+    /// Builds a search-highlight id for a control title. Defaults to the title
+    /// itself, which is harmless when highlighting is not wired up.
+    var highlightID: (String) -> String = { $0 }
+
+    @ObservedObject private var manager = AgentTowerManager.shared
+
+    @Default(.enableAgentTower) private var enableAgentTower
+    @Default(.agentTowerEnabledKinds) private var enabledKinds
+    @Default(.agentTowerMaxHeightFraction) private var maxHeightFraction
+    @Default(.agentTowerSessionPruneHours) private var pruneHours
+
+    @State private var isConfirmingRemoval = false
+
+    var body: some View {
+        Form {
+            generalSection
+            if enableAgentTower {
+                agentsSection
+                statusSection
+                appearanceSection
+                housekeepingSection
+            }
+        }
+        .onAppear { manager.refreshInstallationState() }
+    }
+
+    // MARK: - General
+
+    private var generalSection: some View {
+        Section {
+            Defaults.Toggle(key: .enableAgentTower) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Watch AI coding agents")
+                    Text("Shows a card in the notch for every coding agent running in a terminal.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Watch AI coding agents"))
+        } header: {
+            Text("Agent Tower")
+        } footer: {
+            Text("Turning this on adds a hook to each selected agent's own configuration file. Atoll backs the file up first, only touches its `hooks` section, and removes its entries again when you turn this off.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Agents
+
+    private var agentsSection: some View {
+        Section {
+            let available = manager.availableKinds
+            if available.isEmpty {
+                Text("No supported agent was found in your home folder.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(available) { kind in
+                    Toggle(isOn: binding(for: kind)) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(kind.displayName)
+                                if let descriptor = AgentHookInstaller.descriptor(for: kind, includeApprovals: false),
+                                   !descriptor.isSchemaVerified {
+                                    Text("experimental")
+                                        .font(.caption2.weight(.semibold))
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1)
+                                        .background(.orange.opacity(0.2), in: Capsule())
+                                        .foregroundStyle(.orange)
+                                }
+                            }
+                            if let error = manager.installErrors[kind] {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            } else if let descriptor = AgentHookInstaller.descriptor(for: kind, includeApprovals: false) {
+                                Text(abbreviated(descriptor.configURL.path))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if AgentKind.allCases.contains(where: { !$0.supportsHookInstallation }) {
+                Text("opencode is not supported: it customises behaviour through JavaScript plugins rather than a hook configuration, so there is nothing for Atoll to add.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Agents to watch")
+        } footer: {
+            Text("Agents marked experimental have not been verified against a real installation. Atoll's hook is written to fail silently, so an unrecognised agent simply does nothing rather than interfering.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func binding(for kind: AgentKind) -> Binding<Bool> {
+        Binding(
+            get: { enabledKinds.contains(kind) },
+            set: { isOn in
+                var updated = enabledKinds
+                if isOn {
+                    guard !updated.contains(kind) else { return }
+                    updated.append(kind)
+                } else {
+                    updated.removeAll { $0 == kind }
+                }
+                enabledKinds = updated
+            }
+        )
+    }
+
+    // MARK: - Status
+
+    private var statusSection: some View {
+        Section {
+            LabeledContent {
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(manager.isArmed ? Color.green : Color.orange)
+                        .frame(width: 7, height: 7)
+                    Text(manager.isArmed ? String(localized: "Watching") : String(localized: "Not watching"))
+                        .foregroundStyle(.secondary)
+                }
+            } label: {
+                Text("Status")
+            }
+
+            if let error = manager.setupError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            LabeledContent {
+                Text(manager.installedKinds.isEmpty
+                     ? String(localized: "None")
+                     : manager.installedKinds.map(\.displayName).sorted().joined(separator: ", "))
+                    .foregroundStyle(.secondary)
+            } label: {
+                Text("Hooks installed for")
+            }
+
+            LabeledContent {
+                Text("\(manager.sessions.count)")
+                    .foregroundStyle(.secondary)
+            } label: {
+                Text("Sessions tracked")
+            }
+        } header: {
+            Text("Status")
+        } footer: {
+            Text("Atoll keeps a small folder at ~/.atoll/agent-hooks. Deleting it, or setting ATOLL_HOOKS_DISABLED=1 in your shell, switches every hook off without touching any agent configuration.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Appearance
+
+    private var appearanceSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 4) {
+                LabeledContent {
+                    Text("\(Int(maxHeightFraction * 100))%")
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                } label: {
+                    Text("Tab height")
+                }
+                Slider(value: $maxHeightFraction, in: 0.25...0.7, step: 0.05)
+            }
+            .settingsHighlight(id: highlightID("Tab height"))
+        } header: {
+            Text("Appearance")
+        } footer: {
+            Text("How much of the screen the Agents tab may use when the notch is open.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Housekeeping
+
+    private var housekeepingSection: some View {
+        Section {
+            Picker(selection: $pruneHours) {
+                Text("6 hours").tag(6)
+                Text("24 hours").tag(24)
+                Text("3 days").tag(72)
+                Text("A week").tag(168)
+            } label: {
+                Text("Forget sessions after")
+            }
+
+            Button(role: .destructive) {
+                isConfirmingRemoval = true
+            } label: {
+                Text("Remove all Atoll hooks")
+            }
+            .confirmationDialog(
+                Text("Remove Atoll's hooks from every agent?"),
+                isPresented: $isConfirmingRemoval,
+                titleVisibility: .visible
+            ) {
+                Button(String(localized: "Remove"), role: .destructive) {
+                    manager.removeAllHooks()
+                }
+                Button(String(localized: "Cancel"), role: .cancel) {}
+            } message: {
+                Text("Your own hooks and every other setting in those files are left untouched. Backups stay in Atoll's application support folder.")
+            }
+        } header: {
+            Text("Housekeeping")
+        }
+    }
+
+    private func abbreviated(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        guard path.hasPrefix(home) else { return path }
+        return "~" + path.dropFirst(home.count)
+    }
+}

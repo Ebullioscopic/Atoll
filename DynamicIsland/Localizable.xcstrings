@@ -1138,6 +1138,26 @@
         }
       }
     },
+    "%@ is not valid JSON, so Atoll left it alone. Fix or move the file, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is not valid JSON, so Atoll left it alone. Fix or move the file, then try again."
+          }
+        }
+      }
+    },
+    "%@ does not appear to be installed." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ does not appear to be installed."
+          }
+        }
+      }
+    },
     "%@ left" : {
       "comment" : "A string indicating how much time there is left of an event.",
       "extractionState" : "manual",
@@ -4204,6 +4224,16 @@
         }
       }
     },
+    "3 days" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 days"
+          }
+        }
+      }
+    },
     "3 items" : {
       "comment" : "merge:ko:alt='항목 3개'",
       "localizations" : {
@@ -4564,6 +4594,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "6"
+          }
+        }
+      }
+    },
+    "6 hours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6 hours"
           }
         }
       }
@@ -5049,6 +5089,16 @@
         }
       }
     },
+    "24 hours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "24 hours"
+          }
+        }
+      }
+    },
     "30" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5299,6 +5349,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll 有新版本可用！"
+          }
+        }
+      }
+    },
+    "A week" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A week"
           }
         }
       }
@@ -7476,6 +7536,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "調整鎖定畫面計時器小工具寬度，不影響按鈕大小。"
+          }
+        }
+      }
+    },
+    "Agents to watch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agents to watch"
+          }
+        }
+      }
+    },
+    "Agents marked experimental have not been verified against a real installation. Atoll's hook is written to fail silently, so an unrecognised agent simply does nothing rather than interfering." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agents marked experimental have not been verified against a real installation. Atoll's hook is written to fail silently, so an unrecognised agent simply does nothing rather than interfering."
+          }
+        }
+      }
+    },
+    "Agents" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agents"
+          }
+        }
+      }
+    },
+    "Agent Tower is off" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent Tower is off"
+          }
+        }
+      }
+    },
+    "Agent Tower" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent Tower"
           }
         }
       }
@@ -10500,6 +10610,26 @@
         }
       }
     },
+    "Atoll could not verify its changes to %@ and restored the backup." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll could not verify its changes to %@ and restored the backup."
+          }
+        }
+      }
+    },
+    "Atoll could not prepare its hook folder. Check that ~/.atoll is owned by you and not shared." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll could not prepare its hook folder. Check that ~/.atoll is owned by you and not shared."
+          }
+        }
+      }
+    },
     "Atoll includes a mirror feature that lets you quickly check your appearance using your camera, right from the notch. Camera access is required only to show this live preview. You can turn the mirror feature on or off at any time in the app." : {
       "localizations" : {
         "ko" : {
@@ -10548,6 +10678,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll 包含鏡像功能，讓你可以直接從瀏海處使用相機快速檢查外觀。相機存取僅用於顯示即時預覽。你可以隨時在 App 中開啟或關閉鏡像功能。"
+          }
+        }
+      }
+    },
+    "Atoll keeps a small folder at ~/.atoll/agent-hooks. Deleting it, or setting ATOLL_HOOKS_DISABLED=1 in your shell, switches every hook off without touching any agent configuration." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll keeps a small folder at ~/.atoll/agent-hooks. Deleting it, or setting ATOLL_HOOKS_DISABLED=1 in your shell, switches every hook off without touching any agent configuration."
           }
         }
       }
@@ -17244,6 +17384,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除資料"
+          }
+        }
+      }
+    },
+    "Clear finished" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear finished"
           }
         }
       }
@@ -25506,6 +25656,16 @@
         }
       }
     },
+    "Dismiss session" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dismiss session"
+          }
+        }
+      }
+    },
     "Display Mode" : {
       "localizations" : {
         "fr" : {
@@ -32103,6 +32263,16 @@
         }
       }
     },
+    "experimental" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "experimental"
+          }
+        }
+      }
+    },
     "Extend hover area" : {
       "localizations" : {
         "ko" : {
@@ -33423,6 +33593,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "前景"
+          }
+        }
+      }
+    },
+    "Forget sessions after" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forget sessions after"
           }
         }
       }
@@ -36760,6 +36940,16 @@
         }
       }
     },
+    "Hooks installed for" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hooks installed for"
+          }
+        }
+      }
+    },
     "Horizontal:" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -36850,6 +37040,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "小時"
+          }
+        }
+      }
+    },
+    "How much of the screen the Agents tab may use when the notch is open." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How much of the screen the Agents tab may use when the notch is open."
+          }
+        }
+      }
+    },
+    "Housekeeping" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Housekeeping"
           }
         }
       }
@@ -47931,6 +48141,16 @@
         }
       }
     },
+    "No agent connected" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No agent connected"
+          }
+        }
+      }
+    },
     "No AirPlay devices found" : {
       "comment" : "A message displayed when no AirPlay devices are found.",
       "isCommentAutoGenerated" : true,
@@ -49476,6 +49696,16 @@
         }
       }
     },
+    "No sessions yet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No sessions yet"
+          }
+        }
+      }
+    },
     "No storage devices detected yet." : {
       "comment" : "A message indicating that no storage devices have been detected yet.",
       "isCommentAutoGenerated" : true,
@@ -49526,6 +49756,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未偵測到儲存裝置。"
+          }
+        }
+      }
+    },
+    "No supported agent was found in your home folder." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No supported agent was found in your home folder."
           }
         }
       }
@@ -49644,6 +49884,16 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "非Notch顯示高度"
+          }
+        }
+      }
+    },
+    "None" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
           }
         }
       }
@@ -50055,6 +50305,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未設定"
+          }
+        }
+      }
+    },
+    "Not watching" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not watching"
           }
         }
       }
@@ -51942,6 +52202,16 @@
         }
       }
     },
+    "opencode is not supported: it customises behaviour through JavaScript plugins rather than a hook configuration, so there is nothing for Atoll to add." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "opencode is not supported: it customises behaviour through JavaScript plugins rather than a hook configuration, so there is nothing for Atoll to add."
+          }
+        }
+      }
+    },
     "Opens a transparent preview window with mock data that mirrors the current lock screen widget configuration." : {
       "localizations" : {
         "ko" : {
@@ -53313,6 +53583,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在下方為各小工具選擇液態玻璃變體。更改會同步到「鎖定畫面」分頁。"
+          }
+        }
+      }
+    },
+    "Pick which agents to watch in Settings. Atoll adds a hook to that agent's own configuration." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick which agents to watch in Settings. Atoll adds a hook to that agent's own configuration."
           }
         }
       }
@@ -57248,6 +57528,26 @@
         }
       }
     },
+    "Remove all Atoll hooks" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove all Atoll hooks"
+          }
+        }
+      }
+    },
+    "Remove Atoll's hooks from every agent?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Atoll's hooks from every agent?"
+          }
+        }
+      }
+    },
     "Remove Extension" : {
       "localizations" : {
         "ko" : {
@@ -59663,6 +59963,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "標尺式"
+          }
+        }
+      }
+    },
+    "running" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "running"
           }
         }
       }
@@ -62401,6 +62711,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "工作階段總計"
+          }
+        }
+      }
+    },
+    "Sessions tracked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessions tracked"
           }
         }
       }
@@ -66481,6 +66801,16 @@
         }
       }
     },
+    "Shows a card in the notch for every coding agent running in a terminal." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows a card in the notch for every coding agent running in a terminal."
+          }
+        }
+      }
+    },
     "Shows green camera icon and yellow microphone icon when in use. Uses event-driven CoreAudio and CoreMediaIO APIs." : {
       "localizations" : {
         "ko" : {
@@ -68839,6 +69169,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開始對話以在此檢視聊天記錄"
+          }
+        }
+      }
+    },
+    "Start an agent in a terminal and it will appear here." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start an agent in a terminal and it will appear here."
           }
         }
       }
@@ -71299,6 +71639,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "分頁"
+          }
+        }
+      }
+    },
+    "Tab height" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tab height"
           }
         }
       }
@@ -74210,6 +74560,16 @@
         }
       }
     },
+    "Turn it on in Settings to watch your coding agents here." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn it on in Settings to watch your coding agents here."
+          }
+        }
+      }
+    },
     "Turn off 'Show event for entire duration' to use the post-start duration option." : {
       "localizations" : {
         "ko" : {
@@ -74360,6 +74720,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "關閉此項以在瀏海行事曆和提醒即時動態中包含全天事件。"
+          }
+        }
+      }
+    },
+    "Turning this on adds a hook to each selected agent's own configuration file. Atoll backs the file up first, only touches its `hooks` section, and removes its entries again when you turn this off." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turning this on adds a hook to each selected agent's own configuration file. Atoll backs the file up first, only touches its `hooks` section, and removes its entries again when you turn this off."
           }
         }
       }
@@ -77922,6 +78292,26 @@
         }
       }
     },
+    "waiting" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "waiting"
+          }
+        }
+      }
+    },
+    "Waiting for you" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for you"
+          }
+        }
+      }
+    },
     "Warning" : {
       "localizations" : {
         "ko" : {
@@ -77964,6 +78354,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "警告"
+          }
+        }
+      }
+    },
+    "Watching" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watching"
+          }
+        }
+      }
+    },
+    "Watch AI coding agents" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watch AI coding agents"
           }
         }
       }
@@ -79344,6 +79754,16 @@
         }
       }
     },
+    "Working" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Working"
+          }
+        }
+      }
+    },
     "Works with most media apps, including browsers, to detect what's playing. Note: This may be removed in a future macOS version." : {
       "comment" : "Description of a media controller type when it works with most media apps, including browsers, to detect what's playing. Note: This may be removed in a future macOS version.",
       "isCommentAutoGenerated" : true,
@@ -79962,6 +80382,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未經你同意，相機不會被使用，且不會錄製或儲存任何內容。"
+          }
+        }
+      }
+    },
+    "Your own hooks and every other setting in those files are left untouched. Backups stay in Atoll's application support folder." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your own hooks and every other setting in those files are left untouched. Backups stay in Atoll's application support folder."
           }
         }
       }

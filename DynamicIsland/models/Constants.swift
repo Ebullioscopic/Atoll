@@ -1163,7 +1163,19 @@ extension Defaults.Keys {
     static let terminalForegroundColor = Key<Color>("terminalForegroundColor", default: .white)
     static let terminalCursorColor = Key<Color>("terminalCursorColor", default: Color(.selectedControlColor))
     static let terminalStickyMode = Key<Bool>("terminalStickyMode", default: false)
-    
+
+    // MARK: Agent Tower
+    /// Off by default: the feature edits the user's agent config files, so it has
+    /// to be an explicit opt-in.
+    static let enableAgentTower = Key<Bool>("enableAgentTower", default: false)
+    /// Separate from `enableAgentTower` so monitoring can run without Atoll ever
+    /// being able to answer a permission prompt.
+    static let agentTowerApprovalsEnabled = Key<Bool>("agentTowerApprovalsEnabled", default: false)
+    static let agentTowerEnabledKinds = Key<[AgentKind]>("agentTowerEnabledKinds", default: [.claudeCode])
+    static let agentTowerMaxHeightFraction = Key<Double>("agentTowerMaxHeightFraction", default: 0.4)
+    /// Sessions quiet for longer than this are dropped on the next launch.
+    static let agentTowerSessionPruneHours = Key<Int>("agentTowerSessionPruneHours", default: 24)
+
     // MARK: Timer Feature
     static let enableTimerFeature = Key<Bool>("enableTimerFeature", default: true)
     static let timerDisplayMode = Key<TimerDisplayMode>("timerDisplayMode", default: .tab)
