@@ -320,6 +320,20 @@ final class TeleprompterTests: XCTestCase {
         XCTAssertEqual(reloaded[0].sections[0].targetDuration, 60)
     }
 
+    /// A disabled feature must leave no trace, so merely reading the library
+    /// cannot bring its directory into existence.
+    func testReadingTheLibraryCreatesNothingOnDisk() {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("teleprompter-untouched-\(UUID().uuidString)", isDirectory: true)
+        let url = root.appendingPathComponent("scripts.json")
+
+        XCTAssertTrue(TeleprompterLibraryStore(fileURL: url).load().isEmpty)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: root.path),
+            "Loading an absent library must not create its folder."
+        )
+    }
+
     /// Saving an empty library removes the file rather than leaving `[]` behind.
     func testSavingAnEmptyLibraryRemovesTheFile() throws {
         let url = FileManager.default.temporaryDirectory

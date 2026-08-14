@@ -22,15 +22,18 @@ import Foundation
 ///
 /// Follows the repo convention of `Application Support/DynamicIsland/<Feature>/`.
 enum TeleprompterStorage {
-    static let directory: URL = {
+    /// Computed, and deliberately **not** creating anything.
+    ///
+    /// A lazily-created directory here would appear on every launch even with the
+    /// feature switched off, which quietly breaks the promise that a disabled
+    /// feature leaves no trace. Creation belongs to the write path.
+    static var directory: URL {
         let fm = FileManager.default
-        let support = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-        let dir = (support ?? fm.temporaryDirectory)
+        let support = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
+        return (support ?? fm.temporaryDirectory)
             .appendingPathComponent("DynamicIsland", isDirectory: true)
             .appendingPathComponent("Teleprompter", isDirectory: true)
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }()
+    }
 
     static var scriptsURL: URL {
         directory.appendingPathComponent("scripts.json")
@@ -38,9 +41,13 @@ enum TeleprompterStorage {
 
     /// Per-take history, written later by the debrief.
     static var takesDirectory: URL {
-        let dir = directory.appendingPathComponent("takes", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
+        directory.appendingPathComponent("takes", isDirectory: true)
+    }
+
+    /// Called only when something is about to be written.
+    @discardableResult
+    static func ensureDirectory(_ url: URL) -> Bool {
+        (try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)) != nil
     }
 }
 
@@ -79,6 +86,7 @@ final class TeleprompterLibraryStore {
             Logger.log("Teleprompter: could not encode the script library", category: .ui)
             return
         }
+        TeleprompterStorage.ensureDirectory(fileURL.deletingLastPathComponent())
         try? data.write(to: fileURL, options: .atomic)
     }
 }
