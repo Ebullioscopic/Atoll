@@ -148,7 +148,11 @@ final class TeleprompterManager: ObservableObject {
         // the reader settled on.
         for publisher in Self.perScriptPreferenceChanges() {
             publisher
-                .receive(on: RunLoop.main)
+                // Debounced because these keys are behind sliders. Capturing on
+                // every step of a drag would rewrite the whole library — markdown
+                // and tokens for every script — dozens of times, on the main
+                // thread, for a value the user is still choosing.
+                .debounce(for: .seconds(0.4), scheduler: RunLoop.main)
                 .sink { [weak self] _ in self?.captureCurrentPreferences() }
                 .store(in: &cancellables)
         }
@@ -175,6 +179,9 @@ final class TeleprompterManager: ObservableObject {
 
     func shutdown() {
         endTake()
+        // Flush anything the debounce is still holding, so quitting mid-drag
+        // does not lose the setting.
+        captureCurrentPreferences()
         store.save(scripts)
     }
 
@@ -254,6 +261,9 @@ final class TeleprompterManager: ObservableObject {
 
     func selectScript(id: UUID) {
         guard scripts.contains(where: { $0.id == id }) else { return }
+        // Whatever the reader had just changed belongs to the script they are
+        // leaving, and the debounced capture may not have fired yet.
+        captureCurrentPreferences()
         currentScriptID = id
         // Resume where this script was left, which is what makes reopening one
         // feel like returning to it.

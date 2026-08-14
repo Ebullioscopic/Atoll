@@ -46,6 +46,7 @@ struct TeleprompterSettings: View {
     @State private var importError: String?
     @State private var isImportingKeynote = false
     @State private var keynoteError: String?
+    @State private var historyTakes: [TeleprompterTake] = []
 
     var body: some View {
         Form {
@@ -323,15 +324,26 @@ struct TeleprompterSettings: View {
     private var historySection: some View {
         Section {
             if let script = manager.currentScript {
+                // Read once when the script changes, not on every render: each
+                // read is a file read and a JSON decode, and a settings pane
+                // re-renders for every slider tick in it.
                 TeleprompterTakeHistoryView(
-                    takes: manager.takes(for: script.id),
+                    takes: historyTakes,
                     script: script,
-                    onDelete: { manager.deleteTake($0.id, from: script.id) }
+                    onDelete: { take in
+                        manager.deleteTake(take.id, from: script.id)
+                        historyTakes = manager.takes(for: script.id)
+                    }
                 )
+                .task(id: script.id) { historyTakes = manager.takes(for: script.id) }
+                .onChange(of: manager.lastTake?.id) { _, _ in
+                    historyTakes = manager.takes(for: script.id)
+                }
 
-                if !manager.takes(for: script.id).isEmpty {
+                if !historyTakes.isEmpty {
                     Button(role: .destructive) {
                         manager.clearTakeHistory()
+                        historyTakes = []
                     } label: {
                         Text("Clear this script's history")
                     }
