@@ -36,10 +36,28 @@ struct AgentHookConfigDescriptor: Sendable {
     let kind: AgentKind
     let configURL: URL
     let events: [AgentHookEventSpec]
-    /// True when this agent's hook schema has been verified against a real
-    /// config on disk. Unverified agents are installed only on explicit opt-in
-    /// and are expected to be no-ops rather than to work.
-    let isSchemaVerified: Bool
+    /// How much Atoll actually knows about this agent, as opposed to has assumed.
+    let verification: VerificationLevel
+}
+
+/// What has been checked about an agent's hook contract.
+///
+/// Kept deliberately granular because "verified" was doing too much work: a
+/// config whose *shape* is known is not the same as one whose *decision reply* is
+/// known to be honoured, and telling the user otherwise would be a claim Atoll
+/// cannot back.
+enum VerificationLevel: Sendable {
+    /// Config shape, event names and decision replies all confirmed against a
+    /// real installation.
+    case verified
+    /// The config exists and its shape and event names are confirmed, but whether
+    /// the agent acts on a decision reply has not been observed. Monitoring is
+    /// reliable; approvals may simply do nothing, in which case the agent's own
+    /// prompt appears — the fail-open contract makes that harmless.
+    case schemaOnly
+    /// Written from documentation. Not installed on this machine, so nothing has
+    /// been confirmed.
+    case unverified
 }
 
 /// Writes the hook shim and merges Atoll's entries into each agent's own config.
@@ -120,13 +138,21 @@ enum AgentHookInstaller {
     /// `hooks` risks failing the agent's own settings validation — which would
     /// break the user's agent, not just Atoll's feature. Subagent progress
     /// therefore waits until the events are confirmed to fire.
-    private static let monitoringEvents: [AgentHookEventSpec] = [
-        AgentHookEventSpec(wireName: "SessionStart", usesMatcher: false, expectsDecision: false),
-        AgentHookEventSpec(wireName: "SessionEnd", usesMatcher: false, expectsDecision: false),
-        AgentHookEventSpec(wireName: "Stop", usesMatcher: false, expectsDecision: false),
-        AgentHookEventSpec(wireName: "Notification", usesMatcher: false, expectsDecision: false),
-        AgentHookEventSpec(wireName: "UserPromptSubmit", usesMatcher: false, expectsDecision: false)
-    ]
+    private static func monitoringEvents(includeNotification: Bool) -> [AgentHookEventSpec] {
+        var events: [AgentHookEventSpec] = [
+            AgentHookEventSpec(wireName: "SessionStart", usesMatcher: false, expectsDecision: false),
+            AgentHookEventSpec(wireName: "SessionEnd", usesMatcher: false, expectsDecision: false),
+            AgentHookEventSpec(wireName: "Stop", usesMatcher: false, expectsDecision: false),
+            AgentHookEventSpec(wireName: "UserPromptSubmit", usesMatcher: false, expectsDecision: false)
+        ]
+        if includeNotification {
+            events.insert(
+                AgentHookEventSpec(wireName: "Notification", usesMatcher: false, expectsDecision: false),
+                at: 3
+            )
+        }
+        return events
+    }
 
     /// Cursor uses its own vocabulary — `beforeShellExecution` rather than
     /// `PreToolUse` — and answers with a `permission` key instead of
@@ -148,7 +174,7 @@ enum AgentHookInstaller {
 
         switch kind {
         case .claudeCode:
-            var events = monitoringEvents
+            var events = monitoringEvents(includeNotification: true)
             if includeApprovals {
                 events.append(AgentHookEventSpec(wireName: "PreToolUse", usesMatcher: true, expectsDecision: true))
             }
@@ -156,13 +182,16 @@ enum AgentHookInstaller {
                 kind: kind,
                 configURL: home.appendingPathComponent(".claude/settings.json"),
                 events: events,
-                isSchemaVerified: true
+                verification: .verified
             )
 
         case .codex:
-            // Verified: `~/.codex/hooks.json` uses the same
-            // `hooks.<Event>[].{matcher, hooks[]}` shape as Claude Code.
-            var events = monitoringEvents
+            // `~/.codex/hooks.json` uses the same
+            // `hooks.<Event>[].{matcher, hooks[]}` shape as Claude Code — but a
+            // real one carries no `Notification` event, so Atoll does not
+            // register one either rather than introduce a key the agent may
+            // reject. Whether Codex acts on a decision reply is unobserved.
+            var events = monitoringEvents(includeNotification: false)
             if includeApprovals {
                 events.append(AgentHookEventSpec(wireName: "PreToolUse", usesMatcher: true, expectsDecision: true))
             }
@@ -170,7 +199,7 @@ enum AgentHookInstaller {
                 kind: kind,
                 configURL: home.appendingPathComponent(".codex/hooks.json"),
                 events: events,
-                isSchemaVerified: true
+                verification: .schemaOnly
             )
 
         case .cursor:
@@ -182,13 +211,13 @@ enum AgentHookInstaller {
                 kind: kind,
                 configURL: home.appendingPathComponent(".cursor/hooks.json"),
                 events: events,
-                isSchemaVerified: false
+                verification: .unverified
             )
 
         case .geminiCLI, .qwenCode:
             // Qwen Code is a Gemini CLI fork and shares the settings schema.
             let folder = kind == .geminiCLI ? ".gemini" : ".qwen"
-            var events = monitoringEvents
+            var events = monitoringEvents(includeNotification: true)
             if includeApprovals {
                 events.append(AgentHookEventSpec(wireName: "PreToolUse", usesMatcher: true, expectsDecision: true))
             }
@@ -196,7 +225,7 @@ enum AgentHookInstaller {
                 kind: kind,
                 configURL: home.appendingPathComponent("\(folder)/settings.json"),
                 events: events,
-                isSchemaVerified: false
+                verification: .unverified
             )
 
         case .opencode:

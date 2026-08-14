@@ -579,6 +579,16 @@
         }
       }
     },
+    "\"Monitoring only\" means the agent's config shape is confirmed but Atoll has not observed it acting on an approval — approvals may simply do nothing there. \"Experimental\" means the agent is not installed here, so nothing has been confirmed. In both cases Atoll's hook fails silently, so your agent's own prompt appears as usual rather than anything interfering." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Monitoring only\" means the agent's config shape is confirmed but Atoll has not observed it acting on an approval — approvals may simply do nothing there. \"Experimental\" means the agent is not installed here, so nothing has been confirmed. In both cases Atoll's hook fails silently, so your agent's own prompt appears as usual rather than anything interfering."
+          }
+        }
+      }
+    },
     "(%@)" : {
       "localizations" : {
         "ar" : {
@@ -47090,6 +47100,16 @@
         }
       }
     },
+    "monitoring only" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "monitoring only"
+          }
+        }
+      }
+    },
     "Monitoring Status" : {
       "localizations" : {
         "fr" : {
@@ -63425,6 +63445,16 @@
         }
       }
     },
+    "Session tracking is confirmed for this agent. Whether it acts on an approval from Atoll has not been observed." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session tracking is confirmed for this agent. Whether it acts on an approval from Atoll has not been observed."
+          }
+        }
+      }
+    },
     "Sessions tracked" : {
       "localizations" : {
         "en" : {
@@ -73269,6 +73299,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "第三方行事曆整合"
+          }
+        }
+      }
+    },
+    "This agent is not installed here, so its hook contract is written from documentation and has not been confirmed." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This agent is not installed here, so its hook contract is written from documentation and has not been confirmed."
           }
         }
       }

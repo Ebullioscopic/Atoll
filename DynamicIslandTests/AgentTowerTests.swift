@@ -1377,6 +1377,51 @@ final class AgentTowerTests: XCTestCase {
         }
     }
 
+    /// Each agent's verification level must reflect what has actually been
+    /// observed, not what would be convenient to claim.
+    func testVerificationLevelsMatchWhatIsActuallyKnown() throws {
+        let claude = try XCTUnwrap(AgentHookInstaller.descriptor(for: .claudeCode, includeApprovals: false))
+        XCTAssertEqual(claude.verification, .verified)
+
+        let codex = try XCTUnwrap(AgentHookInstaller.descriptor(for: .codex, includeApprovals: false))
+        XCTAssertEqual(codex.verification, .schemaOnly,
+                       "Codex's config shape is confirmed; acting on a decision is not.")
+
+        for kind in [AgentKind.cursor, .geminiCLI, .qwenCode] {
+            let descriptor = try XCTUnwrap(AgentHookInstaller.descriptor(for: kind, includeApprovals: false))
+            XCTAssertEqual(descriptor.verification, .unverified, "\(kind.displayName)")
+        }
+    }
+
+    /// A real `~/.codex/hooks.json` carries no `Notification` event, so Atoll must
+    /// not introduce a key the agent may reject.
+    func testCodexDoesNotRegisterNotification() throws {
+        let codex = try XCTUnwrap(AgentHookInstaller.descriptor(for: .codex, includeApprovals: false))
+        XCTAssertFalse(codex.events.contains { $0.wireName == "Notification" })
+
+        let claude = try XCTUnwrap(AgentHookInstaller.descriptor(for: .claudeCode, includeApprovals: false))
+        XCTAssertTrue(claude.events.contains { $0.wireName == "Notification" },
+                      "Claude Code's own config does carry it.")
+    }
+
+    /// Every event Atoll registers for any agent must be one seen in a real
+    /// config; an unknown key risks failing that agent's settings validation.
+    func testOnlyEventNamesSeenInRealConfigsAreRegistered() {
+        let observed: Set<String> = [
+            "SessionStart", "SessionEnd", "Stop", "Notification", "UserPromptSubmit",
+            "PreToolUse", "PostToolUse", "PermissionRequest",
+            // Cursor's own vocabulary.
+            "beforeShellExecution", "beforeSubmitPrompt", "stop"
+        ]
+        for kind in AgentKind.allCases {
+            guard let descriptor = AgentHookInstaller.descriptor(for: kind, includeApprovals: true) else { continue }
+            for event in descriptor.events {
+                XCTAssertTrue(observed.contains(event.wireName),
+                              "\(kind.displayName) registers an unobserved event: \(event.wireName)")
+            }
+        }
+    }
+
     func testOpencodeHasNoHookDescriptor() {
         XCTAssertFalse(AgentKind.opencode.supportsHookInstallation)
         XCTAssertNil(AgentHookInstaller.descriptor(for: .opencode, includeApprovals: false))
@@ -1464,7 +1509,7 @@ final class AgentTowerTests: XCTestCase {
             kind: real.kind,
             configURL: configURL,
             events: real.events,
-            isSchemaVerified: real.isSchemaVerified
+            verification: real.verification
         )
         return (descriptor, directory)
     }
@@ -1591,7 +1636,7 @@ final class AgentTowerTests: XCTestCase {
             configURL: FileManager.default.temporaryDirectory
                 .appendingPathComponent("atoll-nonexistent-\(UUID().uuidString)/hooks.json"),
             events: [],
-            isSchemaVerified: false
+            verification: .unverified
         )
         XCTAssertFalse(AgentHookInstaller.isAgentPresent(fake))
         XCTAssertThrowsError(try AgentHookInstaller.install(descriptor: fake))

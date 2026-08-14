@@ -94,13 +94,14 @@ struct AgentTowerSettings: View {
                             HStack(spacing: 6) {
                                 Text(kind.displayName)
                                 if let descriptor = AgentHookInstaller.descriptor(for: kind, includeApprovals: false),
-                                   !descriptor.isSchemaVerified {
-                                    Text("experimental")
+                                   let badge = verificationBadge(descriptor.verification) {
+                                    Text(badge.label)
                                         .font(.caption2.weight(.semibold))
                                         .padding(.horizontal, 5)
                                         .padding(.vertical, 1)
-                                        .background(.orange.opacity(0.2), in: Capsule())
-                                        .foregroundStyle(.orange)
+                                        .background(badge.tint.opacity(0.2), in: Capsule())
+                                        .foregroundStyle(badge.tint)
+                                        .help(Text(badge.explanation))
                                 }
                             }
                             if let error = manager.installErrors[kind] {
@@ -125,7 +126,7 @@ struct AgentTowerSettings: View {
         } header: {
             Text("Agents to watch")
         } footer: {
-            Text("Agents marked experimental have not been verified against a real installation. Atoll's hook is written to fail silently, so an unrecognised agent simply does nothing rather than interfering.")
+            Text("\"Monitoring only\" means the agent's config shape is confirmed but Atoll has not observed it acting on an approval — approvals may simply do nothing there. \"Experimental\" means the agent is not installed here, so nothing has been confirmed. In both cases Atoll's hook fails silently, so your agent's own prompt appears as usual rather than anything interfering.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -213,6 +214,29 @@ struct AgentTowerSettings: View {
             Text("If Atoll is closed, busy, or unsure, it stays silent and your agent's own prompt appears as usual — it can never approve something by failing.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// The badge for an agent's verification level, or `nil` when everything is
+    /// confirmed and no caveat is needed.
+    private func verificationBadge(
+        _ level: VerificationLevel
+    ) -> (label: String, tint: Color, explanation: String)? {
+        switch level {
+        case .verified:
+            return nil
+        case .schemaOnly:
+            return (
+                String(localized: "monitoring only"),
+                .yellow,
+                String(localized: "Session tracking is confirmed for this agent. Whether it acts on an approval from Atoll has not been observed.")
+            )
+        case .unverified:
+            return (
+                String(localized: "experimental"),
+                .orange,
+                String(localized: "This agent is not installed here, so its hook contract is written from documentation and has not been confirmed.")
+            )
         }
     }
 
