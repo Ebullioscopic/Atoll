@@ -1,4 +1,5 @@
 import plistlib
+import re
 import unittest
 from pathlib import Path
 
@@ -29,12 +30,21 @@ class PrivacyConfigurationTests(unittest.TestCase):
     def test_automation_usage_text_names_notes(self):
         project = PROJECT.read_text()
 
-        self.assertEqual(
-            2,
-            project.count(
-                'INFOPLIST_KEY_NSAppleEventsUsageDescription = "Atoll uses AppleScripts to control Spotify, Apple Music, and Notes.";'
-            ),
+        descriptions = re.findall(
+            r'INFOPLIST_KEY_NSAppleEventsUsageDescription = "([^"]+)";', project
         )
+
+        # One per build configuration: a missing one is an automation prompt
+        # with no explanation on that configuration.
+        self.assertEqual(2, len(descriptions))
+
+        # Matched on the app names rather than the whole sentence. The sentence
+        # legitimately grows as Atoll automates more apps, and pinning it word
+        # for word only ever fails for the wrong reason; what must not change is
+        # that the text says which apps it means.
+        for text in descriptions:
+            for app in ("Spotify", "Apple Music", "Notes"):
+                self.assertIn(app, text)
 
     def test_full_access_reminder_api_has_matching_usage_text(self):
         project = PROJECT.read_text()
