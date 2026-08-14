@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 struct AntigravityUsageProvider: UsageProvider {
     let id: ProviderID = .antigravity
@@ -63,80 +62,32 @@ struct AntigravityUsageProvider: UsageProvider {
     // MARK: - Keychain
 
     private func loadKeychainToken() async throws -> AntigravityKeychainToken? {
-        let service = "gemini"
-        let account = "antigravity"
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
+        // Use the `security` CLI — it matches the item's apple-tool partition grant, so no login-keychain password prompt (unlike SecItemCopyMatching).
+        return try await withTimeout(seconds: 3) {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+            task.arguments = ["find-generic-password", "-a", "antigravity", "-s", "gemini", "-w"]
 
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data,
-              let string = String(data: data, encoding: .utf8) else {
-            return nil
-        }
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            task.standardError = Pipe()
 
-        grantKeychainAccess(service: service, account: account)
-        return extractToken(from: string)
-    }
+            do { try task.run() } catch { return nil }
 
-    /// Adds this app to the token item's access list so macOS stops prompting
-    /// for the login keychain password on every read. The item is owned by the
-    /// Gemini CLI, whose token rotation can reset the ACL, hence the re-grant.
-    private func grantKeychainAccess(service: String, account: String) {
-        var appRef: SecTrustedApplication?
-        guard SecTrustedApplicationCreateFromPath(nil, &appRef) == errSecSuccess,
-              let currentApp = appRef else { return }
-
-        // The CLI creates this item via the legacy keychain API, so the ACL is
-        // not exposed through kSecAttrAccess in an attributes query. Reach it
-        // through the item ref instead, or the grant silently never runs.
-        var query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnRef as String: true
-        ]
-        var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return }
-        let item = unsafeBitCast(result, to: SecKeychainItem.self)
-        var accessRef: SecAccess?
-        guard SecKeychainItemCopyAccess(item, &accessRef) == errSecSuccess,
-              let access = accessRef else { return }
-
-        // Preserve the trusted apps already on the item so the CLI keeps working.
-        var apps: [SecTrustedApplication] = []
-        var aclList: CFArray?
-        if SecAccessCopyACLList(access, &aclList) == errSecSuccess,
-           let acls = aclList as? [SecACL] {
-            for acl in acls {
-                var appList: CFArray?
-                var description: CFString?
-                var prompt = SecKeychainPromptSelector(rawValue: 0)
-                if SecACLCopyContents(acl, &appList, &description, &prompt) == errSecSuccess,
-                   let list = appList as? [SecTrustedApplication] {
-                    apps.append(contentsOf: list)
-                }
+            let timeoutTask = Task {
+                try await Task.sleep(nanoseconds: 3_000_000_000)
+                task.terminate()
             }
+
+            task.waitUntilExit()
+            timeoutTask.cancel()
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard task.terminationStatus == 0,
+                  let string = String(data: data, encoding: .utf8) else { return nil }
+
+            return extractToken(from: string)
         }
-
-        if apps.contains(where: { CFEqual($0, currentApp) }) { return }
-
-        apps.append(currentApp)
-        var newAccess: SecAccess?
-        guard SecAccessCreate("Atoll" as CFString, apps as CFArray, &newAccess) == errSecSuccess,
-              let newAccess else { return }
-
-        let updateQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-        SecItemUpdate(updateQuery as CFDictionary, [kSecAttrAccess as String: newAccess] as CFDictionary)
     }
 
     private func extractToken(from raw: String) -> AntigravityKeychainToken? {
