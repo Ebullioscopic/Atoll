@@ -44,12 +44,15 @@ struct TeleprompterSettings: View {
 
     @State private var isImporting = false
     @State private var importError: String?
+    @State private var isImportingKeynote = false
+    @State private var keynoteError: String?
 
     var body: some View {
         Form {
             generalSection
             if isEnabled {
                 libarySection
+                keynoteSection
                 playlistSection
                 readingSection
                 appearanceSection
@@ -243,6 +246,75 @@ struct TeleprompterSettings: View {
             }
         } header: {
             Text("Running order")
+        }
+    }
+
+    // MARK: - Keynote
+
+    @ViewBuilder
+    private var keynoteSection: some View {
+        if KeynoteBridge.isInstalled {
+            Section {
+                Button {
+                    importKeynote()
+                } label: {
+                    Text("Import the open deck's presenter notes")
+                }
+                .disabled(isImportingKeynote)
+
+                Defaults.Toggle(key: .teleprompterFollowKeynote) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Follow the slideshow")
+                        Text("While a take is running, the prompter moves to the section for whichever slide Keynote is showing.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(!manager.isKeynoteScript)
+
+                if !manager.isKeynoteScript {
+                    Text("Import a deck first — following needs to know which section belongs to which slide.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let error = keynoteError ?? manager.keynoteError?.errorDescription {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            } header: {
+                HStack(spacing: 6) {
+                    Text("Keynote")
+                    Text("experimental")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.orange.opacity(0.2), in: Capsule())
+                        .foregroundStyle(.orange)
+                }
+            } footer: {
+                Text("One section per slide, skipped slides left out. Notes are copied, never changed, and Atoll never opens Keynote by itself. Marked experimental because this has been built against Keynote's own scripting dictionary but not yet confirmed against a live slideshow.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func importKeynote() {
+        isImportingKeynote = true
+        keynoteError = nil
+        Task {
+            defer { isImportingKeynote = false }
+            do {
+                let script = try await manager.importKeynoteDeck()
+                if !script.sections.contains(where: { !$0.paragraphs.isEmpty }) {
+                    keynoteError = String(localized: "That deck has no presenter notes to read.")
+                }
+            } catch {
+                keynoteError = (error as? KeynoteBridgeError)?.errorDescription
+                    ?? error.localizedDescription
+            }
         }
     }
 

@@ -58,6 +58,10 @@ struct TeleprompterSection: Identifiable, Codable, Equatable, Sendable {
     var paragraphs: [String]
     /// Speaker notes: shown dimmed, never read aloud, and contributing no tokens.
     var notes: [String]
+    /// The Keynote slide this section came from, when the script was imported
+    /// from a deck. What lets a slide change move the prompter to the right
+    /// place without matching on a heading someone may have renamed.
+    var slideNumber: Int?
 
     var wordCount: Int { tokenRange.count }
 
@@ -69,7 +73,8 @@ struct TeleprompterSection: Identifiable, Codable, Equatable, Sendable {
         keyPhrases: [TeleprompterKeyPhrase] = [],
         tokenRange: Range<Int>,
         paragraphs: [String] = [],
-        notes: [String] = []
+        notes: [String] = [],
+        slideNumber: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -79,6 +84,7 @@ struct TeleprompterSection: Identifiable, Codable, Equatable, Sendable {
         self.tokenRange = tokenRange
         self.paragraphs = paragraphs
         self.notes = notes
+        self.slideNumber = slideNumber
     }
 }
 

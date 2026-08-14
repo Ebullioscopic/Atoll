@@ -107,6 +107,19 @@ enum TeleprompterScriptParser {
             }
             if inFencedBlock { continue }
             if line.isEmpty { continue }
+
+            // A leading backslash escapes the line: whatever follows is prose,
+            // never a marker. Imported text — Keynote's presenter notes, say —
+            // is written by someone who never agreed to this syntax, and a note
+            // that happens to start with `#` must not silently invent a section
+            // and pull the slide mapping out of step.
+            if line.hasPrefix("\\") {
+                let spoken = strippingInlineMarkup(String(line.dropFirst()))
+                guard !spoken.isEmpty else { continue }
+                currentParagraphs.append(spoken)
+                appendTokens(from: spoken)
+                continue
+            }
             // A horizontal rule, not three words.
             if line.allSatisfy({ $0 == "-" || $0 == "*" || $0 == "_" }), line.count >= 3 { continue }
 

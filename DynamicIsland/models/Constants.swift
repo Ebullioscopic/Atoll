@@ -1188,6 +1188,9 @@ extension Defaults.Keys {
     static let teleprompterPlaylistEnabled = Key<Bool>("teleprompterPlaylistEnabled", default: false)
     /// Return to the first script after the last, for a looping display reel.
     static let teleprompterPlaylistLoops = Key<Bool>("teleprompterPlaylistLoops", default: false)
+    /// Move with the slide while a Keynote slideshow is playing. Off until asked
+    /// for: it costs an Apple event a second and an automation permission.
+    static let teleprompterFollowKeynote = Key<Bool>("teleprompterFollowKeynote", default: false)
 
     // MARK: Timer Feature
     static let enableTimerFeature = Key<Bool>("enableTimerFeature", default: true)

@@ -52,10 +52,16 @@ final class TeleprompterManager: ObservableObject {
     /// The running order across scripts.
     @Published private(set) var playlist = TeleprompterPlaylist()
 
+    /// Why following a Keynote slideshow stopped, if it did.
+    @Published private(set) var keynoteError: KeynoteBridgeError?
+    /// The slide Keynote is showing, while it is showing one.
+    @Published private(set) var currentSlideNumber: Int?
+
     private let store = TeleprompterLibraryStore()
     private let takeStore = TeleprompterTakeStore()
     private let playlistStore = TeleprompterPlaylistStore()
     private let speech = TeleprompterSpeechFollower()
+    private let keynote = TeleprompterKeynoteFollower()
     /// When words were heard, relative to the take's start — the raw material for
     /// the pace and pause figures.
     private var speechTimestamps: [TimeInterval] = []
@@ -147,6 +153,13 @@ final class TeleprompterManager: ObservableObject {
                 .store(in: &cancellables)
         }
 
+        keynote.onSlideChange = { [weak self] slide in
+            self?.handleKeynoteSlide(slide)
+        }
+        keynote.onFailure = { [weak self] reason in
+            self?.keynoteError = reason
+        }
+
         speech.onWords = { [weak self] words in
             self?.consume(words)
         }
@@ -201,6 +214,14 @@ final class TeleprompterManager: ObservableObject {
         reparsed.updatedAt = Date()
         reparsed.revision = existing.revision + 1
         reparsed.preferences = existing.preferences
+        // Editing the words of an imported deck should not cost it its link to
+        // the slides. Only carried over when the structure is unchanged; adding
+        // a section makes the positional mapping a guess.
+        if reparsed.sections.count == existing.sections.count {
+            for position in reparsed.sections.indices {
+                reparsed.sections[position].slideNumber = existing.sections[position].slideNumber
+            }
+        }
         scripts[index] = reparsed
 
         if currentScriptID == id {
@@ -289,6 +310,73 @@ final class TeleprompterManager: ObservableObject {
 
         scripts[index].preferences = preferences
         store.save(scripts)
+    }
+
+    // MARK: - Keynote
+
+    /// Whether the current script knows which slide each section belongs to.
+    var isKeynoteScript: Bool {
+        currentScript?.sections.contains { $0.slideNumber != nil } ?? false
+    }
+
+    /// Imports the open deck's presenter notes as a script.
+    @discardableResult
+    func importKeynoteDeck() async throws -> TeleprompterScript {
+        keynoteError = nil
+        do {
+            let deck = try await KeynoteBridge.readDeck()
+            let script = addScript(
+                markdown: KeynoteScriptBuilder.markdown(from: deck),
+                name: deck.name
+            )
+            stampSlideNumbers(from: deck, onScriptWith: script.id)
+            return currentScript ?? script
+        } catch let error as KeynoteBridgeError {
+            keynoteError = error
+            throw error
+        }
+    }
+
+    /// Records which slide each section came from.
+    ///
+    /// Positional, and safe to be: the builder emits exactly one heading per
+    /// slide, and an imported note that begins with `#` is escaped rather than
+    /// allowed to invent a section. If the counts ever disagree, nothing is
+    /// stamped — a script that follows the wrong slides is worse than one that
+    /// does not follow at all.
+    private func stampSlideNumbers(from deck: KeynoteDeck, onScriptWith id: UUID) {
+        guard let index = scripts.firstIndex(where: { $0.id == id }),
+              scripts[index].sections.count == deck.slides.count
+        else { return }
+
+        for (position, slide) in deck.slides.enumerated() {
+            scripts[index].sections[position].slideNumber = slide.number
+        }
+        store.save(scripts)
+    }
+
+    /// Moves to the section belonging to a slide.
+    func jumpToSlide(_ number: Int) {
+        guard let script = currentScript,
+              let index = script.sections.firstIndex(where: { $0.slideNumber == number })
+        else { return }
+        jumpToSection(index)
+    }
+
+    private func handleKeynoteSlide(_ number: Int) {
+        currentSlideNumber = number
+        jumpToSlide(number)
+    }
+
+    private func startKeynoteIfNeeded() {
+        guard Defaults[.teleprompterFollowKeynote], isKeynoteScript else { return }
+        keynoteError = nil
+        keynote.start()
+    }
+
+    private func stopKeynote() {
+        keynote.stop()
+        currentSlideNumber = nil
     }
 
     // MARK: - Playlist
@@ -513,6 +601,7 @@ final class TeleprompterManager: ObservableObject {
         advanceTask?.cancel()
         advanceTask = nil
         stopListening()
+        stopKeynote()
     }
 
     func resumeTake() {
@@ -529,6 +618,7 @@ final class TeleprompterManager: ObservableObject {
         advanceTask?.cancel()
         advanceTask = nil
         stopListening()
+        stopKeynote()
         followMode = .following
         store.save(scripts)
     }
@@ -617,6 +707,9 @@ final class TeleprompterManager: ObservableObject {
         advanceTask?.cancel()
         advanceTask = nil
         stopListening()
+        // Independent of how words advance: Keynote moves the section, the
+        // scroll mode moves the words inside it.
+        startKeynoteIfNeeded()
 
         switch Defaults[.teleprompterScrollMode] {
         case .voice:

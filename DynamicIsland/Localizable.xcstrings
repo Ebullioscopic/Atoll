@@ -10723,6 +10723,16 @@
         }
       }
     },
+    "Atoll needs permission to control Keynote. Allow it in System Settings › Privacy & Security › Automation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll needs permission to control Keynote. Allow it in System Settings › Privacy & Security › Automation."
+          }
+        }
+      }
+    },
     "Atoll needs permission to use speech recognition. Enable it in System Settings › Privacy & Security › Speech Recognition." : {
       "localizations" : {
         "en" : {
@@ -32343,6 +32353,16 @@
         }
       }
     },
+    "experimental" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "experimental"
+          }
+        }
+      }
+    },
     "Extend hover area" : {
       "localizations" : {
         "ko" : {
@@ -33532,6 +33552,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "專注小工具"
+          }
+        }
+      }
+    },
+    "Follow the slideshow" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Follow the slideshow"
           }
         }
       }
@@ -38096,6 +38126,16 @@
         }
       }
     },
+    "Import a deck first — following needs to know which section belongs to which slide." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import a deck first — following needs to know which section belongs to which slide."
+          }
+        }
+      }
+    },
     "Import a script…" : {
       "localizations" : {
         "en" : {
@@ -38222,6 +38262,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "匯入檔案..."
+          }
+        }
+      }
+    },
+    "Import the open deck's presenter notes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import the open deck's presenter notes"
           }
         }
       }
@@ -39574,6 +39624,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "鍵盤快速鍵已停用"
+          }
+        }
+      }
+    },
+    "Keynote" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keynote"
+          }
+        }
+      }
+    },
+    "Keynote deck" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keynote deck"
+          }
+        }
+      }
+    },
+    "Keynote did not answer. It is usually waiting on a dialog — bring it to the front, dismiss whatever it is showing, and try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keynote did not answer. It is usually waiting on a dialog — bring it to the front, dismiss whatever it is showing, and try again."
+          }
+        }
+      }
+    },
+    "Keynote has no presentation open." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keynote has no presentation open."
+          }
+        }
+      }
+    },
+    "Keynote is not installed." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keynote is not installed."
           }
         }
       }
@@ -51773,6 +51873,16 @@
         }
       }
     },
+    "One section per slide, skipped slides left out. Notes are copied, never changed, and Atoll never opens Keynote by itself. Marked experimental because this has been built against Keynote's own scripting dictionary but not yet confirmed against a live slideshow." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One section per slide, skipped slides left out. Notes are copied, never changed, and Atoll never opens Keynote by itself. Marked experimental because this has been built against Keynote's own scripting dictionary but not yet confirmed against a live slideshow."
+          }
+        }
+      }
+    },
     "Only app icon" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -52438,6 +52548,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開啟系統設定"
+          }
+        }
+      }
+    },
+    "Open your deck in Keynote first." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open your deck in Keynote first."
           }
         }
       }
@@ -72642,6 +72762,16 @@
         }
       }
     },
+    "That deck has no presenter notes to read." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That deck has no presenter notes to read."
+          }
+        }
+      }
+    },
     "the AI assistant" : {
       "localizations" : {
         "en" : {
@@ -79934,6 +80064,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "When one script ends the next begins, without touching the Mac."
+          }
+        }
+      }
+    },
+    "While a take is running, the prompter moves to the section for whichever slide Keynote is showing." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While a take is running, the prompter moves to the section for whichever slide Keynote is showing."
           }
         }
       }

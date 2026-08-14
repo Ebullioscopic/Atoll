@@ -49,7 +49,7 @@ public enum TeleprompterDisplayMode: String, CaseIterable, Defaults.Serializable
 }
 
 /// Typeface for the prompter text.
-public enum TeleprompterFontChoice: String, CaseIterable, Codable, Defaults.Serializable, Identifiable {
+public enum TeleprompterFontChoice: String, CaseIterable, Codable, Sendable, Defaults.Serializable, Identifiable {
     case system
     /// A rounded, wide-tracked system face. Chosen as the accessible default
     /// because Atoll cannot ship OpenDyslexic — committing a font binary is

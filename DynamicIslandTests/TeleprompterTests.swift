@@ -730,6 +730,95 @@ final class TeleprompterTests: XCTestCase {
         )
     }
 
+    // MARK: - Keynote import
+
+    private func keynoteReply(_ name: String, _ slides: [(Int, String)]) -> String {
+        let unit = KeynoteBridge.unitSeparator
+        let record = KeynoteBridge.recordSeparator
+        return name + record + slides.map { "\($0.0)\(unit)\($0.1)\(record)" }.joined()
+    }
+
+    func testAKeynoteReplyBecomesADeck() {
+        let deck = KeynoteDeckParser.parse(
+            keynoteReply("Quarterly review", [(1, "Say hello."), (2, "Then the numbers.")])
+        )
+        XCTAssertEqual(deck?.name, "Quarterly review")
+        XCTAssertEqual(deck?.slides, [
+            KeynoteSlide(number: 1, notes: "Say hello."),
+            KeynoteSlide(number: 2, notes: "Then the numbers.")
+        ])
+    }
+
+    /// Slide numbers are the document's, not positions in the reply: skipped
+    /// slides are left out, so the two disagree exactly when it matters.
+    func testSkippedSlidesLeaveTheirNumbersOut() {
+        let deck = KeynoteDeckParser.parse(keynoteReply("Deck", [(1, "One"), (4, "Four")]))
+        XCTAssertEqual(deck?.slides.map(\.number), [1, 4])
+    }
+
+    func testNotesKeepTheirLineBreaks() {
+        let deck = KeynoteDeckParser.parse(keynoteReply("Deck", [(1, "First line\nSecond line")]))
+        XCTAssertEqual(deck?.slides.first?.notes, "First line\nSecond line")
+    }
+
+    func testAnEmptyReplyIsNoDeckAtAll() {
+        XCTAssertNil(KeynoteDeckParser.parse(""), "No document is not a deck with no slides.")
+    }
+
+    func testADeckWithNoSlidesStillHasAName() {
+        let deck = KeynoteDeckParser.parse(keynoteReply("Empty", []))
+        XCTAssertEqual(deck?.name, "Empty")
+        XCTAssertTrue(deck?.slides.isEmpty ?? false)
+        XCTAssertFalse(deck?.hasNotes ?? true)
+    }
+
+    func testAMalformedSlideRecordIsDroppedRatherThanGuessed() {
+        let record = KeynoteBridge.recordSeparator
+        let deck = KeynoteDeckParser.parse("Deck" + record + "not-a-number\u{001F}Notes" + record)
+        XCTAssertEqual(deck?.slides.count, 0)
+    }
+
+    func testEveryImportedSlideGetsItsOwnSection() {
+        let deck = KeynoteDeck(name: "Deck", slides: [
+            KeynoteSlide(number: 1, notes: "Open with the problem."),
+            KeynoteSlide(number: 2, notes: ""),
+            KeynoteSlide(number: 3, notes: "Close.")
+        ])
+        let script = parse(KeynoteScriptBuilder.markdown(from: deck))
+
+        XCTAssertEqual(
+            script.sections.count, 3,
+            "A slide with no notes is still a slide you stand in front of."
+        )
+    }
+
+    /// The bug this escaping exists to prevent: a note beginning with `#` would
+    /// invent a section and shift every slide after it out of step.
+    func testANoteThatLooksLikeMarkupDoesNotBecomeOne() {
+        let deck = KeynoteDeck(name: "Deck", slides: [
+            KeynoteSlide(number: 1, notes: "# not a heading\n> not a note\nordinary line"),
+            KeynoteSlide(number: 2, notes: "Second slide.")
+        ])
+        let script = parse(KeynoteScriptBuilder.markdown(from: deck))
+
+        XCTAssertEqual(script.sections.count, 2)
+        XCTAssertTrue(
+            script.sections[0].notes.isEmpty,
+            "`> not a note` must be read aloud, not filed as a speaker note."
+        )
+        let spoken = script.sections[0].paragraphs.joined(separator: " ")
+        XCTAssertTrue(spoken.contains("not a heading"))
+        XCTAssertTrue(spoken.contains("not a note"))
+    }
+
+    /// The escape is a Markdown convention, so it has to survive being typed
+    /// deliberately too.
+    func testABackslashEscapesALineWithoutBeingRead() {
+        let script = parse("## One\n\\## still prose")
+        XCTAssertEqual(script.sections.count, 1)
+        XCTAssertEqual(script.sections[0].paragraphs, ["## still prose"])
+    }
+
     // MARK: - Running order
 
     func testPlaylistHandsOnToTheNextScript() {
