@@ -1174,6 +1174,11 @@ extension Defaults.Keys {
     static let agentTowerEnabledKinds = Key<[AgentKind]>("agentTowerEnabledKinds", default: [.claudeCode])
     static let agentTowerMaxHeightFraction = Key<Double>("agentTowerMaxHeightFraction", default: 0.4)
     static let agentTowerFlagDangerousCommands = Key<Bool>("agentTowerFlagDangerousCommands", default: true)
+    static let agentTowerShowLiveActivity = Key<Bool>("agentTowerShowLiveActivity", default: true)
+    static let agentTowerEscalationEnabled = Key<Bool>("agentTowerEscalationEnabled", default: true)
+    static let agentTowerPlaySound = Key<Bool>("agentTowerPlaySound", default: false)
+    /// Silences reminders without hiding the request itself.
+    static let agentTowerPrivacyMode = Key<Bool>("agentTowerPrivacyMode", default: false)
     /// Off by default: a remembered approval that outlives the session is the one
     /// part of this feature that can approve something without a human present.
     static let agentTowerAllowAlwaysAllowRules = Key<Bool>("agentTowerAllowAlwaysAllowRules", default: false)

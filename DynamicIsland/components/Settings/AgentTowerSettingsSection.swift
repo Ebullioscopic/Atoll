@@ -47,6 +47,7 @@ struct AgentTowerSettings: View {
             if enableAgentTower {
                 agentsSection
                 approvalsSection
+                notificationsSection
                 statusSection
                 appearanceSection
                 housekeepingSection
@@ -271,6 +272,49 @@ struct AgentTowerSettings: View {
             Text("Status")
         } footer: {
             Text("Atoll keeps a small folder at ~/.atoll/agent-hooks. Deleting it, or setting ATOLL_HOOKS_DISABLED=1 in your shell, switches every hook off without touching any agent configuration.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Notifications
+
+    private var notificationsSection: some View {
+        Section {
+            Defaults.Toggle(key: .agentTowerShowLiveActivity) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Show waiting agents in the closed notch")
+                    Text("A waiting approval takes the notch over music. A merely-running agent shows as a small count beside your track instead.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Defaults.Toggle(key: .agentTowerEscalationEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Remind me while an agent waits")
+                    Text("Nudges immediately, then after 8 seconds, 1, 5 and 15 minutes — widening so an unattended request does not become a stream of alerts.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Defaults.Toggle(key: .agentTowerPlaySound) {
+                Text("Play a sound with each reminder")
+            }
+
+            Defaults.Toggle(key: .agentTowerPrivacyMode) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Privacy mode")
+                    Text("Silences reminders without hiding the request, so nothing pops up while you are sharing your screen.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Notifications")
+        } footer: {
+            Text("Reminders are also silenced automatically while a Focus mode is on.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

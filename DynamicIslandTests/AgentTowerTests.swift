@@ -893,6 +893,63 @@ final class AgentTowerTests: XCTestCase {
         XCTAssertEqual(makeRequest(tool: "Edit").toolLabel, "Edit")
     }
 
+    // MARK: - Escalation ladder
+
+    func testDefaultLadderMatchesTheIntendedCadence() {
+        XCTAssertEqual(AgentEscalationSchedule.defaultSteps, [0, 8, 60, 300, 900])
+    }
+
+    /// The deltas are what the reminder task actually sleeps, so an off-by-one
+    /// here would either double-fire or skip a rung.
+    func testDeltasAreTheGapsBetweenSteps() {
+        XCTAssertEqual(AgentEscalationSchedule.deltas(for: [0, 8, 60, 300, 900]), [0, 8, 52, 240, 600])
+        XCTAssertEqual(AgentEscalationSchedule.deltas(for: [5]), [5])
+        XCTAssertEqual(AgentEscalationSchedule.deltas(for: []), [])
+    }
+
+    /// The steps are configurable, so a hostile or careless list must not produce
+    /// a negative sleep or fire out of order.
+    func testStepsAreNormalisedBeforeUse() {
+        XCTAssertEqual(AgentEscalationSchedule.normalized([60, 0, 8]), [0, 8, 60])
+        XCTAssertEqual(AgentEscalationSchedule.normalized([-5, 0, 10]), [0, 10])
+        XCTAssertEqual(AgentEscalationSchedule.normalized([8, 8, 8]), [8])
+        // And therefore no delta is ever negative.
+        for delta in AgentEscalationSchedule.deltas(for: [900, 60, -1, 8, 0]) {
+            XCTAssertGreaterThanOrEqual(delta, 0)
+        }
+    }
+
+    func testDueCountGrowsWithElapsedTime() {
+        XCTAssertEqual(AgentEscalationSchedule.dueCount(elapsed: 0), 1)
+        XCTAssertEqual(AgentEscalationSchedule.dueCount(elapsed: 7), 1)
+        XCTAssertEqual(AgentEscalationSchedule.dueCount(elapsed: 8), 2)
+        XCTAssertEqual(AgentEscalationSchedule.dueCount(elapsed: 301), 4)
+        XCTAssertEqual(AgentEscalationSchedule.dueCount(elapsed: 5_000), 5)
+    }
+
+    func testDelayUntilNextWalksTheLadderThenStops() {
+        XCTAssertEqual(AgentEscalationSchedule.delayUntilNext(elapsed: 0, firedCount: 0), 0)
+        XCTAssertEqual(AgentEscalationSchedule.delayUntilNext(elapsed: 0, firedCount: 1), 8)
+        XCTAssertEqual(AgentEscalationSchedule.delayUntilNext(elapsed: 30, firedCount: 2), 30)
+        XCTAssertNil(AgentEscalationSchedule.delayUntilNext(elapsed: 0, firedCount: 5),
+                     "The ladder must end rather than repeat forever.")
+        XCTAssertNil(AgentEscalationSchedule.delayUntilNext(elapsed: 0, firedCount: -1))
+    }
+
+    /// A reminder whose moment has already passed is due now, never overdue by a
+    /// negative amount.
+    func testDelayIsNeverNegative() {
+        XCTAssertEqual(AgentEscalationSchedule.delayUntilNext(elapsed: 1_000, firedCount: 1), 0)
+    }
+
+    /// Privacy mode silences the nudge but must not hide the request — the user
+    /// asked not to be interrupted, not to be kept in the dark.
+    func testRemindersAreSuppressedByPrivacyModeAndFocus() {
+        XCTAssertFalse(AgentEscalationSchedule.shouldSuppressReminder(privacyMode: false, doNotDisturbActive: false))
+        XCTAssertTrue(AgentEscalationSchedule.shouldSuppressReminder(privacyMode: true, doNotDisturbActive: false))
+        XCTAssertTrue(AgentEscalationSchedule.shouldSuppressReminder(privacyMode: false, doNotDisturbActive: true))
+    }
+
     // MARK: - Spool envelope
 
     private func envelopeJSON(version: Int = AgentHookSpool.protocolVersion, wait: Bool = false) -> String {

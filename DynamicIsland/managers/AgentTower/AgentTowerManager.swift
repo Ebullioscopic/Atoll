@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import AppKit
 import Combine
 import Defaults
 import Foundation
@@ -53,6 +54,7 @@ final class AgentTowerManager: ObservableObject {
     /// so every path out of a pending request must go through `resolve`.
     private var decisionContinuations: [String: CheckedContinuation<AgentDecision, Never>] = [:]
     private var expiryTasks: [String: Task<Void, Never>] = [:]
+    private var escalationTasks: [String: Task<Void, Never>] = [:]
     private var cancellables = Set<AnyCancellable>()
     private var saveTask: Task<Void, Never>?
     private var hasStarted = false
@@ -314,6 +316,56 @@ final class AgentTowerManager: ObservableObject {
                 guard !Task.isCancelled else { return }
                 self?.resolve(requestID: request.id, with: .noDecision)
             }
+
+            startEscalation(for: request)
+        }
+    }
+
+    // MARK: - Reminders
+
+    /// Nudges the user along a widening ladder while a request goes unanswered.
+    ///
+    /// Runs the ladder as one task per request rather than a shared timer, so
+    /// several waiting agents escalate independently and cancelling is exact.
+    private func startEscalation(for request: AgentPendingRequest) {
+        guard Defaults[.agentTowerEscalationEnabled] else { return }
+
+        escalationTasks[request.id] = Task { [weak self] in
+            for delay in AgentEscalationSchedule.deltas(for: AgentEscalationSchedule.defaultSteps) {
+                if delay > 0 {
+                    try? await Task.sleep(for: .seconds(delay))
+                }
+                guard !Task.isCancelled else { return }
+                self?.deliverReminder(for: request.id)
+            }
+        }
+    }
+
+    /// Shows the notch reminder for a still-pending request.
+    private func deliverReminder(for requestID: String) {
+        guard let request = pendingRequests.first(where: { $0.id == requestID }) else { return }
+
+        let suppressed = AgentEscalationSchedule.shouldSuppressReminder(
+            privacyMode: Defaults[.agentTowerPrivacyMode],
+            doNotDisturbActive: DoNotDisturbManager.shared.isDoNotDisturbActive
+        )
+        // Privacy mode silences the nudge but leaves the card in place: the user
+        // asked not to be interrupted, not to be kept in the dark.
+        guard !suppressed else { return }
+
+        let projectName = sessions.first { $0.id == request.sessionID }?.displayTitle ?? request.kind.displayName
+        DynamicIslandViewCoordinator.shared.toggleSneakPeek(
+            status: true,
+            type: .agentTower,
+            duration: 3,
+            icon: "hand.raised.fill",
+            title: projectName,
+            subtitle: request.toolLabel,
+            accentColor: request.risk >= .high ? .red : .orange
+        )
+
+        if Defaults[.agentTowerPlaySound] {
+            NSSound(named: request.risk >= .high ? "Basso" : "Tink")?.play()
         }
     }
 
@@ -327,6 +379,7 @@ final class AgentTowerManager: ObservableObject {
         let request = pendingRequests.first { $0.id == requestID }
 
         expiryTasks.removeValue(forKey: requestID)?.cancel()
+        escalationTasks.removeValue(forKey: requestID)?.cancel()
         pendingRequests.removeAll { $0.id == requestID }
 
         if let request, decision.createsRule {
