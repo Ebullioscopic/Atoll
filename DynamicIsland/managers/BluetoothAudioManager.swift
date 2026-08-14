@@ -74,6 +74,31 @@ class BluetoothAudioManager: ObservableObject {
     private var isPmsetRefreshInFlight = false
     private var lastPmsetRefreshDate: Date?
     private let pmsetRefreshCooldown: TimeInterval = 5
+    /// The last `system_profiler` reading, shared by everything that needs one.
+    ///
+    /// Spawning that process costs ~200 ms, and it was being spawned once for
+    /// battery levels and again per device for the vendor/product lookup, on
+    /// every connect and every battery refresh. One reading serves them all.
+    private var profilerSnapshot: [String: Any]?
+    private var profilerSnapshotDate: Date?
+    /// Short enough that a stale reading never outlives the event that made it
+    /// interesting; connect and disconnect clear it outright.
+    private let profilerSnapshotTTL: TimeInterval = 30
+    /// Guards the snapshot, which is read from the main thread and written from
+    /// the battery queue.
+    private let profilerSnapshotLock = NSLock()
+
+    /// Where the subprocess half of a battery refresh runs.
+    private let batteryFetchQueue = DispatchQueue(
+        label: "com.dynamicisland.bluetooth.battery", qos: .utility
+    )
+    private var isSubprocessBatteryRefreshInFlight = false
+    private var lastSubprocessBatteryRefresh: Date?
+    /// Last values the subprocesses reported, so the cheap in-process pass can
+    /// keep publishing them instead of dropping a level it already knew.
+    private var subprocessAddressPercentages: [String: Int] = [:]
+    private var subprocessNamePercentages: [String: Int] = [:]
+
     private var hudBatteryWaitTasks: [UUID: Task<Void, Never>] = [:]
     private let hudBatteryWaitInterval: TimeInterval = 0.3
     private let hudBatteryWaitTimeout: TimeInterval = 1.8
@@ -314,7 +339,11 @@ class BluetoothAudioManager: ObservableObject {
     /// Handles Bluetooth device connection notification from DistributedNotificationCenter
     @objc private func handleDeviceConnectedNotification(_ notification: Notification) {
         print("🎧 [BluetoothAudioManager] 📡 Device connection notification received")
-        
+
+        // The cached `system_profiler` reading describes the world as it was
+        // before this device arrived, and the very next thing that happens is
+        // someone asking about that device.
+        invalidateProfilerSnapshot()
         // Re-check all devices since distributed notification doesn't contain device object
         checkForNewlyConnectedDevices()
     }
@@ -322,7 +351,8 @@ class BluetoothAudioManager: ObservableObject {
     /// Handles Bluetooth device disconnection notification from DistributedNotificationCenter
     @objc private func handleDeviceDisconnectedNotification(_ notification: Notification) {
         print("🎧 [BluetoothAudioManager] 📡 Device disconnection notification received")
-        
+
+        invalidateProfilerSnapshot()
         // Re-check all devices to update connection state
         updateConnectedDevices()
     }
@@ -1191,6 +1221,16 @@ class BluetoothAudioManager: ObservableObject {
         return nil
     }
 
+    /// Republishes battery levels from the sources that cost nothing, and asks
+    /// for the expensive ones in the background.
+    ///
+    /// The IORegistry and the preference files are read in-process in well under
+    /// a millisecond. `system_profiler` and `pmset` are subprocesses; running
+    /// them here meant roughly 200 ms on the main thread, at launch and again on
+    /// every connect, disconnect and refresh — measured at four runs in the
+    /// first twenty seconds of a session. They now run on ``batteryFetchQueue``
+    /// and their last answers are kept, so this pass still publishes everything
+    /// it knew a moment ago rather than briefly forgetting a level.
     private func updateBatteryStatuses(force: Bool = false) {
         let now = Date()
         if !force, let lastBatteryStatusUpdate,
@@ -1198,6 +1238,12 @@ class BluetoothAudioManager: ObservableObject {
             return
         }
 
+        publishBatteryStatuses(now: now)
+        requestSubprocessBatteryRefresh(force: force)
+    }
+
+    /// Merges the cheap sources with the last subprocess answers and publishes.
+    private func publishBatteryStatuses(now: Date = Date()) {
         var combinedAddressPercentages: [String: Int] = [:]
         var combinedNamePercentages: [String: Int] = [:]
 
@@ -1209,12 +1255,8 @@ class BluetoothAudioManager: ObservableObject {
         mergeBatteryLevels(into: &combinedAddressPercentages, from: defaults.addresses)
         mergeBatteryLevels(into: &combinedNamePercentages, from: defaults.names)
 
-        let profiler = collectSystemProfilerBatteryLevels()
-        mergeBatteryLevels(into: &combinedAddressPercentages, from: profiler.addresses)
-        mergeBatteryLevels(into: &combinedNamePercentages, from: profiler.names)
-
-        let pmsetEntries = collectPmsetAccessoryBatteryEntries()
-        mergePmsetEntries(pmsetEntries, into: &combinedNamePercentages, logNewEntries: true)
+        mergeBatteryLevels(into: &combinedAddressPercentages, from: subprocessAddressPercentages)
+        mergeBatteryLevels(into: &combinedNamePercentages, from: subprocessNamePercentages)
 
         var statuses: [String: String] = [:]
         for (key, value) in combinedAddressPercentages {
@@ -1232,6 +1274,38 @@ class BluetoothAudioManager: ObservableObject {
             applyUpdates()
         } else {
             DispatchQueue.main.sync(execute: applyUpdates)
+        }
+    }
+
+    /// Runs `system_profiler` and `pmset` off the main thread, then republishes.
+    private func requestSubprocessBatteryRefresh(force: Bool) {
+        guard !isSubprocessBatteryRefreshInFlight else { return }
+        if !force, let last = lastSubprocessBatteryRefresh,
+           Date().timeIntervalSince(last) < batteryStatusUpdateInterval {
+            return
+        }
+        isSubprocessBatteryRefreshInFlight = true
+
+        batteryFetchQueue.async { [weak self] in
+            guard let self else { return }
+            let profiler = self.collectSystemProfilerBatteryLevels()
+            let pmsetEntries = self.collectPmsetAccessoryBatteryEntries()
+
+            DispatchQueue.main.async {
+                self.isSubprocessBatteryRefreshInFlight = false
+                self.lastSubprocessBatteryRefresh = Date()
+
+                var addresses = self.subprocessAddressPercentages
+                var names = self.subprocessNamePercentages
+                self.mergeBatteryLevels(into: &addresses, from: profiler.addresses)
+                self.mergeBatteryLevels(into: &names, from: profiler.names)
+                self.mergePmsetEntries(pmsetEntries, into: &names, logNewEntries: true)
+
+                self.subprocessAddressPercentages = addresses
+                self.subprocessNamePercentages = names
+                self.publishBatteryStatuses()
+                self.applyConnectedDeviceBatteryLevels(triggerPmsetFallback: false)
+            }
         }
     }
 
@@ -1469,7 +1543,43 @@ class BluetoothAudioManager: ObservableObject {
         return Array(identifiers)
     }
 
+    /// A `system_profiler` reading, from cache when there is a fresh one.
+    ///
+    /// Callers used to each spawn their own; on a connect that meant the process
+    /// ran twice on the main thread before the HUD could appear.
     private func systemProfilerBluetoothDictionary() -> [String: Any]? {
+        profilerSnapshotLock.lock()
+        if let snapshot = profilerSnapshot,
+           let date = profilerSnapshotDate,
+           Date().timeIntervalSince(date) < profilerSnapshotTTL {
+            profilerSnapshotLock.unlock()
+            return snapshot
+        }
+        profilerSnapshotLock.unlock()
+
+        let fresh = runSystemProfilerBluetoothDictionary()
+
+        profilerSnapshotLock.lock()
+        profilerSnapshot = fresh
+        profilerSnapshotDate = fresh == nil ? nil : Date()
+        profilerSnapshotLock.unlock()
+
+        return fresh
+    }
+
+    /// Forgets the cached reading.
+    ///
+    /// Called when a device connects or disconnects: that is exactly the moment
+    /// the previous reading stopped describing reality, and also the moment
+    /// something is about to ask.
+    private func invalidateProfilerSnapshot() {
+        profilerSnapshotLock.lock()
+        profilerSnapshot = nil
+        profilerSnapshotDate = nil
+        profilerSnapshotLock.unlock()
+    }
+
+    private func runSystemProfilerBluetoothDictionary() -> [String: Any]? {
         let process = Process()
         process.launchPath = "/usr/sbin/system_profiler"
         process.arguments = ["SPBluetoothDataType", "-json"]
