@@ -55,6 +55,9 @@ struct ContentView: View {
     @ObservedObject var localSendService = LocalSendService.shared
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
+    @ObservedObject var agentTowerManager = AgentTowerManager.shared
+    /// Reference-counted keep-open token held while an agent approval is pending.
+    private static let agentTowerSuppressionToken = UUID()
     
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
@@ -773,6 +776,12 @@ struct ContentView: View {
             }
             .onChange(of: terminalStickyMode) { _, _ in
                 syncStickyTerminalOutsideClickMonitor()
+            }
+            // An agent is blocked waiting for an answer, so the notch must not
+            // close out from under the buttons that give it one. Reference-counted
+            // token rather than another flag in `shouldPreventAutoClose()`.
+            .onChange(of: agentTowerManager.hasPendingApproval) { _, isPending in
+                vm.setAutoCloseSuppression(isPending, token: Self.agentTowerSuppressionToken)
             }
             .onChange(of: vm.notchState) { _, state in
                 if state == .open {

@@ -26,6 +26,11 @@ struct NotchAgentTowerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
+            // An approval outranks the session grid: it is the only thing here
+            // that something is actively waiting on.
+            if !manager.pendingRequests.isEmpty {
+                approvals
+            }
             content
         }
         .padding(.horizontal, 8)
@@ -76,6 +81,24 @@ struct NotchAgentTowerView: View {
             .padding(.vertical, 1)
             .background(tint.opacity(0.22), in: Capsule())
             .foregroundStyle(tint)
+    }
+
+    private var approvals: some View {
+        VStack(spacing: 6) {
+            // Worst risk first, so the most consequential decision is on top.
+            ForEach(manager.pendingRequests.sorted { lhs, rhs in
+                lhs.risk != rhs.risk ? lhs.risk > rhs.risk : lhs.receivedAt < rhs.receivedAt
+            }) { request in
+                AgentApprovalRequestView(
+                    request: request,
+                    projectName: manager.sessions.first { $0.id == request.sessionID }?.projectName
+                ) { decision in
+                    manager.resolve(requestID: request.id, with: decision)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(.smooth(duration: 0.2), value: manager.pendingRequests.map(\.id))
     }
 
     @ViewBuilder

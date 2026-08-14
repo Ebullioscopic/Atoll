@@ -34,6 +34,7 @@ struct AgentTowerSettings: View {
     @ObservedObject private var manager = AgentTowerManager.shared
 
     @Default(.enableAgentTower) private var enableAgentTower
+    @Default(.agentTowerApprovalsEnabled) private var approvalsEnabled
     @Default(.agentTowerEnabledKinds) private var enabledKinds
     @Default(.agentTowerMaxHeightFraction) private var maxHeightFraction
     @Default(.agentTowerSessionPruneHours) private var pruneHours
@@ -45,6 +46,7 @@ struct AgentTowerSettings: View {
             generalSection
             if enableAgentTower {
                 agentsSection
+                approvalsSection
                 statusSection
                 appearanceSection
                 housekeepingSection
@@ -142,6 +144,90 @@ struct AgentTowerSettings: View {
                 enabledKinds = updated
             }
         )
+    }
+
+    // MARK: - Approvals
+
+    private var approvalsSection: some View {
+        Section {
+            Defaults.Toggle(key: .agentTowerApprovalsEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Answer permission prompts from the notch")
+                    Text("Adds a blocking hook so you can approve or deny a command without switching to the terminal.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Answer permission prompts from the notch"))
+
+            if approvalsEnabled {
+                Defaults.Toggle(key: .agentTowerFlagDangerousCommands) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Flag destructive commands")
+                        Text("Warns before approving things like recursive deletes, force pushes, or piping a download into a shell.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Defaults.Toggle(key: .agentTowerAllowAlwaysAllowRules) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Offer \"Always allow\"")
+                        Text("Lets an approval be remembered for this project for a week. Never offered for a command flagged as destructive.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if !manager.approvalRules.isEmpty {
+                    ForEach(manager.approvalRules) { rule in
+                        LabeledContent {
+                            Button(role: .destructive) {
+                                manager.removeRule(id: rule.id)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(rule.displaySubject)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .lineLimit(2)
+                                Text(scopeDescription(rule))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    Button(role: .destructive) {
+                        manager.removeAllRules()
+                    } label: {
+                        Text("Forget all remembered approvals")
+                    }
+                }
+            }
+        } header: {
+            Text("Approvals")
+        } footer: {
+            Text("If Atoll is closed, busy, or unsure, it stays silent and your agent's own prompt appears as usual — it can never approve something by failing.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func scopeDescription(_ rule: AgentApprovalRule) -> String {
+        switch rule.scope {
+        case .session:
+            return String(localized: "This session only")
+        case .project(let path):
+            let name = URL(fileURLWithPath: path).lastPathComponent
+            if let expiresAt = rule.expiresAt {
+                let formatter = RelativeDateTimeFormatter()
+                formatter.unitsStyle = .full
+                return name + " · " + formatter.localizedString(for: expiresAt, relativeTo: Date())
+            }
+            return name
+        }
     }
 
     // MARK: - Status

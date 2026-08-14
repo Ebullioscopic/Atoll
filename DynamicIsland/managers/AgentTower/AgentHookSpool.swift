@@ -93,6 +93,9 @@ final class AgentHookSpool: @unchecked Sendable {
     /// Request ids already handed to the handler, so a directory event that
     /// re-lists a file cannot double-process it.
     private var seenRequestIDs: Set<String> = []
+    /// Request ids already answered. Claimed *before* the body is written, so a
+    /// second decision cannot overwrite the first one's payload.
+    private var answeredRequestIDs: Set<String> = []
 
     // MARK: - Lifecycle
 
@@ -144,6 +147,7 @@ final class AgentHookSpool: @unchecked Sendable {
         handler = nil
         isArmed = false
         seenRequestIDs.removeAll()
+        answeredRequestIDs.removeAll()
         lock.unlock()
 
         source?.cancel()
@@ -324,12 +328,26 @@ final class AgentHookSpool: @unchecked Sendable {
 
     /// Writes a decision for a blocked shim.
     ///
-    /// The payload lands in `out/<id>.json` first and only then is `out/<id>.done`
-    /// created, so the shim — which watches for the sentinel — can never read a
-    /// half-written body. The sentinel is created with `O_EXCL`, so exactly one
-    /// decision per request is ever published even if two callers race.
+    /// Ordering matters twice over, and both orderings are load-bearing:
+    ///
+    /// 1. **The request is claimed before anything is written.** A user tapping
+    ///    Approve at the same moment the expiry timer fires would otherwise have
+    ///    the second decision overwrite the first one's body — while the first
+    ///    one's sentinel already told the shim to read it. The claim is in memory
+    ///    because Atoll is the only writer.
+    /// 2. **The body is written before the sentinel.** The shim polls for
+    ///    `out/<id>.done` and only then reads `out/<id>.json`, so it can never
+    ///    observe a half-written payload. `O_EXCL` on the sentinel is a second
+    ///    layer that also rejects a stale one left by a previous run.
     func respond(to requestID: String, body: Data) {
         guard Self.isSafeRequestID(requestID) else { return }
+
+        lock.lock()
+        let alreadyAnswered = answeredRequestIDs.contains(requestID)
+        if !alreadyAnswered { answeredRequestIDs.insert(requestID) }
+        lock.unlock()
+
+        guard !alreadyAnswered else { return }
 
         let outbox = AgentTowerStorage.outboxDirectory
         let bodyURL = outbox.appendingPathComponent("\(requestID).json")
@@ -340,15 +358,15 @@ final class AgentHookSpool: @unchecked Sendable {
             try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: bodyURL.path)
         } catch {
             Logger.log("Agent Tower: could not write a decision: \(error.localizedDescription)", category: .agents)
+            // Release the claim so a retry is possible.
+            lock.lock()
+            answeredRequestIDs.remove(requestID)
+            lock.unlock()
             return
         }
 
         let descriptor = open(doneURL.path, O_CREAT | O_EXCL | O_WRONLY, 0o600)
-        if descriptor < 0 {
-            // Already answered. Leave the first decision standing.
-            return
-        }
-        close(descriptor)
+        if descriptor >= 0 { close(descriptor) }
     }
 
     /// Request ids come from a shim we wrote, but they are still used to build a
@@ -380,11 +398,10 @@ final class AgentHookSpool: @unchecked Sendable {
             }
         }
 
-        // Keep the dedupe set from growing without bound over a long uptime.
+        // Keep the bookkeeping sets from growing without bound over a long uptime.
         lock.lock()
-        if seenRequestIDs.count > 4096 {
-            seenRequestIDs.removeAll()
-        }
+        if seenRequestIDs.count > 4096 { seenRequestIDs.removeAll() }
+        if answeredRequestIDs.count > 4096 { answeredRequestIDs.removeAll() }
         lock.unlock()
     }
 }

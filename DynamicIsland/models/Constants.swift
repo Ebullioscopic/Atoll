@@ -1173,6 +1173,10 @@ extension Defaults.Keys {
     static let agentTowerApprovalsEnabled = Key<Bool>("agentTowerApprovalsEnabled", default: false)
     static let agentTowerEnabledKinds = Key<[AgentKind]>("agentTowerEnabledKinds", default: [.claudeCode])
     static let agentTowerMaxHeightFraction = Key<Double>("agentTowerMaxHeightFraction", default: 0.4)
+    static let agentTowerFlagDangerousCommands = Key<Bool>("agentTowerFlagDangerousCommands", default: true)
+    /// Off by default: a remembered approval that outlives the session is the one
+    /// part of this feature that can approve something without a human present.
+    static let agentTowerAllowAlwaysAllowRules = Key<Bool>("agentTowerAllowAlwaysAllowRules", default: false)
     /// Sessions quiet for longer than this are dropped on the next launch.
     static let agentTowerSessionPruneHours = Key<Int>("agentTowerSessionPruneHours", default: 24)
 

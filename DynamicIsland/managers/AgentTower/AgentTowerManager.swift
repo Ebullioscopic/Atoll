@@ -44,7 +44,15 @@ final class AgentTowerManager: ObservableObject {
     /// Per-agent install failure, keyed by agent. Shown inline in Settings.
     @Published private(set) var installErrors: [AgentKind: String] = [:]
 
+    /// Requests waiting on the user, newest first.
+    @Published private(set) var pendingRequests: [AgentPendingRequest] = []
+
     private let spool = AgentHookSpool()
+    private let ruleStore = AgentApprovalRuleStore()
+    /// One continuation per blocked hook. Resuming it is what unblocks the agent,
+    /// so every path out of a pending request must go through `resolve`.
+    private var decisionContinuations: [String: CheckedContinuation<AgentDecision, Never>] = [:]
+    private var expiryTasks: [String: Task<Void, Never>] = [:]
     private var cancellables = Set<AnyCancellable>()
     private var saveTask: Task<Void, Never>?
     private var hasStarted = false
@@ -54,6 +62,12 @@ final class AgentTowerManager: ObservableObject {
 
     /// Minimum gap between transcript reads for one session.
     private static let contextRefreshInterval: TimeInterval = 2
+
+    /// How long Atoll waits for the user before answering "no decision".
+    ///
+    /// Shorter than the shim's own polling deadline so the shim always reads a
+    /// real answer and exits cleanly, instead of being cut off mid-wait.
+    private static let decisionDeadline = TimeInterval(AgentHookInstaller.decisionTimeout - 5)
 
     /// Sessions kept in memory. Well above any realistic number of concurrent
     /// agents; the cap exists so a misbehaving hook cannot grow the list without
@@ -72,8 +86,24 @@ final class AgentTowerManager: ObservableObject {
         sessions.filter { $0.status == .working }.count
     }
 
+    /// Sessions that need the user. A pending approval counts even if the
+    /// session's own status has not caught up yet.
     var waitingCount: Int {
-        sessions.filter { $0.status == .waitingOnUser }.count
+        let waitingIDs = Set(pendingRequests.map(\.sessionID))
+        return sessions.filter { $0.status == .waitingOnUser || waitingIDs.contains($0.id) }.count
+    }
+
+    /// The request the notch should show first: worst risk, then oldest.
+    var frontmostRequest: AgentPendingRequest? {
+        pendingRequests.max { lhs, rhs in
+            if lhs.risk != rhs.risk { return lhs.risk < rhs.risk }
+            return lhs.receivedAt > rhs.receivedAt
+        }
+    }
+
+    /// Whether an approval is waiting, which is what the closed notch reacts to.
+    var hasPendingApproval: Bool {
+        !pendingRequests.isEmpty
     }
 
     var finishedCount: Int {
@@ -124,6 +154,20 @@ final class AgentTowerManager: ObservableObject {
             }
             .store(in: &cancellables)
 
+        // Turning approvals on or off changes which hook events are installed, so
+        // the configs have to be rewritten — and anything currently blocked has to
+        // be released rather than left waiting on a feature that just went away.
+        Defaults.publisher(.agentTowerApprovalsEnabled)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] change in
+                guard let self, Defaults[.enableAgentTower] else { return }
+                if !change.newValue { self.resolveAllPending() }
+                self.synchronizeHooks()
+            }
+            .store(in: &cancellables)
+
+        ruleStore.prune(liveSessionIDs: Set(sessions.map(\.id)))
+
         applyEnabledState(Defaults[.enableAgentTower])
     }
 
@@ -133,6 +177,9 @@ final class AgentTowerManager: ObservableObject {
     /// waiting: each one re-checks it while polling and exits with no output, so
     /// quitting Atoll can never leave a session hanging.
     func shutdown() {
+        // Release blocked hooks before the spool goes away, so each agent gets a
+        // real "no decision" instead of discovering the heartbeat is gone.
+        resolveAllPending()
         spool.stop()
         isArmed = false
         saveSessionsNow()
@@ -142,6 +189,7 @@ final class AgentTowerManager: ObservableObject {
         if isEnabled {
             arm()
         } else {
+            resolveAllPending()
             spool.stop()
             isArmed = false
             removeAllHooks()
@@ -192,8 +240,136 @@ final class AgentTowerManager: ObservableObject {
         }
 
         ingest(event, agentPID: envelope.agentPID)
-        return nil
+
+        // Only a hook that is actually blocked, for an event Atoll recognises as
+        // a permission request, and only when the user has enabled approvals.
+        guard envelope.expectsDecision,
+              event.name.expectsDecision,
+              Defaults[.agentTowerApprovalsEnabled],
+              Defaults[.agentTowerEnabledKinds].contains(event.kind)
+        else { return nil }
+
+        let request = makeRequest(id: envelope.id, event: event)
+        let cwd = sessions.first { $0.id == event.sessionKey }?.cwd
+
+        // An existing rule answers without bothering the user. `match` refuses
+        // outright for high-risk commands, so this can never silently approve one.
+        if let rule = ruleStore.match(request, cwd: cwd) {
+            Logger.log(
+                "Agent Tower: auto-approved \(request.toolLabel) from a saved rule (\(rule.id))",
+                category: .agents
+            )
+            return AgentDecisionEncoder.encode(.allowOnce, for: request)
+        }
+
+        let decision = await awaitDecision(for: request)
+        return AgentDecisionEncoder.encode(decision, for: request)
     }
+
+    /// Builds the request card from a hook event.
+    private func makeRequest(id: String, event: AgentHookEvent) -> AgentPendingRequest {
+        let detail: AgentRequestDetail
+        if let command = event.command, !command.isEmpty {
+            detail = .shellCommand(command)
+        } else if let plan = event.plan, !plan.isEmpty, event.toolName?.lowercased().contains("plan") == true {
+            detail = .plan(plan)
+        } else if let path = event.filePath, !path.isEmpty {
+            detail = .fileEdit(path: path, preview: event.toolDescription)
+        } else {
+            detail = .generic(event.toolDescription ?? event.message ?? event.toolName ?? event.rawEventName)
+        }
+
+        let cwd = sessions.first { $0.id == event.sessionKey }?.cwd
+        let flags: [CommandRiskFlag]
+        if case .shellCommand(let command) = detail, Defaults[.agentTowerFlagDangerousCommands] {
+            flags = DestructiveCommandClassifier.evaluate(command: command, cwd: cwd)
+        } else {
+            flags = []
+        }
+
+        return AgentPendingRequest(
+            id: id,
+            sessionID: event.sessionKey,
+            kind: event.kind,
+            rawEventName: event.rawEventName,
+            toolName: event.toolName,
+            detail: detail,
+            riskFlags: flags,
+            receivedAt: event.receivedAt,
+            expiresAt: event.receivedAt.addingTimeInterval(Self.decisionDeadline)
+        )
+    }
+
+    /// Suspends until the user decides, a rule is not involved, or the deadline
+    /// passes.
+    private func awaitDecision(for request: AgentPendingRequest) async -> AgentDecision {
+        await withCheckedContinuation { continuation in
+            decisionContinuations[request.id] = continuation
+            pendingRequests.insert(request, at: 0)
+
+            // Answer slightly before the agent's own hook timeout, so the shim
+            // always exits cleanly rather than being cut off mid-wait.
+            expiryTasks[request.id] = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(Self.decisionDeadline))
+                guard !Task.isCancelled else { return }
+                self?.resolve(requestID: request.id, with: .noDecision)
+            }
+        }
+    }
+
+    /// Answers a pending request. Safe to call twice; the second call is ignored.
+    ///
+    /// This is the only way a blocked hook is ever released, so it must not be
+    /// bypassed — a request removed from `pendingRequests` without resuming its
+    /// continuation would leave the agent waiting out its full timeout.
+    func resolve(requestID: String, with decision: AgentDecision) {
+        guard let continuation = decisionContinuations.removeValue(forKey: requestID) else { return }
+        let request = pendingRequests.first { $0.id == requestID }
+
+        expiryTasks.removeValue(forKey: requestID)?.cancel()
+        pendingRequests.removeAll { $0.id == requestID }
+
+        if let request, decision.createsRule {
+            let cwd = sessions.first { $0.id == request.sessionID }?.cwd
+            ruleStore.record(decision, for: request, cwd: cwd)
+        }
+
+        if let request {
+            Logger.log(
+                "Agent Tower: \(describe(decision)) \(request.toolLabel) for \(request.sessionID)",
+                category: .agents
+            )
+        }
+        continuation.resume(returning: decision)
+    }
+
+    /// Releases every blocked hook with "no decision".
+    ///
+    /// Used when the feature is switched off and when Atoll quits: an agent must
+    /// never be left waiting because Atoll stopped caring.
+    private func resolveAllPending(with decision: AgentDecision = .noDecision) {
+        for id in decisionContinuations.keys {
+            resolve(requestID: id, with: decision)
+        }
+    }
+
+    private func describe(_ decision: AgentDecision) -> String {
+        switch decision {
+        case .allowOnce: return "allowed"
+        case .allowForSession: return "allowed for the session"
+        case .alwaysAllow: return "always allowed"
+        case .deny: return "denied"
+        case .noDecision: return "declined to decide on"
+        }
+    }
+
+    // MARK: - Rules
+
+    var approvalRules: [AgentApprovalRule] { ruleStore.allRules }
+
+    func removeRule(id: UUID) { ruleStore.remove(id: id) }
+
+    func removeAllRules() { ruleStore.removeAll() }
 
     /// Folds an event into the session list.
     func ingest(_ event: AgentHookEvent, agentPID: Int32? = nil) {
