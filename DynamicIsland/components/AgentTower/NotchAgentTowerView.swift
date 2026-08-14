@@ -32,7 +32,10 @@ struct NotchAgentTowerView: View {
         .padding(.bottom, 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .environment(\.colorScheme, .dark)
-        .onAppear { manager.refreshInstallationState() }
+        .onAppear {
+            manager.refreshInstallationState()
+            manager.refreshVisibleContexts()
+        }
     }
 
     private var header: some View {

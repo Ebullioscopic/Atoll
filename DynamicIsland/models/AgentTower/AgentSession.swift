@@ -62,6 +62,13 @@ struct AgentSession: Identifiable, Codable, Equatable, Sendable {
 
     var contextTokens: Int?
     var contextWindow: Int?
+    /// Running maximum context this session has held. Context collapses after a
+    /// compaction, so the peak — not the current value — is what identifies the
+    /// window size. Persisted so a relaunch does not lose the calibration.
+    var observedMaxContextTokens: Int?
+    var contextWindowConfidence: ContextWindowConfidence?
+    /// Model identifier from the last assistant turn.
+    var model: String?
 
     var subagentsStarted: Int
     var subagentsFinished: Int
@@ -93,6 +100,36 @@ struct AgentSession: Identifiable, Codable, Equatable, Sendable {
         max(0, (endedAt ?? now).timeIntervalSince(startedAt))
     }
 
+    /// Folds a transcript tail read into the session.
+    ///
+    /// The observed maximum only ever grows: that is what lets the window size be
+    /// calibrated from data instead of guessed from a model identifier.
+    mutating func apply(_ snapshot: AgentTranscriptSnapshot) {
+        contextTokens = snapshot.contextTokens
+        observedMaxContextTokens = max(observedMaxContextTokens ?? 0, snapshot.contextTokens)
+        if let model = snapshot.model, !model.isEmpty { self.model = model }
+        // The agent's own title beats the directory name.
+        if let agentTitle = snapshot.title, !agentTitle.isEmpty { title = agentTitle }
+        if let mode = snapshot.permissionMode, !mode.isEmpty { permissionMode = mode }
+
+        let window = ContextWindowResolver.resolve(
+            model: self.model,
+            observedTokens: observedMaxContextTokens ?? snapshot.contextTokens,
+            kind: kind
+        )
+        contextWindow = window.tokens
+        contextWindowConfidence = window.confidence
+    }
+
+    /// Whether a percentage is trustworthy enough to draw as a ring.
+    var showsContextFraction: Bool {
+        guard let contextWindow, let contextTokens, let contextWindowConfidence else { return false }
+        return ContextWindowResolver.shouldShowFraction(
+            ContextWindow(tokens: contextWindow, confidence: contextWindowConfidence),
+            usedTokens: contextTokens
+        )
+    }
+
     /// `"2 of 5"` style progress, only once at least one subagent has been seen.
     var subagentProgressText: String? {
         guard subagentsStarted > 0 else { return nil }
@@ -111,6 +148,9 @@ struct AgentSession: Identifiable, Codable, Equatable, Sendable {
         self.endedAt = nil
         self.contextTokens = nil
         self.contextWindow = nil
+        self.observedMaxContextTokens = nil
+        self.contextWindowConfidence = nil
+        self.model = nil
         self.subagentsStarted = 0
         self.subagentsFinished = 0
         self.permissionMode = event.permissionMode

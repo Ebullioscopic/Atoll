@@ -243,6 +243,221 @@ final class AgentTowerTests: XCTestCase {
         XCTAssertEqual(session.contextFraction, 1.0, "An over-full window must not exceed 1.")
     }
 
+    // MARK: - Context window resolution
+
+    /// The case that forced the whole design: a live transcript recorded model
+    /// `claude-opus-5` — no `[1m]` marker anywhere — while carrying 512,031
+    /// tokens. A model-string rule reports 256% full; observation must win.
+    func testObservationPromotesTheWindowPastTheModelTable() {
+        let window = ContextWindowResolver.resolve(
+            model: "claude-opus-5", observedTokens: 512_031, kind: .claudeCode
+        )
+        XCTAssertEqual(window.tokens, 1_000_000)
+        XCTAssertEqual(window.confidence, .observed)
+    }
+
+    func testExplicitLongContextMarkerIsTrusted() {
+        for model in ["claude-opus-5[1m]", "claude-sonnet-4-5-1m", "some-model:1m"] {
+            let window = ContextWindowResolver.resolve(model: model, observedTokens: 10, kind: .claudeCode)
+            XCTAssertEqual(window.tokens, 1_000_000, "\(model) should resolve to a 1M window")
+            XCTAssertEqual(window.confidence, .table)
+        }
+    }
+
+    func testKnownModelWithoutObservationUsesTheTable() {
+        let window = ContextWindowResolver.resolve(
+            model: "claude-opus-5", observedTokens: 50_000, kind: .claudeCode
+        )
+        XCTAssertEqual(window.tokens, 200_000)
+        XCTAssertEqual(window.confidence, .table)
+    }
+
+    func testUnknownModelFallsBackToTheAgentDefaultAsAssumed() {
+        let window = ContextWindowResolver.resolve(
+            model: "something-brand-new", observedTokens: 1_000, kind: .codex
+        )
+        XCTAssertEqual(window.tokens, AgentKind.codex.defaultContextWindow)
+        XCTAssertEqual(window.confidence, .assumed)
+    }
+
+    func testWindowIsPromotedToTheSmallestContainingTier() {
+        XCTAssertEqual(
+            ContextWindowResolver.resolve(model: "claude-x", observedTokens: 210_353, kind: .claudeCode).tokens,
+            400_000
+        )
+        XCTAssertEqual(
+            ContextWindowResolver.resolve(model: "claude-x", observedTokens: 400_001, kind: .claudeCode).tokens,
+            1_000_000
+        )
+    }
+
+    /// Past the largest known tier the observation is rounded up, so the ring
+    /// stays informative instead of pinning at 100% forever.
+    func testObservationBeyondEveryTierRoundsUpToWholeMillions() {
+        let window = ContextWindowResolver.resolve(
+            model: nil, observedTokens: 1_400_000, kind: .claudeCode
+        )
+        XCTAssertEqual(window.tokens, 2_000_000)
+        XCTAssertEqual(window.confidence, .observed)
+    }
+
+    /// A guessed window with a small reading must not be drawn as a percentage.
+    func testFractionIsHiddenWhileTheWindowIsOnlyAssumed() {
+        XCTAssertFalse(ContextWindowResolver.shouldShowFraction(
+            ContextWindow(tokens: 200_000, confidence: .assumed), usedTokens: 10_000
+        ))
+        XCTAssertTrue(ContextWindowResolver.shouldShowFraction(
+            ContextWindow(tokens: 200_000, confidence: .assumed), usedTokens: 180_000
+        ))
+        XCTAssertTrue(ContextWindowResolver.shouldShowFraction(
+            ContextWindow(tokens: 200_000, confidence: .table), usedTokens: 10
+        ))
+    }
+
+    // MARK: - Transcript tail reading
+
+    /// Mirrors the real record shape, including the `cache_creation` dictionary
+    /// that sits next to the `cache_creation_input_tokens` scalar.
+    private func assistantLine(
+        input: Int, cacheCreation: Int, cacheRead: Int, output: Int = 1_849,
+        model: String = "claude-opus-5", sidechain: Bool = false
+    ) -> String {
+        """
+        {"type":"assistant","isSidechain":\(sidechain),"message":{"role":"assistant","model":"\(model)",\
+        "usage":{"input_tokens":\(input),"cache_creation":{"ephemeral_5m_input_tokens":\(cacheCreation)},\
+        "cache_creation_input_tokens":\(cacheCreation),"cache_read_input_tokens":\(cacheRead),\
+        "output_tokens":\(output)}}}
+        """
+    }
+
+    func testContextTokensSumMatchesTheRealTranscript() {
+        let usage: [String: Any] = [
+            "input_tokens": 2,
+            "cache_creation_input_tokens": 558,
+            "cache_read_input_tokens": 511_471,
+            "output_tokens": 1_849,
+            "cache_creation": ["ephemeral_5m_input_tokens": 558]
+        ]
+        XCTAssertEqual(AgentTranscriptReader.contextTokens(from: usage), 512_031)
+    }
+
+    func testTailReadTakesTheNewestAssistantTurnAndMetadata() throws {
+        let lines = [
+            assistantLine(input: 1, cacheCreation: 10, cacheRead: 1_000),
+            #"{"type":"ai-title","aiTitle":"atoll-agent-tower","sessionId":"s"}"#,
+            assistantLine(input: 2, cacheCreation: 558, cacheRead: 511_471),
+            #"{"type":"permission-mode","permissionMode":"auto","sessionId":"s"}"#
+        ]
+        let data = Data((lines.joined(separator: "\n") + "\n").utf8)
+        let snapshot = try XCTUnwrap(AgentTranscriptReader.parseTail(data, startedMidFile: false))
+
+        XCTAssertEqual(snapshot.contextTokens, 512_031)
+        XCTAssertEqual(snapshot.model, "claude-opus-5")
+        XCTAssertEqual(snapshot.title, "atoll-agent-tower")
+        XCTAssertEqual(snapshot.permissionMode, "auto")
+    }
+
+    /// Subagent turns have their own context; counting one would corrupt the
+    /// parent session's ring.
+    func testTailReadIgnoresSidechainTurns() throws {
+        let lines = [
+            assistantLine(input: 2, cacheCreation: 0, cacheRead: 100_000),
+            assistantLine(input: 5, cacheCreation: 0, cacheRead: 9, sidechain: true)
+        ]
+        let data = Data(lines.joined(separator: "\n").utf8)
+        let snapshot = try XCTUnwrap(AgentTranscriptReader.parseTail(data, startedMidFile: false))
+        XCTAssertEqual(snapshot.contextTokens, 100_002)
+    }
+
+    /// Reading from an arbitrary offset lands mid-line; that fragment must be
+    /// discarded rather than fed to the JSON parser.
+    func testTailReadDropsThePartialFirstLine() throws {
+        let partial = #"{"type":"assistant","message":{"role":"assis"#
+        let complete = assistantLine(input: 3, cacheCreation: 0, cacheRead: 7)
+        let data = Data((partial + "\n" + complete).utf8)
+
+        let snapshot = try XCTUnwrap(AgentTranscriptReader.parseTail(data, startedMidFile: true))
+        XCTAssertEqual(snapshot.contextTokens, 10)
+    }
+
+    func testTailReadReturnsNilWithoutAnAssistantTurn() {
+        let data = Data(#"{"type":"user","message":{"role":"user"}}"#.utf8)
+        XCTAssertNil(AgentTranscriptReader.parseTail(data, startedMidFile: false))
+    }
+
+    func testTailReadSurvivesGarbageLines() throws {
+        let lines = [
+            "not json at all",
+            "{ truncated",
+            assistantLine(input: 1, cacheCreation: 1, cacheRead: 1)
+        ]
+        let data = Data(lines.joined(separator: "\n").utf8)
+        let snapshot = try XCTUnwrap(AgentTranscriptReader.parseTail(data, startedMidFile: false))
+        XCTAssertEqual(snapshot.contextTokens, 3)
+    }
+
+    func testReadingAMissingTranscriptReturnsNil() {
+        XCTAssertNil(AgentTranscriptReader.read(path: "/nonexistent/\(UUID().uuidString).jsonl"))
+        XCTAssertNil(AgentTranscriptReader.read(path: ""))
+    }
+
+    /// The tail read must agree with reading the whole file, and must actually
+    /// read only the end of it.
+    func testTailReadOfALargeFileMatchesTheFinalRecord() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("atoll-transcript-\(UUID().uuidString).jsonl")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        var text = ""
+        for index in 0..<2_000 {
+            text += assistantLine(input: index, cacheCreation: 0, cacheRead: 1_000) + "\n"
+            text += #"{"type":"user","message":{"role":"user","content":"padding padding padding padding"}}"# + "\n"
+        }
+        text += assistantLine(input: 2, cacheCreation: 558, cacheRead: 511_471) + "\n"
+        try Data(text.utf8).write(to: url)
+
+        let size = try XCTUnwrap(
+            (try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue
+        )
+        XCTAssertGreaterThan(size, AgentTranscriptReader.defaultTailBytes,
+                             "Fixture must exceed the tail window for this test to mean anything.")
+
+        let snapshot = try XCTUnwrap(AgentTranscriptReader.read(path: url.path))
+        XCTAssertEqual(snapshot.contextTokens, 512_031)
+    }
+
+    // MARK: - Session context folding
+
+    func testApplyingATranscriptCalibratesTheWindowAndKeepsThePeak() throws {
+        let start = try XCTUnwrap(makeEvent(#"{"session_id":"s8","cwd":"/tmp/proj","hook_event_name":"SessionStart"}"#))
+        var session = AgentSession(event: start)
+
+        session.apply(AgentTranscriptSnapshot(
+            contextTokens: 512_031, model: "claude-opus-5", title: "my-session", permissionMode: "auto"
+        ))
+        XCTAssertEqual(session.contextTokens, 512_031)
+        XCTAssertEqual(session.contextWindow, 1_000_000)
+        XCTAssertEqual(session.contextWindowConfidence, .observed)
+        XCTAssertEqual(session.title, "my-session", "The agent's own title should beat the directory name.")
+        XCTAssertEqual(session.permissionMode, "auto")
+
+        // A compaction collapses the live count; the window must not shrink with it.
+        session.apply(AgentTranscriptSnapshot(
+            contextTokens: 40_000, model: "claude-opus-5", title: nil, permissionMode: nil
+        ))
+        XCTAssertEqual(session.contextTokens, 40_000)
+        XCTAssertEqual(session.observedMaxContextTokens, 512_031)
+        XCTAssertEqual(session.contextWindow, 1_000_000, "Window calibration must survive a compaction.")
+        XCTAssertEqual(session.title, "my-session", "A snapshot without a title must not clear one.")
+    }
+
+    func testCompactTokenFormatting() {
+        XCTAssertEqual(AgentContextRing.compactTokens(512_031), "512k")
+        XCTAssertEqual(AgentContextRing.compactTokens(1_000_000), "1M")
+        XCTAssertEqual(AgentContextRing.compactTokens(1_500_000), "1.5M")
+        XCTAssertEqual(AgentContextRing.compactTokens(940), "940")
+    }
+
     // MARK: - Spool envelope
 
     private func envelopeJSON(version: Int = AgentHookSpool.protocolVersion, wait: Bool = false) -> String {

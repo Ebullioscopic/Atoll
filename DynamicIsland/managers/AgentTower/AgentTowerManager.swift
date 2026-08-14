@@ -48,6 +48,12 @@ final class AgentTowerManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var saveTask: Task<Void, Never>?
     private var hasStarted = false
+    /// Last transcript read per session, so a burst of hooks does not re-read a
+    /// multi-megabyte file several times a second.
+    private var lastContextReadAt: [String: Date] = [:]
+
+    /// Minimum gap between transcript reads for one session.
+    private static let contextRefreshInterval: TimeInterval = 2
 
     /// Sessions kept in memory. Well above any realistic number of concurrent
     /// agents; the cap exists so a misbehaving hook cannot grow the list without
@@ -210,7 +216,49 @@ final class AgentTowerManager: ObservableObject {
             }
         }
 
+        refreshContext(for: event.sessionKey)
         scheduleSave()
+    }
+
+    // MARK: - Context window
+
+    /// Reads a session's transcript tail and folds the result in.
+    ///
+    /// Throttled per session and done off the main actor: the transcript is
+    /// megabytes and the notch must not wait on a file read.
+    ///
+    /// - Parameter force: skip the throttle, for an explicit user-visible refresh.
+    func refreshContext(for sessionID: String, force: Bool = false) {
+        guard let index = sessions.firstIndex(where: { $0.id == sessionID }) else { return }
+        guard let path = sessions[index].transcriptPath, !path.isEmpty else { return }
+
+        let now = Date()
+        if !force, let last = lastContextReadAt[sessionID],
+           now.timeIntervalSince(last) < Self.contextRefreshInterval {
+            return
+        }
+        lastContextReadAt[sessionID] = now
+
+        Task.detached(priority: .utility) {
+            guard let snapshot = AgentTranscriptReader.read(path: path) else { return }
+            await MainActor.run {
+                AgentTowerManager.shared.applyTranscript(snapshot, to: sessionID)
+            }
+        }
+    }
+
+    private func applyTranscript(_ snapshot: AgentTranscriptSnapshot, to sessionID: String) {
+        guard let index = sessions.firstIndex(where: { $0.id == sessionID }) else { return }
+        sessions[index].apply(snapshot)
+        scheduleSave()
+    }
+
+    /// Refreshes every live session. Called when the Agents tab appears, so a
+    /// card the user is looking at is never stale.
+    func refreshVisibleContexts() {
+        for session in sessions where session.status != .idle {
+            refreshContext(for: session.id, force: true)
+        }
     }
 
     /// Clears a finished session's card.

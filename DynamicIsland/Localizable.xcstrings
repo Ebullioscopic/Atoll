@@ -697,6 +697,16 @@
         }
       }
     },
+    "(window size estimated)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(window size estimated)"
+          }
+        }
+      }
+    },
     "%.0f seconds" : {
       "comment" : "merge:ko:alt='%.0f초'",
       "localizations" : {
@@ -20084,6 +20094,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直接連線 Spotify App。"
+          }
+        }
+      }
+    },
+    "Context window" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Context window"
+          }
+        }
+      }
+    },
+    "Context used" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Context used"
           }
         }
       }
@@ -70823,6 +70853,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "樣式"
+          }
+        }
+      }
+    },
+    "Subagents finished" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subagents finished"
           }
         }
       }

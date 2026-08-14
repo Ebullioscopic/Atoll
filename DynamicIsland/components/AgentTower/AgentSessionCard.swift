@@ -72,6 +72,7 @@ struct AgentSessionCard: View {
                 .font(.system(size: 12, weight: .semibold))
                 .lineLimit(1)
             Spacer(minLength: 0)
+            AgentContextRing(session: session)
             statusDot
         }
     }
@@ -82,6 +83,12 @@ struct AgentSessionCard: View {
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(statusColor)
                 .lineLimit(1)
+            if let progress = session.subagentProgressText {
+                Text(progress)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .help(Text("Subagents finished"))
+            }
             Spacer(minLength: 0)
             elapsedLabel
         }
