@@ -23,6 +23,8 @@ struct AgentSessionCard: View {
     let session: AgentSession
     /// Called when the user dismisses a finished card.
     let onAcknowledge: () -> Void
+    /// Called when the card is clicked, to bring its terminal forward.
+    var onJumpToTerminal: (() -> Void)?
 
     @State private var isHovering = false
 
@@ -61,6 +63,12 @@ struct AgentSessionCard: View {
         // The whole card reads as one element for VoiceOver; the individual
         // fields are noise on their own.
         .accessibilityElement(children: .combine)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onJumpToTerminal?()
+        }
+        .help(Text(onJumpToTerminal == nil ? "" : String(localized: "Click to bring this agent's terminal forward")))
+        .accessibilityAddTraits(onJumpToTerminal == nil ? [] : .isButton)
     }
 
     private var header: some View {

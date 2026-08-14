@@ -136,9 +136,11 @@ struct NotchAgentTowerView: View {
                 spacing: 8
             ) {
                 ForEach(manager.sessions) { session in
-                    AgentSessionCard(session: session) {
-                        manager.acknowledge(sessionID: session.id)
-                    }
+                    AgentSessionCard(
+                        session: session,
+                        onAcknowledge: { manager.acknowledge(sessionID: session.id) },
+                        onJumpToTerminal: { manager.jumpToTerminal(sessionID: session.id) }
+                    )
                 }
             }
             .padding(.bottom, 4)

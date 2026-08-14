@@ -17876,6 +17876,16 @@
         }
       }
     },
+    "Click to bring this agent's terminal forward" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click to bring this agent's terminal forward"
+          }
+        }
+      }
+    },
     "Clipboard" : {
       "localizations" : {
         "fr" : {

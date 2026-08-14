@@ -950,6 +950,114 @@ final class AgentTowerTests: XCTestCase {
         XCTAssertTrue(AgentEscalationSchedule.shouldSuppressReminder(privacyMode: false, doNotDisturbActive: true))
     }
 
+    // MARK: - Terminal identification and jump
+
+    /// `TERM_PROGRAM` is set by the terminal itself, so it wins over a bundle
+    /// identifier that may describe a wrapper.
+    func testTerminalProgramIsPreferredOverBundleIdentifier() {
+        XCTAssertEqual(
+            TerminalJumpService.host(termProgram: "Apple_Terminal", bundleID: "com.googlecode.iterm2"),
+            .appleTerminal
+        )
+        XCTAssertEqual(
+            TerminalJumpService.host(termProgram: "iTerm.app", bundleID: "com.apple.Terminal"),
+            .iTerm2
+        )
+    }
+
+    func testTerminalProgramMatchingIsCaseInsensitive() {
+        XCTAssertEqual(TerminalJumpService.host(termProgram: "apple_terminal", bundleID: nil), .appleTerminal)
+        XCTAssertEqual(TerminalJumpService.host(termProgram: "ITERM.APP", bundleID: nil), .iTerm2)
+    }
+
+    func testBundleIdentifierIsTheFallback() {
+        XCTAssertEqual(TerminalJumpService.host(termProgram: nil, bundleID: "com.apple.Terminal"), .appleTerminal)
+        XCTAssertEqual(TerminalJumpService.host(termProgram: nil, bundleID: "com.googlecode.iterm2"), .iTerm2)
+    }
+
+    /// A terminal Atoll cannot script is still recognised, so the fallback can
+    /// raise the right application rather than giving up.
+    func testUnscriptableTerminalsAreRecognisedButNotAddressable() {
+        for bundleID in ["com.mitchellh.ghostty", "dev.warp.Warp-Stable",
+                         "net.kovidgoyal.kitty", "org.alacritty", "com.github.wez.wezterm"] {
+            let host = TerminalJumpService.host(termProgram: nil, bundleID: bundleID)
+            XCTAssertEqual(host, .unaddressable(bundleID: bundleID.lowercased()), bundleID)
+            XCTAssertFalse(host.supportsTabSelection, "\(bundleID) has no per-tab addressing.")
+        }
+    }
+
+    func testNoInformationAtAllIsUnknown() {
+        let host = TerminalJumpService.host(termProgram: nil, bundleID: nil)
+        XCTAssertEqual(host, .unknown)
+        XCTAssertFalse(host.supportsTabSelection)
+    }
+
+    func testOnlyScriptableTerminalsClaimTabSelection() {
+        XCTAssertTrue(TerminalHost.appleTerminal.supportsTabSelection)
+        XCTAssertTrue(TerminalHost.iTerm2.supportsTabSelection)
+        XCTAssertFalse(TerminalHost.unaddressable(bundleID: "x").supportsTabSelection)
+        XCTAssertFalse(TerminalHost.unknown.supportsTabSelection)
+    }
+
+    /// The scripts must key on tty, not on a window title: titles collide as soon
+    /// as two agents run in the same project, which is when this matters most.
+    func testGeneratedScriptsMatchOnTtyAndReportAKnownResult() {
+        let terminal = TerminalJumpService.appleTerminalScript(tty: "/dev/ttys004")
+        XCTAssertTrue(terminal.contains("tty of t is \"/dev/ttys004\""))
+        XCTAssertTrue(terminal.contains("return \"ok\""))
+        XCTAssertTrue(terminal.contains("return \"notfound\""))
+        XCTAssertFalse(terminal.contains("custom title"), "Title matching is not reliable enough.")
+
+        let iterm = TerminalJumpService.iTerm2Script(tty: "/dev/ttys009")
+        XCTAssertTrue(iterm.contains("tty of s is \"/dev/ttys009\""),
+                      "iTerm2 exposes tty on a session, one level below the tab.")
+        XCTAssertTrue(iterm.contains("sessions of t"))
+        XCTAssertTrue(iterm.contains("return \"ok\""))
+    }
+
+    /// A missing tab must not abort the whole script — `try` blocks keep the loop
+    /// going so a later tab can still match.
+    func testScriptsToleratePerTabErrors() {
+        XCTAssertTrue(TerminalJumpService.appleTerminalScript(tty: "/dev/ttys1").contains("try"))
+        XCTAssertTrue(TerminalJumpService.iTerm2Script(tty: "/dev/ttys1").contains("try"))
+    }
+
+    // MARK: - Process tree
+
+    /// Reads the real process table for this test host, which is the only honest
+    /// way to check the sysctl plumbing.
+    func testProcessTreeReadsThisProcessAndItsAncestors() throws {
+        let me = getpid()
+        let ancestors = ProcessTree.ancestors(of: me)
+        XCTAssertEqual(ancestors.first, me, "The walk starts at the pid it was given.")
+        XCTAssertEqual(Set(ancestors).count, ancestors.count, "The walk must not revisit a pid.")
+        // The chain stops before `launchd`, so a process parented directly by it
+        // yields exactly one entry — which is what the test host does.
+        XCTAssertFalse(ancestors.contains(1))
+
+        let parent = try XCTUnwrap(ProcessTree.parent(of: me))
+        XCTAssertEqual(parent, getppid())
+    }
+
+    func testProcessTreeIsDepthCapped() {
+        XCTAssertLessThanOrEqual(ProcessTree.ancestors(of: getpid(), limit: 3).count, 3)
+    }
+
+    func testProcessTreeReturnsNilForAProcessThatDoesNotExist() {
+        // pid 0 is the kernel and has no parent; a huge pid does not exist.
+        XCTAssertNil(ProcessTree.parent(of: 999_999))
+        XCTAssertNil(ProcessTree.ttyPath(for: 999_999))
+        XCTAssertTrue(ProcessTree.ancestors(of: 0).isEmpty)
+    }
+
+    /// The test host has no controlling terminal, so this exercises the
+    /// no-tty path rather than asserting a device exists.
+    func testTtyPathIsEitherADeviceOrNil() {
+        if let tty = ProcessTree.ttyPath(for: getpid()) {
+            XCTAssertTrue(tty.hasPrefix("/dev/"), "Got \(tty)")
+        }
+    }
+
     // MARK: - Spool envelope
 
     private func envelopeJSON(version: Int = AgentHookSpool.protocolVersion, wait: Bool = false) -> String {

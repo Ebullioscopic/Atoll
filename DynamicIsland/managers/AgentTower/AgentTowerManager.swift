@@ -490,6 +490,23 @@ final class AgentTowerManager: ObservableObject {
         }
     }
 
+    // MARK: - Terminal
+
+    /// Brings a session's terminal forward.
+    ///
+    /// Best-effort by design: an exact tab where the terminal can be scripted,
+    /// otherwise just the right application, which works everywhere and needs no
+    /// automation consent.
+    func jumpToTerminal(sessionID: String) {
+        guard let session = sessions.first(where: { $0.id == sessionID }) else { return }
+        Task { @MainActor in
+            let outcome = await TerminalJumpService.jump(to: session)
+            if outcome == .failed {
+                Logger.log("Agent Tower: no terminal found for \(session.displayTitle)", category: .agents)
+            }
+        }
+    }
+
     /// Clears a finished session's card.
     func acknowledge(sessionID: String) {
         guard let index = sessions.firstIndex(where: { $0.id == sessionID }) else { return }
