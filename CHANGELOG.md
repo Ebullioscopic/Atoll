@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Teleprompter (groundwork)**: Script parsing for the upcoming notch teleprompter. Markdown is the single input format — `## !` marks a section you mean to cover, `> key: …` marks a phrase to land, and any other `>` line is a speaker note that is shown but never counted as words to read. Code blocks, rules and inline markup are stripped so only what you would say aloud becomes text.
 - Spotify "Like Song" media control: save or remove the current track from your Liked Songs directly from the notch, lock screen, and minimalist player, using the official Spotify Web API (OAuth 2.0 PKCE). Add the control to any media slot in settings. (#579)
 
 - Show the current Claude subscription plan (e.g. `Max 5x`) as a badge next to the Claude card title in the LLM Usage view (#684).
