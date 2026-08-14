@@ -34,6 +34,9 @@ struct TeleprompterScriptTextView: View {
     var isMirrored: Bool
     /// Compact mode drops the section headings and notes, for the notch.
     var isCompact: Bool = false
+    /// Sections the reader has covered so far, so a must-cover marker can tick
+    /// off live rather than only in the debrief.
+    var coveredSectionIndices: Set<Int> = []
 
     /// Scrolls the current word to the middle of the view.
     private let scrollAnchor = UnitPoint.center
@@ -93,14 +96,18 @@ struct TeleprompterScriptTextView: View {
                     .foregroundStyle(.secondary)
                     .frame(minWidth: fontSize * 0.6)
             }
+            let isCovered = coveredSectionIndices.contains(index)
             Text(section.title)
                 .font(.system(size: fontSize * 0.62, weight: .bold))
-                .foregroundStyle(section.mustCover ? Color.green : .secondary)
+                .foregroundStyle(section.mustCover && isCovered ? Color.green : .secondary)
             if section.mustCover {
-                Image(systemName: "checkmark.seal")
+                Image(systemName: isCovered ? "checkmark.seal.fill" : "checkmark.seal")
                     .font(.system(size: fontSize * 0.4))
-                    .foregroundStyle(.green)
-                    .help(Text("You meant to cover this section"))
+                    .foregroundStyle(isCovered ? .green : .secondary)
+                    .help(Text(isCovered
+                               ? String(localized: "Covered")
+                               : String(localized: "You meant to cover this section")))
+                    .animation(.easeOut(duration: 0.25), value: isCovered)
             }
             if let target = section.targetDuration {
                 Text(Self.durationText(target))

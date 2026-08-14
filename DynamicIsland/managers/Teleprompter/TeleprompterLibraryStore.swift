@@ -90,3 +90,66 @@ final class TeleprompterLibraryStore {
         try? data.write(to: fileURL, options: .atomic)
     }
 }
+
+/// Keeps a short history of takes, one file per script.
+///
+/// Bounded on both axes — the newest few per script, and nothing older than a
+/// month — because this is a coaching aid, not an archive, and it holds a record
+/// of what someone said out loud.
+final class TeleprompterTakeStore {
+    /// Takes kept per script.
+    static let maxTakesPerScript = 20
+    /// How long a take is kept regardless.
+    static let retention: TimeInterval = 30 * 24 * 3600
+
+    private let directory: URL
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    init(directory: URL = TeleprompterStorage.takesDirectory) {
+        self.directory = directory
+        encoder.outputFormatting = [.prettyPrinted]
+        encoder.dateEncodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .iso8601
+    }
+
+    private func fileURL(for scriptID: UUID) -> URL {
+        directory.appendingPathComponent("\(scriptID.uuidString).json")
+    }
+
+    /// Takes for one script, newest first, with expired ones already dropped.
+    func takes(for scriptID: UUID, now: Date = Date()) -> [TeleprompterTake] {
+        guard let data = try? Data(contentsOf: fileURL(for: scriptID)),
+              let stored = try? decoder.decode([TeleprompterTake].self, from: data)
+        else { return [] }
+
+        return stored
+            .filter { now.timeIntervalSince($0.startedAt) <= Self.retention }
+            .sorted { $0.startedAt > $1.startedAt }
+    }
+
+    @discardableResult
+    func append(_ take: TeleprompterTake, now: Date = Date()) -> [TeleprompterTake] {
+        var all = takes(for: take.scriptID, now: now)
+        all.insert(take, at: 0)
+        if all.count > Self.maxTakesPerScript {
+            all.removeLast(all.count - Self.maxTakesPerScript)
+        }
+        write(all, for: take.scriptID)
+        return all
+    }
+
+    func removeAll(for scriptID: UUID) {
+        try? FileManager.default.removeItem(at: fileURL(for: scriptID))
+    }
+
+    private func write(_ takes: [TeleprompterTake], for scriptID: UUID) {
+        guard !takes.isEmpty else {
+            removeAll(for: scriptID)
+            return
+        }
+        guard let data = try? encoder.encode(takes) else { return }
+        TeleprompterStorage.ensureDirectory(directory)
+        try? data.write(to: fileURL(for: scriptID), options: .atomic)
+    }
+}

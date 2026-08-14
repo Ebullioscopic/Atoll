@@ -46,8 +46,15 @@ final class TeleprompterManager: ObservableObject {
     /// What the matcher currently believes about the reader.
     @Published private(set) var followMode: FollowMode = .following
 
+    /// The take just finished, shown as a debrief until dismissed.
+    @Published private(set) var lastTake: TeleprompterTake?
+
     private let store = TeleprompterLibraryStore()
+    private let takeStore = TeleprompterTakeStore()
     private let speech = TeleprompterSpeechFollower()
+    /// When words were heard, relative to the take's start — the raw material for
+    /// the pace and pause figures.
+    private var speechTimestamps: [TimeInterval] = []
     private var followState = FollowState()
     private var followIndex: ScriptFollowIndex?
     private var cancellables = Set<AnyCancellable>()
@@ -194,6 +201,9 @@ final class TeleprompterManager: ObservableObject {
     }
 
     func removeScript(id: UUID) {
+        // A script's takes are about that script; keeping them would leave an
+        // orphaned record of what someone said out loud.
+        takeStore.removeAll(for: id)
         scripts.removeAll { $0.id == id }
         if currentScriptID == id {
             currentScriptID = scripts.first?.id
@@ -304,6 +314,9 @@ final class TeleprompterManager: ObservableObject {
         )
 
         followMode = followState.mode
+        if let startedAt = takeStartedAt {
+            speechTimestamps.append(Date().timeIntervalSince(startedAt))
+        }
         // The matcher is the authority on position in this mode, and it only ever
         // moves the confirmed cursor forward.
         if followState.confirmedCursor != confirmedTokenIndex {
@@ -341,6 +354,8 @@ final class TeleprompterManager: ObservableObject {
         guard currentScript != nil else { return }
         isRunning = true
         takeStartedAt = Date()
+        speechTimestamps = []
+        lastTake = nil
         startAdvanceIfNeeded()
     }
 
@@ -359,6 +374,7 @@ final class TeleprompterManager: ObservableObject {
     }
 
     func endTake() {
+        recordTakeIfWorthwhile()
         isRunning = false
         takeStartedAt = nil
         advanceTask?.cancel()
@@ -366,6 +382,45 @@ final class TeleprompterManager: ObservableObject {
         stopListening()
         followMode = .following
         store.save(scripts)
+    }
+
+    /// Files a debrief for a take that actually happened.
+    ///
+    /// A take with nothing matched is someone opening the prompter and closing
+    /// it again; filing statistics for that would only clutter the history.
+    private func recordTakeIfWorthwhile() {
+        guard let script = currentScript,
+              let startedAt = takeStartedAt,
+              followState.matchedWordCount > 0
+        else { return }
+
+        let take = TakeStatsBuilder.build(
+            script: script,
+            state: followState,
+            startedAt: startedAt,
+            duration: Date().timeIntervalSince(startedAt),
+            speechTimestamps: speechTimestamps,
+            followedVoice: Defaults[.teleprompterScrollMode] == .voice,
+            localeIdentifier: readingLocale.identifier
+        )
+        takeStore.append(take)
+        lastTake = take
+    }
+
+    /// Takes recorded for the current script, newest first.
+    var takesForCurrentScript: [TeleprompterTake] {
+        guard let id = currentScriptID else { return [] }
+        return takeStore.takes(for: id)
+    }
+
+    func dismissDebrief() {
+        lastTake = nil
+    }
+
+    func clearTakeHistory() {
+        guard let id = currentScriptID else { return }
+        takeStore.removeAll(for: id)
+        lastTake = nil
     }
 
     func toggleTake() {

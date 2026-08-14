@@ -401,6 +401,165 @@ final class TeleprompterTests: XCTestCase {
         XCTAssertNil(lease.currentOwner)
     }
 
+    // MARK: - Take statistics
+
+    private func takeState(matched: Int, cursor: Int) -> FollowState {
+        var state = FollowState()
+        state.matchedWordCount = matched
+        state.confirmedCursor = cursor
+        return state
+    }
+
+    /// Both figures are reported because they answer different questions: raw is
+    /// what an audience experiences, speaking is what the presenter can act on.
+    func testBothPaceFiguresAreReported() {
+        let script = parse("## One\n" + Array(repeating: "word", count: 200).joined(separator: " "))
+        var state = takeState(matched: 200, cursor: 200)
+        state.matchedWordCount = 200
+
+        // Two minutes wall clock, with a 30-second silence in the middle.
+        let timestamps: [TimeInterval] = Array(stride(from: 0.0, to: 45.0, by: 0.5))
+            + Array(stride(from: 75.0, to: 120.0, by: 0.5))
+
+        let take = TakeStatsBuilder.build(
+            script: script, state: state, startedAt: Date(timeIntervalSince1970: 0),
+            duration: 120, speechTimestamps: timestamps, followedVoice: true,
+            localeIdentifier: "en_US"
+        )
+
+        XCTAssertEqual(take.rawWordsPerMinute, 100, accuracy: 0.5)
+        XCTAssertGreaterThan(
+            take.speakingWordsPerMinute, take.rawWordsPerMinute,
+            "Removing the silence must raise the speaking pace."
+        )
+    }
+
+    func testPaceIsZeroRatherThanInfiniteForADegenerateTake() {
+        let script = parse("## One\nalpha")
+        let take = TakeStatsBuilder.build(
+            script: script, state: FollowState(), startedAt: Date(),
+            duration: 0, speechTimestamps: [], followedVoice: false,
+            localeIdentifier: "en_US"
+        )
+        XCTAssertEqual(take.rawWordsPerMinute, 0)
+        XCTAssertEqual(take.speakingWordsPerMinute, 0)
+    }
+
+    func testPausesAreFoundBetweenWordsAndAtBothEnds() {
+        let pauses = TakeStatsBuilder.pauses(from: [3, 3.4, 3.8, 10, 10.2], duration: 15)
+        XCTAssertEqual(pauses.count, 3, "Leading silence, the middle gap, and the trailing silence.")
+        XCTAssertEqual(pauses[0].offset, 0)
+        XCTAssertEqual(pauses[0].duration, 3, accuracy: 0.01)
+        XCTAssertEqual(pauses[1].duration, 6.2, accuracy: 0.01)
+        XCTAssertEqual(pauses[2].duration, 4.8, accuracy: 0.01)
+    }
+
+    func testShortGapsAreBreathsNotPauses() {
+        XCTAssertTrue(TakeStatsBuilder.pauses(from: [0, 0.5, 1.0, 1.4], duration: 1.5).isEmpty)
+    }
+
+    /// Saying nothing at all is one long silence, not an absence of pauses.
+    func testASilentTakeIsOneLongPause() {
+        let pauses = TakeStatsBuilder.pauses(from: [], duration: 20)
+        XCTAssertEqual(pauses.count, 1)
+        XCTAssertEqual(pauses[0].duration, 20)
+    }
+
+    func testLongestPauseIsSurfaced() {
+        let script = parse("## One\nalpha beta")
+        let take = TakeStatsBuilder.build(
+            script: script, state: takeState(matched: 2, cursor: 2),
+            startedAt: Date(), duration: 30,
+            speechTimestamps: [1, 2, 12, 13], followedVoice: true, localeIdentifier: "en_US"
+        )
+        XCTAssertEqual(take.longestPause?.duration ?? 0, 17, accuracy: 0.01)
+    }
+
+    /// The headline of the debrief: what you meant to cover and did not.
+    func testMissedMustCoverSectionsAreReported() {
+        let script = parse("""
+        ## ! Intro
+        alpha beta gamma
+
+        ## Middle
+        delta epsilon
+
+        ## ! Close
+        zeta eta
+        """)
+        var state = FollowState()
+        state.coveredSectionIndices = [0]
+        state.confirmedCursor = 3
+
+        let take = TakeStatsBuilder.build(
+            script: script, state: state, startedAt: Date(), duration: 10,
+            speechTimestamps: [1, 2, 3], followedVoice: true, localeIdentifier: "en_US"
+        )
+
+        XCTAssertEqual(take.coveredSectionIDs, [script.sections[0].id])
+        XCTAssertEqual(take.missedSectionIDs, [script.sections[2].id], "Only must-cover sections are missed.")
+        XCTAssertFalse(take.missedSectionIDs.contains(script.sections[1].id), "An ordinary section is not a miss.")
+    }
+
+    /// The debrief shows the words that were skipped, not two indices.
+    func testSkippedTextIsCarriedIntoTheTake() {
+        let script = parse("## One\nalpha beta gamma delta epsilon")
+        var state = FollowState()
+        state.confirmedCursor = 5
+        state.skipped = [SkippedRange(range: 1..<3)]
+
+        let take = TakeStatsBuilder.build(
+            script: script, state: state, startedAt: Date(), duration: 5,
+            speechTimestamps: [1], followedVoice: true, localeIdentifier: "en_US"
+        )
+        XCTAssertEqual(take.skips.count, 1)
+        XCTAssertEqual(take.skips[0].text, "beta gamma")
+    }
+
+    func testDeparturesCarryWhatWasActuallySaid() {
+        let script = parse("## One\nalpha beta")
+        var state = FollowState()
+        state.offScriptRuns = [
+            OffScriptRun(scriptIndex: 1, spokenWords: ["something", "else"], startedAt: 4, endedAt: 9)
+        ]
+
+        let take = TakeStatsBuilder.build(
+            script: script, state: state, startedAt: Date(), duration: 12,
+            speechTimestamps: [1, 4, 9], followedVoice: true, localeIdentifier: "en_US"
+        )
+        XCTAssertEqual(take.departures.count, 1)
+        XCTAssertEqual(take.departures[0].spokenText, "something else")
+        XCTAssertEqual(take.departures[0].duration, 5, accuracy: 0.01)
+    }
+
+    /// Jumping to the end must not read as having delivered the whole script.
+    func testCompletionDiscountsWhatWasSkipped() {
+        let script = parse("## One\n" + (1...10).map { "w\($0)" }.joined(separator: " "))
+        var state = FollowState()
+        state.confirmedCursor = 10
+        state.skipped = [SkippedRange(range: 2..<8)]
+
+        let take = TakeStatsBuilder.build(
+            script: script, state: state, startedAt: Date(), duration: 10,
+            speechTimestamps: [1], followedVoice: true, localeIdentifier: "en_US"
+        )
+        XCTAssertEqual(take.completionFraction, 0.4, accuracy: 0.001, "Four of ten words were actually read.")
+    }
+
+    /// A take describes the script as it was; the revision says whether that is
+    /// still the script in front of you.
+    func testTakeRecordsTheScriptRevisionItDescribes() {
+        let script = parse("## One\nalpha")
+        let take = TakeStatsBuilder.build(
+            script: script, state: FollowState(), startedAt: Date(), duration: 1,
+            speechTimestamps: [], followedVoice: false, localeIdentifier: "tr_TR"
+        )
+        XCTAssertEqual(take.scriptRevision, script.revision)
+        XCTAssertEqual(take.scriptID, script.id)
+        XCTAssertEqual(take.localeIdentifier, "tr_TR")
+        XCTAssertFalse(take.followedVoice)
+    }
+
     // MARK: - Library store
 
     func testLibraryRoundTripsThroughDisk() throws {
@@ -447,6 +606,103 @@ final class TeleprompterTests: XCTestCase {
 
         store.save([])
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    // MARK: - Take history
+
+    private func makeTakeStore() -> (TeleprompterTakeStore, URL) {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("teleprompter-takes-\(UUID().uuidString)", isDirectory: true)
+        return (TeleprompterTakeStore(directory: dir), dir)
+    }
+
+    private func sampleTake(
+        scriptID: UUID,
+        startedAt: Date,
+        id: UUID = UUID()
+    ) -> TeleprompterTake {
+        TeleprompterTake(
+            id: id, scriptID: scriptID, scriptRevision: 1, scriptName: "Test",
+            startedAt: startedAt, duration: 60, localeIdentifier: "en_US", followedVoice: true,
+            matchedWordCount: 100, rawWordsPerMinute: 100, speakingWordsPerMinute: 110,
+            pauses: [], coveredSectionIDs: [], missedSectionIDs: [], creditedKeyPhraseIDs: [],
+            skips: [], departures: [], completionFraction: 1
+        )
+    }
+
+    func testTakesRoundTripNewestFirst() throws {
+        let (store, dir) = makeTakeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let scriptID = UUID()
+
+        // Dates have to be recent: reading applies the retention window, so a
+        // 1970 fixture is correctly discarded as expired.
+        let older = Date().addingTimeInterval(-600)
+        let newer = Date().addingTimeInterval(-60)
+        store.append(sampleTake(scriptID: scriptID, startedAt: older))
+        store.append(sampleTake(scriptID: scriptID, startedAt: newer))
+
+        let reloaded = TeleprompterTakeStore(directory: dir).takes(for: scriptID)
+        XCTAssertEqual(reloaded.count, 2)
+        // ISO 8601 encoding drops sub-second precision, which is plenty for a
+        // take history — you cannot run two takes in the same second.
+        XCTAssertEqual(
+            reloaded[0].startedAt.timeIntervalSince1970,
+            newer.timeIntervalSince1970,
+            accuracy: 1,
+            "Newest first."
+        )
+        XCTAssertGreaterThan(reloaded[0].startedAt, reloaded[1].startedAt)
+    }
+
+    /// This is a coaching aid, not an archive, and it records what someone said
+    /// out loud — so it is bounded on both axes.
+    func testTakeHistoryIsCappedPerScript() throws {
+        let (store, dir) = makeTakeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let scriptID = UUID()
+
+        for index in 0..<(TeleprompterTakeStore.maxTakesPerScript + 5) {
+            store.append(sampleTake(scriptID: scriptID, startedAt: Date().addingTimeInterval(-Double(index))))
+        }
+        XCTAssertEqual(store.takes(for: scriptID).count, TeleprompterTakeStore.maxTakesPerScript)
+    }
+
+    func testTakesOlderThanRetentionAreDropped() throws {
+        let (store, dir) = makeTakeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let scriptID = UUID()
+        let now = Date(timeIntervalSince1970: 10_000_000)
+
+        store.append(sampleTake(scriptID: scriptID, startedAt: now), now: now)
+        let ancient = now.addingTimeInterval(-TeleprompterTakeStore.retention - 60)
+        store.append(sampleTake(scriptID: scriptID, startedAt: ancient), now: now)
+
+        let kept = store.takes(for: scriptID, now: now)
+        XCTAssertEqual(kept.count, 1)
+        XCTAssertEqual(kept[0].startedAt, now)
+    }
+
+    func testTakesAreKeptPerScript() throws {
+        let (store, dir) = makeTakeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let first = UUID()
+        let second = UUID()
+
+        store.append(sampleTake(scriptID: first, startedAt: Date()))
+        XCTAssertEqual(store.takes(for: first).count, 1)
+        XCTAssertTrue(store.takes(for: second).isEmpty, "One script's takes must not appear under another.")
+    }
+
+    /// Reading history must not create the folder — the same zero-trace rule as
+    /// the script library.
+    func testReadingTakesCreatesNothingOnDisk() {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("teleprompter-takes-untouched-\(UUID().uuidString)", isDirectory: true)
+        let store = TeleprompterTakeStore(directory: dir)
+
+        XCTAssertTrue(store.takes(for: UUID()).isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dir.path))
     }
 
     // MARK: - Key commands

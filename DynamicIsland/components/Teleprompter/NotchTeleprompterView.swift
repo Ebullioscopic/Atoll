@@ -36,7 +36,14 @@ struct NotchTeleprompterView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
-            if isPasting {
+            if let take = manager.lastTake {
+                // The debrief is the point of the take, so it leads.
+                TeleprompterDebriefView(
+                    take: take,
+                    script: manager.currentScript,
+                    onDismiss: { manager.dismissDebrief() }
+                )
+            } else if isPasting {
                 pasteField
             } else if let script = manager.currentScript {
                 TeleprompterScriptTextView(
@@ -47,7 +54,8 @@ struct NotchTeleprompterView: View {
                     fontChoice: fontChoice,
                     customFontFamily: customFontFamily,
                     isMirrored: isMirrored,
-                    isCompact: true
+                    isCompact: true,
+                    coveredSectionIndices: manager.coveredSectionIndices
                 )
                 sectionRail(script)
             } else {

@@ -44,7 +44,8 @@ struct TeleprompterPanelView: View {
                     fontSize: fontSize,
                     fontChoice: fontChoice,
                     customFontFamily: customFontFamily,
-                    isMirrored: isMirrored
+                    isMirrored: isMirrored,
+                    coveredSectionIndices: manager.coveredSectionIndices
                 )
                 .padding(.top, isShowingControls ? 34 : 8)
             } else {
