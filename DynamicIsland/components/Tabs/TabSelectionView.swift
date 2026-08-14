@@ -95,6 +95,9 @@ struct TabSelectionView: View {
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
+        if Defaults[.enableTeleprompterFeature] && Defaults[.teleprompterDisplayMode].showsNotchTab {
+            tabsArray.append(TabModel(label: "Prompter", icon: "text.viewfinder", view: .teleprompter))
+        }
         if extensionTabsEnabled {
             for payload in extensionTabPayloads {
                 guard let tab = payload.descriptor.tab else { continue }

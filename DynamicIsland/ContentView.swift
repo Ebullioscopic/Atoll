@@ -182,6 +182,16 @@ struct ContentView: View {
             return CGSize(width: baseSize.width, height: terminalHeight)
         }
 
+        if coordinator.currentView == .teleprompter {
+            // Screen-fraction height, like the terminal tab: a script needs more
+            // than the 200pt default to be readable at a glance.
+            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
+            return CGSize(
+                width: baseSize.width,
+                height: max(260, screenHeight * Defaults[.teleprompterMaxHeightFraction])
+            )
+        }
+
         if coordinator.currentView == .extensionExperience {
             if let preferredHeight = extensionTabPreferredHeight(baseSize: baseSize) {
                 return CGSize(width: baseSize.width, height: preferredHeight)
@@ -1107,6 +1117,8 @@ struct ContentView: View {
                                 NotchClipboardView()
                             case .terminal:
                                 NotchTerminalView()
+                            case .teleprompter:
+                                NotchTeleprompterView()
                             case .extensionExperience:
                                 if let payload = currentExtensionTabPayload() {
                                     ExtensionNotchExperienceTabView(payload: payload)

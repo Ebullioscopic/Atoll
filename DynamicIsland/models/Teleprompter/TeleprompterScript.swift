@@ -98,7 +98,9 @@ struct TeleprompterToken: Codable, Equatable, Sendable {
 
 /// A script the prompter can display and follow.
 struct TeleprompterScript: Identifiable, Codable, Equatable, Sendable {
-    let id: UUID
+    /// Mutable so a re-parse after an edit can keep the script's identity rather
+    /// than replacing it with a stranger that has the same name.
+    var id: UUID
     var name: String
     /// Markdown as the user provided it. Everything else is derived, so a
     /// re-parse after an edit is always possible.

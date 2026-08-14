@@ -92,11 +92,17 @@ func enabledStandardTabCount() -> Int {
         count += 1
     }
 
+    // Teleprompter tab, only in the display modes that show one
+    if Defaults[.enableTeleprompterFeature] && Defaults[.teleprompterDisplayMode].showsNotchTab {
+        count += 1
+    }
+
     return count
 }
 
 /// Returns the recommended minimum notch width for the given tab count.
 func recommendedMinimumNotchWidth(forTabCount count: Int) -> CGFloat {
+    if count >= 7 { return 850 }
     if count >= 6 { return 770 }
     if count >= 5 { return 690 }
     return 640

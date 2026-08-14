@@ -23,6 +23,12 @@ import Defaults
 enum ScreenCaptureScope: Int {
     case panelsOnly
     case entireInterface
+    /// The teleprompter, which has its own switch.
+    ///
+    /// Being invisible to Zoom and to screen recorders is the whole point of a
+    /// prompter, so it must not inherit a preference the user set for the notch —
+    /// they are unrelated decisions.
+    case teleprompter
 }
 
 final class ScreenCaptureVisibilityManager {
@@ -36,7 +42,12 @@ final class ScreenCaptureVisibilityManager {
             .map { _ in () }
             .eraseToAnyPublisher()
 
+        let teleprompterPublisher = Defaults.publisher(.teleprompterHideFromScreenCapture)
+            .map { _ in () }
+            .eraseToAnyPublisher()
+
         interfacePublisher
+            .merge(with: teleprompterPublisher)
             .receive(on: RunLoop.main)
             .sink { [weak self] in
                 self?.updateAllWindows()
@@ -62,8 +73,19 @@ final class ScreenCaptureVisibilityManager {
         }
     }
 
-    private func applyVisibility(to window: NSWindow, scope _: ScreenCaptureScope) {
-        let shouldHide = Defaults[.hideDynamicIslandFromScreenCapture]
+    /// The `scope` argument used to be ignored, so every registered window
+    /// followed the one notch preference. It is honoured now, because the
+    /// teleprompter's invisibility is a separate decision from the notch's.
+    private func applyVisibility(to window: NSWindow, scope: ScreenCaptureScope) {
+        let shouldHide: Bool
+        switch scope {
+        case .teleprompter:
+            // Either switch hides it; neither alone reveals it.
+            shouldHide = Defaults[.teleprompterHideFromScreenCapture]
+                || Defaults[.hideDynamicIslandFromScreenCapture]
+        case .panelsOnly, .entireInterface:
+            shouldHide = Defaults[.hideDynamicIslandFromScreenCapture]
+        }
         window.sharingType = shouldHide ? .none : .readOnly
     }
 }

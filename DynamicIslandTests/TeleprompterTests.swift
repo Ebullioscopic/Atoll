@@ -298,6 +298,99 @@ final class TeleprompterTests: XCTestCase {
         XCTAssertEqual(TeleprompterScriptParser.strippingInlineMarkup("![alt](pic.png)"), "")
     }
 
+    // MARK: - Library store
+
+    func testLibraryRoundTripsThroughDisk() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("teleprompter-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let store = TeleprompterLibraryStore(fileURL: url)
+        XCTAssertTrue(store.load().isEmpty)
+
+        let script = parse("## ! Intro (1:00)\n> key: land the point\nHello there.")
+        store.save([script])
+
+        let reloaded = TeleprompterLibraryStore(fileURL: url).load()
+        XCTAssertEqual(reloaded.count, 1)
+        XCTAssertEqual(reloaded[0].markdown, script.markdown)
+        XCTAssertEqual(reloaded[0].tokens.map(\.normalized), script.tokens.map(\.normalized))
+        XCTAssertEqual(reloaded[0].sections[0].keyPhrases.count, 1)
+        XCTAssertTrue(reloaded[0].sections[0].mustCover)
+        XCTAssertEqual(reloaded[0].sections[0].targetDuration, 60)
+    }
+
+    /// Saving an empty library removes the file rather than leaving `[]` behind.
+    func testSavingAnEmptyLibraryRemovesTheFile() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("teleprompter-\(UUID().uuidString).json")
+        let store = TeleprompterLibraryStore(fileURL: url)
+        store.save([parse("## One\nalpha")])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+
+        store.save([])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    // MARK: - Key commands
+
+    /// The reader is looking at a camera, so the keyboard has to drive
+    /// everything. These are the keys the panel claims.
+    func testKeyCommandsCoverPlaybackNavigationAndSectionJumps() {
+        XCTAssertEqual(command(keyCode: 49), .togglePlayback)
+        XCTAssertEqual(command(keyCode: 124), .nextWord)
+        XCTAssertEqual(command(keyCode: 123), .previousWord)
+        XCTAssertEqual(command(keyCode: 125), .nextSection)
+        XCTAssertEqual(command(keyCode: 126), .previousSection)
+        XCTAssertEqual(command(keyCode: 53), .close)
+        XCTAssertEqual(command(keyCode: 15, characters: "r"), .restart)
+    }
+
+    /// `1` means the first section, so the payload is zero-based.
+    func testNumberKeysJumpToTheMatchingSection() {
+        XCTAssertEqual(command(keyCode: 18, characters: "1"), .jumpToSection(0))
+        XCTAssertEqual(command(keyCode: 25, characters: "9"), .jumpToSection(8))
+        XCTAssertNil(command(keyCode: 29, characters: "0"), "There is no zeroth section.")
+    }
+
+    func testUnclaimedKeysArePassedOn() {
+        XCTAssertNil(command(keyCode: 0, characters: "a"))
+    }
+
+    private func command(keyCode: UInt16, characters: String = "") -> TeleprompterKeyCommand? {
+        guard let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: 0, context: nil,
+            characters: characters, charactersIgnoringModifiers: characters,
+            isARepeat: false, keyCode: keyCode
+        ) else {
+            XCTFail("Could not synthesise a key event")
+            return nil
+        }
+        return TeleprompterKeyCommand(event: event)
+    }
+
+    // MARK: - Display mode
+
+    func testDisplayModeControlsWhichSurfacesAppear() {
+        XCTAssertFalse(TeleprompterDisplayMode.panel.showsNotchTab)
+        XCTAssertTrue(TeleprompterDisplayMode.panel.showsPanel)
+        XCTAssertTrue(TeleprompterDisplayMode.tab.showsNotchTab)
+        XCTAssertFalse(TeleprompterDisplayMode.tab.showsPanel)
+        XCTAssertTrue(TeleprompterDisplayMode.both.showsNotchTab)
+        XCTAssertTrue(TeleprompterDisplayMode.both.showsPanel)
+    }
+
+    /// Atoll cannot ship OpenDyslexic — committing a font binary is against the
+    /// project's rules — so the choice must resolve gracefully when it is absent.
+    func testOnlyOpenDyslexicRequiresAnInstalledFont() {
+        XCTAssertNil(TeleprompterFontChoice.system.requiredFamilyName)
+        XCTAssertNil(TeleprompterFontChoice.highLegibility.requiredFamilyName)
+        XCTAssertEqual(TeleprompterFontChoice.openDyslexic.requiredFamilyName, "OpenDyslexic")
+        XCTAssertTrue(TeleprompterFontChoice.system.isAvailable)
+        XCTAssertTrue(TeleprompterFontChoice.highLegibility.isAvailable)
+    }
+
     // MARK: - Whole-script properties
 
     func testEmptyMarkdownProducesAnEmptyButValidScript() {
