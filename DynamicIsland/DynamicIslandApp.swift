@@ -824,6 +824,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }.store(in: &cancellables)
 
+        Defaults.publisher(.enableTeleprompterFeature, options: []).sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.updateFeatureShortcutAvailability()
+            }
+        }.store(in: &cancellables)
+
+        // Terminal had no such observer, so its shortcut only came alive at the
+        // next launch after the feature was switched on.
+        Defaults.publisher(.enableTerminalFeature, options: []).sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.updateFeatureShortcutAvailability()
+            }
+        }.store(in: &cancellables)
+
         // Pin/unpin the notch above all spaces when the hide option changes:
         // "Never hide" joins the max-level CGSSpace, the hide options leave it.
         Defaults.publisher(.hideNotchOption, options: []).sink { [weak self] _ in
@@ -1377,6 +1391,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        KeyboardShortcuts.onKeyDown(for: .teleprompterToggle) { [weak self] in
+            guard let self else { return }
+            guard Defaults[.enableShortcuts], Defaults[.enableTeleprompterFeature] else { return }
+
+            // The floating window is the prompter's own surface, so it wins when
+            // it is shown at all; the notch tab is the fallback.
+            if Defaults[.teleprompterDisplayMode].showsPanel {
+                TeleprompterPanelManager.shared.toggle()
+                return
+            }
+
+            if vm.notchState == .closed {
+                closeNotchWorkItem?.cancel()
+                closeNotchWorkItem = nil
+                vm.open()
+                coordinator.currentView = .teleprompter
+            } else if coordinator.currentView == .teleprompter {
+                coordinator.suppressHoverOpen()
+                vm.close()
+            } else {
+                closeNotchWorkItem?.cancel()
+                closeNotchWorkItem = nil
+                coordinator.currentView = .teleprompter
+            }
+        }
+
+        KeyboardShortcuts.onKeyDown(for: .teleprompterPlayPause) {
+            guard Defaults[.enableShortcuts], Defaults[.enableTeleprompterFeature] else { return }
+            TeleprompterManager.shared.toggleTake()
+        }
+
+        KeyboardShortcuts.onKeyDown(for: .teleprompterNextSection) {
+            guard Defaults[.enableShortcuts], Defaults[.enableTeleprompterFeature] else { return }
+            TeleprompterManager.shared.jumpToNextSection()
+        }
+
+        KeyboardShortcuts.onKeyDown(for: .teleprompterPreviousSection) {
+            guard Defaults[.enableShortcuts], Defaults[.enableTeleprompterFeature] else { return }
+            TeleprompterManager.shared.jumpToPreviousSection()
+        }
+
         KeyboardShortcuts.onKeyDown(for: .screenAssistantPanel) { [weak self] in
             guard let self else { return }
             guard Defaults[.enableShortcuts], Defaults[.enableScreenAssistant] else { return }
@@ -1404,6 +1459,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateShortcut(.colorPickerPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableColorPickerFeature])
         updateShortcut(.screenAssistantPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableScreenAssistant])
         updateShortcut(.toggleTerminalTab, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableTerminalFeature])
+        let teleprompterOn = Defaults[.enableShortcuts] && Defaults[.enableTeleprompterFeature]
+        updateShortcut(.teleprompterToggle, isEnabled: teleprompterOn)
+        updateShortcut(.teleprompterPlayPause, isEnabled: teleprompterOn)
+        updateShortcut(.teleprompterNextSection, isEnabled: teleprompterOn)
+        updateShortcut(.teleprompterPreviousSection, isEnabled: teleprompterOn)
     }
 
     @MainActor

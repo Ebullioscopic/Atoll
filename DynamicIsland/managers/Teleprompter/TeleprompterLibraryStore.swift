@@ -44,6 +44,12 @@ enum TeleprompterStorage {
         directory.appendingPathComponent("takes", isDirectory: true)
     }
 
+    /// The running order, kept beside the library rather than inside it so
+    /// reordering does not rewrite every script's text.
+    static var playlistURL: URL {
+        directory.appendingPathComponent("playlist.json")
+    }
+
     /// Called only when something is about to be written.
     @discardableResult
     static func ensureDirectory(_ url: URL) -> Bool {
@@ -86,6 +92,35 @@ final class TeleprompterLibraryStore {
             Logger.log("Teleprompter: could not encode the script library", category: .ui)
             return
         }
+        TeleprompterStorage.ensureDirectory(fileURL.deletingLastPathComponent())
+        try? data.write(to: fileURL, options: .atomic)
+    }
+}
+
+/// Loads and saves the running order.
+final class TeleprompterPlaylistStore {
+    private let fileURL: URL
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    init(fileURL: URL = TeleprompterStorage.playlistURL) {
+        self.fileURL = fileURL
+        encoder.outputFormatting = [.prettyPrinted]
+    }
+
+    func load() -> TeleprompterPlaylist {
+        guard let data = try? Data(contentsOf: fileURL),
+              let playlist = try? decoder.decode(TeleprompterPlaylist.self, from: data)
+        else { return TeleprompterPlaylist() }
+        return playlist
+    }
+
+    func save(_ playlist: TeleprompterPlaylist) {
+        guard !playlist.isEmpty else {
+            try? FileManager.default.removeItem(at: fileURL)
+            return
+        }
+        guard let data = try? encoder.encode(playlist) else { return }
         TeleprompterStorage.ensureDirectory(fileURL.deletingLastPathComponent())
         try? data.write(to: fileURL, options: .atomic)
     }
@@ -141,6 +176,15 @@ final class TeleprompterTakeStore {
 
     func removeAll(for scriptID: UUID) {
         try? FileManager.default.removeItem(at: fileURL(for: scriptID))
+    }
+
+    /// Drops one take. Someone reviewing a bad run should be able to throw it
+    /// away without clearing the history they are comparing it against.
+    @discardableResult
+    func remove(takeID: UUID, from scriptID: UUID, now: Date = Date()) -> [TeleprompterTake] {
+        let remaining = takes(for: scriptID, now: now).filter { $0.id != takeID }
+        write(remaining, for: scriptID)
+        return remaining
     }
 
     private func write(_ takes: [TeleprompterTake], for scriptID: UUID) {

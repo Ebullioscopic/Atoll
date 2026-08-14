@@ -33,4 +33,11 @@ extension KeyboardShortcuts.Name {
     static let toggleNotchOpen = Self("toggleNotchOpen", default: .init(.i, modifiers: [.command, .shift]))
     static let toggleTerminalTab = Self("toggleTerminalTab", default: .init(.backtick, modifiers: [.control]))
     static let startDemoTimer = Self("startDemoTimer", default: .init(.t, modifiers: [.command, .shift]))
+    static let teleprompterToggle = Self("teleprompterToggle", default: .init(.r, modifiers: [.command, .shift]))
+    static let teleprompterPlayPause = Self("teleprompterPlayPause", default: .init(.k, modifiers: [.command, .shift]))
+    /// Deliberately unassigned. Anything comfortable to press mid-sentence is
+    /// already doing something in the app the speaker is presenting from, and a
+    /// global shortcut takes it away everywhere.
+    static let teleprompterNextSection = Self("teleprompterNextSection")
+    static let teleprompterPreviousSection = Self("teleprompterPreviousSection")
 }

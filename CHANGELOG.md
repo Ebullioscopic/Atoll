@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shelf marquee selection**: Dragging on empty space in the Shelf now draws a rubber-band rectangle that selects every item it touches, matching Finder. Holding Shift unions the marquee with the existing selection instead of replacing it (#682).
 - **Shelf drag-out move toggle**: A new "Allow moving files when dragging out" setting (off by default) keeps drag-out copy-only. Offering a move operation previously let the receiving app relocate the original file out from under the user when the destination was on the same volume (#682).
 
+- **Teleprompter running order, take history and shortcuts**: Line several scripts up and the prompter rolls straight on to the next one when a script ends, optionally looping — the notch shows what is coming. Each script now remembers the size, typeface, pace, opacity and mirroring you last used with it, so a talk and a demo script no longer fight over one setup. Settings gained a browsable history of the takes recorded for a script, with a one-line answer to whether your pace is settling and a way to throw away a single bad run. Four global shortcuts drive it: show the prompter (⌘⇧R), start or pause a take (⌘⇧K), and next/previous section, which are deliberately left unassigned because anything comfortable to press mid-sentence already does something in the app you are presenting from.
+
 ### Changed
 - Improved the Dutch localization by adding missing translations, corrected terminology, and wording aligned with Apple's Dutch macOS conventions.
 - Refreshing the LLM Usage card now skips session logs whose last write predates the seven-day window instead of re-reading the whole log history, and counts a repeated record when the copy inside the window would previously have been suppressed by a copy outside it (#691).
@@ -47,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Open, Open With, Show in Finder, Quick Look, Compress, Copy Path, and the image actions all missing from the Shelf file context menu, caused by `ShelfItem.fileURL` returning a hard-coded `nil` for files (#682).
 - Fixed the notch auto-closing in the middle of a drag and cancelling the session: dragging an item out necessarily takes the cursor off the panel, which tore down the view acting as the drag source (#682).
 - Fixed an issue where scrolling a long note inside the Dynamic Island returned the view to the home view instead of scrolling the note. (`#636`)
+- The Terminal tab's keyboard shortcut now becomes usable as soon as the Terminal feature is switched on, rather than only after the next launch.
 
 ### Removed
 

@@ -49,8 +49,12 @@ final class TeleprompterManager: ObservableObject {
     /// The take just finished, shown as a debrief until dismissed.
     @Published private(set) var lastTake: TeleprompterTake?
 
+    /// The running order across scripts.
+    @Published private(set) var playlist = TeleprompterPlaylist()
+
     private let store = TeleprompterLibraryStore()
     private let takeStore = TeleprompterTakeStore()
+    private let playlistStore = TeleprompterPlaylistStore()
     private let speech = TeleprompterSpeechFollower()
     /// When words were heard, relative to the take's start — the raw material for
     /// the pace and pause figures.
@@ -111,7 +115,9 @@ final class TeleprompterManager: ObservableObject {
         hasStarted = true
 
         scripts = store.load()
+        playlist = playlistStore.load().sanitized(against: Set(scripts.map(\.id)))
         currentScriptID = scripts.first?.id
+        applyPreferencesOfCurrentScript()
 
         Defaults.publisher(.enableTeleprompterFeature)
             .receive(on: RunLoop.main)
@@ -130,6 +136,16 @@ final class TeleprompterManager: ObservableObject {
                 self.resumeTake()
             }
             .store(in: &cancellables)
+
+        // Appearance and pace are edited through the shared keys, wherever the
+        // controls happen to live; whichever script is current adopts whatever
+        // the reader settled on.
+        for publisher in Self.perScriptPreferenceChanges() {
+            publisher
+                .receive(on: RunLoop.main)
+                .sink { [weak self] _ in self?.captureCurrentPreferences() }
+                .store(in: &cancellables)
+        }
 
         speech.onWords = { [weak self] words in
             self?.consume(words)
@@ -205,10 +221,12 @@ final class TeleprompterManager: ObservableObject {
         // orphaned record of what someone said out loud.
         takeStore.removeAll(for: id)
         scripts.removeAll { $0.id == id }
+        setPlaylist(playlist.sanitized(against: Set(scripts.map(\.id))))
         if currentScriptID == id {
             currentScriptID = scripts.first?.id
             confirmedTokenIndex = 0
             endTake()
+            applyPreferencesOfCurrentScript()
         }
         store.save(scripts)
     }
@@ -219,6 +237,94 @@ final class TeleprompterManager: ObservableObject {
         // Resume where this script was left, which is what makes reopening one
         // feel like returning to it.
         confirmedTokenIndex = currentScript?.preferences.lastTokenIndex ?? 0
+        applyPreferencesOfCurrentScript()
+    }
+
+    // MARK: - Per-script memory
+
+    /// The keys a script remembers for itself.
+    private static func perScriptPreferenceChanges() -> [AnyPublisher<Void, Never>] {
+        [
+            Defaults.publisher(.teleprompterFontSize).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.teleprompterFontChoice).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.teleprompterWordsPerMinute).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.teleprompterOpacity).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.teleprompterMirrored).map { _ in () }.eraseToAnyPublisher()
+        ]
+    }
+
+    /// Puts the current script's remembered setup back on screen.
+    ///
+    /// The views keep reading the shared keys, so there is exactly one rendering
+    /// path; a script's memory is a set of values pushed into those keys when it
+    /// becomes current, not a second source of truth the renderer has to consult.
+    private func applyPreferencesOfCurrentScript() {
+        guard Defaults[.teleprompterRememberPerScript], let script = currentScript else { return }
+        let preferences = script.preferences
+        Defaults[.teleprompterFontSize] = preferences.fontSize
+        Defaults[.teleprompterFontChoice] = preferences.fontChoice
+        Defaults[.teleprompterWordsPerMinute] = preferences.wordsPerMinute
+        Defaults[.teleprompterOpacity] = preferences.opacity
+        Defaults[.teleprompterMirrored] = preferences.isMirrored
+    }
+
+    /// Records the setup on the current script.
+    ///
+    /// Safe to run after ``applyPreferencesOfCurrentScript()``: the keys already
+    /// hold that script's own values, so a late notification writes them back
+    /// unchanged rather than starting a loop.
+    private func captureCurrentPreferences() {
+        guard Defaults[.teleprompterRememberPerScript],
+              let id = currentScriptID,
+              let index = scripts.firstIndex(where: { $0.id == id })
+        else { return }
+
+        var preferences = scripts[index].preferences
+        preferences.fontSize = Defaults[.teleprompterFontSize]
+        preferences.fontChoice = Defaults[.teleprompterFontChoice]
+        preferences.wordsPerMinute = Defaults[.teleprompterWordsPerMinute]
+        preferences.opacity = Defaults[.teleprompterOpacity]
+        preferences.isMirrored = Defaults[.teleprompterMirrored]
+        guard preferences != scripts[index].preferences else { return }
+
+        scripts[index].preferences = preferences
+        store.save(scripts)
+    }
+
+    // MARK: - Playlist
+
+    /// The script that follows the current one, if the running order says so.
+    var nextInPlaylist: TeleprompterScript? {
+        guard Defaults[.teleprompterPlaylistEnabled],
+              let id = currentScriptID,
+              let nextID = playlist.next(after: id, loops: Defaults[.teleprompterPlaylistLoops])
+        else { return nil }
+        return scripts.first { $0.id == nextID }
+    }
+
+    func isInPlaylist(_ id: UUID) -> Bool { playlist.contains(id) }
+
+    func toggleInPlaylist(_ id: UUID) {
+        var updated = playlist
+        updated.contains(id) ? updated.remove(id) : updated.add(id)
+        setPlaylist(updated)
+    }
+
+    func movePlaylistEntry(_ id: UUID, by offset: Int) {
+        var updated = playlist
+        updated.move(id, by: offset)
+        setPlaylist(updated)
+    }
+
+    /// Scripts in reading order, for the playlist editor.
+    var playlistScripts: [TeleprompterScript] {
+        playlist.scriptIDs.compactMap { id in scripts.first { $0.id == id } }
+    }
+
+    private func setPlaylist(_ updated: TeleprompterPlaylist) {
+        guard updated != playlist else { return }
+        playlist = updated
+        playlistStore.save(updated)
     }
 
     /// First heading, or first line, as a name for an imported script.
@@ -260,6 +366,32 @@ final class TeleprompterManager: ObservableObject {
               script.sections.indices.contains(sectionIndex)
         else { return }
         setTokenIndex(script.sections[sectionIndex].tokenRange.lowerBound)
+    }
+
+    /// Moves to the next section, or to the very end when there is none left.
+    func jumpToNextSection() {
+        guard let script = currentScript else { return }
+        let next = currentSectionIndex + 1
+        guard script.sections.indices.contains(next) else {
+            setTokenIndex(script.tokens.count)
+            return
+        }
+        jumpToSection(next)
+    }
+
+    /// Moves to the start of this section, or to the previous one when already
+    /// there — the behaviour of a track-back button, which is what people expect
+    /// from a key they press while talking.
+    func jumpToPreviousSection() {
+        guard let script = currentScript,
+              script.sections.indices.contains(currentSectionIndex)
+        else { return }
+        let start = script.sections[currentSectionIndex].tokenRange.lowerBound
+        if confirmedTokenIndex > start {
+            setTokenIndex(start)
+        } else {
+            jumpToSection(currentSectionIndex - 1)
+        }
     }
 
     func restart() {
@@ -322,6 +454,12 @@ final class TeleprompterManager: ObservableObject {
         if followState.confirmedCursor != confirmedTokenIndex {
             confirmedTokenIndex = min(followState.confirmedCursor, script.tokens.count)
             persistPosition()
+
+            // Reading the last word is the end of this script whether the pace
+            // came from a clock or from a voice.
+            if confirmedTokenIndex >= script.tokens.count, nextInPlaylist != nil {
+                handleReachedEnd()
+            }
         }
     }
 
@@ -356,7 +494,18 @@ final class TeleprompterManager: ObservableObject {
         takeStartedAt = Date()
         speechTimestamps = []
         lastTake = nil
+        // A second take must not inherit the first one's matched words and
+        // covered sections. Voice mode rebuilds this when it starts listening;
+        // the other modes never would.
+        resetFollowState()
         startAdvanceIfNeeded()
+    }
+
+    private func resetFollowState() {
+        followState = FollowState()
+        followState.cursor = confirmedTokenIndex
+        followState.confirmedCursor = confirmedTokenIndex
+        followMode = .following
     }
 
     func pauseTake() {
@@ -384,11 +533,32 @@ final class TeleprompterManager: ObservableObject {
         store.save(scripts)
     }
 
+    /// What happens when the reader runs out of script.
+    ///
+    /// With a running order, the take rolls straight on to the next script — the
+    /// point of a playlist is that nobody has to touch the Mac between parts. The
+    /// finished part is still filed, but its debrief is not put on screen: the
+    /// reader is mid-sentence in the next script and the debrief covers the text.
+    private func handleReachedEnd() {
+        guard let nextScript = nextInPlaylist else {
+            pauseTake()
+            return
+        }
+
+        recordTakeIfWorthwhile(surfacingDebrief: false)
+        selectScript(id: nextScript.id)
+        setTokenIndex(0)
+        speechTimestamps = []
+        takeStartedAt = Date()
+        resetFollowState()
+        startAdvanceIfNeeded()
+    }
+
     /// Files a debrief for a take that actually happened.
     ///
     /// A take with nothing matched is someone opening the prompter and closing
     /// it again; filing statistics for that would only clutter the history.
-    private func recordTakeIfWorthwhile() {
+    private func recordTakeIfWorthwhile(surfacingDebrief: Bool = true) {
         guard let script = currentScript,
               let startedAt = takeStartedAt,
               followState.matchedWordCount > 0
@@ -404,13 +574,23 @@ final class TeleprompterManager: ObservableObject {
             localeIdentifier: readingLocale.identifier
         )
         takeStore.append(take)
-        lastTake = take
+        if surfacingDebrief { lastTake = take }
     }
 
     /// Takes recorded for the current script, newest first.
     var takesForCurrentScript: [TeleprompterTake] {
         guard let id = currentScriptID else { return [] }
         return takeStore.takes(for: id)
+    }
+
+    func takes(for scriptID: UUID) -> [TeleprompterTake] {
+        takeStore.takes(for: scriptID)
+    }
+
+    func deleteTake(_ takeID: UUID, from scriptID: UUID) {
+        takeStore.remove(takeID: takeID, from: scriptID)
+        if lastTake?.id == takeID { lastTake = nil }
+        objectWillChange.send()
     }
 
     func dismissDebrief() {
@@ -462,7 +642,7 @@ final class TeleprompterManager: ObservableObject {
                 guard let self, self.isRunning else { return }
                 guard let script = self.currentScript else { return }
                 guard self.confirmedTokenIndex < script.tokens.count else {
-                    self.pauseTake()
+                    self.handleReachedEnd()
                     return
                 }
                 self.confirmedTokenIndex += 1

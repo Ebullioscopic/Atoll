@@ -80,6 +80,22 @@ struct NotchTeleprompterView: View {
                     .lineLimit(1)
             }
 
+            // Knowing what follows is the whole reason to have a running order:
+            // it tells you the prompter will keep going without you.
+            if let next = manager.nextInPlaylist {
+                HStack(spacing: 3) {
+                    Image(systemName: "text.line.first.and.arrowtriangle.forward")
+                    Text(next.name)
+                        .lineLimit(1)
+                }
+                .font(.system(size: 9, weight: .medium))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1)
+                .background(.white.opacity(0.10), in: Capsule())
+                .foregroundStyle(.secondary)
+                .help(Text("Next in the running order"))
+            }
+
             Spacer(minLength: 0)
 
             if manager.currentScript != nil {

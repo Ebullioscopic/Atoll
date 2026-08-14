@@ -1181,6 +1181,13 @@ extension Defaults.Keys {
     static let teleprompterMaxHeightFraction = Key<Double>("teleprompterMaxHeightFraction", default: 0.45)
     /// Locale for reading and, later, for speech recognition. Empty follows the system.
     static let teleprompterLocaleIdentifier = Key<String>("teleprompterLocaleIdentifier", default: "")
+    /// Whether each script keeps its own size, typeface, pace and mirroring.
+    /// On, because a talk and a demo script rarely want the same setup.
+    static let teleprompterRememberPerScript = Key<Bool>("teleprompterRememberPerScript", default: true)
+    /// Roll on to the next script in the running order when one is finished.
+    static let teleprompterPlaylistEnabled = Key<Bool>("teleprompterPlaylistEnabled", default: false)
+    /// Return to the first script after the last, for a looping display reel.
+    static let teleprompterPlaylistLoops = Key<Bool>("teleprompterPlaylistLoops", default: false)
 
     // MARK: Timer Feature
     static let enableTimerFeature = Key<Bool>("enableTimerFeature", default: true)

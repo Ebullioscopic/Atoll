@@ -6517,6 +6517,32 @@ struct Shortcuts: View {
                 }
 
                 Section {
+                    VStack(alignment: .leading) {
+                        KeyboardShortcuts.Recorder("Show the Prompter:", name: .teleprompterToggle)
+                            .disabled(!enableShortcuts || !Defaults[.enableTeleprompterFeature])
+                        KeyboardShortcuts.Recorder("Start or pause a take:", name: .teleprompterPlayPause)
+                            .disabled(!enableShortcuts || !Defaults[.enableTeleprompterFeature])
+                        KeyboardShortcuts.Recorder("Next section:", name: .teleprompterNextSection)
+                            .disabled(!enableShortcuts || !Defaults[.enableTeleprompterFeature])
+                        KeyboardShortcuts.Recorder("Previous section:", name: .teleprompterPreviousSection)
+                            .disabled(!enableShortcuts || !Defaults[.enableTeleprompterFeature])
+                        if !Defaults[.enableTeleprompterFeature] {
+                            Text("Teleprompter feature is disabled")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 2)
+                        }
+                    }
+                } header: {
+                    Text("Teleprompter")
+                } footer: {
+                    Text("The section keys come unassigned on purpose: anything comfortable to press mid-sentence is already doing something in the app you are presenting from.")
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+
+                Section {
                     HStack {
                         VStack(alignment: .leading) {
                             KeyboardShortcuts.Recorder("Color Picker Panel:", name: .colorPickerPanel)

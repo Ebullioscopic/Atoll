@@ -40,6 +40,7 @@ struct TeleprompterSettings: View {
     @Default(.teleprompterOpacity) private var opacity
     @Default(.teleprompterMirrored) private var isMirrored
     @Default(.teleprompterLocaleIdentifier) private var localeIdentifier
+    @Default(.teleprompterPlaylistEnabled) private var playlistEnabled
 
     @State private var isImporting = false
     @State private var importError: String?
@@ -49,8 +50,10 @@ struct TeleprompterSettings: View {
             generalSection
             if isEnabled {
                 libarySection
+                playlistSection
                 readingSection
                 appearanceSection
+                historySection
                 privacySection
             }
         }
@@ -169,6 +172,110 @@ struct TeleprompterSettings: View {
         )
         let sections = "\(script.sections.count) " + String(localized: "sections")
         return "\(words) · \(duration) · \(sections)"
+    }
+
+    // MARK: - Playlist
+
+    private var playlistSection: some View {
+        Section {
+            Defaults.Toggle(key: .teleprompterPlaylistEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Run scripts in order")
+                    Text("When one script ends the next begins, without touching the Mac.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if playlistEnabled {
+                Defaults.Toggle(key: .teleprompterPlaylistLoops) {
+                    Text("Start again after the last one")
+                }
+
+                let ordered = manager.playlistScripts
+                if ordered.isEmpty {
+                    Text("Nothing in the running order yet.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(ordered.enumerated()), id: \.element.id) { position, script in
+                        LabeledContent {
+                            HStack(spacing: 8) {
+                                Button {
+                                    manager.movePlaylistEntry(script.id, by: -1)
+                                } label: {
+                                    Image(systemName: "chevron.up")
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(position == 0)
+
+                                Button {
+                                    manager.movePlaylistEntry(script.id, by: 1)
+                                } label: {
+                                    Image(systemName: "chevron.down")
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(position == ordered.count - 1)
+
+                                Button {
+                                    manager.toggleInPlaylist(script.id)
+                                } label: {
+                                    Image(systemName: "minus.circle")
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        } label: {
+                            Text("\(position + 1). \(script.name)")
+                        }
+                    }
+                }
+
+                let candidates = manager.scripts.filter { !manager.isInPlaylist($0.id) }
+                if !candidates.isEmpty {
+                    Menu {
+                        ForEach(candidates) { script in
+                            Button(script.name) { manager.toggleInPlaylist(script.id) }
+                        }
+                    } label: {
+                        Text("Add a script to the order…")
+                    }
+                }
+            }
+        } header: {
+            Text("Running order")
+        }
+    }
+
+    // MARK: - Take history
+
+    private var historySection: some View {
+        Section {
+            if let script = manager.currentScript {
+                TeleprompterTakeHistoryView(
+                    takes: manager.takes(for: script.id),
+                    script: script,
+                    onDelete: { manager.deleteTake($0.id, from: script.id) }
+                )
+
+                if !manager.takes(for: script.id).isEmpty {
+                    Button(role: .destructive) {
+                        manager.clearTakeHistory()
+                    } label: {
+                        Text("Clear this script's history")
+                    }
+                }
+            } else {
+                Text("Choose a script to see its takes.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Takes")
+        } footer: {
+            Text("Kept on this Mac only: the last \(TeleprompterTakeStore.maxTakesPerScript) takes per script, and nothing older than 30 days. No audio is ever recorded or saved.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     // MARK: - Reading
@@ -309,6 +416,15 @@ struct TeleprompterSettings: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Mirror the text")
                     Text("For reading off a beam-splitter rig.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Defaults.Toggle(key: .teleprompterRememberPerScript) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Remember this per script")
+                    Text("Each script keeps the size, typeface, pace, opacity and mirroring you last used with it. Switch it off to keep one setup for everything.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

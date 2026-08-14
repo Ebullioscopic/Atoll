@@ -694,6 +694,126 @@ final class TeleprompterTests: XCTestCase {
         XCTAssertTrue(store.takes(for: second).isEmpty, "One script's takes must not appear under another.")
     }
 
+    /// Throwing away one bad run must not clear the history it is compared with.
+    func testDeletingOneTakeKeepsTheRest() throws {
+        let (store, dir) = makeTakeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let scriptID = UUID()
+        let doomed = UUID()
+
+        store.append(sampleTake(scriptID: scriptID, startedAt: Date().addingTimeInterval(-600)))
+        store.append(sampleTake(scriptID: scriptID, startedAt: Date().addingTimeInterval(-60), id: doomed))
+        XCTAssertEqual(store.takes(for: scriptID).count, 2)
+
+        let remaining = store.remove(takeID: doomed, from: scriptID)
+        XCTAssertEqual(remaining.count, 1)
+        XCTAssertFalse(remaining.contains { $0.id == doomed })
+        XCTAssertEqual(
+            TeleprompterTakeStore(directory: dir).takes(for: scriptID).count, 1,
+            "The deletion has to survive a reload."
+        )
+    }
+
+    func testDeletingTheLastTakeRemovesTheFile() throws {
+        let (store, dir) = makeTakeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let scriptID = UUID()
+        let only = UUID()
+
+        store.append(sampleTake(scriptID: scriptID, startedAt: Date(), id: only))
+        store.remove(takeID: only, from: scriptID)
+
+        XCTAssertTrue(store.takes(for: scriptID).isEmpty)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: dir.appendingPathComponent("\(scriptID.uuidString).json").path),
+            "An empty history should leave no file behind."
+        )
+    }
+
+    // MARK: - Running order
+
+    func testPlaylistHandsOnToTheNextScript() {
+        let (first, second, third) = (UUID(), UUID(), UUID())
+        let playlist = TeleprompterPlaylist(scriptIDs: [first, second, third])
+
+        XCTAssertEqual(playlist.next(after: first), second)
+        XCTAssertEqual(playlist.next(after: second), third)
+    }
+
+    /// The end of a non-looping order is the end of the take, not a wrap-around.
+    func testPlaylistStopsAtTheEndUnlessItLoops() {
+        let (first, last) = (UUID(), UUID())
+        let playlist = TeleprompterPlaylist(scriptIDs: [first, last])
+
+        XCTAssertNil(playlist.next(after: last))
+        XCTAssertEqual(playlist.next(after: last, loops: true), first)
+    }
+
+    /// A single-script order must not hand back to itself — that would restart
+    /// the same script forever the moment the reader reached the last word.
+    func testASingleScriptNeverLoopsOntoItself() {
+        let only = UUID()
+        XCTAssertNil(TeleprompterPlaylist(scriptIDs: [only]).next(after: only, loops: true))
+    }
+
+    /// Someone reading a script that is not in the order should be left where
+    /// they are rather than dropped into it.
+    func testAScriptOutsideTheOrderHasNoSuccessor() {
+        let playlist = TeleprompterPlaylist(scriptIDs: [UUID(), UUID()])
+        XCTAssertNil(playlist.next(after: UUID()))
+    }
+
+    /// `next(after:)` is keyed by identity, so a script listed twice would have
+    /// two successors and no way to choose.
+    func testTheOrderHoldsEachScriptOnce() {
+        let repeated = UUID()
+        var playlist = TeleprompterPlaylist(scriptIDs: [repeated, UUID(), repeated])
+        XCTAssertEqual(playlist.count, 2)
+
+        playlist.add(repeated)
+        XCTAssertEqual(playlist.count, 2)
+    }
+
+    func testMovingAnEntryStaysInsideTheOrder() {
+        let (first, second) = (UUID(), UUID())
+        var playlist = TeleprompterPlaylist(scriptIDs: [first, second])
+
+        playlist.move(second, by: -1)
+        XCTAssertEqual(playlist.scriptIDs, [second, first])
+
+        // Off either end is a no-op rather than a crash or a silent wrap.
+        playlist.move(second, by: -1)
+        playlist.move(first, by: 3)
+        XCTAssertEqual(playlist.scriptIDs, [second, first])
+    }
+
+    /// Deleting a script leaves a hole nothing else would clean up.
+    func testSanitisingDropsDeletedScripts() {
+        let (kept, deleted) = (UUID(), UUID())
+        let playlist = TeleprompterPlaylist(scriptIDs: [kept, deleted])
+
+        let cleaned = playlist.sanitized(against: [kept])
+        XCTAssertEqual(cleaned.scriptIDs, [kept])
+        XCTAssertNil(cleaned.next(after: kept))
+    }
+
+    func testPlaylistRoundTripsThroughItsStore() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("teleprompter-playlist-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = TeleprompterPlaylistStore(fileURL: url)
+        let order = TeleprompterPlaylist(scriptIDs: [UUID(), UUID()])
+
+        store.save(order)
+        XCTAssertEqual(TeleprompterPlaylistStore(fileURL: url).load(), order)
+
+        store.save(TeleprompterPlaylist())
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: url.path),
+            "An empty order leaves no file, like the rest of the feature."
+        )
+    }
+
     /// Reading history must not create the folder — the same zero-trace rule as
     /// the script library.
     func testReadingTakesCreatesNothingOnDisk() {
