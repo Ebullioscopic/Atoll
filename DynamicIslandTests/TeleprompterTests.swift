@@ -405,6 +405,326 @@ final class TeleprompterTests: XCTestCase {
         XCTAssertTrue(TeleprompterFontChoice.highLegibility.isAvailable)
     }
 
+    // MARK: - Token similarity
+
+    /// Fuzzy-matching function words is where a naive matcher destroys itself:
+    /// `the`, `then`, `they` and `there` are one or two edits apart and are the
+    /// most frequent words in any script.
+    func testShortWordsRequireAnExactMatch() {
+        XCTAssertEqual(TokenSimilarity.compare("the", "the"), .exact)
+        XCTAssertEqual(TokenSimilarity.compare("the", "then"), .none)
+        XCTAssertEqual(TokenSimilarity.compare("they", "then"), .none)
+        XCTAssertEqual(TokenSimilarity.compare("cat", "cut"), .none)
+    }
+
+    func testRecogniserSlipsAndSpellingVariantsAreAccepted() {
+        XCTAssertEqual(TokenSimilarity.compare("recognise", "recognize"), .near)
+        XCTAssertEqual(TokenSimilarity.compare("colour", "color"), .near)
+        XCTAssertEqual(TokenSimilarity.compare("presentation", "presentaton"), .near)
+    }
+
+    func testUnrelatedWordsDoNotMatch() {
+        XCTAssertEqual(TokenSimilarity.compare("engineering", "marketing"), .none)
+        XCTAssertEqual(TokenSimilarity.compare("hello", "goodbye"), .none)
+    }
+
+    /// Turkish, Finnish and Hungarian stack suffixes onto a stable stem. Without
+    /// prefix tolerance nearly every inflected word would read as a miss.
+    func testAgglutinativeSuffixesStillMatchTheirStem() {
+        XCTAssertEqual(TokenSimilarity.compare("kitaplar", "kitap"), .near)
+        XCTAssertEqual(TokenSimilarity.compare("ogrenciler", "ogrenci"), .near)
+
+        // A two-letter stem is not a stem. `evde` and `evlerde` share only `ev`,
+        // which would match far too much to be safe.
+        XCTAssertEqual(TokenSimilarity.compare("evlerde", "evde"), .none)
+        // And a long suffix chain has drifted too far to be the same word here.
+        XCTAssertEqual(TokenSimilarity.compare("kitaplarimizdan", "kitap"), .none)
+    }
+
+    /// `they`/`then` and `there`/`their` are the pairs that would quietly wreck
+    /// the matcher, so they are pinned explicitly.
+    func testTheMostDangerousFunctionWordPairsNeverMatch() {
+        XCTAssertEqual(TokenSimilarity.compare("they", "then"), .none)
+        XCTAssertEqual(TokenSimilarity.compare("there", "their"), .none)
+        XCTAssertEqual(TokenSimilarity.compare("that", "than"), .none)
+        XCTAssertEqual(TokenSimilarity.compare("were", "where"), .none)
+        // Content words of the same length are still allowed to differ by one.
+        XCTAssertEqual(TokenSimilarity.compare("color", "colour"), .near)
+    }
+
+    func testEditDistanceAbandonsEarlyBeyondTheLimit() {
+        XCTAssertEqual(TokenSimilarity.editDistance(Array("abc"), Array("abc"), limit: 2), 0)
+        XCTAssertEqual(TokenSimilarity.editDistance(Array("abc"), Array("abd"), limit: 2), 1)
+        XCTAssertGreaterThan(TokenSimilarity.editDistance(Array("abc"), Array("xyz"), limit: 1), 1)
+    }
+
+    // MARK: - Following the reader
+
+    private func follow(
+        _ script: TeleprompterScript,
+        saying words: [String],
+        state: inout FollowState,
+        at time: TimeInterval = 1
+    ) -> [ScriptFollower.Event] {
+        let index = ScriptFollowIndex(script: script)
+        return ScriptFollower.advance(
+            state: &state,
+            spoken: words.map { TeleprompterTokenizer.normalize($0, locale: english) },
+            script: script,
+            index: index,
+            now: time
+        )
+    }
+
+    /// Speaking the script verbatim should track it exactly and report nothing
+    /// unusual.
+    func testReadingVerbatimTracksWordForWord() {
+        let script = parse("## One\nthe quick brown fox jumps over the lazy dog")
+        var state = FollowState()
+        _ = follow(script, saying: ["the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog"], state: &state)
+
+        XCTAssertEqual(state.confirmedCursor, script.tokens.count)
+        XCTAssertEqual(state.mode, .following)
+        XCTAssertTrue(state.skipped.isEmpty)
+        XCTAssertTrue(state.offScriptRuns.isEmpty)
+        XCTAssertEqual(state.matchedWordCount, 9)
+    }
+
+    /// The highlight must not move on a single ambiguous word.
+    func testTheHighlightWaitsForCorroboration() {
+        let script = parse("## One\nalpha beta gamma delta")
+        var state = FollowState()
+        _ = follow(script, saying: ["alpha"], state: &state)
+        XCTAssertEqual(state.cursor, 1)
+        XCTAssertEqual(state.confirmedCursor, 0, "One word is not enough to move the display.")
+
+        _ = follow(script, saying: ["beta"], state: &state)
+        XCTAssertEqual(state.confirmedCursor, 2)
+    }
+
+    /// A pause must leave the position exactly where it was.
+    func testSilenceDoesNotAdvanceOrPenalise() {
+        let script = parse("## One\nalpha beta gamma delta epsilon")
+        var state = FollowState()
+        _ = follow(script, saying: ["alpha", "beta"], state: &state, at: 1)
+        let position = state.confirmedCursor
+
+        _ = follow(script, saying: [], state: &state, at: 30)
+        XCTAssertEqual(state.confirmedCursor, position)
+        XCTAssertEqual(state.mode, .waiting)
+        XCTAssertTrue(state.offScriptRuns.isEmpty)
+
+        _ = follow(script, saying: ["gamma"], state: &state, at: 31)
+        XCTAssertEqual(state.mode, .following)
+    }
+
+    /// Skipping a clause is ordinary; it should be absorbed and recorded.
+    func testASkippedClauseIsAbsorbedAndRecorded() {
+        let script = parse("## One\nalpha beta gamma delta epsilon zeta eta theta")
+        var state = FollowState()
+        _ = follow(script, saying: ["alpha", "epsilon", "zeta"], state: &state)
+
+        XCTAssertEqual(state.mode, .following)
+        XCTAssertEqual(state.skipped.count, 1)
+        XCTAssertEqual(state.skipped[0].range, 1..<4, "beta gamma delta were skipped.")
+        XCTAssertGreaterThanOrEqual(state.confirmedCursor, 6)
+    }
+
+    /// The regression that matters most: one coincidental common word far away
+    /// must not move the reader.
+    func testASingleFarAwayMatchDoesNotTeleportTheReader() {
+        let body = Array(repeating: "filler", count: 60).joined(separator: " ")
+        let script = parse("## One\nalpha beta \(body) alpha omega")
+        var state = FollowState()
+
+        _ = follow(script, saying: ["alpha", "beta"], state: &state)
+        let before = state.confirmedCursor
+
+        // "omega" only appears at the very end. One hit must not commit.
+        _ = follow(script, saying: ["omega"], state: &state)
+        XCTAssertEqual(state.confirmedCursor, before, "A lone distant match must stay a candidate.")
+    }
+
+    /// Jumping to another section is something presenters do constantly, and it
+    /// looks like this: several distinctive words from somewhere else, together.
+    func testJumpingToAnotherSectionIsFollowed() {
+        let body = Array(repeating: "filler", count: 40).joined(separator: " ")
+        let script = parse("""
+        ## One
+        alpha beta \(body)
+
+        ## Two
+        quarterly revenue forecast improved substantially
+        """)
+        var state = FollowState()
+        _ = follow(script, saying: ["alpha", "beta"], state: &state)
+
+        _ = follow(script, saying: ["quarterly", "revenue", "forecast", "improved"], state: &state)
+        XCTAssertGreaterThan(state.confirmedCursor, 40, "Four agreeing distinctive words should commit the jump.")
+        XCTAssertEqual(state.mode, .following)
+    }
+
+    /// A common word repeated cannot name a place, however often it is said.
+    func testRepeatingACommonWordNeverCausesAJump() {
+        let body = Array(repeating: "filler", count: 40).joined(separator: " ")
+        let script = parse("## One\nalpha beta \(body) filler filler filler")
+        var state = FollowState()
+        _ = follow(script, saying: ["alpha", "beta"], state: &state)
+        let before = state.confirmedCursor
+
+        _ = follow(script, saying: ["filler", "filler", "filler", "filler"], state: &state)
+        XCTAssertLessThanOrEqual(
+            state.confirmedCursor, before + 12,
+            "A word that occurs everywhere identifies nowhere."
+        )
+    }
+
+    /// Repeating yourself is not going off script, and must never rewind the
+    /// highlight.
+    func testRepeatingAPhraseDoesNotRewindOrCountAsOffScript() {
+        let script = parse("## One\nalpha beta gamma delta epsilon")
+        var state = FollowState()
+        _ = follow(script, saying: ["alpha", "beta", "gamma"], state: &state)
+        let position = state.confirmedCursor
+
+        _ = follow(script, saying: ["beta", "gamma"], state: &state)
+        XCTAssertGreaterThanOrEqual(state.confirmedCursor, position, "The highlight must not go backwards.")
+        XCTAssertEqual(state.mode, .following)
+        XCTAssertTrue(state.offScriptRuns.isEmpty)
+    }
+
+    /// Ad-libbing should freeze the prompter rather than send it guessing, and
+    /// the first real word should pick it back up.
+    func testAdLibbingFreezesTheCursorAndResumesCleanly() {
+        let script = parse("## One\nalpha beta gamma delta epsilon zeta")
+        var state = FollowState()
+        _ = follow(script, saying: ["alpha", "beta"], state: &state)
+        let frozen = state.confirmedCursor
+
+        let improvised = ["incidentally", "something", "completely", "different", "happened", "yesterday", "morning"]
+        _ = follow(script, saying: improvised, state: &state, at: 5)
+
+        XCTAssertEqual(state.mode, .offScript)
+        XCTAssertEqual(state.confirmedCursor, frozen, "The cursor must not guess while off script.")
+        XCTAssertFalse(state.offScriptRuns.isEmpty)
+
+        _ = follow(script, saying: ["gamma", "delta"], state: &state, at: 6)
+        XCTAssertEqual(state.mode, .following)
+        XCTAssertGreaterThan(state.confirmedCursor, frozen)
+    }
+
+    /// Partial results arrive cumulatively and get revised, so replaying the same
+    /// words in smaller pieces must land in the same place.
+    func testFeedingWordsOneAtATimeMatchesFeedingThemTogether() {
+        let script = parse("## One\nalpha beta gamma delta epsilon zeta eta")
+        let words = ["alpha", "beta", "gamma", "delta", "epsilon"]
+
+        var bulk = FollowState()
+        _ = follow(script, saying: words, state: &bulk)
+
+        var incremental = FollowState()
+        for word in words {
+            _ = follow(script, saying: [word], state: &incremental)
+        }
+        XCTAssertEqual(bulk.confirmedCursor, incremental.confirmedCursor)
+        XCTAssertEqual(bulk.matchedWordCount, incremental.matchedWordCount)
+    }
+
+    /// A recognition task is torn down and restarted about once a minute. The
+    /// position lives in this state, not in any transcript, so a few words lost
+    /// at the seam must barely register.
+    func testLosingAFewWordsAtATaskBoundaryBarelyMoves() {
+        let script = parse("## One\n" + (1...30).map { "word\($0)" }.joined(separator: " "))
+        let all = (1...30).map { "word\($0)" }
+
+        var uninterrupted = FollowState()
+        _ = follow(script, saying: all, state: &uninterrupted)
+
+        var interrupted = FollowState()
+        _ = follow(script, saying: Array(all[0..<12]), state: &interrupted)
+        // Two words vanish at the seam.
+        _ = follow(script, saying: Array(all[14...]), state: &interrupted)
+
+        XCTAssertEqual(interrupted.mode, .following)
+        XCTAssertEqual(
+            interrupted.confirmedCursor, uninterrupted.confirmedCursor,
+            "A short dropout should be absorbed as an ordinary skip."
+        )
+    }
+
+    /// Numbers are written as digits and spoken as words.
+    func testASpokenNumberMatchesItsWrittenDigits() {
+        let script = parse("## One\nwe shipped 25 features")
+        var state = FollowState()
+        _ = follow(script, saying: ["we", "shipped", "twenty", "features"], state: &state)
+        XCTAssertGreaterThanOrEqual(state.matchedWordCount, 3)
+        XCTAssertEqual(state.mode, .following)
+    }
+
+    // MARK: - Key phrases and coverage
+
+    /// The point of a key phrase: making the argument differently still counts.
+    func testAParaphraseCreditsAKeyPhrase() {
+        let script = parse("""
+        ## ! Close
+        > key: ship the release on Friday
+        Some other words entirely here.
+        """)
+        var state = FollowState()
+        _ = follow(script, saying: ["we", "will", "ship", "the", "release", "friday"], state: &state)
+
+        XCTAssertEqual(state.creditedKeyPhraseIDs.count, 1)
+    }
+
+    func testAnUnrelatedRambleCreditsNothing() {
+        let script = parse("""
+        ## ! Close
+        > key: ship the release on Friday
+        Some other words entirely here.
+        """)
+        var state = FollowState()
+        _ = follow(script, saying: ["the", "weather", "today", "is", "quite", "pleasant"], state: &state)
+        XCTAssertTrue(state.creditedKeyPhraseIDs.isEmpty)
+    }
+
+    /// Reading most of a section covers it.
+    func testReadingASectionMarksItCovered() {
+        let script = parse("## ! Intro\nalpha beta gamma delta epsilon zeta eta theta")
+        var state = FollowState()
+        _ = follow(script, saying: ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta"], state: &state)
+        XCTAssertTrue(state.coveredSectionIndices.contains(0))
+    }
+
+    func testSkippingASectionLeavesItUncovered() {
+        let script = parse("""
+        ## ! One
+        alpha beta gamma delta epsilon zeta eta theta iota kappa
+
+        ## Two
+        omega
+        """)
+        var state = FollowState()
+        _ = follow(script, saying: ["omega"], state: &state)
+        XCTAssertFalse(state.coveredSectionIndices.contains(0), "An unread must-cover section stays uncovered.")
+    }
+
+    // MARK: - Cost
+
+    /// The claim that this is cheap enough to run on every partial result.
+    /// A dynamic-programming pass over the script would fail this loudly.
+    func testFollowingALongScriptIsFast() {
+        let script = parse("## One\n" + (1...6_000).map { "word\($0)" }.joined(separator: " "))
+        let index = ScriptFollowIndex(script: script)
+        let spoken = (1...1_500).map { TeleprompterTokenizer.normalize("word\($0)", locale: english) }
+
+        measure {
+            var state = FollowState()
+            ScriptFollower.advance(
+                state: &state, spoken: spoken, script: script, index: index, now: 1
+            )
+        }
+    }
+
     // MARK: - Whole-script properties
 
     func testEmptyMarkdownProducesAnEmptyButValidScript() {
