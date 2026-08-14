@@ -112,8 +112,27 @@ class BluetoothAudioManager: ObservableObject {
         setupBluetoothObservers()
         setupAirPodsListeningModeObservers()
         setupAirPodsListeningModeLogObserver()
-        checkInitialDevices()
         startPollingForChanges()
+
+        // Deliberately deferred rather than called here.
+        //
+        // `checkInitialDevices()` reaches `systemProfilerBluetoothDictionary()`,
+        // which blocks on `Process.waitUntilExit()`. On the main thread that
+        // **spins the run loop**, so a SwiftUI run-loop observer gets to evaluate
+        // `ContentView.body` while this initialiser is still running. That body
+        // reads `BluetoothAudioManager.shared` — it is a default argument of
+        // `InlineHUD.init` — which re-enters the `swift_once` currently
+        // constructing this very instance, and libdispatch traps with
+        // "BUG IN CLIENT OF LIBDISPATCH: trying to lock recursively".
+        //
+        // It only reproduced with a Bluetooth audio device connected, because
+        // that is what makes the `system_profiler` call slow enough to matter.
+        //
+        // Hopping to the next main-queue turn lets `shared` finish publishing
+        // before any of that work runs, so the re-entry cannot happen.
+        DispatchQueue.main.async { [weak self] in
+            self?.checkInitialDevices()
+        }
     }
     
     deinit {
