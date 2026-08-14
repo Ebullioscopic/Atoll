@@ -23,11 +23,24 @@ import Defaults
 /// WebSocket server for Atoll RPC.
 /// Uses Apple's Network.framework (`NWListener`) — no external dependencies.
 /// Listens on localhost:9020 for JSON-RPC 2.0 requests over WebSocket.
+///
+/// ## Loopback only, and checked twice
+/// `NWListener(using:on:)` binds the **wildcard** address, so this port used to
+/// accept connections from anything on the same network — a client identifies
+/// itself by simply stating a `bundleIdentifier`, so a machine on the café Wi-Fi
+/// could drive the extension API. It is now bound to the loopback address of
+/// each family, and every accepted connection's peer is checked as well: a bind
+/// is one line away from being widened by accident, and the check costs nothing.
+///
+/// Two listeners rather than one because a socket bound to `127.0.0.1` does not
+/// accept `::1` and vice versa, and a client resolving "localhost" may arrive on
+/// either. Each is optional: on a Mac with one family disabled the other still
+/// serves.
 @MainActor
 final class ExtensionRPCServer {
     static let shared = ExtensionRPCServer()
 
-    private var listener: NWListener?
+    private var listeners: [NWListener] = []
     private var connections: [UUID: RPCClientConnection] = [:]
     private var shelfSubscribers: Set<String> = [] // bundleIdentifiers subscribed to shelf events
     private let port: UInt16 = 9020
@@ -40,41 +53,86 @@ final class ExtensionRPCServer {
     // MARK: - Lifecycle
 
     func start() {
-        guard listener == nil else {
+        guard listeners.isEmpty else {
             logDiagnostics("RPC server already running")
             return
         }
 
+        for host in Self.loopbackHosts {
+            if let listener = makeListener(boundTo: host) {
+                listeners.append(listener)
+                listener.start(queue: queue)
+            }
+        }
+
+        if listeners.isEmpty {
+            Logger.log("RPC server could not bind to loopback on port \(port)", category: .extensions)
+        }
+    }
+
+    /// The loopback address of each family. Both are attempted; one is enough.
+    private static let loopbackHosts: [NWEndpoint.Host] = [
+        .ipv4(.loopback),
+        .ipv6(.loopback)
+    ]
+
+    private func makeListener(boundTo host: NWEndpoint.Host) -> NWListener? {
         let params = NWParameters(tls: nil)
         let wsOptions = NWProtocolWebSocket.Options()
         wsOptions.autoReplyPing = true
         params.defaultProtocolStack.applicationProtocols.insert(wsOptions, at: 0)
+        // Without this the listener takes the wildcard address and the port is
+        // reachable from the local network.
+        params.requiredLocalEndpoint = NWEndpoint.hostPort(
+            host: host,
+            port: NWEndpoint.Port(integerLiteral: port)
+        )
+        params.allowLocalEndpointReuse = true
 
+        let listener: NWListener
         do {
-            listener = try NWListener(using: params, on: NWEndpoint.Port(integerLiteral: port))
+            // The port comes from `requiredLocalEndpoint`, and passing it again
+            // as `on:` is rejected outright: the two ways of saying where to
+            // bind may not be combined.
+            listener = try NWListener(using: params)
         } catch {
-            Logger.log("Failed to create RPC listener: \(error.localizedDescription)", category: .extensions)
-            return
+            Logger.log(
+                "Failed to create RPC listener on \(host): \(error.localizedDescription)",
+                category: .extensions
+            )
+            return nil
         }
 
-        listener?.stateUpdateHandler = { [weak self] state in
+        listener.stateUpdateHandler = { [weak self] state in
             Task { @MainActor in
-                self?.handleListenerState(state)
+                self?.handleListenerState(state, host: host)
             }
         }
 
-        listener?.newConnectionHandler = { [weak self] connection in
+        listener.newConnectionHandler = { [weak self] connection in
             Task { @MainActor in
                 self?.handleNewConnection(connection)
             }
         }
 
-        listener?.start(queue: queue)
+        return listener
+    }
+
+    /// Rebinds without disturbing clients that are still connected: a listener
+    /// failing says nothing about the connections it already handed over.
+    private func restartListeners() {
+        for listener in listeners {
+            listener.cancel()
+        }
+        listeners.removeAll()
+        start()
     }
 
     func stop() {
-        listener?.cancel()
-        listener = nil
+        for listener in listeners {
+            listener.cancel()
+        }
+        listeners.removeAll()
         for (_, conn) in connections {
             conn.connection.cancel()
         }
@@ -154,25 +212,40 @@ final class ExtensionRPCServer {
 
     // MARK: - Connection Handling
 
-    private func handleListenerState(_ state: NWListener.State) {
+    private func handleListenerState(_ state: NWListener.State, host: NWEndpoint.Host) {
         switch state {
         case .ready:
-            Logger.log("Started Atoll RPC WebSocket server on port \(port)", category: .extensions)
+            Logger.log("Started Atoll RPC WebSocket server on \(host):\(port)", category: .extensions)
         case .failed(let error):
-            Logger.log("RPC server failed: \(error.localizedDescription)", category: .extensions)
-            // Attempt restart after delay
+            Logger.log(
+                "RPC server on \(host) failed: \(error.localizedDescription)",
+                category: .extensions
+            )
+            // Restart both families rather than the failed one alone: the state
+            // handler cannot say which listener it belongs to, and a half-open
+            // server is harder to reason about than a restarted one.
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-                self?.listener = nil
-                self?.start()
+                self?.restartListeners()
             }
         case .cancelled:
-            logDiagnostics("RPC server listener cancelled")
+            logDiagnostics("RPC server listener on \(host) cancelled")
         default:
             break
         }
     }
 
     private func handleNewConnection(_ nwConnection: NWConnection) {
+        // Belt and braces: the listener is bound to loopback, and anything that
+        // still arrives from elsewhere is dropped before it can send a byte.
+        guard Self.isLoopback(nwConnection.endpoint) else {
+            Logger.log(
+                "Refused an RPC connection from \(nwConnection.endpoint) — this server is local-only",
+                category: .extensions
+            )
+            nwConnection.cancel()
+            return
+        }
+
         let connID = UUID()
         let clientConn = RPCClientConnection(
             id: connID,
@@ -190,6 +263,39 @@ final class ExtensionRPCServer {
         nwConnection.start(queue: queue)
         receiveMessage(connID: connID)
         logDiagnostics("RPC client connected (id: \(connID.uuidString.prefix(8)))")
+    }
+
+    /// Whether a peer is on this Mac.
+    ///
+    /// Pure and static so the interesting cases — an IPv4-mapped IPv6 peer that
+    /// *is* loopback, a LAN address that merely starts with 127 in text form —
+    /// can be decided by a test rather than by reading the code and hoping.
+    static func isLoopback(_ endpoint: NWEndpoint) -> Bool {
+        switch endpoint {
+        case .hostPort(let host, _):
+            return isLoopback(host)
+        case .unix:
+            // A filesystem socket is as local as it gets.
+            return true
+        default:
+            return false
+        }
+    }
+
+    static func isLoopback(_ host: NWEndpoint.Host) -> Bool {
+        switch host {
+        case .ipv4(let address):
+            return address.isLoopback
+        case .ipv6(let address):
+            // `::ffff:127.0.0.1` arrives on a dual-stack socket and is loopback,
+            // however little it looks like it.
+            if let mapped = address.asIPv4 { return mapped.isLoopback }
+            return address.isLoopback
+        case .name(let name, _):
+            return name == "localhost" || name == "localhost."
+        @unknown default:
+            return false
+        }
     }
 
     private func handleConnectionState(connID: UUID, state: NWConnection.State) {
