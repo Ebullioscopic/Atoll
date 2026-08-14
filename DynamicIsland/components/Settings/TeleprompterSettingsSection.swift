@@ -176,10 +176,40 @@ struct TeleprompterSettings: View {
     private var readingSection: some View {
         Section {
             Picker(selection: $scrollMode) {
-                Text(TeleprompterScrollMode.manual.displayName).tag(TeleprompterScrollMode.manual)
-                Text(TeleprompterScrollMode.automatic.displayName).tag(TeleprompterScrollMode.automatic)
+                ForEach(TeleprompterScrollMode.allCases) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
             } label: {
                 Text("Advance")
+            }
+            .onChange(of: scrollMode) { _, mode in
+                guard mode == .voice else { return }
+                // Permission is asked here, the moment the user opts in, so the
+                // system prompts arrive with an obvious reason attached — never
+                // at launch.
+                Task { await manager.prepareVoiceFollowing() }
+            }
+
+            if scrollMode == .voice {
+                if let reason = manager.voiceUnavailability {
+                    Label(reason.message, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } else if manager.supportsOnDeviceVoiceFollowing {
+                    Label(
+                        String(localized: "Recognised entirely on this Mac — no audio leaves it, and none is ever saved."),
+                        systemImage: "checkmark.shield"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                } else {
+                    Label(
+                        String(localized: "This language has no on-device model installed, so voice following is unavailable. Add it in System Settings › Keyboard › Dictation."),
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                }
             }
 
             if scrollMode == .automatic {
@@ -198,7 +228,13 @@ struct TeleprompterSettings: View {
             Picker(selection: $localeIdentifier) {
                 Text("Follow the system").tag("")
                 ForEach(Self.commonLocales, id: \.self) { identifier in
-                    Text(Locale.current.localizedString(forIdentifier: identifier) ?? identifier)
+                    let name = Locale.current.localizedString(forIdentifier: identifier) ?? identifier
+                    // The badge is shown here, at the moment of choosing, rather
+                    // than discovered ten seconds before a call.
+                    let onDevice = TeleprompterSpeechFollower.supportsOnDeviceRecognition(
+                        for: Locale(identifier: identifier)
+                    )
+                    Text(onDevice ? name : name + " " + String(localized: "(no on-device voice)"))
                         .tag(identifier)
                 }
             } label: {
@@ -207,7 +243,7 @@ struct TeleprompterSettings: View {
         } header: {
             Text("Reading")
         } footer: {
-            Text("The language decides how words are compared — it matters for Turkish in particular, where the same letter lowercases differently. It will also pick the voice-recognition language in a later update.")
+            Text("The language decides how words are compared and which voice model is used. It matters for Turkish in particular, where the same letter lowercases differently.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

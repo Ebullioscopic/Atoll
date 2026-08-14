@@ -298,6 +298,109 @@ final class TeleprompterTests: XCTestCase {
         XCTAssertEqual(TeleprompterScriptParser.strippingInlineMarkup("![alt](pic.png)"), "")
     }
 
+    // MARK: - Partial transcript diffing
+
+    /// The recogniser reports the whole utterance every time, so only the new
+    /// tail may reach the matcher.
+    func testOnlyNewWordsAreEmittedFromACumulativeTranscript() {
+        let delta = SpeechTranscriptDiffer.delta(previous: ["i", "have", "a"], current: ["i", "have", "a", "dream"])
+        XCTAssertEqual(delta.newWords, ["dream"])
+        XCTAssertFalse(delta.revisedTail)
+    }
+
+    func testAnUnchangedTranscriptEmitsNothing() {
+        let delta = SpeechTranscriptDiffer.delta(previous: ["hello", "world"], current: ["hello", "world"])
+        XCTAssertTrue(delta.newWords.isEmpty)
+    }
+
+    /// "I have a dre" becoming "I have a dream" is the recogniser doing its job.
+    func testARewriteOfTheRecentTailIsAccepted() {
+        let delta = SpeechTranscriptDiffer.delta(
+            previous: ["i", "have", "a", "dre"],
+            current: ["i", "have", "a", "dream"]
+        )
+        XCTAssertEqual(delta.newWords, ["dream"])
+        XCTAssertTrue(delta.revisedTail)
+    }
+
+    /// A rewrite deep in settled text would mean rewinding a highlight the reader
+    /// has already passed, which is worse than being briefly stale.
+    func testADeepRewriteIsIgnoredExceptForGenuinelyNewWords() {
+        let previous = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta"]
+        let current = ["alpha", "CHANGED", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota"]
+
+        let delta = SpeechTranscriptDiffer.delta(previous: previous, current: current)
+        XCTAssertEqual(delta.newWords, ["iota"], "Only the genuinely new word should be forwarded.")
+        XCTAssertTrue(delta.revisedTail)
+    }
+
+    func testADeepRewriteWithNothingNewEmitsNothing() {
+        let previous = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta"]
+        let current = ["alpha", "CHANGED", "gamma", "delta", "epsilon", "zeta", "eta"]
+        XCTAssertTrue(SpeechTranscriptDiffer.delta(previous: previous, current: current).newWords.isEmpty)
+    }
+
+    /// A new recognition task starts from an empty transcript. Everything it says
+    /// is new — and because position lives in the matcher, that is harmless.
+    func testAFreshTaskEmitsItsWholeTranscript() {
+        let delta = SpeechTranscriptDiffer.delta(previous: [], current: ["and", "so", "we", "continue"])
+        XCTAssertEqual(delta.newWords, ["and", "so", "we", "continue"])
+    }
+
+    /// Replaying a whole session as growing partials must produce each word once.
+    func testStreamingPartialsEmitEveryWordExactlyOnce() {
+        let sentence = ["the", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog"]
+        var previous: [String] = []
+        var emitted: [String] = []
+
+        for count in 1...sentence.count {
+            let current = Array(sentence[0..<count])
+            emitted += SpeechTranscriptDiffer.delta(previous: previous, current: current).newWords
+            previous = current
+        }
+        XCTAssertEqual(emitted, sentence)
+    }
+
+    // MARK: - Microphone lease
+
+    /// Two clients on one microphone means silently recording someone's whole
+    /// presentation, so only one feature may hold it.
+    func testOnlyOneFeatureCanHoldTheMicrophone() {
+        let lease = MicrophoneLease.shared
+        lease.release(.screenAssistant)
+        lease.release(.teleprompter)
+
+        XCTAssertTrue(lease.acquire(.teleprompter))
+        XCTAssertFalse(lease.acquire(.screenAssistant))
+        XCTAssertEqual(lease.blocker(for: .screenAssistant), .teleprompter)
+
+        lease.release(.teleprompter)
+        XCTAssertTrue(lease.acquire(.screenAssistant))
+        lease.release(.screenAssistant)
+    }
+
+    func testReacquiringAsTheCurrentOwnerSucceeds() {
+        let lease = MicrophoneLease.shared
+        lease.release(.teleprompter)
+        XCTAssertTrue(lease.acquire(.teleprompter))
+        XCTAssertTrue(lease.acquire(.teleprompter), "A restart should not have to release first.")
+        XCTAssertNil(lease.blocker(for: .teleprompter))
+        lease.release(.teleprompter)
+    }
+
+    /// A stale teardown must not take the microphone from whoever holds it now.
+    func testReleasingWhenNotTheOwnerIsIgnored() {
+        let lease = MicrophoneLease.shared
+        lease.release(.screenAssistant)
+        lease.release(.teleprompter)
+
+        XCTAssertTrue(lease.acquire(.teleprompter))
+        lease.release(.screenAssistant)
+        XCTAssertEqual(lease.currentOwner, .teleprompter)
+        lease.release(.teleprompter)
+        XCTAssertNil(lease.currentOwner)
+    }
+
     // MARK: - Library store
 
     func testLibraryRoundTripsThroughDisk() throws {

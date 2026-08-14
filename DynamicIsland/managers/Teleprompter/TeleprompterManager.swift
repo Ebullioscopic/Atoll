@@ -40,7 +40,16 @@ final class TeleprompterManager: ObservableObject {
     /// When the current take started, for the elapsed clock.
     @Published private(set) var takeStartedAt: Date?
 
+    /// Non-nil while voice following is unavailable, so the UI can say why.
+    @Published private(set) var voiceUnavailability: SpeechFollowUnavailability?
+    @Published private(set) var isListening = false
+    /// What the matcher currently believes about the reader.
+    @Published private(set) var followMode: FollowMode = .following
+
     private let store = TeleprompterLibraryStore()
+    private let speech = TeleprompterSpeechFollower()
+    private var followState = FollowState()
+    private var followIndex: ScriptFollowIndex?
     private var cancellables = Set<AnyCancellable>()
     private var advanceTask: Task<Void, Never>?
     private var hasStarted = false
@@ -103,12 +112,40 @@ final class TeleprompterManager: ObservableObject {
                 if !change.newValue { self?.endTake() }
             }
             .store(in: &cancellables)
+
+        // Switching modes mid-take should take effect immediately rather than at
+        // the next take.
+        Defaults.publisher(.teleprompterScrollMode)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, self.isRunning else { return }
+                self.pauseTake()
+                self.resumeTake()
+            }
+            .store(in: &cancellables)
+
+        speech.onWords = { [weak self] words in
+            self?.consume(words)
+        }
+        speech.onUnavailable = { [weak self] reason in
+            guard let self else { return }
+            self.voiceUnavailability = reason
+            self.isListening = false
+            // Falling back to manual keeps the prompter usable rather than
+            // leaving the reader with a frozen screen and no explanation.
+            Defaults[.teleprompterScrollMode] = .manual
+        }
     }
 
     func shutdown() {
         endTake()
         store.save(scripts)
     }
+
+    /// Sections the reader has covered so far in this take.
+    var coveredSectionIndices: Set<Int> { followState.coveredSectionIndices }
+    /// Key phrases credited so far, including ones said in other words.
+    var creditedKeyPhraseIDs: Set<UUID> { followState.creditedKeyPhraseIDs }
 
     // MARK: - Library
 
@@ -192,6 +229,14 @@ final class TeleprompterManager: ObservableObject {
     func setTokenIndex(_ index: Int) {
         guard let script = currentScript else { return }
         confirmedTokenIndex = max(0, min(index, script.tokens.count))
+        // Moving by hand overrides the matcher: it must resume from where the
+        // reader put the cursor, not from where it thought they were.
+        followState.cursor = confirmedTokenIndex
+        followState.confirmedCursor = confirmedTokenIndex
+        followState.matchRun = 0
+        followState.offScriptRun = 0
+        followState.jumpTarget = nil
+        followState.jumpConfirmations = 0
         persistPosition()
     }
 
@@ -219,26 +264,98 @@ final class TeleprompterManager: ObservableObject {
         // Not saved on every keystroke; `shutdown()` and library edits flush it.
     }
 
+    // MARK: - Voice following
+
+    /// Begins listening, rebuilding the matcher's index for the current script.
+    private func startListening() {
+        guard let script = currentScript else { return }
+        voiceUnavailability = nil
+
+        followIndex = ScriptFollowIndex(script: script)
+        followState = FollowState()
+        followState.cursor = confirmedTokenIndex
+        followState.confirmedCursor = confirmedTokenIndex
+
+        if let reason = speech.start(locale: readingLocale) {
+            voiceUnavailability = reason
+            isListening = false
+            Defaults[.teleprompterScrollMode] = .manual
+            return
+        }
+        isListening = true
+    }
+
+    private func stopListening() {
+        guard isListening else { return }
+        speech.stop()
+        isListening = false
+    }
+
+    /// Feeds heard words to the matcher and moves the prompter to where it says.
+    private func consume(_ words: [String]) {
+        guard let script = currentScript, let followIndex else { return }
+
+        ScriptFollower.advance(
+            state: &followState,
+            spoken: words,
+            script: script,
+            index: followIndex,
+            now: Date().timeIntervalSince1970
+        )
+
+        followMode = followState.mode
+        // The matcher is the authority on position in this mode, and it only ever
+        // moves the confirmed cursor forward.
+        if followState.confirmedCursor != confirmedTokenIndex {
+            confirmedTokenIndex = min(followState.confirmedCursor, script.tokens.count)
+            persistPosition()
+        }
+    }
+
+    /// Whether the chosen language can be followed entirely on this Mac.
+    var supportsOnDeviceVoiceFollowing: Bool {
+        TeleprompterSpeechFollower.supportsOnDeviceRecognition(for: readingLocale)
+    }
+
+    /// Asks for microphone and speech permission, then reports what blocks voice
+    /// following, if anything.
+    func prepareVoiceFollowing() async -> SpeechFollowUnavailability? {
+        if let denied = await TeleprompterSpeechFollower.requestAuthorization() {
+            voiceUnavailability = denied
+            return denied
+        }
+        guard supportsOnDeviceVoiceFollowing else {
+            let name = Locale.current.localizedString(forIdentifier: readingLocale.identifier)
+                ?? readingLocale.identifier
+            let reason = SpeechFollowUnavailability.noOnDeviceModel(languageName: name)
+            voiceUnavailability = reason
+            return reason
+        }
+        voiceUnavailability = nil
+        return nil
+    }
+
     // MARK: - Takes
 
     func startTake() {
         guard currentScript != nil else { return }
         isRunning = true
         takeStartedAt = Date()
-        startAutomaticAdvanceIfNeeded()
+        startAdvanceIfNeeded()
     }
 
     func pauseTake() {
         isRunning = false
         advanceTask?.cancel()
         advanceTask = nil
+        stopListening()
     }
 
     func resumeTake() {
         guard currentScript != nil else { return }
         isRunning = true
         if takeStartedAt == nil { takeStartedAt = Date() }
-        startAutomaticAdvanceIfNeeded()
+        startAdvanceIfNeeded()
     }
 
     func endTake() {
@@ -246,6 +363,8 @@ final class TeleprompterManager: ObservableObject {
         takeStartedAt = nil
         advanceTask?.cancel()
         advanceTask = nil
+        stopListening()
+        followMode = .following
         store.save(scripts)
     }
 
@@ -258,10 +377,25 @@ final class TeleprompterManager: ObservableObject {
     /// A per-word tick rather than a smooth scroll because the position is a
     /// token index, which is what the voice follower will drive too — so both
     /// modes move the same state and the renderer needs no special case.
-    private func startAutomaticAdvanceIfNeeded() {
+    /// Starts whichever advance mechanism the user chose.
+    private func startAdvanceIfNeeded() {
         advanceTask?.cancel()
         advanceTask = nil
-        guard Defaults[.teleprompterScrollMode] == .automatic else { return }
+        stopListening()
+
+        switch Defaults[.teleprompterScrollMode] {
+        case .voice:
+            startListening()
+            return
+        case .manual:
+            return
+        case .automatic:
+            break
+        }
+        startAutomaticAdvance()
+    }
+
+    private func startAutomaticAdvance() {
 
         let wordsPerMinute = max(20, Defaults[.teleprompterWordsPerMinute])
         let interval = 60.0 / wordsPerMinute

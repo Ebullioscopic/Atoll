@@ -290,6 +290,13 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     
     private func startRecording() {
         guard !isRecording else { return }
+
+        // The teleprompter may be listening. CoreAudio would allow both, which
+        // would mean silently recording someone's whole presentation.
+        guard MicrophoneLease.shared.acquire(.screenAssistant) else {
+            Logger.log("Screen Assistant: the microphone is in use by another feature", category: .ui)
+            return
+        }
         
         let fileName = "recording_\(Date().timeIntervalSince1970).m4a"
         let audioURL = ScreenAssistantManager.audioDataDirectory.appendingPathComponent(fileName)
@@ -324,7 +331,8 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     
     private func stopRecording() {
         guard isRecording else { return }
-        
+
+        MicrophoneLease.shared.release(.screenAssistant)
         audioRecorder?.stop()
         recordingTimer?.invalidate()
         recordingTimer = nil
