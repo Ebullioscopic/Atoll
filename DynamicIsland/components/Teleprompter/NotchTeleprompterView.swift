@@ -24,6 +24,12 @@ import SwiftUI
 struct NotchTeleprompterView: View {
     @ObservedObject private var manager = TeleprompterManager.shared
     @ObservedObject private var panelManager = TeleprompterPanelManager.shared
+    @EnvironmentObject var vm: DynamicIslandViewModel
+
+    /// The notch closes on an upward scroll, which would otherwise make the
+    /// script impossible to scroll through.
+    @State private var suppressionToken = UUID()
+    @State private var isSuppressing = false
 
     @Default(.teleprompterFontSize) private var fontSize
     @Default(.teleprompterFontChoice) private var fontChoice
@@ -66,6 +72,14 @@ struct NotchTeleprompterView: View {
         .padding(.bottom, 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .environment(\.colorScheme, .dark)
+        .onHover { updateSuppression(for: $0) }
+        .onDisappear { updateSuppression(for: false) }
+    }
+
+    private func updateSuppression(for hovering: Bool) {
+        guard hovering != isSuppressing else { return }
+        isSuppressing = hovering
+        vm.setScrollGestureSuppression(hovering, token: suppressionToken)
     }
 
     private var header: some View {

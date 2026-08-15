@@ -704,6 +704,12 @@
             "state" : "translated",
             "value" : "(no on-device voice)"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(cihazda ses yok)"
+          }
         }
       }
     },
@@ -6534,6 +6540,12 @@
             "state" : "translated",
             "value" : "Add a script to the order…"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sıraya bir script ekle…"
+          }
         }
       }
     },
@@ -7072,6 +7084,12 @@
             "state" : "translated",
             "value" : "Add one from Settings, or paste text into the Prompter tab."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ayarlar'dan bir tane ekleyin ya da Prompter sekmesine metin yapıştırın."
+          }
         }
       }
     },
@@ -7135,6 +7153,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Add script"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Script ekle"
           }
         }
       }
@@ -7526,6 +7550,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Advance"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İlerleme"
           }
         }
       }
@@ -9474,6 +9504,12 @@
             "state" : "translated",
             "value" : "another feature"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "başka bir özellik"
+          }
         }
       }
     },
@@ -10619,6 +10655,12 @@
             "state" : "translated",
             "value" : "Atoll is already using the microphone for %@."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll mikrofonu zaten %@ için kullanıyor."
+          }
         }
       }
     },
@@ -10730,6 +10772,12 @@
             "state" : "translated",
             "value" : "Atoll needs permission to control Keynote. Allow it in System Settings › Privacy & Security › Automation."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll'ün Keynote'u yönetmek için izne ihtiyacı var. Sistem Ayarları › Gizlilik ve Güvenlik › Otomasyon bölümünden izin verin."
+          }
         }
       }
     },
@@ -10740,6 +10788,12 @@
             "state" : "translated",
             "value" : "Atoll needs permission to use speech recognition. Enable it in System Settings › Privacy & Security › Speech Recognition."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll'ün konuşma tanımayı kullanmak için izne ihtiyacı var. Sistem Ayarları › Gizlilik ve Güvenlik › Konuşma Tanıma bölümünden etkinleştirin."
+          }
         }
       }
     },
@@ -10749,6 +10803,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll needs microphone access. Enable it in System Settings › Privacy & Security › Microphone."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll'ün mikrofon erişimine ihtiyacı var. Sistem Ayarları › Gizlilik ve Güvenlik › Mikrofon bölümünden etkinleştirin."
           }
         }
       }
@@ -11194,6 +11254,12 @@
             "state" : "translated",
             "value" : "Automatic"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otomatik"
+          }
         }
       }
     },
@@ -11592,6 +11658,12 @@
             "state" : "translated",
             "value" : "Back to the start (R)"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Başa dön (R)"
+          }
         }
       }
     },
@@ -11647,6 +11719,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Background opacity"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arka plan matlığı"
           }
         }
       }
@@ -15862,6 +15940,12 @@
             "state" : "translated",
             "value" : "Choose a script to see its takes."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çekimlerini görmek için bir script seçin."
+          }
         }
       }
     },
@@ -16478,6 +16562,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choose…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seçin…"
           }
         }
       }
@@ -17625,6 +17715,12 @@
             "state" : "translated",
             "value" : "Clear this script's history"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu script'in geçmişini temizle"
+          }
         }
       }
     },
@@ -18264,6 +18360,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Close the prompter (esc)"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompter'ı kapat (esc)"
           }
         }
       }
@@ -20766,6 +20868,12 @@
             "state" : "translated",
             "value" : "Copy some text, then use the clipboard button above."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir metin kopyalayın, sonra yukarıdaki pano düğmesini kullanın."
+          }
         }
       }
     },
@@ -21187,6 +21295,12 @@
             "state" : "translated",
             "value" : "Covered"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Değinildi"
+          }
         }
       }
     },
@@ -21196,6 +21310,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Covered every section you meant to."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Değinmek istediğiniz her bölüme değindiniz."
           }
         }
       }
@@ -21504,6 +21624,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "current"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "geçerli"
           }
         }
       }
@@ -23318,6 +23444,12 @@
             "state" : "translated",
             "value" : "Custom…"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Özel…"
+          }
         }
       }
     },
@@ -24257,6 +24389,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Delete this take"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu çekimi sil"
           }
         }
       }
@@ -25742,6 +25880,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dismiss the debrief"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Değerlendirmeyi kapat"
           }
         }
       }
@@ -27442,6 +27586,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Each script keeps the size, typeface, pace, opacity and mirroring you last used with it. Switch it off to keep one setup for everything."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Her script, onunla en son kullandığınız boyutu, yazı tipini, tempoyu, matlığı ve aynalamayı saklar. Her şey için tek bir düzen isterseniz kapatın."
           }
         }
       }
@@ -32360,6 +32510,12 @@
             "state" : "translated",
             "value" : "experimental"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "deneysel"
+          }
         }
       }
     },
@@ -33245,6 +33401,12 @@
             "state" : "translated",
             "value" : "Floating window"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yüzen pencere"
+          }
         }
       }
     },
@@ -33563,6 +33725,12 @@
             "state" : "translated",
             "value" : "Follow the slideshow"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slayt gösterisini takip et"
+          }
         }
       }
     },
@@ -33572,6 +33740,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Followed your voice"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sesinizi takip etti"
           }
         }
       }
@@ -33583,6 +33757,12 @@
             "state" : "translated",
             "value" : "Font"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yazı tipi ailesi"
+          }
         }
       }
     },
@@ -33593,6 +33773,12 @@
             "state" : "translated",
             "value" : "Follow the system"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sistemi izle"
+          }
         }
       }
     },
@@ -33602,6 +33788,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Follow my voice"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sesimi takip et"
           }
         }
       }
@@ -33707,6 +33899,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "For reading off a beam-splitter rig."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Işık bölücülü bir düzenekten okumak için."
           }
         }
       }
@@ -36468,6 +36666,12 @@
             "state" : "translated",
             "value" : "Hide from screen sharing and recording"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ekran paylaşımı ve kaydından gizle"
+          }
         }
       }
     },
@@ -36949,6 +37153,12 @@
             "state" : "translated",
             "value" : "High legibility"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yüksek okunaklılık"
+          }
         }
       }
     },
@@ -37210,6 +37420,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "How much of the script you actually read, not counting anything skipped over."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atladıklarınız sayılmadan, script'in gerçekte ne kadarını okuduğunuz."
           }
         }
       }
@@ -38133,6 +38349,12 @@
             "state" : "translated",
             "value" : "Import a deck first — following needs to know which section belongs to which slide."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Önce bir sunu içe aktarın — takip için hangi bölümün hangi slayda ait olduğunun bilinmesi gerekiyor."
+          }
         }
       }
     },
@@ -38142,6 +38364,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Import a script…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Script içe aktar…"
           }
         }
       }
@@ -38272,6 +38500,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Import the open deck's presenter notes"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Açık sunudaki konuşmacı notlarını içe aktar"
           }
         }
       }
@@ -39635,6 +39869,12 @@
             "state" : "translated",
             "value" : "Keynote"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keynote"
+          }
         }
       }
     },
@@ -39644,6 +39884,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keynote deck"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keynote sunusu"
           }
         }
       }
@@ -39655,6 +39901,12 @@
             "state" : "translated",
             "value" : "Keynote did not answer. It is usually waiting on a dialog — bring it to the front, dismiss whatever it is showing, and try again."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keynote yanıt vermedi. Genellikle bir iletişim kutusunu bekliyordur — Keynote'u öne getirip gösterdiği şeyi kapatın ve yeniden deneyin."
+          }
         }
       }
     },
@@ -39665,6 +39917,12 @@
             "state" : "translated",
             "value" : "Keynote has no presentation open."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keynote'ta açık bir sunu yok."
+          }
         }
       }
     },
@@ -39674,6 +39932,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keynote is not installed."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keynote kurulu değil."
           }
         }
       }
@@ -41967,6 +42231,12 @@
             "state" : "translated",
             "value" : "Longest pause"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En uzun duraklama"
+          }
         }
       }
     },
@@ -43203,6 +43473,12 @@
             "state" : "translated",
             "value" : "Markdown: `## !` marks a section to cover, `> key:` a phrase to land."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markdown: `## !` değinilecek bölümü, `> key:` geçirilecek ifadeyi işaretler."
+          }
         }
       }
     },
@@ -43212,6 +43488,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Markdown gives you more: `## !` marks a section you mean to cover, `## Intro (1:30)` gives it a target, `> key: …` marks a phrase to land, and any other `>` line is a note you will see but never read aloud."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markdown size daha fazlasını verir: `## !` mutlaka değinmek istediğiniz bir bölümü, `## Giriş (1:30)` ona bir hedef süreyi, `> key: …` mutlaka geçirmek istediğiniz bir ifadeyi işaretler; diğer her `>` satırı ise göreceğiniz ama asla sesli okumayacağınız bir nottur."
           }
         }
       }
@@ -46600,6 +46882,12 @@
             "state" : "translated",
             "value" : "Mirror the text"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metni aynala"
+          }
         }
       }
     },
@@ -46661,6 +46949,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "missed"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eksik"
           }
         }
       }
@@ -48322,6 +48616,12 @@
             "state" : "translated",
             "value" : "Next in the running order"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çalışma sırasındaki bir sonraki"
+          }
         }
       }
     },
@@ -48331,6 +48631,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Next section:"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonraki bölüm:"
           }
         }
       }
@@ -49717,6 +50023,12 @@
             "state" : "translated",
             "value" : "No microphone is available."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kullanılabilir mikrofon yok."
+          }
         }
       }
     },
@@ -50003,6 +50315,12 @@
             "state" : "translated",
             "value" : "No scripts yet. Import a Markdown or text file, or paste one into the Prompter tab."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Henüz script yok. Bir Markdown ya da metin dosyası içe aktarın veya Prompter sekmesine bir tane yapıştırın."
+          }
         }
       }
     },
@@ -50012,6 +50330,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No script yet"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Henüz script yok"
           }
         }
       }
@@ -50076,6 +50400,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No takes yet. Run one and the numbers land here."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Henüz çekim yok. Bir tane yapın, sayılar burada belirsin."
           }
         }
       }
@@ -50358,6 +50688,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Not covered"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Değinilmedi"
           }
         }
       }
@@ -51023,6 +51359,12 @@
             "state" : "translated",
             "value" : "Notch tab"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çentik sekmesi"
+          }
         }
       }
     },
@@ -51212,6 +51554,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nothing in the running order yet."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çalışma sırasında henüz bir şey yok."
           }
         }
       }
@@ -51534,6 +51882,12 @@
             "state" : "translated",
             "value" : "Off script"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Script dışı"
+          }
         }
       }
     },
@@ -51752,6 +52106,12 @@
             "state" : "translated",
             "value" : "On-device speech isn't installed for %@. Add it in System Settings › Keyboard › Dictation, or pick another language."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ için cihaz üstü konuşma tanıma kurulu değil. Sistem Ayarları › Klavye › Dikte bölümünden ekleyin ya da başka bir dil seçin."
+          }
         }
       }
     },
@@ -51879,6 +52239,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "One section per slide, skipped slides left out. Notes are copied, never changed, and Atoll never opens Keynote by itself. Marked experimental because this has been built against Keynote's own scripting dictionary but not yet confirmed against a live slideshow."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slayt başına bir bölüm; atlanan slaytlar hariç tutulur. Notlar kopyalanır, hiç değiştirilmez ve Atoll Keynote'u kendiliğinden asla açmaz. Deneysel olarak işaretli, çünkü Keynote'un kendi betik sözlüğüne göre yazıldı ama henüz canlı bir slayt gösterisine karşı doğrulanmadı."
           }
         }
       }
@@ -52559,6 +52925,12 @@
             "state" : "translated",
             "value" : "Open your deck in Keynote first."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Önce sununuzu Keynote'ta açın."
+          }
         }
       }
     },
@@ -52569,6 +52941,12 @@
             "state" : "translated",
             "value" : "Opening"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Açılış"
+          }
         }
       }
     },
@@ -52578,6 +52956,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OpenDyslexic is not installed. Install it from opendyslexic.org and it will be used here; until then the high-legibility system face is used."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenDyslexic kurulu değil. opendyslexic.org adresinden kurarsanız burada kullanılır; o zamana kadar yüksek okunaklılıktaki sistem yazı tipi kullanılır."
           }
         }
       }
@@ -53137,6 +53521,12 @@
             "state" : "translated",
             "value" : "Pace"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tempo"
+          }
         }
       }
     },
@@ -53399,6 +53789,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Paste a script from the clipboard"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panodan script yapıştır"
           }
         }
       }
@@ -55540,6 +55936,12 @@
             "state" : "translated",
             "value" : "Previous section:"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Önceki bölüm:"
+          }
         }
       }
     },
@@ -55595,6 +55997,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Privacy"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gizlilik"
           }
         }
       }
@@ -56040,6 +56448,12 @@
     "Prompter" : {
       "localizations" : {
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompter"
+          }
+        },
+        "tr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Prompter"
@@ -56726,6 +57140,12 @@
             "state" : "translated",
             "value" : "read"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "okundu"
+          }
         }
       }
     },
@@ -56796,6 +57216,12 @@
             "state" : "translated",
             "value" : "Reading"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Okuma"
+          }
         }
       }
     },
@@ -56805,6 +57231,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Read a script next to your camera, in a floating window that screen sharing cannot see."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kameranızın yanında, ekran paylaşımının göremediği bir yüzen pencerede script okuyun."
           }
         }
       }
@@ -57043,6 +57475,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Recognised entirely on this Mac — no audio leaves it, and none is ever saved."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tümüyle bu Mac'te tanınır — hiçbir ses dışarı çıkmaz ve hiçbiri kaydedilmez."
           }
         }
       }
@@ -57694,6 +58132,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Remember this per script"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bunu her script için ayrı hatırla"
           }
         }
       }
@@ -60414,6 +60858,12 @@
             "state" : "translated",
             "value" : "Run scripts in order"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Script'leri sırayla oynat"
+          }
         }
       }
     },
@@ -60535,6 +60985,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Running order"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çalışma sırası"
           }
         }
       }
@@ -61459,6 +61915,12 @@
             "state" : "translated",
             "value" : "script edited since"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "script sonradan düzenlendi"
+          }
         }
       }
     },
@@ -61469,6 +61931,12 @@
             "state" : "translated",
             "value" : "Scripts"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Script'ler"
+          }
         }
       }
     },
@@ -61478,6 +61946,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Script language"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Script dili"
           }
         }
       }
@@ -62149,6 +62623,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "sections"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bölüm"
           }
         }
       }
@@ -65682,6 +66162,12 @@
             "state" : "translated",
             "value" : "Show it in"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şurada göster"
+          }
         }
       }
     },
@@ -67200,6 +67686,12 @@
             "state" : "translated",
             "value" : "Show the Prompter:"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompter'ı göster:"
+          }
         }
       }
     },
@@ -67307,6 +67799,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Show what happened in this take"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu çekimde ne olduğunu göster"
           }
         }
       }
@@ -68031,6 +68529,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Skipped"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atlanan"
           }
         }
       }
@@ -68870,6 +69374,12 @@
             "state" : "translated",
             "value" : "Speech recognition is unavailable right now."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konuşma tanıma şu anda kullanılamıyor."
+          }
         }
       }
     },
@@ -69700,6 +70210,12 @@
             "state" : "translated",
             "value" : "Start again after the last one"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sonuncudan sonra baştan başla"
+          }
         }
       }
     },
@@ -69937,6 +70453,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Start or pause a take:"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çekimi başlat ya da duraklat:"
           }
         }
       }
@@ -72238,6 +72760,12 @@
             "state" : "translated",
             "value" : "Take finished"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çekim bitti"
+          }
         }
       }
     },
@@ -72248,12 +72776,24 @@
             "state" : "translated",
             "value" : "Takes"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çekimler"
+          }
         }
       }
     },
     "Teleprompter" : {
       "localizations" : {
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teleprompter"
+          }
+        },
+        "tr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Teleprompter"
@@ -72267,6 +72807,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Teleprompter feature is disabled"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teleprompter özelliği kapalı"
           }
         }
       }
@@ -72769,6 +73315,12 @@
             "state" : "translated",
             "value" : "That deck has no presenter notes to read."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu sunuda okunacak konuşmacı notu yok."
+          }
         }
       }
     },
@@ -72778,6 +73330,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "the AI assistant"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "yapay zekâ asistanı"
           }
         }
       }
@@ -72799,6 +73357,12 @@
             "state" : "translated",
             "value" : "The floating window is the default: it is the only surface big enough to read from, and it does not widen the notch."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Varsayılan, yüzen penceredir: okumaya yetecek genişlikteki tek yüzey odur ve çentiği genişletmez."
+          }
         }
       }
     },
@@ -72808,6 +73372,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "That file could not be read as text."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu dosya metin olarak okunamadı."
           }
         }
       }
@@ -72819,6 +73389,12 @@
             "state" : "translated",
             "value" : "Text size"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yazı boyutu"
+          }
         }
       }
     },
@@ -72828,6 +73404,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The section keys come unassigned on purpose: anything comfortable to press mid-sentence is already doing something in the app you are presenting from."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bölüm tuşları bilerek atanmamış geliyor: cümle ortasında rahatça basılabilecek her tuş, sunum yaptığınız uygulamada zaten bir şey yapıyordur."
           }
         }
       }
@@ -72839,6 +73421,12 @@
             "state" : "translated",
             "value" : "the teleprompter"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "teleprompter"
+          }
         }
       }
     },
@@ -72848,6 +73436,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The language decides how words are compared and which voice model is used. It matters for Turkish in particular, where the same letter lowercases differently."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dil, kelimelerin nasıl karşılaştırılacağını ve hangi ses modelinin kullanılacağını belirler. Özellikle Türkçede önemlidir; aynı harf orada farklı küçültülür."
           }
         }
       }
@@ -73296,6 +73890,12 @@
             "state" : "translated",
             "value" : "This language has no on-device model installed, so voice following is unavailable. Add it in System Settings › Keyboard › Dictation."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu dil için cihaz üzerinde model kurulu değil, dolayısıyla sesle takip kullanılamıyor. Sistem Ayarları › Klavye › Dikte bölümünden ekleyebilirsiniz."
+          }
         }
       }
     },
@@ -73412,6 +74012,12 @@
             "state" : "translated",
             "value" : "This take describes an earlier version of the script."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu çekim, script'in daha eski bir sürümünü anlatıyor."
+          }
         }
       }
     },
@@ -73421,6 +74027,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "This window is visible to screen sharing and recording"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu pencere ekran paylaşımı ve kaydında görünür"
           }
         }
       }
@@ -75557,6 +76169,12 @@
             "state" : "translated",
             "value" : "Typeface"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yazı tipi"
+          }
         }
       }
     },
@@ -76114,6 +76732,12 @@
             "state" : "translated",
             "value" : "Untitled script"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adsız script"
+          }
         }
       }
     },
@@ -76123,6 +76747,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Untitled section"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adsız bölüm"
           }
         }
       }
@@ -76771,6 +77401,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kullan"
           }
         }
       }
@@ -80065,6 +80701,12 @@
             "state" : "translated",
             "value" : "When one script ends the next begins, without touching the Mac."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir script bittiğinde sonraki başlar, Mac'e dokunmanıza gerek kalmadan."
+          }
         }
       }
     },
@@ -80074,6 +80716,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "While a take is running, the prompter moves to the section for whichever slide Keynote is showing."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir çekim sürerken prompter, Keynote hangi slaydı gösteriyorsa o slaydın bölümüne geçer."
           }
         }
       }
@@ -80440,6 +81088,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "words"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kelime"
           }
         }
       }
@@ -80827,6 +81481,12 @@
             "state" : "translated",
             "value" : "You covered everything you meant to."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Değinmek istediğiniz her şeye değindiniz."
+          }
         }
       }
     },
@@ -80836,6 +81496,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "You meant to cover this section"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu bölüme değinmeyi planlamıştınız"
           }
         }
       }
@@ -81554,6 +82220,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zoom, Teams, Meet, QuickTime and other recorders will not see the prompter. It stays visible to a camera pointed at your screen."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom, Teams, Meet, QuickTime ve diğer kaydediciler prompter'ı görmez. Ekranınıza doğrultulmuş bir kameraya ise görünür kalır."
           }
         }
       }
