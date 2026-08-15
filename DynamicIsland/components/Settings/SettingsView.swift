@@ -3941,6 +3941,11 @@ struct Shelf: View {
                 }
                 .settingsHighlight(id: highlightID("Copy items on drag"))
 
+                Defaults.Toggle(key: .allowMoveOnDrag) {
+                    Text("Allow moving files when dragging out")
+                }
+                .settingsHighlight(id: highlightID("Allow moving files when dragging out"))
+
                 Defaults.Toggle(key: .autoRemoveShelfItems) {
                     Text("Remove from shelf after dragging")
                 }

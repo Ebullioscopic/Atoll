@@ -1977,11 +1977,21 @@ struct ContentView: View {
                     }
                 }
 
-                try? await Task.sleep(for: .milliseconds(50))
+                try? await Task.sleep(for: .milliseconds(self.hiddenEdgeHoverPollingIntervalMs()))
             }
 
             self.hiddenEdgeHoverPollingTask = nil
         }
+    }
+
+    private func hiddenEdgeHoverPollingIntervalMs() -> Int {
+        if shouldUseHiddenEdgeHoverPolling {
+            return 50
+        }
+        if isHovering && interactionsEnabled {
+            return 100
+        }
+        return 1_000
     }
 
     private func stopHiddenEdgeHoverPolling() {
@@ -2220,7 +2230,11 @@ struct ContentView: View {
     }
 
     private func shouldPreventAutoClose() -> Bool {
-        coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || ClipboardManager.shared.isDraggingItem || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
+        // Dragging a shelf item out necessarily takes the cursor off the notch.
+        // Without this, the hover-exit timer closes the panel mid-drag, tearing
+        // down the NSView that is acting as the drag source and cancelling the
+        // session — an independent second cause of "drag-out doesn't work".
+        coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || ShelfSelectionModel.shared.isDragging || ClipboardManager.shared.isDraggingItem || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
     }
     
     // Helper to prevent rapid haptic feedback
