@@ -22,6 +22,13 @@ import SwiftUI
 /// The Agents tab: one card per AI coding agent session on this Mac.
 struct NotchAgentTowerView: View {
     @ObservedObject private var manager = AgentTowerManager.shared
+    @EnvironmentObject var vm: DynamicIslandViewModel
+
+    /// While the pointer is over this tab, the notch's own scroll gestures are
+    /// held off. Without this the close-on-scroll gesture eats every wheel event
+    /// and the session list cannot be scrolled at all.
+    @State private var suppressionToken = UUID()
+    @State private var isSuppressing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -37,10 +44,18 @@ struct NotchAgentTowerView: View {
         .padding(.bottom, 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .environment(\.colorScheme, .dark)
+        .onHover { updateSuppression(for: $0) }
+        .onDisappear { updateSuppression(for: false) }
         .onAppear {
             manager.refreshInstallationState()
             manager.refreshVisibleContexts()
         }
+    }
+
+    private func updateSuppression(for hovering: Bool) {
+        guard hovering != isSuppressing else { return }
+        isSuppressing = hovering
+        vm.setScrollGestureSuppression(hovering, token: suppressionToken)
     }
 
     private var header: some View {

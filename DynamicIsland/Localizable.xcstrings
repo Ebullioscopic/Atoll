@@ -586,6 +586,12 @@
             "state" : "translated",
             "value" : "\"Monitoring only\" means the agent's config shape is confirmed but Atoll has not observed it acting on an approval — approvals may simply do nothing there. \"Experimental\" means the agent is not installed here, so nothing has been confirmed. In both cases Atoll's hook fails silently, so your agent's own prompt appears as usual rather than anything interfering."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Yalnızca izleme\", ajanın yapılandırma biçiminin doğrulandığı ama Atoll'ün onu bir onaya göre davranırken gözlemlemediği anlamına gelir — orada onaylar hiçbir şey yapmıyor olabilir. \"Deneysel\" ise ajanın burada kurulu olmadığını, yani hiçbir şeyin doğrulanmadığını gösterir. Her iki durumda da Atoll'ün hook'u sessizce geri çekilir; araya bir şey girmez, ajanın kendi istemi her zamanki gibi görünür."
+          }
         }
       }
     },
@@ -713,6 +719,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "(window size estimated)"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(pencere boyutu tahmini)"
           }
         }
       }
@@ -1165,6 +1177,12 @@
             "state" : "translated",
             "value" : "%@ is not valid JSON, so Atoll left it alone. Fix or move the file, then try again."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ geçerli bir JSON değil, bu yüzden Atoll ona dokunmadı. Dosyayı düzeltin ya da taşıyın, sonra yeniden deneyin."
+          }
         }
       }
     },
@@ -1174,6 +1192,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ does not appear to be installed."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ kurulu görünmüyor."
           }
         }
       }
@@ -3930,6 +3954,12 @@
             "state" : "translated",
             "value" : "1 agent"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 ajan"
+          }
         }
       }
     },
@@ -4260,6 +4290,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "3 days"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 gün"
           }
         }
       }
@@ -4634,6 +4670,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "6 hours"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6 saat"
           }
         }
       }
@@ -5126,6 +5168,12 @@
             "state" : "translated",
             "value" : "24 hours"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "24 saat"
+          }
         }
       }
     },
@@ -5390,6 +5438,12 @@
             "state" : "translated",
             "value" : "A waiting approval takes the notch over music. A merely-running agent shows as a small count beside your track instead."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bekleyen bir onay, çentikte müziğin önüne geçer. Yalnızca çalışan bir ajan ise parçanızın yanında küçük bir sayaç olarak görünür."
+          }
         }
       }
     },
@@ -5399,6 +5453,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "A week"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir hafta"
           }
         }
       }
@@ -7325,6 +7385,12 @@
             "state" : "translated",
             "value" : "Adds a blocking hook so you can approve or deny a command without switching to the terminal."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir komutu terminale geçmeden onaylayabilmeniz ya da reddedebilmeniz için bloklayan bir hook ekler."
+          }
         }
       }
     },
@@ -7597,6 +7663,12 @@
             "state" : "translated",
             "value" : "agents"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ajan"
+          }
         }
       }
     },
@@ -7606,6 +7678,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Agents to watch"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İzlenecek ajanlar"
           }
         }
       }
@@ -7627,6 +7705,12 @@
             "state" : "translated",
             "value" : "Agents"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajanlar"
+          }
         }
       }
     },
@@ -7637,6 +7721,12 @@
             "state" : "translated",
             "value" : "Agent Tower is off"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajan Kulesi kapalı"
+          }
         }
       }
     },
@@ -7646,6 +7736,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Agent Tower"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajan Kulesi"
           }
         }
       }
@@ -9209,6 +9305,12 @@
             "state" : "translated",
             "value" : "Always allowed in Atoll"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll'de her zaman izin verildi"
+          }
         }
       }
     },
@@ -9218,6 +9320,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Always"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Her zaman"
           }
         }
       }
@@ -9613,6 +9721,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Answer permission prompts from the notch"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İzin isteklerini çentikten yanıtla"
           }
         }
       }
@@ -10260,6 +10374,12 @@
             "state" : "translated",
             "value" : "Approved in Atoll for this session"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll'de bu oturum için onaylandı"
+          }
         }
       }
     },
@@ -10269,6 +10389,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Approved in Atoll"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll'de onaylandı"
           }
         }
       }
@@ -10280,6 +10406,12 @@
             "state" : "translated",
             "value" : "Approve"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onayla"
+          }
         }
       }
     },
@@ -10289,6 +10421,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Approvals"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onaylar"
           }
         }
       }
@@ -10747,6 +10885,12 @@
             "state" : "translated",
             "value" : "Atoll could not verify its changes to %@ and restored the backup."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll, %@ dosyasında yaptığı değişiklikleri doğrulayamadı ve yedeği geri yükledi."
+          }
         }
       }
     },
@@ -10756,6 +10900,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll could not prepare its hook folder. Check that ~/.atoll is owned by you and not shared."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll hook klasörünü hazırlayamadı. ~/.atoll klasörünün size ait olduğundan ve paylaşılmadığından emin olun."
           }
         }
       }
@@ -10818,6 +10968,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll keeps a small folder at ~/.atoll/agent-hooks. Deleting it, or setting ATOLL_HOOKS_DISABLED=1 in your shell, switches every hook off without touching any agent configuration."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll, ~/.atoll/agent-hooks konumunda küçük bir klasör tutar. Bu klasörü silmek ya da kabuğunuzda ATOLL_HOOKS_DISABLED=1 tanımlamak, hiçbir ajan yapılandırmasına dokunmadan tüm hook'ları kapatır."
           }
         }
       }
@@ -15217,6 +15373,12 @@
             "state" : "translated",
             "value" : "Changes permissions across a whole directory tree"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bütün bir dizin ağacındaki izinleri değiştirir"
+          }
         }
       }
     },
@@ -15226,6 +15388,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Changes ownership of a whole directory tree"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bütün bir dizin ağacının sahipliğini değiştirir"
           }
         }
       }
@@ -17545,6 +17713,12 @@
             "state" : "translated",
             "value" : "Clear finished"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitenleri temizle"
+          }
         }
       }
     },
@@ -17892,6 +18066,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Click to bring this agent's terminal forward"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu ajanın terminalini öne getirmek için tıklayın"
           }
         }
       }
@@ -20255,6 +20435,12 @@
             "state" : "translated",
             "value" : "Context window"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bağlam penceresi"
+          }
         }
       }
     },
@@ -20264,6 +20450,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Context used"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kullanılan bağlam"
           }
         }
       }
@@ -23804,6 +23996,12 @@
             "state" : "translated",
             "value" : "Decodes hidden text and runs it as a script"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gizlenmiş metni çözüp script olarak çalıştırır"
+          }
         }
       }
     },
@@ -23813,6 +24011,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Decodes an encoded payload before running it"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kodlanmış bir yükü çalıştırmadan önce çözer"
           }
         }
       }
@@ -24388,6 +24592,12 @@
             "state" : "translated",
             "value" : "Deletes untracked files, including ignored ones"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İzlenmeyen dosyaları, yok sayılanlar dâhil siler"
+          }
         }
       }
     },
@@ -24397,6 +24607,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Deletes something on GitHub"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub'da bir şeyi siler"
           }
         }
       }
@@ -24408,6 +24624,12 @@
             "state" : "translated",
             "value" : "Deletes matching files across the whole system"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eşleşen dosyaları tüm sistemde siler"
+          }
         }
       }
     },
@@ -24417,6 +24639,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Deletes every file matching a pattern"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir kalıba uyan her dosyayı siler"
           }
         }
       }
@@ -24428,6 +24656,12 @@
             "state" : "translated",
             "value" : "Deletes cluster resources"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Küme kaynaklarını siler"
+          }
         }
       }
     },
@@ -24437,6 +24671,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Deletes cloud storage contents"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bulut depolama içeriğini siler"
           }
         }
       }
@@ -24448,6 +24688,12 @@
             "state" : "translated",
             "value" : "Deletes an app's saved preferences"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir uygulamanın kayıtlı tercihlerini siler"
+          }
         }
       }
     },
@@ -24457,6 +24703,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Deletes a remote branch"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uzak bir dalı siler"
           }
         }
       }
@@ -24468,6 +24720,12 @@
             "state" : "translated",
             "value" : "Deletes a branch without merge checks"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir dalı birleştirme denetimi olmadan siler"
+          }
         }
       }
     },
@@ -24477,6 +24735,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Deletes Keychain items"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anahtar Zinciri ögelerini siler"
           }
         }
       }
@@ -24533,6 +24797,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Denied in Atoll"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll'de reddedildi"
           }
         }
       }
@@ -24652,6 +24922,12 @@
             "state" : "translated",
             "value" : "Deny with a note explaining what to do instead"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bunun yerine ne yapılacağını anlatan bir notla reddet"
+          }
         }
       }
     },
@@ -24661,6 +24937,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Deny with a note"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notla reddet"
           }
         }
       }
@@ -24884,6 +25166,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Destroys provisioned infrastructure"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kurulmuş altyapıyı yok eder"
           }
         }
       }
@@ -25669,6 +25957,12 @@
             "state" : "translated",
             "value" : "Discards changes in tracked files"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İzlenen dosyalardaki değişiklikleri atar"
+          }
         }
       }
     },
@@ -25679,6 +25973,12 @@
             "state" : "translated",
             "value" : "Discards all uncommitted changes"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commit edilmemiş tüm değişiklikleri atar"
+          }
         }
       }
     },
@@ -25688,6 +25988,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Disables a system or login service"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir sistem ya da oturum açma hizmetini devre dışı bırakır"
           }
         }
       }
@@ -26032,6 +26338,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dismiss session"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oturumu kapat"
           }
         }
       }
@@ -27154,6 +27466,12 @@
             "state" : "translated",
             "value" : "Downloads a script and runs it immediately"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir script indirip hemen çalıştırır"
+          }
         }
       }
     },
@@ -28178,6 +28496,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Empties a file in place"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir dosyayı yerinde boşaltır"
           }
         }
       }
@@ -32065,6 +32389,12 @@
             "state" : "translated",
             "value" : "Erases or repartitions a disk"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir diski siler ya da yeniden bölümler"
+          }
         }
       }
     },
@@ -32669,6 +32999,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "experimental"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "deneysel"
           }
         }
       }
@@ -33555,6 +33891,12 @@
             "state" : "translated",
             "value" : "Flag destructive commands"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yıkıcı komutları işaretle"
+          }
         }
       }
     },
@@ -33968,6 +34310,12 @@
             "state" : "translated",
             "value" : "Force-quits processes by name"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Süreçleri adına göre zorla sonlandırır"
+          }
         }
       }
     },
@@ -33978,6 +34326,12 @@
             "state" : "translated",
             "value" : "Force-pushes, overwriting history other people may have"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zorla push eder, başkalarında da olabilecek geçmişin üzerine yazar"
+          }
         }
       }
     },
@@ -33987,6 +34341,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Force-deletes files outside the project folder"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proje klasörünün dışındaki dosyaları zorla siler"
           }
         }
       }
@@ -34044,6 +34404,12 @@
             "state" : "translated",
             "value" : "Forget all remembered approvals"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hatırlanan tüm onayları unut"
+          }
         }
       }
     },
@@ -34053,6 +34419,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Forget sessions after"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oturumları şu süre sonra unut"
           }
         }
       }
@@ -34064,6 +34436,12 @@
             "state" : "translated",
             "value" : "Formats a filesystem"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir dosya sistemini biçimlendirir"
+          }
         }
       }
     },
@@ -34073,6 +34451,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fork bomb: spawns processes until the machine stops responding"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fork bombası: makine yanıt veremez hâle gelene dek süreç doğurur"
           }
         }
       }
@@ -37417,6 +37801,12 @@
             "state" : "translated",
             "value" : "Hooks installed for"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hook kurulan ajanlar"
+          }
         }
       }
     },
@@ -37521,6 +37911,12 @@
             "state" : "translated",
             "value" : "How much of the screen the Agents tab may use when the notch is open."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çentik açıkken Ajanlar sekmesinin ekranın ne kadarını kullanabileceği."
+          }
         }
       }
     },
@@ -37530,6 +37926,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Housekeeping"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bakım"
           }
         }
       }
@@ -38347,6 +38749,12 @@
             "state" : "translated",
             "value" : "If Atoll is closed, busy, or unsure, it stays silent and your agent's own prompt appears as usual — it can never approve something by failing."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll kapalıysa, meşgulse ya da emin değilse sessiz kalır ve ajanınızın kendi istemi her zamanki gibi görünür — başarısız olarak bir şeyi onaylaması mümkün değildir."
+          }
         }
       }
     },
@@ -38582,6 +38990,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Irrecoverably overwrites files"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dosyaların üzerine geri döndürülemez biçimde yazar"
           }
         }
       }
@@ -40537,6 +40951,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lets an approval be remembered for this project for a week. Never offered for a command flagged as destructive."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir onayın bu proje için bir hafta hatırlanmasını sağlar. Yıkıcı olarak işaretlenen bir komut için asla sunulmaz."
           }
         }
       }
@@ -43264,6 +43684,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Makes files writable by every user on the Mac"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dosyaları Mac'teki her kullanıcının yazabileceği hâle getirir"
           }
         }
       }
@@ -47107,6 +47533,12 @@
             "state" : "translated",
             "value" : "monitoring only"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "yalnızca izleme"
+          }
         }
       }
     },
@@ -47453,6 +47885,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Moves something over a system directory"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir şeyi sistem dizininin üzerine taşır"
           }
         }
       }
@@ -48677,6 +49115,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No agent connected"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bağlı ajan yok"
           }
         }
       }
@@ -50233,6 +50677,12 @@
             "state" : "translated",
             "value" : "No sessions yet"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Henüz oturum yok"
+          }
         }
       }
     },
@@ -50296,6 +50746,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No supported agent was found in your home folder."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ana klasörünüzde desteklenen bir ajan bulunamadı."
           }
         }
       }
@@ -50424,6 +50880,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "None"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yok"
           }
         }
       }
@@ -50845,6 +51307,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Not watching"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İzlenmiyor"
           }
         }
       }
@@ -51481,6 +51949,12 @@
             "state" : "translated",
             "value" : "Notifications"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildirimler"
+          }
         }
       }
     },
@@ -51636,6 +52110,12 @@
             "state" : "translated",
             "value" : "Nudges immediately, then after 8 seconds, 1, 5 and 15 minutes — widening so an unattended request does not become a stream of alerts."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hemen, sonra 8 saniye, 1, 5 ve 15 dakika sonra dürter — aralık genişleyerek gider, böylece ilgilenilmeyen bir istek bir uyarı seline dönüşmez."
+          }
         }
       }
     },
@@ -51763,6 +52243,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Offer \"Always allow\""
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Her zaman izin ver\" seçeneğini sun"
           }
         }
       }
@@ -52769,6 +53255,12 @@
             "state" : "translated",
             "value" : "opencode is not supported: it customises behaviour through JavaScript plugins rather than a hook configuration, so there is nothing for Atoll to add."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "opencode desteklenmiyor: davranışını hook yapılandırması yerine JavaScript eklentileriyle özelleştiriyor, dolayısıyla Atoll'ün ekleyebileceği bir şey yok."
+          }
         }
       }
     },
@@ -53326,6 +53818,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Overwrites a file with raw data"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir dosyanın üzerine ham veri yazar"
           }
         }
       }
@@ -54164,6 +54662,12 @@
             "state" : "translated",
             "value" : "Pick which agents to watch in Settings. Atoll adds a hook to that agent's own configuration."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hangi ajanların izleneceğini Ayarlar'dan seçin. Atoll, o ajanın kendi yapılandırmasına bir hook ekler."
+          }
         }
       }
     },
@@ -54631,6 +55135,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Play a sound with each reminder"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Her hatırlatmada ses çal"
           }
         }
       }
@@ -55840,6 +56350,12 @@
             "state" : "translated",
             "value" : "Privacy mode"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gizlilik modu"
+          }
         }
       }
     },
@@ -56281,6 +56797,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Publishes a package publicly"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir paketi herkese açık olarak yayımlar"
           }
         }
       }
@@ -57467,6 +57989,12 @@
             "state" : "translated",
             "value" : "Recursively deletes everything in the current directory"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geçerli dizindeki her şeyi özyinelemeli olarak siler"
+          }
         }
       }
     },
@@ -57476,6 +58004,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Recursively deletes a system or home directory"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir sistem ya da ana dizini özyinelemeli olarak siler"
           }
         }
       }
@@ -57487,6 +58021,12 @@
             "state" : "translated",
             "value" : "Recursively deletes a path outside the project folder"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proje klasörünün dışındaki bir yolu özyinelemeli olarak siler"
+          }
         }
       }
     },
@@ -57496,6 +58036,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Recursively deletes a directory"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir dizini özyinelemeli olarak siler"
           }
         }
       }
@@ -57909,6 +58455,12 @@
             "state" : "translated",
             "value" : "Remind me while an agent waits"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir ajan beklerken bana hatırlat"
+          }
         }
       }
     },
@@ -58077,6 +58629,12 @@
             "state" : "translated",
             "value" : "Reminders are also silenced automatically while a Focus mode is on."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir Odak modu açıkken hatırlatmalar ayrıca kendiliğinden susturulur."
+          }
         }
       }
     },
@@ -58195,6 +58753,12 @@
             "state" : "translated",
             "value" : "Remove all Atoll hooks"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tüm Atoll hook'larını kaldır"
+          }
         }
       }
     },
@@ -58204,6 +58768,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Remove Atoll's hooks from every agent?"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll'ün hook'ları her ajandan kaldırılsın mı?"
           }
         }
       }
@@ -58376,6 +58946,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Removes a published package"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yayımlanmış bir paketi kaldırır"
           }
         }
       }
@@ -59587,6 +60163,12 @@
             "state" : "translated",
             "value" : "Resets privacy permissions for apps"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uygulamaların gizlilik izinlerini sıfırlar"
+          }
         }
       }
     },
@@ -60376,6 +60958,12 @@
             "state" : "translated",
             "value" : "Rewrites the entire repository history"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deponun tüm geçmişini yeniden yazar"
+          }
         }
       }
     },
@@ -60385,6 +60973,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rewrites a remote branch, but refuses if someone else pushed"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uzak dalı yeniden yazar, ama başkası push ettiyse reddeder"
           }
         }
       }
@@ -60674,6 +61268,12 @@
             "state" : "translated",
             "value" : "running"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "çalışıyor"
+          }
         }
       }
     },
@@ -60796,6 +61396,12 @@
             "state" : "translated",
             "value" : "Runs as root"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "root olarak çalışır"
+          }
         }
       }
     },
@@ -60805,6 +61411,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Runs `eval`, so what executes is not visible here"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "`eval` çalıştırır, dolayısıyla ne yürütüleceği burada görünmez"
           }
         }
       }
@@ -63128,6 +63740,12 @@
             "state" : "translated",
             "value" : "Send"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gönder"
+          }
         }
       }
     },
@@ -63452,6 +64070,12 @@
             "state" : "translated",
             "value" : "Session tracking is confirmed for this agent. Whether it acts on an approval from Atoll has not been observed."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu ajan için oturum izleme doğrulandı. Atoll'den gelen bir onaya göre davranıp davranmadığı gözlemlenmedi."
+          }
         }
       }
     },
@@ -63461,6 +64085,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sessions tracked"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İzlenen oturumlar"
           }
         }
       }
@@ -67548,6 +68178,12 @@
             "state" : "translated",
             "value" : "Show waiting agents in the closed notch"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bekleyen ajanları kapalı çentikte göster"
+          }
         }
       }
     },
@@ -67557,6 +68193,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Shows a card in the notch for every coding agent running in a terminal."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir terminalde çalışan her kodlama ajanı için çentikte bir kart gösterir."
           }
         }
       }
@@ -68003,6 +68645,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Silences reminders without hiding the request, so nothing pops up while you are sharing your screen."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İsteği gizlemeden hatırlatmaları susturur, böylece ekranınızı paylaşırken hiçbir şey açılmaz."
           }
         }
       }
@@ -69940,6 +70588,12 @@
             "state" : "translated",
             "value" : "Start an agent in a terminal and it will appear here."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir terminalde ajan başlatın, burada görünecektir."
+          }
         }
       }
     },
@@ -71594,6 +72248,12 @@
             "state" : "translated",
             "value" : "Subagents finished"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Biten alt ajanlar"
+          }
         }
       }
     },
@@ -72419,6 +73079,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tab height"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sekme yüksekliği"
           }
         }
       }
@@ -73310,6 +73976,12 @@
             "state" : "translated",
             "value" : "This agent is not installed here, so its hook contract is written from documentation and has not been confirmed."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu ajan burada kurulu değil; hook sözleşmesi belgelere göre yazıldı ve doğrulanmadı."
+          }
         }
       }
     },
@@ -73532,6 +74204,12 @@
             "state" : "translated",
             "value" : "This session only"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yalnızca bu oturum"
+          }
         }
       }
     },
@@ -73541,6 +74219,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "This session"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu oturum"
           }
         }
       }
@@ -73597,6 +74281,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Time left before Atoll stops waiting and the agent asks you itself"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll beklemeyi bırakıp ajanın soruyu size kendisi sormasına kalan süre"
           }
         }
       }
@@ -75377,6 +76067,12 @@
             "state" : "translated",
             "value" : "Turn it on in Settings to watch your coding agents here."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kodlama ajanlarınızı burada izlemek için Ayarlar'dan açın."
+          }
         }
       }
     },
@@ -75540,6 +76236,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Turning this on adds a hook to each selected agent's own configuration file. Atoll backs the file up first, only touches its `hooks` section, and removes its entries again when you turn this off."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bunu açmak, seçilen her ajanın kendi yapılandırma dosyasına bir hook ekler. Atoll önce dosyayı yedekler, yalnızca `hooks` bölümüne dokunur ve bunu kapattığınızda girdilerini geri alır."
           }
         }
       }
@@ -75706,6 +76408,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Typing here gives the notch keyboard focus."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buraya yazmak klavye odağını çentiğe verir."
           }
         }
       }
@@ -79119,6 +79827,12 @@
             "state" : "translated",
             "value" : "waiting"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bekliyor"
+          }
         }
       }
     },
@@ -79129,6 +79843,12 @@
             "state" : "translated",
             "value" : "Waiting for you"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sizi bekliyor"
+          }
         }
       }
     },
@@ -79138,6 +79858,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "waiting for your decision"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kararınızı bekliyor"
           }
         }
       }
@@ -79195,6 +79921,12 @@
             "state" : "translated",
             "value" : "Warns before approving things like recursive deletes, force pushes, or piping a download into a shell."
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Özyinelemeli silme, zorla push ya da indirilen bir şeyi kabuğa borulama gibi işlemleri onaylamadan önce uyarır."
+          }
         }
       }
     },
@@ -79205,6 +79937,12 @@
             "state" : "translated",
             "value" : "Watching"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İzleniyor"
+          }
         }
       }
     },
@@ -79214,6 +79952,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Watch AI coding agents"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yapay zekâ kodlama ajanlarını izle"
           }
         }
       }
@@ -79661,6 +80405,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "What should it do instead?"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bunun yerine ne yapsın?"
           }
         }
       }
@@ -80611,6 +81361,12 @@
             "state" : "translated",
             "value" : "Working"
           }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çalışıyor"
+          }
         }
       }
     },
@@ -80774,6 +81530,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Writes directly to a disk device"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Doğrudan bir disk aygıtına yazar"
           }
         }
       }
@@ -81252,6 +82014,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Your own hooks and every other setting in those files are left untouched. Backups stay in Atoll's application support folder."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kendi hook'larınız ve o dosyalardaki diğer tüm ayarlar olduğu gibi kalır. Yedekler Atoll'ün uygulama destek klasöründe durmayı sürdürür."
           }
         }
       }

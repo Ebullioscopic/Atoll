@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Open, Open With, Show in Finder, Quick Look, Compress, Copy Path, and the image actions all missing from the Shelf file context menu, caused by `ShelfItem.fileURL` returning a hard-coded `nil` for files (#682).
 - Fixed the notch auto-closing in the middle of a drag and cancelling the session: dragging an item out necessarily takes the cursor off the panel, which tore down the view acting as the drag source (#682).
 - Fixed an issue where scrolling a long note inside the Dynamic Island returned the view to the home view instead of scrolling the note. (`#636`)
+- Fixed the Agents tab not scrolling. It holds a scrollable list of sessions, but never told the notch to hold off its own close-on-scroll gesture while the pointer is over it, so every wheel event was eaten by the gesture instead of reaching the list — the same arrangement the clipboard, notes and terminal tabs already use.
 
 ### Removed
 
