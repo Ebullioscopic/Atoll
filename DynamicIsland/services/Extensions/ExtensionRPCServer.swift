@@ -41,9 +41,17 @@ final class ExtensionRPCServer {
     static let shared = ExtensionRPCServer()
 
     private var listeners: [NWListener] = []
+    /// Whether the server is *meant* to be running. A restart is scheduled three
+    /// seconds out, so without this a `stop()` inside that window is undone by the
+    /// pending closure — the port reopens after the user switched the feature off.
+    private var shouldRun = false
+    /// The single pending restart. Both listeners report failure separately, and
+    /// two restarts in flight means the second cancels the healthy listeners the
+    /// first just created.
+    private var restartWorkItem: DispatchWorkItem?
     private var connections: [UUID: RPCClientConnection] = [:]
     private var shelfSubscribers: Set<String> = [] // bundleIdentifiers subscribed to shelf events
-    private let port: UInt16 = 9020
+    private let port: UInt16 = ExtensionRPCServer.rpcPort
     private let queue = DispatchQueue(label: "com.ebullioscopic.Atoll.rpc.server", qos: .userInitiated)
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
@@ -53,6 +61,7 @@ final class ExtensionRPCServer {
     // MARK: - Lifecycle
 
     func start() {
+        shouldRun = true
         guard listeners.isEmpty else {
             logDiagnostics("RPC server already running")
             return
@@ -71,10 +80,22 @@ final class ExtensionRPCServer {
     }
 
     /// The loopback address of each family. Both are attempted; one is enough.
-    private static let loopbackHosts: [NWEndpoint.Host] = [
+    /// Binding only `::1` silently drops clients that resolve `localhost` to
+    /// `127.0.0.1`, so a test asserts both families are still listed.
+    static let loopbackHosts: [NWEndpoint.Host] = [
         .ipv4(.loopback),
         .ipv6(.loopback)
     ]
+
+    static let rpcPort: UInt16 = 9020
+
+    /// The endpoint a listener is pinned to. Split out from `makeListener` so a
+    /// test can assert the address *and* the port without opening a socket:
+    /// `isLoopback` ignores the port, so nothing else would catch this binding
+    /// drifting to the wrong one.
+    static func requiredLocalEndpoint(for host: NWEndpoint.Host) -> NWEndpoint {
+        .hostPort(host: host, port: NWEndpoint.Port(integerLiteral: rpcPort))
+    }
 
     private func makeListener(boundTo host: NWEndpoint.Host) -> NWListener? {
         let params = NWParameters(tls: nil)
@@ -83,10 +104,7 @@ final class ExtensionRPCServer {
         params.defaultProtocolStack.applicationProtocols.insert(wsOptions, at: 0)
         // Without this the listener takes the wildcard address and the port is
         // reachable from the local network.
-        params.requiredLocalEndpoint = NWEndpoint.hostPort(
-            host: host,
-            port: NWEndpoint.Port(integerLiteral: port)
-        )
+        params.requiredLocalEndpoint = Self.requiredLocalEndpoint(for: host)
         params.allowLocalEndpointReuse = true
 
         let listener: NWListener
@@ -128,7 +146,25 @@ final class ExtensionRPCServer {
         start()
     }
 
+    /// Coalesces the restarts the two listeners request independently, and lets
+    /// `stop()` call one off.
+    private func scheduleListenerRestart() {
+        guard shouldRun else { return }
+        restartWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.shouldRun else { return }
+            self.restartWorkItem = nil
+            self.restartListeners()
+        }
+        restartWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: workItem)
+    }
+
     func stop() {
+        shouldRun = false
+        restartWorkItem?.cancel()
+        restartWorkItem = nil
         for listener in listeners {
             listener.cancel()
         }
@@ -224,9 +260,7 @@ final class ExtensionRPCServer {
             // Restart both families rather than the failed one alone: the state
             // handler cannot say which listener it belongs to, and a half-open
             // server is harder to reason about than a restarted one.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-                self?.restartListeners()
-            }
+            scheduleListenerRestart()
         case .cancelled:
             logDiagnostics("RPC server listener on \(host) cancelled")
         default:

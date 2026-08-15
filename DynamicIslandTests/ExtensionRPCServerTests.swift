@@ -44,6 +44,31 @@ final class ExtensionRPCServerTests: XCTestCase {
         XCTAssertFalse(ExtensionRPCServer.isLoopback(endpoint(.ipv4(lan))))
     }
 
+    /// `isLoopback` ignores the port, so the peer-check tests above stay green
+    /// even if the listener binds the wrong one. This pins the binding itself.
+    func testTheListenerIsPinnedToLoopbackOnTheRPCPort() {
+        for host in ExtensionRPCServer.loopbackHosts {
+            let endpoint = ExtensionRPCServer.requiredLocalEndpoint(for: host)
+            guard case let .hostPort(boundHost, boundPort) = endpoint else {
+                return XCTFail("expected a hostPort endpoint, got \(endpoint)")
+            }
+            XCTAssertEqual(boundPort, 9_020)
+            XCTAssertTrue(
+                ExtensionRPCServer.isLoopback(endpoint),
+                "\(boundHost) is not a loopback address"
+            )
+        }
+    }
+
+    /// Binding one family only would silently drop clients that resolve
+    /// `localhost` to the other.
+    func testBothLoopbackFamiliesAreBound() {
+        let hosts = ExtensionRPCServer.loopbackHosts.map(String.init(describing:))
+        XCTAssertEqual(ExtensionRPCServer.loopbackHosts.count, 2, "both IPv4 and IPv6 must be bound")
+        XCTAssertTrue(hosts.contains { $0.contains("127.0.0.1") }, "IPv4 loopback missing: \(hosts)")
+        XCTAssertTrue(hosts.contains { $0.contains("::1") }, "IPv6 loopback missing: \(hosts)")
+    }
+
     func testAPublicAddressIsRefused() {
         XCTAssertFalse(ExtensionRPCServer.isLoopback(endpoint(.ipv4(IPv4Address("93.184.216.34")!))))
         XCTAssertFalse(ExtensionRPCServer.isLoopback(endpoint(.ipv6(IPv6Address("2606:2800:220:1::1")!))))
