@@ -24,10 +24,13 @@ import Foundation
 import OSLog
 import os
 
-final class SystemTimerBridge {
+final class SystemTimerBridge: ObservableObject {
     static let shared = SystemTimerBridge()
 
     private let logger = os.Logger(subsystem: "com.Ebullioscopic.Atoll", category: "SystemTimerBridge")
+
+    // Cached so layout reads (allowsManualInteraction) don't enumerate running apps.
+    @Published private(set) var canControlClockTimer = false
 
     private struct TimerMetadata: Equatable {
         enum State: Int {
@@ -107,18 +110,59 @@ final class SystemTimerBridge {
     private var fileMonitor: DispatchSourceFileSystemObject?
     private var ticker: DispatchSourceTimer?
     private var defaultsCancellable: AnyCancellable?
+    private var workspaceCancellables = Set<AnyCancellable>()
 
     private var didWarnAboutAccessibility = false
 
+    private func refreshClockControlCapability() {
+        canControlClockTimer = Defaults[.mirrorSystemTimer]
+            && AXIsProcessTrusted()
+            && !NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.clock").isEmpty
+    }
+
+    private func observeClockAppLifecycle() {
+        let center = NSWorkspace.shared.notificationCenter
+        workspaceCancellables.insert(
+            center.publisher(for: NSWorkspace.didLaunchApplicationNotification)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] note in
+                    guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                          app.bundleIdentifier == "com.apple.clock" else { return }
+                    self?.refreshClockControlCapability()
+                }
+        )
+        workspaceCancellables.insert(
+            center.publisher(for: NSWorkspace.didTerminateApplicationNotification)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] note in
+                    guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                          app.bundleIdentifier == "com.apple.clock" else { return }
+                    self?.refreshClockControlCapability()
+                }
+        )
+        // AX trust can be granted while the app stays running; refresh on foreground.
+        workspaceCancellables.insert(
+            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    self?.refreshClockControlCapability()
+                }
+        )
+    }
+
     private init() {
         logDebug("Initializing SystemTimerBridge (mirror enabled: \(Defaults[.mirrorSystemTimer]))")
+        refreshClockControlCapability()
+        observeClockAppLifecycle()
         defaultsCancellable = Defaults.publisher(.mirrorSystemTimer, options: [])
             .sink { [weak self] change in
                 if change.newValue {
                     self?.logDebug("mirrorSystemTimer enabled via Defaults change")
+                    self?.refreshClockControlCapability()
                     self?.startIfNeeded()
                 } else {
                     self?.logDebug("mirrorSystemTimer disabled via Defaults change; stopping monitor")
+                    self?.refreshClockControlCapability()
                     self?.stopMonitoring(clearTimer: true)
                 }
             }
@@ -1125,39 +1169,46 @@ final class SystemTimerBridge {
         case cancel
     }
 
-    var canControlClockTimer: Bool {
-        guard Defaults[.mirrorSystemTimer] else { return false }
-        guard AXIsProcessTrusted() else { return false }
-        return !NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.clock").isEmpty
-    }
-
-    @discardableResult
-    func controlClockTimer(_ action: ClockTimerControl) -> Bool {
+    /// Runs the AX press on the serial queue; completion fires on main so
+    /// callers can safely mutate UI state without blocking the main thread.
+    func controlClockTimer(_ action: ClockTimerControl, completion: @escaping (Bool) -> Void) {
         guard Defaults[.mirrorSystemTimer] else {
             logError("Clock timer control requested while mirroring disabled")
-            return false
+            completion(false)
+            return
         }
         guard AXIsProcessTrusted() else {
             logError("Accessibility permission required to control Clock timers")
-            return false
+            completion(false)
+            return
         }
         guard let clock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.clock").first else {
             logError("Clock app not running; cannot control timer")
-            return false
+            completion(false)
+            return
         }
 
         let application = AXUIElementCreateApplication(clock.processIdentifier)
+        queue.async { [weak self] in
+            guard let self else {
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+            let success = self.performClockControl(action, application: application, clock: clock)
+            DispatchQueue.main.async { completion(success) }
+        }
+    }
+
+    private func performClockControl(_ action: ClockTimerControl, application: AXUIElement, clock: NSRunningApplication) -> Bool {
+        AXUIElementSetMessagingTimeout(application, 2)
+
         if let button = clockControlButton(for: action, in: application) {
             return pressClockButton(button, action: action)
         }
 
         // Timer window may be closed or hidden; bring Clock forward and retry once.
-        if Thread.isMainThread {
+        DispatchQueue.main.async {
             clock.activate(options: [.activateAllWindows])
-        } else {
-            _ = DispatchQueue.main.sync {
-                clock.activate(options: [.activateAllWindows])
-            }
         }
         Thread.sleep(forTimeInterval: 0.4)
 
@@ -1219,14 +1270,17 @@ final class SystemTimerBridge {
     }
 
     private func findElement(identifier: String, in root: AXUIElement) -> AXUIElement? {
-        var queue: [AXUIElement] = [root]
-        while let element = queue.popLast() {
+        var stack: [AXUIElement] = [root]
+        var visited = 0
+        let maxNodes = 2_000
+        while let element = stack.popLast(), visited < maxNodes {
+            visited += 1
             if let found: String = copyAttribute(kAXIdentifierAttribute as CFString, from: element),
                found == identifier {
                 return element
             }
             if let children: [AXUIElement] = copyAttribute(kAXChildrenAttribute as CFString, from: element) {
-                queue.append(contentsOf: children)
+                stack.append(contentsOf: children)
             }
         }
         return nil

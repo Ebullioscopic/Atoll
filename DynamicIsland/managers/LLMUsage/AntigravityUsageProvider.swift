@@ -1,8 +1,10 @@
 import Foundation
+import os
 
 struct AntigravityUsageProvider: UsageProvider {
     let id: ProviderID = .antigravity
     let session: URLSession
+    private static let log = os.Logger(subsystem: "com.atoll.DynamicIsland", category: "AntigravityUsage")
 
     init(session: URLSession = URLSession(configuration: .ephemeral)) {
         self.session = session
@@ -47,7 +49,15 @@ struct AntigravityUsageProvider: UsageProvider {
         // The language server path needs no keychain token, so try it first —
         // reading the token item owned by the Gemini CLI otherwise triggers the
         // login keychain password prompt on every refresh.
-        if let lsSnapshot = try await fetchFromLanguageServer(now: now) {
+        // LS discovery/transport failures are availability issues, not snapshot
+        // errors — fall through to the keychain path rather than aborting.
+        var lsSnapshot: UsageSnapshot?
+        do {
+            lsSnapshot = try await fetchFromLanguageServer(now: now)
+        } catch {
+            Self.log.info("Antigravity language server unavailable (\(error)) — falling back to keychain token path")
+        }
+        if let lsSnapshot {
             return lsSnapshot
         }
 
@@ -79,7 +89,18 @@ struct AntigravityUsageProvider: UsageProvider {
                 task.terminate()
             }
 
-            task.waitUntilExit()
+            // Blocking on waitUntilExit() defeats withTimeout cancellation and
+            // strands the process on the cooperative pool; resume from the
+            // termination handler instead and terminate on cancellation.
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    task.terminationHandler = { _ in
+                        continuation.resume()
+                    }
+                }
+            } onCancel: {
+                task.terminate()
+            }
             timeoutTask.cancel()
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
