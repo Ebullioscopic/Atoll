@@ -12001,6 +12001,22 @@
         }
       }
     },
+    "Badge for running agents" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badge for running agents"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çalışan ajanların rozeti"
+          }
+        }
+      }
+    },
     "Bar" : {
       "comment" : "Name of the timer progress style that shows a horizontal bar.",
       "extractionState" : "stale",
@@ -68187,6 +68203,22 @@
         }
       }
     },
+    "Shown next to your track in the closed notch, beside the number of agents running." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shown next to your track in the closed notch, beside the number of agents running."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kapalı çentikte, parçanızın yanında, çalışan ajan sayısının hemen yanında görünür."
+          }
+        }
+      }
+    },
     "Shows a card in the notch for every coding agent running in a terminal." : {
       "localizations" : {
         "en" : {
@@ -78186,6 +78218,22 @@
         }
       }
     },
+    "Use the plain symbol instead" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use the plain symbol instead"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bunun yerine düz simgeyi kullan"
+          }
+        }
+      }
+    },
     "Use the sliders below to pick unique Apple liquid-glass variants for each widget." : {
       "comment" : "merge:ko:alt='아래의 슬라이더를 사용하여 각 위젯의 고유한 Apple Liquid Glass 스타일을 선택하세요.'",
       "localizations" : {
@@ -78235,6 +78283,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用下方滑桿為每個小工具選擇獨特的 Apple 液態玻璃變體。"
+          }
+        }
+      }
+    },
+    "Use this one" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use this one"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bunu kullan"
           }
         }
       }

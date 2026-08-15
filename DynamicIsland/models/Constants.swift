@@ -1175,6 +1175,10 @@ extension Defaults.Keys {
     static let agentTowerMaxHeightFraction = Key<Double>("agentTowerMaxHeightFraction", default: 0.4)
     static let agentTowerFlagDangerousCommands = Key<Bool>("agentTowerFlagDangerousCommands", default: true)
     static let agentTowerShowLiveActivity = Key<Bool>("agentTowerShowLiveActivity", default: true)
+    /// The badge shown beside your track while agents are running. Empty falls
+    /// back to the symbol, so clearing the field is a way of saying "the plain
+    /// one" rather than "nothing".
+    static let agentTowerRunningEmoji = Key<String>("agentTowerRunningEmoji", default: "🤖")
     static let agentTowerEscalationEnabled = Key<Bool>("agentTowerEscalationEnabled", default: true)
     static let agentTowerPlaySound = Key<Bool>("agentTowerPlaySound", default: false)
     /// Silences reminders without hiding the request itself.

@@ -66,6 +66,9 @@ struct ContentView: View {
     @Default(.showNetworkGraph) var showNetworkGraph
     @Default(.showDiskGraph) var showDiskGraph
     @Default(.enableReminderLiveActivity) var enableReminderLiveActivity
+    /// Observed rather than read inline so changing it in Settings redraws the
+    /// closed notch straight away.
+    @Default(.agentTowerRunningEmoji) var agentTowerRunningEmoji
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.enableHorizontalMusicGestures) var enableHorizontalMusicGestures
@@ -1509,9 +1512,19 @@ struct ContentView: View {
                         size: badgeSize
                     )
                 case .agentTower:
-                    Image(systemName: "sparkles")
-                        .font(.system(size: badgeSize * 0.50, weight: .semibold))
-                        .foregroundStyle(.white)
+                    // An emoji reads at this size where a thin symbol does not,
+                    // and it is the one thing on the closed notch someone might
+                    // want to make their own.
+                    if agentTowerRunningEmoji.isEmpty {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: badgeSize * 0.50, weight: .semibold))
+                            .foregroundStyle(.white)
+                    } else {
+                        Text(agentTowerRunningEmoji)
+                            .font(.system(size: badgeSize * 0.58))
+                            .minimumScaleFactor(0.5)
+                            .lineLimit(1)
+                    }
                 case .shelf:
                     Image(systemName: "tray.and.arrow.down.fill")
                         .font(.system(size: badgeSize * 0.50, weight: .semibold))

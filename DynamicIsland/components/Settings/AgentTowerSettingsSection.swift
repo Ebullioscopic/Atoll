@@ -38,6 +38,7 @@ struct AgentTowerSettings: View {
     @Default(.agentTowerEnabledKinds) private var enabledKinds
     @Default(.agentTowerMaxHeightFraction) private var maxHeightFraction
     @Default(.agentTowerSessionPruneHours) private var pruneHours
+    @Default(.agentTowerRunningEmoji) private var runningEmoji
 
     @State private var isConfirmingRemoval = false
 
@@ -303,6 +304,63 @@ struct AgentTowerSettings: View {
 
     // MARK: - Notifications
 
+    /// The badge shown beside your track while agents are running.
+    ///
+    /// Presets rather than only a text field, because the point is to pick one
+    /// in a second — but the field stays, so any emoji works, and emptying it
+    /// means "use the plain symbol" rather than "show nothing".
+    private var runningEmojiRow: some View {
+        LabeledContent {
+            HStack(spacing: 6) {
+                ForEach(Self.emojiPresets, id: \.self) { preset in
+                    Button {
+                        runningEmoji = preset
+                    } label: {
+                        Text(preset)
+                            .font(.system(size: 15))
+                            .frame(width: 26, height: 22)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(runningEmoji == preset
+                                          ? Color.accentColor.opacity(0.25)
+                                          : Color.secondary.opacity(0.12))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help(Text("Use this one"))
+                }
+
+                TextField("", text: $runningEmoji)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 52)
+                    .multilineTextAlignment(.center)
+                    .onChange(of: runningEmoji) { _, new in
+                        // One character: the badge is a 20-point circle, and a
+                        // pasted sentence would render as a smear.
+                        let first = new.first.map(String.init) ?? ""
+                        if new != first { runningEmoji = first }
+                    }
+
+                Button {
+                    runningEmoji = ""
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                }
+                .buttonStyle(.borderless)
+                .help(Text("Use the plain symbol instead"))
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Badge for running agents")
+                Text("Shown next to your track in the closed notch, beside the number of agents running.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private static let emojiPresets = ["🤖", "✨", "⚡️", "🧠", "🛠️"]
+
     private var notificationsSection: some View {
         Section {
             Defaults.Toggle(key: .agentTowerShowLiveActivity) {
@@ -313,6 +371,8 @@ struct AgentTowerSettings: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            runningEmojiRow
 
             Defaults.Toggle(key: .agentTowerEscalationEnabled) {
                 VStack(alignment: .leading, spacing: 2) {
