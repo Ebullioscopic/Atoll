@@ -212,7 +212,13 @@ class TimerManager: ObservableObject {
     
     func stopTimer() {
         if activeSource == .external {
-            endExternalTimer(triggerSmoothClose: true)
+            if isFinished || isOvertime {
+                endExternalTimer(triggerSmoothClose: true)
+                return
+            }
+            if !SystemTimerBridge.shared.controlClockTimer(.cancel) {
+                endExternalTimer(triggerSmoothClose: true)
+            }
             return
         }
 
@@ -245,6 +251,10 @@ class TimerManager: ObservableObject {
     }
     
     func pauseTimer() {
+        if activeSource == .external {
+            SystemTimerBridge.shared.controlClockTimer(.pause)
+            return
+        }
         guard activeSource == .manual else { return }
         guard isTimerActive && !isPaused else { return }
         isPaused = true
@@ -253,6 +263,10 @@ class TimerManager: ObservableObject {
     }
     
     func resumeTimer() {
+        if activeSource == .external {
+            SystemTimerBridge.shared.controlClockTimer(.resume)
+            return
+        }
         guard activeSource == .manual else { return }
         guard isTimerActive && isPaused else { return }
         isPaused = false
@@ -401,7 +415,12 @@ class TimerManager: ObservableObject {
     }
 
     var allowsManualInteraction: Bool {
-        activeSource != .external
+        switch activeSource {
+        case .external:
+            return SystemTimerBridge.shared.canControlClockTimer
+        default:
+            return true
+        }
     }
 
     enum TimerSource: String {
