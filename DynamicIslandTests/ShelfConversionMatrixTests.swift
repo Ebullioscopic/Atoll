@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import AVFoundation
 import UniformTypeIdentifiers
 import XCTest
 @testable import Atoll
@@ -145,5 +146,50 @@ final class ShelfConversionMatrixTests: XCTestCase {
             let targets = ShelfConversionMatrix.targets(for: source)
             XCTAssertEqual(Set(targets).count, targets.count, "duplicate target for \(source.identifier)")
         }
+    }
+
+    // MARK: - The matrix's promise, checked against the service
+
+    /// The matrix offers WAV and AIFF for audio, but `AVAssetExportSession`'s only
+    /// audio preset is Apple M4A — so before the reader/writer path existed, every
+    /// one of these conversions threw `unsupportedConversion` at the user.
+    func testTheUncompressedAudioTargetsTheMatrixOffersActuallyConvert() async throws {
+        let source = try Self.makeTestTone()
+        defer { try? FileManager.default.removeItem(at: source) }
+
+        for target in ShelfConversionMatrix.targets(for: .wav) {
+            let output = try await ShelfConversionService.convert(source, to: target)
+            defer { try? FileManager.default.removeItem(at: output) }
+
+            let produced = try AVAudioFile(forReading: output)
+            XCTAssertGreaterThan(
+                produced.length, 0,
+                "\(target.title) produced an empty file"
+            )
+            XCTAssertEqual(
+                produced.fileFormat.channelCount, 1,
+                "\(target.title) did not preserve the channel count"
+            )
+        }
+    }
+
+    /// A quarter-second mono tone, written as a WAV — small enough to convert in a
+    /// test, real enough that a decoder has something to read.
+    private static func makeTestTone() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("atoll-conversion-\(UUID().uuidString).wav")
+        let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+
+        let frames = AVAudioFrameCount(44_100 / 4)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
+        buffer.frameLength = frames
+        if let samples = buffer.floatChannelData?[0] {
+            for frame in 0..<Int(frames) {
+                samples[frame] = sin(2 * .pi * 440 * Float(frame) / 44_100) * 0.5
+            }
+        }
+        try file.write(from: buffer)
+        return url
     }
 }

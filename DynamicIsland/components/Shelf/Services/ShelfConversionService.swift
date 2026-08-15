@@ -66,7 +66,7 @@ enum ShelfConversionService {
         case .document:
             try convertDocument(source, to: destination, type: target.type)
         case .documentToPDF:
-            try convertDocumentToPDF(source, to: destination)
+            try await convertDocumentToPDF(source, to: destination)
         }
 
         return destination
@@ -148,12 +148,21 @@ enum ShelfConversionService {
             guard !audioTracks.isEmpty else { throw ShelfConversionError.noAudioTrack }
         }
 
+        // AVAssetExportSession's only audio preset is Apple M4A, so WAV and AIFF —
+        // both offered by `ShelfConversionMatrix` — can never come out of it. They
+        // go through a reader/writer pair that decodes to linear PCM instead.
+        let outputFileType = avFileType(for: type)
+        if audioOnly, outputFileType == .wav || outputFileType == .aiff {
+            try await exportLinearPCM(from: asset, to: destination, fileType: outputFileType)
+            return
+        }
+
         let preset = audioOnly ? AVAssetExportPresetAppleM4A : AVAssetExportPresetPassthrough
         guard let session = AVAssetExportSession(asset: asset, presetName: preset) else {
             throw ShelfConversionError.unsupportedConversion
         }
 
-        let outputType = AVFileType(type.identifier)
+        let outputType = outputFileType
         let supported = session.supportedFileTypes
         guard supported.contains(outputType) else {
             // Passthrough cannot always remux into the requested container; fall
@@ -167,6 +176,100 @@ enum ShelfConversionService {
         }
 
         try await run(session, to: destination, as: outputType)
+    }
+
+    /// `UTType.identifier` and `AVFileType` agree for most formats and not for
+    /// M4A: the type is `public.mpeg-4-audio` while `AVFileType.m4a` is
+    /// `com.apple.m4a-audio`. Building one from the other therefore produced a
+    /// file type no exporter lists as supported, and every M4A conversion failed
+    /// with `unsupportedConversion`. The mapping is spelled out so a mismatch is
+    /// visible rather than silent.
+    static func avFileType(for type: UTType) -> AVFileType {
+        switch type {
+        case .mpeg4Audio: return .m4a
+        case .wav: return .wav
+        case .aiff: return .aiff
+        case .mpeg4Movie: return .mp4
+        case .quickTimeMovie: return .mov
+        default: return AVFileType(type.identifier)
+        }
+    }
+
+    /// Decodes the first audio track to 16-bit linear PCM and writes it into an
+    /// uncompressed container. AIFF is big-endian and WAV little-endian; getting
+    /// that byte order wrong produces a file that plays as noise rather than
+    /// failing, so it is derived from the requested type rather than assumed.
+    private static func exportLinearPCM(
+        from asset: AVAsset,
+        to destination: URL,
+        fileType: AVFileType
+    ) async throws {
+        let tracks = try await asset.loadTracks(withMediaType: .audio)
+        guard let track = tracks.first else { throw ShelfConversionError.noAudioTrack }
+
+        let isBigEndian = fileType == .aiff
+        let pcmSettings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: isBigEndian,
+            AVLinearPCMIsNonInterleaved: false
+        ]
+
+        guard let reader = try? AVAssetReader(asset: asset),
+              let writer = try? AVAssetWriter(outputURL: destination, fileType: fileType)
+        else { throw ShelfConversionError.unsupportedConversion }
+
+        let readerOutput = AVAssetReaderTrackOutput(track: track, outputSettings: pcmSettings)
+        guard reader.canAdd(readerOutput) else { throw ShelfConversionError.unsupportedConversion }
+        reader.add(readerOutput)
+
+        // Sample rate and channel count come from the source so the conversion
+        // stays lossless apart from the bit depth.
+        let formats = try await track.load(.formatDescriptions)
+        let basic = formats.first.flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee }
+        var writerSettings = pcmSettings
+        writerSettings[AVSampleRateKey] = basic?.mSampleRate ?? 44_100
+        writerSettings[AVNumberOfChannelsKey] = Int(basic?.mChannelsPerFrame ?? 2)
+
+        let writerInput = AVAssetWriterInput(mediaType: .audio, outputSettings: writerSettings)
+        writerInput.expectsMediaDataInRealTime = false
+        guard writer.canAdd(writerInput) else { throw ShelfConversionError.unsupportedConversion }
+        writer.add(writerInput)
+
+        guard reader.startReading() else {
+            throw ShelfConversionError.exportFailed(reader.error?.localizedDescription ?? "")
+        }
+        guard writer.startWriting() else {
+            reader.cancelReading()
+            throw ShelfConversionError.exportFailed(writer.error?.localizedDescription ?? "")
+        }
+        writer.startSession(atSourceTime: .zero)
+
+        let queue = DispatchQueue(label: "com.ebullioscopic.Atoll.shelf.pcm-export")
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            writerInput.requestMediaDataWhenReady(on: queue) {
+                while writerInput.isReadyForMoreMediaData {
+                    guard let buffer = readerOutput.copyNextSampleBuffer() else {
+                        writerInput.markAsFinished()
+                        writer.finishWriting { continuation.resume() }
+                        return
+                    }
+                    if !writerInput.append(buffer) {
+                        reader.cancelReading()
+                        writerInput.markAsFinished()
+                        writer.finishWriting { continuation.resume() }
+                        return
+                    }
+                }
+            }
+        }
+
+        if writer.status != .completed {
+            throw ShelfConversionError.exportFailed(
+                writer.error?.localizedDescription ?? reader.error?.localizedDescription ?? ""
+            )
+        }
     }
 
     private static func run(
@@ -208,7 +311,9 @@ enum ShelfConversionService {
         case "rtf": return .rtf
         case "rtfd": return .rtfd
         case "html", "htm": return .html
-        case "doc", "docx": return .docFormat
+        // `.docFormat` is the old binary Word format; a .docx read with it fails.
+        case "docx": return .officeOpenXML
+        case "doc": return .docFormat
         default: return .plain
         }
     }
@@ -236,6 +341,10 @@ enum ShelfConversionService {
         }
     }
 
+    /// Main-actor because it lays the text out through `NSTextView` and prints it
+    /// with `NSPrintOperation`; `convert` is nonisolated, so without this the
+    /// AppKit work could run off the main actor.
+    @MainActor
     private static func convertDocumentToPDF(_ source: URL, to destination: URL) throws {
         let text = try readDocument(source)
 
