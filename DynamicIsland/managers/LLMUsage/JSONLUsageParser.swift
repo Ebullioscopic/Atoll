@@ -60,8 +60,6 @@ struct JSONLUsageParser {
               let timestamp = obj["timestamp"] as? String,
               let date = parseDate(timestamp) else { return nil }
 
-        // Codex emits a per-event delta and a session cumulative total. Only the delta is additive.
-        // Token-count events have no stable identifier and are written once per session log.
         let input = usage["input_tokens"] as? Int ?? 0
         let output = usage["output_tokens"] as? Int ?? 0
         guard input >= 0, output >= 0, (input > 0 || output > 0) else { return nil }
@@ -86,40 +84,109 @@ struct JSONLUsageParser {
         return modified >= cutoff
     }
 
+    /// Stream a JSONL file line by line, calling `process` for each valid record.
+    /// Avoids loading the entire file into memory.
+    private static func streamLines(
+        from file: URL,
+        weekStart: Date,
+        sessionStart: Date,
+        now: Date,
+        seen: inout Set<String>,
+        perModel: inout [String: UsageTotals],
+        snapshot: inout UsageSnapshot
+    ) {
+        let cal = Calendar.current
+        guard let handle = try? FileHandle(forReadingFrom: file) else { return }
+        defer { try? handle.close() }
+
+        var buffer = Data()
+        let chunkSize = 64 * 1024 // 64 KB chunks
+        let maxRecordSize = 1024 * 1024 // 1 MB max per record
+        var discardingOversized = false
+
+        func processRecord(_ rec: UsageRecord) {
+            guard rec.timestamp >= weekStart else { return }
+            if let key = rec.dedupKey {
+                if seen.contains(key) { return }
+                seen.insert(key)
+            }
+            let cost = ModelPricing.cost(model: rec.model, inputTokens: rec.inputTokens, outputTokens: rec.outputTokens)
+            func add(_ t: inout UsageTotals) {
+                t.inputTokens += rec.inputTokens
+                t.outputTokens += rec.outputTokens
+                if let cost { t.costUSD += cost } else { t.hasUnpricedModel = true }
+            }
+            add(&snapshot.week)
+            if cal.isDate(rec.timestamp, inSameDayAs: now) { add(&snapshot.today) }
+            if rec.timestamp >= sessionStart { add(&snapshot.session) }
+            var mt = perModel[rec.model] ?? UsageTotals()
+            add(&mt)
+            perModel[rec.model] = mt
+        }
+
+        func processLine(_ line: String) {
+            guard !line.isEmpty, let rec = parseLine(line) else { return }
+            processRecord(rec)
+        }
+
+        while true {
+            let chunk = handle.readData(ofLength: chunkSize)
+            if chunk.isEmpty { break }
+            buffer.append(chunk)
+
+            // Process complete lines from buffer
+            while let newlineRange = buffer.firstIndex(of: UInt8(ascii: "\n")) {
+                let lineData = buffer.subdata(in: buffer.startIndex..<newlineRange)
+                buffer.removeSubrange(buffer.startIndex...newlineRange)
+
+                if discardingOversized {
+                    // We were discarding an oversized record; this newline ends it.
+                    discardingOversized = false
+                    continue
+                }
+
+                // Skip oversized terminated records before decoding
+                if lineData.count > maxRecordSize {
+                    continue
+                }
+
+                guard let line = String(data: lineData, encoding: .utf8) else { continue }
+                processLine(line)
+            }
+
+            // Bound buffer growth: if buffer exceeds maxRecordSize without a newline,
+            // discard data up to the next newline when it arrives
+            if buffer.count > maxRecordSize {
+                discardingOversized = true
+                buffer.removeFirst(buffer.count - maxRecordSize)
+            }
+        }
+
+        // Process any remaining data in buffer (last line without trailing newline)
+        // but only if it's within the size limit and we're not discarding
+        if !buffer.isEmpty && buffer.count <= maxRecordSize && !discardingOversized,
+           let line = String(data: buffer, encoding: .utf8) {
+            processLine(line)
+        }
+    }
+
     static func aggregate(files: [URL], now: Date) -> UsageSnapshot {
         var snapshot = UsageSnapshot()
         var perModel: [String: UsageTotals] = [:]
         var seen = Set<String>()
-        let cal = Calendar.current
         let sessionStart = now.addingTimeInterval(-5 * 3600)
         let weekStart = now.addingTimeInterval(-7 * 86400)
 
         for file in files where mayContainRecords(after: weekStart, file) {
-            guard let content = try? String(contentsOf: file, encoding: .utf8) else { continue }
-            for line in content.split(separator: "\n") {
-                guard let rec = parseLine(String(line)) else { continue }
-                // Window first, then dedup: a record outside the window can no
-                // longer claim a key and suppress an in-window record that
-                // repeats it. That also makes the totals independent of which
-                // files were read, which is what lets the skip above be sound.
-                guard rec.timestamp >= weekStart else { continue }
-                if let key = rec.dedupKey {
-                    if seen.contains(key) { continue }
-                    seen.insert(key)
-                }
-                let cost = ModelPricing.cost(model: rec.model, inputTokens: rec.inputTokens, outputTokens: rec.outputTokens)
-                func add(_ t: inout UsageTotals) {
-                    t.inputTokens += rec.inputTokens
-                    t.outputTokens += rec.outputTokens
-                    if let cost { t.costUSD += cost } else { t.hasUnpricedModel = true }
-                }
-                add(&snapshot.week)
-                if cal.isDate(rec.timestamp, inSameDayAs: now) { add(&snapshot.today) }
-                if rec.timestamp >= sessionStart { add(&snapshot.session) }
-                var mt = perModel[rec.model] ?? UsageTotals()
-                add(&mt)
-                perModel[rec.model] = mt
-            }
+            streamLines(
+                from: file,
+                weekStart: weekStart,
+                sessionStart: sessionStart,
+                now: now,
+                seen: &seen,
+                perModel: &perModel,
+                snapshot: &snapshot
+            )
         }
         snapshot.models = perModel
             .map { ModelUsage(model: $0.key, totals: $0.value, pool: nil) }
