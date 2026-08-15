@@ -1406,6 +1406,16 @@ extension Defaults.Keys {
             let legacyValue = Defaults[defaultsKey].trimmingCharacters(in: .whitespacesAndNewlines)
             guard !legacyValue.isEmpty else { continue }
 
+            // The Keychain already holds a key for this provider, so it is the
+            // current one and the Defaults copy is stale — a leftover from a
+            // partial migration, or a key the user has since replaced. This runs
+            // on every launch, so writing the legacy value here would restore an
+            // old credential over the working one, every time.
+            if store.hasKey(account) {
+                Defaults[defaultsKey] = ""
+                continue
+            }
+
             if store.write(legacyValue, account: account) == errSecSuccess {
                 Defaults[defaultsKey] = ""
             } else {

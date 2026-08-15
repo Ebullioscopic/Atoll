@@ -93,6 +93,20 @@ final class AIKeyStoreTests: XCTestCase {
         }
     }
 
+    /// Migration runs on every launch, so a stale Defaults value left over from a
+    /// partial migration would otherwise restore an old credential over the
+    /// working one — once per launch, silently.
+    func testMigrationNeverOverwritesAKeyAlreadyInTheKeychain() {
+        let store = FakeAIKeyStore()
+        XCTAssertEqual(store.write("current-key", account: .gemini), errSecSuccess)
+        Defaults[.geminiApiKey] = "stale-key"
+
+        Defaults.Keys.migrateAIProviderKeysToKeychain(store: store)
+
+        XCTAssertEqual(store.read(.gemini), "current-key", "the Keychain copy is the current one")
+        XCTAssertEqual(Defaults[.geminiApiKey], "", "the stale plaintext copy must still be cleared")
+    }
+
     /// The whole point of checking the Keychain status: a failed write must never
     /// leave the user with no copy of their key at all.
     func testMigrationKeepsDefaultsCopyWhenKeychainWriteFails() {

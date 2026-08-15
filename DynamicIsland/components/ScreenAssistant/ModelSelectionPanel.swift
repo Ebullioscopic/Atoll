@@ -131,6 +131,9 @@ struct ModelSelectionView: View {
     @State private var groqApiKey: String = KeychainAIKeyStore.shared.value(.groq)
     
     @State private var showingApiKeyAlert = false
+    /// Set when a Keychain write fails, which keeps the panel open — see
+    /// `saveConfiguration()`.
+    @State private var keychainSaveError: String?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -272,9 +275,16 @@ struct ModelSelectionView: View {
                     closePanel()
                 }
                 .buttonStyle(PlainButtonStyle())
-                
+
                 Spacer()
-                
+
+                if let keychainSaveError {
+                    Label(keychainSaveError, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 Button("Save Configuration") {
                     saveConfiguration()
                 }
@@ -323,18 +333,38 @@ struct ModelSelectionView: View {
     private func saveConfiguration() {
         ensureValidModelSelection()
 
+        // Write the credentials first. If the Keychain refuses, closing the panel
+        // would report success while later requests keep reading the previous
+        // key — so nothing is committed until every write has landed.
+        let writes: [(AIKeyAccount, OSStatus)] = [
+            (.gemini, keyStore.save(geminiApiKey, account: .gemini)),
+            (.openai, keyStore.save(openaiApiKey, account: .openai)),
+            (.claude, keyStore.save(claudeApiKey, account: .claude)),
+            (.groq, keyStore.save(groqApiKey, account: .groq))
+        ]
+
+        let failed = writes.filter { $0.1 != errSecSuccess }
+        guard failed.isEmpty else {
+            for (account, status) in failed {
+                Logger.log(
+                    "Could not save the \(account.rawValue) key to the Keychain (OSStatus \(status)).",
+                    category: .warning
+                )
+            }
+            keychainSaveError = failed.count == 1
+                ? String(localized: "The \(failed[0].0.rawValue) key could not be saved to the Keychain.")
+                : String(localized: "\(failed.count) keys could not be saved to the Keychain.")
+            return
+        }
+
+        keychainSaveError = nil
         Defaults[.selectedAIProvider] = selectedProvider
         Defaults[.selectedAIModel] = selectedModel
         Defaults[.enableThinkingMode] = enableThinking
-        
-        keyStore.save(geminiApiKey, account: .gemini)
-        keyStore.save(openaiApiKey, account: .openai)
-        keyStore.save(claudeApiKey, account: .claude)
         Defaults[.localModelEndpoint] = localEndpoint
-        keyStore.save(groqApiKey, account: .groq)
-        
+
         closePanel()
-        
+
         // Notify that configuration changed
         NotificationCenter.default.post(name: .aiModelConfigurationChanged, object: nil)
     }

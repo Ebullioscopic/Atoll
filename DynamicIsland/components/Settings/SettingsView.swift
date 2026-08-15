@@ -7701,6 +7701,28 @@ struct ScreenAssistantSettings: View {
     @State private var hasGeminiApiKey = KeychainAIKeyStore.shared.hasKey(.gemini)
     @State private var apiKeyText = ""
     @State private var showingApiKey = false
+    /// Shown when the Keychain refuses a write or a delete. The field keeps its
+    /// text in that case so the entered key is not lost.
+    @State private var keyStoreError: String?
+
+    /// Writes the field to the Keychain — an empty field deletes the stored key,
+    /// which is the only way to remove one from here. Returns whether the field
+    /// and the disclosure may now be reset: on failure they must not be, or the
+    /// user is told nothing and loses what they typed.
+    private func commitGeminiKey() -> Bool {
+        let status = keyStore.save(apiKeyText, account: .gemini)
+        guard status == errSecSuccess else {
+            Logger.log(
+                "Could not write the Gemini key to the Keychain (OSStatus \(status)).",
+                category: .warning
+            )
+            keyStoreError = String(localized: "The key could not be saved to the Keychain.")
+            return false
+        }
+        keyStoreError = nil
+        hasGeminiApiKey = keyStore.hasKey(.gemini)
+        return true
+    }
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.screenAssistant.highlightID(for: title)
@@ -7734,14 +7756,12 @@ struct ScreenAssistantSettings: View {
 
                         Button(showingApiKey ? "Hide" : (hasGeminiApiKey ? "Change" : "Set")) {
                             if showingApiKey {
+                                guard commitGeminiKey() else { return }
                                 showingApiKey = false
-                                if !apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    keyStore.save(apiKeyText, account: .gemini)
-                                    hasGeminiApiKey = keyStore.hasKey(.gemini)
-                                }
                                 apiKeyText = ""
                             } else {
                                 showingApiKey = true
+                                keyStoreError = nil
                                 apiKeyText = keyStore.value(.gemini)
                             }
                         }
@@ -7756,6 +7776,13 @@ struct ScreenAssistantSettings: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
 
+                            if let keyStoreError {
+                                Label(keyStoreError, systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
                             HStack {
                                 Button("Open Google AI Studio") {
                                     NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!)
@@ -7764,13 +7791,15 @@ struct ScreenAssistantSettings: View {
 
                                 Spacer()
 
-                                Button("Save") {
-                                    keyStore.save(apiKeyText, account: .gemini)
-                                    hasGeminiApiKey = keyStore.hasKey(.gemini)
+                                Button(apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Remove" : "Save") {
+                                    guard commitGeminiKey() else { return }
                                     showingApiKey = false
                                     apiKeyText = ""
                                 }
-                                .disabled(apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                // Clearing the field and confirming is how a key is
+                                // removed, so an empty field is only invalid when
+                                // there is nothing stored to remove.
+                                .disabled(!hasGeminiApiKey && apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }
                         }
                     }
