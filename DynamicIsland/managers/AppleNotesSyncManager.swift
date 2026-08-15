@@ -125,7 +125,12 @@ final class AppleNotesSyncManager: ObservableObject {
 
     private func merge(localNotes: [NoteItem], remoteNotes: [RemoteAppleNote]) async throws -> [NoteItem] {
         var notes = localNotes
-        var remoteById = Dictionary(uniqueKeysWithValues: remoteNotes.map { ($0.id, $0) })
+        // Apple Notes 可能回吐同 id 的重复条目（跨账户/重复抓取），uniqueKeysWithValues 遇重复会 fatalError。
+        // 改用 uniquingKeysWith，冲突时保留修改时间更新的一条。
+        var remoteById = Dictionary(
+            remoteNotes.map { ($0.id, $0) },
+            uniquingKeysWith: { lhs, rhs in rhs.modificationDate > lhs.modificationDate ? rhs : lhs }
+        )
         var linkedRemoteIds = Set<String>()
 
         for index in notes.indices {
@@ -141,7 +146,9 @@ final class AppleNotesSyncManager: ObservableObject {
             }
         }
 
-        for remote in remoteNotes where !linkedRemoteIds.contains(remote.id) {
+        // 遍历去重后的 remoteById.values 而非原始 remoteNotes：否则同 id 的旧副本可能先被
+        // 处理并占位，新副本被跳过，atollId 匹配与新笔记导入的结果就会依赖数组顺序。
+        for remote in remoteById.values where !linkedRemoteIds.contains(remote.id) {
             if let atollId = remote.atollId,
                let index = notes.firstIndex(where: { $0.id == atollId }) {
                 linkedRemoteIds.insert(remote.id)

@@ -42,6 +42,7 @@ struct LockScreenWeatherWidget: View {
 	@Default(.lockScreenShowCalendarEventAfterStartEnabled) private var lockScreenShowCalendarEventAfterStartEnabled
 	@Default(.lockScreenReminderChipStyle) private var lockScreenReminderChipStyle
 	@Default(.reminderSneakPeekDuration) private var reminderSneakPeekDuration
+	@Default(.lockScreenWidgetAppearance) private var appearance
 
 	@State private var currentTime = Date()
 	@State private var eventCache = NextCalendarEventCache()
@@ -56,7 +57,7 @@ struct LockScreenWeatherWidget: View {
 
 	private let inlinePrimaryFont = Font.system(size: 22, weight: .semibold, design: .rounded)
 	private let inlineSecondaryFont = Font.system(size: 13, weight: .medium, design: .rounded)
-	private let secondaryLabelColor = Color.white.opacity(0.7)
+	private var secondaryLabelColor: Color { appearance.primary(opacity: 0.7) }
 	private static let sunriseFormatter: DateFormatter = {
 		let formatter = DateFormatter()
 		formatter.dateStyle = .none
@@ -534,7 +535,7 @@ struct LockScreenWeatherWidget: View {
 	private var bottomPadding: CGFloat { isInline ? 6 : 10 }
 
 	private var monochromeGaugeTint: Color {
-		Color.white.opacity(0.9)
+		appearance.primary(opacity: 0.9)
 	}
 
 	var body: some View {
@@ -547,12 +548,12 @@ struct LockScreenWeatherWidget: View {
 		}
 		.id(widgetWidthRemeasureToken)
 		.frame(maxWidth: .infinity, alignment: .leading)
-		.foregroundStyle(Color.white.opacity(0.65))
+		.foregroundStyle(appearance.primary(opacity: 0.65))
 		.padding(.horizontal, 10)
 		.padding(.top, topPadding)
 		.padding(.bottom, bottomPadding)
 		.background(Color.clear)
-		.shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 3)
+		.shadow(color: appearance.contentShadow, radius: 8, x: 0, y: 3)
 		.onReceive(minuteTicker.$now) { currentTime = $0 }
 		.onAppear {
 			minuteTicker.start()
@@ -793,7 +794,7 @@ struct LockScreenWeatherWidget: View {
 
 	private func calendarRowIconConfig(for event: EventModel?) -> (name: String, renderingMode: SymbolRenderingMode, colors: [Color]) {
 		guard let event else {
-			return (name: "calendar.badge", renderingMode: .hierarchical, colors: [Color.white.opacity(0.9)])
+			return (name: "calendar.badge", renderingMode: .hierarchical, colors: [appearance.primary(opacity: 0.9)])
 		}
 
 		let badgeColor = reminderChipColor(for: event)
@@ -806,7 +807,7 @@ struct LockScreenWeatherWidget: View {
 			return (
 				name: "calendar.badge",
 				renderingMode: .palette,
-				colors: [badgeColor, Color.white.opacity(0.6)]
+				colors: [badgeColor, appearance.primary(opacity: 0.6)]
 			)
 		}
 
@@ -814,7 +815,7 @@ struct LockScreenWeatherWidget: View {
 		return (
 			name: "calendar.badge",
 			renderingMode: .palette,
-			colors: [eventBadgeColor, Color.white.opacity(0.6)]
+			colors: [eventBadgeColor, appearance.primary(opacity: 0.6)]
 		)
 	}
 
@@ -842,10 +843,12 @@ struct LockScreenWeatherWidget: View {
 		if isReminderCritical(event) { return .red }
 		switch lockScreenReminderChipStyle {
 		case .monochrome:
-			return Color.white.opacity(0.85)
+			return appearance.primary(opacity: 0.85)
 		case .eventColor:
 			let color = reminderAccentColor(for: event)
-			return color.ensureMinimumBrightness(factor: 0.7)
+			return appearance.usesLightGlyphs
+				? color.ensureMinimumBrightness(factor: 0.7)
+				: color
 		}
 	}
 
@@ -854,7 +857,10 @@ struct LockScreenWeatherWidget: View {
 	}
 
 	private func eventAccentColor(for event: EventModel) -> Color {
-		Color(event.calendar.color).ensureMinimumBrightness(factor: 0.7)
+		let color = Color(event.calendar.color)
+		return appearance.usesLightGlyphs
+			? color.ensureMinimumBrightness(factor: 0.7)
+			: color
 	}
 
 	private func isReminderCritical(_ event: EventModel) -> Bool {
@@ -1028,7 +1034,7 @@ struct LockScreenWeatherWidget: View {
 			} currentValueLabel: {
 				Image(systemName: symbolName)
 					.font(.system(size: 20, weight: .semibold))
-					.foregroundStyle(Color.white)
+					.foregroundStyle(appearance.primary())
 			} minimumValueLabel: {
 				EmptyView()
 			} maximumValueLabel: {
@@ -1095,7 +1101,7 @@ struct LockScreenWeatherWidget: View {
 			} currentValueLabel: {
 				Image(systemName: info.iconName)
 					.font(.system(size: 22, weight: .semibold))
-					.foregroundStyle(Color.white)
+					.foregroundStyle(appearance.primary())
 			} minimumValueLabel: {
 				EmptyView()
 			} maximumValueLabel: {
@@ -1144,7 +1150,7 @@ struct LockScreenWeatherWidget: View {
 			} currentValueLabel: {
 				Text("\(info.index)")
 					.font(.system(size: 20, weight: .semibold, design: .rounded))
-					.foregroundStyle(Color.white)
+					.foregroundStyle(appearance.primary())
 			}
 			.gaugeStyle(.accessoryCircular)
 			.tint(aqiTint(for: info))
@@ -1276,11 +1282,11 @@ struct LockScreenWeatherWidget: View {
 		if let iconName = chargingIconName(for: info) {
 			Image(systemName: iconName)
 				.font(.system(size: 22, weight: .semibold))
-				.foregroundStyle(Color.white)
+				.foregroundStyle(appearance.primary())
 		} else {
 			Image(systemName: "bolt.fill")
 				.font(.system(size: 22, weight: .semibold))
-				.foregroundStyle(Color.white)
+				.foregroundStyle(appearance.primary())
 		}
 	}
 
@@ -1347,7 +1353,7 @@ struct LockScreenWeatherWidget: View {
 			Text("\(info.displayCurrent)°")
 				.font(.system(size: 20, weight: .semibold, design: .rounded))
 		}
-		.foregroundStyle(Color.white)
+		.foregroundStyle(appearance.primary())
 	}
 
 	private func temperatureRange(for info: LockScreenWeatherSnapshot.TemperatureInfo) -> ClosedRange<Double> {

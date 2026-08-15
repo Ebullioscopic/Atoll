@@ -547,13 +547,9 @@ struct MusicControlsView: View {
         }
     }
 
-    private var isAppleMusicActive: Bool {
-        musicManager.bundleIdentifier == "com.apple.Music"
-    }
-
     private var displayedSlots: [MusicControlButton] {
         if showCustomControls {
-            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive)
+            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, isSpotifyActive: musicManager.isSpotifyActive)
             return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
         }
 
@@ -636,6 +632,16 @@ struct MusicControlsView: View {
                 scale: .medium
             ) {
                 enableLyrics.toggle()
+            }
+        case .likeTrack:
+            LikeTrackControl { presentation, toggle in
+                HoverButton(
+                    icon: presentation.iconName,
+                    iconColor: presentation.isActive ? brandAccentColor : .white,
+                    scale: .medium
+                ) {
+                    toggle()
+                }
             }
         }
     }
@@ -779,6 +785,8 @@ struct MusicSliderView: View {
     var trailingLabel: TrailingLabel = .duration
     var restingTrackHeight: CGFloat = 8
     var draggingTrackHeight: CGFloat = 14
+    /// When set, bypasses Defaults[.sliderColor] (used by lock screen appearance).
+    var tintOverride: Color? = nil
 
     enum TimeLabelLayout {
         case stacked
@@ -904,7 +912,10 @@ struct MusicSliderView: View {
         )
     }
 
-    private var sliderTint: Color {//
+    private var sliderTint: Color {
+        if let tintOverride {
+            return tintOverride
+        }
         switch Defaults[.sliderColor] {
         case .albumArt:
             return Color(nsColor: color).ensureMinimumBrightness(factor: 0.6)
@@ -916,7 +927,10 @@ struct MusicSliderView: View {
     }
 
     private var timeLabelColor: Color {
-        Defaults[.playerColorTinting]
+        if let tintOverride {
+            return tintOverride
+        }
+        return Defaults[.playerColorTinting]
             ? Color(nsColor: color).ensureMinimumBrightness(factor: 0.6)
             : .gray
     }
