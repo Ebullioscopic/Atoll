@@ -21,6 +21,7 @@ import Defaults
 import SkyLightWindow
 import SwiftUI
 import QuartzCore
+import Combine
 
 @MainActor
 class LockScreenLiveActivityWindowManager {
@@ -36,6 +37,7 @@ class LockScreenLiveActivityWindowManager {
     private var screenChangeObserver: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
     private var currentNotchSize: CGSize?
+    private var siriVisibilityCancellables = Set<AnyCancellable>()
 
     /// Whether the target screen uses Dynamic Island (pill) mode.
     private var isDynamicIslandMode: Bool {
@@ -101,6 +103,12 @@ class LockScreenLiveActivityWindowManager {
 
         self.window = window
         self.hasDelegated = false
+        
+        // Use the centralized autohide helper
+        var siriCancellables = Set<AnyCancellable>()
+        SiriVisibilityMonitor.shared.autohide(window, cancellables: &siriCancellables)
+        self.siriVisibilityCancellables = siriCancellables
+
         return window
     }
 
@@ -142,6 +150,7 @@ class LockScreenLiveActivityWindowManager {
         }
         workspaceObservers = [wakeObserver]
     }
+
 
     private func handleScreenGeometryChange(reason: String) {
         guard let window else { return }

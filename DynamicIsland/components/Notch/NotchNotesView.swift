@@ -49,7 +49,7 @@ struct NotchNotesView: View {
     var body: some View {
         HStack(spacing: 0) {
             if showSplitView {
-                NotchClipboardList()
+                NotchClipboardView(fixedColumns: 2)
                     .frame(maxWidth: .infinity)
                 
                 if enableNotes {
@@ -441,185 +441,6 @@ struct NotchNotesView: View {
 }
 
 // MARK: - Subviews
-
-struct NotchClipboardList: View {
-    @EnvironmentObject var vm: DynamicIslandViewModel
-    @ObservedObject var clipboardManager = ClipboardManager.shared
-    @State private var hoveredItemId: UUID?
-    @State private var justCopiedId: UUID?
-    @State private var suppressionToken = UUID()
-    @State private var isSuppressing = false
-    @State private var showClearHistoryAlert = false
-    @State private var autoCloseToken = UUID()
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Clipboard")
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                
-                Spacer()
-                
-                if !clipboardManager.clipboardHistory.isEmpty {
-                    Button(action: { showClearHistoryAlert = true }) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.red)
-                            .padding(6)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 12)
-            
-            if clipboardManager.clipboardHistory.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "doc.on.clipboard")
-                        .font(.system(size: 32))
-                        .foregroundStyle(.secondary.opacity(0.3))
-                    Text("No copies yet")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    Text("Copy text to see it here")
-                        .font(.caption)
-                        .foregroundStyle(.secondary.opacity(0.7))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.vertical, 30) // Add padding so it's not touching header
-            } else {
-                ZStack {
-                    ScrollView {
-                        LazyVStack(spacing: 4) { // Tighter spacing
-                            ForEach(clipboardManager.clipboardHistory) { item in
-                                NotchClipboardItemRow(
-                                    item: item,
-                                    isHovered: hoveredItemId == item.id,
-                                    justCopied: justCopiedId == item.id
-                                )
-                                .contentShape(Rectangle())
-                                .onHover { isHovered in
-                                    hoveredItemId = isHovered ? item.id : nil
-                                }
-                                .onTapGesture {
-                                    clipboardManager.copyToClipboard(item)
-                                    withAnimation {
-                                        justCopiedId = item.id
-                                    }
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                        if justCopiedId == item.id {
-                                            withAnimation {
-                                                justCopiedId = nil
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 20)
-                    }
-
-                    LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .frame(maxHeight: .infinity, alignment: .top)
-
-                    LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
-                        .allowsHitTesting(false)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                }
-            }
-        }
-        .frame(maxHeight: .infinity)
-        .onHover { hovering in
-            updateSuppression(for: hovering)
-        }
-        .onDisappear {
-            updateSuppression(for: false)
-        }
-        .alert("Clear Clipboard History?", isPresented: $showClearHistoryAlert) {
-            Button("Clear History", role: .destructive) {
-                clipboardManager.clearHistory()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This removes every saved clipboard item from the notch tab.")
-        }
-        .onChange(of: showClearHistoryAlert) { _, isShowing in
-            vm.setAutoCloseSuppression(isShowing, token: autoCloseToken)
-        }
-        .onAppear {
-            if !clipboardManager.isMonitoring {
-                clipboardManager.startMonitoring()
-            }
-        }
-    }
-
-    private func updateSuppression(for hovering: Bool) {
-        guard hovering != isSuppressing else { return }
-        isSuppressing = hovering
-        vm.setScrollGestureSuppression(hovering, token: suppressionToken)
-    }
-}
-
-struct NotchClipboardItemRow: View {
-    let item: ClipboardItem
-    let isHovered: Bool
-    let justCopied: Bool
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            if item.type == .image, let data = item.getImageData(), let nsImage = NSImage(data: data) {
-                 Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 32, height: 32)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
-            } else {
-                Image(systemName: justCopied ? "checkmark.circle.fill" : item.type.icon)
-                    .font(.system(size: 14))
-                    .foregroundColor(justCopied ? .green : .blue)
-                    .frame(width: 20)
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.preview)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                
-                HStack {
-                    Text(item.type.displayName)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(timeAgoString(from: item.timestamp))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(10)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(isHovered ? 0.3 : 0.15))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-    
-    private func timeAgoString(from date: Date) -> String {
-        let interval = Date().timeIntervalSince(date)
-        if interval < 60 { return String(localized: "Just now") }
-        if interval < 3600 { return String(localized: "\(Int(interval/60))m") }
-        return String(localized: "\(Int(interval/3600))h")
-    }
-}
-
 
 struct NoteListView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
@@ -1082,7 +903,11 @@ struct NoteEditorView: View {
     }
 
     @FocusState private var isContentFocused: Bool
-    
+
+    @EnvironmentObject var vm: DynamicIslandViewModel
+    private var suppressionToken = UUID()
+    @State private var isSuppressing = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Toolbar
@@ -1226,10 +1051,22 @@ struct NoteEditorView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity) // Ensure VStack takes full space
         .background(Color.black) // Ensure solid background
+        .onHover { hovering in
+            updateSuppression(for: hovering)
+        }
+        .onDisappear {
+            updateSuppression(for: false)
+        }
         .onAppear {
             if isNew {
                 isContentFocused = true
             }
         }
+    }
+
+    private func updateSuppression(for hovering: Bool) {
+        guard hovering != isSuppressing else { return }
+        isSuppressing = hovering
+        vm.setScrollGestureSuppression(hovering, token: suppressionToken)
     }
 }
