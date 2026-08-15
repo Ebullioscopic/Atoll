@@ -436,13 +436,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.alphaValue = 0
         }
         
-        // Use the same centering logic as updateWindowSizeIfNeeded()
         let screenFrame = screen.frame
+        let topBleed = notchTopScreenBleed(for: screen.localizedName)
         let centerX = screenFrame.origin.x + (screenFrame.width / 2)
         let roundedWidth = window.frame.width.rounded()
         let roundedHeight = window.frame.height.rounded()
         let newX = (centerX - (roundedWidth / 2)).rounded()
-        let newY = (screenFrame.origin.y + screenFrame.height - roundedHeight).rounded()
+        let newY = (screenFrame.maxY + topBleed - roundedHeight).rounded()
 
         window.setFrame(NSRect(
             x: newX,
@@ -535,9 +535,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Use a consistent height for different view types
         if coordinator.currentView == .timer {
             baseSize.height = 250 // Extra space for timer presets
-        } else if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
+        } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
             baseSize.height = max(baseSize.height, preferredHeight)
+        } else if coordinator.currentView == .clipboard {
+            // Clipboard has its own fixed height source; don't inherit the notes layout state.
+            baseSize.height = max(baseSize.height, NotesLayoutState.list.preferredHeight)
         } else if coordinator.currentView == .terminal {
             let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
             let maxFraction = Defaults[.terminalMaxHeightFraction]
@@ -557,16 +560,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return result
     }
 
-    /// Adjusts a base notch size for a specific screen by adding Dynamic Island
-    /// shadow insets and top-offset only when the screen lacks a physical notch
-    /// and the user has chosen the Dynamic Island style.
+    /// Adds Dynamic Island shadow/top insets on non-notch screens, or top bleed on physical-notch screens.
     private func adjustedSizeForScreen(_ baseSize: CGSize, screen: NSScreen) -> CGSize {
-        guard shouldUseDynamicIslandMode(for: screen.localizedName) else {
-            return baseSize
-        }
         var adjusted = baseSize
-        adjusted.width += dynamicIslandShadowInset * 2
-        adjusted.height += dynamicIslandTopOffset
+        if shouldUseDynamicIslandMode(for: screen.localizedName) {
+            adjusted.width += dynamicIslandShadowInset * 2
+            adjusted.height += dynamicIslandTopOffset
+        } else {
+            adjusted.height += notchTopScreenBleed(for: screen.localizedName)
+        }
         return adjusted
     }
 
@@ -596,12 +598,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func resizeWindow(_ window: NSWindow, on screen: NSScreen, to size: CGSize, animated: Bool) {
         let screenFrame = screen.frame
+        let topBleed = notchTopScreenBleed(for: screen.localizedName)
         // Clamp width to screen width so the notch never extends beyond screen edges on scaled displays
         let clampedWidth = min(size.width, screenFrame.width).rounded()
-        let clampedHeight = min(size.height, screenFrame.height).rounded()
+        let maxHeight = screenFrame.height + topBleed
+        let clampedHeight = min(size.height, maxHeight).rounded()
         let centerX = screenFrame.midX
         let newX = (centerX - (clampedWidth / 2)).rounded()
-        let newY = (screenFrame.origin.y + screenFrame.height - clampedHeight).rounded()
+        let newY = (screenFrame.maxY + topBleed - clampedHeight).rounded()
         let targetFrame = NSRect(x: newX, y: newY, width: clampedWidth, height: clampedHeight)
 
         window.setFrame(targetFrame, display: true)
@@ -1253,6 +1257,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // Cancel the auto-close armed by `toggleNotchOpen`. Switching to the clipboard tab
+    // from the header only changes `coordinator.currentView`, so without this the notch
+    // can close mid-copy/drag a few seconds after it was opened.
+    func cancelPendingNotchAutoClose() {
+        closeNotchWorkItem?.cancel()
+        closeNotchWorkItem = nil
+    }
+
     private func registerOptionalShortcutHandlers() {
         guard !optionalShortcutHandlersRegistered else { return }
         optionalShortcutHandlersRegistered = true
@@ -1291,6 +1303,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         vm.close()
                     } else {
                         coordinator.currentView = .notes
+                    }
+                }
+            case .notchTab:
+                // Act on the notch under the cursor, matching toggleNotchOpen: with
+                // showOnAllDisplays the rendered windows use viewModels[screen], so mutating
+                // the primary vm could flip currentView without opening a visible notch.
+                var activeVM = vm
+                if Defaults[.showOnAllDisplays] {
+                    let mouseLocation = NSEvent.mouseLocation
+                    for screen in NSScreen.screens where screen.frame.contains(mouseLocation) {
+                        if let screenViewModel = viewModels[screen] {
+                            activeVM = screenViewModel
+                            break
+                        }
+                    }
+                }
+                // Cancel any pending auto-close armed by toggleNotchOpen, so it can't fire
+                // and close the notch a few seconds after this shortcut opens/switches to it.
+                cancelPendingNotchAutoClose()
+                if activeVM.notchState == .closed {
+                    activeVM.open()
+                    coordinator.currentView = .clipboard
+                } else {
+                    if coordinator.currentView == .clipboard {
+                        activeVM.close()
+                    } else {
+                        coordinator.currentView = .clipboard
                     }
                 }
             }

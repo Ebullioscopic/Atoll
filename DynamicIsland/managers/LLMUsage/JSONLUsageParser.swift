@@ -29,6 +29,11 @@ struct JSONLUsageParser {
     static func parseLine(_ line: String) -> UsageRecord? {
         guard let data = line.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+
+        if let codexRecord = parseCodexTokenCount(obj) {
+            return codexRecord
+        }
+
         let message = obj["message"] as? [String: Any]
         let usage = (message?["usage"] as? [String: Any]) ?? (obj["usage"] as? [String: Any])
         guard let usage else { return nil }
@@ -46,76 +51,154 @@ struct JSONLUsageParser {
         return UsageRecord(timestamp: ts, model: model, inputTokens: input, outputTokens: output, dedupKey: dedupKey)
     }
 
+    private static func parseCodexTokenCount(_ obj: [String: Any]) -> UsageRecord? {
+        guard obj["type"] as? String == "event_msg",
+              let payload = obj["payload"] as? [String: Any],
+              payload["type"] as? String == "token_count",
+              let info = payload["info"] as? [String: Any],
+              let usage = info["last_token_usage"] as? [String: Any],
+              let timestamp = obj["timestamp"] as? String,
+              let date = parseDate(timestamp) else { return nil }
+
+        let input = usage["input_tokens"] as? Int ?? 0
+        let output = usage["output_tokens"] as? Int ?? 0
+        guard input >= 0, output >= 0, (input > 0 || output > 0) else { return nil }
+
+        return UsageRecord(
+            timestamp: date,
+            model: "codex",
+            inputTokens: input,
+            outputTokens: output,
+            dedupKey: nil
+        )
+    }
+
+    /// Session logs are append-only, so a file whose last write predates the
+    /// window cannot contain a record inside it. Returns `true` when the date is
+    /// unreadable, so an unexpected filesystem keeps the file rather than
+    /// silently dropping its records.
+    private static func mayContainRecords(after cutoff: Date, _ file: URL) -> Bool {
+        guard let modified = try? file.resourceValues(forKeys: [.contentModificationDateKey])
+            .contentModificationDate
+        else { return true }
+        return modified >= cutoff
+    }
+
+    /// Stream a JSONL file line by line, calling `process` for each valid record.
+    /// Avoids loading the entire file into memory.
+    private static func streamLines(
+        from file: URL,
+        weekStart: Date,
+        sessionStart: Date,
+        now: Date,
+        seen: inout Set<String>,
+        perModel: inout [String: UsageTotals],
+        snapshot: inout UsageSnapshot
+    ) {
+        let cal = Calendar.current
+        guard let handle = try? FileHandle(forReadingFrom: file) else { return }
+        defer { try? handle.close() }
+
+        var buffer = Data()
+        let chunkSize = 64 * 1024 // 64 KB chunks
+        let maxRecordSize = 1024 * 1024 // 1 MB max per record
+        var discardingOversized = false
+
+        func processRecord(_ rec: UsageRecord) {
+            guard rec.timestamp >= weekStart else { return }
+            if let key = rec.dedupKey {
+                if seen.contains(key) { return }
+                seen.insert(key)
+            }
+            let cost = ModelPricing.cost(model: rec.model, inputTokens: rec.inputTokens, outputTokens: rec.outputTokens)
+            func add(_ t: inout UsageTotals) {
+                t.inputTokens += rec.inputTokens
+                t.outputTokens += rec.outputTokens
+                if let cost { t.costUSD += cost } else { t.hasUnpricedModel = true }
+            }
+            add(&snapshot.week)
+            if cal.isDate(rec.timestamp, inSameDayAs: now) { add(&snapshot.today) }
+            if rec.timestamp >= sessionStart { add(&snapshot.session) }
+            var mt = perModel[rec.model] ?? UsageTotals()
+            add(&mt)
+            perModel[rec.model] = mt
+        }
+
+        func processLine(_ line: String) {
+            guard !line.isEmpty, let rec = parseLine(line) else { return }
+            processRecord(rec)
+        }
+
+        while true {
+            let chunk = handle.readData(ofLength: chunkSize)
+            if chunk.isEmpty { break }
+            buffer.append(chunk)
+
+            // Process complete lines from buffer. Scan the whole chunk advancing a
+            // cursor, then trim the consumed prefix once — removing each line as it
+            // is found shifted the remainder of the buffer for every newline, which
+            // is quadratic on newline-dense JSONL.
+            var searchStart = buffer.startIndex
+            while let newlineIndex = buffer[searchStart...].firstIndex(of: UInt8(ascii: "\n")) {
+                let lineData = buffer[searchStart..<newlineIndex]
+                searchStart = buffer.index(after: newlineIndex)
+
+                if discardingOversized {
+                    // We were discarding an oversized record; this newline ends it.
+                    discardingOversized = false
+                    continue
+                }
+
+                // Skip oversized terminated records before decoding
+                if lineData.count > maxRecordSize {
+                    continue
+                }
+
+                guard let line = String(data: lineData, encoding: .utf8) else { continue }
+                processLine(line)
+            }
+            if searchStart != buffer.startIndex {
+                buffer.removeSubrange(buffer.startIndex..<searchStart)
+            }
+
+            // Bound buffer growth: if buffer exceeds maxRecordSize without a newline,
+            // discard data up to the next newline when it arrives
+            if buffer.count > maxRecordSize {
+                discardingOversized = true
+                buffer.removeFirst(buffer.count - maxRecordSize)
+            }
+        }
+
+        // Process any remaining data in buffer (last line without trailing newline)
+        // but only if it's within the size limit and we're not discarding
+        if !buffer.isEmpty && buffer.count <= maxRecordSize && !discardingOversized,
+           let line = String(data: buffer, encoding: .utf8) {
+            processLine(line)
+        }
+    }
+
     static func aggregate(files: [URL], now: Date) -> UsageSnapshot {
         var snapshot = UsageSnapshot()
         var perModel: [String: UsageTotals] = [:]
         var seen = Set<String>()
-        let cal = Calendar.current
         let sessionStart = now.addingTimeInterval(-5 * 3600)
         let weekStart = now.addingTimeInterval(-7 * 86400)
 
-        for file in files {
-            // Stream the file line-by-line instead of loading the whole JSONL log
-            // (potentially many MB) into a String plus a full array of substrings.
-            enumerateLines(of: file) { line in
-                guard let rec = parseLine(line) else { return }
-                if let key = rec.dedupKey {
-                    if seen.contains(key) { return }
-                    seen.insert(key)
-                }
-                guard rec.timestamp >= weekStart else { return }
-                let cost = ModelPricing.cost(model: rec.model, inputTokens: rec.inputTokens, outputTokens: rec.outputTokens)
-                func add(_ t: inout UsageTotals) {
-                    t.inputTokens += rec.inputTokens
-                    t.outputTokens += rec.outputTokens
-                    if let cost { t.costUSD += cost } else { t.hasUnpricedModel = true }
-                }
-                add(&snapshot.week)
-                if cal.isDate(rec.timestamp, inSameDayAs: now) { add(&snapshot.today) }
-                if rec.timestamp >= sessionStart { add(&snapshot.session) }
-                var mt = perModel[rec.model] ?? UsageTotals()
-                add(&mt)
-                perModel[rec.model] = mt
-            }
+        for file in files where mayContainRecords(after: weekStart, file) {
+            streamLines(
+                from: file,
+                weekStart: weekStart,
+                sessionStart: sessionStart,
+                now: now,
+                seen: &seen,
+                perModel: &perModel,
+                snapshot: &snapshot
+            )
         }
         snapshot.models = perModel
             .map { ModelUsage(model: $0.key, totals: $0.value, pool: nil) }
             .sorted { $0.totals.costUSD > $1.totals.costUSD }
         snapshot.lastUpdated = now
         return snapshot
-    }
-
-    /// Reads a file in fixed-size chunks and invokes `handler` once per non-empty
-    /// line, without ever holding the entire file in memory. Runs synchronously on
-    /// the caller's thread (aggregation already happens off the main thread).
-    private static func enumerateLines(of file: URL, _ handler: (String) -> Void) {
-        guard let fh = try? FileHandle(forReadingFrom: file) else { return }
-        defer { try? fh.close() }
-
-        let chunkSize = 1 << 16 // 64 KB
-        let newline = UInt8(0x0A)
-        var buffer = Data()
-
-        while let chunk = try? fh.read(upToCount: chunkSize), !chunk.isEmpty {
-            buffer.append(chunk)
-            // Scan the whole chunk advancing a cursor, then trim the consumed
-            // prefix once. The previous per-line removeSubrange shifted the rest
-            // of the buffer for every newline → quadratic on newline-dense JSONL.
-            var searchStart = buffer.startIndex
-            while let newlineIndex = buffer[searchStart...].firstIndex(of: newline) {
-                let lineData = buffer[searchStart..<newlineIndex]
-                if !lineData.isEmpty, let line = String(data: lineData, encoding: .utf8) {
-                    handler(line)
-                }
-                searchStart = buffer.index(after: newlineIndex)
-            }
-            if searchStart != buffer.startIndex {
-                buffer.removeSubrange(buffer.startIndex..<searchStart)
-            }
-        }
-
-        if !buffer.isEmpty, let line = String(data: buffer, encoding: .utf8) {
-            handler(line)
-        }
     }
 }

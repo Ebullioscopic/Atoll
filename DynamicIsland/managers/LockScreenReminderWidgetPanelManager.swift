@@ -21,6 +21,7 @@ import SwiftUI
 import SkyLightWindow
 import QuartzCore
 import Defaults
+import Combine
 
 @MainActor
 final class LockScreenReminderWidgetPanelManager {
@@ -30,6 +31,7 @@ final class LockScreenReminderWidgetPanelManager {
     private var hasDelegated = false
     private var screenChangeObserver: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
+    private var cancellables = Set<AnyCancellable>()
 
     var isVisible: Bool {
         window?.isVisible == true
@@ -115,6 +117,9 @@ final class LockScreenReminderWidgetPanelManager {
             SkyLightOperator.shared.delegateWindow(newWindow)
             hasDelegated = true
         }
+        
+        SiriVisibilityMonitor.shared.autohide(newWindow, cancellables: &cancellables)
+        
         return newWindow
     }
 
