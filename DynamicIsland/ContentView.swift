@@ -920,7 +920,14 @@ struct ContentView: View {
                           && coordinator.sneakPeek.value < 0
                           && AirPodsListeningMode.fromHUDSymbol(coordinator.sneakPeek.icon) != nil
 
-                      if currentScreenExpansionType == .battery
+                      // An eye break outranks every other closed-notch activity,
+                      // including the battery and inline HUDs: it lasts only the
+                      // rest duration, and it is the countdown that tells the user
+                      // when they may look back at the screen. Covered by anything
+                      // else, the feature does not work at all.
+                      if vm.notchState == .closed && eyeBreakManager.isBreakVisible && !vm.hideOnClosed && !lockScreenManager.isLocked {
+                          EyeBreakLiveActivity()
+                      } else if currentScreenExpansionType == .battery
                             && isBatteryHUDVisibleOnCurrentScreen
                             && vm.notchState == .closed
                             && Defaults[.showPowerStatusNotifications]
@@ -946,12 +953,6 @@ struct ContentView: View {
                       } else if vm.notchState == .closed && capsLockManager.isCapsLockActive && Defaults[.enableCapsLockIndicator] && !vm.hideOnClosed && !lockScreenManager.isLocked {
                           InlineHUD(type: .constant(.capsLock), value: .constant(1.0), icon: .constant(""), hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
-                      // An eye break outranks the other closed-notch activities,
-                      // including music: it lasts only the rest duration, and a
-                      // reminder the user never sees is the one failure this
-                      // feature cannot afford.
-                      } else if vm.notchState == .closed && eyeBreakManager.isBreakVisible && !vm.hideOnClosed && !lockScreenManager.isLocked {
-                          EyeBreakLiveActivity()
                       } else if canShowMusicDuringExpansion && musicPairingEligible {
                           MusicLiveActivity(secondary: musicSecondary)
                               .id("closed-music-live-activity")

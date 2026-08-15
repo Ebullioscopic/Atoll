@@ -499,6 +499,7 @@ struct SettingsView: View {
             .battery,
             // Productivity
             .timer,
+            .eyeBreak,
             .calendar,
             .notes,
             // Utilities

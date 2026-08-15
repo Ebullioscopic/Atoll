@@ -37,9 +37,23 @@ final class EyeBreakManager: ObservableObject {
     /// Seconds left in the visible break, or nil when nothing is counting down.
     @Published private(set) var remainingSeconds: Int?
 
+    /// The settings steppers already bound these, but `Defaults` is writable from
+    /// outside the app (`defaults write`, a synced plist), and a zero or negative
+    /// duration produces an already-expired deadline: the schedule would then fire
+    /// a break on every tick and each break would end the moment it appeared.
+    /// Both construction sites go through these so the bound cannot be enforced in
+    /// one place and forgotten in the other.
+    private static func clampedWorkInterval() -> TimeInterval {
+        TimeInterval(min(max(Defaults[.eyeBreakWorkInterval], 5), 120)) * 60
+    }
+
+    private static func clampedRestDuration() -> TimeInterval {
+        TimeInterval(min(max(Defaults[.eyeBreakRestDuration], 10), 120))
+    }
+
     private var schedule = EyeBreakSchedule(
-        workInterval: TimeInterval(Defaults[.eyeBreakWorkInterval] * 60),
-        restDuration: TimeInterval(Defaults[.eyeBreakRestDuration])
+        workInterval: EyeBreakManager.clampedWorkInterval(),
+        restDuration: EyeBreakManager.clampedRestDuration()
     )
 
     private var ticker: Timer?
@@ -128,8 +142,8 @@ final class EyeBreakManager: ObservableObject {
 
     private func applyDurations() {
         schedule.updateDurations(
-            workInterval: TimeInterval(Defaults[.eyeBreakWorkInterval] * 60),
-            restDuration: TimeInterval(Defaults[.eyeBreakRestDuration]),
+            workInterval: Self.clampedWorkInterval(),
+            restDuration: Self.clampedRestDuration(),
             at: Date()
         )
         publish()
