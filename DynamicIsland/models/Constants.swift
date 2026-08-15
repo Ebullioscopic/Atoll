@@ -307,13 +307,15 @@ enum ThirdPartyCalendarApp: String, CaseIterable, Codable, Defaults.Serializable
 enum ClipboardDisplayMode: String, CaseIterable, Codable, Defaults.Serializable {
     case popover = "popover"     // Traditional popover attached to button
     case panel = "panel"         // Floating panel near notch
-    case separateTab = "separateTab" // Separate tab in Dynamic Island
-    
+    case separateTab = "separateTab" // Separate tab in Dynamic Island (merges with Notes)
+    case notchTab = "notchTab"   // Dedicated clipboard tab inside the notch (draggable items)
+
     var displayName: String {
         switch self {
         case .popover: return String(localized: "Popover")
         case .panel: return String(localized: "Panel")
         case .separateTab: return String(localized: "Separate Tab")
+        case .notchTab: return String(localized: "Notch Tab")
         }
     }
     
@@ -322,6 +324,7 @@ enum ClipboardDisplayMode: String, CaseIterable, Codable, Defaults.Serializable 
         case .popover: return "Shows clipboard as a dropdown attached to the clipboard button"
         case .panel: return "Shows clipboard in a floating panel near the notch"
         case .separateTab: return "Shows copied items in a separate tab within the Dynamic Island (merges with Notes if enabled)"
+        case .notchTab: return "Shows copied items in a dedicated clipboard tab inside the notch; drag items straight out to other apps"
         }
     }
 }
@@ -622,6 +625,33 @@ enum FocusMonitoringMode: String, CaseIterable, Identifiable, Defaults.Serializa
             return "Use without DevTools"
         case .useDevTools:
             return "Use DevTools"
+        }
+    }
+}
+
+enum SiriResponsivenessMode: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case automatic
+    case highPerformance
+    case balanced
+    case powerSaver
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .automatic: return String(localized: "Automatic")
+        case .highPerformance: return String(localized: "High Performance")
+        case .balanced: return String(localized: "Balanced")
+        case .powerSaver: return String(localized: "Power Saver")
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .automatic: return String(localized: "Adapts based on power source and battery level.")
+        case .highPerformance: return String(localized: "Ultra-fast detection (30Hz) for near-instant hiding.")
+        case .balanced: return String(localized: "Standard detection (16Hz) for smooth responsiveness.")
+        case .powerSaver: return String(localized: "Slower detection (4Hz) to maximize battery life.")
         }
     }
 }
@@ -935,6 +965,7 @@ extension Defaults.Keys {
     static let enableLockScreenMediaWidget = Key<Bool>("enableLockScreenMediaWidget", default: true)
     static let enableLockScreenWeatherWidget = Key<Bool>("enableLockScreenWeatherWidget", default: true)
     static let enableLockScreenFocusWidget = Key<Bool>("enableLockScreenFocusWidget", default: true)
+    static let siriResponsivenessMode = Key<SiriResponsivenessMode>("siriResponsivenessMode", default: .automatic)
     static let enableLockScreenReminderWidget = Key<Bool>("enableLockScreenReminderWidget", default: true)
     static let enableLockScreenTimerWidget = Key<Bool>("enableLockScreenTimerWidget", default: true)
     static let lockScreenWeatherRefreshInterval = Key<TimeInterval>("lockScreenWeatherRefreshInterval", default: 30 * 60)
@@ -952,6 +983,7 @@ extension Defaults.Keys {
     static let lockScreenMusicAlbumParallaxEnabled = Key<Bool>("lockScreenMusicAlbumParallaxEnabled", default: false)
     static let lockScreenTimerVerticalOffset = Key<Double>("lockScreenTimerVerticalOffset", default: 0)
     static let lockScreenTimerWidgetWidth = Key<Double>("lockScreenTimerWidgetWidth", default: 350)
+    static let lockScreenWidgetAppearance = Key<LockScreenWidgetAppearance>("lockScreenWidgetAppearance", default: .dark)
     static let lockScreenGlassStyle = Key<LockScreenGlassStyle>("lockScreenGlassStyle", default: .liquid)
     static let lockScreenGlassCustomizationMode = Key<LockScreenGlassCustomizationMode>(
         "lockScreenGlassCustomizationMode",
@@ -1054,6 +1086,10 @@ extension Defaults.Keys {
         static let localSendDevicePickerGlassMode = Key<LockScreenGlassCustomizationMode>("localSendDevicePickerGlassMode", default: .standard)
         static let localSendDevicePickerLiquidGlassVariant = Key<LiquidGlassVariant>("localSendDevicePickerLiquidGlassVariant", default: .v11)
         static let copyOnDrag = Key<Bool>("copyOnDrag", default: false)
+        // Off by default: offering `.move` to another app lets Finder move the
+        // original out from under the user when the destination is on the same
+        // volume, which reads as data loss.
+        static let allowMoveOnDrag = Key<Bool>("allowMoveOnDrag", default: false)
         static let autoRemoveShelfItems = Key<Bool>("autoRemoveShelfItems", default: false)
         static let expandedDragDetection = Key<Bool>("expandedDragDetection", default: true)
     
@@ -1076,6 +1112,12 @@ extension Defaults.Keys {
     static let spotifyAuthAccessToken = Key<String>("spotifyAuthAccessToken", default: "")
     static let spotifyAuthAccessTokenExpiration = Key<Double>("spotifyAuthAccessTokenExpiration", default: 0)
     static let spotifyAuthLastValidatedAt = Key<Double>("spotifyAuthLastValidatedAt", default: 0)
+    static let spotifyLibraryClientID = Key<String>("spotifyLibraryClientID", default: "")
+    // The OAuth token pair lives in the Keychain (see KeychainSpotifyTokenStore);
+    // these two keys remain only for the one-time migration of early builds.
+    static let spotifyLibraryAccessToken = Key<String>("spotifyLibraryAccessToken", default: "")
+    static let spotifyLibraryRefreshToken = Key<String>("spotifyLibraryRefreshToken", default: "")
+    static let spotifyLibraryTokenExpiration = Key<Double>("spotifyLibraryTokenExpiration", default: 0)
     
     // MARK: Bluetooth Audio Devices
     static let showBluetoothDeviceConnections = Key<Bool>("showBluetoothDeviceConnections", default: true)
