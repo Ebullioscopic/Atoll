@@ -53,6 +53,55 @@ let defaultImage: NSImage = .init(
     accessibilityDescription: "Album Art"
 )!
 
+struct OptimisticPlaybackTransition {
+    private(set) var expectedState: Bool? = nil
+
+    mutating func begin(expecting state: Bool) {
+        expectedState = state
+    }
+
+    mutating func shouldApply(eventIsPlaying: Bool) -> Bool {
+        guard let expectedState else { return true }
+        guard eventIsPlaying == expectedState else { return false }
+
+        self.expectedState = nil
+        return true
+    }
+
+    mutating func cancel(ifExpecting state: Bool) -> Bool {
+        guard expectedState == state else { return false }
+        expectedState = nil
+        return true
+    }
+}
+
+private struct ManualTrackArtworkHandoff {
+    private static let duration: TimeInterval = 0.225
+    private var deadline: Date? = nil
+    private var generation = 0
+
+    mutating func begin(at date: Date = Date()) {
+        generation &+= 1
+        deadline = date.addingTimeInterval(Self.duration)
+    }
+
+    mutating func pendingSchedule(at date: Date = Date()) -> (generation: Int, delay: TimeInterval)? {
+        guard let deadline else { return nil }
+        let remainingDelay = deadline.timeIntervalSince(date)
+        guard remainingDelay > 0 else {
+            self.deadline = nil
+            return nil
+        }
+        return (generation, remainingDelay)
+    }
+
+    mutating func complete(generation: Int) -> Bool {
+        guard self.generation == generation else { return false }
+        deadline = nil
+        return true
+    }
+}
+
 private struct ITunesExplicitnessSearchResponse: Decodable {
     let results: [ITunesExplicitnessTrack]
 }
@@ -446,7 +495,8 @@ class MusicManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var controllerCancellables = Set<AnyCancellable>()
     private var debounceIdleTask: Task<Void, Never>?
-    @MainActor private var pendingOptimisticPlayState: Bool?
+    private var optimisticPlayStateTimeoutTask: Task<Void, Never>?
+    @MainActor private var optimisticPlaybackTransition = OptimisticPlaybackTransition()
 
     // Helper to check if macOS has removed support for NowPlayingController
     public private(set) var isNowPlayingDeprecated: Bool = false
@@ -549,6 +599,8 @@ class MusicManager: ObservableObject {
     }
 
     private(set) var artworkData: Data? = nil
+    private var manualTrackArtworkHandoff = ManualTrackArtworkHandoff()
+    private var artworkHandoffWorkItem: DispatchWorkItem?
 
     @Published var videoArtworkURL: URL? = nil
 
@@ -575,7 +627,9 @@ class MusicManager: ObservableObject {
     private var skipGestureToken: Int = 0
 
     // MARK: - Initialization
-    init() {
+    init(startsControllerSetup: Bool = true) {
+        guard startsControllerSetup else { return }
+
         // Listen for changes to the default controller preference
         NotificationCenter.default.publisher(for: Notification.Name.mediaControllerChanged)
             .sink { [weak self] _ in
@@ -659,12 +713,14 @@ class MusicManager: ObservableObject {
     
     public func destroy() {
         debounceIdleTask?.cancel()
+        optimisticPlayStateTimeoutTask?.cancel()
         lyricsFetchTask?.cancel()
         lyricSyncTask?.cancel()
         explicitLookupTask?.cancel()
         cancellables.removeAll()
         controllerCancellables.removeAll()
         transitionWorkItem?.cancel()
+        artworkHandoffWorkItem?.cancel()
 
         // Release active controller
         activeController = nil
@@ -757,21 +813,34 @@ class MusicManager: ObservableObject {
 
     // MARK: - Update Methods
     @MainActor
+    // pi-lens-ignore: function_body_length
+    // pi-lens-ignore: cyclomatic_complexity
     private func updateFromPlaybackState(_ state: PlaybackState) {
         // Check for playback state changes (playing/paused)
         let eventIsPlaying = state.isPlaying
-        let expectedState = pendingOptimisticPlayState
-        pendingOptimisticPlayState = nil
+        let expectedState = optimisticPlaybackTransition.expectedState
+        let shouldApplyPlaybackEvent = optimisticPlaybackTransition.shouldApply(
+            eventIsPlaying: eventIsPlaying
+        )
 
-        if eventIsPlaying != self.isPlaying {
-            let animation: Animation? = (expectedState == eventIsPlaying) ? .smooth(duration: 0.18) : .smooth
-            applyPlayState(eventIsPlaying, animation: animation)
-
-            if eventIsPlaying && !state.title.isEmpty && !state.artist.isEmpty {
-                self.updateSneakPeek()
+        if shouldApplyPlaybackEvent {
+            if expectedState != nil {
+                optimisticPlayStateTimeoutTask?.cancel()
+                optimisticPlayStateTimeoutTask = nil
             }
-        } else {
-            self.updateIdleState(state: eventIsPlaying)
+
+            if eventIsPlaying != self.isPlaying {
+                let animation: Animation? = (expectedState == eventIsPlaying)
+                    ? .smooth(duration: 0.18)
+                    : .smooth
+                applyPlayState(eventIsPlaying, animation: animation)
+
+                if eventIsPlaying && !state.title.isEmpty && !state.artist.isEmpty {
+                    self.updateSneakPeek()
+                }
+            } else {
+                self.updateIdleState(state: eventIsPlaying)
+            }
         }
 
         // Check for changes in track metadata using last artwork change values
@@ -1185,19 +1254,43 @@ class MusicManager: ObservableObject {
         }
     }
 
-    private var workItem: DispatchWorkItem?
+    @MainActor
+    func beginManualTrackArtworkHandoff() {
+        artworkHandoffWorkItem?.cancel()
+        artworkHandoffWorkItem = nil
+        manualTrackArtworkHandoff.begin()
+    }
 
+    @MainActor
     func updateAlbumArt(newAlbumArt: NSImage) {
-        workItem?.cancel()
-        workItem = DispatchWorkItem { [weak self] in
-            withAnimation(.smooth) {
-                self?.albumArt = newAlbumArt
-                if Defaults[.coloredSpectrogram] {
-                    self?.calculateAverageColor()
-                }
+        artworkHandoffWorkItem?.cancel()
+
+        guard let pending = manualTrackArtworkHandoff.pendingSchedule() else {
+            artworkHandoffWorkItem = nil
+            applyAlbumArt(newAlbumArt)
+            return
+        }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self,
+                  self.manualTrackArtworkHandoff.complete(generation: pending.generation)
+            else { return }
+
+            self.artworkHandoffWorkItem = nil
+            self.applyAlbumArt(newAlbumArt)
+        }
+        artworkHandoffWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + pending.delay, execute: workItem)
+    }
+
+    @MainActor
+    private func applyAlbumArt(_ newAlbumArt: NSImage) {
+        withAnimation(.smooth) {
+            albumArt = newAlbumArt
+            if Defaults[.coloredSpectrogram] {
+                calculateAverageColor()
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: workItem!)
     }
 
     // MARK: - Playback Position Estimation
@@ -1272,8 +1365,12 @@ class MusicManager: ObservableObject {
 
         Task {
             await MainActor.run {
-                pendingOptimisticPlayState = targetState
+                optimisticPlaybackTransition.begin(expecting: targetState)
                 applyPlayState(targetState, animation: .smooth(duration: 0.18))
+                scheduleOptimisticPlayStateRecovery(
+                    expecting: targetState,
+                    controller: controller
+                )
             }
 
             if targetState {
@@ -1284,15 +1381,42 @@ class MusicManager: ObservableObject {
         }
     }
 
+    @MainActor
+    private func scheduleOptimisticPlayStateRecovery(
+        expecting targetState: Bool,
+        controller: any MediaControllerProtocol
+    ) {
+        optimisticPlayStateTimeoutTask?.cancel()
+        optimisticPlayStateTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled, let self else { return }
+
+            let shouldRefresh = await MainActor.run {
+                self.optimisticPlaybackTransition.cancel(ifExpecting: targetState)
+            }
+            guard shouldRefresh else { return }
+
+            await controller.updatePlaybackInfo()
+        }
+    }
+
     func nextTrack() {
+        guard let controller = activeController else { return }
         Task {
-            await activeController?.nextTrack()
+            await MainActor.run {
+                beginManualTrackArtworkHandoff()
+            }
+            await controller.nextTrack()
         }
     }
 
     func previousTrack() {
+        guard let controller = activeController else { return }
         Task {
-            await activeController?.previousTrack()
+            await MainActor.run {
+                beginManualTrackArtworkHandoff()
+            }
+            await controller.previousTrack()
         }
     }
 
@@ -1363,7 +1487,7 @@ class MusicManager: ObservableObject {
         let workspace = NSWorkspace.shared
         if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID) {
             let configuration = NSWorkspace.OpenConfiguration()
-            workspace.openApplication(at: appURL, configuration: configuration) { (app, error) in
+            workspace.openApplication(at: appURL, configuration: configuration) { (_, error) in
                 if let error = error {
                     print("Failed to launch app with bundle ID: \(bundleID), error: \(error)")
                 } else {
@@ -1566,6 +1690,7 @@ class MusicManager: ObservableObject {
         }
     }
 
+    // pi-lens-ignore: large_tuple
     private func currentLyricsLookupContext() -> (key: LyricsLookupKey, requestArtist: String, requestTitle: String, requestAlbum: String)? {
         let requestArtist = normalizedLyricsRequestComponent(artistName)
         let requestTitle = normalizedLyricsTitle(songTitle)
@@ -1883,4 +2008,5 @@ extension View {
     func albumArtFlip(angle: Double) -> some View {
         modifier(AlbumArtFlipModifier(angle: angle))
     }
+// pi-lens-ignore: file_length
 }

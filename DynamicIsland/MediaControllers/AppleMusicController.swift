@@ -34,6 +34,18 @@ private struct ITunesTrack: Decodable {
     let artworkUrl100: String?
 }
 
+struct AppleMusicPlaybackInfo: Sendable {
+    let isPlaying: Bool
+    let title: String
+    let artist: String
+    let album: String
+    let currentTime: Double
+    let duration: Double
+    let isShuffled: Bool
+    let repeatMode: RepeatMode
+    let artwork: Data?
+}
+
 class AppleMusicController: MediaControllerProtocol {
     // MARK: - Properties
     @Published private var playbackState: PlaybackState = PlaybackState(
@@ -54,11 +66,30 @@ class AppleMusicController: MediaControllerProtocol {
     private static let minimumArtworkSize = 16
 
     private var notificationTask: Task<Void, Never>?
+    private var artworkFetchTask: Task<Void, Never>?
+    private var artworkRequestID: UUID?
     private var lastCatalogArtworkKey: String?
     private var cachedCatalogArtwork: Data?
+    private let commandUpdateDelay: Duration
+    private let commandExecutor: (String) async -> Void
+    private let playbackInfoProvider: () async -> AppleMusicPlaybackInfo?
+    private let catalogArtworkProvider: ((String, String, String) async -> Data?)?
 
     // MARK: - Initialization
-    init() {
+    init(
+        commandUpdateDelay: Duration = .milliseconds(25),
+        startsObservers: Bool = true,
+        commandExecutor: ((String) async -> Void)? = nil,
+        playbackInfoProvider: (() async -> AppleMusicPlaybackInfo?)? = nil,
+        catalogArtworkProvider: ((String, String, String) async -> Data?)? = nil
+    ) {
+        self.commandUpdateDelay = commandUpdateDelay
+        self.commandExecutor = commandExecutor ?? Self.executeAppleMusicCommand
+        self.playbackInfoProvider = playbackInfoProvider ?? Self.fetchAppleMusicPlaybackInfo
+        self.catalogArtworkProvider = catalogArtworkProvider
+
+        guard startsObservers else { return }
+
         setupPlaybackStateChangeObserver()
         Task {
             if isActive() {
@@ -81,6 +112,7 @@ class AppleMusicController: MediaControllerProtocol {
     
     deinit {
         notificationTask?.cancel()
+        artworkFetchTask?.cancel()
     }
     
     // MARK: - Protocol Implementation
@@ -97,11 +129,11 @@ class AppleMusicController: MediaControllerProtocol {
     }
     
     func nextTrack() async {
-        await executeCommand("next track")
+        await executeAndRefresh("next track")
     }
     
     func previousTrack() async {
-        await executeCommand("previous track")
+        await executeAndRefresh("previous track")
     }
     
     func seek(to time: Double) async {
@@ -135,34 +167,58 @@ class AppleMusicController: MediaControllerProtocol {
     }
     
     func updatePlaybackInfo() async {
-        guard let descriptor = try? await fetchPlaybackInfoAsync() else { return }
-        guard descriptor.numberOfItems >= 8 else { return }
+        guard let info = await playbackInfoProvider() else { return }
         var updatedState = self.playbackState
 
-        updatedState.isPlaying = descriptor.atIndex(1)?.booleanValue ?? false
-        updatedState.title = descriptor.atIndex(2)?.stringValue ?? "Unknown"
-        updatedState.artist = descriptor.atIndex(3)?.stringValue ?? "Unknown"
-        updatedState.album = descriptor.atIndex(4)?.stringValue ?? "Unknown"
-        updatedState.currentTime = descriptor.atIndex(5)?.doubleValue ?? 0
-        updatedState.duration = descriptor.atIndex(6)?.doubleValue ?? 0
-        updatedState.isShuffled = descriptor.atIndex(7)?.booleanValue ?? false
-        let repeatModeValue = descriptor.atIndex(8)?.int32Value ?? 0
-        updatedState.repeatMode = RepeatMode(rawValue: Int(repeatModeValue)) ?? .off
-
-        // AppleScript returns artwork data for library tracks. For streamed
-        // content not in the library it returns an empty descriptor, so we
-        // fall back to the iTunes Search API to fetch artwork by metadata.
-        if let artworkData = descriptor.atIndex(9)?.data as Data?,
-           artworkData.count > Self.minimumArtworkSize {
-            updatedState.artwork = artworkData
-        } else {
-            updatedState.artwork = await fetchArtworkFromCatalog(
-                title: updatedState.title, artist: updatedState.artist, album: updatedState.album
-            )
-        }
-
+        updatedState.isPlaying = info.isPlaying
+        updatedState.title = info.title
+        updatedState.artist = info.artist
+        updatedState.album = info.album
+        updatedState.currentTime = info.currentTime
+        updatedState.duration = info.duration
+        updatedState.isShuffled = info.isShuffled
+        updatedState.repeatMode = info.repeatMode
+        updatedState.artwork = info.artwork
         updatedState.lastUpdated = Date()
+
+        artworkFetchTask?.cancel()
+        artworkFetchTask = nil
+        artworkRequestID = nil
+
+        // Publish the new track immediately. Streamed Apple Music tracks often
+        // have no embedded artwork, and the catalog fallback can take seconds.
+        // Waiting for it here leaves the previous track's poster on screen.
         self.playbackState = updatedState
+
+        guard info.artwork == nil else { return }
+
+        let requestID = UUID()
+        artworkRequestID = requestID
+        artworkFetchTask = Task { [weak self] in
+            guard let self else { return }
+
+            let artwork: Data?
+            if let catalogArtworkProvider = self.catalogArtworkProvider {
+                artwork = await catalogArtworkProvider(info.title, info.artist, info.album)
+            } else {
+                artwork = await self.fetchArtworkFromCatalog(
+                    title: info.title,
+                    artist: info.artist,
+                    album: info.album
+                )
+            }
+
+            guard !Task.isCancelled, let artwork else { return }
+
+            await MainActor.run {
+                guard self.artworkRequestID == requestID else { return }
+                var artworkState = self.playbackState
+                artworkState.artwork = artwork
+                self.playbackState = artworkState
+                self.artworkRequestID = nil
+                self.artworkFetchTask = nil
+            }
+        }
     }
 
     // MARK: - Private Methods
@@ -215,11 +271,44 @@ class AppleMusicController: MediaControllerProtocol {
     }
 
     private func executeCommand(_ command: String) async {
+        await commandExecutor(command)
+    }
+
+    private static func executeAppleMusicCommand(_ command: String) async {
         let script = "tell application \"Music\" to \(command)"
         try? await AppleScriptHelper.executeVoid(script)
     }
+
+    private func executeAndRefresh(_ command: String) async {
+        await executeCommand(command)
+        try? await Task.sleep(for: commandUpdateDelay)
+        await updatePlaybackInfo()
+    }
     
-    private func fetchPlaybackInfoAsync() async throws -> NSAppleEventDescriptor? {
+    private static func fetchAppleMusicPlaybackInfo() async -> AppleMusicPlaybackInfo? {
+        guard let descriptor = try? await fetchPlaybackInfoDescriptor() else { return nil }
+        guard descriptor.numberOfItems >= 9 else { return nil }
+
+        let repeatModeValue = descriptor.atIndex(8)?.int32Value ?? 0
+        let artworkData = descriptor.atIndex(9)?.data as Data?
+        let validArtwork = artworkData.flatMap {
+            $0.count > minimumArtworkSize ? $0 : nil
+        }
+
+        return AppleMusicPlaybackInfo(
+            isPlaying: descriptor.atIndex(1)?.booleanValue ?? false,
+            title: descriptor.atIndex(2)?.stringValue ?? "Unknown",
+            artist: descriptor.atIndex(3)?.stringValue ?? "Unknown",
+            album: descriptor.atIndex(4)?.stringValue ?? "Unknown",
+            currentTime: descriptor.atIndex(5)?.doubleValue ?? 0,
+            duration: descriptor.atIndex(6)?.doubleValue ?? 0,
+            isShuffled: descriptor.atIndex(7)?.booleanValue ?? false,
+            repeatMode: RepeatMode(rawValue: Int(repeatModeValue)) ?? .off,
+            artwork: validArtwork
+        )
+    }
+
+    private static func fetchPlaybackInfoDescriptor() async throws -> NSAppleEventDescriptor? {
         let script = """
         tell application "Music"
             try
