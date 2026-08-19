@@ -26,6 +26,8 @@ import Defaults
 import Foundation
 import SwiftUI
 
+// swiftlint:disable file_length
+
 // MARK: - Lyric Data Structures
 struct LyricLine: Identifiable, Codable {
     let id = UUID()
@@ -476,6 +478,7 @@ private actor SpotifyExplicitnessResolver {
     }
 }
 
+// swiftlint:disable:next type_body_length
 class MusicManager: ObservableObject {
     enum SkipDirection: Equatable {
         case backward
@@ -600,7 +603,8 @@ class MusicManager: ObservableObject {
 
     private(set) var artworkData: Data? = nil
     private var manualTrackArtworkHandoff = ManualTrackArtworkHandoff()
-    private var artworkHandoffWorkItem: DispatchWorkItem?
+    private var artworkHandoffTask: Task<Void, Never>?
+    private var pendingHandoffArtwork: NSImage?
 
     @Published var videoArtworkURL: URL? = nil
 
@@ -720,7 +724,8 @@ class MusicManager: ObservableObject {
         cancellables.removeAll()
         controllerCancellables.removeAll()
         transitionWorkItem?.cancel()
-        artworkHandoffWorkItem?.cancel()
+        artworkHandoffTask?.cancel()
+        pendingHandoffArtwork = nil
 
         // Release active controller
         activeController = nil
@@ -813,8 +818,7 @@ class MusicManager: ObservableObject {
 
     // MARK: - Update Methods
     @MainActor
-    // pi-lens-ignore: function_body_length
-    // pi-lens-ignore: cyclomatic_complexity
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private func updateFromPlaybackState(_ state: PlaybackState) {
         // Check for playback state changes (playing/paused)
         let eventIsPlaying = state.isPlaying
@@ -1256,31 +1260,46 @@ class MusicManager: ObservableObject {
 
     @MainActor
     func beginManualTrackArtworkHandoff() {
-        artworkHandoffWorkItem?.cancel()
-        artworkHandoffWorkItem = nil
+        artworkHandoffTask?.cancel()
+        artworkHandoffTask = nil
         manualTrackArtworkHandoff.begin()
+        schedulePendingArtworkHandoff()
     }
 
     @MainActor
     func updateAlbumArt(newAlbumArt: NSImage) {
-        artworkHandoffWorkItem?.cancel()
+        pendingHandoffArtwork = newAlbumArt
+        schedulePendingArtworkHandoff()
+    }
 
+    @MainActor
+    private func schedulePendingArtworkHandoff() {
+        artworkHandoffTask?.cancel()
+        artworkHandoffTask = nil
+
+        guard let artwork = pendingHandoffArtwork else { return }
         guard let pending = manualTrackArtworkHandoff.pendingSchedule() else {
-            artworkHandoffWorkItem = nil
-            applyAlbumArt(newAlbumArt)
+            pendingHandoffArtwork = nil
+            applyAlbumArt(artwork)
             return
         }
 
-        let workItem = DispatchWorkItem { [weak self] in
+        artworkHandoffTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(pending.delay))
+            } catch {
+                return
+            }
+
             guard let self,
+                  !Task.isCancelled,
                   self.manualTrackArtworkHandoff.complete(generation: pending.generation)
             else { return }
 
-            self.artworkHandoffWorkItem = nil
-            self.applyAlbumArt(newAlbumArt)
+            self.artworkHandoffTask = nil
+            self.pendingHandoffArtwork = nil
+            self.applyAlbumArt(artwork)
         }
-        artworkHandoffWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + pending.delay, execute: workItem)
     }
 
     @MainActor
@@ -2008,5 +2027,4 @@ extension View {
     func albumArtFlip(angle: Double) -> some View {
         modifier(AlbumArtFlipModifier(angle: angle))
     }
-// pi-lens-ignore: file_length
 }

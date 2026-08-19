@@ -168,7 +168,12 @@ class AppleMusicController: MediaControllerProtocol {
     
     func updatePlaybackInfo() async {
         guard let info = await playbackInfoProvider() else { return }
-        var updatedState = self.playbackState
+        await applyPlaybackInfo(info)
+    }
+
+    @MainActor
+    private func applyPlaybackInfo(_ info: AppleMusicPlaybackInfo) {
+        var updatedState = playbackState
 
         updatedState.isPlaying = info.isPlaying
         updatedState.title = info.title
@@ -188,13 +193,13 @@ class AppleMusicController: MediaControllerProtocol {
         // Publish the new track immediately. Streamed Apple Music tracks often
         // have no embedded artwork, and the catalog fallback can take seconds.
         // Waiting for it here leaves the previous track's poster on screen.
-        self.playbackState = updatedState
+        playbackState = updatedState
 
         guard info.artwork == nil else { return }
 
         let requestID = UUID()
         artworkRequestID = requestID
-        artworkFetchTask = Task { [weak self] in
+        artworkFetchTask = Task { @MainActor [weak self] in
             guard let self else { return }
 
             let artwork: Data?
@@ -208,21 +213,28 @@ class AppleMusicController: MediaControllerProtocol {
                 )
             }
 
-            guard !Task.isCancelled, let artwork else { return }
-
-            await MainActor.run {
-                guard self.artworkRequestID == requestID else { return }
-                var artworkState = self.playbackState
-                artworkState.artwork = artwork
-                self.playbackState = artworkState
-                self.artworkRequestID = nil
-                self.artworkFetchTask = nil
-            }
+            guard !Task.isCancelled else { return }
+            self.completeArtworkRequest(artwork, requestID: requestID)
         }
+    }
+
+    @MainActor
+    private func completeArtworkRequest(_ artwork: Data?, requestID: UUID) {
+        guard artworkRequestID == requestID else { return }
+        defer {
+            artworkRequestID = nil
+            artworkFetchTask = nil
+        }
+        guard let artwork else { return }
+
+        var artworkState = playbackState
+        artworkState.artwork = artwork
+        playbackState = artworkState
     }
 
     // MARK: - Private Methods
 
+    @MainActor
     private func fetchArtworkFromCatalog(title: String, artist: String, album: String) async -> Data? {
         let key = "\(title)|\(artist)|\(album)"
 

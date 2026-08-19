@@ -49,6 +49,10 @@ final class AppleMusicControllerTests: XCTestCase {
                 return completedArtwork
             }
 
+            precondition(
+                continuation == nil,
+                "DeferredArtworkProvider supports one pending fetch"
+            )
             return await withCheckedContinuation { continuation in
                 self.continuation = continuation
             }
@@ -101,6 +105,24 @@ final class AppleMusicControllerTests: XCTestCase {
         XCTAssertFalse(manager.albumArt === newArtwork)
         await fulfillment(of: [artworkPublished], timeout: 1)
         XCTAssertGreaterThanOrEqual(observedDelay, 0.20)
+        withExtendedLifetime(cancellable) {}
+    }
+
+    func testRepeatedManualTrackHandoffPreservesPendingPosterWhenArtworkDoesNotChange() async {
+        let manager = MusicManager(startsControllerSetup: false)
+        let sharedArtwork = NSImage(size: NSSize(width: 48, height: 48))
+        let artworkPublished = expectation(description: "pending shared artwork published")
+        let cancellable = manager.$albumArt.sink { artwork in
+            guard artwork === sharedArtwork else { return }
+            artworkPublished.fulfill()
+        }
+        defer { manager.destroy() }
+
+        manager.beginManualTrackArtworkHandoff()
+        manager.updateAlbumArt(newAlbumArt: sharedArtwork)
+        manager.beginManualTrackArtworkHandoff()
+
+        await fulfillment(of: [artworkPublished], timeout: 1)
         withExtendedLifetime(cancellable) {}
     }
 
@@ -157,6 +179,39 @@ final class AppleMusicControllerTests: XCTestCase {
 
         let events = await recorder.snapshot()
         XCTAssertEqual(events, ["command:next track", "refresh"])
+    }
+
+    func testPlaybackStatePublicationReturnsToMainActor() async {
+        let statePublished = expectation(description: "playback state published on main actor")
+        let controller = AppleMusicController(
+            startsObservers: false,
+            playbackInfoProvider: {
+                AppleMusicPlaybackInfo(
+                    isPlaying: true,
+                    title: "Main Actor Song",
+                    artist: "Main Actor Artist",
+                    album: "Main Actor Album",
+                    currentTime: 0,
+                    duration: 180,
+                    isShuffled: false,
+                    repeatMode: .off,
+                    artwork: Data("artwork".utf8)
+                )
+            }
+        )
+        let cancellable = controller.playbackStatePublisher
+            .dropFirst()
+            .sink { _ in
+                XCTAssertTrue(Thread.isMainThread)
+                statePublished.fulfill()
+            }
+
+        await Task.detached {
+            await controller.updatePlaybackInfo()
+        }.value
+
+        await fulfillment(of: [statePublished], timeout: 1)
+        withExtendedLifetime(cancellable) {}
     }
 
     func testPublishesNewTrackBeforeCatalogArtworkFinishes() async {
