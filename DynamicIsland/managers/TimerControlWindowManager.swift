@@ -57,7 +57,11 @@ final class TimerControlWindowManager {
 
     @discardableResult
     func refresh(using viewModel: DynamicIslandViewModel, metrics: TimerControlWindowMetrics) -> Bool {
-        presenter.refresh(using: viewModel, metrics: metrics)
+        guard !LockScreenManager.shared.currentLockStatus else {
+            hide(animated: false)
+            return false
+        }
+        return presenter.refresh(using: viewModel, metrics: metrics)
     }
 
     func hide(animated: Bool = true, tearDown: Bool = true) {

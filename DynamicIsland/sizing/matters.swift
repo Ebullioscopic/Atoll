@@ -31,6 +31,8 @@ let batterySneakSize: CGSize = .init(width: 160, height: 1)
 // This budget is used only while the side lyrics panel is active.
 let sideLyricsMinimumPlayerWidth: CGFloat = 380
 let sideLyricsMinimumMirrorWidth: CGFloat = 220
+let sideLyricsHStackSpacing: CGFloat = 20
+let sideLyricsCombinedInset: CGFloat = 40
 
 func sideLyricsRequiredNotchWidth() -> CGFloat {
     guard Defaults[.enableLyrics],
@@ -43,17 +45,17 @@ func sideLyricsRequiredNotchWidth() -> CGFloat {
     let panelWidth = max(0, Defaults[.lyricsPanelWidth])
     let offsetDistance = abs(Defaults[.lyricsPanelOffset])
     let mirrorWidth = Defaults[.showMirror] && WebcamManager.shared.cameraAvailable
-        ? sideLyricsMinimumMirrorWidth + 20
+        ? sideLyricsMinimumMirrorWidth + sideLyricsHStackSpacing
         : 0
 
     // Include the home-view and notch content insets so the player receives
     // the same usable width it had before the panel was added.
     return sideLyricsMinimumPlayerWidth
         + panelWidth
-        + 20
+        + sideLyricsHStackSpacing
         + offsetDistance
         + mirrorWidth
-        + 40
+        + sideLyricsCombinedInset
 }
 
 var openNotchSize: CGSize {

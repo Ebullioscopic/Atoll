@@ -104,7 +104,7 @@ final class FlyoutWindowPresenter<Overlay: View, Metrics: FlyoutWindowMetrics> {
            window.contentView === hostingView,
            let screen = resolveScreen(from: viewModel) {
             let targetFrame = frame(for: measuredContentSize, screen: screen, metrics: metrics)
-            applyFrame(targetFrame, to: window, metrics: metrics, animated: false)
+            applyFrame(targetFrame, to: window, metrics: metrics, animated: !window.isVisible)
             return true
         }
 

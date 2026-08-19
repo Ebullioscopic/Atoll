@@ -196,6 +196,8 @@ struct LyricsSidePanelView: View {
     }
 
     var body: some View {
+        let lyrics = self.lyrics
+
         VStack(alignment: .leading, spacing: 0) {
             Text("Lyrics")
                 .font(.headline)
@@ -839,7 +841,7 @@ struct NotchHomeView: View {
             } else if shouldShowSideLyrics {
                 sideLyricsContent
             } else {
-                HStack(alignment: .top, spacing: 20) {
+                HStack(alignment: .top, spacing: sideLyricsHStackSpacing) {
                     // Normal mode: Show full music player with optional calendar and webcam
                     if shouldShowMusicPlayer {
                         MusicPlayerView(albumArtNamespace: albumArtNamespace)
@@ -861,13 +863,8 @@ struct NotchHomeView: View {
                         .environmentObject(vm)
                     }
 
-                    if Defaults[.showMirror],
-                       webcamManager.cameraAvailable,
-                       vm.notchState == .open {
-                        CameraPreviewView(webcamManager: webcamManager)
-                            .scaledToFit()
-                            .opacity(vm.notchState == .closed ? 0 : 1)
-                            .blur(radius: vm.notchState == .closed ? 20 : 0)
+                    if mirrorIsVisible {
+                        cameraPreview
                     }
                 }
             }
@@ -880,7 +877,7 @@ struct NotchHomeView: View {
     }
 
     private var sideLyricsContent: some View {
-        HStack(alignment: .top, spacing: 20) {
+        HStack(alignment: .top, spacing: sideLyricsHStackSpacing) {
             MusicPlayerView(albumArtNamespace: albumArtNamespace)
                 .frame(minWidth: sideLyricsMinimumPlayerWidth, maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
