@@ -887,6 +887,7 @@ struct NotchHomeView: View {
 
             LyricsSidePanelView()
                 .frame(width: max(0, lyricsPanelWidth), alignment: .topLeading)
+                .padding(.leading, max(0, -lyricsPanelOffset))
                 .offset(x: lyricsPanelOffset)
 
             if mirrorIsVisible {

@@ -41,7 +41,7 @@ func sideLyricsRequiredNotchWidth() -> CGFloat {
     else { return 0 }
 
     let panelWidth = max(0, Defaults[.lyricsPanelWidth])
-    let positiveOffset = max(0, Defaults[.lyricsPanelOffset])
+    let offsetDistance = abs(Defaults[.lyricsPanelOffset])
     let mirrorWidth = Defaults[.showMirror] && WebcamManager.shared.cameraAvailable
         ? sideLyricsMinimumMirrorWidth + 20
         : 0
@@ -51,7 +51,7 @@ func sideLyricsRequiredNotchWidth() -> CGFloat {
     return sideLyricsMinimumPlayerWidth
         + panelWidth
         + 20
-        + positiveOffset
+        + offsetDistance
         + mirrorWidth
         + 40
 }
