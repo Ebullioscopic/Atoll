@@ -81,6 +81,12 @@ final class AppleMusicControllerTests: XCTestCase {
             }
         }
 
+        func waitUntilRequested() async {
+            while continuation == nil {
+                await Task.yield()
+            }
+        }
+
         func complete(with artwork: Data?) {
             isCompleted = true
             completedArtwork = artwork
@@ -282,6 +288,37 @@ final class AppleMusicControllerTests: XCTestCase {
 
         XCTAssertEqual(publishedTitles, ["New Song"])
         withExtendedLifetime(cancellable) {}
+    }
+
+    func testControllerDeallocatesWhileArtworkProviderIsUnresolved() async {
+        let deferredArtwork = DeferredArtworkProvider()
+        var controller: AppleMusicController? = AppleMusicController(
+            startsObservers: false,
+            playbackInfoProvider: {
+                AppleMusicPlaybackInfo(
+                    isPlaying: true,
+                    title: "Pending Artwork Song",
+                    artist: "Pending Artwork Artist",
+                    album: "Pending Artwork Album",
+                    currentTime: 0,
+                    duration: 180,
+                    isShuffled: false,
+                    repeatMode: .off,
+                    artwork: nil
+                )
+            },
+            catalogArtworkProvider: { title, artist, album in
+                await deferredArtwork.fetch(title: title, artist: artist, album: album)
+            }
+        )
+        weak var weakController = controller
+
+        await controller?.updatePlaybackInfo()
+        await deferredArtwork.waitUntilRequested()
+        controller = nil
+
+        XCTAssertNil(weakController)
+        await deferredArtwork.complete(with: nil)
     }
 
     func testPublishesNewTrackBeforeCatalogArtworkFinishes() async {

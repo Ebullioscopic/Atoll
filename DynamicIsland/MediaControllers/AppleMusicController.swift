@@ -34,6 +34,56 @@ private struct ITunesTrack: Decodable {
     let artworkUrl100: String?
 }
 
+private actor AppleMusicCatalogArtworkResolver {
+    private var lastArtworkKey: String?
+    private var cachedArtwork: Data?
+
+    func fetch(title: String, artist: String, album: String) async -> Data? {
+        let key = "\(title)|\(artist)|\(album)"
+
+        if key == lastArtworkKey, let cachedArtwork {
+            return cachedArtwork
+        }
+
+        // Search with title + artist only; including album in the query can
+        // confuse the free-text search when names overlap. We validate the
+        // album from the structured response fields instead.
+        let query = "\(title) \(artist)"
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty,
+              let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=song&limit=10")
+        else { return nil }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let response = try JSONDecoder().decode(ITunesSearchResponse.self, from: data)
+            guard !response.results.isEmpty else { return nil }
+
+            let normalizedAlbum = album.lowercased()
+            let normalizedTitle = title.lowercased()
+            let match = response.results.first(where: {
+                $0.trackName?.lowercased() == normalizedTitle
+                    && $0.collectionName?.lowercased() == normalizedAlbum
+            }) ?? response.results.first(where: {
+                $0.collectionName?.lowercased() == normalizedAlbum
+            }) ?? response.results.first(where: {
+                $0.trackName?.lowercased() == normalizedTitle
+            }) ?? response.results.first
+
+            guard let artworkURLString = match?.artworkUrl100 else { return nil }
+            let highResURL = artworkURLString.replacingOccurrences(of: "100x100", with: "600x600")
+            guard let imageURL = URL(string: highResURL) else { return nil }
+
+            let (imageData, _) = try await URLSession.shared.data(from: imageURL)
+            lastArtworkKey = key
+            cachedArtwork = imageData
+            return imageData
+        } catch {
+            return nil
+        }
+    }
+}
+
 struct AppleMusicPlaybackInfo: Sendable {
     let isPlaying: Bool
     let title: String
@@ -69,8 +119,7 @@ class AppleMusicController: MediaControllerProtocol {
     private var playbackInfoRequestGeneration = 0
     private var artworkFetchTask: Task<Void, Never>?
     private var artworkRequestID: UUID?
-    private var lastCatalogArtworkKey: String?
-    private var cachedCatalogArtwork: Data?
+    private let catalogArtworkResolver = AppleMusicCatalogArtworkResolver()
     private let commandUpdateDelay: Duration
     private let commandExecutor: (String) async -> Void
     private let playbackInfoProvider: () async -> AppleMusicPlaybackInfo?
@@ -207,15 +256,15 @@ class AppleMusicController: MediaControllerProtocol {
         guard info.artwork == nil else { return }
 
         let requestID = UUID()
+        let artworkProvider = catalogArtworkProvider
+        let artworkResolver = catalogArtworkResolver
         artworkRequestID = requestID
         artworkFetchTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-
             let artwork: Data?
-            if let catalogArtworkProvider = self.catalogArtworkProvider {
-                artwork = await catalogArtworkProvider(info.title, info.artist, info.album)
+            if let artworkProvider {
+                artwork = await artworkProvider(info.title, info.artist, info.album)
             } else {
-                artwork = await self.fetchArtworkFromCatalog(
+                artwork = await artworkResolver.fetch(
                     title: info.title,
                     artist: info.artist,
                     album: info.album
@@ -223,7 +272,7 @@ class AppleMusicController: MediaControllerProtocol {
             }
 
             guard !Task.isCancelled else { return }
-            self.completeArtworkRequest(artwork, requestID: requestID)
+            self?.completeArtworkRequest(artwork, requestID: requestID)
         }
     }
 
@@ -242,54 +291,6 @@ class AppleMusicController: MediaControllerProtocol {
     }
 
     // MARK: - Private Methods
-
-    @MainActor
-    private func fetchArtworkFromCatalog(title: String, artist: String, album: String) async -> Data? {
-        let key = "\(title)|\(artist)|\(album)"
-
-        if key == lastCatalogArtworkKey, let cached = cachedCatalogArtwork {
-            return cached
-        }
-
-        // Search with title + artist only; including album in the query can
-        // confuse the free-text search when names overlap. We validate the
-        // album from the structured response fields instead.
-        let query = "\(title) \(artist)"
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty,
-              let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=song&limit=10")
-        else { return nil }
-
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let response = try JSONDecoder().decode(ITunesSearchResponse.self, from: data)
-            guard !response.results.isEmpty else { return nil }
-
-            let normalizedAlbum = album.lowercased()
-            let normalizedTitle = title.lowercased()
-
-            let match = response.results.first(where: {
-                $0.trackName?.lowercased() == normalizedTitle &&
-                $0.collectionName?.lowercased() == normalizedAlbum
-            }) ?? response.results.first(where: {
-                $0.collectionName?.lowercased() == normalizedAlbum
-            }) ?? response.results.first(where: {
-                $0.trackName?.lowercased() == normalizedTitle
-            }) ?? response.results.first
-
-            guard let artworkURLString = match?.artworkUrl100 else { return nil }
-
-            let highResURL = artworkURLString.replacingOccurrences(of: "100x100", with: "600x600")
-            guard let imageURL = URL(string: highResURL) else { return nil }
-
-            let (imageData, _) = try await URLSession.shared.data(from: imageURL)
-            lastCatalogArtworkKey = key
-            cachedCatalogArtwork = imageData
-            return imageData
-        } catch {
-            return nil
-        }
-    }
 
     private func executeCommand(_ command: String) async {
         await commandExecutor(command)
