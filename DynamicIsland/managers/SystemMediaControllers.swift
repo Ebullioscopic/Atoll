@@ -16,9 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import Foundation
+import Combine
 import CoreAudio
 import CoreGraphics
+import Foundation
 import IOKit
 
 extension Notification.Name {
@@ -516,6 +517,12 @@ final class SystemBrightnessController {
     private var pendingAdjustTarget: Float?
     private let coreBrightnessClient = CoreBrightnessDisplayClient.shared
     private var pollTimer: Timer?
+    /// The energy gate, mirrored into a plain Bool. The tick used to read it via
+    /// `MainActor.assumeIsolated`, which traps if the timer was ever scheduled off
+    /// the main thread — `Timer` fires on the run loop it was scheduled on, so that
+    /// safety depended on a startup detail rather than on anything enforced here.
+    private var backgroundWorkSuspended = false
+    private var gateCancellable: AnyCancellable?
     // Fast, self-terminating poll used only inside the user-initiated window
     // (after a brightness key press) to capture the settled value.
     private let pollInterval: TimeInterval = 0.15
@@ -567,6 +574,8 @@ final class SystemBrightnessController {
         brightnessAnimationTimer = nil
         pollTimer?.invalidate()
         pollTimer = nil
+        gateCancellable?.cancel()
+        gateCancellable = nil
         userInitiatedResetTimer?.invalidate()
         userInitiatedResetTimer = nil
         userInitiatedBrightnessChange = false
@@ -622,6 +631,8 @@ final class SystemBrightnessController {
             if !self.continuousFallbackPolling {
                 self.pollTimer?.invalidate()
                 self.pollTimer = nil
+                self.gateCancellable?.cancel()
+                self.gateCancellable = nil
             }
         }
     }
@@ -837,10 +848,16 @@ final class SystemBrightnessController {
         guard pollTimer == nil else { return }
         NSLog("ℹ️ SystemBrightnessController: Starting %@ brightness polling (interval: %.2fs)",
               continuousFallbackPolling ? "fallback" : "windowed", interval)
+        // The gate's published projection is @MainActor, so subscribe from there.
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.gateCancellable = ActivityGate.shared.$shouldSuspendBackgroundWork
+                .sink { [weak self] suspended in self?.backgroundWorkSuspended = suspended }
+        }
         let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             guard let self else { return }
             // Energy gate: skip ticks while the screen/system is asleep.
-            if MainActor.assumeIsolated({ ActivityGate.shared.shouldSuspendBackgroundWork }) { return }
+            if self.backgroundWorkSuspended { return }
             // Skip polling while an animation is actively running — the
             // animation timer already handles emission during key presses.
             guard self.brightnessAnimationTimer == nil else { return }
@@ -865,6 +882,7 @@ final class SystemBrightnessController {
 
     deinit {
         brightnessAnimationTimer?.invalidate()
+        gateCancellable?.cancel()
         pollTimer?.invalidate()
         userInitiatedResetTimer?.invalidate()
         observers.forEach { DistributedNotificationCenter.default().removeObserver($0) }
