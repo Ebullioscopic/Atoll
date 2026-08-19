@@ -401,6 +401,8 @@ final class AppleMusicControllerTests: XCTestCase {
         XCTAssertEqual(states.last?.title, "New Song")
         XCTAssertNil(states.last?.artwork, "The previous song poster must clear before the network fallback completes")
 
+        let artworkWasRequested = await deferredArtwork.waitUntilRequested(timeout: .seconds(1))
+        XCTAssertTrue(artworkWasRequested)
         await deferredArtwork.complete(with: newArtwork)
         await fulfillment(of: [artworkPublished], timeout: 1)
         XCTAssertEqual(states.last?.artwork, newArtwork)
