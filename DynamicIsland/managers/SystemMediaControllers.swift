@@ -67,10 +67,31 @@ final class SystemVolumeController {
     var onRouteChange: (() -> Void)?
 
     private let callbackQueue = DispatchQueue(label: "com.dynamicisland.volume-listener")
-    private var currentDeviceID: AudioDeviceID = 0
+    /// Guards the three fields below. They are written from `callbackQueue` when the
+    /// default device changes, and read synchronously by the public API (setVolume,
+    /// getVolume, setMuted, …) on whatever thread the caller is on. The computed
+    /// accessors keep every existing call site unchanged.
+    private let deviceStateLock = NSLock()
+    private var _currentDeviceID: AudioDeviceID = 0
+    private var _volumeElement: AudioObjectPropertyElement?
+    private var _muteElement: AudioObjectPropertyElement?
+
+    private var currentDeviceID: AudioDeviceID {
+        get { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; return _currentDeviceID }
+        set { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; _currentDeviceID = newValue }
+    }
+
+    private var volumeElement: AudioObjectPropertyElement? {
+        get { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; return _volumeElement }
+        set { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; _volumeElement = newValue }
+    }
+
+    private var muteElement: AudioObjectPropertyElement? {
+        get { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; return _muteElement }
+        set { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; _muteElement = newValue }
+    }
+
     private var listenersInstalled = false
-    private var volumeElement: AudioObjectPropertyElement?
-    private var muteElement: AudioObjectPropertyElement?
     private var volumeListenerRegistrations: [VolumeListenerRegistration] = []
     private let silenceThreshold: Float = 0.001 // Treat very low values as mute requests.
 
