@@ -86,13 +86,22 @@ final class FlyoutWindowPresenter<Overlay: View, Metrics: FlyoutWindowMetrics> {
             return present(using: viewModel, metrics: metrics)
         }
 
+        guard let screen = resolveScreen(from: viewModel),
+              viewModel.effectiveClosedNotchHeight > 0,
+              viewModel.closedNotchSize.width > 0 else {
+            hide(animated: false)
+            return false
+        }
+
         if let lastMetrics,
+           let measuredContentSize,
            lastMetrics == metrics,
            !isHiding,
            window.alphaValue > 0.01,
            window.isVisible,
            let hostingView,
-           window.contentView === hostingView {
+           window.contentView === hostingView,
+           window.frame == frame(for: measuredContentSize, screen: screen, metrics: metrics) {
             return true
         }
 

@@ -189,9 +189,12 @@ struct LyricsSidePanelView: View {
         )
     }
 
-    private var lyrics: [LyricLine] {
-        musicManager.syncedLyrics.filter {
-            !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    private var lyrics: [(index: Int, lyric: LyricLine)] {
+        musicManager.syncedLyrics.enumerated().compactMap { index, lyric in
+            guard !lyric.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return nil
+            }
+            return (index: index, lyric: lyric)
         }
     }
 
@@ -217,7 +220,7 @@ struct LyricsSidePanelView: View {
                             .padding(.vertical, 8)
                     } else {
                         LazyVStack(alignment: .leading, spacing: 8) {
-                            ForEach(Array(lyrics.enumerated()), id: \.offset) { index, lyric in
+                            ForEach(lyrics, id: \.index) { index, lyric in
                                 Text(lyric.text)
                                     .font(.system(size: 14, weight: index == musicManager.currentLyricIndex ? .semibold : .regular))
                                     .foregroundStyle(
@@ -237,13 +240,13 @@ struct LyricsSidePanelView: View {
                 .scrollIndicators(.never)
                 .onAppear {
                     let index = musicManager.currentLyricIndex
-                    guard index >= 0, index < lyrics.count else { return }
+                    guard index >= 0, index < musicManager.syncedLyrics.count else { return }
                     DispatchQueue.main.async {
                         proxy.scrollTo(index, anchor: .center)
                     }
                 }
                 .onChange(of: musicManager.currentLyricIndex) { _, index in
-                    guard index >= 0, index < lyrics.count else { return }
+                    guard index >= 0, index < musicManager.syncedLyrics.count else { return }
                     withAnimation(.smooth(duration: 0.3)) {
                         proxy.scrollTo(index, anchor: .center)
                     }
