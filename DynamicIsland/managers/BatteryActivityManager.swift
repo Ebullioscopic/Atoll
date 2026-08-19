@@ -37,6 +37,11 @@ class BatteryActivityManager {
     var onTimeToFullChargeChange: ((Int) -> Void)?
 
     private var batterySource: CFRunLoopSource?
+    /// Guards the registry below. Delivery hops to the main queue, but
+    /// `addObserver`/`removeObserver` are called from wherever the caller happens
+    /// to be — and `addObserver` has to hand back its token synchronously, so it
+    /// cannot simply be moved to the main actor.
+    private let observerLock = NSLock()
     private var observers: [Int: (BatteryEvent) -> Void] = [:]
     private var nextObserverToken: Int = 0
     private var previousBatteryInfo: BatteryInfo?
@@ -305,6 +310,8 @@ class BatteryActivityManager {
     /// - Parameter observer: The observer closure to be called on battery events
     /// - Returns: The ID of the observer for later removal
     func addObserver(_ observer: @escaping (BatteryEvent) -> Void) -> Int {
+        observerLock.lock()
+        defer { observerLock.unlock() }
         let token = nextObserverToken
         nextObserverToken += 1
         observers[token] = observer
@@ -314,17 +321,25 @@ class BatteryActivityManager {
     /// Removes an observer by its ID
     /// - Parameter id: The ID of the observer to be removed
     func removeObserver(byId id: Int) {
+        observerLock.lock()
+        defer { observerLock.unlock() }
         observers.removeValue(forKey: id)
     }
     
     /// Notifies all observers of a battery event
     /// - Parameter event: The battery event to notify
     private func notifyObservers(event: BatteryEvent) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            // Snapshot before invoking: an observer may add/remove observers
-            // from inside its callback, which would mutate `observers` mid-iteration.
-            for observer in Array(self.observers.values) {
+        // Snapshot under the lock, then deliver outside it. An observer may add or
+        // remove observers from inside its callback: enumerating the live registry
+        // would trap on mutation, and holding the lock across delivery would
+        // deadlock the moment a callback called addObserver.
+        observerLock.lock()
+        let snapshot = Array(observers.values)
+        observerLock.unlock()
+
+        guard !snapshot.isEmpty else { return }
+        DispatchQueue.main.async {
+            for observer in snapshot {
                 observer(event)
             }
         }

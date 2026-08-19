@@ -442,6 +442,11 @@ class StatsManager: ObservableObject {
     // Network monitoring state
     private var previousNetworkStats: (bytesIn: UInt64, bytesOut: UInt64) = (0, 0)
     private var previousTimestamp: Date = Date()
+    /// Advanced only when `getifaddrs` succeeded. Sharing `previousTimestamp` with
+    /// disk meant a failed snapshot still moved the clock forward, so the next
+    /// successful sample divided two intervals of traffic by one interval and
+    /// reported roughly double the real speed.
+    private var previousNetworkTimestamp: Date = Date()
     
     // Disk delta state now lives inside `slowCollector` (see below) so the heavy
     // IOStorage walk runs off the main actor without racing the fast path.
@@ -485,9 +490,13 @@ class StatsManager: ObservableObject {
         diskWriteHistory = Array(repeating: 0.0, count: maxHistoryPoints)
         
         // Initialize baseline network stats
-        let initialStats = aggregateNetworkStats(from: snapshotNetworkInterfaces())
+        // A failed getifaddrs leaves the baseline at zero, which the first-run
+        // guard in updateSystemStats reads as "no baseline yet" and re-samples.
+        let initialStats = snapshotNetworkInterfaces().map { aggregateNetworkStats(from: $0) } ?? (0, 0)
         previousNetworkStats = initialStats
         previousTimestamp = Date()
+        previousNetworkTimestamp = previousTimestamp
+
         // Disk baseline is established by `slowCollector` on the first refresh.
 
         Defaults.publisher(.statsUpdateInterval, options: []).sink { [weak self] change in
@@ -558,10 +567,13 @@ class StatsManager: ObservableObject {
         print("StatsManager: Starting monitoring...")
         
         // Reset baseline for accurate measurement
-        let initialStats = aggregateNetworkStats(from: snapshotNetworkInterfaces())
+        // A failed getifaddrs leaves the baseline at zero, which the first-run
+        // guard in updateSystemStats reads as "no baseline yet" and re-samples.
+        let initialStats = snapshotNetworkInterfaces().map { aggregateNetworkStats(from: $0) } ?? (0, 0)
         previousNetworkStats = initialStats
 
         previousTimestamp = Date()
+        previousNetworkTimestamp = previousTimestamp
 
         isMonitoring = true
         lastUpdated = Date()
@@ -691,11 +703,13 @@ class StatsManager: ObservableObject {
         // On a getifaddrs failure (nil snapshot) preserve the prior baseline
         // instead of collapsing to (0,0), which would both fake a speed dip and
         // wipe previousNetworkStats when it is assigned below.
-        let currentNetworkStats = networkSnapshots != nil
-            ? aggregateNetworkStats(from: networkSnapshots)
-            : previousNetworkStats
+        let currentNetworkStats = networkSnapshots.map { aggregateNetworkStats(from: $0) }
+            ?? previousNetworkStats
         let currentTime = Date()
         let timeInterval = currentTime.timeIntervalSince(previousTimestamp)
+        // Nil snapshot: the byte counters did not advance either, so keep measuring
+        // from the last successful sample rather than from this tick.
+        let networkInterval = currentTime.timeIntervalSince(previousNetworkTimestamp)
 
         var downloadSpeed: Double = 0.0
         var uploadSpeed: Double = 0.0
@@ -703,14 +717,14 @@ class StatsManager: ObservableObject {
         var bytesUploaded: UInt64 = 0
 
         // Only calculate speeds if we have a reasonable time interval and this isn't the first run
-        if timeInterval > 0.1 && (previousNetworkStats.bytesIn > 0 || previousNetworkStats.bytesOut > 0) {
+        if networkInterval > 0.1 && (previousNetworkStats.bytesIn > 0 || previousNetworkStats.bytesOut > 0) {
             bytesDownloaded = currentNetworkStats.bytesIn > previousNetworkStats.bytesIn ?
                                 currentNetworkStats.bytesIn - previousNetworkStats.bytesIn : 0
             bytesUploaded = currentNetworkStats.bytesOut > previousNetworkStats.bytesOut ?
                                currentNetworkStats.bytesOut - previousNetworkStats.bytesOut : 0
 
-            downloadSpeed = Double(bytesDownloaded) / timeInterval / 1_048_576 // Convert to MB/s
-            uploadSpeed = Double(bytesUploaded) / timeInterval / 1_048_576 // Convert to MB/s
+            downloadSpeed = Double(bytesDownloaded) / networkInterval / 1_048_576 // Convert to MB/s
+            uploadSpeed = Double(bytesUploaded) / networkInterval / 1_048_576 // Convert to MB/s
         }
 
         // Update cumulative transfer totals (network). Disk totals accumulate on the slow path.
@@ -752,7 +766,8 @@ class StatsManager: ObservableObject {
         // Update previous stats for next calculation
         previousNetworkStats = currentNetworkStats
         previousTimestamp = currentTime
-        networkInterfaces = collectNetworkInterfaces(from: networkSnapshots, deltaTime: timeInterval)
+        if networkSnapshots != nil { previousNetworkTimestamp = currentTime }
+        networkInterfaces = collectNetworkInterfaces(from: networkSnapshots, deltaTime: networkInterval)
 
         // Off-main heavy metrics (GPU, disk I/O + volumes, thermal/frequency), throttled.
         maybeRefreshSlowMetrics()
@@ -1081,10 +1096,13 @@ class StatsManager: ObservableObject {
     }
 
     /// Aggregates total in/out bytes across physical (en*/Wi-Fi) interfaces from a snapshot.
-    private func aggregateNetworkStats(from snapshots: [NetworkInterfaceSnapshot]?) -> (bytesIn: UInt64, bytesOut: UInt64) {
+    /// Takes a non-optional snapshot on purpose. It used to accept an optional and
+    /// return (0, 0) for nil, which reads like a real measurement: assigned to
+    /// `previousNetworkStats` that silently wipes the baseline a failed `getifaddrs`
+    /// was supposed to preserve. Callers now have to say what nil means for them.
+    private func aggregateNetworkStats(from snapshots: [NetworkInterfaceSnapshot]) -> (bytesIn: UInt64, bytesOut: UInt64) {
         var totalBytesIn: UInt64 = 0
         var totalBytesOut: UInt64 = 0
-        guard let snapshots else { return (totalBytesIn, totalBytesOut) }
         for snapshot in snapshots {
             let name = snapshot.name
             // Skip loopback and virtual interfaces, but include en0, en1, etc. and Wi-Fi interfaces
