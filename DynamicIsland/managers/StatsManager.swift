@@ -478,7 +478,9 @@ class StatsManager: ObservableObject {
         diskWriteHistory = Array(repeating: 0.0, count: maxHistoryPoints)
         
         // Initialize baseline network stats
-        let initialStats = aggregateNetworkStats(from: snapshotNetworkInterfaces())
+        // A failed getifaddrs leaves the baseline at zero, which the first-run
+        // guard in updateSystemStats reads as "no baseline yet" and re-samples.
+        let initialStats = snapshotNetworkInterfaces().map { aggregateNetworkStats(from: $0) } ?? (0, 0)
         previousNetworkStats = initialStats
         previousTimestamp = Date()
         
@@ -554,7 +556,9 @@ class StatsManager: ObservableObject {
         print("StatsManager: Starting monitoring...")
         
         // Reset baseline for accurate measurement
-        let initialStats = aggregateNetworkStats(from: snapshotNetworkInterfaces())
+        // A failed getifaddrs leaves the baseline at zero, which the first-run
+        // guard in updateSystemStats reads as "no baseline yet" and re-samples.
+        let initialStats = snapshotNetworkInterfaces().map { aggregateNetworkStats(from: $0) } ?? (0, 0)
         previousNetworkStats = initialStats
         
         let initialDiskStats = getDiskStats()
@@ -677,9 +681,8 @@ class StatsManager: ObservableObject {
         // On a getifaddrs failure (nil snapshot) preserve the prior baseline
         // instead of collapsing to (0,0), which would both fake a speed dip and
         // wipe previousNetworkStats when it is assigned below.
-        let currentNetworkStats = networkSnapshots != nil
-            ? aggregateNetworkStats(from: networkSnapshots)
-            : previousNetworkStats
+        let currentNetworkStats = networkSnapshots.map { aggregateNetworkStats(from: $0) }
+            ?? previousNetworkStats
         let currentTime = Date()
         let timeInterval = currentTime.timeIntervalSince(previousTimestamp)
         
@@ -1080,10 +1083,13 @@ class StatsManager: ObservableObject {
     }
 
     /// Aggregates total in/out bytes across physical (en*/Wi-Fi) interfaces from a snapshot.
-    private func aggregateNetworkStats(from snapshots: [NetworkInterfaceSnapshot]?) -> (bytesIn: UInt64, bytesOut: UInt64) {
+    /// Takes a non-optional snapshot on purpose. It used to accept an optional and
+    /// return (0, 0) for nil, which reads like a real measurement: assigned to
+    /// `previousNetworkStats` that silently wipes the baseline a failed `getifaddrs`
+    /// was supposed to preserve. Callers now have to say what nil means for them.
+    private func aggregateNetworkStats(from snapshots: [NetworkInterfaceSnapshot]) -> (bytesIn: UInt64, bytesOut: UInt64) {
         var totalBytesIn: UInt64 = 0
         var totalBytesOut: UInt64 = 0
-        guard let snapshots else { return (totalBytesIn, totalBytesOut) }
         for snapshot in snapshots {
             let name = snapshot.name
             // Skip loopback and virtual interfaces, but include en0, en1, etc. and Wi-Fi interfaces
