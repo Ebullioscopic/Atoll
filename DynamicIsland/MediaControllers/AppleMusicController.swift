@@ -34,6 +34,22 @@ private struct ITunesTrack: Decodable {
     let artworkUrl100: String?
 }
 
+func makeAppleMusicCatalogSearchURL(query: String) -> URL? {
+    guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+
+    var components = URLComponents()
+    components.scheme = "https"
+    components.host = "itunes.apple.com"
+    components.path = "/search"
+    components.queryItems = [
+        URLQueryItem(name: "term", value: query),
+        URLQueryItem(name: "media", value: "music"),
+        URLQueryItem(name: "entity", value: "song"),
+        URLQueryItem(name: "limit", value: "10")
+    ]
+    return components.url
+}
+
 private actor AppleMusicCatalogArtworkResolver {
     private var lastArtworkKey: String?
     private var cachedArtwork: Data?
@@ -49,10 +65,7 @@ private actor AppleMusicCatalogArtworkResolver {
         // confuse the free-text search when names overlap. We validate the
         // album from the structured response fields instead.
         let query = "\(title) \(artist)"
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty,
-              let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&media=music&entity=song&limit=10")
-        else { return nil }
+        guard let url = makeAppleMusicCatalogSearchURL(query: query) else { return nil }
 
         do {
             let (data, _) = try await URLSession.shared.data(from: url)

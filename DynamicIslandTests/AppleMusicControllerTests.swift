@@ -81,10 +81,15 @@ final class AppleMusicControllerTests: XCTestCase {
             }
         }
 
-        func waitUntilRequested() async {
+        func waitUntilRequested(timeout: Duration) async -> Bool {
+            let clock = ContinuousClock()
+            let deadline = clock.now.advanced(by: timeout)
+
             while continuation == nil {
+                guard clock.now < deadline else { return false }
                 await Task.yield()
             }
+            return true
         }
 
         func complete(with artwork: Data?) {
@@ -93,6 +98,28 @@ final class AppleMusicControllerTests: XCTestCase {
             continuation?.resume(returning: artwork)
             continuation = nil
         }
+    }
+
+    func testCatalogSearchURLSafelyEncodesQueryItems() {
+        let query = "Rock & Roll = Live + Remix?"
+        let url = makeAppleMusicCatalogSearchURL(query: query)
+        let components = url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }
+        let queryItems = Dictionary<String, String?>(
+            uniqueKeysWithValues: components?.queryItems?.map { ($0.name, $0.value) } ?? []
+        )
+
+        XCTAssertEqual(queryItems["term"], query)
+        XCTAssertEqual(queryItems["media"], "music")
+        XCTAssertEqual(queryItems["entity"], "song")
+        XCTAssertEqual(queryItems["limit"], "10")
+    }
+
+    func testDeferredArtworkProviderWaitTimesOutWithoutRequest() async {
+        let provider = DeferredArtworkProvider()
+
+        let wasRequested = await provider.waitUntilRequested(timeout: .milliseconds(10))
+
+        XCTAssertFalse(wasRequested)
     }
 
     func testOptimisticPauseIgnoresStalePlayingEventUntilPausedIsConfirmed() {
@@ -314,7 +341,8 @@ final class AppleMusicControllerTests: XCTestCase {
         weak var weakController = controller
 
         await controller?.updatePlaybackInfo()
-        await deferredArtwork.waitUntilRequested()
+        let artworkWasRequested = await deferredArtwork.waitUntilRequested(timeout: .seconds(1))
+        XCTAssertTrue(artworkWasRequested)
         controller = nil
 
         XCTAssertNil(weakController)
