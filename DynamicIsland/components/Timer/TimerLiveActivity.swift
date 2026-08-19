@@ -59,12 +59,13 @@ struct TimerLiveActivity: View {
     private var transientLabelDuration: TimeInterval { 4 }
     private let controlWindowResumeDelay: TimeInterval = 0.22
 
-    private struct ControlWindowSyncKey: Equatable {
+    private struct ControlWindowSyncKey: Equatable, Hashable {
         var isTimerActive: Bool
-        var timerNameSignature: Int
+        var timerName: String
         var isFinished: Bool
         var isOvertime: Bool
         var isPaused: Bool
+        var countdownWidthSignature: Int
         var closedNotchSize: CGSize
         var screenName: String?
         var hideOnClosed: Bool
@@ -191,10 +192,11 @@ struct TimerLiveActivity: View {
     private var controlWindowSyncKey: ControlWindowSyncKey {
         ControlWindowSyncKey(
             isTimerActive: timerManager.isTimerActive,
-            timerNameSignature: timerManager.timerName.hashValue,
+            timerName: timerManager.timerName,
             isFinished: timerManager.isFinished,
             isOvertime: timerManager.isOvertime,
             isPaused: timerManager.isPaused,
+            countdownWidthSignature: Int(ceil(countdownTextWidth)),
             closedNotchSize: vm.closedNotchSize,
             screenName: vm.screen,
             hideOnClosed: vm.hideOnClosed,
@@ -702,7 +704,8 @@ struct TimerLiveActivity: View {
             notchWidth: vm.closedNotchSize.width + (isHovering ? 8 : 0),
             rightWingWidth: rightWingWidth,
             cornerRadius: cornerRadiusInsets.closed.bottom,
-            spacing: 6
+            spacing: 6,
+            contentRevision: AnyHashable(controlWindowSyncKey)
         )
     }
 }

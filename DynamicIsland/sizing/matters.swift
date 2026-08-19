@@ -27,11 +27,40 @@ import SwiftUI
 let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
+// The standard player needs room for its album art and five-button control row.
+// This budget is used only while the side lyrics panel is active.
+let sideLyricsMinimumPlayerWidth: CGFloat = 380
+let sideLyricsMinimumMirrorWidth: CGFloat = 220
+
+func sideLyricsRequiredNotchWidth() -> CGFloat {
+    guard Defaults[.enableLyrics],
+          !Defaults[.showCalendar],
+          !Defaults[.enableMinimalisticUI],
+          Defaults[.showStandardMediaControls],
+          (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+    else { return 0 }
+
+    let panelWidth = max(0, Defaults[.lyricsPanelWidth])
+    let positiveOffset = max(0, Defaults[.lyricsPanelOffset])
+    let mirrorWidth = Defaults[.showMirror] && WebcamManager.shared.cameraAvailable
+        ? sideLyricsMinimumMirrorWidth + 20
+        : 0
+
+    // Include the home-view and notch content insets so the player receives
+    // the same usable width it had before the panel was added.
+    return sideLyricsMinimumPlayerWidth
+        + panelWidth
+        + 20
+        + positiveOffset
+        + mirrorWidth
+        + 40
+}
+
 var openNotchSize: CGSize {
     let storedWidth = Defaults[.openNotchWidth]
     let minWidth = currentRecommendedMinimumNotchWidth()
     let maxWidth = maxAllowedNotchWidth()
-    let width = min(max(storedWidth, minWidth), maxWidth)
+    let width = min(max(storedWidth, minWidth, sideLyricsRequiredNotchWidth()), maxWidth)
     return .init(width: width, height: 200)
 }
 

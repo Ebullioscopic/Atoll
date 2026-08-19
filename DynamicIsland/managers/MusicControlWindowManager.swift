@@ -28,6 +28,7 @@ struct MusicControlWindowMetrics: Equatable {
     let rightWingWidth: CGFloat
     let cornerRadius: CGFloat
     let spacing: CGFloat
+    let contentRevision: AnyHashable
 }
 
 @MainActor
@@ -38,6 +39,12 @@ final class MusicControlWindowManager {
     private var hostingView: NSHostingView<MusicControlOverlay>?
     private var hasDelegated = false
     private var lastMetrics: MusicControlWindowMetrics?
+    private var measuredContentSize: CGSize?
+    private var measuredNotchHeight: CGFloat?
+    private var measuredCornerRadius: CGFloat?
+    private var measuredContentRevision: AnyHashable?
+    private var frameUpdateGeneration: UInt = 0
+    private var isHiding = false
 
     private init() {}
 
@@ -56,18 +63,49 @@ final class MusicControlWindowManager {
         let hosting = ensureHostingView(with: overlay)
         let fittingSize = measuredSize(for: hosting)
         hosting.frame = NSRect(origin: .zero, size: fittingSize)
+        measuredContentSize = fittingSize
+        measuredNotchHeight = metrics.notchHeight
+        measuredCornerRadius = metrics.cornerRadius
+        measuredContentRevision = metrics.contentRevision
 
         let window = ensureWindow(on: screen)
         if window.contentView !== hosting {
             window.contentView = hosting
         }
 
-        let targetFrame = frame(for: fittingSize, viewModel: viewModel, screen: screen, metrics: metrics)
-        lastMetrics = metrics
+        let targetFrame = frame(for: fittingSize, screen: screen, metrics: metrics)
 
         if !hasDelegated {
             SkyLightOperator.shared.delegateWindow(window)
             hasDelegated = true
+        }
+
+        applyFrame(targetFrame, to: window, metrics: metrics, animated: true)
+        return true
+    }
+
+    private func applyFrame(
+        _ targetFrame: NSRect,
+        to window: NSPanel,
+        metrics: MusicControlWindowMetrics,
+        animated: Bool
+    ) {
+        frameUpdateGeneration &+= 1
+        let generation = frameUpdateGeneration
+        isHiding = false
+        lastMetrics = metrics
+
+        if window.alphaValue > 0.01, window.frame == targetFrame {
+            window.orderFrontRegardless()
+            window.alphaValue = 1
+            return
+        }
+
+        if !animated {
+            updateFrameWithoutLayout(targetFrame, on: window)
+            window.orderFrontRegardless()
+            window.alphaValue = 1
+            return
         }
 
         if window.alphaValue <= 0.01 {
@@ -81,31 +119,66 @@ final class MusicControlWindowManager {
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 window.animator().setFrame(targetFrame, display: true)
                 window.animator().alphaValue = 1
-            } completionHandler: {
-                window.setFrame(targetFrame, display: false)
+            } completionHandler: { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard self?.frameUpdateGeneration == generation else { return }
+                    window.setFrame(targetFrame, display: false)
+                }
             }
         } else {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.16
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 window.animator().setFrame(targetFrame, display: true)
-            } completionHandler: {
-                window.setFrame(targetFrame, display: false)
+            } completionHandler: { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard self?.frameUpdateGeneration == generation else { return }
+                    window.setFrame(targetFrame, display: false)
+                }
             }
             window.orderFrontRegardless()
             window.alphaValue = 1
         }
+    }
 
-        return true
+    /// Hover updates only move the panel. Updating the origin avoids asking
+    /// AppKit to reconfigure the content size and its backing surface.
+    private func updateFrameWithoutLayout(_ targetFrame: NSRect, on window: NSPanel) {
+        guard window.frame != targetFrame else { return }
+        if window.frame.size == targetFrame.size {
+            window.setFrameOrigin(targetFrame.origin)
+        } else {
+            window.setFrame(targetFrame, display: true)
+        }
     }
 
     @discardableResult
     func refresh(using viewModel: DynamicIslandViewModel, metrics: MusicControlWindowMetrics) -> Bool {
-        guard window != nil else {
+        guard let window else {
             return present(using: viewModel, metrics: metrics)
         }
 
-        if let lastMetrics, lastMetrics == metrics {
+        if let lastMetrics,
+           lastMetrics == metrics,
+           !isHiding,
+           window.alphaValue > 0.01,
+           window.isVisible,
+           let hostingView,
+           window.contentView === hostingView {
+            return true
+        }
+
+        // Hover changes placement metrics, but not the overlay's intrinsic size.
+        // Reuse the cached measurement to avoid rebuilding SwiftUI and fittingSize.
+        if let measuredContentSize,
+           measuredNotchHeight == metrics.notchHeight,
+           measuredCornerRadius == metrics.cornerRadius,
+           measuredContentRevision == metrics.contentRevision,
+           let hostingView,
+           window.contentView === hostingView,
+           let screen = resolveScreen(from: viewModel) {
+            let targetFrame = frame(for: measuredContentSize, screen: screen, metrics: metrics)
+            applyFrame(targetFrame, to: window, metrics: metrics, animated: false)
             return true
         }
 
@@ -114,6 +187,10 @@ final class MusicControlWindowManager {
 
     func hide(animated: Bool = true, tearDown: Bool = true) {
         guard let window else { return }
+
+        frameUpdateGeneration &+= 1
+        let generation = frameUpdateGeneration
+        isHiding = animated && window.alphaValue > 0.01
 
         guard animated, window.alphaValue > 0.01 else {
             window.orderOut(nil)
@@ -133,21 +210,30 @@ final class MusicControlWindowManager {
             window.animator().setFrame(retreatFrame, display: true)
             window.animator().alphaValue = 0
         } completionHandler: { [weak self] in
-            window.setFrame(originalFrame, display: false)
-            window.orderOut(nil)
-            window.alphaValue = 0
-            if tearDown {
-                self?.tearDownWindowResources(using: window)
+            Task { @MainActor [weak self] in
+                guard self?.frameUpdateGeneration == generation else { return }
+                window.setFrame(originalFrame, display: false)
+                window.orderOut(nil)
+                window.alphaValue = 0
+                if tearDown {
+                    self?.tearDownWindowResources(using: window)
+                }
             }
         }
     }
 
     private func tearDownWindowResources(using window: NSPanel? = nil) {
+        frameUpdateGeneration &+= 1
         let targetWindow = window ?? self.window
         targetWindow?.contentView = nil
         targetWindow?.orderOut(nil)
         hostingView = nil
         lastMetrics = nil
+        measuredContentSize = nil
+        measuredNotchHeight = nil
+        measuredCornerRadius = nil
+        measuredContentRevision = nil
+        isHiding = false
         self.window = nil
         hasDelegated = false
     }
@@ -204,21 +290,13 @@ final class MusicControlWindowManager {
         return NSScreen.main
     }
 
-    private func frame(for size: CGSize, viewModel: DynamicIslandViewModel, screen: NSScreen, metrics: MusicControlWindowMetrics) -> NSRect {
-        let screenFrame = screen.frame
-        let notchOriginX = screenFrame.midX - (metrics.notchWidth / 2)
-        let originY = screenFrame.maxY - size.height
-
-        let rightEdge = notchOriginX + metrics.notchWidth + metrics.rightWingWidth
-        let rawOriginX = rightEdge + metrics.spacing
-
-        let clampedOriginX = max(screenFrame.minX + 8, min(rawOriginX, screenFrame.maxX - size.width - 8))
-
-        return NSRect(
-            x: clampedOriginX.rounded(),
-            y: originY.rounded(),
-            width: size.width.rounded(),
-            height: size.height.rounded()
+    private func frame(for size: CGSize, screen: NSScreen, metrics: MusicControlWindowMetrics) -> NSRect {
+        FlyoutFrameCalculator.frame(
+            for: size,
+            screenFrame: screen.frame,
+            notchWidth: metrics.notchWidth,
+            rightWingWidth: metrics.rightWingWidth,
+            spacing: metrics.spacing
         )
     }
 
