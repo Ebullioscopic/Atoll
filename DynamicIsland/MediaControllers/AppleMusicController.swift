@@ -66,6 +66,7 @@ class AppleMusicController: MediaControllerProtocol {
     private static let minimumArtworkSize = 16
 
     private var notificationTask: Task<Void, Never>?
+    private var playbackInfoRequestGeneration = 0
     private var artworkFetchTask: Task<Void, Never>?
     private var artworkRequestID: UUID?
     private var lastCatalogArtworkKey: String?
@@ -167,12 +168,20 @@ class AppleMusicController: MediaControllerProtocol {
     }
     
     func updatePlaybackInfo() async {
+        let generation = await beginPlaybackInfoRequest()
         guard let info = await playbackInfoProvider() else { return }
-        await applyPlaybackInfo(info)
+        await applyPlaybackInfo(info, generation: generation)
     }
 
     @MainActor
-    private func applyPlaybackInfo(_ info: AppleMusicPlaybackInfo) {
+    private func beginPlaybackInfoRequest() -> Int {
+        playbackInfoRequestGeneration += 1
+        return playbackInfoRequestGeneration
+    }
+
+    @MainActor
+    private func applyPlaybackInfo(_ info: AppleMusicPlaybackInfo, generation: Int) {
+        guard generation == playbackInfoRequestGeneration else { return }
         var updatedState = playbackState
 
         updatedState.isPlaying = info.isPlaying

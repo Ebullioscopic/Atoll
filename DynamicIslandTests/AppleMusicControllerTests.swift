@@ -39,6 +39,29 @@ final class AppleMusicControllerTests: XCTestCase {
         }
     }
 
+    private actor OutOfOrderPlaybackInfoProvider {
+        private var nextRequestID = 0
+        private var continuations: [Int: CheckedContinuation<AppleMusicPlaybackInfo?, Never>] = [:]
+
+        func next() async -> AppleMusicPlaybackInfo? {
+            let requestID = nextRequestID
+            nextRequestID += 1
+            return await withCheckedContinuation { continuation in
+                continuations[requestID] = continuation
+            }
+        }
+
+        func waitForRequestCount(_ count: Int) async {
+            while continuations.count < count {
+                await Task.yield()
+            }
+        }
+
+        func complete(requestID: Int, with info: AppleMusicPlaybackInfo?) {
+            continuations.removeValue(forKey: requestID)?.resume(returning: info)
+        }
+    }
+
     private actor DeferredArtworkProvider {
         private var continuation: CheckedContinuation<Data?, Never>?
         private var completedArtwork: Data?
@@ -211,6 +234,53 @@ final class AppleMusicControllerTests: XCTestCase {
         }.value
 
         await fulfillment(of: [statePublished], timeout: 1)
+        withExtendedLifetime(cancellable) {}
+    }
+
+    func testOlderPlaybackRefreshCannotOverwriteNewerState() async {
+        let provider = OutOfOrderPlaybackInfoProvider()
+        let controller = AppleMusicController(
+            startsObservers: false,
+            playbackInfoProvider: { await provider.next() }
+        )
+        var publishedTitles: [String] = []
+        let cancellable = controller.playbackStatePublisher
+            .dropFirst()
+            .sink { publishedTitles.append($0.title) }
+        let oldInfo = AppleMusicPlaybackInfo(
+            isPlaying: true,
+            title: "Old Song",
+            artist: "Old Artist",
+            album: "Old Album",
+            currentTime: 10,
+            duration: 180,
+            isShuffled: false,
+            repeatMode: .off,
+            artwork: Data("old-artwork".utf8)
+        )
+        let newInfo = AppleMusicPlaybackInfo(
+            isPlaying: true,
+            title: "New Song",
+            artist: "New Artist",
+            album: "New Album",
+            currentTime: 0,
+            duration: 180,
+            isShuffled: false,
+            repeatMode: .off,
+            artwork: Data("new-artwork".utf8)
+        )
+
+        let olderRefresh = Task { await controller.updatePlaybackInfo() }
+        await provider.waitForRequestCount(1)
+        let newerRefresh = Task { await controller.updatePlaybackInfo() }
+        await provider.waitForRequestCount(2)
+
+        await provider.complete(requestID: 1, with: newInfo)
+        await newerRefresh.value
+        await provider.complete(requestID: 0, with: oldInfo)
+        await olderRefresh.value
+
+        XCTAssertEqual(publishedTitles, ["New Song"])
         withExtendedLifetime(cancellable) {}
     }
 
