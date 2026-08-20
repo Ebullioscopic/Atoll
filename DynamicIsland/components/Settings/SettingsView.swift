@@ -8706,14 +8706,10 @@ struct AppIconImage: View {
     var body: some View {
         Group {
             if let nsImage = resolvedIcon() {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFit()
+                Image(nsImage: nsImage.fitted(toSide: size))
                     .clipShape(RoundedRectangle(cornerRadius: size * 0.2))
             } else if let assetFallback, let nsImage = NSImage(named: NSImage.Name(assetFallback)) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFit()
+                Image(nsImage: nsImage.fitted(toSide: size))
                     .clipShape(RoundedRectangle(cornerRadius: size * 0.2))
             } else {
                 Image(systemName: symbolFallback)
@@ -8749,9 +8745,7 @@ private struct QuickShareProviderIconImage: View {
     var body: some View {
         Group {
             if let imgData = provider.imageData, let nsImg = NSImage(data: imgData) {
-                Image(nsImage: nsImg)
-                    .resizable()
-                    .scaledToFit()
+                Image(nsImage: nsImg.fitted(toSide: size))
                     .clipShape(RoundedRectangle(cornerRadius: size * 0.2))
             } else {
                 AppIconImage(
