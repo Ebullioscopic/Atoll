@@ -4363,6 +4363,7 @@ struct Appearance: View {
     @Default(.enableLockScreenMediaWidget) private var enableLockScreenMediaWidget
     @Default(.enableLockScreenTimerWidget) private var enableLockScreenTimerWidget
     @Default(.externalDisplayStyle) private var externalDisplayStyle
+    @Default(.tabBarPosition) private var tabBarPosition
     @State private var selectedListVisualizer: CustomVisualizer? = nil
 
     @State private var isIconImporterPresented = false
@@ -4468,6 +4469,8 @@ struct Appearance: View {
                     Text("Display Style")
                 }
             }
+
+            tabBarControls()
 
             notchWidthControls()
 
@@ -4986,6 +4989,35 @@ struct Appearance: View {
         }
 
         return false
+    }
+
+    @ViewBuilder
+    private func tabBarControls() -> some View {
+        Section {
+            Picker("Position", selection: $tabBarPosition) {
+                ForEach(TabBarPosition.allCases, id: \.self) { position in
+                    Text(position.displayName).tag(position)
+                }
+            }
+            .settingsHighlight(id: highlightID("Tab bar position"))
+            Text(tabBarPosition.description)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Defaults.Toggle(key: .tabSwitchOnHover) {
+                Text("Switch tabs on hover")
+            }
+            .settingsHighlight(id: highlightID("Switch tabs on hover"))
+            Text("Resting the pointer on a tab selects it, without a click.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text("Tab Bar")
+        }
+        .onChange(of: tabBarPosition) { _, _ in
+            // The leading rail and the header row need different widths.
+            enforceMinimumNotchWidth()
+        }
     }
 
     @ViewBuilder
