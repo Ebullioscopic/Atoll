@@ -1194,6 +1194,8 @@ struct ContentView: View {
         let outerHeight = closedHeight + (isHovering ? 8 : 0)
         let notchContentHeight = isHovering ? max(0, closedHeight) : max(0, closedHeight - 12)
         let wingBaseWidth = max(0, notchContentHeight + gestureProgress / 2)
+        let artworkHeight = max(0, closedHeight - 12)
+        let artworkSize = min(artworkHeight, wingBaseWidth)
         let rawCenterBaseWidth = vm.closedNotchSize.width + (isHovering ? 8 : 0)
         let centerBaseWidth = max(rawCenterBaseWidth, 96)
         let inlineSneakPeekActive = (
@@ -1210,29 +1212,34 @@ struct ContentView: View {
         )
         let effectiveCenterWidth = inlineSneakPeekActive ? 380 : centerBaseWidth
         let notchWidth = wingBaseWidth + effectiveCenterWidth + rightWingWidth
-        let badgeBaseSize = max(13, notchContentHeight * 0.36)
+        let badgeBaseSize = max(13, artworkSize * 0.36)
         let badgeDisplaySize = badgeDisplaySize(for: secondary, baseSize: badgeBaseSize)
         let badgeOffset = badgeOverlayOffset(for: secondary, badgeSize: badgeDisplaySize)
 
         HStack(spacing: 0) {
             ZStack(alignment: .bottomTrailing) {
-                Color.clear
-                    .aspectRatio(1, contentMode: .fit)
-                    .background(
-                        Image(nsImage: musicManager.albumArt)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .clipShape(RoundedRectangle(cornerRadius: musicManager.albumArt.size.width/musicManager.albumArt.size.height > 1.0 ? MusicPlayerImageSizes.cornerRadiusInset.closed/3.0 : MusicPlayerImageSizes.cornerRadiusInset.closed))
-                    )
-                    .clipped()
-                    .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-                    .albumArtFlip(angle: musicManager.flipAngle)
-                albumArtBadge(for: secondary, badgeSize: badgeDisplaySize)
-                    .offset(x: badgeOffset.width, y: badgeOffset.height)
-                    .id(secondary?.id ?? "music-badge")
-                    .contentTransition(.symbolEffect(.replace))
+                // Keep the matched-geometry source bounded to the closed
+                // artwork square while the surrounding hover flap expands.
+                ZStack(alignment: .bottomTrailing) {
+                    Color.clear
+                        .frame(width: artworkSize, height: artworkSize)
+                        .background(
+                            Image(nsImage: musicManager.albumArt)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .clipShape(RoundedRectangle(cornerRadius: musicManager.albumArt.size.width/musicManager.albumArt.size.height > 1.0 ? MusicPlayerImageSizes.cornerRadiusInset.closed/3.0 : MusicPlayerImageSizes.cornerRadiusInset.closed))
+                        )
+                        .clipped()
+                        .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
+                        .albumArtFlip(angle: musicManager.flipAngle)
+                    albumArtBadge(for: secondary, badgeSize: badgeDisplaySize)
+                        .offset(x: badgeOffset.width, y: badgeOffset.height)
+                        .id(secondary?.id ?? "music-badge")
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .frame(width: artworkSize, height: artworkSize, alignment: .bottomTrailing)
             }
-            .frame(width: wingBaseWidth, height: notchContentHeight)
+            .frame(width: wingBaseWidth, height: notchContentHeight, alignment: .center)
 
             Rectangle()
                 .fill(.black)
@@ -2659,13 +2666,34 @@ struct ContentView: View {
     }
 
     #if os(macOS)
+    private struct MusicControlWindowContentKey: Hashable {
+        let isPlaying: Bool
+        let isPlayerIdle: Bool
+        let bundleIdentifier: String?
+        let skipBehavior: String
+        let skipGestureToken: Int?
+    }
+
+    private var musicControlWindowContentRevision: AnyHashable {
+        AnyHashable(
+            MusicControlWindowContentKey(
+                isPlaying: musicManager.isPlaying,
+                isPlayerIdle: musicManager.isPlayerIdle,
+                bundleIdentifier: musicManager.bundleIdentifier,
+                skipBehavior: Defaults[.musicSkipBehavior].rawValue,
+                skipGestureToken: musicManager.skipGesturePulse?.token
+            )
+        )
+    }
+
     private func currentMusicControlWindowMetrics() -> MusicControlWindowMetrics {
         MusicControlWindowMetrics(
             notchHeight: max(vm.closedNotchSize.height, vm.effectiveClosedNotchHeight),
             notchWidth: vm.closedNotchSize.width + (isHovering ? 8 : 0),
             rightWingWidth: max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12) + gestureProgress / 2),
             cornerRadius: activeCornerRadiusInsets.closed.bottom,
-            spacing: 36
+            spacing: 36,
+            contentRevision: musicControlWindowContentRevision
         )
     }
 
