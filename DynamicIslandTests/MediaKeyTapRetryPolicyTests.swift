@@ -64,4 +64,23 @@ final class MediaKeyTapRetryPolicyTests: XCTestCase {
     func testSlowIntervalIsSlowerThanFast() {
         XCTAssertGreaterThan(MediaKeyTapRetryPolicy.slowInterval, MediaKeyTapRetryPolicy.fastInterval)
     }
+
+    /// Every other test here reads the schedule off the constants, so it would
+    /// still pass if the cadence changed underneath it. Pin the published
+    /// numbers: the changelog and the settings copy both promise these.
+    func testScheduleMatchesTheDocumentedValues() {
+        XCTAssertEqual(MediaKeyTapRetryPolicy.fastInterval, 2)
+        XCTAssertEqual(MediaKeyTapRetryPolicy.slowInterval, 15)
+        XCTAssertEqual(MediaKeyTapRetryPolicy.fastAttemptLimit, 30)
+        XCTAssertEqual(MediaKeyTapRetryPolicy.giveUpAfter, 3600)
+    }
+
+    /// "Every 2s for the first minute" is the claim, and it only holds while
+    /// the interval and the attempt limit multiply out to 60s.
+    func testFastPhaseCoversExactlyTheFirstMinute() {
+        XCTAssertEqual(
+            MediaKeyTapRetryPolicy.fastInterval * Double(MediaKeyTapRetryPolicy.fastAttemptLimit),
+            60
+        )
+    }
 }
