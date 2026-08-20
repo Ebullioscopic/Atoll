@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import AppKit
 import Defaults
 import XCTest
 
@@ -115,6 +116,57 @@ final class ClipboardHistoryPersistenceTests: XCTestCase {
         ClipboardItem.pruneInMemoryImages(keeping: [])
 
         XCTAssertNil(item.getImageData(), "bytes for a discarded item should not be retained")
+    }
+
+    // MARK: - Transitions
+
+    /// Turning persistence off deletes the files behind history images. The
+    /// bytes have to be taken into memory first, or the entries still on
+    /// screen lose their picture the moment the setting flips.
+    func testImageStaysReadableAfterDisablingPersistence() {
+        let manager = ClipboardManager.shared
+        let existingHistory = manager.clipboardHistory
+        defer { manager.clipboardHistory = existingHistory }
+
+        Defaults[.persistClipboardHistory] = true
+        let png = makeImageData()
+        let item = ClipboardItem(imageData: png)
+        XCTAssertNotNil(item.imageFileName, "expected a file-backed image to start from")
+        manager.clipboardHistory = [item]
+
+        Defaults[.persistClipboardHistory] = false
+        // The observer runs on the Defaults publisher; give it the turn it needs.
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+
+        XCTAssertEqual(
+            manager.clipboardHistory.first?.getImageData(),
+            png,
+            "the image should still render and re-copy after the files are deleted"
+        )
+    }
+
+    /// Turning persistence back on has to give session-only images a file, or
+    /// the restart the user just opted into restores entries with no picture.
+    func testSessionOnlyImageGainsAFileWhenPersistenceIsEnabled() {
+        let manager = ClipboardManager.shared
+        let existingHistory = manager.clipboardHistory
+        defer { manager.clipboardHistory = existingHistory }
+
+        Defaults[.persistClipboardHistory] = false
+        let png = makeImageData()
+        let item = ClipboardItem(imageData: png)
+        XCTAssertNil(item.imageFileName, "expected a session-only image to start from")
+        manager.clipboardHistory = [item]
+
+        Defaults[.persistClipboardHistory] = true
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+
+        guard let name = manager.clipboardHistory.first?.imageFileName else {
+            return XCTFail("the image should have been given a file")
+        }
+        let url = ClipboardManager.clipboardDataDirectory.appendingPathComponent(name)
+        defer { try? FileManager.default.removeItem(at: url) }
+        XCTAssertEqual(try? Data(contentsOf: url), png)
     }
 
     // MARK: - Stored history

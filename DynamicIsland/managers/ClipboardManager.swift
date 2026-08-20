@@ -46,13 +46,13 @@ struct ClipboardItem: Identifiable, Codable {
         inMemoryImages = inMemoryImages.filter { ids.contains($0.key) }
     }
 
-    private static func storeInMemoryImage(_ data: Data, for id: UUID) {
+    static func storeInMemoryImage(_ data: Data, for id: UUID) {
         inMemoryImagesLock.lock()
         defer { inMemoryImagesLock.unlock() }
         inMemoryImages[id] = data
     }
 
-    private static func inMemoryImage(for id: UUID) -> Data? {
+    static func inMemoryImage(for id: UUID) -> Data? {
         inMemoryImagesLock.lock()
         defer { inMemoryImagesLock.unlock() }
         return inMemoryImages[id]
@@ -60,7 +60,7 @@ struct ClipboardItem: Identifiable, Codable {
 
     // Store different types of data - avoid large binary data in UserDefaults
     let stringData: String?
-    let imageFileName: String? // Store filename instead of data
+    var imageFileName: String? // Store filename instead of data
     let fileURLs: [String]?
     let rtfData: Data? // RTF is typically small, so we can keep this
     
@@ -262,9 +262,15 @@ class ClipboardManager: ObservableObject {
             .sink { [weak self] change in
                 guard let self else { return }
                 if change.newValue {
-                    // Adopt the session's history as the new saved state.
+                    // Session-only images have no file yet; give them one so
+                    // they survive the restart the user just opted into.
+                    self.persistInMemoryImages()
                     self.saveHistoryToDefaults()
+                    self.savePinnedItemsToDefaults()
                 } else {
+                    // Take the bytes into memory before the files go, or the
+                    // items still on screen lose their images mid-session.
+                    self.retainImagesInMemory()
                     ClipboardManager.removeStoredHistory()
                     self.removeUnpinnedImageFiles()
                 }
@@ -273,6 +279,44 @@ class ClipboardManager: ObservableObject {
 
     private static func removeStoredHistory() {
         UserDefaults.standard.removeObject(forKey: "ClipboardHistory")
+    }
+
+    /// Reads every history image into the in-memory store so the entries keep
+    /// rendering and re-copying after their files are deleted.
+    private func retainImagesInMemory() {
+        for item in clipboardHistory {
+            guard item.imageFileName != nil, let data = item.getImageData() else { continue }
+            ClipboardItem.storeInMemoryImage(data, for: item.id)
+        }
+    }
+
+    /// Gives session-only images a file on disk, so turning persistence back on
+    /// keeps the images the current session captured rather than restoring
+    /// entries whose picture is gone.
+    private func persistInMemoryImages() {
+        func fileName(for data: Data) -> String? {
+            let name = "clipboard_image_\(UUID().uuidString).png"
+            let url = ClipboardManager.clipboardDataDirectory.appendingPathComponent(name)
+            do {
+                try data.write(to: url)
+                return name
+            } catch {
+                print("Failed to persist clipboard image: \(error)")
+                return nil
+            }
+        }
+
+        for index in clipboardHistory.indices where clipboardHistory[index].imageFileName == nil {
+            guard let data = ClipboardItem.inMemoryImage(for: clipboardHistory[index].id),
+                  let name = fileName(for: data) else { continue }
+            clipboardHistory[index].imageFileName = name
+        }
+
+        for index in pinnedItems.indices where pinnedItems[index].imageFileName == nil {
+            guard let data = ClipboardItem.inMemoryImage(for: pinnedItems[index].id),
+                  let name = fileName(for: data) else { continue }
+            pinnedItems[index].imageFileName = name
+        }
     }
 
     /// Deletes image files written while persistence was on, so turning the
