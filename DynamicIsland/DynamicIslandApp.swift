@@ -584,7 +584,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             isRecording: ScreenRecordingManager.shared.isRecording,
             closedMusicPairingEligible: closedMusicPairingEligibleForSizing(),
             recordingControlMode: Defaults[.recordingControlMode],
-            canStopFromHUD: ScreenRecordingManager.shared.canStopFromHUD,
+            canStopFromHUD: ScreenRecordingManager.shared.shouldShowStopControlsInHUD,
             enableMinimalisticUI: Defaults[.enableMinimalisticUI],
             recordingHoverStyle: Defaults[.recordingHoverStyle],
             expanded: true

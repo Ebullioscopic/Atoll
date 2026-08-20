@@ -337,6 +337,15 @@ extension ScreenRecordingManager {
         isRecording && stopControlState.canSubmitStopRequest
     }
 
+    var shouldShowStopControlsInHUD: Bool {
+        switch stopControlState {
+        case .ready, .sending, .failed:
+            return isRecording
+        case .unavailable:
+            return false
+        }
+    }
+
     var stopFailureMessage: String? {
         stopControlState.failureMessage
     }

@@ -506,7 +506,7 @@ struct ContentView: View {
                 hasActiveMusicSnapshot: hasActiveMusicSnapshotForClosedPairing
             ),
             recordingControlMode: recordingControlMode,
-            canStopFromHUD: recordingManager.canStopFromHUD,
+            canStopFromHUD: recordingManager.shouldShowStopControlsInHUD,
             enableMinimalisticUI: enableMinimalisticUI,
             recordingHoverStyle: recordingHoverStyle,
             expanded: isHovering

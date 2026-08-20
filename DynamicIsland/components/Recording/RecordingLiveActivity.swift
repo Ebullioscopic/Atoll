@@ -73,7 +73,7 @@ struct RecordingLiveActivity: View {
     }
 
     private var stopControlsEnabled: Bool {
-        recordingControlMode == .withStopButton && recordingManager.canStopFromHUD
+        recordingControlMode == .withStopButton && recordingManager.shouldShowStopControlsInHUD
     }
 
     private var effectiveRecordingHoverStyle: RecordingHoverStyle {
