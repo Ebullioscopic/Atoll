@@ -75,23 +75,25 @@ enum RecordingStopControlState: Equatable {
 }
 
 protocol ScreenRecordingStopControlling {
-    func requestStop() async
+    func requestStop() async -> Bool
 }
 
 struct NativeScreenRecordingStopController: ScreenRecordingStopControlling {
-    func requestStop() async {
-        await sendStopRecordingShortcutViaSystemEvents()
+    func requestStop() async -> Bool {
+        var sentStopRequest = await sendStopRecordingShortcutViaSystemEvents()
 
-        if Task.isCancelled { return }
+        if Task.isCancelled { return sentStopRequest }
         try? await Task.sleep(for: .milliseconds(120))
-        await sendStopRecordingShortcutViaCGEvent()
+        sentStopRequest = await sendStopRecordingShortcutViaCGEvent() || sentStopRequest
 
-        if Task.isCancelled { return }
+        if Task.isCancelled { return sentStopRequest }
         try? await Task.sleep(for: .milliseconds(300))
-        await sendStopRecordingShortcutViaSystemEvents()
+        sentStopRequest = await sendStopRecordingShortcutViaSystemEvents() || sentStopRequest
+
+        return sentStopRequest
     }
 
-    private func sendStopRecordingShortcutViaSystemEvents() async {
+    private func sendStopRecordingShortcutViaSystemEvents() async -> Bool {
         let script = """
         tell application "System Events"
             key down command
@@ -106,15 +108,17 @@ struct NativeScreenRecordingStopController: ScreenRecordingStopControlling {
         do {
             try await AppleScriptHelper.executeVoid(script)
             screenRecordingDebugLog("Sent Command-Control-Escape through System Events")
+            return true
         } catch {
             screenRecordingDebugLog("System Events stop shortcut failed: \(error)")
+            return false
         }
     }
 
-    private func sendStopRecordingShortcutViaCGEvent() async {
+    private func sendStopRecordingShortcutViaCGEvent() async -> Bool {
         guard let source = CGEventSource(stateID: .hidSystemState) else {
             screenRecordingDebugLog("Unable to create CGEventSource for stop shortcut")
-            return
+            return false
         }
 
         let flags: CGEventFlags = [.maskCommand, .maskControl]
@@ -127,17 +131,18 @@ struct NativeScreenRecordingStopController: ScreenRecordingStopControlling {
             keyDown?.post(tap: tap)
 
             try? await Task.sleep(for: .milliseconds(45))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else { return false }
 
             let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
             keyUp?.flags = flags
             keyUp?.post(tap: tap)
 
             try? await Task.sleep(for: .milliseconds(80))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else { return false }
         }
 
         screenRecordingDebugLog("Sent Command-Control-Escape CGEvent stop shortcut")
+        return true
     }
 }
 
@@ -213,12 +218,12 @@ class ScreenRecordingManager: ObservableObject {
         stopRequestTask = Task { @MainActor [weak self] in
             guard let self else { return }
 
-            let nativeStopTask: Task<Void, Never>? = isNativeMacOSScreenRecordingProcessActive()
+            let nativeStopTask: Task<Void, Never>? = await isNativeMacOSScreenRecordingProcessActive()
                 ? Task { @MainActor [weak self] in
                     await self?.stopNativeMacOSScreenRecordingProcesses()
                 }
                 : nil
-            let shortcutStopTask = Task { [stopController] in
+            let shortcutStopTask = Task<Bool, Never> { [stopController] in
                 await stopController.requestStop()
             }
 
@@ -227,7 +232,10 @@ class ScreenRecordingManager: ObservableObject {
 
             if isRecording {
                 await nativeStopTask?.value
-                await shortcutStopTask.value
+                let shortcutSucceeded = await shortcutStopTask.value
+                if !shortcutSucceeded {
+                    screenRecordingDebugLog("All stop shortcut delivery attempts failed")
+                }
             } else {
                 nativeStopTask?.cancel()
                 shortcutStopTask.cancel()
@@ -263,25 +271,27 @@ class ScreenRecordingManager: ObservableObject {
         }
     }
 
-    private func isNativeMacOSScreenRecordingProcessActive() -> Bool {
-        isProcessRunning(named: "screencapture")
+    private func isNativeMacOSScreenRecordingProcessActive() async -> Bool {
+        await isProcessRunning(named: "screencapture")
     }
 
-    private func isProcessRunning(named processName: String) -> Bool {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["-x", processName]
-        task.standardOutput = Pipe()
-        task.standardError = Pipe()
+    private func isProcessRunning(named processName: String) async -> Bool {
+        await Task.detached(priority: .userInitiated) {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+            task.arguments = ["-x", processName]
+            task.standardOutput = Pipe()
+            task.standardError = Pipe()
 
-        do {
-            try task.run()
-            task.waitUntilExit()
-            return task.terminationStatus == 0
-        } catch {
-            screenRecordingDebugLog("pgrep \(processName) failed: \(error)")
-            return false
-        }
+            do {
+                try task.run()
+                task.waitUntilExit()
+                return task.terminationStatus == 0
+            } catch {
+                screenRecordingDebugLog("pgrep \(processName) failed: \(error)")
+                return false
+            }
+        }.value
     }
 
     private func stopNativeMacOSScreenRecordingProcesses() async {
@@ -293,7 +303,7 @@ class ScreenRecordingManager: ObservableObject {
         ]
 
         for arguments in attempts {
-            guard isNativeMacOSScreenRecordingProcessActive() else { return }
+            guard await isNativeMacOSScreenRecordingProcessActive() else { return }
 
             await runKillall(arguments)
             guard !Task.isCancelled else { return }
