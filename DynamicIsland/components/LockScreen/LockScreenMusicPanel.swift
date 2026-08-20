@@ -784,7 +784,7 @@ struct LockScreenMusicPanel: View {
         // Shares PanelControlButton with the rest of the row so the highlight is
         // a full-size circle rather than HoverButton's undersized capsule.
         return PanelControlButton(
-            icon: iconName,
+            glyph: .symbol(iconName),
             frameSize: playPauseFrameSize,
             iconSize: playPauseIconSize,
             iconColor: widgetAppearance.primary(),
@@ -808,6 +808,7 @@ struct LockScreenMusicPanel: View {
         skipDirection: SkipTrackGlyph.Direction? = nil,
         action: @escaping () -> Void
     ) -> some View {
+        let glyph: PanelControlButton.Glyph = skipDirection.map { .skipArrows($0) } ?? .symbol(icon)
         let resolvedActiveColor = activeColor ?? brandAccentColor
         let frameSize: CGFloat = controlFrameSize
         let iconSize: CGFloat = isExpanded ? max(size, controlIconSize) : size
@@ -815,14 +816,13 @@ struct LockScreenMusicPanel: View {
         let backgroundOpacity: Double = isActive ? 0.22 : 0.0
 
         return PanelControlButton(
-            icon: icon,
+            glyph: glyph,
             frameSize: frameSize,
             iconSize: iconSize,
             iconColor: iconColor,
             backgroundOpacity: backgroundOpacity,
             interaction: interaction,
-            symbolEffect: symbolEffect,
-            skipDirection: skipDirection
+            symbolEffect: symbolEffect
         ) {
             registerInteraction()
             action()
@@ -834,7 +834,7 @@ struct LockScreenMusicPanel: View {
         let iconSize: CGFloat = controlIconSize
 
         return PanelControlButton(
-            icon: mediaOutputIcon,
+            glyph: .symbol(mediaOutputIcon),
             frameSize: frameSize,
             iconSize: iconSize,
             iconColor: shouldShowVolumeSlider ? .accentColor : widgetAppearance.primary(opacity: 0.8),
@@ -851,7 +851,7 @@ struct LockScreenMusicPanel: View {
         let iconSize: CGFloat = controlIconSize
 
         return PanelControlButton(
-            icon: "airplayaudio",
+            glyph: .symbol("airplayaudio"),
             frameSize: frameSize,
             iconSize: iconSize,
             iconColor: isAirPlayPopoverPresented ? .accentColor : widgetAppearance.primary(opacity: 0.8),
@@ -1471,16 +1471,29 @@ private struct PanelControlButtonStyle: ButtonStyle {
 }
 
 private struct PanelControlButton: View {
-    let icon: String
+    /// What the button draws. Modelling this as one value rather than an icon
+    /// name plus an optional direction keeps the two from disagreeing, and
+    /// keeps the parameter list shorter than it was before skip arrows existed.
+    enum Glyph {
+        case symbol(String)
+        /// Chevrons that march in this direction on press, the way Apple's do.
+        case skipArrows(SkipTrackGlyph.Direction)
+
+        var symbolName: String {
+            switch self {
+            case .symbol(let name): return name
+            case .skipArrows(let direction): return direction == .forward ? "forward.fill" : "backward.fill"
+            }
+        }
+    }
+
+    let glyph: Glyph
     let frameSize: CGFloat
     let iconSize: CGFloat
     let iconColor: Color
     let backgroundOpacity: Double
     let interaction: Interaction
     let symbolEffect: SymbolEffectStyle
-    /// When set, the button draws an animated skip glyph instead of `icon`:
-    /// the chevrons march in this direction on press the way Apple's do.
-    var skipDirection: SkipTrackGlyph.Direction? = nil
     let action: () -> Void
 
     @Default(.lockScreenWidgetAppearance) private var appearance
@@ -1516,7 +1529,7 @@ private struct PanelControlButton: View {
     }
 
     private func triggerPressEffect() {
-        if skipDirection != nil {
+        if case .skipArrows = glyph {
             skipToken += 1
         }
 
@@ -1552,17 +1565,18 @@ private struct PanelControlButton: View {
 
     @ViewBuilder
     private var iconView: some View {
-        if let skipDirection {
-            SkipTrackGlyph(direction: skipDirection, size: iconSize, trigger: skipToken)
+        switch glyph {
+        case .skipArrows(let direction):
+            SkipTrackGlyph(direction: direction, size: iconSize, trigger: skipToken)
                 .foregroundStyle(iconColor)
-        } else {
+        case .symbol:
             symbolIconView
         }
     }
 
     @ViewBuilder
     private var symbolIconView: some View {
-        let base = Image(systemName: icon)
+        let base = Image(systemName: glyph.symbolName)
             .font(.system(size: iconSize, weight: .medium))
             .foregroundStyle(iconColor)
 
@@ -1573,7 +1587,7 @@ private struct PanelControlButton: View {
             if #available(macOS 14.0, *) {
                 base
                     .contentTransition(.symbolEffect(.replace))
-                    .symbolEffect(.bounce, value: icon)
+                    .symbolEffect(.bounce, value: glyph.symbolName)
             } else {
                 base.contentTransition(.symbolEffect(.replace))
             }

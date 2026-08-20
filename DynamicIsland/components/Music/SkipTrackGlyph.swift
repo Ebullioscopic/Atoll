@@ -44,19 +44,39 @@ struct SkipTrackGlyph: View {
     /// mid-flight simply extends the target and the chevrons keep marching.
     @State private var phase: CGFloat = 0
 
-    /// Triangle size and spacing, tuned against `forward.fill` rendered at the
-    /// same point size so the resting glyph is indistinguishable from it.
-    private var glyphSize: CGFloat { size * 0.88 }
-    private var step: CGFloat { size * 0.52 }
-    private var travelDuration: TimeInterval { 0.26 }
+    // Tuned by rendering this glyph beside `forward.fill` at the same point
+    // size and comparing triangle size and gap; these are the values at which
+    // the resting pair became indistinguishable from the symbol it replaces.
+
+    /// Triangle size as a fraction of the nominal point size. `play.fill` at
+    /// full size is visibly larger than the triangles inside `forward.fill`,
+    /// which fits two into a comparable box.
+    private static let glyphSizeRatio: CGFloat = 0.88
+
+    /// Distance between adjacent triangles, and therefore how far each one
+    /// travels per press.
+    private static let stepRatio: CGFloat = 0.52
+
+    /// One press worth of travel. Short enough to keep up with repeated
+    /// presses, which chain rather than queue.
+    private static let travelDuration: TimeInterval = 0.26
+
+    private var glyphSize: CGFloat { size * SkipTrackGlyph.glyphSizeRatio }
+    private var step: CGFloat { size * SkipTrackGlyph.stepRatio }
 
     var body: some View {
         SkipArrows(phase: phase, glyphSize: glyphSize, step: step)
             .frame(width: size * 1.5, height: size)
             .rotationEffect(direction.rotation)
-            .onChange(of: trigger) { _, _ in
-                withAnimation(.easeOut(duration: travelDuration)) {
-                    phase += 1
+            .onChange(of: trigger) { oldValue, newValue in
+                // Advance by however many presses this delivers. SwiftUI
+                // coalesces state changes within a run loop turn, so two
+                // presses in the same turn arrive as a single call with a
+                // trigger two higher — advancing by one would drop a skip's
+                // worth of travel.
+                let presses = max(newValue - oldValue, 1)
+                withAnimation(.easeOut(duration: SkipTrackGlyph.travelDuration)) {
+                    phase += CGFloat(presses)
                 }
             }
     }

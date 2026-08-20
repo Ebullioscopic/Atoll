@@ -105,10 +105,15 @@ struct HoverButton: View {
         }
     }
 
+    /// Point sizes for the two text styles this button draws at, resolved once
+    /// rather than on every body evaluation.
+    private static let largeGlyphPointSize = NSFont.preferredFont(forTextStyle: .largeTitle).pointSize
+    private static let regularGlyphPointSize = NSFont.preferredFont(forTextStyle: .body).pointSize
+
     /// Point size the skip glyph is drawn at, matched to the text style the
     /// symbol would otherwise use so it sits like the icon it replaces.
     private var glyphPointSize: CGFloat {
-        NSFont.preferredFont(forTextStyle: scale == .large ? .largeTitle : .body).pointSize
+        scale == .large ? HoverButton.largeGlyphPointSize : HoverButton.regularGlyphPointSize
     }
 
     private func triggerPressEffect(override: PressEffect? = nil) {
