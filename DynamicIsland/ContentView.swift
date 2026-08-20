@@ -649,11 +649,6 @@ struct ContentView: View {
                     // tab already selected, where the cursor never enters the notch).
                     syncStickyTerminalOutsideClickMonitor()
                 }
-                #if os(macOS)
-                if newState == .open {
-                    TimerControlWindowManager.shared.hide()
-                }
-                #endif
             }
             .onChange(of: vm.isBatteryPopoverActive) { _, newPopoverState in
                 runAfter(0.1) {
@@ -1189,7 +1184,7 @@ struct ContentView: View {
                 IdleAnimationView()
                     .frame(width: sideSize, height: sideSize)
             }
-        }.frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .top)
+        }.frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
     }
 
     @ViewBuilder
@@ -1197,7 +1192,7 @@ struct ContentView: View {
         let secondary = preResolvedSecondary ?? resolveMusicSecondaryLiveActivity()
         let closedHeight = vm.effectiveClosedNotchHeight
         let outerHeight = closedHeight + (isHovering ? 8 : 0)
-        let notchContentHeight = isHovering ? outerHeight : max(0, closedHeight - 12)
+        let notchContentHeight = isHovering ? max(0, closedHeight) : max(0, closedHeight - 12)
         let wingBaseWidth = max(0, notchContentHeight + gestureProgress / 2)
         let artworkHeight = max(0, closedHeight - 12)
         let artworkSize = min(artworkHeight, wingBaseWidth)

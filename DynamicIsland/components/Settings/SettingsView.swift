@@ -6781,16 +6781,6 @@ struct TimerSettings: View {
             timerPresetsSection
             timerSoundSection
         }
-        .onAppear {
-            if showsLabel {
-                controlWindowEnabled = false
-            }
-        }
-        .onChange(of: showsLabel) { _, show in
-            if show {
-                controlWindowEnabled = false
-            }
-        }
     }
 
     @ViewBuilder
@@ -6927,9 +6917,9 @@ struct TimerSettings: View {
             Toggle("Show preset list in timer tab", isOn: $showTimerPresetsInNotchTab)
                 .settingsHighlight(id: highlightID("Show preset list in timer tab"))
 
-            Toggle("Show floating pause/stop controls", isOn: $controlWindowEnabled)
-                .disabled(showsLabel)
-                .help("These controls sit beside the notch while a timer runs. They require the timer name to stay hidden for spacing.")
+            Toggle("Show pause/stop controls in the notch", isOn: $controlWindowEnabled)
+                .help("Pause and stop buttons appear inline inside the notch while a timer runs.")
+                .settingsHighlight(id: highlightID("Show pause/stop controls in the notch"))
 
             Picker("Progress style", selection: $progressStyle) {
                 ForEach(TimerProgressStyle.allCases) { style in
