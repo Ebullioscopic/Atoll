@@ -344,6 +344,10 @@ class SystemHUDManager {
             SystemOSDManager.enableSystemHUD()
         } else {
             SystemOSDManager.disableSystemHUD()
+            // disableSystemHUD arms the watcher, which polls; on unlock the
+            // helper is already awake and can draw one more HUD before the
+            // first poll lands. Freeze it now as well.
+            SystemOSDManager.suppressNativeOSDNow()
         }
     }
 

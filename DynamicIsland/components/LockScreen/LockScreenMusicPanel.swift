@@ -85,8 +85,12 @@ struct LockScreenMusicPanel: View {
     private let expandedAlbumArtCornerRadius: CGFloat = 60
     private let expandedContentSpacing: CGFloat = 40
     private let collapseTimeout: TimeInterval = 5
-    private let collapsedSliderExtraHeight: CGFloat = 72
-    private let expandedSliderExtraHeight: CGFloat = 88
+    // Room for the volume row: the capsule itself (14 collapsed / 16 expanded)
+    // plus the 14pt gap the controls stack puts above it. The old figures were
+    // sized for a boxed slider with an icon and a percentage label, and left
+    // roughly 40pt of dead space under the panel once that became a capsule.
+    private let collapsedSliderExtraHeight: CGFloat = 32
+    private let expandedSliderExtraHeight: CGFloat = 34
     private let collapsedLyricsExtraHeight: CGFloat = 64
     private let expandedLyricsExtraHeight: CGFloat = 96
 
