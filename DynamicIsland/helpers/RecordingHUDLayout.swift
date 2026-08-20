@@ -109,7 +109,7 @@ func makeRecordingHUDLayout(
     return RecordingHUDLayout(
         isVisible: isVisible,
         stopControlsEnabled: stopControlsEnabled,
-        hoverStyle: enableMinimalisticUI ? recordingHoverStyle : .inline,
+        hoverStyle: recordingHoverStyle,
         expanded: expanded
     )
 }

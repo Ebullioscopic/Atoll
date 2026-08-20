@@ -213,17 +213,29 @@ class ScreenRecordingManager: ObservableObject {
         stopRequestTask = Task { @MainActor [weak self] in
             guard let self else { return }
 
-            await stopController.requestStop()
+            let nativeStopTask: Task<Void, Never>? = isNativeMacOSScreenRecordingProcessActive()
+                ? Task { @MainActor [weak self] in
+                    await self?.stopNativeMacOSScreenRecordingProcesses()
+                }
+                : nil
+            let shortcutStopTask = Task { [stopController] in
+                await stopController.requestStop()
+            }
+
+            await waitForRecordingToStop(maxAttempts: 2)
             guard !Task.isCancelled else { return }
 
-            // macOS can take a few seconds to publish the stopped state after
-            // accepting the native screen recording shortcut.
-            await waitForRecordingToStop(maxAttempts: 8)
+            if isRecording {
+                await nativeStopTask?.value
+                await shortcutStopTask.value
+            } else {
+                nativeStopTask?.cancel()
+                shortcutStopTask.cancel()
+            }
             guard !Task.isCancelled else { return }
 
-            if isRecording, isNativeMacOSScreenRecordingProcessActive() {
-                await stopNativeMacOSScreenRecordingProcesses()
-                await waitForRecordingToStop(maxAttempts: 12)
+            if isRecording {
+                await waitForRecordingToStop(maxAttempts: 8)
             }
 
             if isRecording {

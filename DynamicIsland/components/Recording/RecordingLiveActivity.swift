@@ -24,7 +24,6 @@ struct RecordingLiveActivity: View {
     @ObservedObject var recordingManager = ScreenRecordingManager.shared
     @Default(.recordingHoverStyle) private var recordingHoverStyle
     @Default(.recordingControlMode) private var recordingControlMode
-    @Default(.enableMinimalisticUI) private var enableMinimalisticUI
 
     @Binding var hoverAnimation: Bool
     @Binding var gestureProgress: CGFloat
@@ -34,23 +33,23 @@ struct RecordingLiveActivity: View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
 
-            HStack(spacing: 0) {
-                recordingBadge
-                    .frame(width: leadingWidth, height: rowHeight)
-
-                Rectangle()
-                    .fill(.black)
-                    .frame(width: centerWidth, height: vm.effectiveClosedNotchHeight)
-
-                trailingStatus
-                    .frame(width: trailingWidth, height: rowHeight)
-            }
-            .frame(width: hudWidth, height: vm.effectiveClosedNotchHeight)
-
             if presentation == .expanded {
                 expandedDetails
-                    .frame(width: hudWidth, height: expandedDetailsHeight)
+                    .frame(width: hudWidth, height: hudHeight)
                     .transition(.opacity)
+            } else {
+                HStack(spacing: 0) {
+                    recordingBadge
+                        .frame(width: leadingWidth, height: rowHeight)
+
+                    Rectangle()
+                        .fill(.black)
+                        .frame(width: centerWidth, height: vm.effectiveClosedNotchHeight)
+
+                    trailingStatus
+                        .frame(width: trailingWidth, height: rowHeight)
+                }
+                .frame(width: hudWidth, height: vm.effectiveClosedNotchHeight)
             }
         }
         .frame(width: hudWidth, height: hudHeight, alignment: .bottom)
@@ -77,7 +76,7 @@ struct RecordingLiveActivity: View {
     }
 
     private var effectiveRecordingHoverStyle: RecordingHoverStyle {
-        enableMinimalisticUI ? recordingHoverStyle : .inline
+        recordingHoverStyle
     }
 
     private var hudWidth: CGFloat {
@@ -108,10 +107,6 @@ struct RecordingLiveActivity: View {
 
     private var inlineStopButtonSize: CGFloat {
         min(max(vm.effectiveClosedNotchHeight - 8, 22), 30)
-    }
-
-    private var expandedDetailsHeight: CGFloat {
-        RecordingHUDPresentation.expanded.extraHeight
     }
 
     private var recordingStatusText: String {
@@ -158,12 +153,12 @@ struct RecordingLiveActivity: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(verbatim: "Screen Recording")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.84))
                         .lineLimit(1)
 
                     Text(recordingManager.formattedDuration)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(.red)
                         .lineLimit(1)
@@ -171,7 +166,7 @@ struct RecordingLiveActivity: View {
                 }
 
                 Text(recordingStatusText)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(recordingManager.stopFailureMessage == nil ? .gray.opacity(0.6) : .red.opacity(0.78))
                     .lineLimit(1)
             }
@@ -180,9 +175,10 @@ struct RecordingLiveActivity: View {
 
             stopButton(size: 54, lineWidth: 2.4)
         }
-        .padding(.leading, 35)
-        .padding(.trailing, 40)
-        .padding(.bottom, 20)
+        .padding(.leading, 98)
+        .padding(.trailing, 72)
+        .padding(.top, 22)
+        .padding(.bottom, 22)
     }
 
     private func recordingDot(size: CGFloat) -> some View {
