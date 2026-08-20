@@ -270,12 +270,35 @@ class SystemOSDManager {
         guard isCurrentTransition(generation, active: true) else { return }
 
         do {
+            // Freeze whatever is already running, first and synchronously.
+            //
+            // The kickstart below carries `-k`, which kills the current helper
+            // and starts a live replacement — and every millisecond between the
+            // two is a window where the native HUD draws. That was tolerable
+            // when suppression ran once at startup, but lock-state changes now
+            // re-run it, so the window reopened on every unlock and the native
+            // HUD reappeared on the home screen. A helper that is already
+            // SIGSTOPped needs no replacing; freezing it in place closes the
+            // window entirely, and the watcher still catches any process macOS
+            // swaps in later.
+            if let existing = osduiHelperPID() {
+                suspendOSDUIHelper()
+                guard isCurrentTransition(generation, active: true) else {
+                    resumeOSDUIHelperProcess()
+                    return
+                }
+                suppressionState.withLock { $0.lastSuspendedPID = existing }
+                await MainActor.run {
+                    print("✅ System HUD disabled (suspended running helper \(existing))")
+                }
+                return
+            }
+
             let kickstart = Process()
             kickstart.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            // Force a clean helper instance. A plain kickstart is a no-op when
-            // OSDUIHelper is already running, and macOS may replace that lingering
-            // process on the first media key, briefly exposing the native HUD.
-            kickstart.arguments = ["kickstart", "-k", "gui/\(getuid())/com.apple.OSDUIHelper"]
+            // No helper running — ask launchd for one so there is something to
+            // freeze before the next media key arrives.
+            kickstart.arguments = ["kickstart", "gui/\(getuid())/com.apple.OSDUIHelper"]
             try kickstart.run()
             kickstart.waitUntilExit()
 
