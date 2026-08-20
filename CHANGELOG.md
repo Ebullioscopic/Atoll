@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- The 3D Bluetooth HUD icon, and its preview tile in Settings, no longer render as an empty box when the bundled animation cannot be decoded. Both call sites decided whether to fall back to the SF Symbol by asking whether a file of that name exists, which is true of a Git LFS pointer stub left by a clone made without git-lfs: the file resolves, the fallback never fires, and the player is handed something undecodable. The movie is now validated before use (#744).
 - Fixed a launch crash (`BUG IN CLIENT OF LIBDISPATCH: trying to lock recursively`) that could trap while a Bluetooth audio device was connected. `BluetoothAudioManager`'s initialiser scanned connected devices synchronously, and that scan blocks on `Process.waitUntilExit()`, which spins the run loop — letting SwiftUI evaluate a view body that reads `BluetoothAudioManager.shared` and re-enter the initialiser that was still running. The scan now starts on the next main-queue turn instead.
 - Fixed excessive memory usage by streaming LLM usage JSONL files instead of loading them entirely into memory
 - Reduced idle CPU from always-on notch hover polling and OSDUIHelper process checks by backing off when the app is idle (#641).
