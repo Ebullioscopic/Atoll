@@ -78,13 +78,13 @@ struct OptimisticPlaybackTransition {
 }
 
 private struct ManualTrackArtworkHandoff {
-    private static let duration: TimeInterval = 0.225
+    private static let manualTrackArtworkTransitionDuration: TimeInterval = 0.225
     private var deadline: Date? = nil
     private var generation = 0
 
     mutating func begin(at date: Date = Date()) {
         generation &+= 1
-        deadline = date.addingTimeInterval(Self.duration)
+        deadline = date.addingTimeInterval(Self.manualTrackArtworkTransitionDuration)
     }
 
     mutating func pendingSchedule(at date: Date = Date()) -> (generation: Int, delay: TimeInterval)? {
@@ -492,6 +492,7 @@ class MusicManager: ObservableObject {
     }
 
     static let skipGestureSeekInterval: TimeInterval = 10
+    private static let optimisticPlaybackRecoveryTimeout: Duration = .seconds(2)
 
     // MARK: - Properties
     static let shared = MusicManager()
@@ -1407,7 +1408,7 @@ class MusicManager: ObservableObject {
     ) {
         optimisticPlayStateTimeoutTask?.cancel()
         optimisticPlayStateTimeoutTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: Self.optimisticPlaybackRecoveryTimeout)
             guard !Task.isCancelled, let self else { return }
 
             let shouldRefresh = await MainActor.run {

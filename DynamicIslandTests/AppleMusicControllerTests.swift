@@ -207,11 +207,13 @@ final class AppleMusicControllerTests: XCTestCase {
         withExtendedLifetime(cancellable) {}
     }
 
-    func testAlbumArtAssignmentIsNotDelayed() {
+    func testAutomaticTrackArtworkUpdateAppliesImmediatelyWithoutManualHandoff() {
         let manager = MusicManager(startsControllerSetup: false)
+        let oldArtwork = NSImage(size: NSSize(width: 24, height: 24))
         let newArtwork = NSImage(size: NSSize(width: 32, height: 32))
         defer { manager.destroy() }
 
+        manager.updateAlbumArt(newAlbumArt: oldArtwork)
         manager.updateAlbumArt(newAlbumArt: newArtwork)
 
         XCTAssertTrue(manager.albumArt === newArtwork)

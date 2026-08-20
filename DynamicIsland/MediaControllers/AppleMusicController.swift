@@ -51,6 +51,9 @@ func makeAppleMusicCatalogSearchURL(query: String) -> URL? {
 }
 
 private actor AppleMusicCatalogArtworkResolver {
+    // Intentionally cache only the most recent artwork to bound memory usage.
+    // Consecutive refreshes commonly request the same track, while a larger
+    // cache would retain decoded image data for tracks that may not recur.
     private var lastArtworkKey: String?
     private var cachedArtwork: Data?
 
@@ -271,16 +274,19 @@ class AppleMusicController: MediaControllerProtocol {
         let requestID = UUID()
         let artworkProvider = catalogArtworkProvider
         let artworkResolver = catalogArtworkResolver
+        let title = info.title
+        let artist = info.artist
+        let album = info.album
         artworkRequestID = requestID
         artworkFetchTask = Task { @MainActor [weak self] in
             let artwork: Data?
             if let artworkProvider {
-                artwork = await artworkProvider(info.title, info.artist, info.album)
+                artwork = await artworkProvider(title, artist, album)
             } else {
                 artwork = await artworkResolver.fetch(
-                    title: info.title,
-                    artist: info.artist,
-                    album: info.album
+                    title: title,
+                    artist: artist,
+                    album: album
                 )
             }
 
