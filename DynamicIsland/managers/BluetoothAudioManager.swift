@@ -2852,7 +2852,18 @@ extension BluetoothAudioDeviceType {
     /// file such as an un-fetched Git LFS pointer — because a valid container
     /// may carry all sorts of top-level atoms after it, and rejecting an
     /// unfamiliar one would silently disable a perfectly good animation.
+    ///
+    /// The padding and placeholder types (`free`, `skip`, `wide`, `pnot`) are
+    /// included because real files do start with them: QuickTime writers emit
+    /// `wide` before `mdat` to reserve room for a 64-bit size, and editors
+    /// leave `free`/`skip` where data was removed. The assets here begin
+    /// `ftyp` → `wide` → `mdat` → `moov`.
     private static let leadingAtomTypes: Set<String> = ["ftyp", "moov", "mdat", "free", "skip", "wide", "pnot"]
+
+    /// Upper bound on the atom walk. These are small bundled assets, so a
+    /// chain this long means the file is not what it claims; the bound stops a
+    /// malformed one from being walked indefinitely.
+    private static let maximumAtomCount = 128
 
     /// Walks the top-level atom chain and reports whether the file is a
     /// structurally complete movie.
@@ -2872,19 +2883,19 @@ extension BluetoothAudioDeviceType {
         var offset: UInt64 = 0
         var sawMovieAtom = false
         var atomCount = 0
-        // These are small bundled assets; a chain this long means something is
-        // wrong, and the bound keeps a malformed file from spinning here.
-        let atomLimit = 128
 
         while offset + 8 <= fileSize {
             atomCount += 1
-            guard atomCount <= atomLimit else { return false }
+            guard atomCount <= BluetoothAudioDeviceType.maximumAtomCount else { return false }
 
             guard (try? handle.seek(toOffset: offset)) != nil,
                   let header = try? handle.read(upToCount: 16),
                   header.count >= 8 else { return false }
             let bytes = [UInt8](header)
 
+            // Atom types are four printable ISO 646 characters, so ASCII
+            // decoding is exact rather than an assumption; anything that fails
+            // to decode is not a container header.
             guard let atomType = String(bytes: bytes[4 ..< 8], encoding: .ascii),
                   atomType.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value <= 0x7E }) else { return false }
             if offset == 0, !leadingAtomTypes.contains(atomType) { return false }
