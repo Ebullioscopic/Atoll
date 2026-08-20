@@ -2808,26 +2808,62 @@ extension BluetoothAudioDeviceType {
     /// text file that ships with the correct name and extension but decodes to nothing).
     /// Callers can then fall back to the SF Symbol instead of rendering an empty frame.
     var inlineHUDAnimationURL: URL? {
-        guard let url = Bundle.main.url(
-            forResource: inlineHUDAnimationBaseName,
-            withExtension: "mov",
-            subdirectory: "BluetoothHUDAnimations"
-        ) ?? Bundle.main.url(
-            forResource: inlineHUDAnimationBaseName,
-            withExtension: "mov"
-        ) else { return nil }
+        // Each candidate is validated in turn: a stub in the subdirectory must
+        // not mask a real movie sitting at the bundle root.
+        let candidates = [
+            Bundle.main.url(
+                forResource: inlineHUDAnimationBaseName,
+                withExtension: "mov",
+                subdirectory: "BluetoothHUDAnimations"
+            ),
+            Bundle.main.url(
+                forResource: inlineHUDAnimationBaseName,
+                withExtension: "mov"
+            )
+        ].compactMap { $0 }
 
-        return BluetoothAudioDeviceType.isPlayableMovieFile(at: url) ? url : nil
+        return candidates.first { BluetoothAudioDeviceType.isPlayableMovieFile(at: $0) }
     }
 
-    /// Cheap header sniff: a QuickTime/MP4 file starts with a 4-byte atom size followed by
-    /// a known 4-character atom type.
+    private static let movieAtomTypes: Set<String> = ["ftyp", "moov", "mdat", "free", "skip", "wide", "pnot"]
+
+    /// Header sniff for a QuickTime/ISO BMFF container: a 4-byte atom size, a
+    /// 4-character atom type, and — when the size is extended — a 64-bit size.
+    ///
+    /// Both halves matter. The type alone would accept a truncated or malformed
+    /// file that happens to carry a plausible four characters at offset 4, and
+    /// such a file reaches the player and draws nothing, which is exactly the
+    /// failure this guard exists to prevent.
     private static func isPlayableMovieFile(at url: URL) -> Bool {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
         defer { try? handle.close() }
-        guard let header = try? handle.read(upToCount: 8), header.count == 8 else { return false }
-        let atomType = String(decoding: header.suffix(4), as: UTF8.self)
-        return ["ftyp", "moov", "mdat", "free", "skip", "wide", "pnot"].contains(atomType)
+
+        guard let header = try? handle.read(upToCount: 16), header.count >= 8 else { return false }
+        let bytes = [UInt8](header)
+
+        guard let atomType = String(bytes: bytes[4 ..< 8], encoding: .ascii),
+              movieAtomTypes.contains(atomType) else { return false }
+
+        guard let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(UInt64.init),
+              fileSize >= 8 else { return false }
+
+        let declaredSize = bytes[0 ..< 4].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+
+        switch declaredSize {
+        case 0:
+            // The atom runs to the end of the file.
+            return true
+        case 1:
+            // Extended size: the real length is the next 64 bits.
+            guard bytes.count >= 16 else { return false }
+            let extendedSize = bytes[8 ..< 16].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+            return extendedSize >= 16 && extendedSize <= fileSize
+        case 2 ... 7:
+            // Smaller than the header it must contain.
+            return false
+        default:
+            return declaredSize <= fileSize
+        }
     }
 
     var isAirPods: Bool {
