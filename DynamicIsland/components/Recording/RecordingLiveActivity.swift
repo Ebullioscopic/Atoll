@@ -153,12 +153,12 @@ struct RecordingLiveActivity: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(verbatim: "Screen Recording")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.84))
                         .lineLimit(1)
 
                     Text(recordingManager.formattedDuration)
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(.red)
                         .lineLimit(1)
@@ -166,7 +166,7 @@ struct RecordingLiveActivity: View {
                 }
 
                 Text(recordingStatusText)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(recordingManager.stopFailureMessage == nil ? .gray.opacity(0.6) : .red.opacity(0.78))
                     .lineLimit(1)
             }
