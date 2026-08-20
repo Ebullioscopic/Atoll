@@ -27,6 +27,7 @@ struct NotchNotesView: View {
     @Default(.savedNotes) var savedNotes
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
     @Default(.enableClipboardManager) var enableClipboardManager
+    @Default(.clipboardProvider) var clipboardProvider
     @Default(.enableAppleNotesSync) var enableAppleNotesSync
     
     @State private var selectedNoteId: UUID?
@@ -43,7 +44,7 @@ struct NotchNotesView: View {
     @Default(.enableNotes) var enableNotes
     
     var showSplitView: Bool {
-        return enableClipboardManager && clipboardDisplayMode == .separateTab
+        return ClipboardProviderManager.usesBuiltInClipboard && clipboardDisplayMode == .separateTab
     }
 
     var body: some View {
@@ -127,6 +128,9 @@ struct NotchNotesView: View {
             updateLayoutState()
         }
         .onChange(of: clipboardDisplayMode) { _, _ in
+            updateLayoutState()
+        }
+        .onChange(of: clipboardProvider) { _, _ in
             updateLayoutState()
         }
         .onChange(of: enableNotes) { _, _ in

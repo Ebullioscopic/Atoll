@@ -94,7 +94,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
     private func focusClipboardTabIfNeeded() {
         guard !Defaults[.enableMinimalisticUI] else { return }
-        guard Defaults[.enableClipboardManager] else { return }
+        guard ClipboardProviderManager.usesBuiltInClipboard else { return }
         guard Defaults[.clipboardDisplayMode] == .separateTab else { return }
         guard let lastCopyDate = ClipboardManager.shared.lastCopiedItemDate else { return }
         guard Date().timeIntervalSince(lastCopyDate) <= clipboardFocusWindow else { return }
