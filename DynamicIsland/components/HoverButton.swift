@@ -30,12 +30,17 @@ struct HoverButton: View {
     var contentTransition: ContentTransition = .symbolEffect
     var externalTriggerToken: Int? = nil
     var externalTriggerEffect: PressEffect? = nil
+    /// When set, the button draws an animated skip glyph instead of `icon`:
+    /// the chevrons march in this direction the way Apple's do, and the button
+    /// itself stays put.
+    var skipDirection: SkipTrackGlyph.Direction? = nil
     var action: () -> Void
     
     @State private var isHovering = false
     @State private var pressOffset: CGFloat = 0
     @State private var wiggleAngle: Double = 0
     @State private var wiggleToken: Int = 0
+    @State private var skipToken: Int = 0
     @State private var lastExternalTriggerToken: Int?
 
     var body: some View {
@@ -54,24 +59,33 @@ struct HoverButton: View {
                         .fill(isHovering ? Color.gray.opacity(0.2) : .clear)
                         .frame(width: size, height: size)
                         .overlay {
-                            let baseImage = Image(systemName: icon)
-                                .foregroundColor(iconColor)
-                                .contentTransition(contentTransition)
-                                .font(scale == .large ? .largeTitle : .body)
+                            if let skipDirection {
+                                SkipTrackGlyph(
+                                    direction: skipDirection,
+                                    size: glyphPointSize,
+                                    trigger: skipToken
+                                )
+                                .foregroundStyle(iconColor)
+                            } else {
+                                let baseImage = Image(systemName: icon)
+                                    .foregroundColor(iconColor)
+                                    .contentTransition(contentTransition)
+                                    .font(scale == .large ? .largeTitle : .body)
 
-                            if case .wiggle = pressEffect {
-                                if #available(macOS 15.0, *) {
-                                    baseImage
-                                        .symbolEffect(
-                                            .wiggle.byLayer,
-                                            options: .nonRepeating,
-                                            value: wiggleToken
-                                        )
+                                if case .wiggle = pressEffect {
+                                    if #available(macOS 15.0, *) {
+                                        baseImage
+                                            .symbolEffect(
+                                                .wiggle.byLayer,
+                                                options: .nonRepeating,
+                                                value: wiggleToken
+                                            )
+                                    } else {
+                                        baseImage
+                                    }
                                 } else {
                                     baseImage
                                 }
-                            } else {
-                                baseImage
                             }
                         }
                 }
@@ -91,7 +105,19 @@ struct HoverButton: View {
         }
     }
 
+    /// Point size the skip glyph is drawn at, matched to the text style the
+    /// symbol would otherwise use so it sits like the icon it replaces.
+    private var glyphPointSize: CGFloat {
+        NSFont.preferredFont(forTextStyle: scale == .large ? .largeTitle : .body).pointSize
+    }
+
     private func triggerPressEffect(override: PressEffect? = nil) {
+        // Fires for taps and for gesture-driven pulses alike, and independently
+        // of pressEffect — skip buttons no longer use one.
+        if skipDirection != nil {
+            skipToken += 1
+        }
+
         guard let effect = override ?? pressEffect else { return }
 
         switch effect {
