@@ -651,11 +651,9 @@ struct LockScreenMusicPanel: View {
     }
 
     private func controlsRow(alignment: Alignment, spacing: CGFloat) -> some View {
-        let skipNudge: CGFloat = isExpanded ? 14 : 9
-
-        return HStack(spacing: spacing) {
+        HStack(spacing: spacing) {
             ForEach(Array(displayedSlots.enumerated()), id: \.offset) { _, slot in
-                slotView(for: slot, skipNudge: skipNudge)
+                slotView(for: slot)
             }
         }
         .frame(maxWidth: .infinity, alignment: alignment)
@@ -680,7 +678,7 @@ struct LockScreenMusicPanel: View {
     }
 
     @ViewBuilder
-    private func slotView(for control: MusicControlButton, skipNudge: CGFloat) -> some View {
+    private func slotView(for control: MusicControlButton) -> some View {
         let seekInterval: TimeInterval = 10
 
         switch control {
@@ -692,8 +690,9 @@ struct LockScreenMusicPanel: View {
             controlButton(
                 icon: "backward.fill",
                 size: 18,
-                interaction: .nudge(-skipNudge),
-                symbolEffect: .replace
+                interaction: .none,
+                symbolEffect: .replace,
+                skipDirection: .backward
             ) {
                 musicManager.previousTrack()
             }
@@ -701,8 +700,9 @@ struct LockScreenMusicPanel: View {
             controlButton(
                 icon: "forward.fill",
                 size: 18,
-                interaction: .nudge(skipNudge),
-                symbolEffect: .replace
+                interaction: .none,
+                symbolEffect: .replace,
+                skipDirection: .forward
             ) {
                 musicManager.nextTrack()
             }
@@ -805,6 +805,7 @@ struct LockScreenMusicPanel: View {
         activeColor: Color? = nil,
         interaction: PanelControlButton.Interaction = .none,
         symbolEffect: PanelControlButton.SymbolEffectStyle = .replace,
+        skipDirection: SkipTrackGlyph.Direction? = nil,
         action: @escaping () -> Void
     ) -> some View {
         let resolvedActiveColor = activeColor ?? brandAccentColor
@@ -820,7 +821,8 @@ struct LockScreenMusicPanel: View {
             iconColor: iconColor,
             backgroundOpacity: backgroundOpacity,
             interaction: interaction,
-            symbolEffect: symbolEffect
+            symbolEffect: symbolEffect,
+            skipDirection: skipDirection
         ) {
             registerInteraction()
             action()
@@ -1476,6 +1478,9 @@ private struct PanelControlButton: View {
     let backgroundOpacity: Double
     let interaction: Interaction
     let symbolEffect: SymbolEffectStyle
+    /// When set, the button draws an animated skip glyph instead of `icon`:
+    /// the chevrons march in this direction on press the way Apple's do.
+    var skipDirection: SkipTrackGlyph.Direction? = nil
     let action: () -> Void
 
     @Default(.lockScreenWidgetAppearance) private var appearance
@@ -1483,6 +1488,7 @@ private struct PanelControlButton: View {
     @State private var pressOffset: CGFloat = 0
     @State private var rotationAngle: Double = 0
     @State private var wiggleToken: Int = 0
+    @State private var skipToken: Int = 0
 
     var body: some View {
         Button(action: {
@@ -1510,6 +1516,10 @@ private struct PanelControlButton: View {
     }
 
     private func triggerPressEffect() {
+        if skipDirection != nil {
+            skipToken += 1
+        }
+
         switch interaction {
         case .none:
             return
@@ -1542,6 +1552,16 @@ private struct PanelControlButton: View {
 
     @ViewBuilder
     private var iconView: some View {
+        if let skipDirection {
+            SkipTrackGlyph(direction: skipDirection, size: iconSize, trigger: skipToken)
+                .foregroundStyle(iconColor)
+        } else {
+            symbolIconView
+        }
+    }
+
+    @ViewBuilder
+    private var symbolIconView: some View {
         let base = Image(systemName: icon)
             .font(.system(size: iconSize, weight: .medium))
             .foregroundStyle(iconColor)
