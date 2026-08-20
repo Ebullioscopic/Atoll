@@ -27,11 +27,50 @@ import SwiftUI
 let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
+/// Layout budgets applied to the home view only while the side lyrics panel is active
+enum SideLyricsLayout {
+    /// Room the standard player needs for its album art and five-button control row
+    static let minimumPlayerWidth: CGFloat = 380
+
+    /// Room the webcam mirror needs to stay usable next to the player
+    static let minimumMirrorWidth: CGFloat = 220
+
+    /// Spacing between the player, mirror, and lyrics panel columns
+    static let hStackSpacing: CGFloat = 20
+
+    /// Combined home-view and notch content insets surrounding those columns
+    static let combinedInset: CGFloat = 40
+}
+
+func sideLyricsRequiredNotchWidth() -> CGFloat {
+    guard Defaults[.enableLyrics],
+          !Defaults[.showCalendar],
+          !Defaults[.enableMinimalisticUI],
+          Defaults[.showStandardMediaControls],
+          (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+    else { return 0 }
+
+    let panelWidth = max(0, Defaults[.lyricsPanelWidth])
+    let offsetDistance = abs(Defaults[.lyricsPanelOffset])
+    let mirrorWidth = Defaults[.showMirror] && WebcamManager.shared.cameraAvailable
+        ? SideLyricsLayout.minimumMirrorWidth + SideLyricsLayout.hStackSpacing
+        : 0
+
+    // Include the home-view and notch content insets so the player receives
+    // the same usable width it had before the panel was added.
+    return SideLyricsLayout.minimumPlayerWidth
+        + panelWidth
+        + SideLyricsLayout.hStackSpacing
+        + offsetDistance
+        + mirrorWidth
+        + SideLyricsLayout.combinedInset
+}
+
 var openNotchSize: CGSize {
     let storedWidth = Defaults[.openNotchWidth]
     let minWidth = currentRecommendedMinimumNotchWidth()
     let maxWidth = maxAllowedNotchWidth()
-    let width = min(max(storedWidth, minWidth), maxWidth)
+    let width = min(max(storedWidth, minWidth, sideLyricsRequiredNotchWidth()), maxWidth)
     return .init(width: width, height: 200)
 }
 
