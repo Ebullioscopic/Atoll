@@ -39,6 +39,12 @@ struct SkipTrackGlyph: View {
     /// Increment to play the animation.
     let trigger: Int
 
+    /// Monotonically increasing — one whole step per skip, never reset. The
+    /// layout uses its fractional part, and because the end of a cycle is
+    /// identical to its start, letting it run past 1 is seamless. Chaining
+    /// this way means a press that lands mid-flight extends the target instead
+    /// of restating it (which SwiftUI would see as no change and swallow), and
+    /// there is no reset for an interrupted animation's completion to clobber.
     @State private var phase: CGFloat = 0
 
     /// Triangle size and spacing, tuned against `forward.fill` rendered at the
@@ -69,25 +75,26 @@ struct SkipTrackGlyph: View {
             .font(.system(size: glyphSize, weight: .medium))
     }
 
+    /// Position within the current cycle: 0 at rest, 1 back at rest.
+    private var cyclePhase: CGFloat {
+        phase - phase.rounded(.down)
+    }
+
     private func offset(for slot: Int) -> CGFloat {
-        ((CGFloat(slot) - 1.5) + phase) * step
+        ((CGFloat(slot) - 1.5) + cyclePhase) * step
     }
 
     private func opacity(for slot: Int) -> Double {
         switch slot {
-        case 2: return 1 - phase       // leading: fades as it slides out
-        case 0: return Double(phase)   // spare: fades in behind
+        case 2: return Double(1 - cyclePhase)  // leading: fades as it slides out
+        case 0: return Double(cyclePhase)      // spare: fades in behind
         default: return 1
         }
     }
 
     private func advance() {
-        // Land exactly on the rest state, then reset without animating so the
-        // glyph can fire again immediately.
         withAnimation(.easeOut(duration: travelDuration)) {
-            phase = 1
-        } completion: {
-            phase = 0
+            phase += 1
         }
     }
 }
