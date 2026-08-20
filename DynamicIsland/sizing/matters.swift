@@ -27,12 +27,20 @@ import SwiftUI
 let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
-// The standard player needs room for its album art and five-button control row.
-// This budget is used only while the side lyrics panel is active.
-let sideLyricsMinimumPlayerWidth: CGFloat = 380
-let sideLyricsMinimumMirrorWidth: CGFloat = 220
-let sideLyricsHStackSpacing: CGFloat = 20
-let sideLyricsCombinedInset: CGFloat = 40
+/// Layout budgets applied to the home view only while the side lyrics panel is active
+enum SideLyricsLayout {
+    /// Room the standard player needs for its album art and five-button control row
+    static let minimumPlayerWidth: CGFloat = 380
+
+    /// Room the webcam mirror needs to stay usable next to the player
+    static let minimumMirrorWidth: CGFloat = 220
+
+    /// Spacing between the player, mirror, and lyrics panel columns
+    static let hStackSpacing: CGFloat = 20
+
+    /// Combined home-view and notch content insets surrounding those columns
+    static let combinedInset: CGFloat = 40
+}
 
 func sideLyricsRequiredNotchWidth() -> CGFloat {
     guard Defaults[.enableLyrics],
@@ -45,17 +53,17 @@ func sideLyricsRequiredNotchWidth() -> CGFloat {
     let panelWidth = max(0, Defaults[.lyricsPanelWidth])
     let offsetDistance = abs(Defaults[.lyricsPanelOffset])
     let mirrorWidth = Defaults[.showMirror] && WebcamManager.shared.cameraAvailable
-        ? sideLyricsMinimumMirrorWidth + sideLyricsHStackSpacing
+        ? SideLyricsLayout.minimumMirrorWidth + SideLyricsLayout.hStackSpacing
         : 0
 
     // Include the home-view and notch content insets so the player receives
     // the same usable width it had before the panel was added.
-    return sideLyricsMinimumPlayerWidth
+    return SideLyricsLayout.minimumPlayerWidth
         + panelWidth
-        + sideLyricsHStackSpacing
+        + SideLyricsLayout.hStackSpacing
         + offsetDistance
         + mirrorWidth
-        + sideLyricsCombinedInset
+        + SideLyricsLayout.combinedInset
 }
 
 var openNotchSize: CGSize {

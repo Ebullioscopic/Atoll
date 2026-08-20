@@ -174,6 +174,7 @@ struct LyricsSidePanelView: View {
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @State private var suppressionToken = UUID()
     @State private var isSuppressing = false
+    @State private var lyrics: [(index: Int, lyric: LyricLine)] = []
 
     private var artistLineColor: Color {
         Defaults[.playerColorTinting]
@@ -189,8 +190,8 @@ struct LyricsSidePanelView: View {
         )
     }
 
-    private var lyrics: [(index: Int, lyric: LyricLine)] {
-        musicManager.syncedLyrics.enumerated().compactMap { index, lyric in
+    private static func nonEmptyLines(in lines: [LyricLine]) -> [(index: Int, lyric: LyricLine)] {
+        lines.enumerated().compactMap { index, lyric in
             guard !lyric.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return nil
             }
@@ -199,8 +200,6 @@ struct LyricsSidePanelView: View {
     }
 
     var body: some View {
-        let lyrics = self.lyrics
-
         VStack(alignment: .leading, spacing: 0) {
             Text("Lyrics")
                 .font(.headline)
@@ -239,6 +238,7 @@ struct LyricsSidePanelView: View {
                 }
                 .scrollIndicators(.never)
                 .onAppear {
+                    lyrics = Self.nonEmptyLines(in: musicManager.syncedLyrics)
                     let index = musicManager.currentLyricIndex
                     guard index >= 0, index < musicManager.syncedLyrics.count else { return }
                     DispatchQueue.main.async {
@@ -256,6 +256,9 @@ struct LyricsSidePanelView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.black.opacity(0.3))
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .onChange(of: musicManager.syncedLyrics) { _, newLyrics in
+            lyrics = Self.nonEmptyLines(in: newLyrics)
+        }
         .onHover { hovering in
             updateSuppression(for: hovering)
         }
@@ -844,7 +847,7 @@ struct NotchHomeView: View {
             } else if shouldShowSideLyrics {
                 sideLyricsContent
             } else {
-                HStack(alignment: .top, spacing: sideLyricsHStackSpacing) {
+                HStack(alignment: .top, spacing: SideLyricsLayout.hStackSpacing) {
                     // Normal mode: Show full music player with optional calendar and webcam
                     if shouldShowMusicPlayer {
                         MusicPlayerView(albumArtNamespace: albumArtNamespace)
@@ -880,9 +883,9 @@ struct NotchHomeView: View {
     }
 
     private var sideLyricsContent: some View {
-        HStack(alignment: .top, spacing: sideLyricsHStackSpacing) {
+        HStack(alignment: .top, spacing: SideLyricsLayout.hStackSpacing) {
             MusicPlayerView(albumArtNamespace: albumArtNamespace)
-                .frame(minWidth: sideLyricsMinimumPlayerWidth, maxWidth: .infinity, alignment: .leading)
+                .frame(minWidth: SideLyricsLayout.minimumPlayerWidth, maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
 
             LyricsSidePanelView()
@@ -892,7 +895,7 @@ struct NotchHomeView: View {
 
             if mirrorIsVisible {
                 cameraPreview
-                    .frame(minWidth: sideLyricsMinimumMirrorWidth, maxWidth: .infinity)
+                    .frame(minWidth: SideLyricsLayout.minimumMirrorWidth, maxWidth: .infinity)
             }
         }
     }

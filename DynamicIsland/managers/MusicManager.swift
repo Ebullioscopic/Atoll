@@ -27,7 +27,7 @@ import Foundation
 import SwiftUI
 
 // MARK: - Lyric Data Structures
-struct LyricLine: Identifiable, Codable {
+struct LyricLine: Identifiable, Codable, Equatable {
     let id = UUID()
     let timestamp: TimeInterval
     let text: String
@@ -35,6 +35,12 @@ struct LyricLine: Identifiable, Codable {
     init(timestamp: TimeInterval, text: String) {
         self.timestamp = timestamp
         self.text = text
+    }
+
+    // Compares content only; `id` is regenerated per instance, so identical
+    // lyrics parsed twice would otherwise never compare equal
+    static func == (lhs: LyricLine, rhs: LyricLine) -> Bool {
+        lhs.timestamp == rhs.timestamp && lhs.text == rhs.text
     }
 }
 
