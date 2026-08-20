@@ -45,7 +45,9 @@ struct LockScreenMusicPanel: View {
     @State private var lastDragged: Date = .distantPast
     @State private var isActive = true
     @State private var isExpanded = false
-    @State private var isVolumeSliderVisible = false
+    /// The output picker (device list) — the volume slider is no longer tied
+    /// to it and stays on screen whenever the panel does.
+    @State private var isOutputPickerVisible = false
     @State private var isAirPlayPopoverPresented = false
     @State private var isArtworkFullscreen = false
     
@@ -191,7 +193,7 @@ struct LockScreenMusicPanel: View {
         .onDisappear {
             isActive = false
             cancelCollapseTimer()
-            isVolumeSliderVisible = false
+            isOutputPickerVisible = false
             parallaxResumeWorkItem?.cancel()
             parallaxResumeWorkItem = nil
             isParallaxSuspended = false
@@ -207,12 +209,12 @@ struct LockScreenMusicPanel: View {
         .onChange(of: showMediaOutputControl) { _, enabled in
             if !enabled {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                    isVolumeSliderVisible = false
+                    isOutputPickerVisible = false
                 }
             }
             updatePanelSize()
         }
-        .onChange(of: isVolumeSliderVisible) { _, visible in
+        .onChange(of: isOutputPickerVisible) { _, visible in
             if useMergedAirPlayOutput {
                 if visible && musicManager.isAppleMusicActive {
                     Task { await airPlayManager.refreshDevices() }
@@ -821,11 +823,11 @@ struct LockScreenMusicPanel: View {
             icon: mediaOutputIcon,
             frameSize: frameSize,
             iconSize: iconSize,
-            iconColor: shouldShowVolumeSlider ? .accentColor : widgetAppearance.primary(opacity: 0.8),
-            backgroundOpacity: shouldShowVolumeSlider ? 0.22 : 0.0,
+            iconColor: isOutputPickerOpen ? .accentColor : widgetAppearance.primary(opacity: 0.8),
+            backgroundOpacity: isOutputPickerOpen ? 0.22 : 0.0,
             interaction: .none,
             symbolEffect: .replace,
-            action: toggleVolumeSlider
+            action: toggleOutputPicker
         )
         .accessibilityLabel("Media output")
     }
@@ -903,34 +905,21 @@ struct LockScreenMusicPanel: View {
     }
 
     private var volumeSlider: some View {
-        HStack(spacing: 14) {
-            Image(systemName: volumeIconName)
-                .font(.system(size: isExpanded ? 16 : 14, weight: .semibold))
-                .foregroundColor(widgetAppearance.primary(opacity: 0.8))
-
-            Slider(
-                value: Binding(
-                    get: { Double(volumeModel.level) },
-                    set: { newValue in
-                        registerInteraction()
-                        volumeModel.setVolume(Float(newValue))
-                    }
-                ),
-                in: 0 ... 1
-            )
-            .tint(sliderColor)
-
-            Text(volumePercentage)
-                .font(.system(size: isExpanded ? 12 : 11, weight: .medium, design: .monospaced))
-                .foregroundColor(widgetAppearance.primary(opacity: 0.7))
-                .frame(width: 48, alignment: .trailing)
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
-                .fill(sliderBackgroundFill)
+        // iOS draws this as a bare capsule between two speaker glyphs, with no
+        // surrounding card — the panel is the card.
+        VolumeCapsuleSlider(
+            value: Binding(
+                get: { Double(volumeModel.level) },
+                set: { newValue in
+                    registerInteraction()
+                    volumeModel.setVolume(Float(newValue))
+                }
+            ),
+            tint: widgetAppearance.primary(),
+            compact: !isExpanded,
+            onEditingChanged: { _ in registerInteraction() }
         )
+        .padding(.horizontal, isExpanded ? 6 : 4)
     }
 
     private var airPlaySection: some View {
@@ -1064,19 +1053,30 @@ struct LockScreenMusicPanel: View {
     }
 
     private var shouldShowAirPlay: Bool {
-        useMergedAirPlayOutput && shouldShowVolumeSlider && !airPlayManager.devices.isEmpty
+        useMergedAirPlayOutput && isOutputPickerOpen && !airPlayManager.devices.isEmpty
     }
 
     private var shouldShowRouteSelector: Bool {
-        !useMergedAirPlayOutput && shouldShowVolumeSlider
+        !useMergedAirPlayOutput && isOutputPickerOpen
     }
 
     private var shouldShowAccessorySection: Bool {
         shouldShowAirPlay || shouldShowRouteSelector
     }
 
+    /// Volume sits under the transport row for as long as the panel is up, the
+    /// way iOS shows it on the Lock Screen. It used to be hidden behind the
+    /// output button, which put the most-reached-for control two taps away —
+    /// and left nothing on screen at all when the volume keys were pressed,
+    /// since the notch HUD has nowhere to draw over the lock screen.
     private var shouldShowVolumeSlider: Bool {
-        showMediaOutputControl && isVolumeSliderVisible
+        showMediaOutputControl
+    }
+
+    /// The device list stays behind the output button, which is what that
+    /// button is for.
+    private var isOutputPickerOpen: Bool {
+        showMediaOutputControl && isOutputPickerVisible
     }
 
     private var sliderExtraHeight: CGFloat {
@@ -1144,14 +1144,14 @@ struct LockScreenMusicPanel: View {
         "\(Int(round(volumeModel.level * 100)))%"
     }
 
-    private func toggleVolumeSlider() {
+    private func toggleOutputPicker() {
         guard showMediaOutputControl else {
-            isVolumeSliderVisible = false
+            isOutputPickerVisible = false
             return
         }
 
         registerInteraction()
-        let newState = !isVolumeSliderVisible
+        let newState = !isOutputPickerVisible
         if newState {
             routeManager.refreshDevices()
             if useMergedAirPlayOutput {
@@ -1160,7 +1160,7 @@ struct LockScreenMusicPanel: View {
         }
 
         withAnimation(.easeInOut(duration: 0.24)) {
-            isVolumeSliderVisible = newState
+            isOutputPickerVisible = newState
         }
 
         updatePanelSize()

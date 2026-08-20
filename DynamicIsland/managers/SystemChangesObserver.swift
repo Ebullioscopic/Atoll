@@ -22,6 +22,27 @@ import Defaults
 import AppKit
 import AVFoundation
 
+/// Who draws the volume/brightness HUD, which depends on whether the Mac is
+/// locked.
+///
+/// None of this app's HUDs can be seen over the lock screen: the inline style
+/// lives in the notch, which is not on screen there, and the window-based
+/// styles sit below the lock screen shield. So while locked the app stands
+/// down and macOS's own HUD is unsuppressed instead — except when the lock
+/// screen music panel is up, which carries its own volume slider and would
+/// otherwise leave two indicators on screen at once.
+enum SystemHUDPlacement {
+    /// This app's HUDs are never shown while locked; something else covers it.
+    static func suppressesAppHUD(isLocked: Bool) -> Bool {
+        isLocked
+    }
+
+    /// True when macOS should be allowed to draw its own HUD again.
+    static func yieldsToNativeHUD(isLocked: Bool, lockScreenMusicPanelShowsVolume: Bool) -> Bool {
+        isLocked && !lockScreenMusicPanelShowsVolume
+    }
+}
+
 final class SystemChangesObserver: MediaKeyInterceptorDelegate {
     private weak var coordinator: DynamicIslandViewCoordinator?
     private let volumeController = SystemVolumeController.shared
@@ -222,6 +243,11 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
 
     @MainActor
     private func sendVolumeNotification(value: Float, isMuted: Bool) {
+        // Locked, macOS draws the HUD (or the lock screen music panel does), so
+        // stand down entirely — including the re-suppression below, which would
+        // otherwise silence the native HUD again on the next keypress.
+        guard !SystemHUDPlacement.suppressesAppHUD(isLocked: LockScreenManager.isLockedSnapshot) else { return }
+
         // The CoreAudio volume write wakes the native OSD; suppress it immediately
         // so only our notch HUD shows (parity with brightness). No-op unless active.
         SystemOSDManager.suppressNativeOSDNow()
@@ -276,6 +302,8 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
     }
 
     private func sendBrightnessNotification(value: Float) {
+        guard !SystemHUDPlacement.suppressesAppHUD(isLocked: LockScreenManager.isLockedSnapshot) else { return }
+
         // Send to Circular HUD if enabled
         if Defaults[.enableCircularHUD] && Defaults[.enableBrightnessHUD] {
             Task { @MainActor in
@@ -314,6 +342,8 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
     }
 
     private func sendKeyboardBacklightNotification(value: Float) {
+        guard !SystemHUDPlacement.suppressesAppHUD(isLocked: LockScreenManager.isLockedSnapshot) else { return }
+
         // Send to Circular HUD if enabled
         if Defaults[.enableCircularHUD] && Defaults[.enableKeyboardBacklightHUD] {
             Task { @MainActor in

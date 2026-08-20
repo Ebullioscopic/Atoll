@@ -321,6 +321,32 @@ class SystemHUDManager {
         isSystemOperationInProgress = false
     }
     
+    /// Hands the HUD to macOS while the Mac is locked, and takes it back on
+    /// unlock.
+    ///
+    /// None of this app's HUD styles can be seen over the lock screen — the
+    /// inline one lives in the notch, the others sit below the lock screen
+    /// shield — so suppressing the system HUD there left the volume keys with
+    /// no feedback at all. The exception is the lock screen music panel, which
+    /// carries its own slider; unsuppressing then would put two indicators on
+    /// screen at once.
+    @MainActor
+    func updateNativeHUDSuppressionForLockState(
+        isLocked: Bool,
+        lockScreenMusicPanelShowsVolume: Bool
+    ) {
+        guard isSetupComplete, changesObserver != nil else { return }
+
+        if SystemHUDPlacement.yieldsToNativeHUD(
+            isLocked: isLocked,
+            lockScreenMusicPanelShowsVolume: lockScreenMusicPanelShowsVolume
+        ) {
+            SystemOSDManager.enableSystemHUD()
+        } else {
+            SystemOSDManager.disableSystemHUD()
+        }
+    }
+
     @MainActor
     private func stopSystemObserver() async {
         guard !isSystemOperationInProgress else { return }
