@@ -180,6 +180,7 @@ class ClipboardManager: ObservableObject {
 
     private var timer: Timer?
     private var lastChangeCount: Int = 0
+    private var persistenceCancellable: AnyCancellable?
     
     // Use configurable history size from settings
     private var maxHistoryItems: Int {
@@ -210,6 +211,38 @@ class ClipboardManager: ObservableObject {
         lastChangeCount = NSPasteboard.general.changeCount
         loadHistoryFromDefaults()
         cleanupOldFiles()
+        observeHistoryPersistence()
+    }
+
+    /// Turning persistence off has to erase what is already on disk, otherwise
+    /// the setting would only stop *future* writes and leave the existing
+    /// history — the very thing the user asked not to keep — sitting in
+    /// UserDefaults until something happened to overwrite it.
+    private func observeHistoryPersistence() {
+        persistenceCancellable = Defaults.publisher(.persistClipboardHistory, options: [])
+            .sink { [weak self] change in
+                guard let self else { return }
+                if change.newValue {
+                    // Adopt the session's history as the new saved state.
+                    self.saveHistoryToDefaults()
+                } else {
+                    ClipboardManager.removeStoredHistory()
+                }
+            }
+    }
+
+    private static func removeStoredHistory() {
+        UserDefaults.standard.removeObject(forKey: "ClipboardHistory")
+    }
+
+    /// Erases saved history at launch when persistence is off, without building
+    /// the manager. The instance is created lazily — often not until the user
+    /// opens the clipboard, sometimes never — so leaving this to `init` would
+    /// let history the user asked not to keep sit on disk for the whole
+    /// session.
+    static func purgeStoredHistoryIfPersistenceDisabled() {
+        guard !Defaults[.persistClipboardHistory] else { return }
+        removeStoredHistory()
     }
     
     deinit {
@@ -554,6 +587,12 @@ class ClipboardManager: ObservableObject {
     // MARK: - Persistence
     
     private func saveHistoryToDefaults() {
+        guard Defaults[.persistClipboardHistory] else {
+            // Keep the session's history in memory, but leave nothing behind.
+            ClipboardManager.removeStoredHistory()
+            return
+        }
+
         if let encoded = try? JSONEncoder().encode(clipboardHistory) {
             UserDefaults.standard.set(encoded, forKey: "ClipboardHistory")
         }
@@ -566,9 +605,15 @@ class ClipboardManager: ObservableObject {
     }
     
     private func loadHistoryFromDefaults() {
-        if let data = UserDefaults.standard.data(forKey: "ClipboardHistory"),
-           let history = try? JSONDecoder().decode([ClipboardItem].self, from: data) {
-            clipboardHistory = history
+        if Defaults[.persistClipboardHistory] {
+            if let data = UserDefaults.standard.data(forKey: "ClipboardHistory"),
+               let history = try? JSONDecoder().decode([ClipboardItem].self, from: data) {
+                clipboardHistory = history
+            }
+        } else {
+            // Covers history stored before the setting was turned off, and any
+            // written by an older build that did not know about it.
+            ClipboardManager.removeStoredHistory()
         }
         
         if let data = UserDefaults.standard.data(forKey: "ClipboardPinnedItems"),

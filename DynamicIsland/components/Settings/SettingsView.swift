@@ -903,6 +903,7 @@ struct SettingsView: View {
             // Clipboard
             SettingsSearchEntry(tab: .clipboard, title: "Enable Clipboard Manager", keywords: ["clipboard", "manager"], highlightID: SettingsTab.clipboard.highlightID(for: "Enable Clipboard Manager")),
             SettingsSearchEntry(tab: .clipboard, title: "Show Clipboard Icon", keywords: ["icon", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Show Clipboard Icon")),
+            SettingsSearchEntry(tab: .clipboard, title: "Save History Across Restarts", keywords: ["clipboard", "history", "save", "persist", "privacy", "disk", "disable"], highlightID: SettingsTab.clipboard.highlightID(for: "Save History Across Restarts")),
             SettingsSearchEntry(tab: .clipboard, title: "Display Mode", keywords: ["list", "grid", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Display Mode")),
             SettingsSearchEntry(tab: .clipboard, title: "History Size", keywords: ["history", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "History Size")),
 
@@ -7549,6 +7550,17 @@ struct ClipboardSettings: View {
             }
 
             if enableClipboardManager {
+                Section {
+                    Defaults.Toggle(key: .persistClipboardHistory) {
+                        Text("Save History Across Restarts")
+                    }
+                    .settingsHighlight(id: highlightID("Save History Across Restarts"))
+                } header: {
+                    Text("Privacy")
+                } footer: {
+                    Text("When off, clipboard history is kept in memory for this session only and is never written to disk. Turning it off also erases history that was already saved. Pinned items are kept either way.")
+                }
+
                 Section {
                     Defaults.Toggle(key: .showClipboardIcon) {
                         Text("Show Clipboard Icon")
