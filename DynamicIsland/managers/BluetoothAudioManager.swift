@@ -2886,7 +2886,11 @@ extension BluetoothAudioDeviceType {
                 extent = declaredSize
             }
 
-            guard extent >= 8, offset + extent <= fileSize else { return false }
+            // Subtract rather than add: `extent` comes straight off the file
+            // and can be UInt64.max, and `offset + extent` would trap before
+            // the bound is ever tested. The loop condition keeps
+            // `offset <= fileSize`, so this cannot underflow.
+            guard extent >= 8, extent <= fileSize - offset else { return false }
             if atomType == "moov" { sawMovieAtom = true }
             offset += extent
         }
