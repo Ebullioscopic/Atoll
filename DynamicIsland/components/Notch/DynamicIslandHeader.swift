@@ -36,6 +36,7 @@ struct DynamicIslandHeader: View {
     @Default(.showClipboardIcon) var showClipboardIcon
     @Default(.showColorPickerIcon) var showColorPickerIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
+    @Default(.clipboardProvider) var clipboardProvider
     @Default(.showBatteryIndicator) var showBatteryIndicator
     @Default(.showBatteryPercentInside) var showBatteryPercentInside
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
@@ -90,8 +91,15 @@ struct DynamicIslandHeader: View {
                     
                     if Defaults[.enableClipboardManager]
                         && showClipboardIcon
-                        && clipboardDisplayMode != .separateTab {
+                        // With an external provider the icon is the way into that app,
+                        // so it stays put no matter which built-in display mode is set.
+                        // (`clipboardProvider` is observed so this re-evaluates on change.)
+                        && (ClipboardProviderManager.resolvedProvider.isExternal
+                            || clipboardDisplayMode != .separateTab) {
                         Button(action: {
+                            // An external clipboard app takes the tap instead of Atoll's own UI.
+                            if ClipboardProviderManager.handleClipboardTrigger() { return }
+
                             // Switch behavior based on display mode
                             switch clipboardDisplayMode {
                             case .panel:
@@ -133,7 +141,8 @@ struct DynamicIslandHeader: View {
                             }
                         }
                         .onAppear {
-                            if Defaults[.enableClipboardManager] && !clipboardManager.isMonitoring {
+                            // Skip polling while another app owns the clipboard history.
+                            if ClipboardProviderManager.usesBuiltInClipboard && !clipboardManager.isMonitoring {
                                 clipboardManager.startMonitoring()
                             }
                         }
@@ -282,6 +291,7 @@ struct DynamicIslandHeader: View {
         .onChange(of: coordinator.shouldToggleClipboardPopover) { _ in
             // Only toggle if clipboard is enabled
             if Defaults[.enableClipboardManager] {
+                if ClipboardProviderManager.handleClipboardTrigger() { return }
                 switch clipboardDisplayMode {
                 case .panel:
                     ClipboardPanelManager.shared.toggleClipboardPanel()

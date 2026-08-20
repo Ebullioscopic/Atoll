@@ -104,7 +104,8 @@ struct NotchClipboardView: View {
             vm.setAutoCloseSuppression(isShowing, token: autoCloseToken)
         }
         .onAppear {
-            if Defaults[.enableClipboardManager], !clipboardManager.isMonitoring {
+            // Skip polling while another app owns the clipboard history.
+            if ClipboardProviderManager.usesBuiltInClipboard, !clipboardManager.isMonitoring {
                 clipboardManager.startMonitoring()
             }
         }

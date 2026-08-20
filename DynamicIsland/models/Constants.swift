@@ -329,6 +329,53 @@ enum ClipboardDisplayMode: String, CaseIterable, Codable, Defaults.Serializable 
     }
 }
 
+/// Which app backs Atoll's clipboard history.
+///
+/// Atoll ships its own manager and stays the default, but people who already live in a
+/// dedicated clipboard app can hand the feature over to it: every clipboard trigger
+/// (notch button, keyboard shortcut) then opens that app instead of Atoll's own UI.
+enum ClipboardProvider: String, CaseIterable, Codable, Defaults.Serializable, Identifiable {
+    case builtIn = "builtIn"
+    case maccy = "maccy"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .builtIn: return String(localized: "Atoll (built-in)")
+        case .maccy: return "Maccy"
+        }
+    }
+
+    /// True for anything that isn't Atoll's own clipboard manager.
+    var isExternal: Bool { self != .builtIn }
+
+    /// Bundle identifiers to try when detecting the app and looking up its icon.
+    var bundleIdentifiers: [String] {
+        switch self {
+        case .builtIn: return []
+        case .maccy: return ["org.p0deje.Maccy"]
+        }
+    }
+
+    /// Where to send the user when the app isn't installed yet.
+    var downloadURL: URL? {
+        switch self {
+        case .builtIn: return nil
+        case .maccy: return URL(string: "https://maccy.app")
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .builtIn:
+            return "Atoll keeps its own clipboard history and shows it in the notch."
+        case .maccy:
+            return "Maccy handles the clipboard. Atoll's own history and clipboard shortcut are turned off."
+        }
+    }
+}
+
 enum ScreenAssistantDisplayMode: String, CaseIterable, Codable, Defaults.Serializable {
     case popover = "popover"     // Traditional popover attached to button
     case panel = "panel"         // Floating panel near notch
@@ -1199,6 +1246,7 @@ extension Defaults.Keys {
     static let clipboardHistorySize = Key<Int>("clipboardHistorySize", default: 3)
     static let showClipboardIcon = Key<Bool>("showClipboardIcon", default: true)
     static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .panel)
+    static let clipboardProvider = Key<ClipboardProvider>("clipboardProvider", default: .builtIn)
     
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)

@@ -235,6 +235,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
             Defaults.publisher(.enableNotes).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableClipboardManager).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.clipboardDisplayMode).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.clipboardProvider).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableTerminalFeature).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableMinimalisticUI).map { _ in () }.eraseToAnyPublisher()
         )

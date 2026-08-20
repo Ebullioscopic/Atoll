@@ -677,6 +677,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup Lunar integration
         LunarManager.shared.configure(coordinator: coordinator)
+
+        // Bring up the clipboard provider router so it can detect an external clipboard
+        // app (Maccy) and keep Atoll's own polling in step with the user's choice.
+        ClipboardProviderManager.shared.refreshDetectionStatus()
         
         // Setup ScreenRecording Manager
         if Defaults[.enableScreenRecordingDetection] && !AppRuntimeEnvironment.isUITesting {
@@ -957,6 +961,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         KeyboardShortcuts.isEnabled = Defaults[.enableShortcuts]
         registerOptionalShortcutHandlers()
+
+        // Must follow the registration above: an external clipboard app owns the clipboard
+        // hotkey, so Atoll releases its own to avoid two apps answering one key press.
+        ClipboardProviderManager.shared.syncShortcutRegistration()
         updateFeatureShortcutAvailability()
 
         if !Defaults[.showOnAllDisplays] {
@@ -1281,6 +1289,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyDown(for: .clipboardHistoryPanel) { [weak self] in
             guard let self else { return }
             guard Defaults[.enableShortcuts], Defaults[.enableClipboardManager] else { return }
+
+            // An external clipboard app owns the feature: hand the shortcut to it and
+            // skip Atoll's own history entirely.
+            if ClipboardProviderManager.handleClipboardTrigger() { return }
 
             if !ClipboardManager.shared.isMonitoring {
                 ClipboardManager.shared.startMonitoring()
