@@ -781,7 +781,9 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .media, title: "Music Source", keywords: ["media source", "controller"], highlightID: SettingsTab.media.highlightID(for: "Music Source")),
             SettingsSearchEntry(tab: .media, title: "Skip buttons", keywords: ["skip", "controls", "±10"], highlightID: SettingsTab.media.highlightID(for: "Skip buttons")),
             SettingsSearchEntry(tab: .media, title: "Sneak Peek Style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak Peek Style")),
-            SettingsSearchEntry(tab: .media, title: "Enable lyrics", keywords: ["lyrics", "song text"], highlightID: SettingsTab.media.highlightID(for: "Enable lyrics")),
+            SettingsSearchEntry(tab: .media, title: "Show lyrics on the side (requires calendar off)", keywords: ["lyrics", "song text", "side panel", "calendar"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics on the side (requires calendar off)")),
+            SettingsSearchEntry(tab: .media, title: "Side lyrics width", keywords: ["lyrics", "width", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics width")),
+            SettingsSearchEntry(tab: .media, title: "Side lyrics horizontal offset", keywords: ["lyrics", "offset", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics horizontal offset")),
             SettingsSearchEntry(tab: .media, title: "Show live canvas in Dynamic Island", keywords: ["canvas", "live canvas", "album art", "dynamic island", "spotify canvas"], highlightID: SettingsTab.media.highlightID(for: "Show live canvas in Dynamic Island")),
             SettingsSearchEntry(tab: .media, title: "Auto-hide inactive notch media player", keywords: ["auto hide", "inactive", "placeholder", "notch media"], highlightID: SettingsTab.media.highlightID(for: "Auto-hide inactive notch media player")),
             SettingsSearchEntry(tab: .media, title: "Show Change Media Output control", keywords: ["airplay", "route picker", "media output"], highlightID: SettingsTab.media.highlightID(for: "Show Change Media Output control")),
@@ -2773,6 +2775,10 @@ struct Media: View {
     @Default(.lockScreenMusicFullscreenArtworkEnabled) private var lockScreenMusicFullscreenArtworkEnabled
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
+    @Default(.showCalendar) private var showCalendar
+    @Default(.enableLyrics) private var enableLyrics
+    @Default(.lyricsPanelWidth) private var lyricsPanelWidth
+    @Default(.lyricsPanelOffset) private var lyricsPanelOffset
     @Default(.visualizerBarCount) private var visualizerBarCount
     @Default(.enableWaveformScrubber) private var enableWaveformScrubber
     @Default(.colorExtractionMode) private var colorExtractionMode
@@ -2930,9 +2936,60 @@ struct Media: View {
                 Toggle("Show sneak peek on playback changes", isOn: $showSneakPeekOnTrackChange)
                     .disabled(!enableSneakPeek)
                 Defaults.Toggle(key: .enableLyrics) {
-                    Text("Enable lyrics")
+                    Text("Show lyrics on the side (requires calendar off)")
                 }
-                .settingsHighlight(id: highlightID("Enable lyrics"))
+                .disabled(showCalendar || enableMinimalisticUI || !showStandardMediaControls)
+                .opacity(showCalendar || enableMinimalisticUI || !showStandardMediaControls ? 0.5 : 1)
+                .help(
+                    showCalendar
+                        ? "Disable the calendar to show lyrics in the side panel."
+                        : enableMinimalisticUI
+                            ? "Disable Minimalistic UI to show lyrics in the side panel."
+                            : !showStandardMediaControls
+                                ? "Enable Dynamic Island media controls to show lyrics in the side panel."
+                                : ""
+                )
+                .settingsHighlight(id: highlightID("Show lyrics on the side (requires calendar off)"))
+                if showCalendar {
+                    Text("Disable the calendar to use side lyrics.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if enableMinimalisticUI {
+                    Text("Disable Minimalistic UI to use side lyrics.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if !showStandardMediaControls {
+                    Text("Enable Dynamic Island media controls to use side lyrics.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if enableLyrics && !enableMinimalisticUI && !showCalendar && showStandardMediaControls {
+                    Slider(value: $lyricsPanelWidth, in: 180...420, step: 10) {
+                        HStack {
+                            Text("Side lyrics width")
+                            Spacer()
+                            Text("\(Int(lyricsPanelWidth)) px")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: highlightID("Side lyrics width"))
+
+                    Slider(value: $lyricsPanelOffset, in: -100...100, step: 1) {
+                        HStack {
+                            Text("Side lyrics horizontal offset")
+                            Spacer()
+                            Text("\(lyricsPanelOffset >= 0 ? "+" : "")\(Int(lyricsPanelOffset)) px")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: highlightID("Side lyrics horizontal offset"))
+
+                    Text("These controls apply when the calendar is disabled.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Defaults.Toggle(key: .showLiveCanvasInDynamicIsland) {
                     Text("Show live canvas in Dynamic Island")
                 }
@@ -3123,6 +3180,7 @@ struct Media: View {
 struct CalendarSettings: View {
     @ObservedObject private var calendarManager = CalendarManager.shared
     @Default(.showCalendar) var showCalendar: Bool
+    @Default(.enableLyrics) private var enableLyrics
     @Default(.enableReminderLiveActivity) var enableReminderLiveActivity
     @Default(.reminderPresentationStyle) var reminderPresentationStyle
     @Default(.reminderLeadTime) var reminderLeadTime
@@ -3220,7 +3278,15 @@ struct CalendarSettings: View {
                 Defaults.Toggle(key: .showCalendar) {
                     Text("Show calendar")
                 }
+                .disabled(enableLyrics)
+                .opacity(enableLyrics ? 0.5 : 1)
+                .help(enableLyrics ? "Disable side lyrics to show the calendar." : "")
                 .settingsHighlight(id: highlightID("Show calendar"))
+                if enableLyrics {
+                    Text("Disable side lyrics to use the calendar.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Section(header: Text("Event List")) {
                     Toggle("Hide completed reminders", isOn: $hideCompletedReminders)
@@ -6769,16 +6835,6 @@ struct TimerSettings: View {
             timerPresetsSection
             timerSoundSection
         }
-        .onAppear {
-            if showsLabel {
-                controlWindowEnabled = false
-            }
-        }
-        .onChange(of: showsLabel) { _, show in
-            if show {
-                controlWindowEnabled = false
-            }
-        }
     }
 
     @ViewBuilder
@@ -6915,9 +6971,9 @@ struct TimerSettings: View {
             Toggle("Show preset list in timer tab", isOn: $showTimerPresetsInNotchTab)
                 .settingsHighlight(id: highlightID("Show preset list in timer tab"))
 
-            Toggle("Show floating pause/stop controls", isOn: $controlWindowEnabled)
-                .disabled(showsLabel)
-                .help("These controls sit beside the notch while a timer runs. They require the timer name to stay hidden for spacing.")
+            Toggle("Show pause/stop controls in the notch", isOn: $controlWindowEnabled)
+                .help("Pause and stop buttons appear inline inside the notch while a timer runs.")
+                .settingsHighlight(id: highlightID("Show pause/stop controls in the notch"))
 
             Picker("Progress style", selection: $progressStyle) {
                 ForEach(TimerProgressStyle.allCases) { style in

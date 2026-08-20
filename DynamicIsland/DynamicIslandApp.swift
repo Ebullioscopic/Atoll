@@ -656,6 +656,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let newY = (screenFrame.maxY + topBleed - clampedHeight).rounded()
         let targetFrame = NSRect(x: newX, y: newY, width: clampedWidth, height: clampedHeight)
 
+        // `open()` intentionally requests a forced resize so every display is
+        // considered, but an unchanged frame still needs no AppKit display
+        // transaction. Avoiding that no-op matters during hover/click opens.
+        guard window.frame != targetFrame else { return }
         window.setFrame(targetFrame, display: true)
     }
 
