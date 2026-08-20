@@ -2825,45 +2825,75 @@ extension BluetoothAudioDeviceType {
         return candidates.first { BluetoothAudioDeviceType.isPlayableMovieFile(at: $0) }
     }
 
-    private static let movieAtomTypes: Set<String> = ["ftyp", "moov", "mdat", "free", "skip", "wide", "pnot"]
+    /// Atom types a QuickTime/ISO BMFF file may legitimately start with. Only
+    /// the *first* atom is checked against this list — enough to reject a text
+    /// file such as an un-fetched Git LFS pointer — because a valid container
+    /// may carry all sorts of top-level atoms after it, and rejecting an
+    /// unfamiliar one would silently disable a perfectly good animation.
+    private static let leadingAtomTypes: Set<String> = ["ftyp", "moov", "mdat", "free", "skip", "wide", "pnot"]
 
-    /// Header sniff for a QuickTime/ISO BMFF container: a 4-byte atom size, a
-    /// 4-character atom type, and — when the size is extended — a 64-bit size.
+    /// Walks the top-level atom chain and reports whether the file is a
+    /// structurally complete movie.
     ///
-    /// Both halves matter. The type alone would accept a truncated or malformed
-    /// file that happens to carry a plausible four characters at offset 4, and
-    /// such a file reaches the player and draws nothing, which is exactly the
-    /// failure this guard exists to prevent.
+    /// The chain must tile the file exactly and include a `moov`, which is
+    /// where the playable metadata lives; in these assets it is the last atom,
+    /// so the walk necessarily reaches EOF. This rejects both an un-fetched Git
+    /// LFS pointer and a truncated or header-only file, either of which would
+    /// otherwise reach the player and draw nothing.
     private static func isPlayableMovieFile(at url: URL) -> Bool {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
         defer { try? handle.close() }
 
-        guard let header = try? handle.read(upToCount: 16), header.count >= 8 else { return false }
-        let bytes = [UInt8](header)
-
-        guard let atomType = String(bytes: bytes[4 ..< 8], encoding: .ascii),
-              movieAtomTypes.contains(atomType) else { return false }
-
         guard let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(UInt64.init),
               fileSize >= 8 else { return false }
 
-        let declaredSize = bytes[0 ..< 4].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+        var offset: UInt64 = 0
+        var sawMovieAtom = false
+        var atomCount = 0
+        // These are small bundled assets; a chain this long means something is
+        // wrong, and the bound keeps a malformed file from spinning here.
+        let atomLimit = 128
 
-        switch declaredSize {
-        case 0:
-            // The atom runs to the end of the file.
-            return true
-        case 1:
-            // Extended size: the real length is the next 64 bits.
-            guard bytes.count >= 16 else { return false }
-            let extendedSize = bytes[8 ..< 16].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
-            return extendedSize >= 16 && extendedSize <= fileSize
-        case 2 ... 7:
-            // Smaller than the header it must contain.
-            return false
-        default:
-            return declaredSize <= fileSize
+        while offset + 8 <= fileSize {
+            atomCount += 1
+            guard atomCount <= atomLimit else { return false }
+
+            guard (try? handle.seek(toOffset: offset)) != nil,
+                  let header = try? handle.read(upToCount: 16),
+                  header.count >= 8 else { return false }
+            let bytes = [UInt8](header)
+
+            guard let atomType = String(bytes: bytes[4 ..< 8], encoding: .ascii),
+                  atomType.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value <= 0x7E }) else { return false }
+            if offset == 0, !leadingAtomTypes.contains(atomType) { return false }
+
+            let declaredSize = bytes[0 ..< 4].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+            let extent: UInt64
+
+            switch declaredSize {
+            case 0:
+                // The atom runs to the end of the file.
+                extent = fileSize - offset
+            case 1:
+                // Extended size: the real length is the next 64 bits.
+                guard bytes.count >= 16 else { return false }
+                extent = bytes[8 ..< 16].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+                guard extent >= 16 else { return false }
+            case 2 ... 7:
+                // Smaller than the header it must contain.
+                return false
+            default:
+                extent = declaredSize
+            }
+
+            guard extent >= 8, offset + extent <= fileSize else { return false }
+            if atomType == "moov" { sawMovieAtom = true }
+            offset += extent
         }
+
+        // The chain has to account for the whole file, with the movie metadata
+        // present — a header-only file tiles cleanly but cannot play.
+        return sawMovieAtom && offset == fileSize
     }
 
     var isAirPods: Bool {
