@@ -2286,8 +2286,14 @@ struct ContentView: View {
             return false
         }
 
-        let height = vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0) + 6
-        let width = max(vm.closedNotchSize.width + (isHovering ? 8 : 0), 96) + 24
+        let closedHeight = vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0)
+        let closedWidth = max(vm.closedNotchSize.width + (isHovering ? 8 : 0), 96)
+        let recordingSize = recordingHUDLayout.size(
+            closedNotchSize: vm.closedNotchSize,
+            effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+        )
+        let height = max(closedHeight, recordingSize?.height ?? 0) + 6
+        let width = max(closedWidth, recordingSize?.width ?? 0) + 24
         let minX = screen.frame.midX - width / 2
         let minY = screen.frame.maxY - height
 

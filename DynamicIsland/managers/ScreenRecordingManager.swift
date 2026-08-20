@@ -80,16 +80,26 @@ protocol ScreenRecordingStopControlling {
 
 struct NativeScreenRecordingStopController: ScreenRecordingStopControlling {
     func requestStop() async {
-        sendStopRecordingShortcut()
+        await sendStopRecordingShortcutViaSystemEvents()
 
         if Task.isCancelled { return }
+        try? await Task.sleep(for: .milliseconds(120))
+        await sendStopRecordingShortcutViaCGEvent()
+
+        if Task.isCancelled { return }
+        try? await Task.sleep(for: .milliseconds(300))
         await sendStopRecordingShortcutViaSystemEvents()
     }
 
     private func sendStopRecordingShortcutViaSystemEvents() async {
         let script = """
         tell application "System Events"
-            key code 53 using {command down, control down}
+            key down command
+            key down control
+            key code 53
+            delay 0.05
+            key up control
+            key up command
         end tell
         """
 
@@ -101,7 +111,7 @@ struct NativeScreenRecordingStopController: ScreenRecordingStopControlling {
         }
     }
 
-    private func sendStopRecordingShortcut() {
+    private func sendStopRecordingShortcutViaCGEvent() async {
         guard let source = CGEventSource(stateID: .hidSystemState) else {
             screenRecordingDebugLog("Unable to create CGEventSource for stop shortcut")
             return
@@ -116,9 +126,15 @@ struct NativeScreenRecordingStopController: ScreenRecordingStopControlling {
             keyDown?.flags = flags
             keyDown?.post(tap: tap)
 
+            try? await Task.sleep(for: .milliseconds(45))
+            guard !Task.isCancelled else { return }
+
             let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
             keyUp?.flags = flags
             keyUp?.post(tap: tap)
+
+            try? await Task.sleep(for: .milliseconds(80))
+            guard !Task.isCancelled else { return }
         }
 
         screenRecordingDebugLog("Sent Command-Control-Escape CGEvent stop shortcut")
@@ -200,10 +216,11 @@ class ScreenRecordingManager: ObservableObject {
             await stopController.requestStop()
             guard !Task.isCancelled else { return }
 
-            // Poll the status up to 6 times with 200ms intervals (1.2 seconds max) to handle OS delay
+            // macOS can take a few seconds to publish the stopped state after
+            // accepting the native screen recording shortcut.
             var attempts = 0
-            while attempts < 6 {
-                try? await Task.sleep(for: .milliseconds(200))
+            while attempts < 20 {
+                try? await Task.sleep(for: .milliseconds(250))
                 guard !Task.isCancelled else { return }
 
                 checkRecordingStatus()
