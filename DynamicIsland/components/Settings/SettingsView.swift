@@ -1062,6 +1062,8 @@ struct GeneralSettings: View {
     @Default(.openNotchOnHover) var openNotchOnHover
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
+    @Default(.showKeepScreenAwakeIcon) var showKeepScreenAwakeIcon
+    @Default(.showPreventLidSleepIcon) var showPreventLidSleepIcon
     @Default(.enableHorizontalMusicGestures) var enableHorizontalMusicGestures
     @Default(.musicGestureBehavior) var musicGestureBehavior
     @Default(.reverseSwipeGestures) var reverseSwipeGestures
@@ -1102,6 +1104,54 @@ struct GeneralSettings: View {
                 Text("UI Mode")
             } footer: {
                 Text("Minimalistic mode focuses on media controls and system HUDs, hiding all extra features for a clean, focused experience. Automatically enables simpler animations.")
+            }
+
+            Section {
+                Defaults.Toggle(key: .showKeepScreenAwakeIcon) {
+                    Text("Keep screen awake")
+                }
+                // Hiding the icon removes its off-switch in the notch while the feature stays on —
+                // so drop the underlying assertion at the same time.
+                .onChange(of: showKeepScreenAwakeIcon) {
+                    if !showKeepScreenAwakeIcon {
+                        PowerManagementManager.shared.setKeepScreenAwake(false)
+                    }
+                }
+                .settingsHighlight(id: highlightID("Keep screen awake"))
+
+                Defaults.Toggle(key: .showPreventLidSleepIcon) {
+                    Text("Stay awake with the lid closed")
+                }
+                // Likewise: hiding the icon also revokes stay-awake-with-lid-closed, so the machine
+                // isn't left in a "won't sleep on lid close" state.
+                .onChange(of: showPreventLidSleepIcon) {
+                    if !showPreventLidSleepIcon {
+                        PowerManagementManager.shared.setPreventLidSleep(false)
+                    }
+                }
+                .settingsHighlight(id: highlightID("Stay awake with the lid closed"))
+
+                Text("Closing the lid while this is on keeps the Mac running. Do not put it in a bag - it can overheat.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Defaults.Toggle(key: .showScreenCleaningIcon) {
+                    Text("Clean screen")
+                }
+                .settingsHighlight(id: highlightID("Clean screen"))
+
+                Defaults.Toggle(key: .showKeyboardCleaningIcon) {
+                    Text("Clean keyboard")
+                }
+                .settingsHighlight(id: highlightID("Clean keyboard"))
+
+                Text("Cleaning the keyboard blocks key presses and needs Accessibility permission. Click anywhere to finish; it also stops on its own after two minutes.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Power & cleaning")
+            } footer: {
+                Text("These toggles appear in the notch header. They are never restored after a restart.")
             }
 
             Section {

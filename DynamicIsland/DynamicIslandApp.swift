@@ -294,6 +294,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // synchronously here so it is never left frozen. (See issue #568.)
         SystemOSDManager.resumeOSDUIHelperForTermination()
 
+        // Release the power assertions and the lid-sleep override, and exit cleaning mode —
+        // clean-keyboard especially, so the process can never die holding the event tap and
+        // lock the keyboard.
+        PowerManagementManager.shared.shutdown()
+        KeyboardCleaningManager.shared.stop()
+        ScreenCleaningManager.shared.stop()
+
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
@@ -632,6 +639,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             userInfo: userInfo,
             deliverImmediately: true
         )
+
+        // Clear any "stay awake with lid closed" kernel state that may have leaked from an
+        // abnormal exit last time (see resetClamshellStateOnLaunch).
+        PowerManagementManager.shared.resetClamshellStateOnLaunch()
 
         LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
         LockScreenManager.shared.configure(viewModel: vm)

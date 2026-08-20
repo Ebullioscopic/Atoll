@@ -1200,6 +1200,16 @@ extension Defaults.Keys {
     static let showClipboardIcon = Key<Bool>("showClipboardIcon", default: true)
     static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .panel)
     
+    // MARK: Power & Cleaning Toggles
+    // These only control whether the icons show in the notch. Whether each of the four toggles
+    // is currently active is runtime state, intentionally not persisted: auto-restoring
+    // stay-awake-with-lid-closed after a reboot risks overheating, and the cleaning modes have
+    // even less reason to be restored.
+    static let showKeepScreenAwakeIcon = Key<Bool>("showKeepScreenAwakeIcon", default: true)
+    static let showPreventLidSleepIcon = Key<Bool>("showPreventLidSleepIcon", default: true)
+    static let showScreenCleaningIcon = Key<Bool>("showScreenCleaningIcon", default: true)
+    static let showKeyboardCleaningIcon = Key<Bool>("showKeyboardCleaningIcon", default: true)
+
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)
     static let screenAssistantDisplayMode = Key<ScreenAssistantDisplayMode>("screenAssistantDisplayMode", default: .panel)

@@ -28,6 +28,9 @@ struct DynamicIslandHeader: View {
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
+    @ObservedObject var powerManager = PowerManagementManager.shared
+    @ObservedObject var screenCleaningManager = ScreenCleaningManager.shared
+    @ObservedObject var keyboardCleaningManager = KeyboardCleaningManager.shared
     @State private var showClipboardPopover = false
     @State private var showColorPickerPopover = false
     @State private var showTimerPopover = false
@@ -205,6 +208,47 @@ struct DynamicIslandHeader: View {
                         }
                     }
                     
+                    // Power and cleaning quick toggles
+                    if Defaults[.showKeepScreenAwakeIcon] {
+                        QuickToggleButton(
+                            icon: "lock.open.laptopcomputer",
+                            isActive: powerManager.isKeepingScreenAwake,
+                            help: "Keep screen awake"
+                        ) {
+                            powerManager.toggleKeepScreenAwake()
+                        }
+                    }
+
+                    if Defaults[.showPreventLidSleepIcon] {
+                        QuickToggleButton(
+                            icon: "cup.and.saucer.fill",
+                            isActive: powerManager.isPreventingLidSleep,
+                            help: "Stay awake with the lid closed"
+                        ) {
+                            powerManager.togglePreventLidSleep()
+                        }
+                    }
+
+                    if Defaults[.showScreenCleaningIcon] {
+                        QuickToggleButton(
+                            icon: "sparkles.tv.fill",
+                            isActive: screenCleaningManager.isActive,
+                            help: "Clean screen"
+                        ) {
+                            screenCleaningManager.toggle()
+                        }
+                    }
+
+                    if Defaults[.showKeyboardCleaningIcon] {
+                        QuickToggleButton(
+                            icon: "keyboard.badge.eye",
+                            isActive: keyboardCleaningManager.isActive,
+                            help: "Clean keyboard"
+                        ) {
+                            keyboardCleaningManager.toggle()
+                        }
+                    }
+
                     if Defaults[.settingsIconInNotch] {
                         Button(action: {
                             SettingsWindowController.shared.showWindow()
@@ -333,6 +377,34 @@ private extension DynamicIslandHeader {
             && Defaults[.showClipboardIcon]
             && Defaults[.showColorPickerIcon]
             && Defaults[.enableTimerFeature]
+    }
+}
+
+/// Quick toggle button in the notch: same capsule styling as the existing camera/clipboard/color-picker
+/// buttons, just with an added "active" highlight state.
+private struct QuickToggleButton: View {
+    let icon: String
+    let isActive: Bool
+    let help: LocalizedStringKey
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Capsule()
+                .fill(.black)
+                .frame(width: 30, height: 30)
+                .overlay {
+                    Image(systemName: icon)
+                        .foregroundColor(isActive ? .accentColor : .white)
+                        .padding()
+                        .imageScale(.medium)
+                }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help(help)
+        // The active state is conveyed only by icon color, which VoiceOver can't hear; add a
+        // selected trait so it announces the toggle state.
+        .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 }
 
