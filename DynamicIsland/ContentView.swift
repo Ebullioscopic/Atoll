@@ -127,11 +127,11 @@ struct ContentView: View {
             return CGSize(width: max(baseSize.width, inlineWidth), height: baseSize.height)
         }
 
-        if recordingLiveActivityVisibleOnClosedNotch {
-            return CGSize(
-                width: vm.closedNotchSize.width + recordingHUDExtraWidth,
-                height: vm.effectiveClosedNotchHeight + recordingHUDExtraHeight
-            )
+        if let size = recordingHUDLayout.size(
+            closedNotchSize: vm.closedNotchSize,
+            effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+        ) {
+            return size
         }
         
         // Handle battery HUD expansion sizing
@@ -928,6 +928,13 @@ struct ContentView: View {
             .onChange(of: isHovering) { _, hovering in
                 if shouldShowMusicControlWindow() {
                     enqueueMusicControlWindowSync(forceRefresh: true, delay: hovering ? 0.05 : 0.12)
+                }
+            }
+            .onChange(of: recordingManager.isRecording) { _, isRecording in
+                if isRecording {
+                    stopHoverClickMonitor()
+                } else if isHovering && Defaults[.openNotchOnHover] {
+                    startHoverClickMonitor()
                 }
             }
             .onChange(of: musicManager.isPlaying) { _, isPlaying in
@@ -2082,6 +2089,7 @@ struct ContentView: View {
 
     private func startHoverClickMonitor() {
         guard Defaults[.openNotchOnHover] else { return }
+        guard !recordingLiveActivityVisibleOnClosedNotch else { return }
         guard hoverClickMonitor == nil else { return }
 
         let handleClick: @Sendable () -> Void = { [weak vm, weak lockScreenManager] in
@@ -2089,6 +2097,7 @@ struct ContentView: View {
                 guard let vm, let lockScreenManager else { return }
                 guard !lockScreenManager.isLocked else { return }
                 guard vm.notchState == .closed else { return }
+                guard !self.recordingOpenGestureLocked else { return }
                 guard !self.coordinator.isHoverOpenSuppressed else { return }
                 guard self.isHovering else { return }
                 guard !self.handleClosedMusicWaveformTapIfNeeded() else { return }
@@ -2178,7 +2187,9 @@ struct ContentView: View {
         hoverTask?.cancel()
 
         if hovering {
-            startHoverClickMonitor()
+            if !recordingLiveActivityVisibleOnClosedNotch {
+                startHoverClickMonitor()
+            }
             removeStickyTerminalClickMonitor()
         } else {
             stopHoverClickMonitor()
@@ -2202,6 +2213,7 @@ struct ContentView: View {
 
             guard vm.notchState == .closed,
                 !isSneakPeekVisibleOnCurrentScreen,
+                !recordingLiveActivityVisibleOnClosedNotch,
                 (Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
 
             hoverTask = Task {

@@ -18,34 +18,59 @@
 
 import CoreGraphics
 
+enum RecordingHUDPresentation: String, CaseIterable {
+    case compact
+    case inline
+    case expanded
+
+    var extraWidth: CGFloat {
+        switch self {
+        case .compact:
+            return 132
+        case .inline:
+            return 176
+        case .expanded:
+            return 140
+        }
+    }
+
+    var extraHeight: CGFloat {
+        self == .expanded ? 70 : 0
+    }
+}
+
 struct RecordingHUDLayout {
     let isVisible: Bool
     let stopControlsEnabled: Bool
     let hoverStyle: RecordingHoverStyle
     let expanded: Bool
 
-    var showsDefaultExpansion: Bool {
-        isVisible && stopControlsEnabled && expanded && hoverStyle == .default
-    }
-
-    var showsInlineExpansion: Bool {
-        isVisible && stopControlsEnabled && expanded && hoverStyle == .inline
-    }
-
-    var extraWidth: CGFloat {
-        guard isVisible else { return 0 }
-        guard stopControlsEnabled && expanded else { return 132 }
+    var presentation: RecordingHUDPresentation {
+        guard isVisible else { return .compact }
+        guard stopControlsEnabled && expanded else { return .compact }
 
         switch hoverStyle {
         case .default:
-            return 140
+            return .expanded
         case .inline:
-            return 176
+            return .inline
         }
     }
 
+    var showsDefaultExpansion: Bool {
+        isVisible && presentation == .expanded
+    }
+
+    var showsInlineExpansion: Bool {
+        isVisible && presentation == .inline
+    }
+
+    var extraWidth: CGFloat {
+        isVisible ? presentation.extraWidth : 0
+    }
+
     var extraHeight: CGFloat {
-        showsDefaultExpansion ? 70 : 0
+        isVisible ? presentation.extraHeight : 0
     }
 
     func size(closedNotchSize: CGSize, effectiveClosedNotchHeight: CGFloat) -> CGSize? {

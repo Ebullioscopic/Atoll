@@ -80,10 +80,10 @@ protocol ScreenRecordingStopControlling {
 
 struct NativeScreenRecordingStopController: ScreenRecordingStopControlling {
     func requestStop() async {
-        await sendStopRecordingShortcutViaSystemEvents()
+        sendStopRecordingShortcut()
 
         if Task.isCancelled { return }
-        sendStopRecordingShortcut()
+        await sendStopRecordingShortcutViaSystemEvents()
     }
 
     private func sendStopRecordingShortcutViaSystemEvents() async {
@@ -200,10 +200,18 @@ class ScreenRecordingManager: ObservableObject {
             await stopController.requestStop()
             guard !Task.isCancelled else { return }
 
-            try? await Task.sleep(for: .milliseconds(550))
-            guard !Task.isCancelled else { return }
+            // Poll the status up to 6 times with 200ms intervals (1.2 seconds max) to handle OS delay
+            var attempts = 0
+            while attempts < 6 {
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled else { return }
 
-            checkRecordingStatus()
+                checkRecordingStatus()
+                if !isRecording {
+                    break
+                }
+                attempts += 1
+            }
 
             if isRecording {
                 publishStopFailure()

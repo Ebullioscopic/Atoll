@@ -214,24 +214,3 @@ struct RecordingLiveActivity: View {
         .accessibilityLabel(String(localized: "Stop recording"))
     }
 }
-
-private enum RecordingHUDPresentation {
-    case compact
-    case inline
-    case expanded
-
-    var extraWidth: CGFloat {
-        switch self {
-        case .compact:
-            return 132
-        case .inline:
-            return 176
-        case .expanded:
-            return 140
-        }
-    }
-
-    var extraHeight: CGFloat {
-        self == .expanded ? 70 : 0
-    }
-}
