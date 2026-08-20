@@ -2937,6 +2937,7 @@ struct Media: View {
                     Text("Show lyrics on the side (requires calendar off)")
                 }
                 .disabled(showCalendar)
+                .opacity(showCalendar ? 0.5 : 1)
                 .help(showCalendar ? "Disable the calendar to show lyrics in the side panel." : "")
                 .settingsHighlight(id: highlightID("Show lyrics on the side (requires calendar off)"))
                 if showCalendar {
@@ -3159,6 +3160,7 @@ struct Media: View {
 struct CalendarSettings: View {
     @ObservedObject private var calendarManager = CalendarManager.shared
     @Default(.showCalendar) var showCalendar: Bool
+    @Default(.enableLyrics) private var enableLyrics
     @Default(.enableReminderLiveActivity) var enableReminderLiveActivity
     @Default(.reminderPresentationStyle) var reminderPresentationStyle
     @Default(.reminderLeadTime) var reminderLeadTime
@@ -3256,7 +3258,15 @@ struct CalendarSettings: View {
                 Defaults.Toggle(key: .showCalendar) {
                     Text("Show calendar")
                 }
+                .disabled(enableLyrics)
+                .opacity(enableLyrics ? 0.5 : 1)
+                .help(enableLyrics ? "Disable side lyrics to show the calendar." : "")
                 .settingsHighlight(id: highlightID("Show calendar"))
+                if enableLyrics {
+                    Text("Disable side lyrics to use the calendar.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Section(header: Text("Event List")) {
                     Toggle("Hide completed reminders", isOn: $hideCompletedReminders)
