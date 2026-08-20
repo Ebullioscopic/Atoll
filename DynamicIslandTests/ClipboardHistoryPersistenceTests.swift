@@ -131,6 +131,35 @@ final class ClipboardHistoryPersistenceTests: XCTestCase {
         XCTAssertNil(UserDefaults.standard.data(forKey: historyKey))
     }
 
+    // MARK: - Pinned items
+
+    /// Clearing favorites used to empty the array and save, leaving the PNG
+    /// behind every pinned image orphaned in `clipboardDataDirectory`.
+    func testClearingPinnedItemsDeletesTheirImageFiles() {
+        Defaults[.persistClipboardHistory] = true
+        let manager = ClipboardManager.shared
+        let existingPins = manager.pinnedItems
+
+        let item = ClipboardItem(imageData: makeImageData())
+        guard let fileName = item.imageFileName else {
+            return XCTFail("expected an image file while persistence is on")
+        }
+        let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+
+        manager.pinnedItems = [item]
+        manager.clearPinnedItems()
+
+        XCTAssertTrue(manager.pinnedItems.isEmpty)
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: fileURL.path),
+            "the image behind a cleared favorite should not survive"
+        )
+
+        manager.pinnedItems = existingPins
+        manager.savePinnedItemsToDefaults()
+    }
+
     func testLaunchPurgeLeavesStoredHistoryAloneWhenEnabled() {
         let stored = Data("[]".utf8)
         UserDefaults.standard.set(stored, forKey: historyKey)

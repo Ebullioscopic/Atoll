@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- Clearing clipboard favorites now deletes the image files behind them instead of orphaning a PNG of every pinned image in the app's data directory, and the startup cleanup no longer deletes those files while the favorites still reference them (#743).
 - The clipboard settings and shortcut descriptions now show the shortcut you actually have bound, instead of a hard-coded "Cmd+Shift+V" that went stale the moment anyone rebound it (#743).
 - Fixed a launch crash (`BUG IN CLIENT OF LIBDISPATCH: trying to lock recursively`) that could trap while a Bluetooth audio device was connected. `BluetoothAudioManager`'s initialiser scanned connected devices synchronously, and that scan blocks on `Process.waitUntilExit()`, which spins the run loop — letting SwiftUI evaluate a view body that reads `BluetoothAudioManager.shared` and re-enter the initialiser that was still running. The scan now starts on the next main-queue turn instead.
 - Fixed excessive memory usage by streaming LLM usage JSONL files instead of loading them entirely into memory

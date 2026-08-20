@@ -398,6 +398,25 @@ class ClipboardManager: ObservableObject {
         saveHistoryToDefaults()
     }
     
+    /// Clears favorites, deleting the image files behind them.
+    ///
+    /// Callers used to empty `pinnedItems` and save directly, which left the
+    /// PNG of every pinned image orphaned in `clipboardDataDirectory` forever —
+    /// `clearHistory()` deletes files, this path did not.
+    func clearPinnedItems() {
+        for item in pinnedItems {
+            guard let fileName = item.imageFileName else { continue }
+            let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+
+        pinnedItems.removeAll()
+        savePinnedItemsToDefaults()
+        ClipboardItem.pruneInMemoryImages(
+            keeping: Set(clipboardHistory.map { $0.id })
+        )
+    }
+
     func pinItem(_ item: ClipboardItem) {
         // Update the item to be pinned
         var pinnedItem = item
@@ -631,7 +650,10 @@ class ClipboardManager: ObservableObject {
     private func cleanupOldFiles() {
         guard let files = try? FileManager.default.contentsOfDirectory(at: ClipboardManager.clipboardDataDirectory, includingPropertiesForKeys: nil) else { return }
         
+        // Pinned items live in the same directory; leaving them out here
+        // deleted the image behind every favorite on the next launch.
         let referencedFiles = Set(clipboardHistory.compactMap { $0.imageFileName })
+            .union(pinnedItems.compactMap { $0.imageFileName })
         
         for file in files {
             let fileName = file.lastPathComponent

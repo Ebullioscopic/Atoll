@@ -7654,8 +7654,7 @@ struct ClipboardSettings: View {
                     .disabled(clipboardManager.clipboardHistory.isEmpty)
 
                     Button("Clear Pinned Items") {
-                        clipboardManager.pinnedItems.removeAll()
-                        clipboardManager.savePinnedItemsToDefaults()
+                        clipboardManager.clearPinnedItems()
                     }
                     .foregroundColor(.red)
                     .disabled(clipboardManager.pinnedItems.isEmpty)
