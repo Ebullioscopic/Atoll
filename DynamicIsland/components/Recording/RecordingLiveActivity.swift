@@ -67,6 +67,7 @@ struct RecordingLiveActivity: View {
     }
 
     private var presentation: RecordingHUDPresentation {
+        guard !recordingManager.isScreenSharingAppActive else { return .compact }
         guard hoverAnimation, stopControlsEnabled else { return .compact }
         return effectiveRecordingHoverStyle == .default ? .expanded : .inline
     }

@@ -39,6 +39,41 @@ private func screenRecordingDebugLog(_ message: String) {
 #endif
 }
 
+private let screenSharingAppBundleIdentifiers: Set<String> = [
+    "com.apple.FaceTime",
+    "com.apple.ScreenSharing",
+    "com.cisco.webexmeetingsapp",
+    "com.hnc.Discord",
+    "com.microsoft.teams",
+    "com.microsoft.teams2",
+    "com.skype.skype",
+    "com.tinyspeck.slackmacgap",
+    "us.zoom.xos"
+]
+
+private let screenSharingAppNameTokens: [String] = [
+    "discord",
+    "facetime",
+    "microsoft teams",
+    "screen sharing",
+    "skype",
+    "slack",
+    "webex",
+    "zoom"
+]
+
+private func isScreenSharingApplication(_ application: NSRunningApplication?) -> Bool {
+    guard let application else { return false }
+
+    if let bundleIdentifier = application.bundleIdentifier,
+       screenSharingAppBundleIdentifiers.contains(bundleIdentifier) {
+        return true
+    }
+
+    let appName = (application.localizedName ?? "").lowercased()
+    return screenSharingAppNameTokens.contains { appName.contains($0) }
+}
+
 private func screenCaptureEventCallback(eventType: Int32, _: Int32, _: Int32, context: UnsafeMutableRawPointer?) {
     guard let context else { return }
     let manager = Unmanaged<ScreenRecordingManager>.fromOpaque(context).takeUnretainedValue()
@@ -154,6 +189,7 @@ class ScreenRecordingManager: ObservableObject {
     @Published var isMonitoring: Bool = false
     @Published var recordingDuration: TimeInterval = 0
     @Published var stopControlState: RecordingStopControlState = .unavailable
+    @Published var isScreenSharingAppActive: Bool = false
 
     private let coordinator = DynamicIslandViewCoordinator.shared
     private let stopController: ScreenRecordingStopControlling
@@ -161,6 +197,7 @@ class ScreenRecordingManager: ObservableObject {
     private var durationTimer: Timer?
     private var stopRequestTask: Task<Void, Never>?
     private var stopFailureClearTask: Task<Void, Never>?
+    private var workspaceObservers: [NSObjectProtocol] = []
 
     private init(stopController: ScreenRecordingStopControlling = NativeScreenRecordingStopController()) {
         self.stopController = stopController
@@ -179,6 +216,7 @@ class ScreenRecordingManager: ObservableObject {
         }
 
         isMonitoring = true
+        startScreenSharingAppMonitoring()
         setupPrivateAPINotifications()
         checkRecordingStatus()
         screenRecordingDebugLog("Started screen capture monitoring")
@@ -191,6 +229,7 @@ class ScreenRecordingManager: ObservableObject {
         }
 
         isMonitoring = false
+        stopScreenSharingAppMonitoring()
         stopDurationTracking()
         isRecording = false
         stopRequestTask?.cancel()
@@ -343,6 +382,51 @@ class ScreenRecordingManager: ObservableObject {
         } else {
             screenRecordingDebugLog("Failed to register private API notifications")
         }
+    }
+
+    private func startScreenSharingAppMonitoring() {
+        stopScreenSharingAppMonitoring()
+        updateScreenSharingAppState()
+
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        let activationObserver = workspaceCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateScreenSharingAppState()
+            }
+        }
+
+        let terminationObserver = workspaceCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateScreenSharingAppState()
+            }
+        }
+
+        workspaceObservers = [activationObserver, terminationObserver]
+    }
+
+    private func stopScreenSharingAppMonitoring() {
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        for observer in workspaceObservers {
+            workspaceCenter.removeObserver(observer)
+        }
+        workspaceObservers.removeAll()
+        isScreenSharingAppActive = false
+    }
+
+    private func updateScreenSharingAppState() {
+        let isActive = isScreenSharingApplication(NSWorkspace.shared.frontmostApplication)
+        guard isActive != isScreenSharingAppActive else { return }
+
+        isScreenSharingAppActive = isActive
+        screenRecordingDebugLog("Screen sharing app active: \(isActive)")
     }
 
     func checkRecordingStatus() {

@@ -509,6 +509,7 @@ struct ContentView: View {
             canStopFromHUD: recordingManager.shouldShowStopControlsInHUD,
             enableMinimalisticUI: enableMinimalisticUI,
             recordingHoverStyle: recordingHoverStyle,
+            suppressHoverExpansion: recordingManager.isScreenSharingAppActive,
             expanded: isHovering
         )
     }

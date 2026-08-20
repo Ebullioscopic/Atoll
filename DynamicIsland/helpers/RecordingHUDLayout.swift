@@ -44,9 +44,11 @@ struct RecordingHUDLayout {
     let stopControlsEnabled: Bool
     let hoverStyle: RecordingHoverStyle
     let expanded: Bool
+    let suppressHoverExpansion: Bool
 
     var presentation: RecordingHUDPresentation {
         guard isVisible else { return .compact }
+        guard !suppressHoverExpansion else { return .compact }
         guard stopControlsEnabled && expanded else { return .compact }
 
         switch hoverStyle {
@@ -94,6 +96,7 @@ func makeRecordingHUDLayout(
     canStopFromHUD: Bool,
     enableMinimalisticUI: Bool,
     recordingHoverStyle: RecordingHoverStyle,
+    suppressHoverExpansion: Bool = false,
     expanded: Bool
 ) -> RecordingHUDLayout {
     let isVisible = notchState == .closed
@@ -110,6 +113,7 @@ func makeRecordingHUDLayout(
         isVisible: isVisible,
         stopControlsEnabled: stopControlsEnabled,
         hoverStyle: recordingHoverStyle,
-        expanded: expanded
+        expanded: expanded,
+        suppressHoverExpansion: suppressHoverExpansion
     )
 }

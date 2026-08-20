@@ -587,6 +587,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             canStopFromHUD: ScreenRecordingManager.shared.shouldShowStopControlsInHUD,
             enableMinimalisticUI: Defaults[.enableMinimalisticUI],
             recordingHoverStyle: Defaults[.recordingHoverStyle],
+            suppressHoverExpansion: ScreenRecordingManager.shared.isScreenSharingAppActive,
             expanded: true
         )
     }
