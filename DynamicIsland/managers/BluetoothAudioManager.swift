@@ -2807,7 +2807,29 @@ extension BluetoothAudioDeviceType {
     /// QuickTime/MP4 movie (for example an un-fetched Git LFS pointer, which is a small
     /// text file that ships with the correct name and extension but decodes to nothing).
     /// Callers can then fall back to the SF Symbol instead of rendering an empty frame.
+    /// Memoised so the validation runs once per device type.
+    ///
+    /// This is read from `body` — `InlineHUD` evaluates it on every HUD render
+    /// — and validation opens the file and walks its atom chain. Bundled
+    /// resources cannot change while the app runs, so the answer is computed
+    /// once and kept, including a negative answer.
+    private static let animationURLCacheLock = NSLock()
+    private static var animationURLCache: [BluetoothAudioDeviceType: URL?] = [:]
+
     var inlineHUDAnimationURL: URL? {
+        BluetoothAudioDeviceType.animationURLCacheLock.lock()
+        defer { BluetoothAudioDeviceType.animationURLCacheLock.unlock() }
+
+        if let cached = BluetoothAudioDeviceType.animationURLCache[self] {
+            return cached
+        }
+
+        let resolved = resolvedInlineHUDAnimationURL
+        BluetoothAudioDeviceType.animationURLCache[self] = resolved
+        return resolved
+    }
+
+    private var resolvedInlineHUDAnimationURL: URL? {
         // Each candidate is validated in turn: a stub in the subdirectory must
         // not mask a real movie sitting at the bundle root.
         let candidates = [
