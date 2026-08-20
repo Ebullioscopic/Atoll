@@ -2801,6 +2801,35 @@ enum BluetoothAudioDeviceType {
 }
 
 extension BluetoothAudioDeviceType {
+    /// Resolves the bundled looping HUD animation for this device type.
+    ///
+    /// Returns `nil` when the movie is missing *or* when the bundled file is not a real
+    /// QuickTime/MP4 movie (for example an un-fetched Git LFS pointer, which is a small
+    /// text file that ships with the correct name and extension but decodes to nothing).
+    /// Callers can then fall back to the SF Symbol instead of rendering an empty frame.
+    var inlineHUDAnimationURL: URL? {
+        guard let url = Bundle.main.url(
+            forResource: inlineHUDAnimationBaseName,
+            withExtension: "mov",
+            subdirectory: "BluetoothHUDAnimations"
+        ) ?? Bundle.main.url(
+            forResource: inlineHUDAnimationBaseName,
+            withExtension: "mov"
+        ) else { return nil }
+
+        return BluetoothAudioDeviceType.isPlayableMovieFile(at: url) ? url : nil
+    }
+
+    /// Cheap header sniff: a QuickTime/MP4 file starts with a 4-byte atom size followed by
+    /// a known 4-character atom type.
+    private static func isPlayableMovieFile(at url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        guard let header = try? handle.read(upToCount: 8), header.count == 8 else { return false }
+        let atomType = String(decoding: header.suffix(4), as: UTF8.self)
+        return ["ftyp", "moov", "mdat", "free", "skip", "wide", "pnot"].contains(atomType)
+    }
+
     var isAirPods: Bool {
         switch self {
         case .airpods, .airpodsGen3, .airpodsGen4, .airpodsPro, .airpodsPro3, .airpodsMax:
