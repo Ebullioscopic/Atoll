@@ -479,7 +479,24 @@ struct MusicControlsView: View {
     private func syncHUDValueIfNeeded(force: Bool) {
         guard shouldShowControlHUDRow else { return }
         guard force || !hudDragging else { return }
-        hudValue = Double(coordinator.sneakPeek.value)
+
+        let target = Double(coordinator.sneakPeek.value)
+        guard target != hudValue else { return }
+
+        guard !force else {
+            // First sync when the row appears: adopt the current level outright
+            // rather than sliding up to it from wherever the slider last sat.
+            hudValue = target
+            return
+        }
+
+        // The keys deliver discrete steps (1/16 of the range each), and nothing
+        // animated the fill between them, so the track jumped. Glide instead —
+        // short enough to keep up with key auto-repeat, and interruptible, so a
+        // held key reads as one continuous sweep rather than a queue of hops.
+        withAnimation(.easeOut(duration: 0.18)) {
+            hudValue = target
+        }
     }
 
     private func updateControlHUDValue(_ newValue: Double) {
