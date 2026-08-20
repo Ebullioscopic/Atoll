@@ -262,6 +262,40 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        Publishers.MergeMany(
+            Defaults.publisher(.enableLyrics, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.showCalendar, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.showStandardMediaControls, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.autoHideInactiveNotchMediaPlayer, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.showMirror, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.lyricsPanelWidth, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.lyricsPanelOffset, options: []).map { _ in () }.eraseToAnyPublisher(),
+            MusicManager.shared.$isPlaying.map { _ in () }.eraseToAnyPublisher(),
+            MusicManager.shared.$songTitle.map { _ in () }.eraseToAnyPublisher(),
+            MusicManager.shared.$artistName.map { _ in () }.eraseToAnyPublisher(),
+            WebcamManager.shared.$cameraAvailable.map { _ in () }.eraseToAnyPublisher()
+        )
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateSideLyricsNotchSizeIfNeeded()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func updateSideLyricsNotchSizeIfNeeded() {
+        guard notchState == .open, !Defaults[.enableMinimalisticUI] else { return }
+
+        let updatedTarget = calculateDynamicNotchSize()
+        guard notchSize != updatedTarget else { return }
+        withAnimation(.smooth) {
+            notchSize = updatedTarget
+        }
+        AppDelegate.shared?.ensureWindowSize(
+            addShadowPadding(to: updatedTarget, isMinimalistic: false),
+            animated: true,
+            force: false
+        )
     }
 
     private func handleMinimalisticTimerHeightChange() {
