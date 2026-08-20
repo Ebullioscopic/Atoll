@@ -101,10 +101,18 @@ class ClipboardPanel: NSPanel {
         
         // Check if we have a saved position
         if let savedPosition = getSavedPosition() {
-            // Validate saved position is still on screen
             let savedFrame = NSRect(origin: savedPosition, size: panelFrame.size)
-            if screenFrame.intersects(savedFrame) {
+            if screenFrame.contains(savedFrame) {
                 setFrameOrigin(savedPosition)
+                return
+            }
+            // Merely intersecting is not enough: a position saved when the
+            // panel was narrower can now hang off the edge. Nudge it back
+            // inside rather than throwing the user's placement away.
+            if screenFrame.intersects(savedFrame) {
+                setFrameOrigin(
+                    ClipboardPanel.clampedOrigin(savedPosition, size: panelFrame.size, within: screenFrame)
+                )
                 return
             }
         }
@@ -116,6 +124,17 @@ class ClipboardPanel: NSPanel {
         setFrameOrigin(NSPoint(x: xPosition, y: yPosition))
     }
     
+    /// Keeps a frame of `size` fully inside `bounds`, pinning to the origin
+    /// edges if the panel is somehow larger than the visible frame.
+    static func clampedOrigin(_ origin: NSPoint, size: NSSize, within bounds: NSRect) -> NSPoint {
+        let maxX = max(bounds.minX, bounds.maxX - size.width)
+        let maxY = max(bounds.minY, bounds.maxY - size.height)
+        return NSPoint(
+            x: min(max(origin.x, bounds.minX), maxX),
+            y: min(max(origin.y, bounds.minY), maxY)
+        )
+    }
+
     private func getSavedPosition() -> NSPoint? {
         let defaults = UserDefaults.standard
         let x = defaults.double(forKey: "clipboardPanelPositionX")
@@ -468,6 +487,7 @@ struct ClipboardPanelItemRow: View {
     let onHover: (UUID?) -> Void
     @ObservedObject var clipboardManager = ClipboardManager.shared
     @State private var justCopied = false
+    @State private var copyResetWorkItem: DispatchWorkItem?
 
     private var thumbnail: NSImage? {
         guard item.type == .image, let data = item.getImageData() else { return nil }
@@ -593,11 +613,17 @@ struct ClipboardPanelItemRow: View {
             justCopied = true
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        // Copying the same row again restarts the confirmation: without
+        // cancelling, the first timer clears the checkmark 1.5s after the
+        // *first* press, cutting the second one short.
+        copyResetWorkItem?.cancel()
+        let reset = DispatchWorkItem {
             withAnimation(.easeOut(duration: 0.18)) {
                 justCopied = false
             }
         }
+        copyResetWorkItem = reset
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: reset)
     }
 
     private func timeAgoString(from date: Date) -> String {
