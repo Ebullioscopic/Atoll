@@ -177,7 +177,7 @@ struct RecordingLiveActivity: View {
         }
         .padding(.leading, 35)
         .padding(.trailing, 40)
-        .padding(.top, 25)
+        .padding(.top, 29)
         .padding(.bottom, 20)
     }
 
