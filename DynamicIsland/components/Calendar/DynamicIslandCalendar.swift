@@ -441,8 +441,10 @@ struct CalendarView: View {
                 hideAllDayEvents: hideAllDayEvents
             )
             if filteredEvents.isEmpty {
+                // Centre it in the space left under the header rather than
+                // hanging it off the header with all the slack below.
                 EmptyEventsView(selectedDate: selectedDate)
-                Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 EventListView(events: calendarManager.events, selectedDate: selectedDate)
             }
@@ -773,17 +775,23 @@ struct EmptyEventsView: View {
     let selectedDate: Date
 
     var body: some View {
-        VStack {
+        // Explicit spacing: the default VStack gap (8pt) applied equally between
+        // the icon and both lines, which left the two labels floating apart
+        // instead of reading as one caption block under the glyph.
+        VStack(spacing: 0) {
             Image(systemName: "calendar.badge.checkmark")
-                .font(.title)
+                .font(.system(size: 20, weight: .regular))
                 .foregroundColor(Color(white: 0.65))
+                .padding(.bottom, 7)
             Text(Calendar.current.isDateInToday(selectedDate) ? "No events today" : "No events")
                 .font(.subheadline)
                 .foregroundColor(.white)
             Text("Enjoy your free time!")
                 .font(.caption)
                 .foregroundColor(Color(white: 0.65))
+                .padding(.top, 1)
         }
+        .multilineTextAlignment(.center)
     }
 }
 
