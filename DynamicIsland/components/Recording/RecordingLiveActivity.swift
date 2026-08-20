@@ -153,12 +153,12 @@ struct RecordingLiveActivity: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(verbatim: "Screen Recording")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.84))
                         .lineLimit(1)
 
                     Text(recordingManager.formattedDuration)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(.red)
                         .lineLimit(1)
@@ -166,7 +166,7 @@ struct RecordingLiveActivity: View {
                 }
 
                 Text(recordingStatusText)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(recordingManager.stopFailureMessage == nil ? .gray.opacity(0.6) : .red.opacity(0.78))
                     .lineLimit(1)
             }
@@ -175,10 +175,9 @@ struct RecordingLiveActivity: View {
 
             stopButton(size: 54, lineWidth: 2.4)
         }
-        .padding(.leading, 98)
-        .padding(.trailing, 72)
-        .padding(.top, 22)
-        .padding(.bottom, 22)
+        .padding(.leading, 35)
+        .padding(.trailing, 40)
+        .padding(.bottom, 20)
     }
 
     private func recordingDot(size: CGFloat) -> some View {

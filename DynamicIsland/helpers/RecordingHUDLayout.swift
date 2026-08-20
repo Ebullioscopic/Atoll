@@ -30,7 +30,7 @@ enum RecordingHUDPresentation: String, CaseIterable {
         case .inline:
             return 176
         case .expanded:
-            return 320
+            return 140
         }
     }
 
