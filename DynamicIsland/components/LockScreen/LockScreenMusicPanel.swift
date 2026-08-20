@@ -914,7 +914,9 @@ struct LockScreenMusicPanel: View {
         // surrounding card — the panel is the card.
         VolumeCapsuleSlider(
             value: Binding(
-                get: { Double(volumeModel.level) },
+                // Muting leaves `level` where it was, so reading it alone left
+                // the capsule full and the glyph un-slashed while muted.
+                get: { volumeModel.isMuted ? 0 : Double(volumeModel.level) },
                 set: { newValue in
                     registerInteraction()
                     volumeModel.setVolume(Float(newValue))
