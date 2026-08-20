@@ -2936,16 +2936,34 @@ struct Media: View {
                 Defaults.Toggle(key: .enableLyrics) {
                     Text("Show lyrics on the side (requires calendar off)")
                 }
-                .disabled(showCalendar)
-                .opacity(showCalendar ? 0.5 : 1)
-                .help(showCalendar ? "Disable the calendar to show lyrics in the side panel." : "")
+                .disabled(showCalendar || enableMinimalisticUI || !showStandardMediaControls)
+                .opacity(showCalendar || enableMinimalisticUI || !showStandardMediaControls ? 0.5 : 1)
+                .help(
+                    showCalendar
+                        ? "Disable the calendar to show lyrics in the side panel."
+                        : enableMinimalisticUI
+                            ? "Disable Minimalistic UI to show lyrics in the side panel."
+                            : !showStandardMediaControls
+                                ? "Enable Dynamic Island media controls to show lyrics in the side panel."
+                                : ""
+                )
                 .settingsHighlight(id: highlightID("Show lyrics on the side (requires calendar off)"))
                 if showCalendar {
                     Text("Disable the calendar to use side lyrics.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                if enableLyrics && !enableMinimalisticUI && !showCalendar {
+                if enableMinimalisticUI {
+                    Text("Disable Minimalistic UI to use side lyrics.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if !showStandardMediaControls {
+                    Text("Enable Dynamic Island media controls to use side lyrics.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if enableLyrics && !enableMinimalisticUI && !showCalendar && showStandardMediaControls {
                     Slider(value: $lyricsPanelWidth, in: 180...420, step: 10) {
                         HStack {
                             Text("Side lyrics width")
