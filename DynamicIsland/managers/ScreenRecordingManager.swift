@@ -218,16 +218,12 @@ class ScreenRecordingManager: ObservableObject {
 
             // macOS can take a few seconds to publish the stopped state after
             // accepting the native screen recording shortcut.
-            var attempts = 0
-            while attempts < 20 {
-                try? await Task.sleep(for: .milliseconds(250))
-                guard !Task.isCancelled else { return }
+            await waitForRecordingToStop(maxAttempts: 8)
+            guard !Task.isCancelled else { return }
 
-                checkRecordingStatus()
-                if !isRecording {
-                    break
-                }
-                attempts += 1
+            if isRecording, isNativeMacOSScreenRecordingProcessActive() {
+                await stopNativeMacOSScreenRecordingProcesses()
+                await waitForRecordingToStop(maxAttempts: 12)
             }
 
             if isRecording {
@@ -239,6 +235,80 @@ class ScreenRecordingManager: ObservableObject {
 
             stopRequestTask = nil
         }
+    }
+
+    private func waitForRecordingToStop(maxAttempts: Int) async {
+        var attempts = 0
+        while attempts < maxAttempts {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+
+            checkRecordingStatus()
+            if !isRecording {
+                break
+            }
+            attempts += 1
+        }
+    }
+
+    private func isNativeMacOSScreenRecordingProcessActive() -> Bool {
+        isProcessRunning(named: "screencapture")
+    }
+
+    private func isProcessRunning(named processName: String) -> Bool {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        task.arguments = ["-x", processName]
+        task.standardOutput = Pipe()
+        task.standardError = Pipe()
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+            return task.terminationStatus == 0
+        } catch {
+            screenRecordingDebugLog("pgrep \(processName) failed: \(error)")
+            return false
+        }
+    }
+
+    private func stopNativeMacOSScreenRecordingProcesses() async {
+        let attempts = [
+            ["-INT", "screencapture"],
+            ["-TERM", "screencapture"],
+            ["-TERM", "screencaptureui"],
+            ["-TERM", "ScreenCaptureUI"]
+        ]
+
+        for arguments in attempts {
+            guard isNativeMacOSScreenRecordingProcessActive() else { return }
+
+            await runKillall(arguments)
+            guard !Task.isCancelled else { return }
+
+            try? await Task.sleep(for: .milliseconds(180))
+            checkRecordingStatus()
+            if !isRecording {
+                return
+            }
+        }
+    }
+
+    private func runKillall(_ arguments: [String]) async {
+        await Task.detached(priority: .userInitiated) {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+            task.arguments = arguments
+            task.standardOutput = Pipe()
+            task.standardError = Pipe()
+
+            do {
+                try task.run()
+                task.waitUntilExit()
+            } catch {
+                screenRecordingDebugLog("killall \(arguments.joined(separator: " ")) failed: \(error)")
+            }
+        }.value
     }
 
     private func setupPrivateAPINotifications() {

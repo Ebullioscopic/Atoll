@@ -4120,17 +4120,12 @@ struct LiveActivitiesSettings: View {
     @Default(.showRecordingIndicator) var showRecordingIndicator
     @Default(.recordingHoverStyle) var recordingHoverStyle
     @Default(.recordingControlMode) var recordingControlMode
-    @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @Default(.enableDoNotDisturbDetection) var enableDoNotDisturbDetection
     @Default(.focusIndicatorNonPersistent) var focusIndicatorNonPersistent
     @Default(.capsLockIndicatorTintMode) var capsLockTintMode
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.liveActivities.highlightID(for: title)
-    }
-
-    private var availableRecordingHoverStyles: [RecordingHoverStyle] {
-        enableMinimalisticUI ? RecordingHoverStyle.allCases : [.inline]
     }
 
     var body: some View {
@@ -4165,16 +4160,14 @@ struct LiveActivitiesSettings: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Picker("Recording hover style", selection: $recordingHoverStyle) {
-                        ForEach(availableRecordingHoverStyles) { style in
+                        ForEach(RecordingHoverStyle.allCases) { style in
                             Text(style.title)
                                 .tag(style)
                         }
                     }
                     .pickerStyle(.segmented)
 
-                    Text(enableMinimalisticUI
-                         ? "Default uses the expanded recording HUD. Inline keeps the stop control inside the notch height."
-                         : "Default hover style is available only in Minimalistic mode. Inline will be used here.")
+                    Text("Default uses the expanded recording HUD. Inline keeps the stop control inside the notch height.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -4378,16 +4371,6 @@ struct LiveActivitiesSettings: View {
         .navigationTitle("Live Activities")
         .onAppear {
             fullDiskAccessPermission.refreshStatus()
-            normalizeRecordingHoverStyle()
-        }
-        .onChange(of: enableMinimalisticUI) { _, _ in
-            normalizeRecordingHoverStyle()
-        }
-    }
-
-    private func normalizeRecordingHoverStyle() {
-        if !enableMinimalisticUI && recordingHoverStyle == .default {
-            recordingHoverStyle = .inline
         }
     }
 }
