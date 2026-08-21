@@ -24,6 +24,14 @@ import XCTest
 /// looks like from one scan to the next, so the browsers' naming conventions
 /// are what the whole feature rests on.
 final class PartialDownloadTests: XCTestCase {
+    /// Every file on disk is stamped with the same arbitrary date unless a test
+    /// cares about the difference, which keeps the cases about the rule.
+    private let arbitrary = Date(timeIntervalSince1970: 1_000_000)
+
+    private func stamps(_ names: Set<String>) -> [String: Date] {
+        Dictionary(uniqueKeysWithValues: names.map { ($0, arbitrary) })
+    }
+
     /// Each browser marks work in progress with its own extension.
     func testRecognisesEveryBrowsersTemporaryFile() {
         XCTAssertTrue(PartialDownload.isInProgress("archive.zip.crdownload"))
@@ -56,10 +64,7 @@ final class PartialDownloadTests: XCTestCase {
     /// first time that name exists at all.
     func testChromiumDownloadCompletesWhenTheDestinationAppears() {
         XCTAssertEqual(
-            PartialDownload.completed(
-                among: ["archive.zip.crdownload"],
-                nonEmptyFiles: ["archive.zip"]
-            ),
+            PartialDownload.completed(among: ["archive.zip.crdownload"], stamps: stamps(["archive.zip"]), stampsWhenStarted: [:]),
             ["archive.zip.crdownload"]
         )
     }
@@ -71,18 +76,12 @@ final class PartialDownloadTests: XCTestCase {
         // Mid-download: the part file is gone from this set only because the
         // caller passes what disappeared, and the placeholder is still empty.
         XCTAssertTrue(
-            PartialDownload.completed(
-                among: ["archive.zip.part"],
-                nonEmptyFiles: []
-            ).isEmpty,
+            PartialDownload.completed(among: ["archive.zip.part"], stamps: stamps([]), stampsWhenStarted: [:]).isEmpty,
             "an empty placeholder must not be mistaken for a finished download"
         )
 
         XCTAssertEqual(
-            PartialDownload.completed(
-                among: ["archive.zip.part"],
-                nonEmptyFiles: ["archive.zip"]
-            ),
+            PartialDownload.completed(among: ["archive.zip.part"], stamps: stamps(["archive.zip"]), stampsWhenStarted: [:]),
             ["archive.zip.part"]
         )
     }
@@ -92,10 +91,7 @@ final class PartialDownloadTests: XCTestCase {
     func testCancelledFirefoxDownloadNeverCounts() {
         for remaining in [Set<String>(), ["unrelated.dmg"]] {
             XCTAssertTrue(
-                PartialDownload.completed(
-                    among: ["archive.zip.part"],
-                    nonEmptyFiles: remaining
-                ).isEmpty
+                PartialDownload.completed(among: ["archive.zip.part"], stamps: stamps(remaining), stampsWhenStarted: [:]).isEmpty
             )
         }
     }
@@ -105,7 +101,8 @@ final class PartialDownloadTests: XCTestCase {
         XCTAssertEqual(
             PartialDownload.completed(
                 among: ["archive.zip.part", "movie.mp4.crdownload"],
-                nonEmptyFiles: ["archive.zip"]
+                stamps: stamps(["archive.zip"]),
+                stampsWhenStarted: [:]
             ),
             ["archive.zip.part"]
         )
@@ -127,7 +124,7 @@ final class PartialDownloadTests: XCTestCase {
         let onDisk: Set<String> = ["landed.zip"]
 
         XCTAssertEqual(
-            PartialDownload.completed(among: vanished, nonEmptyFiles: onDisk),
+            PartialDownload.completed(among: vanished, stamps: stamps(onDisk), stampsWhenStarted: [:]),
             ["landed.zip.part"]
         )
     }
@@ -138,7 +135,38 @@ final class PartialDownloadTests: XCTestCase {
         let vanished: Set<String> = ["one.zip.part", "two.dmg.crdownload"]
 
         XCTAssertTrue(
-            PartialDownload.completed(among: vanished, nonEmptyFiles: ["unrelated.txt"]).isEmpty
+            PartialDownload.completed(among: vanished, stamps: stamps(["unrelated.txt"]), stampsWhenStarted: [:]).isEmpty
+        )
+    }
+
+    /// A download told to replace a file that is already there starts with a
+    /// destination full of the *old* file's bytes. Cancelling it must not read
+    /// as a completion just because something is sitting at the target name.
+    func testReplacingCancelledLeavesTheOldFileAlone() {
+        let existing = stamps(["archive.zip"])
+
+        XCTAssertTrue(
+            PartialDownload.completed(
+                among: ["archive.zip.crdownload"],
+                stamps: existing,
+                stampsWhenStarted: existing
+            ).isEmpty
+        )
+    }
+
+    /// The same replace, but finished: the rename gives the destination a new
+    /// modification date, which is what separates it from the case above.
+    func testReplacingCompletedIsACompletion() {
+        let before = stamps(["archive.zip"])
+        let after = ["archive.zip": arbitrary.addingTimeInterval(30)]
+
+        XCTAssertEqual(
+            PartialDownload.completed(
+                among: ["archive.zip.crdownload"],
+                stamps: after,
+                stampsWhenStarted: before
+            ),
+            ["archive.zip.crdownload"]
         )
     }
 }

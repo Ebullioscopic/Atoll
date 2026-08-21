@@ -46,17 +46,32 @@ enum PartialDownload {
     /// Of the temporary files that have just vanished, the ones that finished —
     /// the rest were cancelled.
     ///
-    /// A download is only finished once its destination holds data. Firefox
-    /// creates the destination up front as an empty placeholder and writes the
-    /// bytes to the `.part` file beside it, so mere existence proves nothing:
-    /// cancelling removes the `.part` file first and the placeholder a moment
-    /// later, and a scan landing in between would read a cancellation as a
-    /// completion.
+    /// A download is finished once its destination has been *written*, which is
+    /// not the same as the destination being there. Two cases make the
+    /// difference matter. Firefox creates the destination up front as an empty
+    /// placeholder and writes the bytes to the `.part` file beside it, so mere
+    /// existence proves nothing — holding data is the test, and only non-empty
+    /// files get a stamp. And a download told to replace a file that is already
+    /// there starts with a destination that holds data before a single byte
+    /// arrives, so the stamp has to have *changed* since the temporary file
+    /// appeared; otherwise cancelling one reads as a completion.
+    ///
+    /// - Parameters:
+    ///   - stamps: modification dates of the non-empty files on disk now.
+    ///   - stampsWhenStarted: the same, captured for each destination when its
+    ///     temporary file first appeared. A missing entry means there was
+    ///     nothing there, or nothing with anything in it.
     static func completed(
         among disappearedFiles: Set<String>,
-        nonEmptyFiles: Set<String>
+        stamps: [String: Date],
+        stampsWhenStarted: [String: Date]
     ) -> Set<String> {
-        disappearedFiles.filter { nonEmptyFiles.contains(destination(of: $0)) }
+        disappearedFiles.filter { name in
+            let target = destination(of: name)
+            guard let now = stamps[target] else { return false }
+            guard let before = stampsWhenStarted[target] else { return true }
+            return now != before
+        }
     }
 }
 
@@ -82,6 +97,10 @@ class DownloadManager {
     /// last download was cancelled closed the activity outright, with nothing
     /// shown for the ones that had finished.
     private var vanishedSinceActive: Set<String> = []
+    /// What each in-flight download's destination looked like when its
+    /// temporary file appeared, so a destination that was already on disk is
+    /// not mistaken for one this download wrote.
+    private var destinationStampsWhenStarted: [String: Date] = [:]
     
     private var downloadsDirectory: URL? {
         FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
@@ -116,6 +135,7 @@ class DownloadManager {
         previousInProgressFiles.removeAll()
         ignoredFiles.removeAll()
         vanishedSinceActive.removeAll()
+        destinationStampsWhenStarted.removeAll()
         isDownloading = false
 
         let path = downloadsDirectory.path
@@ -150,6 +170,7 @@ class DownloadManager {
         previousInProgressFiles.removeAll()
         ignoredFiles.removeAll()
         vanishedSinceActive.removeAll()
+        destinationStampsWhenStarted.removeAll()
         isDownloading = false
     }
     
@@ -157,12 +178,12 @@ class DownloadManager {
         guard let downloadsDirectory else { return }
         
         let inProgressFiles: Set<String>
-        let nonEmptyFiles: Set<String>
+        var stamps: [String: Date] = [:]
 
         do {
             let contents = try FileManager.default.contentsOfDirectory(
                 at: downloadsDirectory,
-                includingPropertiesForKeys: [.fileSizeKey]
+                includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]
             )
 
             inProgressFiles = Set(contents
@@ -170,24 +191,23 @@ class DownloadManager {
                 .filter { PartialDownload.isInProgress($0) }
             )
 
-            nonEmptyFiles = Set(contents
-                .filter { url in
-                    let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-                    return size > 0
-                }
-                .map { $0.lastPathComponent }
-            )
+            for url in contents {
+                let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+                guard (values?.fileSize ?? 0) > 0, let modified = values?.contentModificationDate else { continue }
+                stamps[url.lastPathComponent] = modified
+            }
 
         } catch {
             return
         }
 
+        let resolvedStamps = stamps
         Task { @MainActor in
-            self.processDownloadFiles(inProgressFiles, nonEmptyFiles: nonEmptyFiles)
+            self.processDownloadFiles(inProgressFiles, stamps: resolvedStamps)
         }
     }
     
-    private func processDownloadFiles(_ inProgressFiles: Set<String>, nonEmptyFiles: Set<String>) {
+    private func processDownloadFiles(_ inProgressFiles: Set<String>, stamps: [String: Date]) {
 
         if !hasPerformedInitialScan {
             hasPerformedInitialScan = true
@@ -198,7 +218,15 @@ class DownloadManager {
         }
 
         let disappearedFiles = previousInProgressFiles.subtracting(inProgressFiles)
+        let appearedFiles = inProgressFiles.subtracting(previousInProgressFiles)
         previousInProgressFiles = inProgressFiles
+
+        // Captured the moment a download starts writing, and only then: taking
+        // it later would record what this download had already put there.
+        for name in appearedFiles {
+            let target = PartialDownload.destination(of: name)
+            destinationStampsWhenStarted[target] = stamps[target]
+        }
 
         // Judged against the ignore list as it stands, before the expiry below.
         vanishedSinceActive.formUnion(disappearedFiles.subtracting(ignoredFiles))
@@ -222,6 +250,7 @@ class DownloadManager {
         // completion logic
         guard isDownloading else {
             vanishedSinceActive.removeAll()
+            destinationStampsWhenStarted.removeAll()
             return
         }
 
@@ -241,9 +270,11 @@ class DownloadManager {
         // being written is not a partial download.
         let completedFiles = PartialDownload.completed(
             among: vanishedSinceActive,
-            nonEmptyFiles: nonEmptyFiles
+            stamps: stamps,
+            stampsWhenStarted: destinationStampsWhenStarted
         )
         vanishedSinceActive.removeAll()
+        destinationStampsWhenStarted.removeAll()
 
         if completedFiles.isEmpty {
             closeDownloadViewImmediately()
