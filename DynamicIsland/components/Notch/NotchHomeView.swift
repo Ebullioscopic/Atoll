@@ -403,7 +403,6 @@ struct MusicControlsView: View {
     @Default(.enableLyrics) private var enableLyrics
     @Default(.showCalendar) private var showCalendar
     private let seekInterval: TimeInterval = 10
-    private let skipMagnitude: CGFloat = 6
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -592,7 +591,24 @@ struct MusicControlsView: View {
     private func syncHUDValueIfNeeded(force: Bool) {
         guard shouldShowControlHUDRow else { return }
         guard force || !hudDragging else { return }
-        hudValue = Double(coordinator.sneakPeek.value)
+
+        let target = Double(coordinator.sneakPeek.value)
+        guard target != hudValue else { return }
+
+        guard !force else {
+            // First sync when the row appears: adopt the current level outright
+            // rather than sliding up to it from wherever the slider last sat.
+            hudValue = target
+            return
+        }
+
+        // The keys deliver discrete steps (1/16 of the range each), and nothing
+        // animated the fill between them, so the track jumped. Glide instead —
+        // short enough to keep up with key auto-repeat, and interruptible, so a
+        // held key reads as one continuous sweep rather than a queue of hops.
+        withAnimation(.easeOut(duration: 0.18)) {
+            hudValue = target
+        }
     }
 
     private func updateControlHUDValue(_ newValue: Double) {
@@ -688,16 +704,18 @@ struct MusicControlsView: View {
         case .trackBackward:
             playbackButton(
                 icon: "backward.fill",
-                press: .nudge(-skipMagnitude),
-                trigger: skipGestureTrigger(for: .trackBackward)
+                press: nil,
+                trigger: skipGestureTrigger(for: .trackBackward),
+                skipDirection: .backward
             ) {
                 musicManager.previousTrack()
             }
         case .trackForward:
             playbackButton(
                 icon: "forward.fill",
-                press: .nudge(skipMagnitude),
-                trigger: skipGestureTrigger(for: .trackForward)
+                press: nil,
+                trigger: skipGestureTrigger(for: .trackForward),
+                skipDirection: .forward
             ) {
                 musicManager.nextTrack()
             }
@@ -760,13 +778,16 @@ struct MusicControlsView: View {
 
     private struct SkipTrigger {
         let token: Int
-        let pressEffect: HoverButton.PressEffect
+        /// nil for the track buttons: the pulse advances the skip glyph rather
+        /// than moving the button.
+        let pressEffect: HoverButton.PressEffect?
     }
 
     private func playbackButton(
         icon: String,
         press: HoverButton.PressEffect?,
         trigger: SkipTrigger?,
+        skipDirection: SkipTrackGlyph.Direction? = nil,
         action: @escaping () -> Void
     ) -> some View {
         HoverButton(
@@ -774,7 +795,8 @@ struct MusicControlsView: View {
             scale: .medium,
             pressEffect: press,
             externalTriggerToken: trigger?.token,
-            externalTriggerEffect: trigger?.pressEffect
+            externalTriggerEffect: trigger?.pressEffect,
+            skipDirection: skipDirection
         ) {
             action()
         }
@@ -785,9 +807,9 @@ struct MusicControlsView: View {
 
         switch control {
         case .trackBackward where pulse.behavior == .track && pulse.direction == .backward:
-            return SkipTrigger(token: pulse.token, pressEffect: .nudge(-skipMagnitude))
+            return SkipTrigger(token: pulse.token, pressEffect: nil)
         case .trackForward where pulse.behavior == .track && pulse.direction == .forward:
-            return SkipTrigger(token: pulse.token, pressEffect: .nudge(skipMagnitude))
+            return SkipTrigger(token: pulse.token, pressEffect: nil)
         case .seekBackward where pulse.behavior == .tenSecond && pulse.direction == .backward:
             return SkipTrigger(token: pulse.token, pressEffect: .wiggle(.counterClockwise))
         case .seekForward where pulse.behavior == .tenSecond && pulse.direction == .forward:

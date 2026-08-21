@@ -30,13 +30,18 @@ struct NotchLLMUsageView: View {
 
     private func isEnabled(_ provider: ProviderID) -> Bool { Defaults[provider.enabledKey] }
 
+    private var enabledProviders: [ProviderID] {
+        ProviderID.allCases.filter { isEnabled($0) }
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            ForEach(ProviderID.allCases.filter { isEnabled($0) }) { provider in
+            ForEach(enabledProviders) { provider in
                 card(for: provider)
             }
         }
         .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .environment(\.colorScheme, .dark)
         .onAppear { manager.refreshAll() }
     }
@@ -77,6 +82,7 @@ struct NotchLLMUsageView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
+        .frame(height: llmUsageProviderCardHeight, alignment: .topLeading)
         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
     }
 

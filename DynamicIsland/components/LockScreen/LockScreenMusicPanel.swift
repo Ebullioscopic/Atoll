@@ -83,6 +83,14 @@ struct LockScreenMusicPanel: View {
     private let expandedAlbumArtCornerRadius: CGFloat = 60
     private let expandedContentSpacing: CGFloat = 40
     private let collapseTimeout: TimeInterval = 5
+    // Transport control sizing. Apple sizes the circular highlight at roughly
+    // 2.2x the glyph so the tint reads as a comfortable ring around the symbol
+    // instead of hugging it; these pairs keep that ratio in both states.
+    private var controlFrameSize: CGFloat { isExpanded ? 62 : 40 }
+    private var controlIconSize: CGFloat { isExpanded ? 26 : 18 }
+    private var playPauseFrameSize: CGFloat { isExpanded ? 80 : 54 }
+    private var playPauseIconSize: CGFloat { isExpanded ? 34 : 24 }
+
     private let collapsedSliderExtraHeight: CGFloat = 72
     private let expandedSliderExtraHeight: CGFloat = 88
     private let collapsedLyricsExtraHeight: CGFloat = 64
@@ -321,31 +329,31 @@ struct LockScreenMusicPanel: View {
                     MusicTitleMarqueeView(
                         text: musicManager.songTitle.isEmpty ? "No Music Playing" : musicManager.songTitle,
                         isExplicit: !musicManager.songTitle.isEmpty && musicManager.isCurrentTrackExplicit,
-                        font: .system(size: 12, weight: .semibold),
-                        nsFont: .subheadline,
+                        font: .system(size: 14, weight: .semibold),
+                        nsFont: .headline,
                         textColor: widgetAppearance.primary(),
                         minDuration: 0.45,
                         frameWidth: geo.size.width,
                         badgeSpacing: 5,
                         badgeLabel: "E",
-                        badgeHeight: 13,
+                        badgeHeight: 15,
                         badgeForegroundColor: widgetAppearance.usesLightGlyphs
                             ? Color.black.opacity(0.72)
                             : Color.white.opacity(0.85),
                         badgeBackgroundColor: widgetAppearance.primary(opacity: 0.46),
                         badgeHorizontalPadding: 4,
-                        badgeMinWidth: 14,
+                        badgeMinWidth: 16,
                         badgeCornerRadius: 4
                     )
 
                     Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
-                        .font(.system(size: 10, weight: .regular))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(artistLabelColor(factor: 0.6))
                         .lineLimit(1)
                 }
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, minHeight: 30, maxHeight: 30, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36, alignment: .leading)
 
             visualizer(height: 16)
         }
@@ -359,31 +367,31 @@ struct LockScreenMusicPanel: View {
                     MusicTitleMarqueeView(
                         text: musicManager.songTitle.isEmpty ? "No Music Playing" : musicManager.songTitle,
                         isExplicit: !musicManager.songTitle.isEmpty && musicManager.isCurrentTrackExplicit,
-                        font: .system(size: 18, weight: .semibold),
-                        nsFont: .title3,
+                        font: .system(size: 21, weight: .semibold),
+                        nsFont: .title2,
                         textColor: widgetAppearance.primary(),
                         minDuration: 0.55,
                         frameWidth: geo.size.width,
                         badgeSpacing: 6,
                         badgeLabel: "E",
-                        badgeHeight: 16,
+                        badgeHeight: 18,
                         badgeForegroundColor: widgetAppearance.usesLightGlyphs
                             ? Color.black.opacity(0.74)
                             : Color.white.opacity(0.88),
                         badgeBackgroundColor: widgetAppearance.primary(opacity: 0.5),
                         badgeHorizontalPadding: 5,
-                        badgeMinWidth: 17,
+                        badgeMinWidth: 19,
                         badgeCornerRadius: 5
                     )
 
                     Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundColor(artistLabelColor(factor: 0.7))
                         .lineLimit(2)
                 }
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
 
             visualizer(height: 20)
         }
@@ -605,7 +613,9 @@ struct LockScreenMusicPanel: View {
     // MARK: - Playback Controls
     
     private func playbackControls(alignment: Alignment) -> some View {
-        let spacing: CGFloat = isExpanded ? 24 : 20
+        // Tighter than before: the highlight circles are now wide enough that
+        // Apple-sized gaps between them keep the row visually grouped.
+        let spacing: CGFloat = isExpanded ? 14 : 10
         let verticalSpacing: CGFloat = (shouldShowVolumeSlider || shouldShowInlineLyrics) ? 14 : 10
 
         return VStack(spacing: verticalSpacing) {
@@ -641,11 +651,9 @@ struct LockScreenMusicPanel: View {
     }
 
     private func controlsRow(alignment: Alignment, spacing: CGFloat) -> some View {
-        let skipNudge: CGFloat = isExpanded ? 14 : 9
-
-        return HStack(spacing: spacing) {
+        HStack(spacing: spacing) {
             ForEach(Array(displayedSlots.enumerated()), id: \.offset) { _, slot in
-                slotView(for: slot, skipNudge: skipNudge)
+                slotView(for: slot)
             }
         }
         .frame(maxWidth: .infinity, alignment: alignment)
@@ -670,7 +678,7 @@ struct LockScreenMusicPanel: View {
     }
 
     @ViewBuilder
-    private func slotView(for control: MusicControlButton, skipNudge: CGFloat) -> some View {
+    private func slotView(for control: MusicControlButton) -> some View {
         let seekInterval: TimeInterval = 10
 
         switch control {
@@ -682,8 +690,9 @@ struct LockScreenMusicPanel: View {
             controlButton(
                 icon: "backward.fill",
                 size: 18,
-                interaction: .nudge(-skipNudge),
-                symbolEffect: .replace
+                interaction: .none,
+                symbolEffect: .replace,
+                skipDirection: .backward
             ) {
                 musicManager.previousTrack()
             }
@@ -691,8 +700,9 @@ struct LockScreenMusicPanel: View {
             controlButton(
                 icon: "forward.fill",
                 size: 18,
-                interaction: .nudge(skipNudge),
-                symbolEffect: .replace
+                interaction: .none,
+                symbolEffect: .replace,
+                skipDirection: .forward
             ) {
                 musicManager.nextTrack()
             }
@@ -769,19 +779,23 @@ struct LockScreenMusicPanel: View {
     }
 
     private var playPauseButton: some View {
-        let frameSize: CGFloat = isExpanded ? 80 : 54
         let iconName = musicManager.isPlaying ? "pause.fill" : "play.fill"
 
-        return HoverButton(
-            icon: iconName,
+        // Shares PanelControlButton with the rest of the row so the highlight is
+        // a full-size circle rather than HoverButton's undersized capsule.
+        return PanelControlButton(
+            glyph: .symbol(iconName),
+            frameSize: playPauseFrameSize,
+            iconSize: playPauseIconSize,
             iconColor: widgetAppearance.primary(),
-            scale: .large,
-            pressEffect: nil
+            backgroundOpacity: 0,
+            interaction: .none,
+            symbolEffect: .replace
         ) {
             registerInteraction()
             musicManager.togglePlay()
         }
-        .frame(width: frameSize, height: frameSize)
+        .accessibilityLabel(musicManager.isPlaying ? "Pause" : "Play")
     }
     
     private func controlButton(
@@ -791,16 +805,18 @@ struct LockScreenMusicPanel: View {
         activeColor: Color? = nil,
         interaction: PanelControlButton.Interaction = .none,
         symbolEffect: PanelControlButton.SymbolEffectStyle = .replace,
+        skipDirection: SkipTrackGlyph.Direction? = nil,
         action: @escaping () -> Void
     ) -> some View {
+        let glyph: PanelControlButton.Glyph = skipDirection.map { .skipArrows($0) } ?? .symbol(icon)
         let resolvedActiveColor = activeColor ?? brandAccentColor
-        let frameSize: CGFloat = isExpanded ? 56 : 32
-        let iconSize: CGFloat = isExpanded ? max(size, 24) : size
+        let frameSize: CGFloat = controlFrameSize
+        let iconSize: CGFloat = isExpanded ? max(size, controlIconSize) : size
         let iconColor = isActive ? resolvedActiveColor : widgetAppearance.primary(opacity: 0.8)
         let backgroundOpacity: Double = isActive ? 0.22 : 0.0
 
         return PanelControlButton(
-            icon: icon,
+            glyph: glyph,
             frameSize: frameSize,
             iconSize: iconSize,
             iconColor: iconColor,
@@ -814,11 +830,11 @@ struct LockScreenMusicPanel: View {
     }
     
     private var mediaOutputControlButton: some View {
-        let frameSize: CGFloat = isExpanded ? 56 : 32
-        let iconSize: CGFloat = isExpanded ? 26 : 18
+        let frameSize: CGFloat = controlFrameSize
+        let iconSize: CGFloat = controlIconSize
 
         return PanelControlButton(
-            icon: mediaOutputIcon,
+            glyph: .symbol(mediaOutputIcon),
             frameSize: frameSize,
             iconSize: iconSize,
             iconColor: shouldShowVolumeSlider ? .accentColor : widgetAppearance.primary(opacity: 0.8),
@@ -831,11 +847,11 @@ struct LockScreenMusicPanel: View {
     }
 
     private var standaloneAirPlayButton: some View {
-        let frameSize: CGFloat = isExpanded ? 56 : 32
-        let iconSize: CGFloat = isExpanded ? 26 : 18
+        let frameSize: CGFloat = controlFrameSize
+        let iconSize: CGFloat = controlIconSize
 
         return PanelControlButton(
-            icon: "airplayaudio",
+            glyph: .symbol("airplayaudio"),
             frameSize: frameSize,
             iconSize: iconSize,
             iconColor: isAirPlayPopoverPresented ? .accentColor : widgetAppearance.primary(opacity: 0.8),
@@ -1422,8 +1438,56 @@ struct LockScreenMusicPanel: View {
     }
 }
 
+/// Apple's transport-control feedback: the tint fills the whole circular
+/// target (never a ring hugging the glyph), deepens on press, and the button
+/// dips slightly while it is held.
+private struct PanelControlButtonStyle: ButtonStyle {
+    let restingOpacity: Double
+    let isHovering: Bool
+    let appearance: LockScreenWidgetAppearance
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                Circle()
+                    .fill(appearance.primary(opacity: opacity(isPressed: configuration.isPressed)))
+            )
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .animation(
+                .easeOut(duration: configuration.isPressed ? 0.09 : 0.24),
+                value: configuration.isPressed
+            )
+    }
+
+    private func opacity(isPressed: Bool) -> Double {
+        if isPressed {
+            return min(max(restingOpacity + 0.16, 0.26), 0.4)
+        }
+        if isHovering {
+            return min(max(restingOpacity + 0.08, 0.15), 0.32)
+        }
+        return restingOpacity
+    }
+}
+
 private struct PanelControlButton: View {
-    let icon: String
+    /// What the button draws. Modelling this as one value rather than an icon
+    /// name plus an optional direction keeps the two from disagreeing, and
+    /// keeps the parameter list shorter than it was before skip arrows existed.
+    enum Glyph {
+        case symbol(String)
+        /// Chevrons that march in this direction on press, the way Apple's do.
+        case skipArrows(SkipTrackGlyph.Direction)
+
+        var symbolName: String {
+            switch self {
+            case .symbol(let name): return name
+            case .skipArrows(let direction): return direction == .forward ? "forward.fill" : "backward.fill"
+            }
+        }
+    }
+
+    let glyph: Glyph
     let frameSize: CGFloat
     let iconSize: CGFloat
     let iconColor: Color
@@ -1437,20 +1501,24 @@ private struct PanelControlButton: View {
     @State private var pressOffset: CGFloat = 0
     @State private var rotationAngle: Double = 0
     @State private var wiggleToken: Int = 0
+    @State private var skipToken: Int = 0
 
     var body: some View {
         Button(action: {
             triggerPressEffect()
             action()
         }) {
-            RoundedRectangle(cornerRadius: frameSize / 2, style: .continuous)
-                .fill(backgroundColor)
-                .overlay(
-                    iconView
-                )
+            iconView
+                .frame(width: frameSize, height: frameSize)
+                .contentShape(Circle())
         }
-        .frame(width: frameSize, height: frameSize)
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(
+            PanelControlButtonStyle(
+                restingOpacity: backgroundOpacity,
+                isHovering: isHovering,
+                appearance: appearance
+            )
+        )
         .offset(x: pressOffset)
         .rotationEffect(.degrees(rotationAngle))
         .onHover { hovering in
@@ -1460,13 +1528,11 @@ private struct PanelControlButton: View {
         }
     }
 
-    private var backgroundColor: Color {
-        let hoveredOpacity = max(backgroundOpacity + 0.08, 0.18)
-        let appliedOpacity = isHovering ? hoveredOpacity : backgroundOpacity
-        return appearance.primary(opacity: min(appliedOpacity, 0.32))
-    }
-
     private func triggerPressEffect() {
+        if case .skipArrows = glyph {
+            skipToken += 1
+        }
+
         switch interaction {
         case .none:
             return
@@ -1499,7 +1565,18 @@ private struct PanelControlButton: View {
 
     @ViewBuilder
     private var iconView: some View {
-        let base = Image(systemName: icon)
+        switch glyph {
+        case .skipArrows(let direction):
+            SkipTrackGlyph(direction: direction, size: iconSize, trigger: skipToken)
+                .foregroundStyle(iconColor)
+        case .symbol:
+            symbolIconView
+        }
+    }
+
+    @ViewBuilder
+    private var symbolIconView: some View {
+        let base = Image(systemName: glyph.symbolName)
             .font(.system(size: iconSize, weight: .medium))
             .foregroundStyle(iconColor)
 
@@ -1510,7 +1587,7 @@ private struct PanelControlButton: View {
             if #available(macOS 14.0, *) {
                 base
                     .contentTransition(.symbolEffect(.replace))
-                    .symbolEffect(.bounce, value: icon)
+                    .symbolEffect(.bounce, value: glyph.symbolName)
             } else {
                 base.contentTransition(.symbolEffect(.replace))
             }

@@ -31,6 +31,7 @@
 		7EF19C172F577040005B9929 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 7EF19C162F577040005B9929 /* SwiftTerm */; };
 		A1B2C3D4E5F60718293A4B5C /* ExtensionRPCServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */; };
 		A3C83CAF84544DCE386C3BB8 /* DynamicIslandUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54078F29304A9DBBEFBDF932 /* DynamicIslandUITests.swift */; };
+		A4B5C6D7E8F90123456789AB /* AppleMusicControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */; };
 		B4777BB9FE29243B253B8306 /* SpotifyLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */; };
 		C0DECAFE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */; };
 		F1E2D3C4B5A6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */; };
@@ -80,6 +81,7 @@
 		957599910322B546D91E6F96 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A058D80A7EF44593B0F24EB7 /* DynamicIslandUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicIslandUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExtensionRPCServerTests.swift; sourceTree = "<group>"; };
+		A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleMusicControllerTests.swift; sourceTree = "<group>"; };
 		C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlyoutFrameCalculatorTests.swift; sourceTree = "<group>"; };
 		DAA671E7B1B26733F02166C5 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpotifyLibraryTests.swift; sourceTree = "<group>"; };
@@ -177,6 +179,7 @@
 		50983E4A1FCC1F5E2220FF8A /* DynamicIslandTests */ = {
 			isa = PBXGroup;
 			children = (
+				A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */,
 				C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */,
 				DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */,
 				A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */,
@@ -450,6 +453,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A4B5C6D7E8F90123456789AB /* AppleMusicControllerTests.swift in Sources */,
 				B4777BB9FE29243B253B8306 /* SpotifyLibraryTests.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5C /* ExtensionRPCServerTests.swift in Sources */,
 				F1E2D3C4B5A6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift in Sources */,
