@@ -244,6 +244,31 @@ func notchTerminalBottomCornerRadii(
     return (outerBottom, max(0, outerBottom - p))
 }
 
+/// Height of the inline lyrics line shown under the artist name on the home tab.
+///
+/// The player column is laid out inside a greedy `GeometryReader`, so the lyrics
+/// line takes its space out of the gap above the transport controls instead of
+/// growing the notch. Handing that height back keeps the controls from being
+/// crowded when lyrics are on.
+let inlineLyricsLineHeight: CGFloat = 18
+
+/// Grows the open notch by one lyrics line when the home tab renders inline lyrics.
+///
+/// The extra height is applied whenever inline lyrics are enabled rather than only
+/// while a line is on screen, so the notch keeps a stable height between lyric lines.
+func inlineLyricsAdjustedNotchSize(
+    from baseSize: CGSize,
+    isHomeTabActive: Bool
+) -> CGSize {
+    guard isHomeTabActive, Defaults[.enableLyrics], Defaults[.showCalendar] else {
+        return baseSize
+    }
+
+    var adjustedSize = baseSize
+    adjustedSize.height += inlineLyricsLineHeight
+    return adjustedSize
+}
+
 func statsAdjustedNotchSize(
     from baseSize: CGSize,
     isStatsTabActive: Bool,
