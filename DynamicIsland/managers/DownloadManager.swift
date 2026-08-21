@@ -75,6 +75,13 @@ class DownloadManager {
     private var hasPerformedInitialScan: Bool = false
     private var previousInProgressFiles: Set<String> = []
     private var ignoredFiles: Set<String> = []
+    /// Temporary files that have gone since the live activity appeared, held
+    /// until nothing is being written any more. A download that lands while
+    /// another is still going cannot be judged at the scan that sees it go —
+    /// there is still active work — and dropping it there meant a run whose
+    /// last download was cancelled closed the activity outright, with nothing
+    /// shown for the ones that had finished.
+    private var vanishedSinceActive: Set<String> = []
     
     private var downloadsDirectory: URL? {
         FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
@@ -108,6 +115,7 @@ class DownloadManager {
         hasPerformedInitialScan = false
         previousInProgressFiles.removeAll()
         ignoredFiles.removeAll()
+        vanishedSinceActive.removeAll()
         isDownloading = false
 
         let path = downloadsDirectory.path
@@ -141,6 +149,7 @@ class DownloadManager {
         hasPerformedInitialScan = false
         previousInProgressFiles.removeAll()
         ignoredFiles.removeAll()
+        vanishedSinceActive.removeAll()
         isDownloading = false
     }
     
@@ -191,10 +200,19 @@ class DownloadManager {
         let disappearedFiles = previousInProgressFiles.subtracting(inProgressFiles)
         previousInProgressFiles = inProgressFiles
 
-        let activeFiles = inProgressFiles.subtracting(ignoredFiles)
-        let hasActiveDownloads = !activeFiles.isEmpty
+        // Judged against the ignore list as it stands, before the expiry below.
+        vanishedSinceActive.formUnion(disappearedFiles.subtracting(ignoredFiles))
 
-        if hasActiveDownloads {
+        // A partial file present at launch is ignored by name, so a download
+        // already running when the app starts does not claim an activity of its
+        // own. Once that file is gone the name is free again — a later download
+        // that happens to reuse it is a new download, and was otherwise ignored
+        // for the life of the process.
+        ignoredFiles.subtract(disappearedFiles)
+
+        let activeFiles = inProgressFiles.subtracting(ignoredFiles)
+
+        if !activeFiles.isEmpty {
             // Covers both a download appearing and one still writing: the state
             // update is a no-op once the live activity is already showing.
             updateDownloadingState(isActive: true)
@@ -202,17 +220,21 @@ class DownloadManager {
         }
 
         // completion logic
-        guard isDownloading else { return }
+        guard isDownloading else {
+            vanishedSinceActive.removeAll()
+            return
+        }
 
-        // Nothing is being written any more, so the downloads that were still
-        // running have either landed on their destination or been abandoned.
-        // Only a finished one earns the completion animation; the destination
-        // never appears as a download of its own, because a file that is not
-        // still being written is not a partial download.
+        // Nothing is being written any more, so the downloads that were running
+        // have either landed on their destination or been abandoned. Only a
+        // finished one earns the completion animation; the destination never
+        // appears as a download of its own, because a file that is not still
+        // being written is not a partial download.
         let completedFiles = PartialDownload.completed(
-            among: disappearedFiles.subtracting(ignoredFiles),
+            among: vanishedSinceActive,
             nonEmptyFiles: nonEmptyFiles
         )
+        vanishedSinceActive.removeAll()
 
         if completedFiles.isEmpty {
             closeDownloadViewImmediately()

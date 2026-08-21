@@ -117,4 +117,28 @@ final class PartialDownloadTests: XCTestCase {
     func testTheDestinationIsNeverItselfADownload() {
         XCTAssertFalse(PartialDownload.isInProgress(PartialDownload.destination(of: "archive.zip.part")))
     }
+
+    /// One download landing while another is still writing must survive to the
+    /// scan that decides the outcome. The set is accumulated by the manager;
+    /// what matters here is that a mixed batch is judged per file, not as a
+    /// whole — a later cancellation must not disown an earlier completion.
+    func testCompletionSurvivesACancellationInTheSameBatch() {
+        let vanished: Set<String> = ["landed.zip.part", "abandoned.dmg.part"]
+        let onDisk: Set<String> = ["landed.zip"]
+
+        XCTAssertEqual(
+            PartialDownload.completed(among: vanished, nonEmptyFiles: onDisk),
+            ["landed.zip.part"]
+        )
+    }
+
+    /// And the reverse: nothing on disk means nothing finished, however many
+    /// files went at once.
+    func testABatchWithNothingOnDiskCompletesNothing() {
+        let vanished: Set<String> = ["one.zip.part", "two.dmg.crdownload"]
+
+        XCTAssertTrue(
+            PartialDownload.completed(among: vanished, nonEmptyFiles: ["unrelated.txt"]).isEmpty
+        )
+    }
 }
