@@ -84,7 +84,21 @@ struct LockScreenMusicPanel: View {
     private let expandedPanelCornerRadius: CGFloat = 52
     private let collapsedAlbumArtCornerRadius: CGFloat = 16
     private let expandedAlbumArtCornerRadius: CGFloat = 60
-    private let expandedContentSpacing: CGFloat = 40
+    private let expandedContentSpacing: CGFloat = 28
+
+    /// Expanded artwork fills the panel's content height rather than staying a
+    /// fixed square in the middle of it. The panel grows as the volume and
+    /// output rows appear, and a fixed square left a band of dead space above
+    /// and below the art every time it did.
+    private var expandedArtworkSize: CGFloat {
+        let contentHeight = Self.expandedSize.height + totalExtraHeight - expandedVerticalInsets
+        return min(max(contentHeight, 200), 330)
+    }
+
+    /// The top and bottom insets `panelForeground` applies when expanded.
+    private var expandedVerticalInsets: CGFloat {
+        usesSpotifyCanvasFallbackContentPresentation ? 32 : 38
+    }
 
     /// Expanded is the mode you open to read along, so the lyrics get a column
     /// of their own beside the player rather than a single line squeezed under
@@ -328,17 +342,21 @@ struct LockScreenMusicPanel: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 HStack(alignment: .center, spacing: expandedContentSpacing) {
-                    albumArtButton(size: 230, cornerRadius: expandedAlbumArtCornerRadius)
-                        .frame(width: 230, height: 230)
+                    albumArtButton(size: expandedArtworkSize, cornerRadius: expandedAlbumArtCornerRadius)
+                        .frame(width: expandedArtworkSize, height: expandedArtworkSize)
 
-                    VStack(alignment: .leading, spacing: 20) {
+                    // Title at the top, transport at the bottom, the gap taken
+                    // up between them -- rather than one clump floating in the
+                    // middle with dead space above and below it.
+                    VStack(alignment: .leading, spacing: 0) {
                         expandedHeader
+                        Spacer(minLength: 16)
                         progressBar
-                            .padding(.top, 10)
                             .frame(maxWidth: .infinity)
+                        Spacer(minLength: 12)
                         playbackControls(alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
                     if usesExpandedLyricsColumn {
                         expandedLyricsColumn
@@ -346,6 +364,7 @@ struct LockScreenMusicPanel: View {
                             .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
+                .frame(maxHeight: .infinity)
             }
         }
         .frame(maxHeight: .infinity, alignment: .center)
@@ -424,9 +443,14 @@ struct LockScreenMusicPanel: View {
                 }
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 52, maxHeight: 52, alignment: .leading)
 
-            visualizer(height: 20)
+            // Sits with the title block rather than floating off at the column's
+            // far edge, and drops out entirely when the lyrics column is there --
+            // two things competing for the same corner read as clutter.
+            if !usesExpandedLyricsColumn {
+                visualizer(height: 20)
+            }
         }
     }
 
@@ -912,7 +936,15 @@ struct LockScreenMusicPanel: View {
     /// The read-along column: the whole song, scrolling itself to the line
     /// being sung, with that line swept in time the same way the notch does it.
     private var expandedLyricsColumn: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        HStack(spacing: 0) {
+            // A hairline spine, so the column reads as its own half of the
+            // panel instead of text that drifted away from the controls.
+            Rectangle()
+                .fill(widgetAppearance.primary(opacity: 0.12))
+                .frame(width: 1)
+                .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "quote.bubble")
                     .font(.system(size: 12, weight: .semibold))
@@ -920,14 +952,15 @@ struct LockScreenMusicPanel: View {
                     .font(.system(size: 12, weight: .semibold))
             }
             .foregroundColor(widgetAppearance.primary(opacity: 0.55))
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 18)
+            .padding(.top, 2)
 
             SyncedLyricsList(
                 musicManager: musicManager,
                 style: SyncedLyricsStyle(
                     fontSize: 15,
                     lineSpacing: 12,
-                    horizontalPadding: 14,
+                    horizontalPadding: 18,
                     sung: widgetAppearance.primary(),
                     unsung: widgetAppearance.primary(opacity: 0.35),
                     idle: widgetAppearance.primary(opacity: 0.35),
@@ -948,8 +981,10 @@ struct LockScreenMusicPanel: View {
                     endPoint: .bottom
                 )
             )
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
-        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(.trailing, 4)
     }
 
     private func lyricsSection(alignment: Alignment) -> some View {
@@ -1217,13 +1252,18 @@ struct LockScreenMusicPanel: View {
             let totalCount = airPlayManager.devices.count
             let deviceRows: CGFloat = CGFloat(totalCount) * 30 + CGFloat(max(totalCount - 1, 0)) * 6
             let sliders: CGFloat = CGFloat(selectedCount) * 34
-            return min(deviceRows + sliders + 24, accessorySectionScrollMaxHeight + 16)
+            return min(deviceRows + sliders + accessorySectionChrome, accessorySectionScrollMaxHeight + 16)
         }
 
         let totalCount = max(routeManager.devices.count, 1)
         let deviceRows: CGFloat = CGFloat(totalCount) * 30 + CGFloat(max(totalCount - 1, 0)) * 6
-        return min(deviceRows + 24, accessorySectionScrollMaxHeight + 16)
+        return min(deviceRows + accessorySectionChrome, accessorySectionScrollMaxHeight + 16)
     }
+
+    /// The section's own vertical padding plus the 14pt the controls stack puts
+    /// above it. Leaving the stack's spacing out is what left the last device
+    /// row cut in half by the panel's bottom edge.
+    private var accessorySectionChrome: CGFloat { 38 }
 
     private var totalExtraHeight: CGFloat {
         sliderExtraHeight + accessorySectionExtraHeight + lyricsExtraHeight
