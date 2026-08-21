@@ -69,7 +69,10 @@ struct DynamicIslandHeader: View {
                     }
             }
 
-            HStack(spacing: 4) {
+            // 30pt targets sitting 4pt apart read as one run of buttons rather
+            // than as separate ones; 8 is the gap Apple leaves between controls
+            // of this size.
+            HStack(spacing: 8) {
                 if vm.notchState == .open && !enableMinimalisticUI {
                     if Defaults[.showMirror] {
                         Button(action: {
@@ -81,8 +84,7 @@ struct DynamicIslandHeader: View {
                                 .overlay {
                                     Image(systemName: "web.camera")
                                         .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
+                                        .font(.system(size: 15, weight: .medium))
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -112,10 +114,9 @@ struct DynamicIslandHeader: View {
                                 .fill(.black)
                                 .frame(width: 30, height: 30)
                                 .overlay {
-                                    Image(systemName: "doc.on.clipboard")
+                                    Image(systemName: "list.clipboard")
                                         .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
+                                        .font(.system(size: 15, weight: .medium))
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -155,8 +156,7 @@ struct DynamicIslandHeader: View {
                                 .overlay {
                                     Image(systemName: "eyedropper")
                                         .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
+                                        .font(.system(size: 15, weight: .medium))
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -187,8 +187,7 @@ struct DynamicIslandHeader: View {
                                 .overlay {
                                     Image(systemName: "timer")
                                         .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
+                                        .font(.system(size: 15, weight: .medium))
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -213,10 +212,9 @@ struct DynamicIslandHeader: View {
                                 .fill(.black)
                                 .frame(width: 30, height: 30)
                                 .overlay {
-                                    Image(systemName: "gear")
+                                    Image(systemName: "gearshape")
                                         .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
+                                        .font(.system(size: 15, weight: .medium))
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
