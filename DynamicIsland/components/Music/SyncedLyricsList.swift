@@ -102,9 +102,9 @@ struct SyncedLyricsList: View {
                     Text(musicManager.currentLyrics.isEmpty ? style.placeholder : musicManager.currentLyrics)
                         .font(.system(size: style.fontSize, weight: .medium))
                         .foregroundStyle(style.idle)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, style.horizontalPadding)
                         .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     // Redraw on every frame while playing so the highlight
                     // tracks the music instead of stepping line by line.
@@ -114,9 +114,13 @@ struct SyncedLyricsList: View {
 
                         LazyVStack(alignment: .leading, spacing: style.lineSpacing) {
                             ForEach(lyrics) { row in
+                                // Padding inside the width claim, not outside
+                                // it: the other order made each row the full
+                                // column wide *plus* its own insets, so long
+                                // lines ran off the panel instead of wrapping.
                                 lyricRow(row, isCurrent: row.index == current, progress: progress)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal, style.horizontalPadding)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                     .id(row.index)
                             }
                         }

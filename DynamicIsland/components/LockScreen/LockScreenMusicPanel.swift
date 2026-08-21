@@ -86,13 +86,36 @@ struct LockScreenMusicPanel: View {
     private let expandedAlbumArtCornerRadius: CGFloat = 60
     private let expandedContentSpacing: CGFloat = 28
 
+    /// One gap between the metadata, the progress row and the transport. Even
+    /// spacing beats pinning the ends: pushing title and transport apart left
+    /// the whole column's slack sitting in the two gaps between them.
+    private let expandedColumnSpacing: CGFloat = 18
+
     /// Expanded artwork fills the panel's content height rather than staying a
     /// fixed square in the middle of it. The panel grows as the volume and
     /// output rows appear, and a fixed square left a band of dead space above
     /// and below the art every time it did.
     private var expandedArtworkSize: CGFloat {
-        let contentHeight = Self.expandedSize.height + totalExtraHeight - expandedVerticalInsets
-        return min(max(contentHeight, 200), 330)
+        min(max(expandedBaseContentHeight + totalExtraHeight, 200), 360)
+    }
+
+    private var expandedBaseContentHeight: CGFloat {
+        Self.expandedSize.height - expandedVerticalInsets
+    }
+
+    /// What the expanded player's middle column actually needs. The panel then
+    /// grows by the shortfall, if any, rather than by a fixed reserve per row:
+    /// reserving for the volume and output rows on top of a height the column
+    /// already had room for is what opened the gaps between everything.
+    private var expandedColumnContentHeight: CGFloat {
+        var height: CGFloat = 52
+        height += expandedColumnSpacing + 20
+        height += expandedColumnSpacing + playPauseFrameSize
+        if shouldShowVolumeSlider {
+            height += 14 + 13
+            height += accessorySectionRawHeight
+        }
+        return height
     }
 
     /// The top and bottom insets `panelForeground` applies when expanded.
@@ -134,6 +157,12 @@ struct LockScreenMusicPanel: View {
     /// Whether the expanded player reads its lyrics in a side column. The
     /// Spotify-canvas fallback already hands its lyrics to a separate window,
     /// and drops the inline artwork, so it keeps the stacked layout.
+    /// Expanded, in the two-or-three column arrangement -- as opposed to the
+    /// Spotify-canvas fallback, which stays stacked.
+    private var usesExpandedColumnLayout: Bool {
+        isExpanded && !hidesInlineArtworkForSpotifyCanvasFallback
+    }
+
     private var usesExpandedLyricsColumn: Bool {
         isExpanded && shouldShowInlineLyrics && !hidesInlineArtworkForSpotifyCanvasFallback
     }
@@ -345,18 +374,13 @@ struct LockScreenMusicPanel: View {
                     albumArtButton(size: expandedArtworkSize, cornerRadius: expandedAlbumArtCornerRadius)
                         .frame(width: expandedArtworkSize, height: expandedArtworkSize)
 
-                    // Title at the top, transport at the bottom, the gap taken
-                    // up between them -- rather than one clump floating in the
-                    // middle with dead space above and below it.
-                    VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: expandedColumnSpacing) {
                         expandedHeader
-                        Spacer(minLength: 16)
                         progressBar
                             .frame(maxWidth: .infinity)
-                        Spacer(minLength: 12)
                         playbackControls(alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
                     if usesExpandedLyricsColumn {
                         expandedLyricsColumn
@@ -1246,6 +1270,12 @@ struct LockScreenMusicPanel: View {
     }
 
     private var accessorySectionExtraHeight: CGFloat {
+        // The expanded column has the room already; see expandedColumnContentHeight.
+        guard !usesExpandedColumnLayout else { return 0 }
+        return accessorySectionRawHeight
+    }
+
+    private var accessorySectionRawHeight: CGFloat {
         guard shouldShowAccessorySection else { return 0 }
         if shouldShowAirPlay {
             let selectedCount = airPlayManager.devices.filter(\.isSelected).count
@@ -1266,7 +1296,7 @@ struct LockScreenMusicPanel: View {
     private var accessorySectionChrome: CGFloat { 38 }
 
     private var totalExtraHeight: CGFloat {
-        sliderExtraHeight + accessorySectionExtraHeight + lyricsExtraHeight
+        panelAdditionalHeight(forExpanded: isExpanded)
     }
 
     private var totalExtraWidth: CGFloat {
@@ -1290,9 +1320,12 @@ struct LockScreenMusicPanel: View {
     }
 
     private func panelAdditionalHeight(forExpanded expanded: Bool) -> CGFloat {
-        sliderHeight(forExpanded: expanded, visible: shouldShowVolumeSlider) +
-        accessorySectionExtraHeight +
-        lyricsHeight(forExpanded: expanded, enabled: shouldShowInlineLyrics)
+        if expanded && !hidesInlineArtworkForSpotifyCanvasFallback {
+            return max(0, expandedColumnContentHeight - expandedBaseContentHeight)
+        }
+        return sliderHeight(forExpanded: expanded, visible: shouldShowVolumeSlider) +
+            accessorySectionExtraHeight +
+            lyricsHeight(forExpanded: expanded, enabled: shouldShowInlineLyrics)
     }
 
     private func updatePanelSize(animated: Bool = true) {
@@ -1613,7 +1646,7 @@ private struct PanelControlButtonStyle: ButtonStyle {
             )
             .scaleEffect(configuration.isPressed ? 0.94 : 1)
             .animation(
-                .easeOut(duration: configuration.isPressed ? 0.09 : 0.24),
+                .easeOut(duration: configuration.isPressed ? 0.06 : 0.15),
                 value: configuration.isPressed
             )
     }
@@ -1735,9 +1768,13 @@ private struct PanelControlButton: View {
 
     @ViewBuilder
     private var symbolIconView: some View {
+        // The glyph swap rides whatever animation is ambient when `isPlaying`
+        // changes, and the default is slow enough that pause reads as lagging
+        // the click. Naming a fast one here pins it.
         let base = Image(systemName: glyph.symbolName)
             .font(.system(size: iconSize, weight: .medium))
             .foregroundStyle(iconColor)
+            .animation(.snappy(duration: 0.16), value: glyph.symbolName)
 
         switch symbolEffect {
         case .replace:
