@@ -169,4 +169,19 @@ final class PartialDownloadTests: XCTestCase {
             ["archive.zip.crdownload"]
         )
     }
+
+    /// Later, not merely different. A destination that comes out older than it
+    /// was when the download started was not written by that download.
+    func testAnOlderDestinationIsNotACompletion() {
+        let before = ["archive.zip": arbitrary]
+        let after = ["archive.zip": arbitrary.addingTimeInterval(-60)]
+
+        XCTAssertTrue(
+            PartialDownload.completed(
+                among: ["archive.zip.crdownload"],
+                stamps: after,
+                stampsWhenStarted: before
+            ).isEmpty
+        )
+    }
 }

@@ -70,7 +70,10 @@ enum PartialDownload {
             let target = destination(of: name)
             guard let now = stamps[target] else { return false }
             guard let before = stampsWhenStarted[target] else { return true }
-            return now != before
+            // Later, not merely different. A destination that came out older
+            // than it was when the download started was not written by it --
+            // something restored or copied an earlier file over the name.
+            return now > before
         }
     }
 }
@@ -124,7 +127,11 @@ class DownloadManager {
             startMonitoring()
         } else {
             stopMonitoring()
-            updateDownloadingState(isActive: false)
+            // Not updateDownloadingState: stopMonitoring has already cleared
+            // isDownloading, which is the flag that call checks before doing
+            // anything, so switching the listener off mid-download left the
+            // live activity on screen with nothing left to close it.
+            closeDownloadViewImmediately()
         }
     }
     
