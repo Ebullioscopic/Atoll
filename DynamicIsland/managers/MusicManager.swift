@@ -1807,10 +1807,6 @@ class MusicManager: ObservableObject {
         let playbackPosition = max(estimatedPlaybackPosition(), elapsedTime)
         updateCurrentLyric(for: playbackPosition)
 
-        if currentLyricIndex == -1, let firstLine = lyrics.first?.text {
-            currentLyrics = firstLine
-        }
-
         if Defaults[.enableLyrics] {
             startLyricSync()
         } else {
@@ -1835,17 +1831,21 @@ class MusicManager: ObservableObject {
             }
         }
 
+        // The text is settled independently of whether the index moved. Lyrics
+        // arrive with the index already at -1, so keying the text off a change in
+        // the index leaves whatever was there before standing.
+        let newText = newIndex >= 0 && newIndex < syncedLyrics.count
+            ? syncedLyrics[newIndex].text
+            : ""
+
         if newIndex != currentLyricIndex {
             currentLyricIndex = newIndex
-            if newIndex >= 0 && newIndex < syncedLyrics.count {
-                currentLyrics = syncedLyrics[newIndex].text
-            } else {
-                // No line is current -- playback is before the first one, which
-                // happens on a fresh track and after seeking into the intro.
-                // Leaving the previous line in place shows it as though it were
-                // being sung.
-                currentLyrics = ""
-            }
+        }
+
+        // Compared before assigning: this runs on every sync tick, and writing an
+        // unchanged value would republish and redraw for nothing.
+        if currentLyrics != newText {
+            currentLyrics = newText
         }
     }
 

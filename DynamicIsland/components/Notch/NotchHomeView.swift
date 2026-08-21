@@ -303,13 +303,16 @@ struct LyricsSidePanelView: View {
                 .onAppear {
                     lyrics = Self.rows(for: musicManager.syncedLyrics, duration: musicManager.songDuration)
                     let index = musicManager.currentLyricIndex
-                    guard index >= 0, index < musicManager.syncedLyrics.count else { return }
+                    // Ask the rows, not the raw lyrics: the intro marker is keyed
+                    // to -1, which a lower bound of zero rejects, and blank gap
+                    // markers have no row of their own to scroll to.
+                    guard lyrics.contains(where: { $0.index == index }) else { return }
                     DispatchQueue.main.async {
                         proxy.scrollTo(index, anchor: .center)
                     }
                 }
                 .onChange(of: musicManager.currentLyricIndex) { _, index in
-                    guard index >= 0, index < musicManager.syncedLyrics.count else { return }
+                    guard lyrics.contains(where: { $0.index == index }) else { return }
                     withAnimation(.smooth(duration: 0.3)) {
                         proxy.scrollTo(index, anchor: .center)
                     }
