@@ -95,9 +95,42 @@ struct LockScreenMusicPanel: View {
     /// fixed square in the middle of it. The panel grows as the volume and
     /// output rows appear, and a fixed square left a band of dead space above
     /// and below the art every time it did.
+    /// The artwork is the flexible column: it takes whatever the transport row
+    /// and the lyrics column do not need. Sizing it off the panel's height
+    /// alone is what pushed the lyrics past the right edge -- the transport row
+    /// has a hard minimum width and simply refuses to be squeezed, so the
+    /// overflow came out of whatever sat beside it.
     private var expandedArtworkSize: CGFloat {
-        min(max(expandedBaseContentHeight + totalExtraHeight, 200), 360)
+        let heightBudget = expandedBaseContentHeight + totalExtraHeight
+
+        var widthBudget = Self.expandedSize.width + totalExtraWidth
+        widthBudget -= expandedHorizontalInsets
+        widthBudget -= expandedContentSpacing + minimumTransportColumnWidth
+        if usesExpandedLyricsColumn {
+            widthBudget -= expandedContentSpacing + expandedLyricsColumnWidth
+        }
+
+        return min(max(min(heightBudget, widthBudget), 180), 340)
     }
+
+    /// What the transport row cannot go below: every control at its expanded
+    /// size, the gaps between them, and a little either side. Measured from the
+    /// slots actually on screen, since the row is user-configurable.
+    private var minimumTransportColumnWidth: CGFloat {
+        let count = displayedSlots.count
+        guard count > 0 else { return 0 }
+        let hasPlayPause = displayedSlots.contains(.playPause)
+        let secondaries = CGFloat(hasPlayPause ? count - 1 : count)
+        let gaps = CGFloat(count - 1) * 14
+        return secondaries * controlFrameSize
+            + (hasPlayPause ? playPauseFrameSize : 0)
+            + gaps
+            + 24
+    }
+
+    /// The leading and trailing insets `panelForeground` applies when expanded,
+    /// which are 20pt a side in both presentations.
+    private let expandedHorizontalInsets: CGFloat = 40
 
     private var expandedBaseContentHeight: CGFloat {
         Self.expandedSize.height - expandedVerticalInsets
@@ -1308,7 +1341,11 @@ struct LockScreenMusicPanel: View {
               shouldShowInlineLyrics,
               !hidesInlineArtworkForSpotifyCanvasFallback
         else { return 0 }
-        return expandedLyricsColumnWidth
+        // The column plus room for the transport row to keep its width. Adding
+        // only the column's own width took that room out of the player side,
+        // which the transport row will not give up -- so the lyrics were the
+        // ones pushed off the edge.
+        return expandedLyricsColumnWidth + 72
     }
 
     private func lyricsHeight(forExpanded expanded: Bool, enabled: Bool) -> CGFloat {
