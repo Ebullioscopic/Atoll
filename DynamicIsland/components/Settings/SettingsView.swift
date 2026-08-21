@@ -2254,6 +2254,26 @@ private struct ExternalDisplayIntegrationsSection: View {
         SettingsTab.hudAndOSD.highlightID(for: title)
     }
 
+    /// Whether the selected DDC provider is actually running.
+    private var ddcProviderRunning: Bool {
+        switch thirdPartyDDCProvider {
+        case .betterDisplay: return betterDisplayManager.isRunning
+        case .lunar: return lunarManager.isRunning
+        }
+    }
+
+    /// Mirrors `SystemHUDManager.resolvedControlFlags()`: ownership only transfers
+    /// while integration is enabled *and* the provider is running. When the
+    /// provider is quit, Atoll handles the keys again and the saved step sizes
+    /// apply, so the controls have to come back with it.
+    private var externalOwnsBrightness: Bool {
+        enableThirdPartyDDCIntegration && ddcProviderRunning
+    }
+
+    private var externalOwnsVolume: Bool {
+        externalOwnsBrightness && enableExternalVolumeControlListener
+    }
+
     private var providerStatusText: String {
         switch thirdPartyDDCProvider {
         case .betterDisplay:
@@ -2328,8 +2348,8 @@ private struct ExternalDisplayIntegrationsSection: View {
                     }
                 }
                 .settingsHighlight(id: highlightID("Volume step"))
-                .disabled(enableExternalVolumeControlListener)
-                .help(enableExternalVolumeControlListener ? "Disabled while \"Enable external volume control listener\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
+                .disabled(externalOwnsVolume)
+                .help(externalOwnsVolume ? "Disabled while \"Enable external volume control listener\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
 
                 Stepper(value: $volumeFineStepPercent, in: 1...25) {
                     HStack {
@@ -2341,10 +2361,10 @@ private struct ExternalDisplayIntegrationsSection: View {
                     }
                 }
                 .settingsHighlight(id: highlightID("Volume fine step"))
-                .disabled(enableExternalVolumeControlListener)
-                .help(enableExternalVolumeControlListener ? "Disabled while \"Enable external volume control listener\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
+                .disabled(externalOwnsVolume)
+                .help(externalOwnsVolume ? "Disabled while \"Enable external volume control listener\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
 
-                if enableExternalVolumeControlListener {
+                if externalOwnsVolume {
                     Text("Disabled while external display volume integration is active.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -2360,8 +2380,8 @@ private struct ExternalDisplayIntegrationsSection: View {
                     }
                 }
                 .settingsHighlight(id: highlightID("Brightness step"))
-                .disabled(enableThirdPartyDDCIntegration)
-                .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is on \u{2014} that app owns the brightness keys." : "")
+                .disabled(externalOwnsBrightness)
+                .help(externalOwnsBrightness ? "Disabled while external display integration is on \u{2014} that app owns the brightness keys." : "")
 
                 Stepper(value: $brightnessFineStepPercent, in: 1...25) {
                     HStack {
@@ -2373,10 +2393,10 @@ private struct ExternalDisplayIntegrationsSection: View {
                     }
                 }
                 .settingsHighlight(id: highlightID("Brightness fine step"))
-                .disabled(enableThirdPartyDDCIntegration)
-                .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is on \u{2014} that app owns the brightness keys." : "")
+                .disabled(externalOwnsBrightness)
+                .help(externalOwnsBrightness ? "Disabled while external display integration is on \u{2014} that app owns the brightness keys." : "")
 
-                if enableThirdPartyDDCIntegration {
+                if externalOwnsBrightness {
                     Text("Disabled while external display brightness integration is active.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
