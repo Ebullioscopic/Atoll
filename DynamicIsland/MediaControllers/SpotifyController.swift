@@ -44,7 +44,9 @@ class SpotifyController: MediaControllerProtocol {
     private var sessionChangeCancellable: AnyCancellable?
 
     // Constant for time between command and update
-    private let commandUpdateDelay: Duration = .milliseconds(25)
+    private let commandUpdateDelay: Duration
+    private let commandExecutor: (String) async -> Void
+    private let playbackInfoFetcher: () async throws -> NSAppleEventDescriptor?
 
     private var lastArtworkURL: String?
     private var artworkFetchTask: Task<Void, Never>?
@@ -57,7 +59,18 @@ class SpotifyController: MediaControllerProtocol {
     private var artistMetadataFetchTask: Task<Void, Never>?
     private var currentArtistTrackURI: String?
 
-    init() {
+    init(
+        commandUpdateDelay: Duration = .milliseconds(25),
+        startsObservers: Bool = true,
+        commandExecutor: ((String) async -> Void)? = nil,
+        playbackInfoFetcher: (() async throws -> NSAppleEventDescriptor?)? = nil
+    ) {
+        self.commandUpdateDelay = commandUpdateDelay
+        self.commandExecutor = commandExecutor ?? Self.executeSpotifyCommand
+        self.playbackInfoFetcher = playbackInfoFetcher ?? Self.fetchSpotifyPlaybackInfo
+
+        guard startsObservers else { return }
+
         setupPlaybackStateChangeObserver()
         setupSessionChangeObserver()
         Task {
@@ -111,7 +124,7 @@ class SpotifyController: MediaControllerProtocol {
     func play() async { await executeCommand("play") }
     func pause() async { await executeCommand("pause") }
     func togglePlay() async { await executeCommand("playpause") }
-    func nextTrack() async { await executeCommand("next track") }
+    func nextTrack() async { await executeAndRefresh("next track") }
 
     func previousTrack() async {
         await executeAndRefresh("previous track")
@@ -299,6 +312,10 @@ class SpotifyController: MediaControllerProtocol {
         }
     }
     private func executeCommand(_ command: String) async {
+        await commandExecutor(command)
+    }
+
+    private static func executeSpotifyCommand(_ command: String) async {
         let script = "tell application \"Spotify\" to \(command)"
         try? await AppleScriptHelper.executeVoid(script)
     }
@@ -310,6 +327,10 @@ class SpotifyController: MediaControllerProtocol {
     }
 
     private func fetchPlaybackInfoAsync() async throws -> NSAppleEventDescriptor? {
+        try await playbackInfoFetcher()
+    }
+
+    private static func fetchSpotifyPlaybackInfo() async throws -> NSAppleEventDescriptor? {
         let script = """
         tell application "Spotify"
             set isRunning to true
