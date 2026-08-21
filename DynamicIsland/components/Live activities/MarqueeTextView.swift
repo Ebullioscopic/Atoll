@@ -37,6 +37,123 @@ struct MeasureSizeModifier: ViewModifier {
     }
 }
 
+enum MusicLyricsLayoutMetrics {
+    static let standardFontSize: CGFloat = 12
+    static let standardMinimumFontSize: CGFloat = 4
+    static let standardWeight: Font.Weight = .regular
+    static let standardNSWeight: NSFont.Weight = .regular
+    static let standardTopPadding: CGFloat = 2
+
+    static let minimalisticOpenFontSize: CGFloat = 12
+    static let minimalisticOpenMinimumFontSize: CGFloat = 4
+    static let minimalisticOpenWeight: Font.Weight = .semibold
+    static let minimalisticOpenNSWeight: NSFont.Weight = .semibold
+    static let minimalisticOpenTopPadding: CGFloat = 10
+
+    static let compactFontSize: CGFloat = 11
+    static let compactMinimumFontSize: CGFloat = 4
+    static let compactWeight: Font.Weight = .semibold
+    static let compactNSWeight: NSFont.Weight = .semibold
+    static let compactBottomAreaPadding: CGFloat = 4
+
+    static var standardReservedTextHeight: CGFloat {
+        TwoLineFittingText.reservedHeight(fontSize: standardFontSize, weight: standardNSWeight)
+    }
+
+    static var standardReservedAreaHeight: CGFloat {
+        standardTopPadding + standardReservedTextHeight
+    }
+
+    static var minimalisticOpenReservedTextHeight: CGFloat {
+        TwoLineFittingText.reservedHeight(fontSize: minimalisticOpenFontSize, weight: minimalisticOpenNSWeight)
+    }
+
+    static var minimalisticOpenReservedAreaHeight: CGFloat {
+        minimalisticOpenTopPadding + minimalisticOpenReservedTextHeight
+    }
+
+    static var compactReservedTextHeight: CGFloat {
+        TwoLineFittingText.reservedHeight(fontSize: compactFontSize, weight: compactNSWeight)
+    }
+
+    static var compactReservedAreaHeight: CGFloat {
+        compactBottomAreaPadding + compactReservedTextHeight
+    }
+}
+
+struct TwoLineFittingText: View {
+    let text: String
+    let fontSize: CGFloat
+    let minimumFontSize: CGFloat
+    let weight: Font.Weight
+    let nsWeight: NSFont.Weight
+    let textColor: Color
+    let alignment: Alignment
+    let multilineTextAlignment: TextAlignment
+
+    init(
+        text: String,
+        fontSize: CGFloat,
+        minimumFontSize: CGFloat,
+        weight: Font.Weight = .regular,
+        nsWeight: NSFont.Weight = .regular,
+        textColor: Color = .primary,
+        alignment: Alignment = .topLeading,
+        multilineTextAlignment: TextAlignment = .leading
+    ) {
+        self.text = text
+        self.fontSize = fontSize
+        self.minimumFontSize = minimumFontSize
+        self.weight = weight
+        self.nsWeight = nsWeight
+        self.textColor = textColor
+        self.alignment = alignment
+        self.multilineTextAlignment = multilineTextAlignment
+    }
+
+    var body: some View {
+        Text(Self.normalizedDisplayText(text))
+            .font(.system(size: fontSize, weight: weight))
+            .foregroundColor(textColor)
+            .lineLimit(2)
+            .multilineTextAlignment(multilineTextAlignment)
+            .allowsTightening(true)
+            .minimumScaleFactor(max(0.1, minimumFontSize / max(fontSize, 1)))
+            .frame(maxWidth: .infinity, alignment: alignment)
+            // Pass the caller's alignment through — .frame(height:) defaults to .center,
+            // which floated a one-line lyric half a line below the top-aligned note icon.
+            .frame(height: Self.reservedHeight(fontSize: fontSize, weight: nsWeight), alignment: alignment)
+    }
+
+    static func reservedHeight(fontSize: CGFloat, weight: NSFont.Weight = .regular) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: fontSize, weight: weight)
+        return ceil(font.ascender - font.descender + font.leading) * 2
+    }
+
+    private static func normalizedDisplayText(_ text: String) -> String {
+        let normalizedLines = text
+            .components(separatedBy: .newlines)
+            .map { line in
+                line
+                    .components(separatedBy: .whitespacesAndNewlines)
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
+            }
+            .filter { !$0.isEmpty }
+
+        guard !normalizedLines.isEmpty else { return "" }
+
+        // Plain-lyrics fallbacks can contain the full song body. Keep the preview to
+        // the first two logical lines so the UI stays readable.
+        if normalizedLines.count > 1 {
+            return normalizedLines.prefix(2).joined(separator: "\n")
+        }
+
+        return normalizedLines[0]
+    }
+
+}
+
 struct MarqueeText: View {
     @Binding var text: String
     let font: Font
@@ -58,6 +175,10 @@ struct MarqueeText: View {
         self.backgroundColor = backgroundColor
         self.minDuration = minDuration
         self.frameWidth = frameWidth
+    }
+
+    static func reservedHeight(forTextStyle textStyle: NSFont.TextStyle) -> CGFloat {
+        ceil(NSFont.preferredFont(forTextStyle: textStyle).pointSize * 1.3)
     }
     
     private var needsScrolling: Bool {
@@ -94,7 +215,7 @@ struct MarqueeText: View {
         }
         .frame(width: frameWidth, alignment: .leading)
         .clipped()
-        .frame(height: textSize.height * 1.3)
+        .frame(height: Self.reservedHeight(forTextStyle: nsFont))
     }
     
     private func resetAndStart() {
@@ -255,7 +376,7 @@ struct MusicTitleMarqueeView: View {
     }
 
     private var needsScrolling: Bool {
-        measuredTextWidth > titleFrameWidth
+        frameWidth > 0 && measuredTextWidth > titleFrameWidth
     }
 
     var body: some View {
@@ -293,5 +414,6 @@ struct MusicTitleMarqueeView: View {
             }
         }
         .frame(width: frameWidth, alignment: alignment)
+        .frame(height: MarqueeText.reservedHeight(forTextStyle: nsFont))
     }
 }

@@ -84,6 +84,8 @@ struct ContentView: View {
     @Default(.enableCapsLockIndicator) var enableCapsLockIndicator
     @Default(.enableExtensionLiveActivities) var enableExtensionLiveActivities
     @Default(.showStandardMediaControls) var showStandardMediaControls
+    @Default(.enableLyrics) var enableLyrics
+    @Default(.showCalendar) var showCalendar
     @Default(.externalDisplayStyle) var externalDisplayStyle
     @Default(.hideNonNotchUntilHover) var hideNonNotchUntilHover
     @Default(.terminalStickyMode) var terminalStickyMode
@@ -99,8 +101,24 @@ struct ContentView: View {
     
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
-        let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: isDynamicIslandMode) : openNotchSize
-        
+        // Always start from the open-size base so the frame constraint never changes
+        // when the notch opens/closes — a frame constraint change during the open
+        // transition causes HostingScrollView.retargetContentOffsetIfNeeded to see a
+        // cached _sizeThatFits result that no longer matches the live layout, which
+        // triggers beginTransaction inside a layout pass → crash.
+        var baseSize = enableMinimalisticUI ? minimalisticOpenNotchSize(isDynamicIslandMode: isDynamicIslandMode, screen: currentScreenName) : openNotchSize
+
+        // Always add the lyrics height so the frame stays stable when the notch opens.
+        // standardMusicLyricsOpenHeightAdjustment returns 0 when lyrics are off or
+        // irrelevant, so this is a no-op in most configurations.
+        baseSize.height += standardMusicLyricsOpenHeightAdjustment(
+            currentView: coordinator.currentView,
+            isMinimalistic: enableMinimalisticUI,
+            lyricsEnabled: enableLyrics,
+            standardMediaControlsEnabled: showStandardMediaControls,
+            calendarShown: showCalendar
+        )
+
         // When inline sneak peek is active in closed notch, use the wider inline width
         // so the outer maxWidth frame doesn't clip the expanded content
         let airPodsListeningModeSneakActive = vm.notchState == .closed
@@ -166,7 +184,7 @@ struct ContentView: View {
                 return CGSize(width: width, height: height)
             }
         }
-        
+
         if coordinator.currentView == .timer {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
         }
@@ -225,7 +243,9 @@ struct ContentView: View {
     
 
     @State private var hoverTask: Task<Void, Never>?
+    @State private var isHoverExitScheduled = false
     @State private var isHovering: Bool = false
+    @State private var lastNotchOpenedAt: Date = .distantPast
     @State private var lastHapticTime: Date = Date()
     @State private var hoverClickMonitor: Any?
     @State private var hoverClickLocalMonitor: Any?
@@ -288,6 +308,8 @@ struct ContentView: View {
     private let statsAdditionalRowHeight: CGFloat = statsSecondRowContentHeight + statsGridSpacingHeight
     private let musicControlPauseGrace: TimeInterval = 5
     private let musicControlResumeDelay: TimeInterval = 0.24
+    private let hoverExitDebounce: TimeInterval = 0.1
+    private let hoverOpenTransitionRecoveryWindow: TimeInterval = 0.45
 
     // MARK: - Tab switch direction for smooth transitions
     
@@ -613,7 +635,7 @@ struct ContentView: View {
         NotchLayout()
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
-            .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
+            .padding([.horizontal, .bottom], vm.notchState == .open ? openNotchSurfaceBottomPadding : 0)
             .padding(.top, isIslandMode ? 0 : notchTopScreenBleedAmount)
             .background(.black)
             .clipShape(resolvedClipShape)
@@ -805,7 +827,7 @@ struct ContentView: View {
         }
         .frame(
             maxWidth: (dynamicNotchSize.width + (vm.notchState == .open ? 24 : 0) + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)).rounded(),
-            maxHeight: (dynamicNotchSize.height + (vm.notchState == .open ? 12 : 0) + (isIslandMode ? 0 : notchTopScreenBleedAmount) + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)).rounded(),
+            maxHeight: (dynamicNotchSize.height + (vm.notchState == .open ? openNotchSurfaceBottomPadding : 0) + (isIslandMode ? 0 : notchTopScreenBleedAmount) + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)).rounded(),
             alignment: .top
         )
         .animation(nil, value: vm.notchState)
@@ -956,7 +978,7 @@ struct ContentView: View {
 
     @ViewBuilder
       func NotchLayout() -> some View {
-          VStack(alignment: .leading) {
+          VStack(alignment: .leading, spacing: vm.notchState == .open ? openNotchSectionSpacing : 0) {
               VStack(alignment: .leading) {
                   if coordinator.firstLaunch {
                       Spacer()
@@ -1979,6 +2001,7 @@ struct ContentView: View {
 
     // MARK: - Private Methods
     private func openNotch() {
+        lastNotchOpenedAt = Date()
         vm.open()
     }
 
@@ -2035,6 +2058,7 @@ struct ContentView: View {
     /// `.onDisappear` and from `vm.onViewTeardown` on window close. Idempotent.
     private func performViewTeardown() {
         hoverTask?.cancel()
+        isHoverExitScheduled = false
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
         stopHiddenEdgeHoverPolling()
@@ -2061,9 +2085,9 @@ struct ContentView: View {
                         ? self.isPointInsideNotchWindow()
                         : self.isMouseOverClosedNotchHitArea()
                     if !stillInside {
-                        self.hoverTask?.cancel()
-                        self.stopHoverClickMonitor()
-                        self.finishHoverExit()
+                        // Route through handleHover so the polled exit shares the same
+                        // debounce and open-transition recovery guard as onHover exits.
+                        self.handleHover(false)
                     }
                 }
 
@@ -2178,6 +2202,16 @@ struct ContentView: View {
     }
 
     // MARK: - Hover Management
+
+    private var remainingHoverOpenTransitionRecovery: TimeInterval {
+        max(0, hoverOpenTransitionRecoveryWindow - Date().timeIntervalSince(lastNotchOpenedAt))
+    }
+
+    private func shouldDeferHoverExitForOpenTransition(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
+        vm.notchState == .open
+            && remainingHoverOpenTransitionRecovery > 0
+            && vm.isMouseHovering(position: location)
+    }
     
     /// Handle hover state changes with debouncing
     private func handleHover(_ hovering: Bool) {
@@ -2186,7 +2220,14 @@ struct ContentView: View {
             return
         }
 
+        // The hover polls repeat their exit call every tick; rescheduling here would
+        // reset the debounce each time and race the pending exit task's timer.
+        if !hovering, isHoverExitScheduled {
+            return
+        }
+
         hoverTask?.cancel()
+        isHoverExitScheduled = false
 
         if hovering {
             if !recordingLiveActivityVisibleOnClosedNotch {
@@ -2239,11 +2280,26 @@ struct ContentView: View {
                 }
             }
         } else {
+            isHoverExitScheduled = true
             hoverTask = Task {
-                try? await Task.sleep(for: .milliseconds(100))
+                try? await Task.sleep(for: .seconds(hoverExitDebounce))
                 guard !Task.isCancelled else { return }
 
+                let transitionRecoveryDelay = await MainActor.run {
+                    self.shouldDeferHoverExitForOpenTransition()
+                        ? self.remainingHoverOpenTransitionRecovery
+                        : 0
+                }
+
+                if transitionRecoveryDelay > 0 {
+                    try? await Task.sleep(for: .seconds(transitionRecoveryDelay))
+                    guard !Task.isCancelled else { return }
+                }
+
                 await MainActor.run {
+                    // Clear before the top-edge check so a retained hover can be
+                    // rescheduled by the next poll tick or onHover event.
+                    self.isHoverExitScheduled = false
                     if self.shouldRetainHoverAtScreenTopEdge() {
                         return
                     }

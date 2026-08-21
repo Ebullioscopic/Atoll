@@ -156,7 +156,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 }
                 if let delegate = AppDelegate.shared {
                     delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
+                        openNotchWindowSize(for: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
                         animated: true,
                         force: false
                     )
@@ -164,16 +164,17 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Observe settings + lyrics changes to dynamically resize the notch
-        let enableLyricsPublisher = Defaults.publisher(.enableLyrics).map { $0.newValue }
-
-        enableLyricsPublisher
-            .combineLatest(MusicManager.shared.$currentLyrics)
-            .removeDuplicates { $0.0 == $1.0 && $0.1 == $1.1 }
+        // Lyrics reserve a fixed two-line area, so text changes should not resize the window.
+        Defaults.publisher(.enableLyrics)
+            .map { $0.newValue }
+            .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                guard Defaults[.enableMinimalisticUI] else { return }
+                guard Defaults[.enableMinimalisticUI]
+                        || standardMusicLyricsOpenHeightAffectsLayout(currentView: self.coordinator.currentView) else {
+                    return
+                }
                 let updatedTarget = self.calculateDynamicNotchSize()
                 guard self.notchState == .open else { return }
                 guard self.notchSize != updatedTarget else { return }
@@ -182,7 +183,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 }
                 if let delegate = AppDelegate.shared {
                     delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
+                        openNotchWindowSize(for: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
                         animated: true,
                         force: false
                     )
@@ -211,7 +212,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 }
                 if let delegate = AppDelegate.shared {
                     delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
+                        openNotchWindowSize(for: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
                         animated: false,
                         force: false
                     )
@@ -232,7 +233,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 }
                 if let delegate = AppDelegate.shared {
                     delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
+                        openNotchWindowSize(for: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
                         animated: true,
                         force: false
                     )
@@ -255,7 +256,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 }
                 if let delegate = AppDelegate.shared {
                     delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: false),
+                        openNotchWindowSize(for: updatedTarget, isMinimalistic: false),
                         animated: true,
                         force: false
                     )
@@ -292,7 +293,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             notchSize = updatedTarget
         }
         AppDelegate.shared?.ensureWindowSize(
-            addShadowPadding(to: updatedTarget, isMinimalistic: false),
+            openNotchWindowSize(for: updatedTarget, isMinimalistic: false),
             animated: true,
             force: false
         )
@@ -308,7 +309,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         }
         if let delegate = AppDelegate.shared {
             delegate.ensureWindowSize(
-                addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
+                openNotchWindowSize(for: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
                 animated: true,
                 force: false
             )
@@ -371,7 +372,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         let applyWindowResize: () -> Void = {
             guard let delegate = AppDelegate.shared else { return }
             delegate.ensureWindowSize(
-                addShadowPadding(to: targetSize, isMinimalistic: Defaults[.enableMinimalisticUI]),
+                openNotchWindowSize(for: targetSize, isMinimalistic: Defaults[.enableMinimalisticUI]),
                 animated: false,
                 force: true
             )
@@ -392,8 +393,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
     
     private func calculateDynamicNotchSize() -> CGSize {
-        let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
+        let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen), screen: screen) : openNotchSize
         var adjustedSize = baseSize
+        adjustedSize.height += standardMusicLyricsOpenHeightAdjustment(currentView: coordinator.currentView)
 
         if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
             let preferred = coordinator.notesLayoutState.preferredHeight

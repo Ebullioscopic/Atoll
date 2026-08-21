@@ -403,6 +403,13 @@ struct MusicControlsView: View {
     @Default(.enableLyrics) private var enableLyrics
     @Default(.showCalendar) private var showCalendar
     private let seekInterval: TimeInterval = 10
+    private let skipMagnitude: CGFloat = 6
+    private let songInfoSpacing: CGFloat = 4
+    private let songInfoTopPadding: CGFloat = 10
+    private let songInfoLeadingPadding: CGFloat = 5
+    private let musicSliderHeight: CGFloat = 36
+    private let musicSliderTopPadding: CGFloat = 5
+    private let explicitBadgeHeight: CGFloat = 14
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -419,15 +426,15 @@ struct MusicControlsView: View {
 
     private var songInfoAndSlider: some View {
         GeometryReader { geo in
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: songInfoSpacing) {
                 songInfo(width: geo.size.width)
                     .zIndex(1) // Ensure it draws above the waveform scrubber
                 musicSlider
                     .zIndex(0)
             }
         }
-        .padding(.top, 10)
-        .padding(.leading, 5)
+        .padding(.top, songInfoTopPadding)
+        .padding(.leading, songInfoLeadingPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -440,7 +447,7 @@ struct MusicControlsView: View {
                 nsFont: .headline,
                 textColor: .white,
                 frameWidth: width,
-                badgeHeight: 14
+                badgeHeight: explicitBadgeHeight
             )
             MarqueeText(
                 $musicManager.artistName,
@@ -451,6 +458,9 @@ struct MusicControlsView: View {
                 frameWidth: width
             )
             .fontWeight(.medium)
+            // Lyrics get a fixed two-line area and shrink instead of scrolling horizontally.
+            // Only rendered inline when the calendar is shown; otherwise lyrics live in
+            // the side panel (see shouldShowSideLyrics).
             if enableLyrics && showCalendar {
                 let transition = AnyTransition.asymmetric(
                     insertion: .move(edge: .bottom).combined(with: .opacity),
@@ -460,20 +470,18 @@ struct MusicControlsView: View {
                 let line = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
 
                 if !line.isEmpty {
-                    let lyricsBinding = Binding<String>(
-                        get: { musicManager.currentLyrics },
-                        set: { _ in }
-                    )
-
-                    MarqueeText(
-                        lyricsBinding,
-                        font: .system(size: 12, weight: .regular),
-                        nsFont: .headline,
+                    TwoLineFittingText(
+                        text: line,
+                        fontSize: MusicLyricsLayoutMetrics.standardFontSize,
+                        minimumFontSize: MusicLyricsLayoutMetrics.standardMinimumFontSize,
+                        weight: MusicLyricsLayoutMetrics.standardWeight,
+                        nsWeight: MusicLyricsLayoutMetrics.standardNSWeight,
                         textColor: .white.opacity(0.7),
-                        minDuration: 0.35,
-                        frameWidth: width
+                        alignment: .topLeading,
+                        multilineTextAlignment: .leading
                     )
-                    .padding(.top, 2)
+                    .frame(width: width)
+                    .padding(.top, MusicLyricsLayoutMetrics.standardTopPadding)
                     .id(line)
                     .transition(transition)
                     .animation(.easeInOut(duration: 0.32), value: line)
@@ -505,8 +513,8 @@ struct MusicControlsView: View {
                 guard !musicManager.isLiveStream else { return }
                 MusicManager.shared.seek(to: newValue)
             }
-            .padding(.top, 5)
-            .frame(height: 36)
+            .padding(.top, musicSliderTopPadding)
+            .frame(height: musicSliderHeight)
         }
     }
 

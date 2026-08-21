@@ -130,20 +130,25 @@ struct MinimalisticMusicPlayerView: View {
 
                 // Compact progress bar
                 progressBar
-                    .padding(.top, batteryOffNotchMode ? 4 : 6)
+                    .frame(height: batteryOffNotchMode ? nil : MinimalisticMusicPlayerLayoutMetrics.progressBarHeight, alignment: .center)
+                    .padding(.top, batteryOffNotchMode ? 4 : MinimalisticMusicPlayerLayoutMetrics.progressBarTopPadding)
+                    .clipped()
                 
                 // Compact playback controls
                 if shouldShowControlHUDRow {
                     controlHUDRow
-                        .padding(.top, 4)
+                        .frame(height: batteryOffNotchMode ? nil : MinimalisticMusicPlayerLayoutMetrics.playbackControlsHeight, alignment: .center)
+                        .padding(.top, MinimalisticMusicPlayerLayoutMetrics.playbackControlsTopPadding)
                 } else {
                     playbackControls
-                        .padding(.top, 4)
+                        .frame(height: batteryOffNotchMode ? nil : MinimalisticMusicPlayerLayoutMetrics.playbackControlsHeight, alignment: .center)
+                        .padding(.top, MinimalisticMusicPlayerLayoutMetrics.playbackControlsTopPadding)
                 }
 
                 if enableLyrics {
+                    // lyricsView reserves its own two-line height internally.
                     lyricsView
-                        .padding(.top, 10)
+                        .padding(.top, MusicLyricsLayoutMetrics.minimalisticOpenTopPadding)
                 }
 
                 timerCountdownSection
@@ -234,6 +239,10 @@ struct MinimalisticMusicPlayerView: View {
         coordinator.timerLiveActivityEnabled && timerManager.isExternalTimerActive
     }
 
+    private var isDynamicIslandMode: Bool {
+        shouldUseDynamicIslandMode(for: vm.screen)
+    }
+
     private var brandAccentColor: Color {
         musicManager.brandAccentColor
     }
@@ -272,16 +281,13 @@ struct MinimalisticMusicPlayerView: View {
     }
 
     private func calculateDynamicHeight() -> CGFloat {
-        let isDynamicIsland = shouldUseDynamicIslandMode(for: vm.screen)
-
         if !batteryOffNotchMode {
-            // ── Battery ON / DI: use the exact original height formula ──
-            var height: CGFloat = 50 // header
-            height += 6 + 4          // progress bar top padding + bar
-            height += 54 + 2         // controls + top padding
+            // ── Battery ON / DI: fixed metrics so the open size never varies ──
+            var height = MinimalisticMusicPlayerLayoutMetrics.baseOpenHeight(isDynamicIslandMode: isDynamicIslandMode)
 
+            // Add lyrics height if enabled in settings (reserve space even while loading)
             if enableLyrics {
-                height += 10 + 34 // lyrics padding + estimated height
+                height += MinimalisticMusicPlayerLayoutMetrics.lyricsHeight
             }
             if shouldShowTimerCountdown {
                 height += minimalisticTimerCountdownBlockHeight
@@ -289,9 +295,6 @@ struct MinimalisticMusicPlayerView: View {
             if shouldShowReminderList {
                 height += reminderListHeight
             }
-
-            height += isDynamicIsland ? 14 : 15 // top padding
-            height += isDynamicIsland ? 14 : ReminderLiveActivityManager.baselineMinimalisticBottomPadding
             return height
         }
 
@@ -303,7 +306,7 @@ struct MinimalisticMusicPlayerView: View {
         height += 54 + 2         // controls + top padding
 
         if enableLyrics {
-            height += 10 + 34
+            height += MusicLyricsLayoutMetrics.minimalisticOpenReservedAreaHeight
         }
         if shouldShowTimerCountdown {
             height += minimalisticTimerCountdownBlockHeight
@@ -457,18 +460,23 @@ struct MinimalisticMusicPlayerView: View {
             removal: .move(edge: .top).combined(with: .opacity)
         )
 
-        return HStack(spacing: 6) {
+        return HStack(alignment: .top, spacing: 6) {
             if !line.isEmpty {
                 Image(systemName: "music.note")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white.opacity(0.7))
                     .symbolRenderingMode(.monochrome)
 
-                Text(line)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.88))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                TwoLineFittingText(
+                    text: line,
+                    fontSize: MusicLyricsLayoutMetrics.minimalisticOpenFontSize,
+                    minimumFontSize: MusicLyricsLayoutMetrics.minimalisticOpenMinimumFontSize,
+                    weight: MusicLyricsLayoutMetrics.minimalisticOpenWeight,
+                    nsWeight: MusicLyricsLayoutMetrics.minimalisticOpenNSWeight,
+                    textColor: .white.opacity(0.88),
+                    alignment: .topLeading,
+                    multilineTextAlignment: .leading
+                )
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.trailing, 6)
                     .id(line)
@@ -476,7 +484,8 @@ struct MinimalisticMusicPlayerView: View {
             }
         }
         .padding(.horizontal, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: MusicLyricsLayoutMetrics.minimalisticOpenReservedTextHeight, alignment: .top)
         .animation(.smooth(duration: 0.32), value: line)
     }
     

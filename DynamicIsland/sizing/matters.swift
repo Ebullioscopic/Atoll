@@ -160,29 +160,79 @@ func enforceMinimumNotchWidth() {
         Defaults[.openNotchWidth] = width
     }
 }
-private let minimalisticBaseOpenNotchSize: CGSize = .init(width: 420, height: 180)
-private let minimalisticLyricsExtraHeight: CGFloat = 40
+enum MinimalisticMusicPlayerLayoutMetrics {
+    static let standardOpenWidth: CGFloat = 420
+    static let dynamicIslandOpenWidth: CGFloat = 340
+    static let headerHeight: CGFloat = 50
+    static let outerHeaderControlHeight: CGFloat = 30
+    static let progressBarTopPadding: CGFloat = 6
+    static let progressBarHeight: CGFloat = 22
+    static let playbackControlsTopPadding: CGFloat = 4
+    static let playbackControlsHeight: CGFloat = 60
+    static let standardTopPadding: CGFloat = 6
+    static let standardFrameTopAllowance: CGFloat = 15
+    static let dynamicIslandVerticalPadding: CGFloat = 14
+
+    static var standardBottomPadding: CGFloat {
+        ReminderLiveActivityManager.baselineMinimalisticBottomPadding
+    }
+
+    static var lyricsHeight: CGFloat {
+        MusicLyricsLayoutMetrics.minimalisticOpenReservedAreaHeight
+    }
+
+    static func topPadding(isDynamicIslandMode: Bool) -> CGFloat {
+        isDynamicIslandMode ? dynamicIslandVerticalPadding : standardTopPadding
+    }
+
+    static func bottomPadding(isDynamicIslandMode: Bool) -> CGFloat {
+        isDynamicIslandMode ? dynamicIslandVerticalPadding : standardBottomPadding
+    }
+
+    static func outerHeaderHeight(isDynamicIslandMode: Bool, screen: String? = nil) -> CGFloat {
+        let headerHeight = isDynamicIslandMode
+            ? outerHeaderControlHeight
+            : max(outerHeaderControlHeight, getClosedNotchSize(screen: screen).height)
+        return headerHeight + openNotchSectionSpacing
+    }
+
+    static func baseOpenHeight(isDynamicIslandMode: Bool) -> CGFloat {
+        headerHeight
+        + progressBarTopPadding
+        + progressBarHeight
+        + playbackControlsTopPadding
+        + playbackControlsHeight
+        + (isDynamicIslandMode ? dynamicIslandVerticalPadding : standardFrameTopAllowance)
+        + bottomPadding(isDynamicIslandMode: isDynamicIslandMode)
+    }
+}
 let minimalisticTimerCountdownTopPadding: CGFloat = 12
 let minimalisticTimerCountdownContentHeight: CGFloat = 82
 let minimalisticTimerCountdownBlockHeight: CGFloat = minimalisticTimerCountdownTopPadding + minimalisticTimerCountdownContentHeight
 let statsSecondRowContentHeight: CGFloat = 120
 let statsGridSpacingHeight: CGFloat = 12
+let openNotchSectionSpacing: CGFloat = 8
+let openNotchSurfaceBottomPadding: CGFloat = 12
 let llmUsageOpenNotchHeight: CGFloat = 220
 let llmUsageProviderCardHeight: CGFloat = 188
 let notchShadowPaddingStandard: CGFloat = 18
 let notchShadowPaddingMinimalistic: CGFloat = 12
 
 @MainActor
-func minimalisticOpenNotchSize(isDynamicIslandMode: Bool) -> CGSize {
-    var size = minimalisticBaseOpenNotchSize
-
-    if isDynamicIslandMode {
-        size.width = 340 // Reduced from 420 for a narrower pill
-        size.height = 144 // Exact height of the minimalistic music player view
-    }
+func minimalisticOpenNotchSize(isDynamicIslandMode: Bool, screen: String? = nil) -> CGSize {
+    var size = CGSize(
+        width: isDynamicIslandMode
+            ? MinimalisticMusicPlayerLayoutMetrics.dynamicIslandOpenWidth
+            : MinimalisticMusicPlayerLayoutMetrics.standardOpenWidth,
+        height: MinimalisticMusicPlayerLayoutMetrics.baseOpenHeight(isDynamicIslandMode: isDynamicIslandMode)
+            + MinimalisticMusicPlayerLayoutMetrics.outerHeaderHeight(
+                isDynamicIslandMode: isDynamicIslandMode,
+                screen: screen
+            )
+    )
 
     if Defaults[.enableLyrics] {
-        size.height += minimalisticLyricsExtraHeight
+        size.height += MinimalisticMusicPlayerLayoutMetrics.lyricsHeight
     }
     
     let reminderCount = ReminderLiveActivityManager.shared.activeWindowReminders.count
@@ -282,6 +332,53 @@ func notchShadowPaddingValue(isMinimalistic: Bool) -> CGFloat {
 
 func addShadowPadding(to size: CGSize, isMinimalistic: Bool) -> CGSize {
     CGSize(width: size.width, height: size.height + notchShadowPaddingValue(isMinimalistic: isMinimalistic))
+}
+
+func openNotchWindowSize(
+    for contentSize: CGSize,
+    isMinimalistic: Bool = Defaults[.enableMinimalisticUI]
+) -> CGSize {
+    addShadowPadding(
+        to: CGSize(
+            width: contentSize.width,
+            height: contentSize.height + openNotchSurfaceBottomPadding
+        ),
+        isMinimalistic: isMinimalistic
+    )
+}
+
+func standardMusicLyricsOpenHeightAffectsLayout(
+    currentView: NotchViews,
+    isMinimalistic: Bool = Defaults[.enableMinimalisticUI],
+    standardMediaControlsEnabled: Bool = Defaults[.showStandardMediaControls]
+) -> Bool {
+    // .extensionExperience falls back to rendering NotchHomeView when no
+    // extension payload is available, so it needs the same reserved lyric area.
+    !isMinimalistic
+        && (currentView == .home || currentView == .extensionExperience)
+        && standardMediaControlsEnabled
+}
+
+func standardMusicLyricsOpenHeightAdjustment(
+    currentView: NotchViews,
+    isMinimalistic: Bool = Defaults[.enableMinimalisticUI],
+    lyricsEnabled: Bool = Defaults[.enableLyrics],
+    standardMediaControlsEnabled: Bool = Defaults[.showStandardMediaControls],
+    calendarShown: Bool = Defaults[.showCalendar]
+) -> CGFloat {
+    // Inline lyrics only render alongside the calendar; with the calendar hidden
+    // they move to the side panel, which adds width, not height.
+    guard lyricsEnabled,
+          calendarShown,
+          standardMusicLyricsOpenHeightAffectsLayout(
+              currentView: currentView,
+              isMinimalistic: isMinimalistic,
+              standardMediaControlsEnabled: standardMediaControlsEnabled
+          ) else {
+        return 0
+    }
+
+    return MusicLyricsLayoutMetrics.standardReservedAreaHeight
 }
 
 /// Determines whether a specific screen should render the Dynamic Island pill

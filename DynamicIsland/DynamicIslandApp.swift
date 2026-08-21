@@ -541,9 +541,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return addShadowPadding(to: CGSize(width: width, height: height), isMinimalistic: Defaults[.enableMinimalisticUI])
             }
         }
-        
+
+        // NOTE: The notch window stays a constant (open) size whether the notch is
+        // open or closed — opening/closing only morphs the drawn notch shape inside
+        // it. Do NOT shrink the window to the closed size here: resizing the window on
+        // open/close makes the embedded calendar ScrollView's content offset never
+        // settle, which spins AppKit's "Update Constraints in Window" loop until it
+        // crashes. The lyrics height is added unconditionally for the same reason —
+        // so the size never changes between closed and open.
+
         // Use minimalistic or normal size based on settings
-        var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
+        var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen), screen: vm.screen) : openNotchSize
+        baseSize.height += standardMusicLyricsOpenHeightAdjustment(currentView: coordinator.currentView)
         
         // Use a consistent height for different view types
         if coordinator.currentView == .timer {
@@ -567,12 +576,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             isStatsTabActive: coordinator.currentView == .stats,
             secondRowProgress: coordinator.statsSecondRowExpansion
         )
-        let result = addShadowPadding(
-            to: adjustedContentSize,
+        return openNotchWindowSize(
+            for: adjustedContentSize,
             isMinimalistic: Defaults[.enableMinimalisticUI]
         )
-
-        return result
     }
 
     private func recordingHUDLayoutForSizing() -> RecordingHUDLayout {
@@ -880,6 +887,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.publisher(.enableMinimalisticUI, options: []).sink { [weak self] _ in
             // Update window size IMMEDIATELY (no debouncing) to prevent position shift
             self?.updateWindowSizeIfNeeded()
+        }.store(in: &cancellables)
+
+        Defaults.publisher(.showStandardMediaControls, options: []).sink { [weak self] _ in
+            self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
         
         // Observe screen recording settings changes

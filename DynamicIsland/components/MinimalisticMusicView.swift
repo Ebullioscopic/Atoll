@@ -19,13 +19,18 @@
 import SwiftUI
 import Defaults
 
-// Note: lyrics display is inlined into the main minimalistic view below and is controlled by Defaults[.enableLyrics]
+// Note: lyrics display is shown in a dedicated block below the compact main row and is controlled by Defaults[.enableLyrics]
 
 struct MinimalisticMusicView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var musicManager = MusicManager.shared
     @Default(.enableLyrics) var enableLyrics
     @State private var isHovering: Bool = false
+
+    private var lyricsExtraHeight: CGFloat {
+        guard enableLyrics else { return 0 }
+        return MusicLyricsLayoutMetrics.compactReservedAreaHeight
+    }
     
     var body: some View {
         VStack(spacing: 2) {
@@ -34,7 +39,7 @@ struct MinimalisticMusicView: View {
                 // Left: Album Art
                 albumArtView
 
-                // Middle: Song Title, Artist and Lyrics (lyrics shown under artist when enabled)
+                // Middle: Song Title and Artist
                 Rectangle()
                     .fill(.black)
                     .overlay(
@@ -62,12 +67,6 @@ struct MinimalisticMusicView: View {
                                         .lineLimit(1)
                                         .frame(maxWidth: .infinity, alignment: .center)
                                 }
-
-                                // Lyrics under the author name (same font size as author)
-                                if enableLyrics {
-                                    lyricsLineView
-                                        .font(.system(size: 11, weight: .regular))
-                                }
                             }
                             .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
                         }
@@ -78,10 +77,12 @@ struct MinimalisticMusicView: View {
                 visualizerView
             }
 
-            // (lyrics are displayed inline under the artist name)
+            if enableLyrics {
+                lyricsLineView
+                    .padding(.top, 2)
+            }
         }
-        // reserve extra height when lyrics are enabled
-        .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
+        .frame(height: vm.effectiveClosedNotchHeight + lyricsExtraHeight + (isHovering ? 8 : 0), alignment: .top)
         .onHover { hovering in
             isHovering = hovering
         }
@@ -129,18 +130,23 @@ private extension MinimalisticMusicView {
     var lyricsLineView: some View {
         let line = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        return HStack(spacing: 6) {
+        return HStack(alignment: .top, spacing: 6) {
             if !line.isEmpty {
                 Image(systemName: "music.note")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white.opacity(0.7))
                     .symbolRenderingMode(.monochrome)
 
-                Text(line)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.88))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
+                TwoLineFittingText(
+                    text: line,
+                    fontSize: MusicLyricsLayoutMetrics.compactFontSize,
+                    minimumFontSize: MusicLyricsLayoutMetrics.compactMinimumFontSize,
+                    weight: MusicLyricsLayoutMetrics.compactWeight,
+                    nsWeight: MusicLyricsLayoutMetrics.compactNSWeight,
+                    textColor: .white.opacity(0.88),
+                    alignment: .top,
+                    multilineTextAlignment: .center
+                )
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.horizontal, 6)
                     .id(line)
@@ -151,6 +157,7 @@ private extension MinimalisticMusicView {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
+        .frame(height: MusicLyricsLayoutMetrics.compactReservedTextHeight, alignment: .center)
         .animation(.smooth(duration: 0.32), value: line)
     }
 }

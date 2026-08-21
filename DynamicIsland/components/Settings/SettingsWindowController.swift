@@ -24,21 +24,19 @@ import AppKit
 import SwiftUI
 import Sparkle
 
+private final class SettingsWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
 class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
     private var updaterController: SPUStandardUpdaterController?
+    private var focusRetryWorkItem: DispatchWorkItem?
+    private var pendingPresentationWorkItem: DispatchWorkItem?
     
     private init() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 600),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        
-        super.init(window: window)
-        
-        setupWindow()
+        super.init(window: nil)
     }
     
     required init?(coder: NSCoder) {
@@ -47,22 +45,45 @@ class SettingsWindowController: NSWindowController {
     
     func setUpdaterController(_ controller: SPUStandardUpdaterController) {
         self.updaterController = controller
-        // Recreate the content view with the proper updater controller
-        setupWindow()
+        if let window {
+            installContent(in: window)
+        }
     }
     
-    private func setupWindow() {
-        guard let window = window else { return }
-        
+    private func makeWindow() -> NSWindow {
+        let window = SettingsWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 700, height: 600),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+
+        setupWindow(window)
+        ScreenCaptureVisibilityManager.shared.register(window, scope: .panelsOnly)
+        return window
+    }
+
+    private func ensureWindow() -> NSWindow {
+        if let window {
+            return window
+        }
+
+        let window = makeWindow()
+        self.window = window
+        return window
+    }
+
+    private func setupWindow(_ window: NSWindow) {
         window.title = "Atoll Settings"
         window.titlebarAppearsTransparent = false
         window.titleVisibility = .visible
         window.toolbarStyle = .unified
         window.isMovableByWindowBackground = true
         window.level = .normal
+        window.isReleasedWhenClosed = false
         
         // Make it behave like a regular app window with proper Spaces support
-        window.collectionBehavior = [.managed, .participatesInCycle]
+        window.collectionBehavior = [.managed, .participatesInCycle, .moveToActiveSpace]
         
         // Ensure proper window behavior
         window.hidesOnDeactivate = false
@@ -72,53 +93,76 @@ class SettingsWindowController: NSWindowController {
         window.isRestorable = true
         window.identifier = NSUserInterfaceItemIdentifier("DynamicIslandSettingsWindow")
         
-        // Create the SwiftUI content
+        installContent(in: window)
+        window.delegate = self
+    }
+
+    private func installContent(in window: NSWindow) {
         let settingsView = SettingsView(updaterController: updaterController)
         let hostingView = NSHostingView(rootView: settingsView)
         window.contentView = hostingView
-        
-        // Handle window closing
-        window.delegate = self
-        
-        ScreenCaptureVisibilityManager.shared.register(window, scope: .panelsOnly)
     }
     
     func showWindow() {
-        // Ensure window exists
-        _ = window
+        focusRetryWorkItem?.cancel()
+        pendingPresentationWorkItem?.cancel()
+
+        // The app normally runs as an accessory app. Switch to regular before
+        // requesting focus so AppKit can make the settings window key/main.
+        NSApp.setActivationPolicy(.regular)
+
+        let present = DispatchWorkItem { [weak self] in
+            self?.presentSettingsWindow()
+        }
+        pendingPresentationWorkItem = present
+        DispatchQueue.main.async(execute: present)
+    }
+
+    private func presentSettingsWindow() {
+        let window = ensureWindow()
 
         // Reassert regular window semantics in case any prior state mutated this window.
-        window?.level = .normal
-        window?.collectionBehavior = [.managed, .participatesInCycle]
-        
-        // If window is already visible, bring it to front properly
-        if window?.isVisible == true {
-            NSApp.activate(ignoringOtherApps: true)
-            window?.orderFrontRegardless()
-            window?.makeKeyAndOrderFront(nil)
-            return
+        window.level = .normal
+        window.collectionBehavior = [.managed, .participatesInCycle, .moveToActiveSpace]
+
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
         }
-        
-        // Show the window with proper ordering
-        window?.orderFrontRegardless()
-        window?.makeKeyAndOrderFront(nil)
-        window?.center()
-        
-        // Activate the app and ensure window gets focus
+
+        if !window.isVisible {
+            window.center()
+        }
+
+        focus(window)
+
+        let retry = DispatchWorkItem { [weak self] in
+            guard let self, let window = self.window, window.isVisible else { return }
+            self.focus(window)
+        }
+        focusRetryWorkItem = retry
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: retry)
+    }
+
+    private func focus(_ window: NSWindow) {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.unhide(nil)
+        NSRunningApplication.current.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
         NSApp.activate(ignoringOtherApps: true)
-        
-        // Force window to front after activation
-        DispatchQueue.main.async { [weak self] in
-            self?.window?.makeKeyAndOrderFront(nil)
-        }
+        window.orderFrontRegardless()
+        window.makeKeyAndOrderFront(nil)
+        window.makeMain()
     }
     
     override func close() {
+        focusRetryWorkItem?.cancel()
+        pendingPresentationWorkItem?.cancel()
         super.close()
         relinquishFocus()
     }
-    
+
     private func relinquishFocus() {
+        focusRetryWorkItem?.cancel()
+        pendingPresentationWorkItem?.cancel()
         window?.orderOut(nil)
         
         // Set app back to accessory mode immediately
