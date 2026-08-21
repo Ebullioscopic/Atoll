@@ -1393,14 +1393,20 @@ extension Defaults.Keys {
     ///
     /// Only a shortcut still sitting on the old default is moved. Anyone who picked their own
     /// keeps it — including, unavoidably, anyone who deliberately chose Cmd+Shift+C.
+    ///
+    /// The marker is written last: if this crashed between marking and moving, the migration
+    /// would be considered done while the shortcut still sat on the old key, with no second
+    /// chance to correct it. Running twice is harmless by comparison, since the second run
+    /// finds Cmd+Shift+V rather than the legacy default and changes nothing.
     static func migrateClipboardShortcutToV() {
         guard Defaults[.didMigrateClipboardShortcutToV] == false else { return }
-        Defaults[.didMigrateClipboardShortcutToV] = true
 
         let legacyDefault = KeyboardShortcuts.Shortcut(.c, modifiers: [.shift, .command])
-        guard KeyboardShortcuts.getShortcut(for: .clipboardHistoryPanel) == legacyDefault else { return }
+        if KeyboardShortcuts.getShortcut(for: .clipboardHistoryPanel) == legacyDefault {
+            KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.shift, .command]), for: .clipboardHistoryPanel)
+        }
 
-        KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.shift, .command]), for: .clipboardHistoryPanel)
+        Defaults[.didMigrateClipboardShortcutToV] = true
     }
 
     static func migrateCapsLockTintMode() {
