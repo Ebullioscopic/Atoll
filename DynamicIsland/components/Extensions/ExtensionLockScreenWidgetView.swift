@@ -237,14 +237,45 @@ struct ExtensionWidgetElementView: View {
     let element: AtollWidgetContentElement
     let accent: Color
     let allowWebInteraction: Bool
+    let actionURL: URL?
+    let onOpenURL: (() -> Void)?
+
+    init(
+        element: AtollWidgetContentElement,
+        accent: Color,
+        allowWebInteraction: Bool,
+        actionURL: URL? = nil,
+        onOpenURL: (() -> Void)? = nil
+    ) {
+        self.element = element
+        self.accent = accent
+        self.allowWebInteraction = allowWebInteraction
+        self.actionURL = actionURL
+        self.onOpenURL = onOpenURL
+    }
 
     var body: some View {
         switch element {
         case let .text(text, font: font, color: color, alignment: _):
-            Text(text)
+            let label = Text(text)
                 .font(font.swiftUIFont())
                 .foregroundStyle((color?.swiftUIColor) ?? Color.white.opacity(0.9))
                 .lineLimit(2)
+            if let actionURL {
+                Button {
+                    guard CodexThreadActionResolver.isCodexThreadURL(actionURL) else { return }
+                    guard NSWorkspace.shared.open(actionURL) else { return }
+                    onOpenURL?()
+                } label: {
+                    label
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("打开对应的 Codex 对话")
+            } else {
+                label
+            }
         case let .icon(iconDescriptor, tint):
             ExtensionIconView(
                 descriptor: iconDescriptor,

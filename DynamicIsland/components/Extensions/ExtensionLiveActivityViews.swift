@@ -33,6 +33,8 @@ struct ExtensionLiveActivityStandaloneView: View {
     let payload: ExtensionLiveActivityPayload
     let layout: ExtensionStandaloneLayout
     let isHovering: Bool
+    let onActivate: () -> Void
+    let onHoverChanged: (Bool) -> Void
 
     private var descriptor: AtollLiveActivityDescriptor { payload.descriptor }
     private var contentHeight: CGFloat { layout.contentHeight }
@@ -65,6 +67,9 @@ struct ExtensionLiveActivityStandaloneView: View {
                 .frame(width: layout.trailingWidth, height: contentHeight)
         }
         .frame(width: layout.totalWidth, height: layout.outerHeight + (isHovering ? 8 : 0))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onActivate)
+        .onHover(perform: onHoverChanged)
         .transition(
             .asymmetric(
                 insertion: .scale(scale: 0.95).combined(with: .opacity).animation(.spring(response: 0.4, dampingFraction: 0.8)),
@@ -76,6 +81,7 @@ struct ExtensionLiveActivityStandaloneView: View {
             logExtensionDiagnostics("Displaying extension live activity \(payload.descriptor.id) for \(payload.bundleIdentifier) as standalone view")
         }
         .onDisappear {
+            onHoverChanged(false)
             logExtensionDiagnostics("Hid extension live activity \(payload.descriptor.id) standalone view")
         }
     }
@@ -182,6 +188,7 @@ private func logExtensionDiagnostics(_ message: String) {
 
 struct ExtensionNotchExperienceTabView: View {
     let payload: ExtensionNotchExperiencePayload
+    let onOpenURL: (() -> Void)?
 
     @Default(.enableExtensionNotchInteractiveWebViews) private var interactiveWebViewsEnabled
 
@@ -202,7 +209,9 @@ struct ExtensionNotchExperienceTabView: View {
                             ExtensionNotchSectionView(
                                 section: section,
                                 accent: accentColor,
-                                allowWebInteraction: allowInteractiveWebViews
+                                allowWebInteraction: allowInteractiveWebViews,
+                                metadata: descriptor.metadata,
+                                onOpenURL: onOpenURL
                             )
                             .accessibilityIdentifier("extension-notch-section-\(payload.descriptor.id)-\(index)")
                         }
@@ -279,6 +288,8 @@ struct ExtensionNotchSectionView: View {
     let section: AtollNotchContentSection
     let accent: Color
     let allowWebInteraction: Bool
+    let metadata: [String: String]
+    let onOpenURL: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -315,7 +326,13 @@ struct ExtensionNotchSectionView: View {
             ExtensionWidgetElementView(
                 element: element,
                 accent: accent,
-                allowWebInteraction: allowWebInteraction
+                allowWebInteraction: allowWebInteraction,
+                actionURL: CodexThreadActionResolver.url(
+                    sectionID: section.id,
+                    elementIndex: index,
+                    metadata: metadata
+                ),
+                onOpenURL: onOpenURL
             )
             .accessibilityIdentifier("extension-notch-element-\(index)")
         }
@@ -371,7 +388,9 @@ struct ExtensionMinimalisticExperienceView: View {
                             ExtensionNotchSectionView(
                                 section: section,
                                 accent: accent,
-                                allowWebInteraction: interactiveWebViewsEnabled
+                                allowWebInteraction: interactiveWebViewsEnabled,
+                                metadata: descriptor.metadata,
+                                onOpenURL: nil
                             )
                             .accessibilityIdentifier("extension-minimalistic-section-\(payload.descriptor.id)-\(index)")
                         }

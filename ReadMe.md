@@ -38,6 +38,16 @@
 
 Atoll turns the MacBook notch into a focused command surface for media, system insight, and quick utilities. It stays out of the way until needed, then expands with responsive, native SwiftUI animations.
 
+## Built-in Codex Utility
+
+This product branch includes Codex task status as a native Atoll utility. It uses local Codex Hooks and an Atoll-bundled `CodexHookHelper`; there is no separate CodexAtoll app, menu-bar item, extension authorization flow, or second package to install.
+
+- Configure it from **Atoll Settings → Utilities → Codex**.
+- Show running, approval-waiting, and recently completed tasks in the notch.
+- Open the matching Codex conversation from the expanded task view.
+- Choose whether task previews and fullscreen Codex status are shown.
+- Build and distribute the feature as part of the single Atoll app.
+
 <p align="center">
   <img src="https://i.postimg.cc/t49mW5yN/Screenshot-2026-03-02-at-6-00-22-PM.png" alt="Atoll lock screen" width="920">
 </p>

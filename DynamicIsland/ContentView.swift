@@ -211,6 +211,7 @@ struct ContentView: View {
     @State private var stickyTerminalClickMonitor: Any?
     @State private var hiddenEdgeHoverPollingTask: Task<Void, Never>?
     @State private var isHoveringClosedMusicWaveformControl: Bool = false
+    @State private var hoveredExtensionLiveActivity: ExtensionLiveActivityPayload?
 
     @State private var gestureProgress: CGFloat = .zero
     @State private var skipGestureActiveDirection: MusicManager.SkipDirection?
@@ -577,7 +578,7 @@ struct ContentView: View {
                         if vm.notchState == .closed && Defaults[.enableHaptics] {
                             triggerHapticIfAllowed()
                         }
-                        openNotch()
+                        openNotch(targeting: hoveredExtensionLiveActivity)
                     }
                     .conditionalModifier(Defaults[.enableGestures]) { view in
                         view
@@ -971,7 +972,21 @@ struct ContentView: View {
                           ExtensionLiveActivityStandaloneView(
                               payload: extensionPayload,
                               layout: layout,
-                              isHovering: isHovering
+                              isHovering: isHovering,
+                              onActivate: {
+                                  if vm.notchState == .closed && Defaults[.enableHaptics] {
+                                      triggerHapticIfAllowed()
+                                  }
+                                  openNotch(targeting: extensionPayload)
+                              },
+                              onHoverChanged: { hovering in
+                                  if hovering {
+                                      hoveredExtensionLiveActivity = extensionPayload
+                                  } else if hoveredExtensionLiveActivity?.id == extensionPayload.id,
+                                            hoveredExtensionLiveActivity?.bundleIdentifier == extensionPayload.bundleIdentifier {
+                                      hoveredExtensionLiveActivity = nil
+                                  }
+                              }
                           )
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && !shelfState.isEmpty && !vm.hideOnClosed && !lockScreenManager.isLocked && !enableMinimalisticUI {
                           ShelfInlineLiveActivity()
@@ -1042,7 +1057,11 @@ struct ContentView: View {
                           }
                           // Extension live activity sneak peek
                           else if case let .extensionLiveActivity(bundleID, activityID) = coordinator.sneakPeek.type {
-                              if !vm.hideOnClosed && activeSneakPeekStyle == .standard {
+                              let isBuiltInCodex = CodexPresentationConstants.isBuiltInCodex(
+                                  bundleIdentifier: bundleID
+                              )
+                              if (!vm.hideOnClosed || (isBuiltInCodex && Defaults[.codexShowInFullscreen]))
+                                  && activeSneakPeekStyle == .standard {
                                   let payload = extensionLiveActivityManager.payload(bundleIdentifier: bundleID, activityID: activityID)
                                   let descriptor = payload?.descriptor
                                   let accent = (descriptor?.accentColor.swiftUIColor ?? coordinator.sneakPeek.accentColor ?? .gray)
@@ -1102,7 +1121,10 @@ struct ContentView: View {
                                 NotchTerminalView()
                             case .extensionExperience:
                                 if let payload = currentExtensionTabPayload() {
-                                    ExtensionNotchExperienceTabView(payload: payload)
+                                    ExtensionNotchExperienceTabView(
+                                        payload: payload,
+                                        onOpenURL: { vm.close() }
+                                    )
                                 } else {
                                     NotchHomeView(albumArtNamespace: albumArtNamespace)
                                 }
@@ -1620,7 +1642,9 @@ struct ContentView: View {
     }
 
     private func resolvedExtensionMusicPayload() -> ExtensionLiveActivityPayload? {
-        let candidates = extensionLiveActivityManager.sortedActivities(for: true)
+        let candidates = extensionLiveActivityManager.sortedActivities(for: true).filter {
+            isExtensionActivitySourceEnabled($0)
+        }
         guard let payload = candidates.first else {
             ExtensionRoutingDiagnostics.shared.logSuppression(
                 .music,
@@ -1631,7 +1655,17 @@ struct ContentView: View {
             return nil
         }
 
-        guard enableExtensionLiveActivities else {
+        let isBuiltInCodex = CodexPresentationConstants.isBuiltInCodex(
+            bundleIdentifier: payload.bundleIdentifier
+        )
+
+        guard CodexPresentationVisibilityPolicy.canShow(
+            isBuiltInCodex: isBuiltInCodex,
+            codexEnabled: Defaults[.enableCodexIntegration],
+            thirdPartyEnabled: enableExtensionLiveActivities,
+            hideOnClosed: vm.hideOnClosed,
+            showCodexInFullscreen: Defaults[.codexShowInFullscreen]
+        ) else {
             ExtensionRoutingDiagnostics.shared.logSuppression(
                 .music,
                 reason: "feature toggle disabled",
@@ -1653,15 +1687,6 @@ struct ContentView: View {
             ExtensionRoutingDiagnostics.shared.logSuppression(
                 .music,
                 reason: "notch is \(vm.notchState)",
-                pendingCount: candidates.count
-            )
-            return nil
-        }
-
-        guard !vm.hideOnClosed else {
-            ExtensionRoutingDiagnostics.shared.logSuppression(
-                .music,
-                reason: "hideOnClosed engaged (fullscreen)",
                 pendingCount: candidates.count
             )
             return nil
@@ -1699,7 +1724,9 @@ struct ContentView: View {
     }
 
     private func resolvedExtensionStandalonePayload(excluding musicPayloadID: String?) -> ExtensionLiveActivityPayload? {
-        let baseCandidates = extensionLiveActivityManager.sortedActivities()
+        let baseCandidates = extensionLiveActivityManager.sortedActivities().filter {
+            isExtensionActivitySourceEnabled($0)
+        }
         guard !baseCandidates.isEmpty else {
             ExtensionRoutingDiagnostics.shared.logSuppression(
                 .standalone,
@@ -1729,7 +1756,17 @@ struct ContentView: View {
             return nil
         }
 
-        guard enableExtensionLiveActivities else {
+        let isBuiltInCodex = CodexPresentationConstants.isBuiltInCodex(
+            bundleIdentifier: payload.bundleIdentifier
+        )
+
+        guard CodexPresentationVisibilityPolicy.canShow(
+            isBuiltInCodex: isBuiltInCodex,
+            codexEnabled: Defaults[.enableCodexIntegration],
+            thirdPartyEnabled: enableExtensionLiveActivities,
+            hideOnClosed: vm.hideOnClosed,
+            showCodexInFullscreen: Defaults[.codexShowInFullscreen]
+        ) else {
             ExtensionRoutingDiagnostics.shared.logSuppression(
                 .standalone,
                 reason: "feature toggle disabled",
@@ -1742,15 +1779,6 @@ struct ContentView: View {
             ExtensionRoutingDiagnostics.shared.logSuppression(
                 .standalone,
                 reason: "notch is \(vm.notchState)",
-                pendingCount: candidates.count
-            )
-            return nil
-        }
-
-        guard !vm.hideOnClosed else {
-            ExtensionRoutingDiagnostics.shared.logSuppression(
-                .standalone,
-                reason: "hideOnClosed engaged (fullscreen)",
                 pendingCount: candidates.count
             )
             return nil
@@ -1785,6 +1813,13 @@ struct ContentView: View {
 
         ExtensionRoutingDiagnostics.shared.logDisplay(.standalone, payload: payload)
         return payload
+    }
+
+    private func isExtensionActivitySourceEnabled(_ payload: ExtensionLiveActivityPayload) -> Bool {
+        if CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: payload.bundleIdentifier) {
+            return Defaults[.enableCodexIntegration]
+        }
+        return enableExtensionLiveActivities
     }
 
     private func extensionStandaloneLayout(for payload: ExtensionLiveActivityPayload, notchHeight: CGFloat, isHovering: Bool) -> ExtensionStandaloneLayout {
@@ -1879,7 +1914,13 @@ struct ContentView: View {
     }
 
     // MARK: - Private Methods
-    private func openNotch() {
+    private func openNotch(targeting liveActivity: ExtensionLiveActivityPayload? = nil) {
+        if let liveActivity,
+           let target = extensionNotchExperienceManager.linkedTabPayload(for: liveActivity) {
+            coordinator.selectedExtensionExperienceID = target.descriptor.id
+            coordinator.currentView = .extensionExperience
+        }
+
         withAnimation(.bouncy.speed(1.2)) {
             vm.open()
         }
@@ -1947,6 +1988,7 @@ struct ContentView: View {
         clearMusicControlVisibilityDeadline()
         musicControlSuppressionTask?.cancel()
         isHoveringClosedMusicWaveformControl = false
+        hoveredExtensionLiveActivity = nil
     }
 
     private func startHiddenEdgeHoverPolling() {
@@ -1988,7 +2030,7 @@ struct ContentView: View {
                 if Defaults[.enableHaptics] {
                     self.triggerHapticIfAllowed()
                 }
-                self.openNotch()
+                self.openNotch(targeting: self.hoveredExtensionLiveActivity)
             }
         }
 
@@ -2107,7 +2149,9 @@ struct ContentView: View {
                             self.coordinator.currentView = .timer
                         }
                     }
-                    self.openNotch()
+                    self.openNotch(
+                        targeting: shouldFocusTimerTab ? nil : self.hoveredExtensionLiveActivity
+                    )
                 }
             }
         } else {
@@ -2189,25 +2233,17 @@ struct ContentView: View {
     }
 
     private func currentExtensionTabPayload() -> ExtensionNotchExperiencePayload? {
-        guard Defaults[.enableThirdPartyExtensions],
-              Defaults[.enableExtensionNotchExperiences],
-              Defaults[.enableExtensionNotchTabs] else {
-            return nil
-        }
-        if let selectedID = coordinator.selectedExtensionExperienceID,
-           let payload = extensionNotchExperienceManager.payload(experienceID: selectedID) {
-            return payload
-        }
-        return extensionNotchExperienceManager.highestPriorityTabPayload()
+        extensionNotchExperienceManager.selectedTabPayload(
+            experienceID: coordinator.selectedExtensionExperienceID
+        )
     }
 
     private func extensionTabPreferredHeight(baseSize: CGSize) -> CGFloat? {
-        guard let preferred = currentExtensionTabPayload()?.descriptor.tab?.preferredHeight else {
-            return nil
-        }
-        let minHeight = baseSize.height
-        let maxHeight = baseSize.height + statsAdditionalRowHeight
-        return min(max(preferred, minHeight), maxHeight)
+        extensionNotchExperienceManager.preferredTabHeight(
+            experienceID: coordinator.selectedExtensionExperienceID,
+            baseHeight: baseSize.height,
+            standardMaximumHeight: baseSize.height + statsAdditionalRowHeight
+        )
     }
 
     // Estimate the height required for minimalistic overrides (notably web content) and clamp it to the notch bounds.

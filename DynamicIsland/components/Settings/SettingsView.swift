@@ -64,6 +64,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case downloads
     case shelf
     case shortcuts
+    case codex
     case notes
     case terminal
     case about
@@ -78,7 +79,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .hudAndOSD, .battery:                                           return .system
         case .timer, .calendar, .notes:                                      return .productivity
         case .clipboard, .screenAssistant, .colorPicker, .shelf,
-             .downloads, .shortcuts:                                         return .utilities
+             .downloads, .shortcuts, .codex:                                 return .utilities
         case .stats, .terminal:                                              return .developer
         case .extensions:                                                    return .integrations
         case .about:                                                         return .info
@@ -105,6 +106,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .downloads: return String(localized: "Downloads")
         case .shelf: return String(localized: "Shelf")
         case .shortcuts: return String(localized: "Shortcuts")
+        case .codex: return "Codex"
         case .notes: return String(localized: "Notes")
         case .terminal: return String(localized: "Terminal")
         case .about: return String(localized: "About")
@@ -131,6 +133,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .downloads: return "square.and.arrow.down"
         case .shelf: return "books.vertical"
         case .shortcuts: return "keyboard"
+        case .codex: return "terminal.fill"
         case .notes: return "note.text"
         case .terminal: return "apple.terminal"
         case .about: return "info.circle"
@@ -157,6 +160,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .downloads: return .gray
         case .shelf: return .brown
         case .shortcuts: return .orange
+        case .codex: return .blue
         case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
         case .about: return .secondary
@@ -504,6 +508,7 @@ struct SettingsView: View {
             .shelf,
             .downloads,
             .shortcuts,
+            .codex,
             // Developer
             .stats,
             .terminal,
@@ -929,6 +934,10 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .terminal, title: "Scrollback lines", keywords: ["terminal", "scrollback", "buffer", "history"], highlightID: SettingsTab.terminal.highlightID(for: "Scrollback lines")),
             SettingsSearchEntry(tab: .terminal, title: "Option as Meta", keywords: ["terminal", "option", "meta", "alt", "key"], highlightID: SettingsTab.terminal.highlightID(for: "Option as Meta")),
             SettingsSearchEntry(tab: .terminal, title: "Mouse reporting", keywords: ["terminal", "mouse", "reporting", "vim", "tmux"], highlightID: SettingsTab.terminal.highlightID(for: "Mouse reporting")),
+            SettingsSearchEntry(tab: .codex, title: "Enable Codex integration", keywords: ["codex", "hooks", "helper", "integration"], highlightID: "codex-Enable Codex integration"),
+            SettingsSearchEntry(tab: .codex, title: "Show closed status", keywords: ["codex", "notch", "status", "summary"], highlightID: "codex-Show closed status"),
+            SettingsSearchEntry(tab: .codex, title: "Show task tab", keywords: ["codex", "task", "tab", "conversation"], highlightID: "codex-Show task tab"),
+            SettingsSearchEntry(tab: .codex, title: "Show in fullscreen", keywords: ["codex", "fullscreen", "hide"], highlightID: "codex-Show in fullscreen"),
         ]
     }
 
@@ -1015,6 +1024,10 @@ struct SettingsView: View {
         case .shortcuts:
             SettingsForm(tab: .shortcuts) {
                 Shortcuts()
+            }
+        case .codex:
+            SettingsForm(tab: .codex) {
+                CodexSettingsView()
             }
         case .notes:
             SettingsForm(tab: .notes) {
@@ -3643,43 +3656,45 @@ struct About: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.bottom, 5)
 
-                Section {
-                    ForEach(UpdateChannel.availableChannels) { channel in
-                        Button {
-                            updateChannel = channel
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: channel.badgeIcon)
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(Color(channel.badgeColor))
-                                    .frame(width: 20, alignment: .center)
-
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(channel.displayName)
-                                        .foregroundStyle(.primary)
-                                    Text(channel.description)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-
-                                if updateChannel == channel {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 12, weight: .semibold))
+                if AtollDistributionConfiguration.updateFeedURL != nil {
+                    Section {
+                        ForEach(UpdateChannel.availableChannels) { channel in
+                            Button {
+                                updateChannel = channel
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: channel.badgeIcon)
+                                        .font(.system(size: 13))
                                         .foregroundStyle(Color(channel.badgeColor))
-                                }
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
+                                        .frame(width: 20, alignment: .center)
 
-                    Text("Current build: \(UpdateChannel.buildChannel.displayName)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("Update channel")
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(channel.displayName)
+                                            .foregroundStyle(.primary)
+                                        Text(channel.description)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    if updateChannel == channel {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundStyle(Color(channel.badgeColor))
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        Text("Current build: \(UpdateChannel.buildChannel.displayName)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } header: {
+                        Text("Update channel")
+                    }
                 }
                 VStack(spacing: 0) {
                     Divider()

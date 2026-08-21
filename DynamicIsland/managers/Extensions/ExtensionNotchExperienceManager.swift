@@ -48,6 +48,44 @@ final class ExtensionNotchExperienceManager: ObservableObject {
         }
     }
 
+    /// Registers an Atoll-owned experience directly in the host without using
+    /// the third-party authorization or RPC/XPC persistence path.
+    func presentBuiltIn(descriptor: AtollNotchExperienceDescriptor, bundleIdentifier: String) throws {
+        guard CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: bundleIdentifier),
+              descriptor.bundleIdentifier == bundleIdentifier else {
+            throw ExtensionValidationError.invalidDescriptor("Invalid built-in experience")
+        }
+        try ExtensionDescriptorValidator.validate(descriptor)
+
+        if let index = activeExperiences.firstIndex(where: {
+            $0.descriptor.id == descriptor.id && $0.bundleIdentifier == bundleIdentifier
+        }) {
+            activeExperiences[index] = ExtensionNotchExperiencePayload(
+                bundleIdentifier: bundleIdentifier,
+                descriptor: descriptor,
+                receivedAt: activeExperiences[index].receivedAt
+            )
+        } else {
+            activeExperiences.append(
+                ExtensionNotchExperiencePayload(
+                    bundleIdentifier: bundleIdentifier,
+                    descriptor: descriptor,
+                    receivedAt: .now
+                )
+            )
+        }
+        sortExperiences()
+    }
+
+    func dismissBuiltIn(experienceID: String, bundleIdentifier: String) {
+        guard CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: bundleIdentifier) else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            activeExperiences.removeAll {
+                $0.descriptor.id == experienceID && $0.bundleIdentifier == bundleIdentifier
+            }
+        }
+    }
+
     // MARK: - Presentation Lifecycle
 
     func present(descriptor: AtollNotchExperienceDescriptor, bundleIdentifier: String) throws {
@@ -162,12 +200,47 @@ final class ExtensionNotchExperienceManager: ObservableObject {
     // MARK: - Presentation Resolution
 
     func highestPriorityTabPayload() -> ExtensionNotchExperiencePayload? {
-        guard Defaults[.enableThirdPartyExtensions],
-              Defaults[.enableExtensionNotchExperiences],
-              Defaults[.enableExtensionNotchTabs] else {
+        activeExperiences.first(where: isTabPayloadEnabled)
+    }
+
+    func selectedTabPayload(experienceID: String?) -> ExtensionNotchExperiencePayload? {
+        if let experienceID,
+           let payload = payload(experienceID: experienceID),
+           isTabPayloadEnabled(payload) {
+            return payload
+        }
+        return highestPriorityTabPayload()
+    }
+
+    func preferredTabHeight(
+        experienceID: String?,
+        baseHeight: CGFloat,
+        standardMaximumHeight: CGFloat
+    ) -> CGFloat? {
+        guard let payload = selectedTabPayload(experienceID: experienceID),
+              let preferredHeight = payload.descriptor.tab?.preferredHeight else {
             return nil
         }
-        return activeExperiences.first(where: { $0.descriptor.tab != nil })
+
+        return ExtensionExperienceHeightResolver.preferredHeight(
+            requestedHeight: preferredHeight,
+            baseHeight: baseHeight,
+            standardMaximumHeight: standardMaximumHeight,
+            builtInMaximumHeight: CodexPresentationConstants.expandedTabPreferredHeight,
+            isBuiltInExperience: CodexPresentationConstants.isBuiltInCodex(
+                bundleIdentifier: payload.bundleIdentifier
+            )
+        )
+    }
+
+    func isTabPayloadEnabled(_ payload: ExtensionNotchExperiencePayload) -> Bool {
+        guard payload.descriptor.tab != nil else { return false }
+        if CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: payload.bundleIdentifier) {
+            return Defaults[.enableCodexIntegration] && Defaults[.codexShowTaskTab]
+        }
+        return Defaults[.enableThirdPartyExtensions]
+            && Defaults[.enableExtensionNotchExperiences]
+            && Defaults[.enableExtensionNotchTabs]
     }
 
     func minimalisticReplacementPayload() -> ExtensionNotchExperiencePayload? {
@@ -187,6 +260,38 @@ final class ExtensionNotchExperienceManager: ObservableObject {
         activeExperiences.first { $0.descriptor.id == experienceID }
     }
 
+    func linkedTabPayload(for liveActivity: ExtensionLiveActivityPayload) -> ExtensionNotchExperiencePayload? {
+        let isBuiltInCodex = CodexPresentationConstants.isBuiltInCodex(
+            bundleIdentifier: liveActivity.bundleIdentifier
+        )
+        let extensionTabsEnabled = isBuiltInCodex
+            ? Defaults[.enableCodexIntegration] && Defaults[.codexShowTaskTab]
+            : Defaults[.enableThirdPartyExtensions]
+                && Defaults[.enableExtensionNotchExperiences]
+                && Defaults[.enableExtensionNotchTabs]
+        let candidates = activeExperiences.map {
+            ExtensionExperienceRouteCandidate(
+                experienceID: $0.descriptor.id,
+                bundleIdentifier: $0.bundleIdentifier,
+                hasTabConfiguration: $0.hasTabConfiguration
+            )
+        }
+
+        guard let targetExperienceID = ExtensionExperienceRouteResolver.resolveTargetExperienceID(
+            liveActivityBundleIdentifier: liveActivity.bundleIdentifier,
+            metadata: liveActivity.descriptor.metadata,
+            extensionTabsEnabled: extensionTabsEnabled,
+            candidates: candidates
+        ) else {
+            return nil
+        }
+
+        return payload(
+            bundleIdentifier: liveActivity.bundleIdentifier,
+            experienceID: targetExperienceID
+        )
+    }
+
     // MARK: - Snapshot Sync
 
     private func sortExperiences() {
@@ -202,14 +307,20 @@ final class ExtensionNotchExperienceManager: ObservableObject {
 
     private func broadcastSnapshot() {
         guard !suppressBroadcast else { return }
-        eventBridge.broadcastNotchExperienceSnapshot(activeExperiences)
+        let externalExperiences = activeExperiences.filter {
+            !CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: $0.bundleIdentifier)
+        }
+        eventBridge.broadcastNotchExperienceSnapshot(externalExperiences)
         logDiagnostics("Broadcasted notch experience snapshot (count: \(activeExperiences.count))")
     }
 
     private func applySnapshot(_ payloads: [ExtensionNotchExperiencePayload], sourcePID: Int32) {
         guard sourcePID != currentProcessID else { return }
         suppressBroadcast = true
-        activeExperiences = payloads.sorted(by: descriptorComparator)
+        let builtInExperiences = activeExperiences.filter {
+            CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: $0.bundleIdentifier)
+        }
+        activeExperiences = (payloads + builtInExperiences).sorted(by: descriptorComparator)
         suppressBroadcast = false
         logDiagnostics("Applied external notch experience snapshot from PID \(sourcePID) (count: \(payloads.count))")
     }

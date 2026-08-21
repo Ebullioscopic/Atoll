@@ -1168,6 +1168,14 @@ extension Defaults.Keys {
     static let enableThinkingMode = Key<Bool>("enableThinkingMode", default: false)
     static let localModelEndpoint = Key<String>("localModelEndpoint", default: "http://localhost:11434")
 
+    // MARK: Codex Utility
+    static let enableCodexIntegration = Key<Bool>("enableCodexIntegration", default: true)
+    static let codexShowClosedStatus = Key<Bool>("codexShowClosedStatus", default: true)
+    static let codexShowTaskTab = Key<Bool>("codexShowTaskTab", default: true)
+    static let codexCompletionNotifications = Key<Bool>("codexCompletionNotifications", default: true)
+    static let codexShowContentPreviews = Key<Bool>("codexShowContentPreviews", default: true)
+    static let codexShowInFullscreen = Key<Bool>("codexShowInFullscreen", default: true)
+
     // MARK: Third-Party Extensions
     static let enableThirdPartyExtensions = Key<Bool>("enableThirdPartyExtensions", default: true)
     static let enableExtensionLiveActivities = Key<Bool>("enableExtensionLiveActivities", default: true)

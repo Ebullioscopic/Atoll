@@ -48,6 +48,52 @@ final class ExtensionLiveActivityManager: ObservableObject {
         }
     }
 
+    /// Registers an Atoll-owned activity directly in the host. Built-in sources
+    /// bypass third-party authorization and are never written to the extension
+    /// transport snapshot.
+    func presentBuiltIn(descriptor: AtollLiveActivityDescriptor, bundleIdentifier: String) throws {
+        guard CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: bundleIdentifier),
+              descriptor.isValid else {
+            throw ExtensionValidationError.invalidDescriptor("Invalid built-in activity")
+        }
+
+        let isUpdate: Bool
+        if let index = activeActivities.firstIndex(where: {
+            $0.descriptor.id == descriptor.id && $0.bundleIdentifier == bundleIdentifier
+        }) {
+            activeActivities[index] = ExtensionLiveActivityPayload(
+                bundleIdentifier: bundleIdentifier,
+                descriptor: descriptor,
+                receivedAt: activeActivities[index].receivedAt
+            )
+            isUpdate = true
+        } else {
+            activeActivities.append(
+                ExtensionLiveActivityPayload(
+                    bundleIdentifier: bundleIdentifier,
+                    descriptor: descriptor,
+                    receivedAt: .now
+                )
+            )
+            isUpdate = false
+        }
+        sortActivities()
+
+        let config = descriptor.sneakPeekConfig ?? .default
+        if config.enabled && (!isUpdate || config.showOnUpdate) {
+            triggerSneakPeek(for: descriptor, bundleIdentifier: bundleIdentifier, config: config)
+        }
+    }
+
+    func dismissBuiltIn(activityID: String, bundleIdentifier: String) {
+        guard CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: bundleIdentifier) else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            activeActivities.removeAll {
+                $0.descriptor.id == activityID && $0.bundleIdentifier == bundleIdentifier
+            }
+        }
+    }
+
     func present(descriptor: AtollLiveActivityDescriptor, bundleIdentifier: String) throws {
         guard authorizationManager.canProcessLiveActivityRequest(from: bundleIdentifier) else {
             logDiagnostics("Rejected live activity \(descriptor.id) from \(bundleIdentifier): scope disabled or bundle unauthorized")
@@ -174,14 +220,20 @@ final class ExtensionLiveActivityManager: ObservableObject {
 
     private func broadcastSnapshot() {
         guard !suppressBroadcast else { return }
-        eventBridge.broadcastLiveActivitySnapshot(activeActivities)
+        let externalActivities = activeActivities.filter {
+            !CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: $0.bundleIdentifier)
+        }
+        eventBridge.broadcastLiveActivitySnapshot(externalActivities)
         logDiagnostics("Broadcasted live activity snapshot (count: \(activeActivities.count))")
     }
 
     private func applySnapshot(_ payloads: [ExtensionLiveActivityPayload], sourcePID: Int32) {
         guard sourcePID != currentProcessID else { return }
         suppressBroadcast = true
-        activeActivities = payloads.sorted(by: descriptorComparator)
+        let builtInActivities = activeActivities.filter {
+            CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: $0.bundleIdentifier)
+        }
+        activeActivities = (payloads + builtInActivities).sorted(by: descriptorComparator)
         suppressBroadcast = false
         logDiagnostics("Applied external live activity snapshot from PID \(sourcePID) (count: \(payloads.count))")
     }

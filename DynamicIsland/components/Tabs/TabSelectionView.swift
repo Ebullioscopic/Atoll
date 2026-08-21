@@ -95,21 +95,19 @@ struct TabSelectionView: View {
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
-        if extensionTabsEnabled {
-            for payload in extensionTabPayloads {
-                guard let tab = payload.descriptor.tab else { continue }
-                let accent = payload.descriptor.accentColor.swiftUIColor
-                let iconName = tab.iconSymbolName ?? "puzzlepiece.extension"
-                tabsArray.append(
-                    TabModel(
-                        label: tab.title,
-                        icon: iconName,
-                        view: .extensionExperience,
-                        experienceID: payload.descriptor.id,
-                        accentColor: accent
-                    )
+        for payload in availableNotchTabPayloads {
+            guard let tab = payload.descriptor.tab else { continue }
+            let accent = payload.descriptor.accentColor.swiftUIColor
+            let iconName = tab.iconSymbolName ?? "puzzlepiece.extension"
+            tabsArray.append(
+                TabModel(
+                    label: tab.title,
+                    icon: iconName,
+                    view: .extensionExperience,
+                    experienceID: payload.descriptor.id,
+                    accentColor: accent
                 )
-            }
+            )
         }
         return tabsArray
     }
@@ -155,8 +153,14 @@ struct TabSelectionView: View {
         enableThirdPartyExtensions && enableExtensionNotchExperiences && enableExtensionNotchTabs
     }
 
-    private var extensionTabPayloads: [ExtensionNotchExperiencePayload] {
-        extensionNotchExperienceManager.activeExperiences.filter { $0.descriptor.tab != nil }
+    private var availableNotchTabPayloads: [ExtensionNotchExperiencePayload] {
+        extensionNotchExperienceManager.activeExperiences.filter { payload in
+            guard payload.descriptor.tab != nil else { return false }
+            if CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: payload.bundleIdentifier) {
+                return Defaults[.enableCodexIntegration] && Defaults[.codexShowTaskTab]
+            }
+            return extensionTabsEnabled
+        }
     }
 
     private var homeTabVisible: Bool {

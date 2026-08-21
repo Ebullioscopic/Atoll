@@ -221,6 +221,20 @@ class DynamicIslandViewCoordinator: ObservableObject {
             }
             .store(in: &cancellables)
 
+        Defaults.publisher(.enableCodexIntegration)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.handleExtensionFeatureToggle()
+            }
+            .store(in: &cancellables)
+
+        Defaults.publisher(.codexShowTaskTab)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.handleExtensionFeatureToggle()
+            }
+            .store(in: &cancellables)
+
         handleExtensionExperienceSnapshot(extensionNotchExperienceManager.activeExperiences)
 
         // Observe all tab-affecting settings to enforce minimum notch width
@@ -287,13 +301,13 @@ class DynamicIslandViewCoordinator: ObservableObject {
     }
 
     private func handleExtensionExperienceSnapshot(_ experiences: [ExtensionNotchExperiencePayload]) {
-        guard extensionTabsAllowed else {
-            selectedExtensionExperienceID = nil
-            resetExtensionViewIfNeeded()
-            return
+        let tabCapablePayloads = experiences.filter { payload in
+            guard payload.descriptor.tab != nil else { return false }
+            if CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: payload.bundleIdentifier) {
+                return Defaults[.enableCodexIntegration] && Defaults[.codexShowTaskTab]
+            }
+            return extensionTabsAllowed
         }
-
-        let tabCapablePayloads = experiences.filter { $0.descriptor.tab != nil }
         guard !tabCapablePayloads.isEmpty else {
             selectedExtensionExperienceID = nil
             resetExtensionViewIfNeeded()

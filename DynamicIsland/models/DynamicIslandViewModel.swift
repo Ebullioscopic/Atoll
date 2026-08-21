@@ -367,6 +367,16 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             return adjustedSize
         }
 
+        if coordinator.currentView == .extensionExperience,
+           let preferredHeight = ExtensionNotchExperienceManager.shared.preferredTabHeight(
+               experienceID: coordinator.selectedExtensionExperienceID,
+               baseHeight: adjustedSize.height,
+               standardMaximumHeight: adjustedSize.height + statsSecondRowContentHeight + statsGridSpacingHeight
+           ) {
+            adjustedSize.height = preferredHeight
+            return adjustedSize
+        }
+
         return statsAdjustedNotchSize(
             from: adjustedSize,
             isStatsTabActive: coordinator.currentView == .stats,
