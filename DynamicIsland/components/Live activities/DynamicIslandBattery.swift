@@ -91,9 +91,13 @@ struct BatteryView: View {
 
                 RoundedRectangle(cornerRadius: bodyRadius - inset * 0.5, style: .continuous)
                     .fill(batteryColor)
-                    // Never narrower than it is tall, so a nearly flat battery
-                    // still reads as a rounded nub rather than a sliver.
-                    .frame(width: max((batteryWidth - inset * 2) * fraction, height - inset * 2))
+                    // Proportional, with a floor only above zero and only wide
+                    // enough to be visible. Flooring it at the body's height
+                    // instead -- reasoning that a fill wants to be at least as
+                    // wide as it is round -- put the floor at 12.6pt of a 27pt
+                    // track on a 30pt battery, so an empty one drew as 47% full
+                    // and every level below that was overstated.
+                    .frame(width: fillWidth(fraction: fraction, inset: inset))
                     .padding(inset)
 
                 HStack(spacing: height * 0.04) {
@@ -119,6 +123,11 @@ struct BatteryView: View {
         }
         .animation(.smooth(duration: 0.3), value: levelBattery)
         .animation(.smooth(duration: 0.3), value: batteryColor)
+    }
+
+    private func fillWidth(fraction: CGFloat, inset: CGFloat) -> CGFloat {
+        guard fraction > 0 else { return 0 }
+        return max((batteryWidth - inset * 2) * fraction, 2)
     }
 
     /// The unfilled part of the battery, and its terminal. Light enough that
