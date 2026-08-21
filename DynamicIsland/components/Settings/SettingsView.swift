@@ -896,6 +896,8 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .stats, title: "Codex Provider", keywords: ["llm", "codex", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Codex Provider")),
             SettingsSearchEntry(tab: .stats, title: "Cursor Provider", keywords: ["llm", "cursor", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Cursor Provider")),
             SettingsSearchEntry(tab: .stats, title: "Antigravity Provider", keywords: ["llm", "antigravity", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Antigravity Provider")),
+            SettingsSearchEntry(tab: .stats, title: "New API Provider", keywords: ["llm", "new api", "newapi", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "New API Provider")),
+            SettingsSearchEntry(tab: .stats, title: "New API Accounts", keywords: ["llm", "new api", "newapi", "accounts", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "New API Accounts")),
             SettingsSearchEntry(tab: .stats, title: "Stop monitoring after closing the notch", keywords: ["stats", "auto stop"], highlightID: SettingsTab.stats.highlightID(for: "Stop monitoring after closing the notch")),
             SettingsSearchEntry(tab: .stats, title: "CPU Usage", keywords: ["cpu", "graph"], highlightID: SettingsTab.stats.highlightID(for: "CPU Usage")),
             SettingsSearchEntry(tab: .stats, title: "Temperature unit", keywords: ["cpu", "temperature", "celsius", "fahrenheit"], highlightID: SettingsTab.stats.highlightID(for: "Temperature unit")),
@@ -7309,6 +7311,7 @@ struct StatsSettings: View {
     @ObservedObject var statsManager = StatsManager.shared
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.enableLLMUsageFeature) var enableLLMUsageFeature
+    @Default(.enableNewAPIProvider) var enableNewAPIProvider
     @Default(.statsStopWhenNotchCloses) var statsStopWhenNotchCloses
     @Default(.statsUpdateInterval) var statsUpdateInterval
     @Default(.showCpuGraph) var showCpuGraph
@@ -7317,6 +7320,10 @@ struct StatsSettings: View {
     @Default(.showNetworkGraph) var showNetworkGraph
     @Default(.showDiskGraph) var showDiskGraph
     @Default(.cpuTemperatureUnit) var cpuTemperatureUnit
+    @State private var newAPIAccounts = Defaults[.newAPIAccounts]
+    @State private var isNewAPIEditorPresented = false
+    @State private var editingNewAPIAccount: NewAPIAccount?
+    @State private var accountPendingDeletion: NewAPIAccount?
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.stats.highlightID(for: title)
@@ -7390,10 +7397,74 @@ struct StatsSettings: View {
                         Text("Antigravity")
                     }
                     .settingsHighlight(id: highlightID("Antigravity Provider"))
+
+                    Defaults.Toggle(key: .enableNewAPIProvider) {
+                        Text("New API")
+                    }
+                    .settingsHighlight(id: highlightID("New API Provider"))
+                    .onChange(of: enableNewAPIProvider) { _, _ in
+                        LLMUsageManager.shared.refreshAll(force: true)
+                    }
                 } header: {
                     Text("LLM Providers")
                 } footer: {
                     Text("Choose which AI providers appear in the Usage tab.")
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    .font(.caption)
+                }
+
+                Section {
+                    if newAPIAccounts.isEmpty {
+                        Text("Add one or more New API accounts to monitor their balance and usage.")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    } else {
+                        ForEach(newAPIAccounts) { account in
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(account.name)
+                                    Text(account.baseURL)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+
+                                Spacer()
+
+                                Button {
+                                    editingNewAPIAccount = account
+                                    isNewAPIEditorPresented = true
+                                } label: {
+                                    Image(systemName: "pencil")
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Edit New API account")
+
+                                Button(role: .destructive) {
+                                    accountPendingDeletion = account
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Delete New API account")
+                            }
+                        }
+                    }
+
+                    Button {
+                        editingNewAPIAccount = nil
+                        isNewAPIEditorPresented = true
+                    } label: {
+                        Label("Add New API Account", systemImage: "plus")
+                    }
+                    .buttonStyle(.bordered)
+                    .settingsHighlight(id: highlightID("New API Accounts"))
+                } header: {
+                    Text("New API Accounts")
+                } footer: {
+                    Text("API keys are stored in the macOS Keychain. Balance and usage are shown in the quota units reported by your New API server.")
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                         .font(.caption)
@@ -7600,6 +7671,113 @@ struct StatsSettings: View {
             }
         }
         .navigationTitle("Stats")
+        .onAppear {
+            newAPIAccounts = Defaults[.newAPIAccounts]
+        }
+        .sheet(isPresented: $isNewAPIEditorPresented) {
+            NewAPIAccountEditor(account: editingNewAPIAccount) { account, apiKey in
+                try NewAPIAccountStore.upsert(account, apiKey: apiKey)
+                newAPIAccounts = Defaults[.newAPIAccounts]
+                LLMUsageManager.shared.refreshAll(force: true)
+                isNewAPIEditorPresented = false
+            }
+        }
+        .confirmationDialog(
+            "Delete New API account?",
+            isPresented: Binding(
+                get: { accountPendingDeletion != nil },
+                set: { if !$0 { accountPendingDeletion = nil } }
+            ),
+            presenting: accountPendingDeletion
+        ) { account in
+            Button("Delete \(account.name)", role: .destructive) {
+                do {
+                    try NewAPIAccountStore.delete(account)
+                    newAPIAccounts = Defaults[.newAPIAccounts]
+                    LLMUsageManager.shared.refreshAll(force: true)
+                } catch {
+                    // Keychain deletion failures should not remove the visible account silently.
+                }
+                accountPendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) {
+                accountPendingDeletion = nil
+            }
+        } message: { account in
+            Text("This removes \(account.name) and its stored API key from Atoll.")
+        }
+    }
+}
+
+private struct NewAPIAccountEditor: View {
+    let account: NewAPIAccount?
+    let onSave: (NewAPIAccount, String) throws -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var baseURL: String
+    @State private var apiKey: String
+    @State private var errorMessage: String?
+
+    init(account: NewAPIAccount?, onSave: @escaping (NewAPIAccount, String) throws -> Void) {
+        self.account = account
+        self.onSave = onSave
+        _name = State(initialValue: account?.name ?? "")
+        _baseURL = State(initialValue: account?.baseURL ?? "https://")
+        _apiKey = State(initialValue: account.map { NewAPIKeychain.read(accountID: $0.id) ?? "" } ?? "")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(account == nil ? "Add New API Account" : "Edit New API Account")
+                .font(.title3.weight(.semibold))
+
+            Form {
+                TextField("Account name", text: $name)
+                TextField("Base URL", text: $baseURL)
+                    .textContentType(.URL)
+                SecureField("API key", text: $apiKey)
+                    .textContentType(.password)
+            }
+            .formStyle(.grouped)
+            .frame(width: 420)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Save") {
+                    save()
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 470)
+    }
+
+    private func save() {
+        let updated = NewAPIAccount(
+            id: account?.id ?? UUID(),
+            name: name,
+            baseURL: baseURL
+        )
+        do {
+            try onSave(updated, apiKey)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

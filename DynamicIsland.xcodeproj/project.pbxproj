@@ -36,6 +36,7 @@
 		C0DECAFE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */; };
 		B1C2D3E4F5A60718293A4B01 /* MediaKeyTapRetryPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5A60718293A4B02 /* MediaKeyTapRetryPolicyTests.swift */; };
 		F1E2D3C4B5A6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */; };
+		F5A6B7C8D9E0F1A2B3C4D5E6 /* NewAPIUsageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6B7C8D9E0F1A2B3C4D5E6F7 /* NewAPIUsageTests.swift */; };
 		F3E4D5C6B7A8E9F0A1B2C3D4 /* Contents/Helpers/NowPlayingTestClient in CopyFiles */ = {isa = PBXBuildFile; fileRef = F2E3D4C5B6A7E8F9A0B1C2D3 /* Contents/Helpers/NowPlayingTestClient */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		F910B9C812C7AEFE2293F7D2 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 47C39E67B09152F6665ED683 /* Cocoa.framework */; };
 /* End PBXBuildFile section */
@@ -88,6 +89,7 @@
 		DAA671E7B1B26733F02166C5 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpotifyLibraryTests.swift; sourceTree = "<group>"; };
 		E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JSONLUsageParserTests.swift; sourceTree = "<group>"; };
+		F6B7C8D9E0F1A2B3C4D5E6F7 /* NewAPIUsageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewAPIUsageTests.swift; sourceTree = "<group>"; };
 		F2E3D4C5B6A7E8F9A0B1C2D3 /* Contents/Helpers/NowPlayingTestClient */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.executable"; path = Contents/Helpers/NowPlayingTestClient; sourceTree = "<group>"; };
 		F4C1DD09EC134302938E84F6 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = Frameworks/MediaRemoteAdapter.framework; sourceTree = SOURCE_ROOT; };
 		F54406E72CD4987A00C7AFD9 /* Atoll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atoll.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -187,6 +189,7 @@
 				DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */,
 				A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */,
 				E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */,
+				F6B7C8D9E0F1A2B3C4D5E6F7 /* NewAPIUsageTests.swift */,
 				957599910322B546D91E6F96 /* Info.plist */,
 			);
 			path = DynamicIslandTests;
@@ -462,6 +465,7 @@
 				F1E2D3C4B5A6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift in Sources */,
 				C0DECAFE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift in Sources */,
 				B1C2D3E4F5A60718293A4B01 /* MediaKeyTapRetryPolicyTests.swift in Sources */,
+				F5A6B7C8D9E0F1A2B3C4D5E6 /* NewAPIUsageTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
