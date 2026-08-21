@@ -28,7 +28,12 @@ struct LockScreenMusicPanel: View {
     }
 
     static let collapsedHeight: CGFloat = 180
-    static let defaultCollapsedWidth: CGFloat = 420
+    /// The width the panel starts at, and what "reset to default" restores.
+    ///
+    /// Also the value `Defaults.Key.lockScreenMusicPanelWidth` defaults to, so the
+    /// two cannot drift apart: the stored default used to be 350 while reset put
+    /// it at 420, so the app disagreed with itself about its own default.
+    static let defaultCollapsedWidth: CGFloat = 390
     static var collapsedSize: CGSize {
         CGSize(width: CGFloat(Defaults[.lockScreenMusicPanelWidth]), height: collapsedHeight)
     }
