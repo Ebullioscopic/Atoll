@@ -7603,6 +7603,36 @@ struct StatsSettings: View {
     }
 }
 
+/// Names the shortcut that actually opens the clipboard history.
+///
+/// The caption used to spell out a fixed combination, which was both wrong --
+/// the default is the one declared in ShortcutConstants, not Cmd+Shift+V -- and
+/// unable to be right, since the shortcut is rebindable in Settings.
+private struct ClipboardManagerFooter: View {
+    @State private var shortcut = KeyboardShortcuts.Name.clipboardHistoryPanel.shortcut?.description
+
+    var body: some View {
+        caption
+            .onReceive(NotificationCenter.default.publisher(for: .keyboardShortcutByNameDidChange)) { _ in
+                shortcut = KeyboardShortcuts.Name.clipboardHistoryPanel.shortcut?.description
+            }
+    }
+
+    private var caption: Text {
+        let lead = Text("Monitor clipboard changes and keep a history of recent copies.")
+        guard let shortcut, !shortcut.isEmpty else {
+            return lead + Text(" ") + Text("Assign a shortcut under Shortcuts to open the history.")
+        }
+        return lead + Text(" ") + Text("Press \(shortcut) to open the history.")
+    }
+}
+
+extension Notification.Name {
+    /// KeyboardShortcuts posts this whenever a binding changes, but keeps the
+    /// name internal to the package, so it is spelled out here.
+    static let keyboardShortcutByNameDidChange = Notification.Name("KeyboardShortcuts_shortcutByNameDidChange")
+}
+
 struct ClipboardSettings: View {
     @ObservedObject var clipboardManager = ClipboardManager.shared
     @Default(.enableClipboardManager) var enableClipboardManager
@@ -7631,7 +7661,7 @@ struct ClipboardSettings: View {
             } header: {
                 Text("Clipboard Manager")
             } footer: {
-                Text("Monitor clipboard changes and keep a history of recent copies. Use Cmd+Shift+V to quickly access clipboard history.")
+                ClipboardManagerFooter()
             }
 
             if enableClipboardManager {
