@@ -144,6 +144,21 @@ final class CodexFeatureController: ObservableObject {
         presentationCoordinator.update(snapshot: presentationSnapshot())
     }
 
+    func acknowledgeCompletions() {
+        guard Defaults[.enableCodexIntegration] else { return }
+        let effects = store.acknowledgeCompletions()
+        guard !effects.isEmpty else { return }
+
+        do {
+            try repository.save(store.snapshot)
+            snapshot = store.snapshot
+            presentationCoordinator.update(snapshot: presentationSnapshot())
+            lastError = nil
+        } catch {
+            lastError = "清除 Codex 已完成计数失败：\(error.localizedDescription)"
+        }
+    }
+
     func openCodexConversation(sessionID: String) {
         guard let url = CodexAppLink.url(forSessionID: sessionID), NSWorkspace.shared.open(url) else {
             lastError = "无法打开 Codex 对话"

@@ -63,31 +63,41 @@ public struct CodexPresentationBuilder: Sendable {
     let waiting = active.filter { $0.status == .waitingForApproval }
     let running = active.filter { $0.status == .running }
     let recent = snapshot.recentCompletions.sorted { $0.completedAt > $1.completedAt }
+    let unacknowledged = snapshot.unacknowledgedCompletions.sorted {
+      $0.completedAt > $1.completedAt
+    }
     let compactStatus = CodexCompactStatus(
-      lines: compactStatusLines(waiting: waiting, running: running, recent: recent)
+      lines: compactStatusLines(
+        waiting: waiting,
+        running: running,
+        completions: unacknowledged
+      )
     )
     let trailingContent = compactTrailingContent(status: compactStatus)
     let pulseCompletion =
       context.sessionID.flatMap { sessionID in
-        recent.first { $0.sessionID == sessionID }
-      } ?? (context == .steady ? nil : recent.first)
+        unacknowledged.first { $0.sessionID == sessionID }
+      } ?? (context == .steady ? nil : unacknowledged.first)
     var statusMetadata = [
       "codex_waiting_count": String(waiting.count),
       "codex_running_count": String(running.count),
-      "codex_completed_count": String(recent.count),
-      "codex_status_layout": compactStatus.lines.count > 1 ? "native-stacked" : "single",
+      "codex_completed_count": String(unacknowledged.count),
+      "codex_status_layout": "single",
       "codex_presentation_phase": context.phaseName,
     ]
     statusMetadata.merge(compactStatus.metadata) { _, new in new }
 
     let live: AtollLiveActivityDescriptor?
-    switch (waiting.isEmpty, running.isEmpty, recent.first) {
+    switch (waiting.isEmpty, running.isEmpty, unacknowledged.first) {
     case (false, _, _):
       let first = waiting.first
       live = makeLive(
         title: "Codex 等待批准",
         subtitle: statusSummary(
-          waitingCount: waiting.count, runningCount: running.count, completedCount: recent.count),
+          waitingCount: waiting.count,
+          runningCount: running.count,
+          completedCount: unacknowledged.count
+        ),
         icon: .symbol(name: "exclamationmark.triangle.fill"),
         color: .orange,
         trailingContent: trailingContent,
@@ -101,7 +111,10 @@ public struct CodexPresentationBuilder: Sendable {
       live = makeLive(
         title: "Codex",
         subtitle: statusSummary(
-          waitingCount: 0, runningCount: running.count, completedCount: recent.count),
+          waitingCount: 0,
+          runningCount: running.count,
+          completedCount: unacknowledged.count
+        ),
         icon: .symbol(name: isCompletionPulse ? "checkmark.circle.fill" : "terminal.fill"),
         color: isCompletionPulse ? .green : .blue,
         trailingContent: trailingContent,
@@ -113,7 +126,7 @@ public struct CodexPresentationBuilder: Sendable {
     case (true, true, let completion?):
       live = makeLive(
         title: completion.projectName,
-        subtitle: "最近 10 分钟完成 \(recent.count) 个任务",
+        subtitle: "最近 10 分钟完成 \(unacknowledged.count) 个任务",
         icon: .symbol(name: "checkmark.circle.fill"),
         color: .green,
         trailingContent: trailingContent,
@@ -193,7 +206,7 @@ public struct CodexPresentationBuilder: Sendable {
     guard let first = status.lines.first else { return .none }
     return .text(
       status.fallbackText,
-      font: .system(size: status.lines.count > 1 ? 9 : 11, weight: .semibold),
+      font: .system(size: 12, weight: .semibold),
       color: first.atollColor
     )
   }
@@ -201,37 +214,36 @@ public struct CodexPresentationBuilder: Sendable {
   private func compactStatusLines(
     waiting: [CodexTaskRecord],
     running: [CodexTaskRecord],
-    recent: [CodexCompletionRecord]
+    completions: [CodexCompletionRecord]
   ) -> [CodexCompactStatusLine] {
-    var lines: [CodexCompactStatusLine] = []
-    if !waiting.isEmpty {
-      lines.append(
+    if !completions.isEmpty {
+      return [
         CodexCompactStatusLine(
-          label: "\(waiting.count) 等待批准",
-          detail: nil,
-          tone: .orange
-        )
-      )
-    }
-    if !running.isEmpty {
-      lines.append(
-        CodexCompactStatusLine(
-          label: "\(running.count) 进行中",
-          detail: nil,
-          tone: .blue
-        )
-      )
-    }
-    if !recent.isEmpty {
-      lines.append(
-        CodexCompactStatusLine(
-          label: "\(recent.count) 已完成",
+          label: "\(completions.count) · 已完成",
           detail: nil,
           tone: .green
         )
-      )
+      ]
     }
-    return lines
+    if !waiting.isEmpty {
+      return [
+        CodexCompactStatusLine(
+          label: "\(waiting.count) · 等待批准",
+          detail: nil,
+          tone: .orange
+        )
+      ]
+    }
+    if !running.isEmpty {
+      return [
+        CodexCompactStatusLine(
+          label: "\(running.count) · 进行中",
+          detail: nil,
+          tone: .blue
+        )
+      ]
+    }
+    return []
   }
 
   private func statusSummary(waitingCount: Int, runningCount: Int, completedCount: Int) -> String {
@@ -250,37 +262,58 @@ public struct CodexPresentationBuilder: Sendable {
     var items: [CodexConversationPresentationItem] = []
 
     for (index, task) in waiting.enumerated() {
+      let title = conversationTitle(
+        from: task.promptPreview ?? task.approvalPreview,
+        fallback: task.projectName
+      )
       items.append(
         CodexConversationPresentationItem(
           sectionID: "waiting-\(index)",
           sessionID: task.sessionID,
-          projectName: task.projectName,
+          title: title,
           status: statusLine(task: task, status: "等待批准"),
-          content: task.approvalPreview ?? task.promptPreview ?? "需要用户批准"
+          content: conversationContent(
+            preferred: task.approvalPreview,
+            title: title,
+            projectName: task.projectName,
+            fallback: "需要用户批准"
+          )
         )
       )
     }
 
     for (index, task) in running.enumerated() {
+      let title = conversationTitle(from: task.promptPreview, fallback: task.projectName)
       items.append(
         CodexConversationPresentationItem(
           sectionID: "running-\(index)",
           sessionID: task.sessionID,
-          projectName: task.projectName,
+          title: title,
           status: statusLine(task: task, status: "运行中"),
-          content: task.promptPreview ?? task.approvalPreview ?? "Codex 会话"
+          content: conversationContent(
+            preferred: nil,
+            title: title,
+            projectName: task.projectName,
+            fallback: "Codex 会话"
+          )
         )
       )
     }
 
     for (index, completion) in recent.enumerated() {
+      let title = conversationTitle(from: completion.promptPreview, fallback: completion.projectName)
       items.append(
         CodexConversationPresentationItem(
           sectionID: "recent-\(index)",
           sessionID: completion.sessionID,
-          projectName: completion.projectName,
+          title: title,
           status: "已完成",
-          content: completion.resultPreview ?? completion.promptPreview ?? "Codex 会话已完成"
+          content: conversationContent(
+            preferred: completion.resultPreview,
+            title: title,
+            projectName: completion.projectName,
+            fallback: "Codex 会话已完成"
+          )
         )
       )
     }
@@ -305,7 +338,7 @@ public struct CodexPresentationBuilder: Sendable {
     return items.map { item in
       AtollNotchContentSection(
         id: item.sectionID,
-        title: item.projectName,
+        title: item.title,
         subtitle: item.status,
         layout: .stack,
         elements: [text(item.content)]
@@ -353,14 +386,54 @@ public struct CodexPresentationBuilder: Sendable {
     .text(value, font: .system(size: 12, weight: .regular), color: .white)
   }
 
+  private func conversationTitle(from preview: String?, fallback: String) -> String {
+    PreviewSanitizer.sanitizePrompt(preview, maxLength: 24)
+      ?? PreviewSanitizer.sanitize(fallback, maxLength: 24)
+      ?? "Codex 会话"
+  }
+
+  private func conversationContent(
+    preferred: String?,
+    title: String,
+    projectName: String,
+    fallback: String
+  ) -> String {
+    if let preferred = PreviewSanitizer.sanitize(preferred), preferred != title {
+      return preferred
+    }
+    if let projectName = PreviewSanitizer.sanitize(projectName), projectName != title {
+      return projectName
+    }
+    return fallback
+  }
+
 }
 
 private struct CodexConversationPresentationItem: Equatable, Sendable {
   let sectionID: String
   let sessionID: String
-  let projectName: String
+  let title: String
   let status: String
   let content: String
+}
+
+enum CodexConversationVisualState: Equatable, Sendable {
+  case waitingForApproval
+  case running
+  case completed
+
+  init?(sectionID: String?) {
+    guard let sectionID else { return nil }
+    if sectionID.hasPrefix("waiting-") {
+      self = .waitingForApproval
+    } else if sectionID.hasPrefix("running-") {
+      self = .running
+    } else if sectionID.hasPrefix("recent-") {
+      self = .completed
+    } else {
+      return nil
+    }
+  }
 }
 
 struct CodexCompactStatus: Equatable, Sendable {

@@ -61,7 +61,7 @@ public struct CodexEventReducer: Sendable {
       task.cwd = event.cwd ?? task.cwd
       task.projectName = projectName(from: task.cwd)
       task.promptPreview =
-        preferences.previewMode == .projectOnly ? nil : PreviewSanitizer.sanitize(event.prompt)
+        preferences.previewMode == .projectOnly ? nil : PreviewSanitizer.sanitizePrompt(event.prompt)
       task.resultPreview = nil
       task.approvalPreview = nil
       task.toolName = nil
@@ -149,6 +149,19 @@ public struct CodexEventReducer: Sendable {
     return [.persist, .refreshPresentation]
   }
 
+  public func acknowledgeCompletions(
+    state: inout CodexTaskStoreSnapshot,
+    now: Date
+  ) -> [CodexStateEffect] {
+    let visibleCompletionIDs = state.recentCompletions.map(\.id)
+    let acknowledgedCompletionIDs = state.acknowledgedCompletionIDs ?? []
+    guard Set(visibleCompletionIDs) != Set(acknowledgedCompletionIDs) else { return [] }
+
+    state.acknowledgedCompletionIDs = visibleCompletionIDs
+    state.savedAt = now
+    return [.persist, .refreshPresentation]
+  }
+
   private func upsert(_ task: CodexTaskRecord, into tasks: inout [CodexTaskRecord]) {
     if let index = tasks.firstIndex(where: { $0.sessionID == task.sessionID }) {
       tasks[index] = task
@@ -180,13 +193,19 @@ public struct CodexEventReducer: Sendable {
     preferences: AppPreferences
   ) -> Bool {
     let previous = state.recentCompletions
+    let previousAcknowledgedCompletionIDs = state.acknowledgedCompletionIDs ?? []
     let cutoff = now.addingTimeInterval(-preferences.recentRetention)
     state.recentCompletions = state.recentCompletions
       .filter { $0.completedAt > cutoff }
       .sorted { $0.completedAt > $1.completedAt }
       .prefix(preferences.maxRecentCompletions)
       .map { $0 }
+    let retainedCompletionIDs = Set(state.recentCompletions.map(\.id))
+    state.acknowledgedCompletionIDs = previousAcknowledgedCompletionIDs.filter {
+      retainedCompletionIDs.contains($0)
+    }
     return state.recentCompletions != previous
+      || state.acknowledgedCompletionIDs != previousAcknowledgedCompletionIDs
   }
 
   private func projectName(from cwd: String?) -> String {
@@ -233,5 +252,10 @@ public struct CodexTaskStore: Sendable {
   @discardableResult
   public mutating func performMaintenance(now: Date = Date()) -> [CodexStateEffect] {
     reducer.performMaintenance(state: &snapshot, now: now, preferences: preferences)
+  }
+
+  @discardableResult
+  public mutating func acknowledgeCompletions(now: Date = Date()) -> [CodexStateEffect] {
+    reducer.acknowledgeCompletions(state: &snapshot, now: now)
   }
 }

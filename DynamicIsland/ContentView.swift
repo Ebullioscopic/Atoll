@@ -1125,6 +1125,11 @@ struct ContentView: View {
                                         payload: payload,
                                         onOpenURL: { vm.close() }
                                     )
+                                    .onAppear {
+                                        acknowledgeCodexCompletionsIfNeeded(
+                                            bundleIdentifier: payload.bundleIdentifier
+                                        )
+                                    }
                                 } else {
                                     NotchHomeView(albumArtNamespace: albumArtNamespace)
                                 }
@@ -1939,15 +1944,43 @@ struct ContentView: View {
 
     // MARK: - Private Methods
     private func openNotch(targeting liveActivity: ExtensionLiveActivityPayload? = nil) {
-        if let liveActivity,
-           let target = extensionNotchExperienceManager.linkedTabPayload(for: liveActivity) {
+        let resolvedLiveActivity = liveActivity ?? activeCodexSneakPeekPayload()
+        if let resolvedLiveActivity,
+           let target = extensionNotchExperienceManager.linkedTabPayload(for: resolvedLiveActivity) {
             coordinator.selectedExtensionExperienceID = target.descriptor.id
             coordinator.currentView = .extensionExperience
         }
 
+        acknowledgeCodexCompletionsIfNeeded(
+            bundleIdentifier: resolvedLiveActivity?.bundleIdentifier
+        )
+
         withAnimation(.bouncy.speed(1.2)) {
             vm.open()
         }
+    }
+
+    private func activeCodexSneakPeekPayload() -> ExtensionLiveActivityPayload? {
+        guard case let .extensionLiveActivity(bundleIdentifier, activityID) = coordinator.sneakPeek.type,
+              CodexPresentationConstants.isBuiltInCodex(
+                  bundleIdentifier: bundleIdentifier
+              ) else {
+            return nil
+        }
+        return extensionLiveActivityManager.payload(
+            bundleIdentifier: bundleIdentifier,
+            activityID: activityID
+        )
+    }
+
+    private func acknowledgeCodexCompletionsIfNeeded(bundleIdentifier: String?) {
+        guard let bundleIdentifier,
+              CodexPresentationConstants.isBuiltInCodex(
+                  bundleIdentifier: bundleIdentifier
+              ) else {
+            return
+        }
+        CodexFeatureController.shared.acknowledgeCompletions()
     }
 
     private func shouldShowClosedMusicWaveformPlayPauseOverlay(for secondary: MusicSecondaryLiveActivity?) -> Bool {

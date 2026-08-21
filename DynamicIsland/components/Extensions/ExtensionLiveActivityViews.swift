@@ -205,10 +205,12 @@ private func logExtensionDiagnostics(_ message: String) {
 }
 
 struct ExtensionNotchExperienceTabView: View {
+    @EnvironmentObject private var vm: DynamicIslandViewModel
     let payload: ExtensionNotchExperiencePayload
     let onOpenURL: (() -> Void)?
 
     @Default(.enableExtensionNotchInteractiveWebViews) private var interactiveWebViewsEnabled
+    @State private var scrollSuppressionToken = UUID()
 
     private var descriptor: AtollNotchExperienceDescriptor { payload.descriptor }
     private var tabConfiguration: AtollNotchExperienceDescriptor.TabConfiguration? { descriptor.tab }
@@ -259,6 +261,15 @@ struct ExtensionNotchExperienceTabView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(tabBackground)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        // The parent notch also listens for upward scrolls to close the panel.
+        // Keep that gesture from competing with this tab's vertical list, just
+        // like the calendar view does while the pointer is over its scroller.
+        .onHover { inside in
+            vm.setScrollGestureSuppression(inside, token: scrollSuppressionToken)
+        }
+        .onDisappear {
+            vm.setScrollGestureSuppression(false, token: scrollSuppressionToken)
+        }
     }
 
     @ViewBuilder
@@ -344,22 +355,48 @@ struct ExtensionNotchSectionView: View {
 
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ExtensionNotchSectionHeader(section: section)
+            ExtensionNotchSectionHeader(
+                section: section,
+                statusColor: conversationStatusColor
+            )
             layoutContent
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(isHoveringAction ? 0.085 : 0.04))
+        .background(cardBackgroundColor)
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(
-                    accent.opacity(isHoveringAction ? 0.55 : 0),
+                    cardBorderColor,
                     lineWidth: 1
                 )
         }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .animation(.easeOut(duration: 0.14), value: isHoveringAction)
+    }
+
+    private var conversationStatusColor: Color? {
+        switch CodexConversationVisualState(sectionID: section.id) {
+        case .waitingForApproval: return .orange
+        case .running: return Color(red: 0.24, green: 0.58, blue: 1)
+        case .completed: return Color(red: 0.24, green: 0.78, blue: 0.43)
+        case nil: return nil
+        }
+    }
+
+    private var cardBackgroundColor: Color {
+        guard let conversationStatusColor else {
+            return Color.white.opacity(isHoveringAction ? 0.085 : 0.04)
+        }
+        return conversationStatusColor.opacity(isHoveringAction ? 0.14 : 0.065)
+    }
+
+    private var cardBorderColor: Color {
+        guard let conversationStatusColor else {
+            return accent.opacity(isHoveringAction ? 0.55 : 0)
+        }
+        return conversationStatusColor.opacity(isHoveringAction ? 0.9 : 0.38)
     }
 
     private var sectionActionURL: URL? {
@@ -417,6 +454,7 @@ struct ExtensionNotchSectionView: View {
 
 struct ExtensionNotchSectionHeader: View {
     let section: AtollNotchContentSection
+    let statusColor: Color?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -424,11 +462,19 @@ struct ExtensionNotchSectionHeader: View {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
             }
             if let subtitle = section.subtitle {
-                Text(subtitle)
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.7))
+                HStack(spacing: 5) {
+                    if let statusColor {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 6, weight: .bold))
+                            .foregroundStyle(statusColor)
+                    }
+                    Text(subtitle)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(statusColor ?? Color.white.opacity(0.7))
+                }
             }
         }
     }

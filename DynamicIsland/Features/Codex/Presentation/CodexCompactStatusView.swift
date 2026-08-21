@@ -8,15 +8,12 @@ struct CodexCompactStatusView: View {
   var body: some View {
     VStack(alignment: .trailing, spacing: 0) {
       ForEach(Array(status.lines.enumerated()), id: \.offset) { _, line in
-        MarqueeText(
-          .constant(line.displayText),
-          font: .system(size: fontSize, weight: .semibold),
-          nsFont: .body,
-          textColor: line.tone.swiftUIColor,
-          minDuration: 1,
-          frameWidth: availableWidth
-        )
-        .frame(width: availableWidth, height: rowHeight, alignment: .trailing)
+        Text(line.displayText)
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(line.tone.swiftUIColor)
+          .lineLimit(1)
+          .minimumScaleFactor(0.82)
+          .frame(width: availableWidth, height: rowHeight, alignment: .trailing)
       }
     }
     .frame(width: availableWidth, height: availableHeight, alignment: .center)
@@ -26,14 +23,6 @@ struct CodexCompactStatusView: View {
 
   private var rowHeight: CGFloat {
     availableHeight / CGFloat(max(status.lines.count, 1))
-  }
-
-  private var fontSize: CGFloat {
-    switch status.lines.count {
-    case 0...1: return 10.5
-    case 2: return 9
-    default: return 7.5
-    }
   }
 }
 
