@@ -1076,7 +1076,12 @@ struct LockScreenMusicPanel: View {
     }
 
     private var shouldShowAirPlay: Bool {
-        useMergedAirPlayOutput && isOutputPickerOpen && !airPlayManager.devices.isEmpty
+        // Deliberately not gated on the device list being non-empty. The merged
+        // output mode owns this slot outright -- shouldShowRouteSelector stands
+        // down whenever it is on -- so requiring devices left the open picker
+        // rendering nothing at all, and made airPlaySection's own "No AirPlay
+        // outputs available" state unreachable.
+        useMergedAirPlayOutput && isOutputPickerOpen
     }
 
     private var shouldShowRouteSelector: Bool {
