@@ -70,10 +70,19 @@ final class LRCParserTests: XCTestCase {
         XCTAssertEqual(lines.first?.timestamp, 0)
     }
 
-    func testMetadataAndEmptyLinesAreIgnored() {
-        let lines = LRCParser.parse("[ar:Artist]\n[ti:Title]\n[00:10.00]\n[00:20.00]real")
+    func testMetadataIsIgnored() {
+        let lines = LRCParser.parse("[ar:Artist]\n[ti:Title]\n[00:20.00]real")
 
         XCTAssertEqual(lines.map(\.text), ["real"])
+    }
+
+    func testATimestampWithNoTextIsKeptAsAGapMarker() {
+        // LRC marks where singing stops with a bare timestamp, and that is what
+        // delimits an instrumental break -- dropping it loses the gap entirely.
+        let lines = LRCParser.parse("[00:10.00]sung\n[00:12.00]\n[00:30.00]sung again")
+
+        XCTAssertEqual(lines.map(\.timestamp), [10, 12, 30])
+        XCTAssertEqual(lines.map(\.text), ["sung", "", "sung again"])
     }
 
     func testLinesComeBackInTimeOrder() {

@@ -1863,6 +1863,39 @@ class MusicManager: ObservableObject {
         }
     }
 
+    /// The stretch of the track the lyric line at `index` is on screen for.
+    ///
+    /// The window ends where the next line begins, whatever that line is -- an
+    /// empty one marks where singing stops, so it closes the window just as a
+    /// sung line would.
+    func lyricWindow(at index: Int) -> (start: TimeInterval, end: TimeInterval)? {
+        guard index >= 0, index < syncedLyrics.count else { return nil }
+
+        let start = syncedLyrics[index].timestamp
+        let end: TimeInterval
+        if index + 1 < syncedLyrics.count {
+            end = syncedLyrics[index + 1].timestamp
+        } else if songDuration > start {
+            end = songDuration
+        } else {
+            return nil
+        }
+
+        guard end > start else { return nil }
+        return (start, end)
+    }
+
+    /// How far playback has moved through the line currently on screen, 0...1.
+    ///
+    /// Drives the highlight that sweeps across the line as it is sung. Returns 0
+    /// when there is no line to sweep, so the caller draws an unstarted line
+    /// rather than a fully swept one.
+    func currentLyricSweepProgress(at date: Date = Date()) -> Double {
+        guard let window = lyricWindow(at: currentLyricIndex) else { return 0 }
+        let elapsed = estimatedPlaybackPosition(at: date) - window.start
+        return min(max(elapsed / (window.end - window.start), 0), 1)
+    }
+
     /// How long to wait before the displayed lyric could next change.
     ///
     /// A fixed polling interval shows every line up to that interval late. Sleeping

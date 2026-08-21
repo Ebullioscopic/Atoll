@@ -174,7 +174,7 @@ struct LyricsSidePanelView: View {
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @State private var suppressionToken = UUID()
     @State private var isSuppressing = false
-    @State private var lyrics: [(index: Int, lyric: LyricLine)] = []
+    @State private var lyrics: [LyricRow] = []
 
     private var artistLineColor: Color {
         Defaults[.playerColorTinting]
@@ -182,21 +182,84 @@ struct LyricsSidePanelView: View {
             : .gray
     }
 
-    private var currentLyricGradient: LinearGradient {
-        LinearGradient(
-            colors: [artistLineColor, .white, artistLineColor.opacity(0.82)],
+    /// A row in the lyrics list: either a sung line or a stretch of music with
+    /// no words, which is shown as a note rather than as blank space.
+    fileprivate enum LyricRow: Identifiable {
+        case line(index: Int, text: String)
+        case instrumental(index: Int)
+
+        /// The index into `syncedLyrics` this row is driven by, which is also
+        /// what the scroll position and the current-line highlight key off.
+        var index: Int {
+            switch self {
+            case let .line(index, _), let .instrumental(index): return index
+            }
+        }
+
+        var id: Int { index }
+    }
+
+    /// Gaps shorter than this are breaths between lines, not instrumental
+    /// breaks, and showing a note for them would flicker.
+    private static let instrumentalGapThreshold: TimeInterval = 5
+
+    /// The colour a line has already been sung in.
+    private var sungLyricColor: Color { .white }
+
+    /// The colour a line has yet to be sung in. Tinted rather than plain grey so
+    /// the unsung remainder still reads as part of the current line.
+    private var unsungLyricColor: Color { artistLineColor.opacity(0.55) }
+
+    /// A highlight that has swept `progress` of the way across the line.
+    ///
+    /// The two middle stops sit either side of the playhead, so the boundary
+    /// between sung and unsung is a soft edge travelling along the line rather
+    /// than a hard wipe.
+    private func sweepGradient(progress: Double) -> LinearGradient {
+        let clamped = min(max(progress, 0), 1)
+        let feather = 0.06
+        return LinearGradient(
+            stops: [
+                .init(color: sungLyricColor, location: 0),
+                .init(color: sungLyricColor, location: max(0, clamped - feather)),
+                .init(color: unsungLyricColor, location: min(1, clamped + feather)),
+                .init(color: unsungLyricColor, location: 1)
+            ],
             startPoint: .leading,
             endPoint: .trailing
         )
     }
 
-    private static func nonEmptyLines(in lines: [LyricLine]) -> [(index: Int, lyric: LyricLine)] {
-        lines.enumerated().compactMap { index, lyric in
-            guard !lyric.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return nil
+    /// Builds the display rows, inserting an instrumental marker wherever the
+    /// track goes long enough without words.
+    ///
+    /// LRC marks where singing stops with a bare timestamp, so a gap is the
+    /// stretch between such a marker and the next line. The run-up to the first
+    /// line is treated the same way, which is what covers a song's intro.
+    fileprivate static func rows(for lines: [LyricLine], duration: TimeInterval) -> [LyricRow] {
+        var rows: [LyricRow] = []
+
+        for (index, lyric) in lines.enumerated() {
+            let isBlank = lyric.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+            if isBlank {
+                let end = index + 1 < lines.count ? lines[index + 1].timestamp : duration
+                if end - lyric.timestamp >= instrumentalGapThreshold {
+                    rows.append(.instrumental(index: index))
+                }
+                continue
             }
-            return (index: index, lyric: lyric)
+
+            // An intro long enough to sit through gets a marker of its own. It is
+            // keyed to -1, the index the current line holds before the first line.
+            if rows.isEmpty, lyric.timestamp >= instrumentalGapThreshold {
+                rows.append(.instrumental(index: -1))
+            }
+
+            rows.append(.line(index: index, text: lyric.text))
         }
+
+        return rows
     }
 
     var body: some View {
@@ -218,27 +281,27 @@ struct LyricsSidePanelView: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
                     } else {
-                        LazyVStack(alignment: .leading, spacing: 8) {
-                            ForEach(lyrics, id: \.index) { index, lyric in
-                                Text(lyric.text)
-                                    .font(.system(size: 14, weight: index == musicManager.currentLyricIndex ? .semibold : .regular))
-                                    .foregroundStyle(
-                                        index == musicManager.currentLyricIndex
-                                            ? AnyShapeStyle(currentLyricGradient)
-                                            : AnyShapeStyle(Color.white.opacity(0.5))
-                                    )
-                                    .lineLimit(2)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 12)
-                                    .id(index)
+                        // Redraw on every frame while playing so the highlight
+                        // tracks the music instead of stepping line by line.
+                        TimelineView(.animation(paused: !musicManager.isPlaying)) { timeline in
+                            let current = musicManager.currentLyricIndex
+                            let progress = musicManager.currentLyricSweepProgress(at: timeline.date)
+
+                            LazyVStack(alignment: .leading, spacing: 8) {
+                                ForEach(lyrics) { row in
+                                    lyricRow(row, isCurrent: row.index == current, progress: progress)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 12)
+                                        .id(row.index)
+                                }
                             }
+                            .padding(.vertical, 4)
                         }
-                        .padding(.vertical, 4)
                     }
                 }
                 .scrollIndicators(.never)
                 .onAppear {
-                    lyrics = Self.nonEmptyLines(in: musicManager.syncedLyrics)
+                    lyrics = Self.rows(for: musicManager.syncedLyrics, duration: musicManager.songDuration)
                     let index = musicManager.currentLyricIndex
                     guard index >= 0, index < musicManager.syncedLyrics.count else { return }
                     DispatchQueue.main.async {
@@ -257,13 +320,41 @@ struct LyricsSidePanelView: View {
         .background(Color.black.opacity(0.3))
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         .onChange(of: musicManager.syncedLyrics) { _, newLyrics in
-            lyrics = Self.nonEmptyLines(in: newLyrics)
+            lyrics = Self.rows(for: newLyrics, duration: musicManager.songDuration)
         }
         .onHover { hovering in
             updateSuppression(for: hovering)
         }
         .onDisappear {
             updateSuppression(for: false)
+        }
+    }
+
+    @ViewBuilder
+    private func lyricRow(_ row: LyricRow, isCurrent: Bool, progress: Double) -> some View {
+        switch row {
+        case let .line(_, text):
+            Text(text)
+                .font(.system(size: 14, weight: isCurrent ? .semibold : .regular))
+                .foregroundStyle(
+                    isCurrent
+                        ? AnyShapeStyle(sweepGradient(progress: progress))
+                        : AnyShapeStyle(Color.white.opacity(0.5))
+                )
+                .lineLimit(2)
+
+        case .instrumental:
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Image(systemName: "music.note")
+                        .font(.system(size: 12, weight: isCurrent ? .semibold : .regular))
+                }
+            }
+            .foregroundStyle(
+                isCurrent
+                    ? AnyShapeStyle(sweepGradient(progress: progress))
+                    : AnyShapeStyle(Color.white.opacity(0.5))
+            )
         }
     }
 

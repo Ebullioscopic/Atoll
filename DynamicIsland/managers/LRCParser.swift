@@ -43,8 +43,10 @@ enum LRCParser {
             let textStart = lastMatch.range.location + lastMatch.range.length
             guard textStart <= nsLine.length else { continue }
 
+            // A timestamp with no text behind it is not junk: LRC uses it to mark
+            // where singing stops, which is what delimits an instrumental break.
+            // Keep it as an empty line so callers can see the gap.
             let text = nsLine.substring(from: textStart).trimmingCharacters(in: .whitespaces)
-            guard !text.isEmpty else { continue }
 
             for match in matches {
                 guard let timestamp = timestamp(from: match, in: nsLine) else { continue }
