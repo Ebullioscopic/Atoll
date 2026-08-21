@@ -596,7 +596,8 @@ struct LockScreenMusicPanel: View {
                 trailingLabel: .remaining,
                 restingTrackHeight: 7,
                 draggingTrackHeight: 11,
-                tintOverride: progressSliderTint
+                tintOverride: progressSliderTint,
+                desaturatesWhenIdle: true
             )
         }
         .onAppear {
