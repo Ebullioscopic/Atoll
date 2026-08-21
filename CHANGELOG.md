@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- The source app badge on the lock screen artwork is sized against the artwork rather than the panel's state. It was a flat 34pt on 60pt of collapsed artwork — over half its width — and pushed a further 12pt clear of the corner, so it read as a second icon parked beside the album instead of a mark on it. It is about a third of the artwork now and straddles the corner, with the shadow scaled to match.
 - Atoll no longer draws its own volume, brightness or keyboard-backlight HUD while the Mac is locked. None of its styles can be seen there — the inline one lives in the notch, the window-based ones sit below the lock screen shield — so each keypress built an indicator nobody could see, and the re-suppression that came with it silenced the native HUD again on every press (#745).
 - Muting from the lock screen now empties the volume capsule and slashes its speaker glyph. Muting leaves the stored level where it was and the capsule read that level directly, so it stayed full and un-slashed while the Mac was silent (#745).
 - The mute button in the notch's output picker no longer has its speaker waves running into the edge of its circular chip. The glyph is about half the chip now, which is roughly where Apple puts one.

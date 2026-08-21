@@ -444,12 +444,13 @@ struct LockScreenMusicPanel: View {
             } else {
                 albumArtImage(size: size, cornerRadius: cornerRadius)
                 if showAppIcon, let icon = lockScreenAppIcon {
+                    let badge = appIconSize(forArtwork: size)
                     icon
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: appIconSize, height: appIconSize)
-                        .shadow(color: Color.black.opacity(0.35), radius: 6, x: 0, y: 4)
-                        .offset(x: appIconOffset, y: appIconOffset)
+                        .frame(width: badge, height: badge)
+                        .shadow(color: Color.black.opacity(0.28), radius: badge * 0.14, x: 0, y: badge * 0.06)
+                        .offset(x: badge * 0.26, y: badge * 0.26)
                         .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -1384,16 +1385,17 @@ struct LockScreenMusicPanel: View {
         return AppIcon(for: bundleIdentifier)
     }
 
-    private var appIconSize: CGFloat {
-        isExpanded ? 58 : 34
-    }
-
-    private var appIconCornerRadius: CGFloat {
-        isExpanded ? 18 : 12
-    }
-
-    private var appIconOffset: CGFloat {
-        isExpanded ? 18 : 12
+    /// The source badge, sized against the artwork it sits on rather than
+    /// against the panel's state.
+    ///
+    /// It was a flat 34pt on 60pt of collapsed artwork — over half its width —
+    /// pushed a further 12pt clear of the corner, so it read as a second icon
+    /// parked beside the album rather than as a mark on it. A third of the
+    /// artwork, straddling the corner, is the proportion Apple uses; the clamp
+    /// keeps it from growing with the expanded artwork, which is five times the
+    /// size and does not want a five-times badge.
+    private func appIconSize(forArtwork artworkSize: CGFloat) -> CGFloat {
+        min(max(artworkSize * 0.34, 20), 54)
     }
 
     private func resolvedArtworkCornerRadius(from baseCornerRadius: CGFloat) -> CGFloat {
