@@ -393,7 +393,6 @@ struct MusicControlsView: View {
     @State private var sliderValue: Double = MusicManager.shared.estimatedPlaybackPosition()
     @State private var dragging: Bool = false
     @State private var lastDragged: Date = .distantPast
-    @State private var songInfoWidth: CGFloat = 0
     @State private var hudValue: Double = 0
     @State private var hudDragging: Bool = false
     @State private var hudLastDragged: Date = .distantPast
@@ -406,13 +405,8 @@ struct MusicControlsView: View {
     private let seekInterval: TimeInterval = 10
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading) {
             songInfoAndSlider
-            // Deliberate gap rather than whatever the block above happens to
-            // leave behind. Spacer still absorbs the slack when there is room,
-            // so the usual two-line layout is unchanged, but a third line
-            // (inline lyrics) can no longer close it up against the controls.
-            Spacer(minLength: MusicPlayerLayout.minimumControlsGap)
             if shouldShowControlHUDRow {
                 controlHUDRow
             } else {
@@ -424,24 +418,13 @@ struct MusicControlsView: View {
     }
 
     private var songInfoAndSlider: some View {
-        // A GeometryReader here was greedy: it filled the column and left the
-        // marquee width as its only useful output, so the space above the
-        // controls was whatever the reader had not used. Measure the width in
-        // the background instead and let the stack size to its content.
-        VStack(alignment: .leading, spacing: 4) {
-            songInfo(width: songInfoWidth)
-                .zIndex(1) // Ensure it draws above the waveform scrubber
-            musicSlider
-                .zIndex(0)
-        }
-        .background(
-            GeometryReader { geo in
-                Color.clear.preference(key: SongInfoWidthKey.self, value: geo.size.width)
+        GeometryReader { geo in
+            VStack(alignment: .leading, spacing: 4) {
+                songInfo(width: geo.size.width)
+                    .zIndex(1) // Ensure it draws above the waveform scrubber
+                musicSlider
+                    .zIndex(0)
             }
-        )
-        .onPreferenceChange(SongInfoWidthKey.self) { width in
-            guard abs(width - songInfoWidth) > 0.5 else { return }
-            songInfoWidth = width
         }
         .padding(.top, 10)
         .padding(.leading, 5)
@@ -952,19 +935,6 @@ struct NotchHomeView: View {
 
     private var minimalisticOverridePayload: ExtensionNotchExperiencePayload? {
         extensionNotchExperienceManager.minimalisticReplacementPayload()
-    }
-}
-
-enum MusicPlayerLayout {
-    /// Smallest gap left between the elapsed-time row and the transport
-    /// controls. Below this the two read as one crowded block.
-    static let minimumControlsGap: CGFloat = 10
-}
-
-private struct SongInfoWidthKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
     }
 }
 
