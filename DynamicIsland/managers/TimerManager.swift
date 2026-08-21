@@ -22,6 +22,7 @@ import SwiftUI
 import AVFoundation
 import AppKit
 import Defaults
+import os
 
 class TimerManager: ObservableObject {
     // MARK: - Properties
@@ -127,6 +128,7 @@ class TimerManager: ObservableObject {
     private var soundPlayer: AVAudioPlayer?
     private var smoothCloseWorkItem: DispatchWorkItem?
     private var lifecycle = TimerLifecycle()
+    private let logger = os.Logger(subsystem: "com.Ebullioscopic.Atoll", category: "TimerManager")
 
     /// Identifies the current timer run. Delayed cleanup must match this value
     /// before changing presentation state.
@@ -141,7 +143,14 @@ class TimerManager: ObservableObject {
     }
     // MARK: - Initialization
     private init() {
-        // Simple initialization
+        // Views observe TimerManager, not the bridge; forward capability
+        // changes so allowsManualInteraction reflects Clock app lifecycle.
+        SystemTimerBridge.shared.$canControlClockTimer
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
     
     deinit {
@@ -212,7 +221,16 @@ class TimerManager: ObservableObject {
     
     func stopTimer() {
         if activeSource == .external {
-            endExternalTimer(triggerSmoothClose: true)
+            if isFinished || isOvertime {
+                endExternalTimer(triggerSmoothClose: true)
+                return
+            }
+            SystemTimerBridge.shared.controlClockTimer(.cancel) { [weak self] success in
+                guard let self else { return }
+                if !success {
+                    self.endExternalTimer(triggerSmoothClose: true)
+                }
+            }
             return
         }
 
@@ -245,6 +263,14 @@ class TimerManager: ObservableObject {
     }
     
     func pauseTimer() {
+        if activeSource == .external {
+            SystemTimerBridge.shared.controlClockTimer(.pause) { [weak self] success in
+                if !success {
+                    self?.logExternalControlFailure("pause")
+                }
+            }
+            return
+        }
         guard activeSource == .manual else { return }
         guard isTimerActive && !isPaused else { return }
         isPaused = true
@@ -253,6 +279,14 @@ class TimerManager: ObservableObject {
     }
     
     func resumeTimer() {
+        if activeSource == .external {
+            SystemTimerBridge.shared.controlClockTimer(.resume) { [weak self] success in
+                if !success {
+                    self?.logExternalControlFailure("resume")
+                }
+            }
+            return
+        }
         guard activeSource == .manual else { return }
         guard isTimerActive && isPaused else { return }
         isPaused = false
@@ -401,7 +435,16 @@ class TimerManager: ObservableObject {
     }
 
     var allowsManualInteraction: Bool {
-        activeSource != .external
+        switch activeSource {
+        case .external:
+            return SystemTimerBridge.shared.canControlClockTimer
+        default:
+            return true
+        }
+    }
+
+    private func logExternalControlFailure(_ action: String) {
+        logger.error("Failed to \(action) external Clock timer; state not changed")
     }
 
     enum TimerSource: String {
