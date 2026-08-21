@@ -243,6 +243,7 @@ struct ContentView: View {
     
 
     @State private var hoverTask: Task<Void, Never>?
+    @State private var isHoverExitScheduled = false
     @State private var isHovering: Bool = false
     @State private var lastNotchOpenedAt: Date = .distantPast
     @State private var lastHapticTime: Date = Date()
@@ -2057,6 +2058,7 @@ struct ContentView: View {
     /// `.onDisappear` and from `vm.onViewTeardown` on window close. Idempotent.
     private func performViewTeardown() {
         hoverTask?.cancel()
+        isHoverExitScheduled = false
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
         stopHiddenEdgeHoverPolling()
@@ -2218,7 +2220,14 @@ struct ContentView: View {
             return
         }
 
+        // The hover polls repeat their exit call every tick; rescheduling here would
+        // reset the debounce each time and race the pending exit task's timer.
+        if !hovering, isHoverExitScheduled {
+            return
+        }
+
         hoverTask?.cancel()
+        isHoverExitScheduled = false
 
         if hovering {
             if !recordingLiveActivityVisibleOnClosedNotch {
@@ -2271,6 +2280,7 @@ struct ContentView: View {
                 }
             }
         } else {
+            isHoverExitScheduled = true
             hoverTask = Task {
                 try? await Task.sleep(for: .seconds(hoverExitDebounce))
                 guard !Task.isCancelled else { return }
@@ -2287,6 +2297,9 @@ struct ContentView: View {
                 }
 
                 await MainActor.run {
+                    // Clear before the top-edge check so a retained hover can be
+                    // rescheduled by the next poll tick or onHover event.
+                    self.isHoverExitScheduled = false
                     if self.shouldRetainHoverAtScreenTopEdge() {
                         return
                     }
