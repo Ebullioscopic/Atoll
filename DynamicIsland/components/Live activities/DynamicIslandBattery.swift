@@ -302,6 +302,7 @@ struct BatteryMenuView: View {
 struct DynamicIslandBatteryView: View {
     
     @Default(.showBatteryPercentage) var showBatteryPercentage
+    @Default(.showBatteryPercentInside) var showBatteryPercentInside
     @State var batteryWidth: CGFloat = 26
     var isCharging: Bool = false
     var isInLowPowerMode: Bool = false
@@ -319,7 +320,8 @@ struct DynamicIslandBatteryView: View {
 
     var body: some View {
         HStack {
-            if showBatteryPercentage {
+            // The number goes in one place or the other, never both.
+            if showBatteryPercentage && !showBatteryPercentInside {
                 ZStack(alignment: .trailing) {
                     Text("100%")
                         .font(.callout)
@@ -338,7 +340,8 @@ struct DynamicIslandBatteryView: View {
                 isCharging: isCharging,
                 isInLowPowerMode: isInLowPowerMode,
                 batteryWidth: batteryWidth,
-                isForNotification: isForNotification
+                isForNotification: isForNotification,
+                showPercentInside: showBatteryPercentInside
             )
         }
         .scaleEffect(isPressed ? 0.95 : 1.0)

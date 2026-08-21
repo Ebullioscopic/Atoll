@@ -1098,7 +1098,11 @@ struct GeneralSettings: View {
                 Defaults.Toggle(key: .showBatteryPercentInside) {
                     Text("Show battery percentage inside icon")
                 }
-                .disabled(!enableMinimalisticUI || !Defaults[.showMinimalisticBatteryIndicator])
+                // Draws inside whichever battery the notch is showing, so it is
+                // gated on there being one -- not on Minimalistic UI, which only
+                // decides which of the two gets drawn.
+                .disabled(!Defaults[.showBatteryIndicator]
+                    || (enableMinimalisticUI && !Defaults[.showMinimalisticBatteryIndicator]))
                 .settingsHighlight(id: highlightID("Show battery percentage inside icon"))
             } header: {
                 Text("UI Mode")
