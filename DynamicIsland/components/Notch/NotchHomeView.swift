@@ -239,6 +239,15 @@ struct LyricsSidePanelView: View {
     fileprivate static func rows(for lines: [LyricLine], duration: TimeInterval) -> [LyricRow] {
         var rows: [LyricRow] = []
 
+        // An intro long enough to sit through gets a marker of its own, keyed to
+        // -1 -- the index the current line holds before the first line starts.
+        // Decided from the first timestamp alone: keying it off "nothing added
+        // yet" missed the case where the first entry is itself a qualifying gap
+        // marker, which claims the first row and leaves the intro without one.
+        if let first = lines.first, first.timestamp >= instrumentalGapThreshold {
+            rows.append(.instrumental(index: -1))
+        }
+
         for (index, lyric) in lines.enumerated() {
             let isBlank = lyric.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 
@@ -248,12 +257,6 @@ struct LyricsSidePanelView: View {
                     rows.append(.instrumental(index: index))
                 }
                 continue
-            }
-
-            // An intro long enough to sit through gets a marker of its own. It is
-            // keyed to -1, the index the current line holds before the first line.
-            if rows.isEmpty, lyric.timestamp >= instrumentalGapThreshold {
-                rows.append(.instrumental(index: -1))
             }
 
             rows.append(.line(index: index, text: lyric.text))

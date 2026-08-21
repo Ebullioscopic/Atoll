@@ -1804,8 +1804,7 @@ class MusicManager: ObservableObject {
             return
         }
 
-        let playbackPosition = max(estimatedPlaybackPosition(), elapsedTime)
-        updateCurrentLyric(for: playbackPosition)
+        updateCurrentLyric(for: lyricPlaybackPosition())
 
         if Defaults[.enableLyrics] {
             startLyricSync()
@@ -1858,7 +1857,7 @@ class MusicManager: ObservableObject {
             guard let self = self else { return }
             while !Task.isCancelled {
                 // Compute estimated playback position and update lyric
-                let position = self.estimatedPlaybackPosition()
+                let position = self.lyricPlaybackPosition()
                 let delay = await MainActor.run { () -> TimeInterval in
                     self.updateCurrentLyric(for: position)
                     return self.delayUntilNextLyric(after: position)
@@ -1867,6 +1866,16 @@ class MusicManager: ObservableObject {
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
+    }
+
+    /// Playback position for lyric purposes, tolerant of a missing duration.
+    ///
+    /// `estimatedPlaybackPosition` clamps to `songDuration`, which is zero until
+    /// the duration arrives and for streams that never report one -- so it answers
+    /// zero however far playback has actually got, which pegs every lyric at the
+    /// start of the track. Elapsed time is the better answer there.
+    private func lyricPlaybackPosition(at date: Date = Date()) -> TimeInterval {
+        max(estimatedPlaybackPosition(at: date), elapsedTime)
     }
 
     /// Gaps shorter than this are breaths between lines rather than instrumental
@@ -1932,7 +1941,7 @@ class MusicManager: ObservableObject {
     /// rather than a fully swept one.
     func currentLyricSweepProgress(at date: Date = Date()) -> Double {
         guard let window = lyricWindow(at: currentLyricIndex) else { return 0 }
-        let elapsed = estimatedPlaybackPosition(at: date) - window.start
+        let elapsed = lyricPlaybackPosition(at: date) - window.start
         return min(max(elapsed / (window.end - window.start), 0), 1)
     }
 
