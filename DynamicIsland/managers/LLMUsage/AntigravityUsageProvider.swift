@@ -1,9 +1,10 @@
 import Foundation
-import Security
+import os
 
 struct AntigravityUsageProvider: UsageProvider {
     let id: ProviderID = .antigravity
     let session: URLSession
+    private static let log = os.Logger(subsystem: "com.atoll.DynamicIsland", category: "AntigravityUsage")
 
     init(session: URLSession = URLSession(configuration: .ephemeral)) {
         self.session = session
@@ -45,13 +46,24 @@ struct AntigravityUsageProvider: UsageProvider {
         var snapshot = UsageSnapshot()
         snapshot.lastUpdated = now
 
+        // The language server path needs no keychain token, so try it first —
+        // reading the token item owned by the Gemini CLI otherwise triggers the
+        // login keychain password prompt on every refresh.
+        // LS discovery/transport failures are availability issues, not snapshot
+        // errors — fall through to the keychain path rather than aborting.
+        var lsSnapshot: UsageSnapshot?
+        do {
+            lsSnapshot = try await fetchFromLanguageServer(now: now)
+        } catch {
+            Self.log.info("Antigravity language server unavailable (\(error)) — falling back to keychain token path")
+        }
+        if let lsSnapshot {
+            return lsSnapshot
+        }
+
         let token = try await loadKeychainToken()
         guard let token else {
             throw UsageError.notConfigured("Antigravity not signed in")
-        }
-
-        if let lsSnapshot = try await fetchFromLanguageServer(now: now) {
-            return lsSnapshot
         }
 
         return try await fetchFromCloudCode(token: token, now: now)
@@ -60,24 +72,43 @@ struct AntigravityUsageProvider: UsageProvider {
     // MARK: - Keychain
 
     private func loadKeychainToken() async throws -> AntigravityKeychainToken? {
-        let service = "gemini"
-        let account = "antigravity"
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
+        // Use the `security` CLI — it matches the item's apple-tool partition grant, so no login-keychain password prompt (unlike SecItemCopyMatching).
+        return try await withTimeout(seconds: 3) {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+            task.arguments = ["find-generic-password", "-a", "antigravity", "-s", "gemini", "-w"]
 
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data,
-              let string = String(data: data, encoding: .utf8) else {
-            return nil
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            task.standardError = Pipe()
+
+            do { try task.run() } catch { return nil }
+
+            let timeoutTask = Task {
+                try await Task.sleep(nanoseconds: 3_000_000_000)
+                task.terminate()
+            }
+
+            // Blocking on waitUntilExit() defeats withTimeout cancellation and
+            // strands the process on the cooperative pool; resume from the
+            // termination handler instead and terminate on cancellation.
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    task.terminationHandler = { _ in
+                        continuation.resume()
+                    }
+                }
+            } onCancel: {
+                task.terminate()
+            }
+            timeoutTask.cancel()
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard task.terminationStatus == 0,
+                  let string = String(data: data, encoding: .utf8) else { return nil }
+
+            return extractToken(from: string)
         }
-
-        return extractToken(from: string)
     }
 
     private func extractToken(from raw: String) -> AntigravityKeychainToken? {
