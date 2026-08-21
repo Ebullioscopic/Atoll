@@ -1386,8 +1386,11 @@ struct MediaOutputSelectorPopover: View {
                 Button {
                     volumeModel.toggleMute()
                 } label: {
+                    // Half the chip, which is about where Apple puts a glyph
+                    // inside a circular one. At 18pt the speaker's waves ran
+                    // right up against the edge of the circle.
                     Image(systemName: volumeIconName)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.primary)
                         .frame(width: 28, height: 28)
                         .background(
