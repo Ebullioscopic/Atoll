@@ -163,11 +163,19 @@ struct SyncedLyricsList: View {
 
         switch row {
         case let .line(_, text):
-            swept(isCurrent: isCurrent, progress: progress) {
-                Text(text)
-                    .font(.system(size: size, weight: isCurrent ? .semibold : .regular))
-                    .lineLimit(style.lineLimit)
-            }
+            // Word by word rather than one sweep across the whole block: a line
+            // that wraps used to light its second row level with its first,
+            // since a gradient over a two-line Text runs straight down both.
+            SweptLyricText(
+                text: text,
+                fontSize: size,
+                weight: isCurrent ? .semibold : .regular,
+                progress: progress,
+                isCurrent: isCurrent,
+                sung: style.sung,
+                unsung: style.unsung,
+                idle: style.idle
+            )
 
         case .instrumental:
             swept(isCurrent: isCurrent, progress: progress) {
