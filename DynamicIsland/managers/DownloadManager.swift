@@ -225,6 +225,15 @@ class DownloadManager {
             return
         }
 
+        // The completion animation owns the next couple of seconds, and a
+        // directory event during them is likely rather than hypothetical --
+        // the rename that finishes a download is itself one. Such a scan finds
+        // nothing left to have completed, and would close the view mid-animation.
+        guard !isDownloadCompleted else {
+            vanishedSinceActive.removeAll()
+            return
+        }
+
         // Nothing is being written any more, so the downloads that were running
         // have either landed on their destination or been abandoned. Only a
         // finished one earns the completion animation; the destination never
@@ -238,7 +247,7 @@ class DownloadManager {
 
         if completedFiles.isEmpty {
             closeDownloadViewImmediately()
-        } else if !isDownloadCompleted {
+        } else {
             updateDownloadingState(isActive: false)
         }
     }
