@@ -462,7 +462,10 @@ struct LockScreenMusicPanel: View {
         )
         .frame(width: size)
         .background(albumArtBackground(cornerRadius: artworkCornerRadius))
-        .clipShape(RoundedRectangle(cornerRadius: artworkCornerRadius, style: .continuous))
+        // Deliberately no clip here. The artwork clips itself to this radius
+        // and the background is already a rounded rect of it, so the only
+        // thing a clip at this level did was cut the corner off the source
+        // badge, which is meant to overhang.
         .opacity(musicManager.isPlaying ? 1 : 0.4)
         .scaleEffect(musicManager.isPlaying ? 1 : 0.85)
         .animation(.easeInOut(duration: 0.2), value: musicManager.isPlaying)
