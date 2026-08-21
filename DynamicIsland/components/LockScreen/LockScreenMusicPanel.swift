@@ -52,6 +52,9 @@ struct LockScreenMusicPanel: View {
     @State private var collapseWorkItem: DispatchWorkItem?
     @State private var parallaxResumeWorkItem: DispatchWorkItem?
     @State private var isParallaxSuspended = false
+    /// Whether the pointer is resting on the panel, which holds the collapse
+    /// timer off entirely rather than merely restarting it.
+    @State private var isPointerInsidePanel = false
     @State private var lastLoggedGlassSnapshot: GlassLogSnapshot?
     @Default(.lockScreenGlassStyle) var lockScreenGlassStyle
     @Default(.lockScreenGlassCustomizationMode) private var glassCustomizationMode
@@ -87,7 +90,11 @@ struct LockScreenMusicPanel: View {
     /// of their own beside the player rather than a single line squeezed under
     /// the controls. The panel widens by exactly this much when it is shown.
     private let expandedLyricsColumnWidth: CGFloat = 300
-    private let collapseTimeout: TimeInterval = 5
+    // Expanded used to be a glance at bigger artwork, and five seconds was
+    // enough for that. It now holds the lyrics column, which is something you
+    // sit and read, so the panel waits far longer -- and does not start
+    // counting at all while the pointer is on it.
+    private let collapseTimeout: TimeInterval = 30
     // Transport control sizing. Apple sizes the circular highlight at roughly
     // 2.2x the glyph so the tint reads as a comfortable ring around the symbol
     // instead of hugging it; these pairs keep that ratio in both states.
@@ -195,6 +202,14 @@ struct LockScreenMusicPanel: View {
             y: usesSpotifyCanvasFallbackContentPresentation ? 14 : 10
         )
         .contentShape(Rectangle())
+        .onHover { hovering in
+            isPointerInsidePanel = hovering
+            if hovering {
+                cancelCollapseTimer()
+            } else {
+                registerInteraction()
+            }
+        }
         .animation(.easeInOut(duration: 0.28), value: isExpanded)
         .animation(.easeInOut(duration: 0.24), value: shouldShowVolumeSlider)
         .onAppear {
@@ -528,6 +543,7 @@ struct LockScreenMusicPanel: View {
     private func registerInteraction() {
         cancelCollapseTimer()
         guard isExpanded else { return }
+        guard !isPointerInsidePanel else { return }
 
         let workItem = DispatchWorkItem {
             suspendParallaxInteraction()
