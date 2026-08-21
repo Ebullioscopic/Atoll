@@ -1839,6 +1839,12 @@ class MusicManager: ObservableObject {
             currentLyricIndex = newIndex
             if newIndex >= 0 && newIndex < syncedLyrics.count {
                 currentLyrics = syncedLyrics[newIndex].text
+            } else {
+                // No line is current -- playback is before the first one, which
+                // happens on a fresh track and after seeking into the intro.
+                // Leaving the previous line in place shows it as though it were
+                // being sung.
+                currentLyrics = ""
             }
         }
     }

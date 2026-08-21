@@ -573,11 +573,14 @@ struct MusicControlsView: View {
                 )
 
                 let line = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
+                let isInstrumentalBreak = musicManager.isInInstrumentalBreak
 
-                if line.isEmpty, musicManager.isInInstrumentalBreak {
-                    // The line is blank because the track is between verses, not
-                    // because there is nothing to show. Mark it the way the side
-                    // panel does instead of leaving a hole in the layout.
+                if isInstrumentalBreak {
+                    // The track is between verses, so mark it the way the side
+                    // panel does instead of leaving a hole in the layout. Driven
+                    // by the break itself rather than by the line being blank:
+                    // during an intro there is no current line to blank out, so
+                    // testing the text would miss it.
                     HStack(spacing: 4) {
                         ForEach(0..<3, id: \.self) { _ in
                             Image(systemName: "music.note")
@@ -589,7 +592,7 @@ struct MusicControlsView: View {
                     .transition(transition)
                 }
 
-                if !line.isEmpty {
+                if !isInstrumentalBreak, !line.isEmpty {
                     let lyricsBinding = Binding<String>(
                         get: { musicManager.currentLyrics },
                         set: { _ in }
