@@ -1069,17 +1069,29 @@ struct MusicSliderView: View {
         }
     }
 
+    @ViewBuilder
     private var sliderCore: some View {
-        CustomSlider(
-            value: $sliderValue,
-            range: 0 ... duration,
-            color: sliderTint,
-            dragging: $dragging,
-            lastDragged: $lastDragged,
-            onValueChange: onValueChange,
-            restingTrackHeight: restingTrackHeight,
-            draggingTrackHeight: draggingTrackHeight
-        )
+        if hasUsableDuration {
+            CustomSlider(
+                value: $sliderValue,
+                range: 0 ... duration,
+                color: sliderTint,
+                dragging: $dragging,
+                lastDragged: $lastDragged,
+                onValueChange: onValueChange,
+                restingTrackHeight: restingTrackHeight,
+                draggingTrackHeight: draggingTrackHeight
+            )
+        } else {
+            // `0 ... duration` traps when the upper bound is below the lower
+            // one, so a negative duration crashes here before any of the
+            // formatting guards get a look at it. A length nobody has reported
+            // also has nothing to scrub within, so the track is inert.
+            Capsule(style: .continuous)
+                .fill(sliderTint.opacity(0.18))
+                .frame(height: restingTrackHeight)
+                .frame(maxWidth: .infinity)
+        }
     }
 
     private var sliderTint: Color {
@@ -1127,8 +1139,15 @@ struct MusicSliderView: View {
         case .duration:
             return timeString(from: duration)
         case .remaining:
-            let remaining = max(duration - sliderValue, 0)
-            return "-" + timeString(from: remaining)
+            // A position that is not a position cannot be subtracted from
+            // anything, and a negative one would inflate what is left rather
+            // than reduce it.
+            guard sliderValue.isFinite, sliderValue >= 0 else { return Self.unknownTime }
+
+            let remaining = timeString(from: max(duration - sliderValue, 0))
+            // The minus belongs to a time, not to the absence of one: prefixing
+            // it unconditionally turned --:-- into ---:--.
+            return remaining == Self.unknownTime ? remaining : "-" + remaining
         }
     }
 
