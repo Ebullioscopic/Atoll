@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- Fixed provider icons stretching into a flat smear inside menu-style pickers (most visibly the AirDrop icon in the Shelf's Quick Share popover). Rendering a picker's selected row into the `NSPopUpButton` title drops SwiftUI's frame but keeps `.resizable()`, so the icon expanded to the button's full width; icons now carry their own point size instead. Also affects the Quick Share picker in Settings and the third-party display app picker.
 - Fixed the screen recording HUD stop button collapsing out from under the pointer while the stop request is being sent.
 - Fixed the screen recording HUD stop button being ignored while hovering when "Open notch on hover" is enabled, because the hover click monitor opened the notch instead of forwarding the click.
 - Fixed stale album artwork appearing during manual track transitions in Apple Music and Spotify by publishing track changes immediately and safely handing off asynchronously fetched artwork.
