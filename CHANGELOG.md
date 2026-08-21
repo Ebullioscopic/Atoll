@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Firefox downloads**: download detection now notices Firefox downloads as well as Chromium and Safari ones. Firefox writes its in-progress file as `.part`, which was not among the extensions watched, so its downloads produced no live activity at all. It also creates the destination file up front as an empty placeholder, which the old completion test read as a cancellation — so a Firefox download that *did* finish would have had its activity yanked away instead of showing the completion animation. Completion is now decided by whether the destination holds data once the temporary file goes, which is the same question for every browser.
 - Spotify "Like Song" media control: save or remove the current track from your Liked Songs directly from the notch, lock screen, and minimalist player, using the official Spotify Web API (OAuth 2.0 PKCE). Add the control to any media slot in settings. (#579)
 
 - Show the current Claude subscription plan (e.g. `Max 5x`) as a badge next to the Claude card title in the LLM Usage view (#684).
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- The Downloads settings tab says what download detection actually does and which browsers it covers, rather than naming a file extension. The "Download indicator style" heading was also drawn in hardcoded white, which is invisible against a light Settings window, and stayed fully lit while its buttons were disabled.
 - Fixed a launch crash (`BUG IN CLIENT OF LIBDISPATCH: trying to lock recursively`) that could trap while a Bluetooth audio device was connected. `BluetoothAudioManager`'s initialiser scanned connected devices synchronously, and that scan blocks on `Process.waitUntilExit()`, which spins the run loop — letting SwiftUI evaluate a view body that reads `BluetoothAudioManager.shared` and re-enter the initialiser that was still running. The scan now starts on the next main-queue turn instead.
 - Fixed excessive memory usage by streaming LLM usage JSONL files instead of loading them entirely into memory
 - Reduced idle CPU from always-on notch hover polling and OSDUIHelper process checks by backing off when the app is idle (#641).
