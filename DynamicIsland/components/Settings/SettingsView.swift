@@ -1639,7 +1639,7 @@ struct Downloads: View {
             } header: {
                 Text("Download Detection")
             } footer: {
-                Text("Monitor your Downloads folder for Chromium-style downloads (.crdownload files) and show a live activity in the Dynamic Island while downloads are in progress.")
+                Text("Monitor your Downloads folder for downloads from Chrome, Safari and Firefox, and show a live activity in the Dynamic Island while they are in progress.")
             }
         }
         .navigationTitle("Downloads")

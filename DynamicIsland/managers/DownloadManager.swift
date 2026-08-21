@@ -21,6 +21,45 @@ import SwiftUI
 import Observation
 import Defaults
 
+/// The half-finished files browsers leave in the Downloads folder, and the
+/// finished file each one is going to turn into.
+///
+/// Every browser names its temporary file after the destination and adds an
+/// extension: Chromium writes `archive.zip.crdownload`, Safari an
+/// `archive.zip.download` bundle, Firefox `archive.zip.part`. Stripping that
+/// extension therefore names the file the download is aiming at, whichever
+/// browser produced it.
+enum PartialDownload {
+    /// Extensions that mark a file as still being written, lowercased.
+    static let extensions: Set<String> = ["crdownload", "download", "part"]
+
+    /// Whether `name` is a download in progress rather than a finished file.
+    static func isInProgress(_ name: String) -> Bool {
+        extensions.contains((name as NSString).pathExtension.lowercased())
+    }
+
+    /// The name `name` takes once the browser is finished with it.
+    static func destination(of name: String) -> String {
+        (name as NSString).deletingPathExtension
+    }
+
+    /// Of the temporary files that have just vanished, the ones that finished —
+    /// the rest were cancelled.
+    ///
+    /// A download is only finished once its destination holds data. Firefox
+    /// creates the destination up front as an empty placeholder and writes the
+    /// bytes to the `.part` file beside it, so mere existence proves nothing:
+    /// cancelling removes the `.part` file first and the placeholder a moment
+    /// later, and a scan landing in between would read a cancellation as a
+    /// completion.
+    static func completed(
+        among disappearedFiles: Set<String>,
+        nonEmptyFiles: Set<String>
+    ) -> Set<String> {
+        disappearedFiles.filter { nonEmptyFiles.contains(destination(of: $0)) }
+    }
+}
+
 @Observable
 @MainActor
 class DownloadManager {
@@ -34,8 +73,7 @@ class DownloadManager {
     private let queue = DispatchQueue(label: "com.dynamicisland.downloads.monitor", qos: .utility)
     private var completionTimer: Timer?
     private var hasPerformedInitialScan: Bool = false
-    private var initialCrDownloadFiles: Set<String> = []
-    private var previousAllFiles: Set<String> = []
+    private var previousInProgressFiles: Set<String> = []
     private var ignoredFiles: Set<String> = []
     
     private var downloadsDirectory: URL? {
@@ -68,11 +106,10 @@ class DownloadManager {
         guard source == nil, let downloadsDirectory else { return }
         
         hasPerformedInitialScan = false
-        initialCrDownloadFiles.removeAll()
-        previousAllFiles.removeAll()
+        previousInProgressFiles.removeAll()
         ignoredFiles.removeAll()
         isDownloading = false
-        
+
         let path = downloadsDirectory.path
         let fd = open(path, O_EVTONLY)
         guard fd >= 0 else { return }
@@ -102,7 +139,7 @@ class DownloadManager {
         source = nil
         
         hasPerformedInitialScan = false
-        initialCrDownloadFiles.removeAll()
+        previousInProgressFiles.removeAll()
         ignoredFiles.removeAll()
         isDownloading = false
     }
@@ -110,81 +147,77 @@ class DownloadManager {
     private func scanDownloadsDirectory() {
         guard let downloadsDirectory else { return }
         
-        let crDownloadFiles: Set<String>
-        let allFiles: Set<String>
-        
+        let inProgressFiles: Set<String>
+        let nonEmptyFiles: Set<String>
+
         do {
             let contents = try FileManager.default.contentsOfDirectory(
                 at: downloadsDirectory,
-                includingPropertiesForKeys: [.creationDateKey]
+                includingPropertiesForKeys: [.fileSizeKey]
             )
-            
-            crDownloadFiles = Set(contents
-                .filter {
-                    let ext = $0.pathExtension.lowercased()
-                    return ext == "crdownload" || ext == "download"
+
+            inProgressFiles = Set(contents
+                .map { $0.lastPathComponent }
+                .filter { PartialDownload.isInProgress($0) }
+            )
+
+            nonEmptyFiles = Set(contents
+                .filter { url in
+                    let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+                    return size > 0
                 }
                 .map { $0.lastPathComponent }
             )
-            
-            allFiles = Set(contents.map { $0.lastPathComponent })
-            
+
         } catch {
             return
         }
-        
+
         Task { @MainActor in
-            self.processDownloadFiles(crDownloadFiles, allFiles: allFiles)
+            self.processDownloadFiles(inProgressFiles, nonEmptyFiles: nonEmptyFiles)
         }
     }
     
-    private func processDownloadFiles(_ crDownloadFiles: Set<String>, allFiles: Set<String>) {
-        
+    private func processDownloadFiles(_ inProgressFiles: Set<String>, nonEmptyFiles: Set<String>) {
+
         if !hasPerformedInitialScan {
             hasPerformedInitialScan = true
-            initialCrDownloadFiles = crDownloadFiles
-            previousAllFiles = allFiles
-            ignoredFiles = crDownloadFiles
+            previousInProgressFiles = inProgressFiles
+            ignoredFiles = inProgressFiles
             isDownloading = false
             return
         }
-        
-        let newFiles = crDownloadFiles.subtracting(initialCrDownloadFiles)
-        let disappearedFiles = initialCrDownloadFiles.subtracting(crDownloadFiles)
-        let newRegularFiles = allFiles.subtracting(previousAllFiles).subtracting(crDownloadFiles)
-        
-        initialCrDownloadFiles = crDownloadFiles
-        previousAllFiles = allFiles
-        
-        let activeFiles = crDownloadFiles.subtracting(ignoredFiles)
+
+        let disappearedFiles = previousInProgressFiles.subtracting(inProgressFiles)
+        previousInProgressFiles = inProgressFiles
+
+        let activeFiles = inProgressFiles.subtracting(ignoredFiles)
         let hasActiveDownloads = !activeFiles.isEmpty
-        
-        if !newFiles.isEmpty {
-            let newActiveFiles = newFiles.subtracting(ignoredFiles)
-            if !newActiveFiles.isEmpty {
-                if !isDownloading {
-                    updateDownloadingState(isActive: true)
-                }
-            }
-        }
-        
-        // completion logic
-        if isDownloading {
-            if !hasActiveDownloads {
-                if !newRegularFiles.isEmpty || disappearedFiles.isEmpty {
-                    
-                    if !isDownloadCompleted {
-                        updateDownloadingState(isActive: false)
-                    }
-                    
-                } else {
-                    closeDownloadViewImmediately()
-                }
-                
-            }
-            
-        } else if hasActiveDownloads {
+
+        if hasActiveDownloads {
+            // Covers both a download appearing and one still writing: the state
+            // update is a no-op once the live activity is already showing.
             updateDownloadingState(isActive: true)
+            return
+        }
+
+        // completion logic
+        guard isDownloading else { return }
+
+        // Nothing is being written any more, so the downloads that were still
+        // running have either landed on their destination or been abandoned.
+        // Only a finished one earns the completion animation; the destination
+        // never appears as a download of its own, because a file that is not
+        // still being written is not a partial download.
+        let completedFiles = PartialDownload.completed(
+            among: disappearedFiles.subtracting(ignoredFiles),
+            nonEmptyFiles: nonEmptyFiles
+        )
+
+        if completedFiles.isEmpty {
+            closeDownloadViewImmediately()
+        } else if !isDownloadCompleted {
+            updateDownloadingState(isActive: false)
         }
     }
     
