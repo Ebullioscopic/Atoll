@@ -256,11 +256,20 @@ let inlineLyricsLineHeight: CGFloat = 18
 ///
 /// The extra height is applied whenever inline lyrics are enabled rather than only
 /// while a line is on screen, so the notch keeps a stable height between lyric lines.
+///
+/// Minimalistic UI is excluded: its player draws lyrics whenever they are enabled,
+/// regardless of the calendar, and sizes itself for them through its own resize
+/// publisher. Adding this line there would reserve room for a line the standard
+/// player is not drawing.
 func inlineLyricsAdjustedNotchSize(
     from baseSize: CGSize,
     isHomeTabActive: Bool
 ) -> CGSize {
-    guard isHomeTabActive, Defaults[.enableLyrics], Defaults[.showCalendar] else {
+    guard isHomeTabActive,
+          !Defaults[.enableMinimalisticUI],
+          Defaults[.enableLyrics],
+          Defaults[.showCalendar]
+    else {
         return baseSize
     }
 
