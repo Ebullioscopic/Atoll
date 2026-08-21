@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Lyrics follow the music**: the current line in the side lyrics panel is now lit by a highlight that sweeps across it in time with playback, instead of the whole line changing colour at once. Stretches of a track with no words are shown as music notes rather than as a gap — LRC marks where singing stops with a bare timestamp, so the break is read from the lyrics themselves rather than guessed, and only breaks of five seconds or more are marked so breaths between lines do not flicker.
+- **Lyrics follow the music**: the current line in the side lyrics panel and the lock screen music player is now lit by a highlight that sweeps across it in time with playback, instead of the whole line changing colour at once. Stretches of a track with no words are shown as music notes rather than as a gap — LRC marks where singing stops with a bare timestamp, so the break is read from the lyrics themselves rather than guessed, and only breaks of five seconds or more are marked so breaths between lines do not flicker.
 - Spotify "Like Song" media control: save or remove the current track from your Liked Songs directly from the notch, lock screen, and minimalist player, using the official Spotify Web API (OAuth 2.0 PKCE). Add the control to any media slot in settings. (#579)
 
 - Show the current Claude subscription plan (e.g. `Max 5x`) as a badge next to the Claude card title in the LLM Usage view (#684).

@@ -877,33 +877,59 @@ struct LockScreenMusicPanel: View {
 
     private func lyricsSection(alignment: Alignment) -> some View {
         let line = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isInstrumentalBreak = musicManager.isInInstrumentalBreak
+        let fontSize: CGFloat = isExpanded ? 14 : 12
         let transition: AnyTransition = .asymmetric(
             insertion: .move(edge: .bottom).combined(with: .opacity),
             removal: .move(edge: .top).combined(with: .opacity)
         )
 
-        return HStack(spacing: 8) {
-            if !line.isEmpty {
-                Image(systemName: "music.note")
-                    .font(.system(size: isExpanded ? 14 : 12, weight: .semibold))
-                    .foregroundColor(widgetAppearance.primary(opacity: 0.7))
-                    .symbolRenderingMode(.monochrome)
+        // Redraws each frame while playing so the highlight tracks the music
+        // rather than stepping a whole line at a time.
+        return TimelineView(.animation(paused: !musicManager.isPlaying)) { timeline in
+            let progress = musicManager.currentLyricSweepProgress(at: timeline.date)
 
-                Text(line)
-                    .font(.system(size: isExpanded ? 14 : 12, weight: .semibold))
-                    .foregroundColor(widgetAppearance.primary(opacity: 0.88))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.trailing, 6)
-                    .id(line)
-                    .transition(transition)
+            HStack(spacing: 8) {
+                if isInstrumentalBreak {
+                    // Carrying on without words, rather than nothing to show.
+                    InstrumentalBreakNotes(fontSize: fontSize)
+                        .lyricSweep(
+                            progress: progress,
+                            isCurrent: true,
+                            unsung: widgetAppearance.primary(opacity: 0.45),
+                            idle: widgetAppearance.primary(opacity: 0.45)
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(transition)
+                } else if !line.isEmpty {
+                    Image(systemName: "music.note")
+                        .font(.system(size: fontSize, weight: .semibold))
+                        .foregroundColor(widgetAppearance.primary(opacity: 0.7))
+                        .symbolRenderingMode(.monochrome)
+
+                    Text(line)
+                        .font(.system(size: fontSize, weight: .semibold))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .lyricSweep(
+                            progress: progress,
+                            isCurrent: true,
+                            sung: widgetAppearance.primary(opacity: 1),
+                            unsung: widgetAppearance.primary(opacity: 0.45),
+                            idle: widgetAppearance.primary(opacity: 0.88)
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.trailing, 6)
+                        .id(line)
+                        .transition(transition)
+                }
             }
+            .padding(.horizontal, isExpanded ? 10 : 8)
+            .padding(.top, isExpanded ? 12 : 8)
+            .frame(maxWidth: .infinity, alignment: alignment)
+            .animation(.smooth(duration: 0.32), value: line)
+            .animation(.smooth(duration: 0.32), value: isInstrumentalBreak)
         }
-        .padding(.horizontal, isExpanded ? 10 : 8)
-        .padding(.top, isExpanded ? 12 : 8)
-        .frame(maxWidth: .infinity, alignment: alignment)
-        .animation(.smooth(duration: 0.32), value: line)
     }
 
     private var repeatIcon: String {

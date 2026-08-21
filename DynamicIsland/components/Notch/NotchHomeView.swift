@@ -210,26 +210,6 @@ struct LyricsSidePanelView: View {
     /// the unsung remainder still reads as part of the current line.
     private var unsungLyricColor: Color { artistLineColor.opacity(0.55) }
 
-    /// A highlight that has swept `progress` of the way across the line.
-    ///
-    /// The two middle stops sit either side of the playhead, so the boundary
-    /// between sung and unsung is a soft edge travelling along the line rather
-    /// than a hard wipe.
-    private func sweepGradient(progress: Double) -> LinearGradient {
-        let clamped = min(max(progress, 0), 1)
-        let feather = 0.06
-        return LinearGradient(
-            stops: [
-                .init(color: sungLyricColor, location: 0),
-                .init(color: sungLyricColor, location: max(0, clamped - feather)),
-                .init(color: unsungLyricColor, location: min(1, clamped + feather)),
-                .init(color: unsungLyricColor, location: 1)
-            ],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-    }
-
     /// Builds the display rows, inserting an instrumental marker wherever the
     /// track goes long enough without words.
     ///
@@ -353,39 +333,25 @@ struct LyricsSidePanelView: View {
 
         case .instrumental:
             swept(isCurrent: isCurrent, progress: progress) {
-                HStack(spacing: 4) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        Image(systemName: "music.note")
-                            .font(.system(size: 12, weight: isCurrent ? .semibold : .regular))
-                    }
-                }
+                InstrumentalBreakNotes(weight: isCurrent ? .semibold : .regular)
             }
         }
     }
 
-    /// Paints `content` with the sweep, or dims it when it is not the current row.
-    ///
-    /// The gradient is overlaid and masked to the content rather than handed to
-    /// `foregroundStyle`. A gradient set as a foreground style is resolved against
-    /// each leaf view's own bounds, so a row built from several glyphs gets the
-    /// whole gradient repeated inside every one of them and none of them appear
-    /// to sweep. Masking one overlay stretches a single gradient across the row.
     @ViewBuilder
     private func swept<Content: View>(
         isCurrent: Bool,
         progress: Double,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        let content = content()
-
-        if isCurrent {
-            content
-                .hidden()
-                .overlay { sweepGradient(progress: progress) }
-                .mask { content }
-        } else {
-            content.foregroundStyle(Color.white.opacity(0.5))
-        }
+        content()
+            .lyricSweep(
+                progress: progress,
+                isCurrent: isCurrent,
+                sung: sungLyricColor,
+                unsung: unsungLyricColor,
+                idle: .white.opacity(0.5)
+            )
     }
 
     // Prevent lyrics scrolling to close the expanded notch
@@ -587,13 +553,8 @@ struct MusicControlsView: View {
                     // by the break itself rather than by the line being blank:
                     // during an intro there is no current line to blank out, so
                     // testing the text would miss it.
-                    HStack(spacing: 4) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            Image(systemName: "music.note")
-                                .font(.system(size: 10, weight: .regular))
-                        }
-                    }
-                    .foregroundStyle(.white.opacity(0.7))
+                    InstrumentalBreakNotes(fontSize: 10, weight: .regular)
+                        .foregroundStyle(.white.opacity(0.7))
                     .padding(.top, 2)
                     .transition(transition)
                 }
