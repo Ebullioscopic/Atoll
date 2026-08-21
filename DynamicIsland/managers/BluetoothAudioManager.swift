@@ -2801,6 +2801,138 @@ enum BluetoothAudioDeviceType {
 }
 
 extension BluetoothAudioDeviceType {
+    /// Resolves the bundled looping HUD animation for this device type.
+    ///
+    /// Returns `nil` when the movie is missing *or* when the bundled file is not a real
+    /// QuickTime/MP4 movie (for example an un-fetched Git LFS pointer, which is a small
+    /// text file that ships with the correct name and extension but decodes to nothing).
+    /// Callers can then fall back to the SF Symbol instead of rendering an empty frame.
+    /// Memoised so the validation runs once per device type.
+    ///
+    /// This is read from `body` — `InlineHUD` evaluates it on every HUD render
+    /// — and validation opens the file and walks its atom chain. Bundled
+    /// resources cannot change while the app runs, so the answer is computed
+    /// once and kept, including a negative answer.
+    private static let animationURLCacheLock = NSLock()
+    private static var animationURLCache: [BluetoothAudioDeviceType: URL?] = [:]
+
+    var inlineHUDAnimationURL: URL? {
+        BluetoothAudioDeviceType.animationURLCacheLock.lock()
+        defer { BluetoothAudioDeviceType.animationURLCacheLock.unlock() }
+
+        if let cached = BluetoothAudioDeviceType.animationURLCache[self] {
+            return cached
+        }
+
+        let resolved = resolvedInlineHUDAnimationURL
+        BluetoothAudioDeviceType.animationURLCache[self] = resolved
+        return resolved
+    }
+
+    private var resolvedInlineHUDAnimationURL: URL? {
+        // Each candidate is validated in turn: a stub in the subdirectory must
+        // not mask a real movie sitting at the bundle root.
+        let candidates = [
+            Bundle.main.url(
+                forResource: inlineHUDAnimationBaseName,
+                withExtension: "mov",
+                subdirectory: "BluetoothHUDAnimations"
+            ),
+            Bundle.main.url(
+                forResource: inlineHUDAnimationBaseName,
+                withExtension: "mov"
+            )
+        ].compactMap { $0 }
+
+        return candidates.first { BluetoothAudioDeviceType.isPlayableMovieFile(at: $0) }
+    }
+
+    /// Atom types a QuickTime/ISO BMFF file may legitimately start with. Only
+    /// the *first* atom is checked against this list — enough to reject a text
+    /// file such as an un-fetched Git LFS pointer — because a valid container
+    /// may carry all sorts of top-level atoms after it, and rejecting an
+    /// unfamiliar one would silently disable a perfectly good animation.
+    ///
+    /// The padding and placeholder types (`free`, `skip`, `wide`, `pnot`) are
+    /// included because real files do start with them: QuickTime writers emit
+    /// `wide` before `mdat` to reserve room for a 64-bit size, and editors
+    /// leave `free`/`skip` where data was removed. The assets here begin
+    /// `ftyp` → `wide` → `mdat` → `moov`.
+    private static let leadingAtomTypes: Set<String> = ["ftyp", "moov", "mdat", "free", "skip", "wide", "pnot"]
+
+    /// Upper bound on the atom walk. These are small bundled assets, so a
+    /// chain this long means the file is not what it claims; the bound stops a
+    /// malformed one from being walked indefinitely.
+    private static let maximumAtomCount = 128
+
+    /// Walks the top-level atom chain and reports whether the file is a
+    /// structurally complete movie.
+    ///
+    /// The chain must tile the file exactly and include a `moov`, which is
+    /// where the playable metadata lives; in these assets it is the last atom,
+    /// so the walk necessarily reaches EOF. This rejects both an un-fetched Git
+    /// LFS pointer and a truncated or header-only file, either of which would
+    /// otherwise reach the player and draw nothing.
+    private static func isPlayableMovieFile(at url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+
+        guard let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(UInt64.init),
+              fileSize >= 8 else { return false }
+
+        var offset: UInt64 = 0
+        var sawMovieAtom = false
+        var atomCount = 0
+
+        while offset + 8 <= fileSize {
+            atomCount += 1
+            guard atomCount <= BluetoothAudioDeviceType.maximumAtomCount else { return false }
+
+            guard (try? handle.seek(toOffset: offset)) != nil,
+                  let header = try? handle.read(upToCount: 16),
+                  header.count >= 8 else { return false }
+            let bytes = [UInt8](header)
+
+            // Atom types are four printable ISO 646 characters, so ASCII
+            // decoding is exact rather than an assumption; anything that fails
+            // to decode is not a container header.
+            guard let atomType = String(bytes: bytes[4 ..< 8], encoding: .ascii),
+                  atomType.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value <= 0x7E }) else { return false }
+            if offset == 0, !leadingAtomTypes.contains(atomType) { return false }
+
+            let declaredSize = bytes[0 ..< 4].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+            let extent: UInt64
+
+            switch declaredSize {
+            case 0:
+                // The atom runs to the end of the file.
+                extent = fileSize - offset
+            case 1:
+                // Extended size: the real length is the next 64 bits.
+                guard bytes.count >= 16 else { return false }
+                extent = bytes[8 ..< 16].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+                guard extent >= 16 else { return false }
+            case 2 ... 7:
+                // Smaller than the header it must contain.
+                return false
+            default:
+                extent = declaredSize
+            }
+
+            // Subtract rather than add: `extent` comes straight off the file
+            // and can be UInt64.max, and `offset + extent` would trap before
+            // the bound is ever tested. The loop condition keeps
+            // `offset <= fileSize`, so this cannot underflow.
+            guard extent >= 8, extent <= fileSize - offset else { return false }
+            if atomType == "moov" { sawMovieAtom = true }
+            offset += extent
+        }
+
+        // The chain has to account for the whole file, with the movie metadata
+        // present — a header-only file tiles cleanly but cannot play.
+        return sawMovieAtom && offset == fileSize
+    }
+
     var isAirPods: Bool {
         switch self {
         case .airpods, .airpodsGen3, .airpodsGen4, .airpodsPro, .airpodsPro3, .airpodsMax:
