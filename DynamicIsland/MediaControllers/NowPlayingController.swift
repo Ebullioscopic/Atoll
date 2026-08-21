@@ -162,7 +162,11 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         }
         
         process.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
-        process.arguments = [scriptURL.path, frameworkPath, "stream"]
+        // --micros swaps the time keys for microsecond equivalents. The default
+        // "timestamp" is an ISO-8601 string truncated to whole seconds, which
+        // throws away up to a second of the playback anchor and makes every
+        // position estimate drift by that much.
+        process.arguments = [scriptURL.path, frameworkPath, "stream", "--micros"]
         
         let pipeHandler = JSONLinesPipeHandler()
         process.standardOutput = await pipeHandler.getPipe()
@@ -212,11 +216,22 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         newPlaybackState.title = payload.title ?? (diff ? self.playbackState.title : "")
         newPlaybackState.artist = payload.artist ?? (diff ? self.playbackState.artist : "")
         newPlaybackState.album = payload.album ?? (diff ? self.playbackState.album : "")
-        newPlaybackState.duration = payload.duration ?? (diff ? self.playbackState.duration : 0)
-        
-        // Match boring.notch behavior: if elapsedTime is provided use it,
-        // if this update is a diff keep the previous currentTime, otherwise default to 0.
-        newPlaybackState.currentTime = payload.elapsedTime ?? (diff ? self.playbackState.currentTime : 0)
+        newPlaybackState.duration = payload.resolvedDuration ?? (diff ? self.playbackState.duration : 0)
+
+        // The reported position and the instant it was sampled are a matched pair:
+        // elapsedTime is the position *at* timestamp. They have to be adopted or
+        // carried forward together -- pairing a fresh position with the previous
+        // update's anchor makes every estimate run ahead by the age of that anchor.
+        if let elapsed = payload.resolvedElapsedTime {
+            newPlaybackState.currentTime = elapsed
+            newPlaybackState.lastUpdated = payload.resolvedTimestamp ?? Date()
+        } else if diff {
+            newPlaybackState.currentTime = self.playbackState.currentTime
+            newPlaybackState.lastUpdated = self.playbackState.lastUpdated
+        } else {
+            newPlaybackState.currentTime = 0
+            newPlaybackState.lastUpdated = payload.resolvedTimestamp ?? Date()
+        }
 
         
         if let shuffleMode = payload.shuffleMode {
@@ -242,15 +257,6 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             newPlaybackState.artwork = nil
         }
 
-        if let dateString = payload.timestamp,
-           let date = ISO8601DateFormatter().date(from: dateString) {
-            newPlaybackState.lastUpdated = date
-        } else if !diff {
-            newPlaybackState.lastUpdated = Date()
-        } else {
-            newPlaybackState.lastUpdated = self.playbackState.lastUpdated
-        }
-
         newPlaybackState.playbackRate = payload.playbackRate ?? (diff ? self.playbackState.playbackRate : 1.0)
         newPlaybackState.isPlaying = payload.playing ?? (diff ? self.playbackState.isPlaying : false)
         newPlaybackState.bundleIdentifier = (
@@ -274,6 +280,12 @@ struct NowPlayingPayload: Codable {
     let album: String?
     let duration: Double?
     let elapsedTime: Double?
+    /// Microsecond variants, emitted in place of the keys above when the adapter
+    /// runs with --micros. Preferred because the plain "timestamp" is truncated
+    /// to whole seconds.
+    let durationMicros: Double?
+    let elapsedTimeMicros: Double?
+    let timestampEpochMicros: Double?
     let shuffleMode: Int?
     let repeatMode: Int?
     let artworkData: String?
@@ -282,6 +294,34 @@ struct NowPlayingPayload: Codable {
     let playing: Bool?
     let parentApplicationBundleIdentifier: String?
     let bundleIdentifier: String?
+}
+
+extension NowPlayingPayload {
+    private static let isoFormatter = ISO8601DateFormatter()
+
+    var resolvedDuration: Double? {
+        if let durationMicros { return durationMicros / 1_000_000 }
+        return duration
+    }
+
+    var resolvedElapsedTime: Double? {
+        if let elapsedTimeMicros { return elapsedTimeMicros / 1_000_000 }
+        return elapsedTime
+    }
+
+    /// The instant ``resolvedElapsedTime`` was sampled.
+    ///
+    /// Prefers the microsecond epoch value. The ISO-8601 string is only a
+    /// fallback for adapters that do not honour --micros: it is formatted as
+    /// `yyyy-MM-dd'T'HH:mm:ss'Z'`, so it silently drops the sub-second part of
+    /// the anchor and biases the position estimate forward by up to a second.
+    var resolvedTimestamp: Date? {
+        if let timestampEpochMicros {
+            return Date(timeIntervalSince1970: timestampEpochMicros / 1_000_000)
+        }
+        guard let timestamp else { return nil }
+        return Self.isoFormatter.date(from: timestamp)
+    }
 }
 
 actor JSONLinesPipeHandler {

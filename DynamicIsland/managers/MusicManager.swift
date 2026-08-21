@@ -1819,41 +1819,7 @@ class MusicManager: ObservableObject {
     }
 
     private func parseLRC(_ lrc: String) -> [LyricLine] {
-        let lines = lrc.components(separatedBy: .newlines)
-        var lyrics: [LyricLine] = []
-
-        // Accept patterns like [m:ss], [mm:ss], [mm:ss.xx] where centiseconds are optional
-        let pattern = "\\[(\\d{1,2}):(\\d{2})(?:\\.(\\d{1,2}))?\\]"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
-
-        for line in lines {
-            let nsLine = line as NSString
-            let fullRange = NSRange(location: 0, length: nsLine.length)
-            if let match = regex.firstMatch(in: line, options: [], range: fullRange) {
-                let minRange = match.range(at: 1)
-                let secRange = match.range(at: 2)
-                let centiRange = match.range(at: 3)
-
-                let minStr = minRange.location != NSNotFound ? nsLine.substring(with: minRange) : "0"
-                let secStr = secRange.location != NSNotFound ? nsLine.substring(with: secRange) : "0"
-                let centiStr = (centiRange.location != NSNotFound) ? nsLine.substring(with: centiRange) : "0"
-
-                let minutes = Double(minStr) ?? 0
-                let seconds = Double(secStr) ?? 0
-                let centis = Double(centiStr) ?? 0
-                let timestamp = minutes * 60 + seconds + centis / 100.0
-
-                let textStart = match.range.location + match.range.length
-                if textStart <= nsLine.length {
-                    let text = nsLine.substring(from: textStart).trimmingCharacters(in: .whitespaces)
-                    if !text.isEmpty {
-                        lyrics.append(LyricLine(timestamp: timestamp, text: text))
-                    }
-                }
-            }
-        }
-
-        return lyrics.sorted(by: { $0.timestamp < $1.timestamp })
+        LRCParser.parse(lrc)
     }
 
     func updateCurrentLyric(for elapsedTime: TimeInterval) {
@@ -1887,14 +1853,32 @@ class MusicManager: ObservableObject {
             while !Task.isCancelled {
                 // Compute estimated playback position and update lyric
                 let position = self.estimatedPlaybackPosition()
-                await MainActor.run {
+                let delay = await MainActor.run { () -> TimeInterval in
                     self.updateCurrentLyric(for: position)
+                    return self.delayUntilNextLyric(after: position)
                 }
 
-                // Sleep ~300ms between updates
-                try? await Task.sleep(nanoseconds: 300_000_000)
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
+    }
+
+    /// How long to wait before the displayed lyric could next change.
+    ///
+    /// A fixed polling interval shows every line up to that interval late. Sleeping
+    /// until the next line's own timestamp lands on the boundary instead. The upper
+    /// bound keeps seeks and pauses responsive, and the lower bound stops the loop
+    /// from spinning through lines that share a timestamp.
+    private func delayUntilNextLyric(after position: TimeInterval) -> TimeInterval {
+        let minimumDelay: TimeInterval = 0.05
+        let maximumDelay: TimeInterval = 0.25
+
+        guard isPlaying, playbackRate > 0,
+              let next = syncedLyrics.first(where: { $0.timestamp > position })
+        else { return maximumDelay }
+
+        let untilNext = (next.timestamp - position) / playbackRate
+        return min(max(untilNext, minimumDelay), maximumDelay)
     }
 
     private func stopLyricSync() {
