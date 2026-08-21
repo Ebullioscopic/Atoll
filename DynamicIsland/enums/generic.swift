@@ -254,21 +254,19 @@ enum LockScreenWeatherTemperatureUnit: String, CaseIterable, Defaults.Serializab
 
     var id: String { rawValue }
 
-    /// What macOS itself would show. Read from `MeasurementFormatter` with a
-    /// natural scale rather than from the locale's measurement system, because
-    /// the Temperature control in Language & Region is set independently — a
-    /// metric locale can still be set to Fahrenheit, and locales such as the UK
-    /// are non-metric overall while still reporting weather in Celsius.
+    /// What macOS itself would show.
+    ///
+    /// The Temperature control in Language & Region is set independently of the
+    /// measurement system, so this has to read the temperature preference rather
+    /// than infer it: a US-region Mac can be set to Celsius and a metric one to
+    /// Fahrenheit, and both happen. `UnitTemperature(forLocale:)` reports that
+    /// preference; deriving it from a formatted measurement follows the
+    /// measurement system instead and gets both of those cases backwards.
     ///
     /// Used only as the initial value: once someone picks a unit, that choice
     /// is stored and this is not consulted again.
     static var matchingSystemPreference: LockScreenWeatherTemperatureUnit {
-        let formatter = MeasurementFormatter()
-        formatter.locale = .current
-        formatter.unitOptions = .naturalScale
-        formatter.numberFormatter.maximumFractionDigits = 0
-        let rendered = formatter.string(from: Measurement(value: 0, unit: UnitTemperature.celsius))
-        return rendered.contains(UnitTemperature.fahrenheit.symbol) ? .fahrenheit : .celsius
+        UnitTemperature(forLocale: .current) == .fahrenheit ? .fahrenheit : .celsius
     }
 
     var usesMetricSystem: Bool { self == .celsius }

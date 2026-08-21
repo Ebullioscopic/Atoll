@@ -849,7 +849,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .lockScreen, title: "Timer liquid mode", keywords: ["timer", "standard", "custom"], highlightID: SettingsTab.lockScreen.highlightID(for: "Timer liquid mode")),
             SettingsSearchEntry(tab: .lockScreen, title: "Timer widget variant", keywords: ["timer variant", "liquid"], highlightID: SettingsTab.lockScreen.highlightID(for: "Timer widget variant")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen weather", keywords: ["weather widget"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen weather")),
-            SettingsSearchEntry(tab: .lockScreen, title: "Layout", keywords: ["inline", "circular", "weather layout"], highlightID: SettingsTab.lockScreen.highlightID(for: "Layout")),
+            SettingsSearchEntry(tab: .lockScreen, title: "Widget layout", keywords: ["inline", "circular", "widget layout", "weather layout", "status widget"], highlightID: SettingsTab.lockScreen.highlightID(for: "Widget layout")),
             SettingsSearchEntry(tab: .lockScreen, title: "Weather data provider", keywords: ["wttr", "open meteo"], highlightID: SettingsTab.lockScreen.highlightID(for: "Weather data provider")),
             SettingsSearchEntry(tab: .lockScreen, title: "Temperature unit", keywords: ["celsius", "fahrenheit"], highlightID: SettingsTab.lockScreen.highlightID(for: "Temperature unit")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show location label", keywords: ["location", "weather"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show location label")),
@@ -2329,7 +2329,7 @@ private struct ExternalDisplayIntegrationsSection: View {
                 }
                 .settingsHighlight(id: highlightID("Volume step"))
                 .disabled(enableExternalVolumeControlListener)
-                .help(enableExternalVolumeControlListener ? "Disabled while \"Route volume from the external app\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
+                .help(enableExternalVolumeControlListener ? "Disabled while \"Enable external volume control listener\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
 
                 Stepper(value: $volumeFineStepPercent, in: 1...25) {
                     HStack {
@@ -2342,7 +2342,7 @@ private struct ExternalDisplayIntegrationsSection: View {
                 }
                 .settingsHighlight(id: highlightID("Volume fine step"))
                 .disabled(enableExternalVolumeControlListener)
-                .help(enableExternalVolumeControlListener ? "Disabled while \"Route volume from the external app\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
+                .help(enableExternalVolumeControlListener ? "Disabled while \"Enable external volume control listener\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
 
                 if enableExternalVolumeControlListener {
                     Text("Disabled while external display volume integration is active.")
@@ -3362,7 +3362,15 @@ struct CalendarSettings: View {
                     Defaults.Toggle(key: .enableLockScreenReminderWidget) {
                         Text("Show lock screen reminder")
                     }
+                    .disabled(!enableReminderLiveActivity)
+                    .help(enableReminderLiveActivity ? "" : "Requires the reminder live activity, which is off in Live Activities settings.")
                     .settingsHighlight(id: highlightID("Show lock screen reminder"))
+
+                    if !enableReminderLiveActivity {
+                        Text("The lock screen reminder is produced by the reminder live activity, which is currently off above.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
                     Picker("Chip color", selection: $lockScreenReminderChipStyle) {
                         ForEach(LockScreenReminderChipStyle.allCases) { style in
@@ -5630,7 +5638,7 @@ struct LockScreenSettings: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .disabled(!enableLockScreenReminderWidget)
+                .disabled(!enableLockScreenReminderWidget || !enableReminderLiveActivity)
                 .settingsHighlight(id: highlightID("Reminder alignment"))
 
                 HStack {
@@ -5640,7 +5648,7 @@ struct LockScreenSettings: View {
                         in: -160...160,
                         step: 2
                     )
-                    .disabled(!enableLockScreenReminderWidget)
+                    .disabled(!enableLockScreenReminderWidget || !enableReminderLiveActivity)
                     Text("\(Int(lockScreenReminderWidgetVerticalOffset)) px")
                         .foregroundStyle(.secondary)
                         .frame(width: 70, alignment: .trailing)
