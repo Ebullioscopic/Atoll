@@ -1004,7 +1004,7 @@ extension Defaults.Keys {
     static let lockScreenWeatherShowsLocation = Key<Bool>("lockScreenWeatherShowsLocation", default: true)
     static let lockScreenWeatherShowsSunrise = Key<Bool>("lockScreenWeatherShowsSunrise", default: true)
     static let lockScreenWeatherWidgetStyle = Key<LockScreenWeatherWidgetStyle>("lockScreenWeatherWidgetStyle", default: .inline)
-    static let lockScreenWeatherTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("lockScreenWeatherTemperatureUnit", default: .celsius)
+    static let lockScreenWeatherTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("lockScreenWeatherTemperatureUnit", default: .matchingSystemPreference)
     static let lockScreenWeatherShowsAQI = Key<Bool>("lockScreenWeatherShowsAQI", default: true)
     static let lockScreenWeatherAQIScale = Key<LockScreenWeatherAirQualityScale>("lockScreenWeatherAQIScale", default: .us)
     static let lockScreenWeatherUsesGaugeTint = Key<Bool>("lockScreenWeatherUsesGaugeTint", default: false)
@@ -1177,7 +1177,7 @@ extension Defaults.Keys {
     static let showGpuGraph = Key<Bool>("showGpuGraph", default: true)
     static let showNetworkGraph = Key<Bool>("showNetworkGraph", default: false)
     static let showDiskGraph = Key<Bool>("showDiskGraph", default: false)
-    static let cpuTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("cpuTemperatureUnit", default: .celsius)
+    static let cpuTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("cpuTemperatureUnit", default: .matchingSystemPreference)
     
     // MARK: Terminal Feature
     static let enableTerminalFeature = Key<Bool>("enableTerminalFeature", default: false)

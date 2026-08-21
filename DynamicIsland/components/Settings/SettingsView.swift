@@ -5318,10 +5318,24 @@ struct LockScreenSettings: View {
                 }
                 .pickerStyle(.segmented)
                 .settingsHighlight(id: highlightID("Widget appearance"))
+
+                Picker("Widget layout", selection: $lockScreenWeatherWidgetStyle) {
+                    ForEach(LockScreenWeatherWidgetStyle.allCases) { style in
+                        Text(style.localizedName).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .settingsHighlight(id: highlightID("Widget layout"))
+
+                if lockScreenWeatherWidgetStyle == .circular {
+                    Text("The circular layout has no room for the location label or sunrise time, and draws the battery gauge as a ring.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("Use Light when the wallpaper is bright so titles and labels stay readable.")
+                Text("Applies to the whole status widget \u{2014} weather, battery, focus, location and the next-event row are all drawn in the chosen appearance and layout. Use Light when the wallpaper is bright so titles and labels stay readable.")
             }
 
             Section {
@@ -5525,21 +5539,6 @@ struct LockScreenSettings: View {
                 .settingsHighlight(id: highlightID("Show lock screen weather"))
 
                 if enableLockScreenWeatherWidget {
-                    Picker("Widget layout", selection: $lockScreenWeatherWidgetStyle) {
-                        ForEach(LockScreenWeatherWidgetStyle.allCases) { style in
-                            Text(style.localizedName).tag(style)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .help("Applies to the whole status capsule, not the weather alone \u{2014} the battery gauge and any Bluetooth or charging indicators are drawn in the chosen layout too.")
-                    .settingsHighlight(id: highlightID("Widget layout"))
-
-                    if lockScreenWeatherWidgetStyle == .circular {
-                        Text("The circular layout has no room for the location label or sunrise time, and draws the battery gauge as a ring.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
                     Picker("Weather data provider", selection: $lockScreenWeatherProviderSource) {
                         ForEach(LockScreenWeatherProviderSource.allCases) { source in
                             Text(source.displayName).tag(source)
@@ -5600,7 +5599,7 @@ struct LockScreenSettings: View {
             } header: {
                 Text("Weather Widget")
             } footer: {
-                Text("Enable the weather capsule and configure its provider, units, and optional AQI indicator. The layout chosen here applies to the whole status capsule, including the battery indicator configured below.")
+                Text("Enable the weather capsule and configure its provider, units, and optional AQI indicator. Its layout is set by \"Widget layout\" under Appearance, which covers the whole status widget.")
             }
 
             Section {
