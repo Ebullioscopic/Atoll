@@ -1863,13 +1863,47 @@ class MusicManager: ObservableObject {
         }
     }
 
+    /// Gaps shorter than this are breaths between lines rather than instrumental
+    /// breaks; marking them would flicker.
+    static let instrumentalBreakThreshold: TimeInterval = 5
+
+    /// Whether playback is in a stretch with no words long enough to be worth
+    /// marking, rather than simply between two sung lines.
+    ///
+    /// LRC marks where singing stops with a bare timestamp, so a break is a
+    /// blank line that runs for a while. The run-up to the first line counts too,
+    /// which is what covers a song's intro.
+    var isInInstrumentalBreak: Bool {
+        guard !syncedLyrics.isEmpty else { return false }
+
+        let index = currentLyricIndex
+        if index < 0 {
+            // Before the first line: the intro is a break if it is long enough.
+            return (syncedLyrics.first?.timestamp ?? 0) >= Self.instrumentalBreakThreshold
+        }
+
+        guard index < syncedLyrics.count,
+              syncedLyrics[index].text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let window = lyricWindow(at: index)
+        else { return false }
+
+        return window.end - window.start >= Self.instrumentalBreakThreshold
+    }
+
     /// The stretch of the track the lyric line at `index` is on screen for.
     ///
     /// The window ends where the next line begins, whatever that line is -- an
     /// empty one marks where singing stops, so it closes the window just as a
     /// sung line would.
     func lyricWindow(at index: Int) -> (start: TimeInterval, end: TimeInterval)? {
-        guard index >= 0, index < syncedLyrics.count else { return nil }
+        // -1 is the run-up to the first line, which is the index the current line
+        // holds before any line has started and which the intro marker keys off.
+        if index < 0 {
+            guard let first = syncedLyrics.first, first.timestamp > 0 else { return nil }
+            return (0, first.timestamp)
+        }
+
+        guard index < syncedLyrics.count else { return nil }
 
         let start = syncedLyrics[index].timestamp
         let end: TimeInterval

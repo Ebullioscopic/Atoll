@@ -225,6 +225,12 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         if let elapsed = payload.resolvedElapsedTime {
             newPlaybackState.currentTime = elapsed
             newPlaybackState.lastUpdated = payload.resolvedTimestamp ?? Date()
+        } else if payload.clearsElapsedTime {
+            // The sender named the position and set it to null, so there is
+            // nothing left to extrapolate from. Carrying the old pair forward
+            // here would keep advancing a position the sender has disowned.
+            newPlaybackState.currentTime = 0
+            newPlaybackState.lastUpdated = payload.resolvedTimestamp ?? Date()
         } else if diff {
             newPlaybackState.currentTime = self.playbackState.currentTime
             newPlaybackState.lastUpdated = self.playbackState.lastUpdated
@@ -294,6 +300,54 @@ struct NowPlayingPayload: Codable {
     let playing: Bool?
     let parentApplicationBundleIdentifier: String?
     let bundleIdentifier: String?
+
+    /// Whether the update names a position field and sets it to null.
+    ///
+    /// A diff omits what has not changed, so an absent position means "carry the
+    /// last one forward". A position that is present but null is the sender
+    /// saying it no longer has one. Optional decoding renders both as nil, so
+    /// the distinction has to be captured while the container is still in hand
+    /// -- otherwise a cleared position is mistaken for an unchanged one and the
+    /// old position keeps being extrapolated from.
+    let clearsElapsedTime: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case title, artist, album, duration, elapsedTime
+        case durationMicros, elapsedTimeMicros, timestampEpochMicros
+        case shuffleMode, repeatMode, artworkData, timestamp
+        case playbackRate, playing
+        case parentApplicationBundleIdentifier, bundleIdentifier
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        artist = try container.decodeIfPresent(String.self, forKey: .artist)
+        album = try container.decodeIfPresent(String.self, forKey: .album)
+        duration = try container.decodeIfPresent(Double.self, forKey: .duration)
+        elapsedTime = try container.decodeIfPresent(Double.self, forKey: .elapsedTime)
+        durationMicros = try container.decodeIfPresent(Double.self, forKey: .durationMicros)
+        elapsedTimeMicros = try container.decodeIfPresent(Double.self, forKey: .elapsedTimeMicros)
+        timestampEpochMicros = try container.decodeIfPresent(Double.self, forKey: .timestampEpochMicros)
+        shuffleMode = try container.decodeIfPresent(Int.self, forKey: .shuffleMode)
+        repeatMode = try container.decodeIfPresent(Int.self, forKey: .repeatMode)
+        artworkData = try container.decodeIfPresent(String.self, forKey: .artworkData)
+        timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
+        playbackRate = try container.decodeIfPresent(Double.self, forKey: .playbackRate)
+        playing = try container.decodeIfPresent(Bool.self, forKey: .playing)
+        parentApplicationBundleIdentifier = try container.decodeIfPresent(
+            String.self, forKey: .parentApplicationBundleIdentifier
+        )
+        bundleIdentifier = try container.decodeIfPresent(String.self, forKey: .bundleIdentifier)
+
+        func isExplicitlyNull(_ key: CodingKeys) throws -> Bool {
+            try container.contains(key) && container.decodeNil(forKey: key)
+        }
+
+        clearsElapsedTime = try isExplicitlyNull(.elapsedTime)
+            || isExplicitlyNull(.elapsedTimeMicros)
+    }
 }
 
 extension NowPlayingPayload {
