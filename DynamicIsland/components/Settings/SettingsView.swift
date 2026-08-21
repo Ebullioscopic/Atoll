@@ -781,7 +781,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .media, title: "Music Source", keywords: ["media source", "controller"], highlightID: SettingsTab.media.highlightID(for: "Music Source")),
             SettingsSearchEntry(tab: .media, title: "Skip buttons", keywords: ["skip", "controls", "±10"], highlightID: SettingsTab.media.highlightID(for: "Skip buttons")),
             SettingsSearchEntry(tab: .media, title: "Sneak Peek Style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak Peek Style")),
-            SettingsSearchEntry(tab: .media, title: "Show lyrics on the side (requires calendar off)", keywords: ["lyrics", "song text", "side panel", "calendar"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics on the side (requires calendar off)")),
+            SettingsSearchEntry(tab: .media, title: "Show lyrics", keywords: ["lyrics", "song text", "side panel", "calendar", "inline"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
             SettingsSearchEntry(tab: .media, title: "Side lyrics width", keywords: ["lyrics", "width", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics width")),
             SettingsSearchEntry(tab: .media, title: "Side lyrics horizontal offset", keywords: ["lyrics", "offset", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics horizontal offset")),
             SettingsSearchEntry(tab: .media, title: "Show live canvas in Dynamic Island", keywords: ["canvas", "live canvas", "album art", "dynamic island", "spotify canvas"], highlightID: SettingsTab.media.highlightID(for: "Show live canvas in Dynamic Island")),
@@ -2942,32 +2942,33 @@ struct Media: View {
                 Toggle("Show sneak peek on playback changes", isOn: $showSneakPeekOnTrackChange)
                     .disabled(!enableSneakPeek)
                 Defaults.Toggle(key: .enableLyrics) {
-                    Text("Show lyrics on the side (requires calendar off)")
+                    Text("Show lyrics")
                 }
-                .disabled(showCalendar || enableMinimalisticUI || !showStandardMediaControls)
-                .opacity(showCalendar || enableMinimalisticUI || !showStandardMediaControls ? 0.5 : 1)
+                .disabled(enableMinimalisticUI || !showStandardMediaControls)
+                .opacity(enableMinimalisticUI || !showStandardMediaControls ? 0.5 : 1)
                 .help(
-                    showCalendar
-                        ? "Disable the calendar to show lyrics in the side panel."
-                        : enableMinimalisticUI
-                            ? "Disable Minimalistic UI to show lyrics in the side panel."
-                            : !showStandardMediaControls
-                                ? "Enable Dynamic Island media controls to show lyrics in the side panel."
-                                : ""
+                    enableMinimalisticUI
+                        ? "Disable Minimalistic UI to show lyrics."
+                        : !showStandardMediaControls
+                            ? "Enable Dynamic Island media controls to show lyrics."
+                            : ""
                 )
-                .settingsHighlight(id: highlightID("Show lyrics on the side (requires calendar off)"))
-                if showCalendar {
-                    Text("Disable the calendar to use side lyrics.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                .settingsHighlight(id: highlightID("Show lyrics"))
+                Text(
+                    showCalendar
+                        ? "Lyrics appear under the artist name, beside the calendar."
+                        : "Lyrics appear in their own panel beside the player."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 if enableMinimalisticUI {
-                    Text("Disable Minimalistic UI to use side lyrics.")
+                    Text("Disable Minimalistic UI to use lyrics.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 if !showStandardMediaControls {
-                    Text("Enable Dynamic Island media controls to use side lyrics.")
+                    Text("Enable Dynamic Island media controls to use lyrics.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -3284,14 +3285,12 @@ struct CalendarSettings: View {
                 Defaults.Toggle(key: .showCalendar) {
                     Text("Show calendar")
                 }
-                .disabled(enableLyrics)
-                .opacity(enableLyrics ? 0.5 : 1)
-                .help(enableLyrics ? "Disable side lyrics to show the calendar." : "")
                 .settingsHighlight(id: highlightID("Show calendar"))
                 if enableLyrics {
-                    Text("Disable side lyrics to use the calendar.")
+                    Text("With lyrics on, the calendar shares the notch and lyrics move under the artist name.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Section(header: Text("Event List")) {
