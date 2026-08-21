@@ -827,7 +827,21 @@ struct ContentView: View {
     }
 
     private var rootBodyView: some View {
-        ZStack(alignment: .top) {
+        let standardRootWidth = dynamicNotchSize.width
+            + (vm.notchState == .open ? 24 : 0)
+            + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)
+        let standardRootHeight = dynamicNotchSize.height
+            + (vm.notchState == .open ? 12 : 0)
+            + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)
+        let whatsAppRootWidth = dynamicNotchSize.width
+            + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)
+        let whatsAppRootHeight = dynamicNotchSize.height
+            + currentShadowPadding
+            + (isDynamicIslandMode ? dynamicIslandTopOffset : 0)
+        let rootWidth = isWhatsAppExpansionVisible ? whatsAppRootWidth : standardRootWidth
+        let rootHeight = isWhatsAppExpansionVisible ? whatsAppRootHeight : standardRootHeight
+
+        return ZStack(alignment: .top) {
             configuredMainLayout
         }
         .frame(
@@ -836,8 +850,8 @@ struct ContentView: View {
             alignment: .top
         )
         .frame(
-            maxWidth: (dynamicNotchSize.width + (vm.notchState == .open ? 24 : 0) + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)).rounded(),
-            maxHeight: (dynamicNotchSize.height + (vm.notchState == .open ? 12 : 0) + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)).rounded(),
+            maxWidth: rootWidth.rounded(),
+            maxHeight: rootHeight.rounded(),
             alignment: .top
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

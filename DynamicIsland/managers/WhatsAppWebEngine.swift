@@ -4602,23 +4602,41 @@ private enum JS {
                 return selected;
             }
 
+            async function togglePollOptionInDom(root, expectedText) {
+                var target = findOptionClickTarget(root, expectedText);
+                if (!target || !target.element) return false;
+                clickPoint(target.x, target.y, target.element);
+                clickElement(target.element);
+                try {
+                    target.element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32, which: 32 }));
+                    target.element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32, which: 32 }));
+                } catch (e) {}
+                await sleep(650);
+                postPollDebug('vote dom toggled option="' + (expectedText || optionText) + '" question="' + (questionText || '') + '" target=' + target.tag + '[role=' + target.role + ',checked=' + target.ariaChecked + ']');
+                return true;
+            }
+
             async function syncMultiplePollOptionsInDom(root) {
                 var poll = extractPoll(root);
                 if (!poll || !poll.allowsMultipleSelection) return false;
                 if (!poll.selectedStateReliable) {
-                    return await clickPollOptionInDom(root, optionText);
+                    return await togglePollOptionInDom(root, optionText);
                 }
 
                 var clickedAny = false;
                 for (var p = 0; p < poll.options.length; p++) {
                     var option = poll.options[p];
                     var desired = intendedOptionTexts.some(function(text) { return optionTextMatches(option.text, text); });
-                    if (!desired && !option.selected) continue;
                     var target = findOptionClickTarget(root, option.text);
                     var current = !!option.selected || (target && targetLooksSelected(target.element));
+                    if (!desired && !current) continue;
                     if (desired === current) continue;
                     if (target && target.element) {
-                        await clickPollOptionInDom(root, option.text);
+                        if (desired) {
+                            await clickPollOptionInDom(root, option.text);
+                        } else {
+                            await togglePollOptionInDom(root, option.text);
+                        }
                         clickedAny = true;
                     }
                     await sleep(220);
