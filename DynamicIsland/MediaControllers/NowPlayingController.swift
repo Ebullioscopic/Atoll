@@ -239,6 +239,40 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             newPlaybackState.lastUpdated = payload.resolvedTimestamp ?? Date()
         }
 
+        // Senders are not obliged to keep publishing. Spotify anchors once when
+        // a track starts and then says nothing for the rest of it -- measured
+        // here as an elapsed of 0 paired with a timestamp 141 seconds old, on a
+        // track that had been playing for exactly that long. Extrapolating from
+        // a stale anchor is fine while the music is running, because wall-clock
+        // time and playback time advance together.
+        //
+        // They stop agreeing the moment playback stops. A pause that the sender
+        // does not follow with a fresh position leaves the anchor where it was,
+        // so when playback resumes the extrapolation silently counts the paused
+        // time as played, and every pause pushes the estimate further ahead --
+        // which is why the position could only be brought back by pausing and
+        // playing until the sender happened to republish.
+        //
+        // So the position is re-anchored on the transition itself: frozen where
+        // it had got to when playback stops, and restarted from there when it
+        // resumes.
+        let wasPlaying = self.playbackState.isPlaying
+        let isPlayingNow = payload.playing ?? (diff ? wasPlaying : false)
+
+        if payload.resolvedElapsedTime == nil, wasPlaying != isPlayingNow {
+            let transitionInstant = payload.resolvedTimestamp ?? Date()
+
+            if wasPlaying {
+                let elapsedWhilePlaying = transitionInstant.timeIntervalSince(self.playbackState.lastUpdated)
+                newPlaybackState.currentTime = max(
+                    0,
+                    self.playbackState.currentTime + (elapsedWhilePlaying * self.playbackState.playbackRate)
+                )
+            }
+
+            newPlaybackState.lastUpdated = transitionInstant
+        }
+
         
         if let shuffleMode = payload.shuffleMode {
             newPlaybackState.isShuffled = shuffleMode != 1
