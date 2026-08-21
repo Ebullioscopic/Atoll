@@ -527,6 +527,16 @@ struct ExtensionCountdownTextView: View {
 
 enum ExtensionLayoutMetrics {
     static func trailingWidth(for payload: ExtensionLiveActivityPayload, baseWidth: CGFloat, maxWidth: CGFloat? = nil) -> CGFloat {
+        if CodexPresentationConstants.isBuiltInCodex(
+            bundleIdentifier: payload.bundleIdentifier
+        ), let status = CodexCompactStatus(metadata: payload.descriptor.metadata) {
+            let preferredWidth = status.preferredTrailingWidth
+            if let maxWidth {
+                return min(max(baseWidth, preferredWidth), maxWidth)
+            }
+            return max(baseWidth, preferredWidth)
+        }
+
         let renderable = resolvedExtensionTrailingRenderable(for: payload.descriptor)
         var width: CGFloat
         switch renderable {

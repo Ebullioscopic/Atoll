@@ -1210,7 +1210,11 @@ struct ContentView: View {
     @ViewBuilder
     private func MusicLiveActivity(secondary preResolvedSecondary: MusicSecondaryLiveActivity? = nil) -> some View {
         let secondary = preResolvedSecondary ?? resolveMusicSecondaryLiveActivity()
-        let notchContentHeight = max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12))
+        let additionalHeight = codexCompactAdditionalHeight(for: secondary)
+        let notchContentHeight = max(
+            0,
+            vm.effectiveClosedNotchHeight + additionalHeight - (isHovering ? 0 : 12)
+        )
         let wingBaseWidth = max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12) + gestureProgress / 2)
         let rawCenterBaseWidth = vm.closedNotchSize.width + (isHovering ? 8 : 0)
         let centerBaseWidth = max(rawCenterBaseWidth, 96)
@@ -1322,8 +1326,24 @@ struct ContentView: View {
                 .contentTransition(.symbolEffect(.replace))
         }
         .frame(width: notchWidth, height: notchContentHeight)
-        .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
+        .frame(
+            height: vm.effectiveClosedNotchHeight + additionalHeight + (isHovering ? 8 : 0),
+            alignment: .center
+        )
         .animation(.smooth(duration: 0.25), value: secondary?.id)
+    }
+
+    private func codexCompactAdditionalHeight(
+        for secondary: MusicSecondaryLiveActivity?
+    ) -> CGFloat {
+        guard case let .extensionPayload(payload) = secondary,
+              CodexPresentationConstants.isBuiltInCodex(
+                  bundleIdentifier: payload.bundleIdentifier
+              ),
+              let status = CodexCompactStatus(metadata: payload.descriptor.metadata) else {
+            return 0
+        }
+        return status.additionalClosedHeight
     }
 
     private func resolveMusicSecondaryLiveActivity(isMusicPairingEligible: Bool = true) -> MusicSecondaryLiveActivity? {
@@ -1823,9 +1843,13 @@ struct ContentView: View {
     }
 
     private func extensionStandaloneLayout(for payload: ExtensionLiveActivityPayload, notchHeight: CGFloat, isHovering: Bool) -> ExtensionStandaloneLayout {
-        let outerHeight = notchHeight
-        let contentHeight = max(0, notchHeight - (isHovering ? 0 : 12))
-        let leadingWidth = max(contentHeight, 44)
+        let compactStatus = CodexPresentationConstants.isBuiltInCodex(
+            bundleIdentifier: payload.bundleIdentifier
+        ) ? CodexCompactStatus(metadata: payload.descriptor.metadata) : nil
+        let outerHeight = notchHeight + (compactStatus?.additionalClosedHeight ?? 0)
+        let baseContentHeight = max(0, notchHeight - (isHovering ? 0 : 12))
+        let contentHeight = max(0, outerHeight - (isHovering ? 0 : 12))
+        let leadingWidth = max(baseContentHeight, 44)
         let centerWidth: CGFloat = max(vm.closedNotchSize.width + (isHovering ? 8 : 0), 96)
         let trailingWidth = ExtensionLayoutMetrics.trailingWidth(
             for: payload,

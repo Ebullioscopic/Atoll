@@ -19,6 +19,7 @@
 import SwiftUI
 import Defaults
 import AtollExtensionKit
+import AppKit
 
 struct ExtensionStandaloneLayout {
     let totalWidth: CGFloat
@@ -98,31 +99,48 @@ struct ExtensionMusicWingView: View {
     private var trailingRenderable: ExtensionTrailingRenderable {
         resolvedExtensionTrailingRenderable(for: descriptor)
     }
+    private var codexCompactStatus: CodexCompactStatus? {
+        guard CodexPresentationConstants.isBuiltInCodex(
+            bundleIdentifier: payload.bundleIdentifier
+        ) else {
+            return nil
+        }
+        return CodexCompactStatus(metadata: descriptor.metadata)
+    }
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 6) {
-            switch trailingRenderable {
-            case let .content(content):
-                if case .none = content {
-                    Spacer(minLength: 0)
-                } else {
-                    ExtensionEdgeContentView(
-                        content: content,
+            if let codexCompactStatus {
+                CodexCompactStatusView(
+                    status: codexCompactStatus,
+                    availableWidth: max(24, trailingWidth - 8),
+                    availableHeight: max(16, notchHeight - 12)
+                )
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            } else {
+                switch trailingRenderable {
+                case let .content(content):
+                    if case .none = content {
+                        Spacer(minLength: 0)
+                    } else {
+                        ExtensionEdgeContentView(
+                            content: content,
+                            accent: accentColor,
+                            availableWidth: trailingWidth,
+                            alignment: .trailing
+                        )
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                case let .indicator(indicator):
+                    ExtensionProgressIndicatorView(
+                        indicator: indicator,
+                        progress: descriptor.progress,
                         accent: accentColor,
-                        availableWidth: trailingWidth,
-                        alignment: .trailing
+                        estimatedDuration: descriptor.estimatedDuration,
+                        maxVisualHeight: notchHeight
                     )
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-            case let .indicator(indicator):
-                ExtensionProgressIndicatorView(
-                    indicator: indicator,
-                    progress: descriptor.progress,
-                    accent: accentColor,
-                    estimatedDuration: descriptor.estimatedDuration,
-                    maxVisualHeight: notchHeight
-                )
-                .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
             Spacer(minLength: 0)
@@ -291,15 +309,71 @@ struct ExtensionNotchSectionView: View {
     let metadata: [String: String]
     let onOpenURL: (() -> Void)?
 
+    @State private var isHoveringAction = false
+
     var body: some View {
+        Group {
+            if let sectionActionURL {
+                Button {
+                    openCodexThread(sectionActionURL)
+                } label: {
+                    cardContent
+                }
+                .buttonStyle(.plain)
+                .help("打开对应的 Codex 对话")
+                .onHover { isHovering in
+                    isHoveringAction = isHovering
+                    if isHovering {
+                        NSCursor.pointingHand.set()
+                    } else {
+                        NSCursor.arrow.set()
+                    }
+                }
+                .onDisappear {
+                    if isHoveringAction {
+                        NSCursor.arrow.set()
+                        isHoveringAction = false
+                    }
+                }
+            } else {
+                cardContent
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var cardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             ExtensionNotchSectionHeader(section: section)
             layoutContent
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.04))
+        .background(Color.white.opacity(isHoveringAction ? 0.085 : 0.04))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(
+                    accent.opacity(isHoveringAction ? 0.55 : 0),
+                    lineWidth: 1
+                )
+        }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .animation(.easeOut(duration: 0.14), value: isHoveringAction)
+    }
+
+    private var sectionActionURL: URL? {
+        CodexThreadActionResolver.sectionURL(
+            sectionID: section.id,
+            elementCount: section.elements.count,
+            metadata: metadata
+        )
+    }
+
+    private func openCodexThread(_ url: URL) {
+        guard CodexThreadActionResolver.isCodexThreadURL(url) else { return }
+        guard NSWorkspace.shared.open(url) else { return }
+        onOpenURL?()
     }
 
     @ViewBuilder
@@ -327,11 +401,13 @@ struct ExtensionNotchSectionView: View {
                 element: element,
                 accent: accent,
                 allowWebInteraction: allowWebInteraction,
-                actionURL: CodexThreadActionResolver.url(
-                    sectionID: section.id,
-                    elementIndex: index,
-                    metadata: metadata
-                ),
+                actionURL: sectionActionURL == nil
+                    ? CodexThreadActionResolver.url(
+                        sectionID: section.id,
+                        elementIndex: index,
+                        metadata: metadata
+                    )
+                    : nil,
                 onOpenURL: onOpenURL
             )
             .accessibilityIdentifier("extension-notch-element-\(index)")

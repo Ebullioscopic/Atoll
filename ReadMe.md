@@ -79,6 +79,20 @@ This product branch includes Codex task status as a native Atoll utility. It use
 - Xcode 15+ to build from source.
 - Permissions as needed: Accessibility, Camera, Calendar, Screen Recording, Music.
 
+## Development Run
+
+Unless a Release package is explicitly required, use the Debug app for development and UI verification instead of packaging or copying a new app into `/Applications`:
+
+```bash
+./scripts/dev-run
+```
+
+It reuses a fixed DerivedData directory for incremental Debug builds, stops every running Atoll instance, and launches only the app produced from the current working tree. The Debug app is named **Atoll Dev**, uses the existing `com.Ebullioscopic.Atoll.dev` bundle identifier, and is ad-hoc signed so local development does not require the release team's signing certificate.
+
+Running the `DynamicIsland` scheme with Xcode's Run command provides the same incremental build/debug workflow and now stops stale Atoll processes before launch.
+
+Do not create or retain extra `.app` copies for individual changes. `/Applications/Atoll.app` may remain installed as the Release copy, but it must not run at the same time as **Atoll Dev**. Before accepting a runtime result, verify that the active executable comes from `DerivedData/Dev/Build/Products/Debug/Atoll.app` and that its bundle identifier is `com.Ebullioscopic.Atoll.dev`.
+
 ## Installation
 1) Download the latest DMG [here](https://github.com/Ebullioscopic/Atoll/releases/latest).
 2) Open the DMG and drag Atoll into Applications.

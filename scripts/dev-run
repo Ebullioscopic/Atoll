@@ -1,0 +1,83 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+repo_root="${0:A:h:h}"
+derived_data="${ATOLL_DERIVED_DATA_PATH:-$repo_root/DerivedData/Dev}"
+app_path="$derived_data/Build/Products/Debug/Atoll.app"
+executable_path="$app_path/Contents/MacOS/Atoll"
+build_log="$derived_data/dev-run-build.log"
+architecture="$(/usr/bin/uname -m)"
+
+cd "$repo_root"
+
+revision="$(/usr/bin/git rev-parse --short HEAD)"
+if [[ -n "$(/usr/bin/git status --porcelain --untracked-files=normal)" ]]; then
+    revision="${revision}-dirty"
+fi
+
+echo "Building Atoll Dev ($revision)..."
+/bin/mkdir -p "$derived_data"
+if ! /usr/bin/xcodebuild \
+        -project DynamicIsland.xcodeproj \
+        -scheme DynamicIsland \
+        -configuration Debug \
+        -destination "platform=macOS,arch=$architecture" \
+        -derivedDataPath "$derived_data" \
+        -quiet \
+        build >"$build_log" 2>&1; then
+    echo "Build failed. Relevant output:" >&2
+    /usr/bin/tail -n 120 "$build_log" >&2
+    echo "Full log: $build_log" >&2
+    exit 1
+fi
+
+warning_count="$(/usr/bin/grep -c 'warning:' "$build_log" || true)"
+if (( warning_count > 0 )); then
+    echo "Build succeeded with $warning_count warning line(s); full log: $build_log"
+fi
+
+if [[ ! -x "$executable_path" ]]; then
+    echo "Build succeeded, but the expected app was not found at: $app_path" >&2
+    exit 1
+fi
+
+existing_pids=("${(@f)$(/usr/bin/pgrep -x Atoll 2>/dev/null || true)}")
+if (( ${#existing_pids} > 0 )); then
+    echo "Stopping existing Atoll process(es): ${existing_pids[*]}"
+    /bin/kill "${existing_pids[@]}"
+
+    for _ in {1..30}; do
+        if ! /usr/bin/pgrep -x Atoll >/dev/null 2>&1; then
+            break
+        fi
+        /bin/sleep 0.1
+    done
+
+    if /usr/bin/pgrep -x Atoll >/dev/null 2>&1; then
+        echo "An existing Atoll process did not exit; the new build was not launched." >&2
+        exit 1
+    fi
+fi
+
+/usr/bin/open -n "$app_path"
+
+for _ in {1..50}; do
+    running_pid="$(/usr/bin/pgrep -n -x Atoll 2>/dev/null || true)"
+    if [[ -n "$running_pid" ]]; then
+        running_command="$(/bin/ps -ww -p "$running_pid" -o command=)"
+        if [[ "$running_command" == "$executable_path"* ]]; then
+            bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist")"
+            echo "Running Atoll Dev"
+            echo "  PID: $running_pid"
+            echo "  Bundle ID: $bundle_id"
+            echo "  Source: $revision"
+            echo "  App: $app_path"
+            exit 0
+        fi
+    fi
+    /bin/sleep 0.1
+done
+
+echo "Atoll launched, but its executable path could not be verified." >&2
+exit 1

@@ -1,5 +1,4 @@
 import AtollExtensionKit
-import CoreGraphics
 import Foundation
 
 public struct CodexPresentation: Equatable, Sendable {
@@ -64,35 +63,22 @@ public struct CodexPresentationBuilder: Sendable {
     let waiting = active.filter { $0.status == .waitingForApproval }
     let running = active.filter { $0.status == .running }
     let recent = snapshot.recentCompletions.sorted { $0.completedAt > $1.completedAt }
-    let currentLines = compactStatusLines(
-      waitingCount: waiting.count,
-      runningCount: running.count,
-      completedCount: recent.count
+    let compactStatus = CodexCompactStatus(
+      lines: compactStatusLines(waiting: waiting, running: running, recent: recent)
     )
-    let previousLines: [CompactStatusLine]? = {
-      guard case .completionPulse = context else { return nil }
-      return compactStatusLines(
-        waitingCount: waiting.count,
-        runningCount: running.count + context.completedCount,
-        completedCount: max(0, recent.count - context.completedCount)
-      )
-    }()
-    let trailingContent = compactTrailingContent(
-      currentLines: currentLines,
-      previousLines: previousLines,
-      animated: context != .steady
-    )
+    let trailingContent = compactTrailingContent(status: compactStatus)
     let pulseCompletion =
       context.sessionID.flatMap { sessionID in
         recent.first { $0.sessionID == sessionID }
       } ?? (context == .steady ? nil : recent.first)
-    let statusMetadata = [
+    var statusMetadata = [
       "codex_waiting_count": String(waiting.count),
       "codex_running_count": String(running.count),
       "codex_completed_count": String(recent.count),
-      "codex_status_layout": currentLines.count > 1 ? "stacked" : "single",
+      "codex_status_layout": compactStatus.lines.count > 1 ? "native-stacked" : "single",
       "codex_presentation_phase": context.phaseName,
     ]
+    statusMetadata.merge(compactStatus.metadata) { _, new in new }
 
     let live: AtollLiveActivityDescriptor?
     switch (waiting.isEmpty, running.isEmpty, recent.first) {
@@ -140,13 +126,18 @@ public struct CodexPresentationBuilder: Sendable {
       live = nil
     }
 
-    let sections = makeSections(waiting: waiting, running: running, recent: recent)
+    let conversationItems = makeConversationItems(
+      waiting: waiting,
+      running: running,
+      recent: recent
+    )
+    let sections = makeSections(from: conversationItems)
     var metadata = [
       CodexPresentationConstants.targetExperienceMetadataKey: CodexPresentationConstants.experienceID,
       "tab_id": CodexPresentationConstants.tabID,
     ]
     metadata.merge(
-      makeCodexThreadActionMetadata(waiting: waiting, running: running, recent: recent)
+      makeCodexThreadActionMetadata(from: conversationItems)
     ) { _, new in new }
     let tab = AtollNotchExperienceDescriptor.TabConfiguration(
       title: "Codex",
@@ -198,61 +189,49 @@ public struct CodexPresentationBuilder: Sendable {
     )
   }
 
-  private func compactTrailingContent(
-    currentLines: [CompactStatusLine],
-    previousLines: [CompactStatusLine]?,
-    animated: Bool
-  ) -> AtollTrailingContent {
-    guard let first = currentLines.first else { return .none }
-    if currentLines.count == 1, !animated {
-      return .text(
-        first.text,
-        font: .system(size: 11, weight: .semibold),
-        color: first.atollColor
-      )
-    }
-    return .animation(
-      data: CompactStatusAnimation.make(
-        currentLines: currentLines,
-        previousLines: animated ? previousLines : nil
-      ),
-      size: CGSize(width: 104, height: 34)
+  private func compactTrailingContent(status: CodexCompactStatus) -> AtollTrailingContent {
+    guard let first = status.lines.first else { return .none }
+    return .text(
+      status.fallbackText,
+      font: .system(size: status.lines.count > 1 ? 9 : 11, weight: .semibold),
+      color: first.atollColor
     )
   }
 
   private func compactStatusLines(
-    waitingCount: Int,
-    runningCount: Int,
-    completedCount: Int
-  ) -> [CompactStatusLine] {
-    if waitingCount > 0 {
-      var lines = [CompactStatusLine(text: "\(waitingCount) 个等待批准", color: .orange)]
-      let secondary: CompactStatusLine?
-      switch (runningCount > 0, completedCount > 0) {
-      case (true, true):
-        secondary = CompactStatusLine(
-          text: "\(runningCount) 进行中 · \(completedCount) 已完成", color: .blue)
-      case (true, false):
-        secondary = CompactStatusLine(text: "\(runningCount) 个进行中", color: .blue)
-      case (false, true):
-        secondary = CompactStatusLine(text: "\(completedCount) 个已完成", color: .green)
-      default:
-        secondary = nil
-      }
-      if let secondary { lines.append(secondary) }
-      return lines
+    waiting: [CodexTaskRecord],
+    running: [CodexTaskRecord],
+    recent: [CodexCompletionRecord]
+  ) -> [CodexCompactStatusLine] {
+    var lines: [CodexCompactStatusLine] = []
+    if !waiting.isEmpty {
+      lines.append(
+        CodexCompactStatusLine(
+          label: "\(waiting.count) 等待批准",
+          detail: nil,
+          tone: .orange
+        )
+      )
     }
-    if runningCount > 0 {
-      var lines = [CompactStatusLine(text: "\(runningCount) 个进行中", color: .blue)]
-      if completedCount > 0 {
-        lines.append(CompactStatusLine(text: "\(completedCount) 个已完成", color: .green))
-      }
-      return lines
+    if !running.isEmpty {
+      lines.append(
+        CodexCompactStatusLine(
+          label: "\(running.count) 进行中",
+          detail: nil,
+          tone: .blue
+        )
+      )
     }
-    if completedCount > 0 {
-      return [CompactStatusLine(text: "\(completedCount) 个已完成", color: .green)]
+    if !recent.isEmpty {
+      lines.append(
+        CodexCompactStatusLine(
+          label: "\(recent.count) 已完成",
+          detail: nil,
+          tone: .green
+        )
+      )
     }
-    return []
+    return lines
   }
 
   private func statusSummary(waitingCount: Int, runningCount: Int, completedCount: Int) -> String {
@@ -263,91 +242,86 @@ public struct CodexPresentationBuilder: Sendable {
     return parts.joined(separator: " · ")
   }
 
-  private func makeSections(
+  private func makeConversationItems(
     waiting: [CodexTaskRecord],
     running: [CodexTaskRecord],
     recent: [CodexCompletionRecord]
-  ) -> [AtollNotchContentSection] {
-    var sections: [AtollNotchContentSection] = []
-    if !waiting.isEmpty {
-      sections.append(makeTaskSection(id: "waiting", title: "等待批准", tasks: waiting, status: "等待批准"))
-    }
-    if !running.isEmpty {
-      sections.append(makeTaskSection(id: "running", title: "进行中", tasks: running, status: "运行中"))
-    }
-    if !recent.isEmpty {
-      let elements = recent.prefix(CodexPresentationConstants.visibleRecentConversationLimit).map {
-        completion in
-        text("✓ \(completion.projectName) — \(completion.resultPreview ?? "已完成")")
-      }
-      sections.append(
-        AtollNotchContentSection(
-          id: "recent",
-          title: "最近 10 分钟完成",
-          layout: .stack,
-          elements: elements
+  ) -> [CodexConversationPresentationItem] {
+    var items: [CodexConversationPresentationItem] = []
+
+    for (index, task) in waiting.enumerated() {
+      items.append(
+        CodexConversationPresentationItem(
+          sectionID: "waiting-\(index)",
+          sessionID: task.sessionID,
+          projectName: task.projectName,
+          status: statusLine(task: task, status: "等待批准"),
+          content: task.approvalPreview ?? task.promptPreview ?? "需要用户批准"
         )
       )
     }
-    if sections.isEmpty {
-      sections.append(
+
+    for (index, task) in running.enumerated() {
+      items.append(
+        CodexConversationPresentationItem(
+          sectionID: "running-\(index)",
+          sessionID: task.sessionID,
+          projectName: task.projectName,
+          status: statusLine(task: task, status: "运行中"),
+          content: task.promptPreview ?? task.approvalPreview ?? "Codex 会话"
+        )
+      )
+    }
+
+    for (index, completion) in recent.enumerated() {
+      items.append(
+        CodexConversationPresentationItem(
+          sectionID: "recent-\(index)",
+          sessionID: completion.sessionID,
+          projectName: completion.projectName,
+          status: "已完成",
+          content: completion.resultPreview ?? completion.promptPreview ?? "Codex 会话已完成"
+        )
+      )
+    }
+
+    return Array(items.prefix(CodexPresentationConstants.visibleConversationLimit))
+  }
+
+  private func makeSections(
+    from items: [CodexConversationPresentationItem]
+  ) -> [AtollNotchContentSection] {
+    guard !items.isEmpty else {
+      return [
         AtollNotchContentSection(
           id: "empty-state",
           title: "暂无 Codex 任务",
           layout: .stack,
           elements: [text("新任务开始后会自动显示在这里")]
         )
+      ]
+    }
+
+    return items.map { item in
+      AtollNotchContentSection(
+        id: item.sectionID,
+        title: item.projectName,
+        subtitle: item.status,
+        layout: .stack,
+        elements: [text(item.content)]
       )
     }
-    return sections
-  }
-
-  private func makeTaskSection(
-    id: String,
-    title: String,
-    tasks: [CodexTaskRecord],
-    status: String
-  ) -> AtollNotchContentSection {
-    var elements: [AtollWidgetContentElement] = []
-    for task in tasks.prefix(5) {
-      let preview = task.promptPreview ?? task.approvalPreview ?? "Codex 会话"
-      elements.append(
-        text("● \(task.projectName) — \(preview) · \(statusLine(task: task, status: status))"))
-    }
-    if tasks.count > 5 {
-      elements.append(text("还有 \(tasks.count - 5) 个任务…"))
-    }
-    return AtollNotchContentSection(id: id, title: title, elements: elements)
   }
 
   private func makeCodexThreadActionMetadata(
-    waiting: [CodexTaskRecord],
-    running: [CodexTaskRecord],
-    recent: [CodexCompletionRecord]
+    from items: [CodexConversationPresentationItem]
   ) -> [String: String] {
     var metadata: [String: String] = [:]
-
-    for (index, task) in waiting.prefix(5).enumerated() {
+    for item in items {
       addActionMetadata(
-        for: "waiting",
-        elementIndex: index,
-        sessionID: task.sessionID,
-        to: &metadata
-      )
-    }
-    for (index, task) in running.prefix(5).enumerated() {
-      addActionMetadata(
-        for: "running",
-        elementIndex: index,
-        sessionID: task.sessionID,
-        to: &metadata
-      )
-    }
-    for (index, completion) in recent.prefix(CodexPresentationConstants.visibleRecentConversationLimit).enumerated() {
-      addActionMetadata(
-        for: "recent",
-        elementIndex: index,
-        sessionID: completion.sessionID,
+        for: item.sectionID,
+        elementIndex: 0,
+        sessionID: item.sessionID,
         to: &metadata
       )
     }
@@ -381,12 +355,87 @@ public struct CodexPresentationBuilder: Sendable {
 
 }
 
-private struct CompactStatusLine: Equatable, Sendable {
-  let text: String
-  let color: CompactStatusColor
+private struct CodexConversationPresentationItem: Equatable, Sendable {
+  let sectionID: String
+  let sessionID: String
+  let projectName: String
+  let status: String
+  let content: String
+}
+
+struct CodexCompactStatus: Equatable, Sendable {
+  static let lineCountMetadataKey = "codex_compact_line_count"
+  static let lineMetadataPrefix = "codex_compact_line_"
+  static let compactTrailingWidth: CGFloat = 84
+  static let additionalHeightPerRow: CGFloat = 16
+
+  let lines: [CodexCompactStatusLine]
+
+  init(lines: [CodexCompactStatusLine]) {
+    self.lines = lines
+  }
+
+  init?(metadata: [String: String]) {
+    guard let countValue = metadata[Self.lineCountMetadataKey],
+          let count = Int(countValue),
+          count > 0 else {
+      return nil
+    }
+    let decoded = (0..<count).compactMap { index -> CodexCompactStatusLine? in
+      let prefix = "\(Self.lineMetadataPrefix)\(index)_"
+      guard let label = metadata["\(prefix)label"],
+            let toneValue = metadata["\(prefix)tone"],
+            let tone = CodexCompactStatusTone(rawValue: toneValue) else {
+        return nil
+      }
+      return CodexCompactStatusLine(
+        label: label,
+        detail: metadata["\(prefix)detail"],
+        tone: tone
+      )
+    }
+    guard decoded.count == count else { return nil }
+    lines = decoded
+  }
+
+  var fallbackText: String {
+    lines.map(\.displayText).joined(separator: "  ")
+  }
+
+  var preferredTrailingWidth: CGFloat {
+    Self.compactTrailingWidth
+  }
+
+  var additionalClosedHeight: CGFloat {
+    CGFloat(max(0, lines.count - 1)) * Self.additionalHeightPerRow
+  }
+
+  var metadata: [String: String] {
+    var values = [Self.lineCountMetadataKey: String(lines.count)]
+    for (index, line) in lines.enumerated() {
+      let prefix = "\(Self.lineMetadataPrefix)\(index)_"
+      values["\(prefix)label"] = line.label
+      values["\(prefix)tone"] = line.tone.rawValue
+      if let detail = line.detail {
+        values["\(prefix)detail"] = detail
+      }
+    }
+    return values
+  }
+}
+
+struct CodexCompactStatusLine: Equatable, Sendable {
+  let label: String
+  let detail: String?
+  let tone: CodexCompactStatusTone
+
+  var displayText: String {
+    guard let detail, !detail.isEmpty else { return label }
+    return "\(label) · \(detail)"
+  }
 
   var atollColor: AtollColorDescriptor {
-    switch color {
+    switch tone {
     case .blue: return .blue
     case .green: return .green
     case .orange: return .orange
@@ -394,206 +443,8 @@ private struct CompactStatusLine: Equatable, Sendable {
   }
 }
 
-private enum CompactStatusColor: Equatable, Sendable {
+enum CodexCompactStatusTone: String, Equatable, Sendable {
   case blue
   case green
   case orange
-
-  var lottieRGB: [Double] {
-    switch self {
-    case .blue: return [0.22, 0.56, 1.0]
-    case .green: return [0.24, 0.82, 0.43]
-    case .orange: return [1.0, 0.60, 0.16]
-    }
-  }
-}
-
-private enum CompactStatusAnimation {
-  private static let width = 104.0
-  private static let height = 34.0
-  private static let framesPerSecond = 30.0
-  private static let outputFrame = 300.0
-
-  static func make(
-    currentLines: [CompactStatusLine],
-    previousLines: [CompactStatusLine]?
-  ) -> Data {
-    var layers: [[String: Any]] = []
-    var layerIndex = 1
-
-    if let previousLines {
-      for (index, line) in previousLines.enumerated() {
-        layers.append(
-          textLayer(
-            line,
-            name: "Previous status \(index)",
-            index: layerIndex,
-            startY: lineY(lineCount: previousLines.count, index: index),
-            endY: lineY(lineCount: previousLines.count, index: index),
-            appearance: .disappearing
-          )
-        )
-        layerIndex += 1
-      }
-    }
-
-    for (index, line) in currentLines.enumerated() {
-      let targetY = lineY(lineCount: currentLines.count, index: index)
-      let sourceY: Double
-      if let previousLines, previousLines.indices.contains(index) {
-        sourceY = lineY(lineCount: previousLines.count, index: index)
-      } else {
-        sourceY = targetY + 4
-      }
-      layers.append(
-        textLayer(
-          line,
-          name: "Current status \(index)",
-          index: layerIndex,
-          startY: sourceY,
-          endY: targetY,
-          appearance: previousLines == nil ? .static : .appearing
-        )
-      )
-      layerIndex += 1
-    }
-
-    let object: [String: Any] = [
-      "v": "5.10.0",
-      "fr": framesPerSecond,
-      "ip": 0,
-      "op": outputFrame,
-      "w": width,
-      "h": height,
-      "nm": "Atoll Codex compact stacked status",
-      "ddd": 0,
-      "assets": [],
-      "fonts": [
-        "list": [
-          [
-            "fName": "PingFangSC-Semibold",
-            "fFamily": "PingFang SC",
-            "fStyle": "Semibold",
-            "ascent": 75,
-          ]
-        ]
-      ],
-      "layers": layers,
-      "meta": [
-        "codex_status_lines": currentLines.map(\.text),
-        "codex_previous_status_lines": previousLines?.map(\.text) ?? [],
-      ],
-    ]
-
-    return (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data()
-  }
-
-  private enum Appearance {
-    case `static`
-    case appearing
-    case disappearing
-  }
-
-  private static func textLayer(
-    _ line: CompactStatusLine,
-    name: String,
-    index: Int,
-    startY: Double,
-    endY: Double,
-    appearance: Appearance
-  ) -> [String: Any] {
-    let fontSize = line.text.count > 13 ? 8.5 : 10.0
-    return [
-      "ddd": 0,
-      "ind": index,
-      "ty": 5,
-      "nm": name,
-      "sr": 1,
-      "ks": [
-        "o": opacityProperty(for: appearance),
-        "r": ["a": 0, "k": 0],
-        "p": positionProperty(startY: startY, endY: endY, animated: appearance == .appearing),
-        "a": ["a": 0, "k": [0, 0, 0]],
-        "s": ["a": 0, "k": [100, 100, 100]],
-      ],
-      "ao": 0,
-      "t": [
-        "d": [
-          "k": [
-            [
-              "s": [
-                "s": fontSize,
-                "f": "PingFangSC-Semibold",
-                "t": line.text,
-                "j": 0,
-                "tr": 0,
-                "lh": 12,
-                "ls": 0,
-                "fc": line.color.lottieRGB,
-              ],
-              "t": 0,
-            ]
-          ]
-        ],
-        "p": [:],
-        "m": ["g": 1, "a": ["a": 0, "k": [0, 0]]],
-      ],
-      "ip": 0,
-      "op": outputFrame,
-      "st": 0,
-      "bm": 0,
-    ]
-  }
-
-  private static func opacityProperty(for appearance: Appearance) -> [String: Any] {
-    switch appearance {
-    case .static:
-      return ["a": 0, "k": 100]
-    case .appearing:
-      return [
-        "a": 1,
-        "k": [
-          keyframe(time: 0, start: [0], end: [0]),
-          keyframe(time: 5, start: [0], end: [100]),
-          ["t": 14, "s": [100]],
-        ],
-      ]
-    case .disappearing:
-      return [
-        "a": 1,
-        "k": [
-          keyframe(time: 0, start: [100], end: [0]),
-          ["t": 8, "s": [0]],
-        ],
-      ]
-    }
-  }
-
-  private static func positionProperty(startY: Double, endY: Double, animated: Bool) -> [String:
-    Any]
-  {
-    guard animated else { return ["a": 0, "k": [2, endY, 0]] }
-    return [
-      "a": 1,
-      "k": [
-        keyframe(time: 0, start: [2, startY, 0], end: [2, endY, 0]),
-        ["t": 14, "s": [2, endY, 0]],
-      ],
-    ]
-  }
-
-  private static func keyframe(time: Double, start: [Double], end: [Double]) -> [String: Any] {
-    [
-      "i": ["x": 0.67, "y": 1.0],
-      "o": ["x": 0.33, "y": 0.0],
-      "t": time,
-      "s": start,
-      "e": end,
-    ]
-  }
-
-  private static func lineY(lineCount: Int, index: Int) -> Double {
-    guard lineCount > 1 else { return 20 }
-    return index == 0 ? 12 : 27
-  }
 }

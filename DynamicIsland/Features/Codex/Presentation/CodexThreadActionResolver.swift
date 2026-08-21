@@ -3,6 +3,15 @@ import Foundation
 enum CodexThreadActionResolver {
     static let metadataPrefix = "atoll.openCodexThread."
 
+    static func sectionURL(
+        sectionID: String?,
+        elementCount: Int,
+        metadata: [String: String]
+    ) -> URL? {
+        guard elementCount == 1 else { return nil }
+        return url(sectionID: sectionID, elementIndex: 0, metadata: metadata)
+    }
+
     static func url(
         sectionID: String?,
         elementIndex: Int,

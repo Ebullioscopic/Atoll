@@ -82,19 +82,39 @@ struct ExtensionExperienceRouteTests {
         )
 
         let threadURL = CodexThreadActionResolver.url(
-            sectionID: "recent",
+            sectionID: "recent-0",
             elementIndex: 0,
             metadata: [
-                "\(CodexThreadActionResolver.metadataPrefix)recent.0": "codex://threads/session-1"
+                "\(CodexThreadActionResolver.metadataPrefix)recent-0.0": "codex://threads/session-1"
             ]
         )
         try expect(threadURL?.absoluteString == "codex://threads/session-1", "Codex thread action resolves")
         try expect(
+            CodexThreadActionResolver.sectionURL(
+                sectionID: "recent-0",
+                elementCount: 1,
+                metadata: [
+                    "\(CodexThreadActionResolver.metadataPrefix)recent-0.0": "codex://threads/session-1"
+                ]
+            )?.absoluteString == "codex://threads/session-1",
+            "single-conversation section promotes its thread action to the whole card"
+        )
+        try expect(
+            CodexThreadActionResolver.sectionURL(
+                sectionID: "recent-0",
+                elementCount: 2,
+                metadata: [
+                    "\(CodexThreadActionResolver.metadataPrefix)recent-0.0": "codex://threads/session-1"
+                ]
+            ) == nil,
+            "multi-element sections keep element-level interaction"
+        )
+        try expect(
             CodexThreadActionResolver.url(
-                sectionID: "recent",
+                sectionID: "recent-0",
                 elementIndex: 1,
                 metadata: [
-                    "\(CodexThreadActionResolver.metadataPrefix)recent.0": "codex://threads/session-1"
+                    "\(CodexThreadActionResolver.metadataPrefix)recent-0.0": "codex://threads/session-1"
                 ]
             ) == nil,
             "missing element action remains inert"

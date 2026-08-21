@@ -127,6 +127,7 @@ public struct CodexTaskStoreSnapshot: Codable, Equatable, Sendable {
     public var savedAt: Date
     public var tasks: [CodexTaskRecord]
     public var recentCompletions: [CodexCompletionRecord]
+    public var acknowledgedCompletionIDs: [UUID]?
     public var processedEventIDs: [UUID]
 
     public init(
@@ -134,13 +135,20 @@ public struct CodexTaskStoreSnapshot: Codable, Equatable, Sendable {
         savedAt: Date = Date(),
         tasks: [CodexTaskRecord] = [],
         recentCompletions: [CodexCompletionRecord] = [],
+        acknowledgedCompletionIDs: [UUID] = [],
         processedEventIDs: [UUID] = []
     ) {
         self.schemaVersion = schemaVersion
         self.savedAt = savedAt
         self.tasks = tasks
         self.recentCompletions = recentCompletions
+        self.acknowledgedCompletionIDs = acknowledgedCompletionIDs
         self.processedEventIDs = processedEventIDs
+    }
+
+    public var unacknowledgedCompletions: [CodexCompletionRecord] {
+        let acknowledged = Set(acknowledgedCompletionIDs ?? [])
+        return recentCompletions.filter { !acknowledged.contains($0.id) }
     }
 
     public static var empty: CodexTaskStoreSnapshot { CodexTaskStoreSnapshot() }
