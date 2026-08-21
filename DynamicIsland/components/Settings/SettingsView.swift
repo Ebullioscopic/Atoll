@@ -717,6 +717,8 @@ struct SettingsView: View {
             // Live Activities
             SettingsSearchEntry(tab: .liveActivities, title: "Enable Screen Recording Detection", keywords: ["screen recording", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Screen Recording Detection")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Recording Indicator", keywords: ["recording indicator", "red dot"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Recording Indicator")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Recording Controls", keywords: ["screen recording", "stop button", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Recording Controls")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Recording Hover Style", keywords: ["screen recording", "hover", "inline", "stop"], highlightID: SettingsTab.liveActivities.highlightID(for: "Recording Hover Style")),
             SettingsSearchEntry(tab: .liveActivities, title: "Enable Focus Detection", keywords: ["focus", "do not disturb", "dnd"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Focus Detection")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Focus Indicator", keywords: ["focus icon", "moon"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Focus Indicator")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Focus Label", keywords: ["focus label", "text"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Focus Label")),
@@ -779,7 +781,9 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .media, title: "Music Source", keywords: ["media source", "controller"], highlightID: SettingsTab.media.highlightID(for: "Music Source")),
             SettingsSearchEntry(tab: .media, title: "Skip buttons", keywords: ["skip", "controls", "±10"], highlightID: SettingsTab.media.highlightID(for: "Skip buttons")),
             SettingsSearchEntry(tab: .media, title: "Sneak Peek Style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak Peek Style")),
-            SettingsSearchEntry(tab: .media, title: "Enable lyrics", keywords: ["lyrics", "song text"], highlightID: SettingsTab.media.highlightID(for: "Enable lyrics")),
+            SettingsSearchEntry(tab: .media, title: "Show lyrics on the side (requires calendar off)", keywords: ["lyrics", "song text", "side panel", "calendar"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics on the side (requires calendar off)")),
+            SettingsSearchEntry(tab: .media, title: "Side lyrics width", keywords: ["lyrics", "width", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics width")),
+            SettingsSearchEntry(tab: .media, title: "Side lyrics horizontal offset", keywords: ["lyrics", "offset", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics horizontal offset")),
             SettingsSearchEntry(tab: .media, title: "Show live canvas in Dynamic Island", keywords: ["canvas", "live canvas", "album art", "dynamic island", "spotify canvas"], highlightID: SettingsTab.media.highlightID(for: "Show live canvas in Dynamic Island")),
             SettingsSearchEntry(tab: .media, title: "Auto-hide inactive notch media player", keywords: ["auto hide", "inactive", "placeholder", "notch media"], highlightID: SettingsTab.media.highlightID(for: "Auto-hide inactive notch media player")),
             SettingsSearchEntry(tab: .media, title: "Show Change Media Output control", keywords: ["airplay", "route picker", "media output"], highlightID: SettingsTab.media.highlightID(for: "Show Change Media Output control")),
@@ -831,6 +835,7 @@ struct SettingsView: View {
 
             // Lock Screen
             SettingsSearchEntry(tab: .lockScreen, title: "Preview lock screen widgets", keywords: ["preview", "lock screen", "widgets"], highlightID: SettingsTab.lockScreen.highlightID(for: "Preview lock screen widgets")),
+            SettingsSearchEntry(tab: .lockScreen, title: "Widget appearance", keywords: ["appearance", "theme", "dark", "light", "contrast", "wallpaper"], highlightID: SettingsTab.lockScreen.highlightID(for: "Widget appearance")),
             SettingsSearchEntry(tab: .lockScreen, title: "Enable lock screen live activity", keywords: ["lock screen", "live activity"], highlightID: SettingsTab.lockScreen.highlightID(for: "Enable lock screen live activity")),
             SettingsSearchEntry(tab: .lockScreen, title: "Play lock/unlock sounds", keywords: ["chime", "sound"], highlightID: SettingsTab.lockScreen.highlightID(for: "Play lock/unlock sounds")),
             SettingsSearchEntry(tab: .lockScreen, title: "Material", keywords: ["glass", "frosted", "liquid"], highlightID: SettingsTab.lockScreen.highlightID(for: "Material")),
@@ -2770,6 +2775,10 @@ struct Media: View {
     @Default(.lockScreenMusicFullscreenArtworkEnabled) private var lockScreenMusicFullscreenArtworkEnabled
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
+    @Default(.showCalendar) private var showCalendar
+    @Default(.enableLyrics) private var enableLyrics
+    @Default(.lyricsPanelWidth) private var lyricsPanelWidth
+    @Default(.lyricsPanelOffset) private var lyricsPanelOffset
     @Default(.visualizerBarCount) private var visualizerBarCount
     @Default(.enableWaveformScrubber) private var enableWaveformScrubber
     @Default(.colorExtractionMode) private var colorExtractionMode
@@ -2829,6 +2838,7 @@ struct Media: View {
 
             if mediaController == .spotify {
                 SpotifyAuthSettingsSection()
+                SpotifyLikeButtonSettingsSection()
             }
 
             Section {
@@ -2926,9 +2936,60 @@ struct Media: View {
                 Toggle("Show sneak peek on playback changes", isOn: $showSneakPeekOnTrackChange)
                     .disabled(!enableSneakPeek)
                 Defaults.Toggle(key: .enableLyrics) {
-                    Text("Enable lyrics")
+                    Text("Show lyrics on the side (requires calendar off)")
                 }
-                .settingsHighlight(id: highlightID("Enable lyrics"))
+                .disabled(showCalendar || enableMinimalisticUI || !showStandardMediaControls)
+                .opacity(showCalendar || enableMinimalisticUI || !showStandardMediaControls ? 0.5 : 1)
+                .help(
+                    showCalendar
+                        ? "Disable the calendar to show lyrics in the side panel."
+                        : enableMinimalisticUI
+                            ? "Disable Minimalistic UI to show lyrics in the side panel."
+                            : !showStandardMediaControls
+                                ? "Enable Dynamic Island media controls to show lyrics in the side panel."
+                                : ""
+                )
+                .settingsHighlight(id: highlightID("Show lyrics on the side (requires calendar off)"))
+                if showCalendar {
+                    Text("Disable the calendar to use side lyrics.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if enableMinimalisticUI {
+                    Text("Disable Minimalistic UI to use side lyrics.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if !showStandardMediaControls {
+                    Text("Enable Dynamic Island media controls to use side lyrics.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if enableLyrics && !enableMinimalisticUI && !showCalendar && showStandardMediaControls {
+                    Slider(value: $lyricsPanelWidth, in: 180...420, step: 10) {
+                        HStack {
+                            Text("Side lyrics width")
+                            Spacer()
+                            Text("\(Int(lyricsPanelWidth)) px")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: highlightID("Side lyrics width"))
+
+                    Slider(value: $lyricsPanelOffset, in: -100...100, step: 1) {
+                        HStack {
+                            Text("Side lyrics horizontal offset")
+                            Spacer()
+                            Text("\(lyricsPanelOffset >= 0 ? "+" : "")\(Int(lyricsPanelOffset)) px")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: highlightID("Side lyrics horizontal offset"))
+
+                    Text("These controls apply when the calendar is disabled.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Defaults.Toggle(key: .showLiveCanvasInDynamicIsland) {
                     Text("Show live canvas in Dynamic Island")
                 }
@@ -3119,6 +3180,7 @@ struct Media: View {
 struct CalendarSettings: View {
     @ObservedObject private var calendarManager = CalendarManager.shared
     @Default(.showCalendar) var showCalendar: Bool
+    @Default(.enableLyrics) private var enableLyrics
     @Default(.enableReminderLiveActivity) var enableReminderLiveActivity
     @Default(.reminderPresentationStyle) var reminderPresentationStyle
     @Default(.reminderLeadTime) var reminderLeadTime
@@ -3216,7 +3278,15 @@ struct CalendarSettings: View {
                 Defaults.Toggle(key: .showCalendar) {
                     Text("Show calendar")
                 }
+                .disabled(enableLyrics)
+                .opacity(enableLyrics ? 0.5 : 1)
+                .help(enableLyrics ? "Disable side lyrics to show the calendar." : "")
                 .settingsHighlight(id: highlightID("Show calendar"))
+                if enableLyrics {
+                    Text("Disable side lyrics to use the calendar.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Section(header: Text("Event List")) {
                     Toggle("Hide completed reminders", isOn: $hideCompletedReminders)
@@ -3762,14 +3832,7 @@ private extension DevicesSettingsView {
                         .font(.system(size: 24, weight: .semibold))
                         .symbolRenderingMode(.hierarchical)
                 case .threeD:
-                    if let url = Bundle.main.url(
-                        forResource: BluetoothAudioDeviceType.airpods.inlineHUDAnimationBaseName,
-                        withExtension: "mov",
-                        subdirectory: "BluetoothHUDAnimations"
-                    ) ?? Bundle.main.url(
-                        forResource: BluetoothAudioDeviceType.airpods.inlineHUDAnimationBaseName,
-                        withExtension: "mov"
-                    ) {
+                    if let url = BluetoothAudioDeviceType.airpods.inlineHUDAnimationURL {
                         SettingsLoopingVideoIcon(url: url, size: CGSize(width: 28, height: 28))
                             .frame(width: 28, height: 28)
                     } else {
@@ -3939,6 +4002,11 @@ struct Shelf: View {
                 }
                 .settingsHighlight(id: highlightID("Copy items on drag"))
 
+                Defaults.Toggle(key: .allowMoveOnDrag) {
+                    Text("Allow moving files when dragging out")
+                }
+                .settingsHighlight(id: highlightID("Allow moving files when dragging out"))
+
                 Defaults.Toggle(key: .autoRemoveShelfItems) {
                     Text("Remove from shelf after dragging")
                 }
@@ -4042,6 +4110,9 @@ struct LiveActivitiesSettings: View {
     @ObservedObject private var fullDiskAccessPermission = FullDiskAccessPermissionStore.shared
 
     @Default(.enableScreenRecordingDetection) var enableScreenRecordingDetection
+    @Default(.showRecordingIndicator) var showRecordingIndicator
+    @Default(.recordingHoverStyle) var recordingHoverStyle
+    @Default(.recordingControlMode) var recordingControlMode
     @Default(.enableDoNotDisturbDetection) var enableDoNotDisturbDetection
     @Default(.focusIndicatorNonPersistent) var focusIndicatorNonPersistent
     @Default(.capsLockIndicatorTintMode) var capsLockTintMode
@@ -4063,6 +4134,38 @@ struct LiveActivitiesSettings: View {
                 }
                 .disabled(!enableScreenRecordingDetection)
                 .settingsHighlight(id: highlightID("Show Recording Indicator"))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Recording controls", selection: $recordingControlMode) {
+                        ForEach(RecordingControlMode.allCases) { mode in
+                            Text(mode.title)
+                                .tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text("Indicator only keeps the recording live activity passive. With stop button enables native recording controls.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .disabled(!enableScreenRecordingDetection)
+                .settingsHighlight(id: highlightID("Recording Controls"))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Recording hover style", selection: $recordingHoverStyle) {
+                        ForEach(RecordingHoverStyle.allCases) { style in
+                            Text(style.title)
+                                .tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text("Default uses the expanded recording HUD. Inline keeps the stop control inside the notch height.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .disabled(!enableScreenRecordingDetection || !showRecordingIndicator || recordingControlMode != .withStopButton)
+                .settingsHighlight(id: highlightID("Recording Hover Style"))
 
                 if recordingManager.isMonitoring {
                     HStack {
@@ -5069,6 +5172,7 @@ struct LockScreenSettings: View {
     @Default(.lockScreenSelectedCalendarIDs) private var lockScreenSelectedCalendarIDs
     @Default(.lockScreenShowCalendarEventAfterStartEnabled) private var lockScreenShowCalendarEventAfterStartEnabled
     @Default(.lockScreenMusicMergedAirPlayOutput) private var lockScreenMusicMergedAirPlayOutput
+    @Default(.lockScreenWidgetAppearance) private var lockScreenWidgetAppearance
     @ObservedObject private var musicManager = MusicManager.shared
 
     private var isAppleMusicActive: Bool {
@@ -5197,6 +5301,20 @@ struct LockScreenSettings: View {
                 Text("Preview")
             } footer: {
                 Text("Opens a transparent preview window with mock data that mirrors the current lock screen widget configuration.")
+            }
+
+            Section {
+                Picker("Widget appearance", selection: $lockScreenWidgetAppearance) {
+                    ForEach(LockScreenWidgetAppearance.allCases) { appearance in
+                        Text(appearance.localizedName).tag(appearance)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .settingsHighlight(id: highlightID("Widget appearance"))
+            } header: {
+                Text("Appearance")
+            } footer: {
+                Text("Use Light when the wallpaper is bright so titles and labels stay readable.")
             }
 
             Section {
@@ -6693,16 +6811,6 @@ struct TimerSettings: View {
             timerPresetsSection
             timerSoundSection
         }
-        .onAppear {
-            if showsLabel {
-                controlWindowEnabled = false
-            }
-        }
-        .onChange(of: showsLabel) { _, show in
-            if show {
-                controlWindowEnabled = false
-            }
-        }
     }
 
     @ViewBuilder
@@ -6839,9 +6947,9 @@ struct TimerSettings: View {
             Toggle("Show preset list in timer tab", isOn: $showTimerPresetsInNotchTab)
                 .settingsHighlight(id: highlightID("Show preset list in timer tab"))
 
-            Toggle("Show floating pause/stop controls", isOn: $controlWindowEnabled)
-                .disabled(showsLabel)
-                .help("These controls sit beside the notch while a timer runs. They require the timer name to stay hidden for spacing.")
+            Toggle("Show pause/stop controls in the notch", isOn: $controlWindowEnabled)
+                .help("Pause and stop buttons appear inline inside the notch while a timer runs.")
+                .settingsHighlight(id: highlightID("Show pause/stop controls in the notch"))
 
             Picker("Progress style", selection: $progressStyle) {
                 ForEach(TimerProgressStyle.allCases) { style in
@@ -7590,6 +7698,8 @@ struct ClipboardSettings: View {
                         Text("Panel mode shows clipboard in a floating window near the notch.")
                     case .separateTab:
                         Text("Separate Tab mode integrates Copied Items and Notes into a single view. If both are enabled, Notes appear on the right and Clipboard on the left.")
+                    case .notchTab:
+                        Text("Notch Tab mode shows clipboard in its own tab inside the notch. Drag text, image, or single-file items straight out to Finder or another app.")
                     }
                 }
 
@@ -8626,14 +8736,10 @@ struct AppIconImage: View {
     var body: some View {
         Group {
             if let nsImage = resolvedIcon() {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFit()
+                Image(nsImage: nsImage.fitted(toSide: size))
                     .clipShape(RoundedRectangle(cornerRadius: size * 0.2))
             } else if let assetFallback, let nsImage = NSImage(named: NSImage.Name(assetFallback)) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFit()
+                Image(nsImage: nsImage.fitted(toSide: size))
                     .clipShape(RoundedRectangle(cornerRadius: size * 0.2))
             } else {
                 Image(systemName: symbolFallback)
@@ -8669,9 +8775,7 @@ private struct QuickShareProviderIconImage: View {
     var body: some View {
         Group {
             if let imgData = provider.imageData, let nsImg = NSImage(data: imgData) {
-                Image(nsImage: nsImg)
-                    .resizable()
-                    .scaledToFit()
+                Image(nsImage: nsImg.fitted(toSide: size))
                     .clipShape(RoundedRectangle(cornerRadius: size * 0.2))
             } else {
                 AppIconImage(

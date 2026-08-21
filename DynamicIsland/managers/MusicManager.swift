@@ -26,8 +26,10 @@ import Defaults
 import Foundation
 import SwiftUI
 
+// swiftlint:disable file_length
+
 // MARK: - Lyric Data Structures
-struct LyricLine: Identifiable, Codable {
+struct LyricLine: Identifiable, Codable, Equatable {
     let id = UUID()
     let timestamp: TimeInterval
     let text: String
@@ -35,6 +37,12 @@ struct LyricLine: Identifiable, Codable {
     init(timestamp: TimeInterval, text: String) {
         self.timestamp = timestamp
         self.text = text
+    }
+
+    // Compares content only; `id` is regenerated per instance, so identical
+    // lyrics parsed twice would otherwise never compare equal
+    static func == (lhs: LyricLine, rhs: LyricLine) -> Bool {
+        lhs.timestamp == rhs.timestamp && lhs.text == rhs.text
     }
 }
 
@@ -52,6 +60,55 @@ let defaultImage: NSImage = .init(
     systemSymbolName: "heart.fill",
     accessibilityDescription: "Album Art"
 )!
+
+struct OptimisticPlaybackTransition {
+    private(set) var expectedState: Bool? = nil
+
+    mutating func begin(expecting state: Bool) {
+        expectedState = state
+    }
+
+    mutating func shouldApply(eventIsPlaying: Bool) -> Bool {
+        guard let expectedState else { return true }
+        guard eventIsPlaying == expectedState else { return false }
+
+        self.expectedState = nil
+        return true
+    }
+
+    mutating func cancel(ifExpecting state: Bool) -> Bool {
+        guard expectedState == state else { return false }
+        expectedState = nil
+        return true
+    }
+}
+
+private struct ManualTrackArtworkHandoff {
+    private static let manualTrackArtworkTransitionDuration: TimeInterval = 0.225
+    private var deadline: Date? = nil
+    private var generation = 0
+
+    mutating func begin(at date: Date = Date()) {
+        generation &+= 1
+        deadline = date.addingTimeInterval(Self.manualTrackArtworkTransitionDuration)
+    }
+
+    mutating func pendingSchedule(at date: Date = Date()) -> (generation: Int, delay: TimeInterval)? {
+        guard let deadline else { return nil }
+        let remainingDelay = deadline.timeIntervalSince(date)
+        guard remainingDelay > 0 else {
+            self.deadline = nil
+            return nil
+        }
+        return (generation, remainingDelay)
+    }
+
+    mutating func complete(generation: Int) -> Bool {
+        guard self.generation == generation else { return false }
+        deadline = nil
+        return true
+    }
+}
 
 private struct ITunesExplicitnessSearchResponse: Decodable {
     let results: [ITunesExplicitnessTrack]
@@ -427,6 +484,7 @@ private actor SpotifyExplicitnessResolver {
     }
 }
 
+// swiftlint:disable:next type_body_length
 class MusicManager: ObservableObject {
     enum SkipDirection: Equatable {
         case backward
@@ -440,13 +498,15 @@ class MusicManager: ObservableObject {
     }
 
     static let skipGestureSeekInterval: TimeInterval = 10
+    private static let optimisticPlaybackRecoveryTimeout: Duration = .seconds(2)
 
     // MARK: - Properties
     static let shared = MusicManager()
     private var cancellables = Set<AnyCancellable>()
     private var controllerCancellables = Set<AnyCancellable>()
     private var debounceIdleTask: Task<Void, Never>?
-    @MainActor private var pendingOptimisticPlayState: Bool?
+    private var optimisticPlayStateTimeoutTask: Task<Void, Never>?
+    @MainActor private var optimisticPlaybackTransition = OptimisticPlaybackTransition()
 
     // Helper to check if macOS has removed support for NowPlayingController
     public private(set) var isNowPlayingDeprecated: Bool = false
@@ -493,6 +553,9 @@ class MusicManager: ObservableObject {
     @Published var avgColor: NSColor = .white
     @Published var secondaryColor: NSColor = .gray
     @Published var bundleIdentifier: String? = nil
+
+    var isAppleMusicActive: Bool { bundleIdentifier == "com.apple.Music" }
+    var isSpotifyActive: Bool { bundleIdentifier == SpotifyController.bundleIdentifier }
     @Published var songDuration: TimeInterval = 0
     @Published var elapsedTime: TimeInterval = 0
     @Published var timestampDate: Date = .init()
@@ -514,6 +577,10 @@ class MusicManager: ObservableObject {
     private var lyricSyncTask: Task<Void, Never>?
     private var lyricsFetchTask: Task<Void, Never>?
     private var lyricsFetchKey: LyricsLookupKey?
+    // Identity of the fetch that is allowed to write lyrics state. A cancelled
+    // task can still reach its completion handler, and the key alone does not
+    // tell it apart from a newer fetch for the same track.
+    private var lyricsFetchID: UUID?
     private var activeLyricsKey: LyricsLookupKey?
     private var lyricsCache: [LyricsLookupKey: [LyricLine]] = [:]
     // Bounded, insertion-order eviction so the cache cannot grow unboundedly.
@@ -521,6 +588,13 @@ class MusicManager: ObservableObject {
     private var lyricsCacheOrder: [LyricsLookupKey] = []
     private var explicitLookupTask: Task<Void, Never>?
     private var explicitLookupKey: String?
+
+    // MARK: - Spotify Liked Songs
+    /// nil = unknown (not Spotify, not connected, or lookup pending) — the like button renders disabled.
+    @Published private(set) var isCurrentTrackLiked: Bool? = nil
+    private var likedLookupTrackID: String?
+    private var likedLookupTask: Task<Void, Never>?
+    private var likeToggleTask: Task<Void, Never>?
 
     /// Inserts lyrics with insertion-order eviction to keep the cache bounded.
     private func storeLyricsInCache(_ lyrics: [LyricLine], for key: LyricsLookupKey) {
@@ -535,6 +609,9 @@ class MusicManager: ObservableObject {
     }
 
     private(set) var artworkData: Data? = nil
+    private var manualTrackArtworkHandoff = ManualTrackArtworkHandoff()
+    private var artworkHandoffTask: Task<Void, Never>?
+    private var pendingHandoffArtwork: NSImage?
 
     @Published var videoArtworkURL: URL? = nil
 
@@ -561,7 +638,9 @@ class MusicManager: ObservableObject {
     private var skipGestureToken: Int = 0
 
     // MARK: - Initialization
-    init() {
+    init(startsControllerSetup: Bool = true) {
+        guard startsControllerSetup else { return }
+
         // Listen for changes to the default controller preference
         NotificationCenter.default.publisher(for: Notification.Name.mediaControllerChanged)
             .sink { [weak self] _ in
@@ -645,12 +724,15 @@ class MusicManager: ObservableObject {
     
     public func destroy() {
         debounceIdleTask?.cancel()
+        optimisticPlayStateTimeoutTask?.cancel()
         lyricsFetchTask?.cancel()
         lyricSyncTask?.cancel()
         explicitLookupTask?.cancel()
         cancellables.removeAll()
         controllerCancellables.removeAll()
         transitionWorkItem?.cancel()
+        artworkHandoffTask?.cancel()
+        pendingHandoffArtwork = nil
 
         // Release active controller
         activeController = nil
@@ -743,21 +825,33 @@ class MusicManager: ObservableObject {
 
     // MARK: - Update Methods
     @MainActor
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private func updateFromPlaybackState(_ state: PlaybackState) {
         // Check for playback state changes (playing/paused)
         let eventIsPlaying = state.isPlaying
-        let expectedState = pendingOptimisticPlayState
-        pendingOptimisticPlayState = nil
+        let expectedState = optimisticPlaybackTransition.expectedState
+        let shouldApplyPlaybackEvent = optimisticPlaybackTransition.shouldApply(
+            eventIsPlaying: eventIsPlaying
+        )
 
-        if eventIsPlaying != self.isPlaying {
-            let animation: Animation? = (expectedState == eventIsPlaying) ? .smooth(duration: 0.18) : .smooth
-            applyPlayState(eventIsPlaying, animation: animation)
-
-            if eventIsPlaying && !state.title.isEmpty && !state.artist.isEmpty {
-                self.updateSneakPeek()
+        if shouldApplyPlaybackEvent {
+            if expectedState != nil {
+                optimisticPlayStateTimeoutTask?.cancel()
+                optimisticPlayStateTimeoutTask = nil
             }
-        } else {
-            self.updateIdleState(state: eventIsPlaying)
+
+            if eventIsPlaying != self.isPlaying {
+                let animation: Animation? = (expectedState == eventIsPlaying)
+                    ? .smooth(duration: 0.18)
+                    : .smooth
+                applyPlayState(eventIsPlaying, animation: animation)
+
+                if eventIsPlaying && !state.title.isEmpty && !state.artist.isEmpty {
+                    self.updateSneakPeek()
+                }
+            } else {
+                self.updateIdleState(state: eventIsPlaying)
+            }
         }
 
         // Check for changes in track metadata using last artwork change values
@@ -873,6 +967,7 @@ class MusicManager: ObservableObject {
         }
         
         updateLiveStreamState(with: state)
+        self.refreshLikedFlag(for: state)
         self.timestampDate = state.lastUpdated
 
         // Manage lyric sync task based on playback/lyrics availability
@@ -881,6 +976,61 @@ class MusicManager: ObservableObject {
             startLyricSync()
         } else {
             stopLyricSync()
+        }
+    }
+
+    @MainActor
+    private func refreshLikedFlag(for state: PlaybackState) {
+        guard state.bundleIdentifier == SpotifyController.bundleIdentifier,
+              SpotifyLibraryManager.shared.isAuthenticated,
+              let lookupKey = SpotifyExplicitnessResolver.LookupKey(
+                  contentIdentifier: state.contentIdentifier,
+                  contentURL: state.contentURL
+              )
+        else {
+            likedLookupTask?.cancel()
+            likedLookupTask = nil
+            likedLookupTrackID = nil
+            if isCurrentTrackLiked != nil {
+                isCurrentTrackLiked = nil
+            }
+            return
+        }
+
+        guard likedLookupTrackID != lookupKey.trackID else { return }
+
+        likedLookupTask?.cancel()
+        likeToggleTask?.cancel()
+        likedLookupTrackID = lookupKey.trackID
+        isCurrentTrackLiked = nil
+
+        let trackID = lookupKey.trackID
+        likedLookupTask = Task { [weak self] in
+            let saved = await SpotifyLibraryManager.shared.isTrackSaved(trackID: trackID)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self, self.likedLookupTrackID == trackID else { return }
+                self.isCurrentTrackLiked = saved
+            }
+        }
+    }
+
+    @MainActor
+    func toggleLike() {
+        guard let trackID = likedLookupTrackID,
+              let currentValue = isCurrentTrackLiked else { return }
+
+        let targetValue = !currentValue
+        isCurrentTrackLiked = targetValue
+
+        likeToggleTask?.cancel()
+        likeToggleTask = Task { [weak self] in
+            let success = await SpotifyLibraryManager.shared.setTrackSaved(targetValue, trackID: trackID)
+            guard !Task.isCancelled, !success else { return }
+            await MainActor.run {
+                guard let self, self.likedLookupTrackID == trackID else { return }
+                self.isCurrentTrackLiked = currentValue
+            }
         }
     }
 
@@ -1115,19 +1265,58 @@ class MusicManager: ObservableObject {
         }
     }
 
-    private var workItem: DispatchWorkItem?
+    @MainActor
+    func beginManualTrackArtworkHandoff() {
+        artworkHandoffTask?.cancel()
+        artworkHandoffTask = nil
+        manualTrackArtworkHandoff.begin()
+        schedulePendingArtworkHandoff()
+    }
 
+    @MainActor
     func updateAlbumArt(newAlbumArt: NSImage) {
-        workItem?.cancel()
-        workItem = DispatchWorkItem { [weak self] in
-            withAnimation(.smooth) {
-                self?.albumArt = newAlbumArt
-                if Defaults[.coloredSpectrogram] {
-                    self?.calculateAverageColor()
-                }
+        pendingHandoffArtwork = newAlbumArt
+        schedulePendingArtworkHandoff()
+    }
+
+    @MainActor
+    private func schedulePendingArtworkHandoff() {
+        artworkHandoffTask?.cancel()
+        artworkHandoffTask = nil
+
+        guard let artwork = pendingHandoffArtwork else { return }
+        guard let pending = manualTrackArtworkHandoff.pendingSchedule() else {
+            pendingHandoffArtwork = nil
+            applyAlbumArt(artwork)
+            return
+        }
+
+        artworkHandoffTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(pending.delay))
+            } catch {
+                return
+            }
+
+            guard let self,
+                  !Task.isCancelled,
+                  self.manualTrackArtworkHandoff.complete(generation: pending.generation)
+            else { return }
+
+            self.artworkHandoffTask = nil
+            self.pendingHandoffArtwork = nil
+            self.applyAlbumArt(artwork)
+        }
+    }
+
+    @MainActor
+    private func applyAlbumArt(_ newAlbumArt: NSImage) {
+        withAnimation(.smooth) {
+            albumArt = newAlbumArt
+            if Defaults[.coloredSpectrogram] {
+                calculateAverageColor()
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: workItem!)
     }
 
     // MARK: - Playback Position Estimation
@@ -1202,8 +1391,12 @@ class MusicManager: ObservableObject {
 
         Task {
             await MainActor.run {
-                pendingOptimisticPlayState = targetState
+                optimisticPlaybackTransition.begin(expecting: targetState)
                 applyPlayState(targetState, animation: .smooth(duration: 0.18))
+                scheduleOptimisticPlayStateRecovery(
+                    expecting: targetState,
+                    controller: controller
+                )
             }
 
             if targetState {
@@ -1214,15 +1407,42 @@ class MusicManager: ObservableObject {
         }
     }
 
+    @MainActor
+    private func scheduleOptimisticPlayStateRecovery(
+        expecting targetState: Bool,
+        controller: any MediaControllerProtocol
+    ) {
+        optimisticPlayStateTimeoutTask?.cancel()
+        optimisticPlayStateTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.optimisticPlaybackRecoveryTimeout)
+            guard !Task.isCancelled, let self else { return }
+
+            let shouldRefresh = await MainActor.run {
+                self.optimisticPlaybackTransition.cancel(ifExpecting: targetState)
+            }
+            guard shouldRefresh else { return }
+
+            await controller.updatePlaybackInfo()
+        }
+    }
+
     func nextTrack() {
+        guard let controller = activeController else { return }
         Task {
-            await activeController?.nextTrack()
+            await MainActor.run {
+                beginManualTrackArtworkHandoff()
+            }
+            await controller.nextTrack()
         }
     }
 
     func previousTrack() {
+        guard let controller = activeController else { return }
         Task {
-            await activeController?.previousTrack()
+            await MainActor.run {
+                beginManualTrackArtworkHandoff()
+            }
+            await controller.previousTrack()
         }
     }
 
@@ -1293,7 +1513,7 @@ class MusicManager: ObservableObject {
         let workspace = NSWorkspace.shared
         if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID) {
             let configuration = NSWorkspace.OpenConfiguration()
-            workspace.openApplication(at: appURL, configuration: configuration) { (app, error) in
+            workspace.openApplication(at: appURL, configuration: configuration) { (_, error) in
                 if let error = error {
                     print("Failed to launch app with bundle ID: \(bundleID), error: \(error)")
                 } else {
@@ -1329,26 +1549,40 @@ class MusicManager: ObservableObject {
         if isEnabled {
             prepareLyricsForCurrentTrack(prioritizeVisibleResult: true)
         } else {
-            stopLyricSync()
+            discardLyrics()
         }
     }
 
+    /// Drops any lyrics state and stops an in-flight fetch.
+    private func discardLyrics() {
+        activeLyricsKey = nil
+        lyricsFetchKey = nil
+        lyricsFetchID = nil
+        lyricsFetchTask?.cancel()
+        lyricsFetchTask = nil
+        syncedLyrics = []
+        currentLyrics = ""
+        currentLyricIndex = -1
+        stopLyricSync()
+    }
+
     private func prepareLyricsForCurrentTrack(forceFetch: Bool = false, prioritizeVisibleResult: Bool = false) {
+        // `enableLyrics` reached only as far as the display: with lyrics switched
+        // off the placeholder was suppressed, but the track title and artist were
+        // still sent to LRCLIB on every track change, and nothing consumed the
+        // reply. Stop before the request rather than after it.
+        guard Defaults[.enableLyrics] else {
+            discardLyrics()
+            return
+        }
+
         guard let lookup = currentLyricsLookupContext() else {
-            activeLyricsKey = nil
-            lyricsFetchKey = nil
-            lyricsFetchTask?.cancel()
-            lyricsFetchTask = nil
-            syncedLyrics = []
-            currentLyrics = ""
-            currentLyricIndex = -1
-            stopLyricSync()
+            discardLyrics()
             return
         }
 
         let key = lookup.key
-        let lyricsEnabled = Defaults[.enableLyrics]
-        let shouldShowLoading = lyricsEnabled && prioritizeVisibleResult
+        let shouldShowLoading = prioritizeVisibleResult
         let trackChanged = activeLyricsKey != key
         activeLyricsKey = key
 
@@ -1373,8 +1607,10 @@ class MusicManager: ObservableObject {
 
         lyricsFetchTask?.cancel()
         lyricsFetchKey = key
+        let fetchID = UUID()
+        lyricsFetchID = fetchID
 
-        if shouldShowLoading || (lyricsEnabled && syncedLyrics.isEmpty) {
+        if shouldShowLoading || syncedLyrics.isEmpty {
             currentLyrics = "Loading lyrics..."
         }
 
@@ -1394,21 +1630,23 @@ class MusicManager: ObservableObject {
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    guard self.activeLyricsKey == key else { return }
+                    guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
                     self.storeLyricsInCache(lyrics, for: key)
                     self.lyricsFetchKey = nil
+                    self.lyricsFetchID = nil
                     self.lyricsFetchTask = nil
                     self.applyLyricsToDisplay(lyrics)
                 }
             } catch {
                 print("Failed to fetch lyrics: \(error)")
                 await MainActor.run {
-                    guard self.activeLyricsKey == key else { return }
+                    guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
                     self.lyricsFetchKey = nil
+                    self.lyricsFetchID = nil
                     self.lyricsFetchTask = nil
                     self.syncedLyrics = []
                     self.currentLyricIndex = -1
-                    self.currentLyrics = lyricsEnabled ? "No lyrics found" : ""
+                    self.currentLyrics = "No lyrics found"
                     self.stopLyricSync()
                 }
             }
@@ -1478,6 +1716,7 @@ class MusicManager: ObservableObject {
         }
     }
 
+    // pi-lens-ignore: large_tuple
     private func currentLyricsLookupContext() -> (key: LyricsLookupKey, requestArtist: String, requestTitle: String, requestAlbum: String)? {
         let requestArtist = normalizedLyricsRequestComponent(artistName)
         let requestTitle = normalizedLyricsTitle(songTitle)

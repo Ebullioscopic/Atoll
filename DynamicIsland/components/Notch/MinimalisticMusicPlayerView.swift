@@ -995,13 +995,9 @@ private struct MinimalisticReminderDetailsView: View {
         )
     }
 
-    private var isAppleMusicActive: Bool {
-        musicManager.bundleIdentifier == "com.apple.Music"
-    }
-
     private var displayedSlots: [MusicControlButton] {
         if showCustomControls {
-            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive)
+            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, isSpotifyActive: musicManager.isSpotifyActive)
             return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
         }
 
@@ -1076,6 +1072,17 @@ private struct MinimalisticReminderDetailsView: View {
                 symbolEffect: .replace
             ) {
                 enableLyrics.toggle()
+            }
+        case .likeTrack:
+            LikeTrackControl { presentation, toggle in
+                controlButton(
+                    icon: presentation.iconName,
+                    isActive: presentation.isActive,
+                    activeColor: brandAccentColor,
+                    symbolEffect: .replace
+                ) {
+                    toggle()
+                }
             }
         }
     }
