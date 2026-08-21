@@ -1105,7 +1105,24 @@ struct MusicSliderView: View {
             : .gray
     }
 
+    /// Whether the reported duration is one a track could actually have.
+    ///
+    /// Senders do not always report a usable one — a live stream has none to
+    /// give, and some hand back a sentinel or an epoch timestamp instead. The
+    /// remaining-time label subtracts the position from it and formats the
+    /// result as hours, so an epoch came out on screen as `-1732919508:00:54`.
+    /// A day is well past any track and well short of any of those.
+    private var hasUsableDuration: Bool {
+        duration.isFinite && duration > 0 && duration <= 24 * 60 * 60
+    }
+
+    /// Shown in place of a time there is no sensible value for, rather than a
+    /// formatted impossibility.
+    private static let unknownTime = "--:--"
+
     private var trailingTimeText: String {
+        guard hasUsableDuration else { return Self.unknownTime }
+
         switch trailingLabel {
         case .duration:
             return timeString(from: duration)
@@ -1124,6 +1141,12 @@ struct MusicSliderView: View {
     }
 
     func timeString(from seconds: Double) -> String {
+        // Int(_:) traps on a value too large to represent, and NaN has no
+        // meaning here either; neither belongs on screen as a time.
+        guard seconds.isFinite, seconds >= 0, seconds < Double(Int.max) else {
+            return Self.unknownTime
+        }
+
         let totalMinutes = Int(seconds) / 60
         let remainingSeconds = Int(seconds) % 60
         let hours = totalMinutes / 60
