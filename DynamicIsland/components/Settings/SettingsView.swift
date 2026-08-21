@@ -3832,14 +3832,7 @@ private extension DevicesSettingsView {
                         .font(.system(size: 24, weight: .semibold))
                         .symbolRenderingMode(.hierarchical)
                 case .threeD:
-                    if let url = Bundle.main.url(
-                        forResource: BluetoothAudioDeviceType.airpods.inlineHUDAnimationBaseName,
-                        withExtension: "mov",
-                        subdirectory: "BluetoothHUDAnimations"
-                    ) ?? Bundle.main.url(
-                        forResource: BluetoothAudioDeviceType.airpods.inlineHUDAnimationBaseName,
-                        withExtension: "mov"
-                    ) {
+                    if let url = BluetoothAudioDeviceType.airpods.inlineHUDAnimationURL {
                         SettingsLoopingVideoIcon(url: url, size: CGSize(width: 28, height: 28))
                             .frame(width: 28, height: 28)
                     } else {
