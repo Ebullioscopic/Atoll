@@ -37,6 +37,7 @@ class LockScreenPanelManager {
     private var collapsedFrame: NSRect?
     private var isPanelExpanded = false
     private var currentAdditionalHeight: CGFloat = 0
+    private var currentAdditionalWidth: CGFloat = 0
     private let collapsedPanelCornerRadius: CGFloat = 28
     private let expandedPanelCornerRadius: CGFloat = 52
     private(set) var latestFrame: NSRect?
@@ -118,6 +119,7 @@ class LockScreenPanelManager {
         collapsedFrame = defaultCollapsedFrame
         isPanelExpanded = false
         currentAdditionalHeight = 0
+        currentAdditionalWidth = 0
 
         let window: NSWindow
 
@@ -184,7 +186,12 @@ class LockScreenPanelManager {
         print("[\(timestamp())] LockScreenPanelManager: panel visible")
     }
 
-    func updatePanelSize(expanded: Bool, additionalHeight: CGFloat = 0, animated: Bool = true) {
+    func updatePanelSize(
+        expanded: Bool,
+        additionalHeight: CGFloat = 0,
+        additionalWidth: CGFloat = 0,
+        animated: Bool = true
+    ) {
         guard let window = panelWindow, let screen = currentScreen() else {
             return
         }
@@ -194,7 +201,10 @@ class LockScreenPanelManager {
         let baseSize = expanded ? LockScreenMusicPanel.expandedSize : LockScreenMusicPanel.collapsedSize
         let targetFrame = targetFrame(
             for: screen.frame,
-            panelSize: CGSize(width: baseSize.width, height: baseSize.height + additionalHeight)
+            panelSize: CGSize(
+                width: baseSize.width + additionalWidth,
+                height: baseSize.height + additionalHeight
+            )
         )
 
         if animated {
@@ -225,6 +235,7 @@ class LockScreenPanelManager {
 
         isPanelExpanded = expanded
         currentAdditionalHeight = additionalHeight
+        currentAdditionalWidth = additionalWidth
     }
 
     func notifyTimerWidgetFrameChanged(animated: Bool) {
@@ -239,7 +250,12 @@ class LockScreenPanelManager {
         collapsedFrame = newCollapsed
 
         guard panelWindow != nil else { return }
-        updatePanelSize(expanded: isPanelExpanded, additionalHeight: currentAdditionalHeight, animated: animated)
+        updatePanelSize(
+            expanded: isPanelExpanded,
+            additionalHeight: currentAdditionalHeight,
+            additionalWidth: currentAdditionalWidth,
+            animated: animated
+        )
         LockScreenTimerWidgetManager.shared.notifyMusicPanelFrameChanged(animated: animated)
     }
 
@@ -274,7 +290,12 @@ class LockScreenPanelManager {
 
         let screenFrame = screen.frame
         collapsedFrame = collapsedFrame(for: screenFrame)
-        updatePanelSize(expanded: isPanelExpanded, additionalHeight: currentAdditionalHeight, animated: false)
+        updatePanelSize(
+            expanded: isPanelExpanded,
+            additionalHeight: currentAdditionalHeight,
+            additionalWidth: currentAdditionalWidth,
+            animated: false
+        )
         LockScreenTimerWidgetManager.shared.notifyMusicPanelFrameChanged(animated: false)
 
         print("[\(timestamp())] LockScreenPanelManager: realigned window due to \(reason)")

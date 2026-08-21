@@ -1,0 +1,193 @@
+//
+//  SyncedLyricsList.swift
+//  DynamicIsland
+//
+//  The scrolling, swept lyrics list shared by the notch's lyrics tab and the
+//  expanded lock screen player, so the two cannot drift apart in how they
+//  decide what a row is or which one is current.
+//
+
+import SwiftUI
+
+/// A row in the lyrics list: either a sung line or a stretch of music with no
+/// words, which is shown as a note rather than as blank space.
+enum LyricRow: Identifiable {
+    case line(index: Int, text: String)
+    case instrumental(index: Int)
+
+    /// The index into `syncedLyrics` this row is driven by, which is also what
+    /// the scroll position and the current-line highlight key off.
+    var index: Int {
+        switch self {
+        case let .line(index, _), let .instrumental(index): return index
+        }
+    }
+
+    var id: Int { index }
+}
+
+enum SyncedLyricsRows {
+    /// Gaps shorter than this are breaths between lines, not instrumental
+    /// breaks, and showing a note for them would flicker.
+    static let instrumentalGapThreshold: TimeInterval = 5
+
+    /// Builds the display rows, inserting an instrumental marker wherever the
+    /// track goes long enough without words.
+    ///
+    /// LRC marks where singing stops with a bare timestamp, so a gap is the
+    /// stretch between such a marker and the next line. The run-up to the first
+    /// line is treated the same way, which is what covers a song's intro.
+    static func rows(for lines: [LyricLine], duration: TimeInterval) -> [LyricRow] {
+        var rows: [LyricRow] = []
+
+        // An intro long enough to sit through gets a marker of its own, keyed to
+        // -1 -- the index the current line holds before the first line starts.
+        // Decided from the first timestamp alone: keying it off "nothing added
+        // yet" missed the case where the first entry is itself a qualifying gap
+        // marker, which claims the first row and leaves the intro without one.
+        if let first = lines.first, first.timestamp >= instrumentalGapThreshold {
+            rows.append(.instrumental(index: -1))
+        }
+
+        for (index, lyric) in lines.enumerated() {
+            let isBlank = lyric.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+            if isBlank {
+                let end = index + 1 < lines.count ? lines[index + 1].timestamp : duration
+                if end - lyric.timestamp >= instrumentalGapThreshold {
+                    rows.append(.instrumental(index: index))
+                }
+                continue
+            }
+
+            rows.append(.line(index: index, text: lyric.text))
+        }
+
+        return rows
+    }
+}
+
+/// The colours and metrics a host gives the list, so the notch and the lock
+/// screen can look like themselves while sharing the behaviour.
+struct SyncedLyricsStyle {
+    var fontSize: CGFloat = 14
+    var currentFontSize: CGFloat?
+    var lineSpacing: CGFloat = 8
+    var lineLimit: Int = 2
+    /// The note glyphs read as decoration rather than as words, so they stay
+    /// smaller than the surrounding text.
+    var instrumentalFontSize: CGFloat = 12
+    var horizontalPadding: CGFloat = 12
+    var verticalPadding: CGFloat = 4
+    /// Colour a line has already been sung in.
+    var sung: Color = .white
+    /// Colour the remainder of the current line is drawn in.
+    var unsung: Color
+    /// Colour every line that is not the current one is drawn in.
+    var idle: Color
+    /// Shown when the track has no synced lyrics at all.
+    var placeholder: String = "Show lyrics here"
+}
+
+struct SyncedLyricsList: View {
+    @ObservedObject var musicManager = MusicManager.shared
+    let style: SyncedLyricsStyle
+
+    @State private var lyrics: [LyricRow] = []
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                if lyrics.isEmpty {
+                    Text(musicManager.currentLyrics.isEmpty ? style.placeholder : musicManager.currentLyrics)
+                        .font(.system(size: style.fontSize, weight: .medium))
+                        .foregroundStyle(style.idle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, style.horizontalPadding)
+                        .padding(.vertical, 8)
+                } else {
+                    // Redraw on every frame while playing so the highlight
+                    // tracks the music instead of stepping line by line.
+                    TimelineView(.animation(paused: !musicManager.isPlaying)) { timeline in
+                        let current = musicManager.currentLyricIndex
+                        let progress = musicManager.currentLyricSweepProgress(at: timeline.date)
+
+                        LazyVStack(alignment: .leading, spacing: style.lineSpacing) {
+                            ForEach(lyrics) { row in
+                                lyricRow(row, isCurrent: row.index == current, progress: progress)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, style.horizontalPadding)
+                                    .id(row.index)
+                            }
+                        }
+                        .padding(.vertical, style.verticalPadding)
+                    }
+                }
+            }
+            .scrollIndicators(.never)
+            .onAppear {
+                lyrics = SyncedLyricsRows.rows(for: musicManager.syncedLyrics, duration: musicManager.songDuration)
+                let index = musicManager.currentLyricIndex
+                // Ask the rows, not the raw lyrics: the intro marker is keyed to
+                // -1, which a lower bound of zero rejects, and blank gap markers
+                // have no row of their own to scroll to.
+                guard lyrics.contains(where: { $0.index == index }) else { return }
+                DispatchQueue.main.async {
+                    proxy.scrollTo(index, anchor: .center)
+                }
+            }
+            .onChange(of: musicManager.currentLyricIndex) { _, index in
+                guard lyrics.contains(where: { $0.index == index }) else { return }
+                withAnimation(.smooth(duration: 0.3)) {
+                    proxy.scrollTo(index, anchor: .center)
+                }
+            }
+        }
+        .onChange(of: musicManager.syncedLyrics) { _, newLyrics in
+            lyrics = SyncedLyricsRows.rows(for: newLyrics, duration: musicManager.songDuration)
+        }
+        .onChange(of: musicManager.songDuration) { _, duration in
+            // Duration closes the last line's window, so a trailing outro is only
+            // marked once it is known -- and it can arrive after the lyrics do.
+            lyrics = SyncedLyricsRows.rows(for: musicManager.syncedLyrics, duration: duration)
+        }
+    }
+
+    @ViewBuilder
+    private func lyricRow(_ row: LyricRow, isCurrent: Bool, progress: Double) -> some View {
+        let size = isCurrent ? (style.currentFontSize ?? style.fontSize) : style.fontSize
+
+        switch row {
+        case let .line(_, text):
+            swept(isCurrent: isCurrent, progress: progress) {
+                Text(text)
+                    .font(.system(size: size, weight: isCurrent ? .semibold : .regular))
+                    .lineLimit(style.lineLimit)
+            }
+
+        case .instrumental:
+            swept(isCurrent: isCurrent, progress: progress) {
+                InstrumentalBreakNotes(
+                    fontSize: style.instrumentalFontSize,
+                    weight: isCurrent ? .semibold : .regular
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func swept<Content: View>(
+        isCurrent: Bool,
+        progress: Double,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .lyricSweep(
+                progress: progress,
+                isCurrent: isCurrent,
+                sung: style.sung,
+                unsung: style.unsung,
+                idle: style.idle
+            )
+    }
+}

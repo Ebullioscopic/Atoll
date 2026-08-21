@@ -174,75 +174,20 @@ struct LyricsSidePanelView: View {
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @State private var suppressionToken = UUID()
     @State private var isSuppressing = false
-    @State private var lyrics: [LyricRow] = []
-
     private var artistLineColor: Color {
         Defaults[.playerColorTinting]
             ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6)
             : .gray
     }
 
-    /// A row in the lyrics list: either a sung line or a stretch of music with
-    /// no words, which is shown as a note rather than as blank space.
-    fileprivate enum LyricRow: Identifiable {
-        case line(index: Int, text: String)
-        case instrumental(index: Int)
-
-        /// The index into `syncedLyrics` this row is driven by, which is also
-        /// what the scroll position and the current-line highlight key off.
-        var index: Int {
-            switch self {
-            case let .line(index, _), let .instrumental(index): return index
-            }
-        }
-
-        var id: Int { index }
-    }
-
-    /// Gaps shorter than this are breaths between lines, not instrumental
-    /// breaks, and showing a note for them would flicker.
-    private static let instrumentalGapThreshold: TimeInterval = 5
-
-    /// The colour a line has already been sung in.
-    private var sungLyricColor: Color { .white }
-
     /// The colour a line has yet to be sung in. Tinted rather than plain grey so
     /// the unsung remainder still reads as part of the current line.
-    private var unsungLyricColor: Color { artistLineColor.opacity(0.55) }
-
-    /// Builds the display rows, inserting an instrumental marker wherever the
-    /// track goes long enough without words.
-    ///
-    /// LRC marks where singing stops with a bare timestamp, so a gap is the
-    /// stretch between such a marker and the next line. The run-up to the first
-    /// line is treated the same way, which is what covers a song's intro.
-    fileprivate static func rows(for lines: [LyricLine], duration: TimeInterval) -> [LyricRow] {
-        var rows: [LyricRow] = []
-
-        // An intro long enough to sit through gets a marker of its own, keyed to
-        // -1 -- the index the current line holds before the first line starts.
-        // Decided from the first timestamp alone: keying it off "nothing added
-        // yet" missed the case where the first entry is itself a qualifying gap
-        // marker, which claims the first row and leaves the intro without one.
-        if let first = lines.first, first.timestamp >= instrumentalGapThreshold {
-            rows.append(.instrumental(index: -1))
-        }
-
-        for (index, lyric) in lines.enumerated() {
-            let isBlank = lyric.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-
-            if isBlank {
-                let end = index + 1 < lines.count ? lines[index + 1].timestamp : duration
-                if end - lyric.timestamp >= instrumentalGapThreshold {
-                    rows.append(.instrumental(index: index))
-                }
-                continue
-            }
-
-            rows.append(.line(index: index, text: lyric.text))
-        }
-
-        return rows
+    private var lyricsStyle: SyncedLyricsStyle {
+        SyncedLyricsStyle(
+            sung: .white,
+            unsung: artistLineColor.opacity(0.55),
+            idle: .white.opacity(0.5)
+        )
     }
 
     var body: some View {
@@ -254,104 +199,17 @@ struct LyricsSidePanelView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 6)
 
-            ScrollViewReader { proxy in
-                ScrollView(.vertical) {
-                    if lyrics.isEmpty {
-                        Text(musicManager.currentLyrics.isEmpty ? "Show lyrics here" : musicManager.currentLyrics)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.78))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                    } else {
-                        // Redraw on every frame while playing so the highlight
-                        // tracks the music instead of stepping line by line.
-                        TimelineView(.animation(paused: !musicManager.isPlaying)) { timeline in
-                            let current = musicManager.currentLyricIndex
-                            let progress = musicManager.currentLyricSweepProgress(at: timeline.date)
-
-                            LazyVStack(alignment: .leading, spacing: 8) {
-                                ForEach(lyrics) { row in
-                                    lyricRow(row, isCurrent: row.index == current, progress: progress)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.horizontal, 12)
-                                        .id(row.index)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                }
-                .scrollIndicators(.never)
-                .onAppear {
-                    lyrics = Self.rows(for: musicManager.syncedLyrics, duration: musicManager.songDuration)
-                    let index = musicManager.currentLyricIndex
-                    // Ask the rows, not the raw lyrics: the intro marker is keyed
-                    // to -1, which a lower bound of zero rejects, and blank gap
-                    // markers have no row of their own to scroll to.
-                    guard lyrics.contains(where: { $0.index == index }) else { return }
-                    DispatchQueue.main.async {
-                        proxy.scrollTo(index, anchor: .center)
-                    }
-                }
-                .onChange(of: musicManager.currentLyricIndex) { _, index in
-                    guard lyrics.contains(where: { $0.index == index }) else { return }
-                    withAnimation(.smooth(duration: 0.3)) {
-                        proxy.scrollTo(index, anchor: .center)
-                    }
-                }
-            }
+            SyncedLyricsList(musicManager: musicManager, style: lyricsStyle)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.black.opacity(0.3))
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-        .onChange(of: musicManager.syncedLyrics) { _, newLyrics in
-            lyrics = Self.rows(for: newLyrics, duration: musicManager.songDuration)
-        }
-        .onChange(of: musicManager.songDuration) { _, duration in
-            // Duration closes the last line's window, so a trailing outro is only
-            // marked once it is known -- and it can arrive after the lyrics do.
-            lyrics = Self.rows(for: musicManager.syncedLyrics, duration: duration)
-        }
         .onHover { hovering in
             updateSuppression(for: hovering)
         }
         .onDisappear {
             updateSuppression(for: false)
         }
-    }
-
-    @ViewBuilder
-    private func lyricRow(_ row: LyricRow, isCurrent: Bool, progress: Double) -> some View {
-        switch row {
-        case let .line(_, text):
-            swept(isCurrent: isCurrent, progress: progress) {
-                Text(text)
-                    .font(.system(size: 14, weight: isCurrent ? .semibold : .regular))
-                    .lineLimit(2)
-            }
-
-        case .instrumental:
-            swept(isCurrent: isCurrent, progress: progress) {
-                InstrumentalBreakNotes(weight: isCurrent ? .semibold : .regular)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func swept<Content: View>(
-        isCurrent: Bool,
-        progress: Double,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        content()
-            .lyricSweep(
-                progress: progress,
-                isCurrent: isCurrent,
-                sung: sungLyricColor,
-                unsung: unsungLyricColor,
-                idle: .white.opacity(0.5)
-            )
     }
 
     // Prevent lyrics scrolling to close the expanded notch

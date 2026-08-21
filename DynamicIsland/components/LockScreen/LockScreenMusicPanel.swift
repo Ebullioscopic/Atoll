@@ -82,6 +82,11 @@ struct LockScreenMusicPanel: View {
     private let collapsedAlbumArtCornerRadius: CGFloat = 16
     private let expandedAlbumArtCornerRadius: CGFloat = 60
     private let expandedContentSpacing: CGFloat = 40
+
+    /// Expanded is the mode you open to read along, so the lyrics get a column
+    /// of their own beside the player rather than a single line squeezed under
+    /// the controls. The panel widens by exactly this much when it is shown.
+    private let expandedLyricsColumnWidth: CGFloat = 300
     private let collapseTimeout: TimeInterval = 5
     // Transport control sizing. Apple sizes the circular highlight at roughly
     // 2.2x the glyph so the tint reads as a comfortable ring around the symbol
@@ -102,7 +107,14 @@ struct LockScreenMusicPanel: View {
 
     private var currentSize: CGSize {
         let base = isExpanded ? Self.expandedSize : collapsedPanelSize
-        return CGSize(width: base.width, height: base.height + totalExtraHeight)
+        return CGSize(width: base.width + totalExtraWidth, height: base.height + totalExtraHeight)
+    }
+
+    /// Whether the expanded player reads its lyrics in a side column. The
+    /// Spotify-canvas fallback already hands its lyrics to a separate window,
+    /// and drops the inline artwork, so it keeps the stacked layout.
+    private var usesExpandedLyricsColumn: Bool {
+        isExpanded && shouldShowInlineLyrics && !hidesInlineArtworkForSpotifyCanvasFallback
     }
 
     private var collapsedPanelSize: CGSize {
@@ -312,6 +324,12 @@ struct LockScreenMusicPanel: View {
                         playbackControls(alignment: .leading)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if usesExpandedLyricsColumn {
+                        expandedLyricsColumn
+                            .frame(width: expandedLyricsColumnWidth)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
                 }
             }
         }
@@ -637,7 +655,7 @@ struct LockScreenMusicPanel: View {
                 }
             }
 
-            if shouldShowInlineLyrics {
+            if shouldShowInlineLyrics && !usesExpandedLyricsColumn {
                 lyricsSection(alignment: alignment)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -873,6 +891,49 @@ struct LockScreenMusicPanel: View {
                 dismiss: { isAirPlayPopoverPresented = false }
             )
         }
+    }
+
+    /// The read-along column: the whole song, scrolling itself to the line
+    /// being sung, with that line swept in time the same way the notch does it.
+    private var expandedLyricsColumn: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "quote.bubble")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Lyrics")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundColor(widgetAppearance.primary(opacity: 0.55))
+            .padding(.horizontal, 14)
+
+            SyncedLyricsList(
+                musicManager: musicManager,
+                style: SyncedLyricsStyle(
+                    fontSize: 15,
+                    lineSpacing: 12,
+                    horizontalPadding: 14,
+                    sung: widgetAppearance.primary(),
+                    unsung: widgetAppearance.primary(opacity: 0.35),
+                    idle: widgetAppearance.primary(opacity: 0.35),
+                    placeholder: "No lyrics for this track"
+                )
+            )
+            // Fades the ends rather than cutting them, so the column reads as a
+            // window onto the song instead of a box with clipped text.
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black, location: 0.1),
+                        .init(color: .black, location: 0.9),
+                        .init(color: .clear, location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private func lyricsSection(alignment: Alignment) -> some View {
@@ -1152,8 +1213,23 @@ struct LockScreenMusicPanel: View {
         sliderExtraHeight + accessorySectionExtraHeight + lyricsExtraHeight
     }
 
+    private var totalExtraWidth: CGFloat {
+        panelAdditionalWidth(forExpanded: isExpanded)
+    }
+
+    private func panelAdditionalWidth(forExpanded expanded: Bool) -> CGFloat {
+        guard expanded,
+              shouldShowInlineLyrics,
+              !hidesInlineArtworkForSpotifyCanvasFallback
+        else { return 0 }
+        return expandedLyricsColumnWidth
+    }
+
     private func lyricsHeight(forExpanded expanded: Bool, enabled: Bool) -> CGFloat {
         guard enabled else { return 0 }
+        // The side column lives inside the panel's existing height, so it must
+        // not also reserve a stacked row's worth of it.
+        if expanded && !hidesInlineArtworkForSpotifyCanvasFallback { return 0 }
         return expanded ? expandedLyricsExtraHeight : collapsedLyricsExtraHeight
     }
 
@@ -1167,6 +1243,7 @@ struct LockScreenMusicPanel: View {
         LockScreenPanelManager.shared.updatePanelSize(
             expanded: isExpanded,
             additionalHeight: panelAdditionalHeight(forExpanded: isExpanded),
+            additionalWidth: panelAdditionalWidth(forExpanded: isExpanded),
             animated: animated
         )
     }
