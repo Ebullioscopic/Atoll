@@ -31,7 +31,20 @@ import CoreImage.CIFilterBuiltins
 
 extension NSImage {
 
-    
+    /// A copy whose declared point size fits inside a `side`x`side` square, aspect preserved.
+    ///
+    /// Needed wherever an icon sits in a menu-style `Picker`: rendering the selected row into
+    /// the `NSPopUpButton` title drops SwiftUI's `.frame(width:height:)` but keeps
+    /// `.resizable()`, so a resizable icon stretches to the button's full width (the AirDrop
+    /// icon rendered as a flat wide smear). An image carrying its own size needs neither
+    /// modifier and draws identically in the menu and in the button.
+    func fitted(toSide side: CGFloat) -> NSImage {
+        guard size.width > 0, size.height > 0, let copy = copy() as? NSImage else { return self }
+        let scale = min(side / size.width, side / size.height)
+        copy.size = NSSize(width: size.width * scale, height: size.height * scale)
+        return copy
+    }
+
     func averageColor(completion: @escaping (NSColor?) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             guard let cgImage = self.cgImage(forProposedRect: nil, context: nil, hints: nil) else {

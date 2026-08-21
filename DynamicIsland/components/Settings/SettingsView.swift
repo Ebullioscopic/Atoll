@@ -717,6 +717,8 @@ struct SettingsView: View {
             // Live Activities
             SettingsSearchEntry(tab: .liveActivities, title: "Enable Screen Recording Detection", keywords: ["screen recording", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Screen Recording Detection")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Recording Indicator", keywords: ["recording indicator", "red dot"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Recording Indicator")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Recording Controls", keywords: ["screen recording", "stop button", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Recording Controls")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Recording Hover Style", keywords: ["screen recording", "hover", "inline", "stop"], highlightID: SettingsTab.liveActivities.highlightID(for: "Recording Hover Style")),
             SettingsSearchEntry(tab: .liveActivities, title: "Enable Focus Detection", keywords: ["focus", "do not disturb", "dnd"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Focus Detection")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Focus Indicator", keywords: ["focus icon", "moon"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Focus Indicator")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Focus Label", keywords: ["focus label", "text"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Focus Label")),
@@ -4116,6 +4118,9 @@ struct LiveActivitiesSettings: View {
     @ObservedObject private var fullDiskAccessPermission = FullDiskAccessPermissionStore.shared
 
     @Default(.enableScreenRecordingDetection) var enableScreenRecordingDetection
+    @Default(.showRecordingIndicator) var showRecordingIndicator
+    @Default(.recordingHoverStyle) var recordingHoverStyle
+    @Default(.recordingControlMode) var recordingControlMode
     @Default(.enableDoNotDisturbDetection) var enableDoNotDisturbDetection
     @Default(.focusIndicatorNonPersistent) var focusIndicatorNonPersistent
     @Default(.capsLockIndicatorTintMode) var capsLockTintMode
@@ -4137,6 +4142,38 @@ struct LiveActivitiesSettings: View {
                 }
                 .disabled(!enableScreenRecordingDetection)
                 .settingsHighlight(id: highlightID("Show Recording Indicator"))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Recording controls", selection: $recordingControlMode) {
+                        ForEach(RecordingControlMode.allCases) { mode in
+                            Text(mode.title)
+                                .tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text("Indicator only keeps the recording live activity passive. With stop button enables native recording controls.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .disabled(!enableScreenRecordingDetection)
+                .settingsHighlight(id: highlightID("Recording Controls"))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Recording hover style", selection: $recordingHoverStyle) {
+                        ForEach(RecordingHoverStyle.allCases) { style in
+                            Text(style.title)
+                                .tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text("Default uses the expanded recording HUD. Inline keeps the stop control inside the notch height.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .disabled(!enableScreenRecordingDetection || !showRecordingIndicator || recordingControlMode != .withStopButton)
+                .settingsHighlight(id: highlightID("Recording Hover Style"))
 
                 if recordingManager.isMonitoring {
                     HStack {
@@ -8734,14 +8771,10 @@ struct AppIconImage: View {
     var body: some View {
         Group {
             if let nsImage = resolvedIcon() {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFit()
+                Image(nsImage: nsImage.fitted(toSide: size))
                     .clipShape(RoundedRectangle(cornerRadius: size * 0.2))
             } else if let assetFallback, let nsImage = NSImage(named: NSImage.Name(assetFallback)) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFit()
+                Image(nsImage: nsImage.fitted(toSide: size))
                     .clipShape(RoundedRectangle(cornerRadius: size * 0.2))
             } else {
                 Image(systemName: symbolFallback)
@@ -8777,9 +8810,7 @@ private struct QuickShareProviderIconImage: View {
     var body: some View {
         Group {
             if let imgData = provider.imageData, let nsImg = NSImage(data: imgData) {
-                Image(nsImage: nsImg)
-                    .resizable()
-                    .scaledToFit()
+                Image(nsImage: nsImg.fitted(toSide: size))
                     .clipShape(RoundedRectangle(cornerRadius: size * 0.2))
             } else {
                 AppIconImage(
