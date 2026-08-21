@@ -36,7 +36,7 @@ struct VolumeCapsuleSlider: View {
     @State private var isDragging = false
     @State private var isHovering = false
 
-    private var trackHeight: CGFloat { compact ? 11 : 13 }
+    private var trackHeight: CGFloat { compact ? 10 : 13 }
     private var glyphSize: CGFloat { compact ? 10 : 11.5 }
 
     /// iOS dims the glyph you are moving away from and lights the one you are

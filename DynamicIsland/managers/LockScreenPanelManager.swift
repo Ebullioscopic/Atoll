@@ -386,7 +386,7 @@ class LockScreenPanelManager {
         // The panel grows upward as the volume and lyrics rows appear, so the
         // resting position has to leave room for them without drifting up into
         // the time. Fine tuning is the vertical offset setting, below.
-        let defaultLowering: CGFloat = -44
+        let defaultLowering: CGFloat = -68
         let userOffset = CGFloat(Defaults[.lockScreenMusicVerticalOffset])
         let clampedOffset = min(max(userOffset, -160), 160)
         var originY = baseOriginY + defaultLowering + clampedOffset

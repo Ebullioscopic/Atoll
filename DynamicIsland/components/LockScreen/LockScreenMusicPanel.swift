@@ -105,13 +105,15 @@ struct LockScreenMusicPanel: View {
     private var playPauseFrameSize: CGFloat { isExpanded ? 84 : 58 }
     private var playPauseIconSize: CGFloat { isExpanded ? 39 : 28 }
 
-    // Room for the volume row: the capsule (11 collapsed / 13 expanded), the
+    // Room for the volume row: the capsule (10 collapsed / 13 expanded), the
     // 14pt gap the controls stack puts above it, and enough left over for the
     // panel's own bottom inset. The original 72/88 was sized for a boxed slider
     // with an icon and a percentage label and left ~40pt of dead space; trimming
     // it to just the content instead pinned the capsule against the bottom edge.
-    private let collapsedSliderExtraHeight: CGFloat = 46
-    private let expandedSliderExtraHeight: CGFloat = 50
+    // Content is top-aligned in the panel, so anything reserved past what the
+    // row actually draws reads as dead space under the capsule.
+    private let collapsedSliderExtraHeight: CGFloat = 32
+    private let expandedSliderExtraHeight: CGFloat = 36
     private let collapsedLyricsExtraHeight: CGFloat = 64
     private let expandedLyricsExtraHeight: CGFloat = 96
 
@@ -287,8 +289,9 @@ struct LockScreenMusicPanel: View {
                 collapsedLayout
             }
         }
-        .padding(.horizontal, usesSpotifyCanvasFallbackContentPresentation ? (isExpanded ? 24 : 22) : (isExpanded ? 24 : 20))
-        .padding(.vertical, usesSpotifyCanvasFallbackContentPresentation ? (isExpanded ? 18 : 14) : (isExpanded ? 22 : 16))
+        .padding(.horizontal, usesSpotifyCanvasFallbackContentPresentation ? (isExpanded ? 20 : 18) : (isExpanded ? 20 : 16))
+        .padding(.top, usesSpotifyCanvasFallbackContentPresentation ? (isExpanded ? 18 : 14) : (isExpanded ? 22 : 16))
+        .padding(.bottom, usesSpotifyCanvasFallbackContentPresentation ? (isExpanded ? 14 : 10) : (isExpanded ? 16 : 12))
         .frame(
             maxWidth: .infinity,
             maxHeight: .infinity,
