@@ -95,8 +95,15 @@ struct LockScreenMusicPanel: View {
     // instead of hugging it; these pairs keep that ratio in both states.
     private var controlFrameSize: CGFloat { isExpanded ? 62 : 40 }
     private var controlIconSize: CGFloat { isExpanded ? 26 : 18 }
-    private var playPauseFrameSize: CGFloat { isExpanded ? 80 : 54 }
-    private var playPauseIconSize: CGFloat { isExpanded ? 34 : 24 }
+
+    // Play/pause leads the row. When the secondary controls were sized up to
+    // match Apple, this pair was left where it was, and the gap between them
+    // closed from 1.7x to 1.35x -- enough that the row read as five buttons of
+    // one size. Its glyph also sits proportionally larger in its highlight than
+    // the others, which is what Apple does: the primary control is the one you
+    // aim at without looking.
+    private var playPauseFrameSize: CGFloat { isExpanded ? 84 : 58 }
+    private var playPauseIconSize: CGFloat { isExpanded ? 39 : 28 }
 
     // Room for the volume row: the capsule (14 collapsed / 16 expanded), the
     // 14pt gap the controls stack puts above it, and enough left over for the
