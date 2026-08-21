@@ -514,6 +514,38 @@ enum BatteryNotificationStyle: String, CaseIterable, Identifiable, Defaults.Seri
     }
 }
 
+enum RecordingHoverStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case `default`
+    case inline
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .default:
+            return String(localized: "Default")
+        case .inline:
+            return String(localized: "Inline")
+        }
+    }
+}
+
+enum RecordingControlMode: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case indicatorOnly
+    case withStopButton
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .indicatorOnly:
+            return String(localized: "Indicator only")
+        case .withStopButton:
+            return String(localized: "With stop button")
+        }
+    }
+}
+
 enum MusicAuxiliaryControl: String, CaseIterable, Identifiable, Defaults.Serializable {
     case shuffle
     case repeatMode
@@ -1184,6 +1216,7 @@ extension Defaults.Keys {
     static let reminderPresentationStyle = Key<ReminderPresentationStyle>("reminderPresentationStyle", default: .ringCountdown)
     static let reminderLeadTime = Key<Int>("reminderLeadTime", default: 5)
     static let reminderSneakPeekDuration = Key<Double>("reminderSneakPeekDuration", default: 5)
+    // Legacy key name: the separate control window is gone, this now shows inline notch controls.
     static let timerControlWindowEnabled = Key<Bool>("timerControlWindowEnabled", default: true)
     
     // MARK: ColorPicker Feature
@@ -1301,6 +1334,8 @@ extension Defaults.Keys {
     // MARK: Screen Recording Detection Feature
     static let enableScreenRecordingDetection = Key<Bool>("enableScreenRecordingDetection", default: true)
     static let showRecordingIndicator = Key<Bool>("showRecordingIndicator", default: true)
+    static let recordingHoverStyle = Key<RecordingHoverStyle>("recordingHoverStyle", default: .default)
+    static let recordingControlMode = Key<RecordingControlMode>("recordingControlMode", default: .withStopButton)
     // Polling removed - now uses event-driven private API detection (CGSIsScreenWatcherPresent)
     // static let enableScreenRecordingPolling = Key<Bool>("enableScreenRecordingPolling", default: false)
 
@@ -1334,6 +1369,8 @@ extension Defaults.Keys {
     
     // MARK: Lyrics Feature
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
+    static let lyricsPanelWidth = Key<CGFloat>("lyricsPanelWidth", default: 280)
+    static let lyricsPanelOffset = Key<CGFloat>("lyricsPanelOffset", default: 0)
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)
     
     // MARK: Notes Feature
