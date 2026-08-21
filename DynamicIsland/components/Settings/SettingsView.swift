@@ -2329,6 +2329,7 @@ private struct ExternalDisplayIntegrationsSection: View {
                 }
                 .settingsHighlight(id: highlightID("Volume step"))
                 .disabled(enableExternalVolumeControlListener)
+                .help(enableExternalVolumeControlListener ? "Disabled while \"Route volume from the external app\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
 
                 Stepper(value: $volumeFineStepPercent, in: 1...25) {
                     HStack {
@@ -2341,6 +2342,7 @@ private struct ExternalDisplayIntegrationsSection: View {
                 }
                 .settingsHighlight(id: highlightID("Volume fine step"))
                 .disabled(enableExternalVolumeControlListener)
+                .help(enableExternalVolumeControlListener ? "Disabled while \"Route volume from the external app\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
 
                 if enableExternalVolumeControlListener {
                     Text("Disabled while external display volume integration is active.")
@@ -2359,6 +2361,7 @@ private struct ExternalDisplayIntegrationsSection: View {
                 }
                 .settingsHighlight(id: highlightID("Brightness step"))
                 .disabled(enableThirdPartyDDCIntegration)
+                .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is on \u{2014} that app owns the brightness keys." : "")
 
                 Stepper(value: $brightnessFineStepPercent, in: 1...25) {
                     HStack {
@@ -2371,6 +2374,7 @@ private struct ExternalDisplayIntegrationsSection: View {
                 }
                 .settingsHighlight(id: highlightID("Brightness fine step"))
                 .disabled(enableThirdPartyDDCIntegration)
+                .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is on \u{2014} that app owns the brightness keys." : "")
 
                 if enableThirdPartyDDCIntegration {
                     Text("Disabled while external display brightness integration is active.")
@@ -2882,7 +2886,7 @@ struct Media: View {
                         Text("Show \"Change Media Output\" control")
                     }
                     .settingsHighlight(id: highlightID("Show Change Media Output control"))
-                    .help("Adds the AirPlay/route picker button back to the customizable controls palette.")
+                    .help("Adds the AirPlay/route picker button back to the customizable controls palette. The lock screen panel also uses this button for its volume slider, so turning it off leaves that panel with no volume control.")
                     MusicSlotConfigurationView()
                 } else {
                     Text("Turn on customizable controls to rearrange media buttons.")
@@ -2903,22 +2907,24 @@ struct Media: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if musicControlWindowEnabled {
-                Section {
-                    Picker("Skip buttons", selection: $musicSkipBehavior) {
-                        ForEach(MusicSkipBehavior.allCases) { behavior in
-                            Text(behavior.displayName).tag(behavior)
-                        }
+            Section {
+                Picker("Skip buttons", selection: $musicSkipBehavior) {
+                    ForEach(MusicSkipBehavior.allCases) { behavior in
+                        Text(behavior.displayName).tag(behavior)
                     }
-                    .pickerStyle(.segmented)
-                    .settingsHighlight(id: highlightID("Skip buttons"))
-
-                    Text(musicSkipBehavior.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("Floating window panel skip behaviour")
                 }
+                .pickerStyle(.segmented)
+                .settingsHighlight(id: highlightID("Skip buttons"))
+
+                Text(musicSkipBehavior.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Skip button behaviour")
+            } footer: {
+                Text("Applies everywhere the transport controls appear: the notch player, the lock screen panel, and the floating window.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section {
                 Toggle(
@@ -5133,6 +5139,7 @@ struct Appearance: View {
 }
 
 struct LockScreenSettings: View {
+    @Default(.enableReminderLiveActivity) private var enableReminderLiveActivity
     @ObservedObject private var calendarManager = CalendarManager.shared
     @ObservedObject private var previewManager = LockScreenWidgetPreviewManager.shared
     @Default(.lockScreenGlassStyle) private var lockScreenGlassStyle
@@ -5518,13 +5525,20 @@ struct LockScreenSettings: View {
                 .settingsHighlight(id: highlightID("Show lock screen weather"))
 
                 if enableLockScreenWeatherWidget {
-                    Picker("Layout", selection: $lockScreenWeatherWidgetStyle) {
+                    Picker("Widget layout", selection: $lockScreenWeatherWidgetStyle) {
                         ForEach(LockScreenWeatherWidgetStyle.allCases) { style in
                             Text(style.localizedName).tag(style)
                         }
                     }
                     .pickerStyle(.segmented)
-                    .settingsHighlight(id: highlightID("Layout"))
+                    .help("Applies to the whole status capsule, not the weather alone \u{2014} the battery gauge and any Bluetooth or charging indicators are drawn in the chosen layout too.")
+                    .settingsHighlight(id: highlightID("Widget layout"))
+
+                    if lockScreenWeatherWidgetStyle == .circular {
+                        Text("The circular layout has no room for the location label or sunrise time, and draws the battery gauge as a ring.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
                     Picker("Weather data provider", selection: $lockScreenWeatherProviderSource) {
                         ForEach(LockScreenWeatherProviderSource.allCases) { source in
@@ -5546,12 +5560,14 @@ struct LockScreenSettings: View {
                         Text("Show location label")
                     }
                     .disabled(lockScreenWeatherWidgetStyle == .circular)
+                    .help(lockScreenWeatherWidgetStyle == .circular ? "Available in the inline layout only." : "")
                     .settingsHighlight(id: highlightID("Show location label"))
 
                     Defaults.Toggle(key: .lockScreenWeatherShowsSunrise) {
                         Text("Show sunrise time")
                     }
                     .disabled(lockScreenWeatherWidgetStyle != .inline)
+                    .help(lockScreenWeatherWidgetStyle != .inline ? "Available in the inline layout only." : "")
                     .settingsHighlight(id: highlightID("Show sunrise time"))
 
                     Defaults.Toggle(key: .lockScreenWeatherShowsAQI) {
@@ -5584,14 +5600,22 @@ struct LockScreenSettings: View {
             } header: {
                 Text("Weather Widget")
             } footer: {
-                Text("Enable the weather capsule and configure its layout, provider, units, and optional battery/AQI indicators.")
+                Text("Enable the weather capsule and configure its provider, units, and optional AQI indicator. The layout chosen here applies to the whole status capsule, including the battery indicator configured below.")
             }
 
             Section {
                 Defaults.Toggle(key: .enableLockScreenReminderWidget) {
                     Text("Show lock screen reminder")
                 }
+                .disabled(!enableReminderLiveActivity)
+                .help(enableReminderLiveActivity ? "" : "Requires the reminder live activity, which is off in Live Activities settings.")
                 .settingsHighlight(id: highlightID("Show lock screen reminder"))
+
+                if !enableReminderLiveActivity {
+                    Text("The lock screen reminder is produced by the reminder live activity, which is currently off in Live Activities settings.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Picker("Chip color", selection: $lockScreenReminderChipStyle) {
                     ForEach(LockScreenReminderChipStyle.allCases) { style in
@@ -5599,7 +5623,7 @@ struct LockScreenSettings: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .disabled(!enableLockScreenReminderWidget)
+                .disabled(!enableLockScreenReminderWidget || !enableReminderLiveActivity)
                 .settingsHighlight(id: highlightID("Chip color"))
 
                 Picker("Alignment", selection: $lockScreenReminderWidgetHorizontalAlignment) {
