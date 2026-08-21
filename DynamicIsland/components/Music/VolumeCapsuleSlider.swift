@@ -39,6 +39,15 @@ struct VolumeCapsuleSlider: View {
     private var trackHeight: CGFloat { compact ? 10 : 13 }
     private var glyphSize: CGFloat { compact ? 10 : 11.5 }
 
+    /// Whether the control is being touched -- hovered or dragged.
+    private var isEngaged: Bool { isDragging || isHovering }
+
+    /// Apple leaves the volume bar grey until you reach for it, and only then
+    /// gives it full colour and full brightness. Resting at full strength made
+    /// it compete with the artwork it sits under.
+    private var trackSaturation: Double { isEngaged ? 1 : 0 }
+    private var fillOpacity: Double { isDragging ? 1 : (isHovering ? 0.8 : 0.55) }
+
     /// iOS dims the glyph you are moving away from and lights the one you are
     /// moving toward, so the pair reads as a scale rather than decoration.
     private var quietGlyphOpacity: Double { 0.3 + (1 - fraction) * 0.55 }
@@ -66,6 +75,9 @@ struct VolumeCapsuleSlider: View {
                 .frame(width: glyphSize + 4, alignment: .trailing)
         }
         .animation(.easeOut(duration: 0.2), value: fraction)
+        .saturation(trackSaturation)
+        .animation(.easeOut(duration: 0.2), value: trackSaturation)
+        .animation(.easeOut(duration: 0.2), value: fillOpacity)
         .accessibilityElement()
         .accessibilityLabel("Volume")
         .accessibilityValue("\(Int(round(fraction * 100)))%")
@@ -88,10 +100,10 @@ struct VolumeCapsuleSlider: View {
 
             ZStack(alignment: .leading) {
                 Capsule(style: .continuous)
-                    .fill(tint.opacity(isDragging || isHovering ? 0.22 : 0.16))
+                    .fill(tint.opacity(isEngaged ? 0.22 : 0.14))
 
                 Capsule(style: .continuous)
-                    .fill(tint.opacity(0.92))
+                    .fill(tint.opacity(fillOpacity))
                     .frame(width: filled)
             }
             .frame(height: trackHeight)
