@@ -1099,7 +1099,6 @@ private struct MinimalisticReminderDetailsView: View {
         @StateObject private var volumeModel = MediaOutputVolumeViewModel()
         @EnvironmentObject private var vm: DynamicIslandViewModel
         @State private var isPopoverPresented = false
-        @State private var isHoveringPopover = false
 
         var body: some View {
             MinimalisticSquircircleButton(
@@ -1121,20 +1120,13 @@ private struct MinimalisticReminderDetailsView: View {
                 MediaOutputSelectorPopover(
                     routeManager: routeManager,
                     volumeModel: volumeModel,
-                    onHoverChanged: { hovering in
-                        isHoveringPopover = hovering
-                        updateActivity()
-                    }
+                    onHoverChanged: { _ in }
                 ) {
                     isPopoverPresented = false
-                    isHoveringPopover = false
                     updateActivity()
                 }
             }
-            .onChange(of: isPopoverPresented) { _, presented in
-                if !presented {
-                    isHoveringPopover = false
-                }
+            .onChange(of: isPopoverPresented) { _, _ in
                 updateActivity()
             }
             .onAppear {
@@ -1146,7 +1138,10 @@ private struct MinimalisticReminderDetailsView: View {
         }
 
         private func updateActivity() {
-            vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+            // Presentation alone -- see MediaOutputPickerButton: also requiring
+            // hover let the notch auto-close while the pointer was over the
+            // popover, which is a separate window.
+            vm.isMediaOutputPopoverActive = isPopoverPresented
         }
     }
 
@@ -1155,7 +1150,6 @@ private struct MinimalisticReminderDetailsView: View {
         @ObservedObject private var airPlayManager = AppleMusicAirPlayManager.shared
         @EnvironmentObject private var vm: DynamicIslandViewModel
         @State private var isPopoverPresented = false
-        @State private var isHoveringPopover = false
 
         private var isAppleMusicActive: Bool {
             musicManager.bundleIdentifier == "com.apple.Music"
@@ -1180,18 +1174,13 @@ private struct MinimalisticReminderDetailsView: View {
             .popover(isPresented: $isPopoverPresented, arrowEdge: .bottom) {
                 AirPlaySelectorPopover(
                     airPlayManager: airPlayManager,
-                    onHoverChanged: { hovering in
-                        isHoveringPopover = hovering
-                        updateActivity()
-                    }
+                    onHoverChanged: { _ in }
                 ) {
                     isPopoverPresented = false
-                    isHoveringPopover = false
                     updateActivity()
                 }
             }
-            .onChange(of: isPopoverPresented) { _, presented in
-                if !presented { isHoveringPopover = false }
+            .onChange(of: isPopoverPresented) { _, _ in
                 updateActivity()
             }
             .onAppear {
@@ -1210,7 +1199,10 @@ private struct MinimalisticReminderDetailsView: View {
         }
 
         private func updateActivity() {
-            vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+            // Presentation alone -- see MediaOutputPickerButton: also requiring
+            // hover let the notch auto-close while the pointer was over the
+            // popover, which is a separate window.
+            vm.isMediaOutputPopoverActive = isPopoverPresented
         }
     }
 
