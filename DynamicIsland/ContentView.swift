@@ -2083,9 +2083,9 @@ struct ContentView: View {
                         ? self.isPointInsideNotchWindow()
                         : self.isMouseOverClosedNotchHitArea()
                     if !stillInside {
-                        self.hoverTask?.cancel()
-                        self.stopHoverClickMonitor()
-                        self.finishHoverExit()
+                        // Route through handleHover so the polled exit shares the same
+                        // debounce and open-transition recovery guard as onHover exits.
+                        self.handleHover(false)
                     }
                 }
 

@@ -878,7 +878,7 @@ struct LockScreenMusicPanel: View {
     private func lyricsSection(alignment: Alignment) -> some View {
         let line = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
         let lyricFontSize: CGFloat = isExpanded ? 14 : 12
-        let lyricMinimumFontSize: CGFloat = isExpanded ? 5 : 4
+        let lyricMinimumFontSize: CGFloat = isExpanded ? 10 : 9
         let transition: AnyTransition = .asymmetric(
             insertion: .move(edge: .bottom).combined(with: .opacity),
             removal: .move(edge: .top).combined(with: .opacity)

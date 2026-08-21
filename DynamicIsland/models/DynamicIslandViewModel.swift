@@ -293,7 +293,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             notchSize = updatedTarget
         }
         AppDelegate.shared?.ensureWindowSize(
-            addShadowPadding(to: updatedTarget, isMinimalistic: false),
+            openNotchWindowSize(for: updatedTarget, isMinimalistic: false),
             animated: true,
             force: false
         )

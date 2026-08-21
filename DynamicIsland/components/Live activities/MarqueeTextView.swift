@@ -120,7 +120,9 @@ struct TwoLineFittingText: View {
             .allowsTightening(true)
             .minimumScaleFactor(max(0.1, minimumFontSize / max(fontSize, 1)))
             .frame(maxWidth: .infinity, alignment: alignment)
-            .frame(height: Self.reservedHeight(fontSize: fontSize, weight: nsWeight))
+            // Pass the caller's alignment through — .frame(height:) defaults to .center,
+            // which floated a one-line lyric half a line below the top-aligned note icon.
+            .frame(height: Self.reservedHeight(fontSize: fontSize, weight: nsWeight), alignment: alignment)
     }
 
     static func reservedHeight(fontSize: CGFloat, weight: NSFont.Weight = .regular) -> CGFloat {

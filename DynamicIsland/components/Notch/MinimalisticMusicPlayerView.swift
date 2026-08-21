@@ -146,8 +146,8 @@ struct MinimalisticMusicPlayerView: View {
                 }
 
                 if enableLyrics {
+                    // lyricsView reserves its own two-line height internally.
                     lyricsView
-                        .frame(height: MusicLyricsLayoutMetrics.minimalisticOpenReservedTextHeight, alignment: .top)
                         .padding(.top, MusicLyricsLayoutMetrics.minimalisticOpenTopPadding)
                 }
 
@@ -306,7 +306,7 @@ struct MinimalisticMusicPlayerView: View {
         height += 54 + 2         // controls + top padding
 
         if enableLyrics {
-            height += 10 + 34
+            height += MusicLyricsLayoutMetrics.minimalisticOpenReservedAreaHeight
         }
         if shouldShowTimerCountdown {
             height += minimalisticTimerCountdownBlockHeight
