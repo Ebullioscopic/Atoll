@@ -322,6 +322,11 @@ struct LyricsSidePanelView: View {
         .onChange(of: musicManager.syncedLyrics) { _, newLyrics in
             lyrics = Self.rows(for: newLyrics, duration: musicManager.songDuration)
         }
+        .onChange(of: musicManager.songDuration) { _, duration in
+            // Duration closes the last line's window, so a trailing outro is only
+            // marked once it is known -- and it can arrive after the lyrics do.
+            lyrics = Self.rows(for: musicManager.syncedLyrics, duration: duration)
+        }
         .onHover { hovering in
             updateSuppression(for: hovering)
         }
