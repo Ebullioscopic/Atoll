@@ -331,16 +331,10 @@ class SystemHUDManager {
     /// carries its own slider; unsuppressing then would put two indicators on
     /// screen at once.
     @MainActor
-    func updateNativeHUDSuppressionForLockState(
-        isLocked: Bool,
-        lockScreenMusicPanelShowsVolume: Bool
-    ) {
+    func updateNativeHUDSuppressionForLockState(isLocked: Bool) {
         guard isSetupComplete, changesObserver != nil else { return }
 
-        if SystemHUDPlacement.yieldsToNativeHUD(
-            isLocked: isLocked,
-            lockScreenMusicPanelShowsVolume: lockScreenMusicPanelShowsVolume
-        ) {
+        if SystemHUDPlacement.yieldsToNativeHUD(isLocked: isLocked) {
             SystemOSDManager.enableSystemHUD()
         } else {
             SystemOSDManager.disableSystemHUD()

@@ -38,8 +38,22 @@ enum SystemHUDPlacement {
     }
 
     /// True when macOS should be allowed to draw its own HUD again.
-    static func yieldsToNativeHUD(isLocked: Bool, lockScreenMusicPanelShowsVolume: Bool) -> Bool {
-        isLocked && !lockScreenMusicPanelShowsVolume
+    ///
+    /// Whenever the Mac is locked — including with the music panel up. The
+    /// panel replaces the *volume* indicator only, but native suppression is
+    /// not per-channel: there is one `OSDUIHelper`, frozen or not. Withholding
+    /// it because the panel shows volume therefore left the brightness and
+    /// keyboard-backlight keys with no indicator from either side, since
+    /// `suppressesAppHUD` has already stood this app's HUDs down for every
+    /// channel while locked.
+    ///
+    /// Silently dead keys are the worse failure, so the panel's capsule and the
+    /// native HUD are both allowed to show volume while locked. Removing that
+    /// duplication needs per-channel *interception* — swallow the volume keys
+    /// so only the capsule moves, let brightness through to the native HUD —
+    /// which is a larger change than this decision point.
+    static func yieldsToNativeHUD(isLocked: Bool) -> Bool {
+        isLocked
     }
 }
 

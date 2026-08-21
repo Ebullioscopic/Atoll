@@ -21,8 +21,8 @@ import XCTest
 @testable import Atoll
 
 /// Which HUD can be drawn depends on whether the Mac is locked, and getting it
-/// wrong is silent: the volume keys simply do nothing, because this app has
-/// already suppressed the system HUD.
+/// wrong is silent: the keys simply do nothing, because this app has already
+/// suppressed the system HUD.
 final class SystemHUDPlacementTests: XCTestCase {
     /// This app's HUDs cannot be seen over the lock screen at all, so they stand
     /// down there rather than drawing where nobody can see them — which also
@@ -32,28 +32,32 @@ final class SystemHUDPlacementTests: XCTestCase {
         XCTAssertFalse(SystemHUDPlacement.suppressesAppHUD(isLocked: false))
     }
 
-    /// Locked with nothing else showing volume, macOS draws its own HUD again.
-    func testYieldsToNativeHUDWhileLockedWithNoMusicPanel() {
-        XCTAssertTrue(
-            SystemHUDPlacement.yieldsToNativeHUD(isLocked: true, lockScreenMusicPanelShowsVolume: false)
-        )
+    /// Locked, macOS draws its own HUD again.
+    func testYieldsToNativeHUDWhileLocked() {
+        XCTAssertTrue(SystemHUDPlacement.yieldsToNativeHUD(isLocked: true))
     }
 
-    /// The music panel carries its own slider, so unsuppressing there would put
-    /// two volume indicators on screen at once.
-    func testDoesNotYieldWhenTheMusicPanelShowsVolume() {
-        XCTAssertFalse(
-            SystemHUDPlacement.yieldsToNativeHUD(isLocked: true, lockScreenMusicPanelShowsVolume: true)
-        )
-    }
-
-    /// Unlocked, this app owns the HUD either way.
+    /// Unlocked, this app owns the HUD.
     func testNeverYieldsWhileUnlocked() {
-        XCTAssertFalse(
-            SystemHUDPlacement.yieldsToNativeHUD(isLocked: false, lockScreenMusicPanelShowsVolume: false)
-        )
-        XCTAssertFalse(
-            SystemHUDPlacement.yieldsToNativeHUD(isLocked: false, lockScreenMusicPanelShowsVolume: true)
-        )
+        XCTAssertFalse(SystemHUDPlacement.yieldsToNativeHUD(isLocked: false))
+    }
+
+    /// The two decisions have to agree about who is drawing.
+    ///
+    /// `suppressesAppHUD` stands this app down for *every* channel while
+    /// locked — volume, brightness and keyboard backlight alike. If yielding
+    /// were ever withheld while locked, those channels would have no indicator
+    /// from either side, and the keys would appear dead. The lock screen music
+    /// panel used to withhold it, on the grounds that its capsule already shows
+    /// volume; that left brightness silent whenever music was playing.
+    func testNoChannelIsEverLeftWithoutAHUD() {
+        for isLocked in [true, false] {
+            let appStandsDown = SystemHUDPlacement.suppressesAppHUD(isLocked: isLocked)
+            let nativeDraws = SystemHUDPlacement.yieldsToNativeHUD(isLocked: isLocked)
+            XCTAssertFalse(
+                appStandsDown && !nativeDraws,
+                "locked=\(isLocked): neither this app nor macOS would draw a HUD"
+            )
+        }
     }
 }

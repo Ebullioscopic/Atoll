@@ -50,8 +50,7 @@ class LockScreenManager: ObservableObject {
     @Published var isLockIdle: Bool = true
     @Published var shouldDelayPostUnlockMusicHUD: Bool = false
     @Published var lastUpdated: Date = .distantPast
-    private var musicSessionCancellable: AnyCancellable?
-    private var lastNativeHUDState: NativeHUDState?
+    private var lastNativeHUDLockState: Bool?
     
     // MARK: - Private Properties
     private var debounceIdleTask: Task<Void, Never>?
@@ -151,7 +150,6 @@ class LockScreenManager: ObservableObject {
         // Show panel FIRST (creates and shows window on lock screen)
         print("[\(timestamp())] LockScreenManager: 🎵 Showing lock screen panel")
         LockScreenPanelManager.shared.showPanel()
-        observeMusicSessionWhileLocked()
         updateNativeHUDSuppression()
         LockScreenLiveActivityWindowManager.shared.showLocked()
         LockScreenWeatherManager.shared.showWeatherWidget()
@@ -182,7 +180,6 @@ class LockScreenManager: ObservableObject {
         lastUpdated = Date()
         updateIdleState(locked: false)
         isLocked = false
-        musicSessionCancellable = nil
         updateNativeHUDSuppression()
         stopLockStatePolling()
         postUnlockMusicHUDTask?.cancel()
@@ -277,42 +274,15 @@ class LockScreenManager: ObservableObject {
     // MARK: - Idle State Management
 
     /// Copy EXACT logic from ScreenRecordingManager
-    /// Volume feedback on the lock screen comes from macOS, unless the music
-    /// panel is up with its own slider. Re-evaluated whenever either of those
-    /// can change.
-    /// Music starting or stopping while locked flips which side owns the HUD.
-    /// `hasActiveSession` is derived rather than published, so this watches the
-    /// manager for any change and re-evaluates on the next turn.
-    private func observeMusicSessionWhileLocked() {
-        musicSessionCancellable = MusicManager.shared.objectWillChange
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                guard let self, self.isLocked else { return }
-                self.updateNativeHUDSuppression()
-            }
-    }
-
+    /// Volume feedback on the lock screen comes from macOS, for as long as the
+    /// Mac is locked. Whether the music panel is up no longer changes that, so
+    /// this only has to run when the lock state itself changes.
     func updateNativeHUDSuppression() {
-        let panelShowsVolume = isLocked
-            && Defaults[.enableLockScreenMediaWidget]
-            && Defaults[.showMediaOutputControl]
-            && MusicManager.shared.hasActiveSession
+        // Handing the HUD over restarts OSDUIHelper, so only act on a change.
+        guard isLocked != lastNativeHUDLockState else { return }
+        lastNativeHUDLockState = isLocked
 
-        // Handing the HUD over restarts OSDUIHelper, so only do it when the
-        // answer actually changes — this is re-evaluated on every music update.
-        let state = NativeHUDState(isLocked: isLocked, panelShowsVolume: panelShowsVolume)
-        guard state != lastNativeHUDState else { return }
-        lastNativeHUDState = state
-
-        SystemHUDManager.shared.updateNativeHUDSuppressionForLockState(
-            isLocked: isLocked,
-            lockScreenMusicPanelShowsVolume: panelShowsVolume
-        )
-    }
-
-    private struct NativeHUDState: Equatable {
-        let isLocked: Bool
-        let panelShowsVolume: Bool
+        SystemHUDManager.shared.updateNativeHUDSuppressionForLockState(isLocked: isLocked)
     }
 
     private func updateIdleState(locked: Bool) {
