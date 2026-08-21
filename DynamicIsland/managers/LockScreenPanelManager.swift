@@ -144,6 +144,9 @@ class LockScreenPanelManager {
             panelWindow = newWindow
             window = newWindow
             hasDelegated = false
+            
+            // Apply Siri autohide
+            SiriVisibilityMonitor.shared.autohide(window, cancellables: &cancellables)
         }
 
         window.setFrame(targetFrame, display: true)

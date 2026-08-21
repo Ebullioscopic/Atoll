@@ -137,6 +137,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
+
+    // Block-based AudioTap observers, kept with their center so they can be removed by token
+    private var audioTapObserverTokens: [(center: NotificationCenter, token: NSObjectProtocol)] = []
 //    let calendarManager = CalendarManager.shared
 //    let webcamManager = WebcamManager.shared
 //    var closeNotchWorkItem: DispatchWorkItem?
@@ -194,6 +197,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Setup observers for music player state changes to restart AudioTap capture
     private func setupAudioTapMusicObservers() {
+        // Registration is additive and this runs again every time the waveform setting is
+        // switched back on, so drop the previous generation instead of stacking duplicates.
+        // Block-based observers are only removable through the token they return, which is
+        // why they are retained in `audioTapObserverTokens`.
+        tearDownAudioTapMusicObservers()
+
         // Listen for app launches to restart capture when music apps are opened
         let targetBundleIDs = [
             "com.apple.Music",
@@ -209,7 +218,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "com.coppertino.Vox",
         ]
         
-        NSWorkspace.shared.notificationCenter.addObserver(
+        let launchToken = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification,
             object: nil,
             queue: .main
@@ -229,7 +238,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Also observe app terminations to restart capture
-        NSWorkspace.shared.notificationCenter.addObserver(
+        let terminateToken = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification,
             object: nil,
             queue: .main
@@ -244,8 +253,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 AudioTap.shared.restartCapture()
             }
         }
+
+        // Restart capture when the audio output route changes (e.g. AirPods connect/
+        // disconnect). AudioTap skips Spotify while a Bluetooth route is active to keep the
+        // AirPods pause gesture working, so the tap must be rebuilt to re-include or exclude
+        // Spotify whenever the route flips.
+        let routeToken = NotificationCenter.default.addObserver(
+            forName: .systemAudioRouteDidChange,
+            object: nil,
+            queue: .main
+        ) { _ in
+            if Defaults[.enableRealTimeWaveform] {
+                print("🔀 [AudioTap] Audio route changed, restarting capture...")
+                AudioTap.shared.restartCapture()
+            }
+        }
+
+        audioTapObserverTokens = [
+            (NSWorkspace.shared.notificationCenter, launchToken),
+            (NSWorkspace.shared.notificationCenter, terminateToken),
+            (NotificationCenter.default, routeToken),
+        ]
     }
-    
+
+    /// Removes the AudioTap observers registered by `setupAudioTapMusicObservers()`.
+    private func tearDownAudioTapMusicObservers() {
+        for (center, token) in audioTapObserverTokens {
+            center.removeObserver(token)
+        }
+        audioTapObserverTokens.removeAll()
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
@@ -341,23 +379,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Rebuilds the notch's CGSSpace membership from the current hide option and the
-    /// live windows. The space pins the notch above every space (fullscreen included)
-    /// and is used **only** for "Never hide"; the hide options keep the set empty so
-    /// FullscreenMediaDetector can hide the notch. Assigning the whole set lets the
-    /// CGSSpace diff additions/removals, so this is safe to call on any change.
+    /// Rebuilds the notch's CGSSpace membership from the live windows.
+    /// This intentionally does not gate on `hideNotchOption == .never`: Space
+    /// membership keeps the window anchored while switching desktops, while
+    /// FullscreenMediaDetector/`hideOnClosed` owns whether the closed notch renders
+    /// in fullscreen.
     @MainActor
     private func syncNotchSpaceMembership() {
-        guard Defaults[.hideNotchOption] == .never else {
-            NotchSpaceManager.shared.notchSpace.windows = []
-            return
-        }
+        NotchSpaceManager.shared.notchSpace.windows = currentDynamicIslandWindows()
+    }
+
+    private func currentDynamicIslandWindows() -> Set<NSWindow> {
         if Defaults[.showOnAllDisplays] {
-            NotchSpaceManager.shared.notchSpace.windows = Set(windows.values)
+            return Set(windows.values)
         } else if let window = window {
-            NotchSpaceManager.shared.notchSpace.windows = [window]
-        } else {
-            NotchSpaceManager.shared.notchSpace.windows = []
+            return [window]
+        }
+        return []
+    }
+
+    @MainActor
+    private func reassertDynamicIslandWindowSpacePresence() {
+        guard !windowsHiddenForLock else { return }
+
+        syncNotchSpaceMembership()
+
+        for window in currentDynamicIslandWindows() {
+            window.collectionBehavior = DynamicIslandWindow.pinnedCollectionBehavior
+            window.orderFrontRegardless()
         }
     }
 
@@ -389,12 +438,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         
         window.orderFrontRegardless()
-        // Pin above every space (fullscreen included) only for "Never hide"; the
-        // hide options leave the window on the collectionBehavior path so
-        // FullscreenMediaDetector can hide it. See NotchSpaceManager.
-        if Defaults[.hideNotchOption] == .never {
-            NotchSpaceManager.shared.notchSpace.windows.insert(window)
-        }
+        NotchSpaceManager.shared.notchSpace.windows.insert(window)
         //SkyLightOperator.shared.delegateWindow(window)
         return window
     }
@@ -405,13 +449,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.alphaValue = 0
         }
         
-        // Use the same centering logic as updateWindowSizeIfNeeded()
         let screenFrame = screen.frame
+        let topBleed = notchTopScreenBleed(for: screen.localizedName)
         let centerX = screenFrame.origin.x + (screenFrame.width / 2)
         let roundedWidth = window.frame.width.rounded()
         let roundedHeight = window.frame.height.rounded()
         let newX = (centerX - (roundedWidth / 2)).rounded()
-        let newY = (screenFrame.origin.y + screenFrame.height - roundedHeight).rounded()
+        let newY = (screenFrame.maxY + topBleed - roundedHeight).rounded()
 
         window.setFrame(NSRect(
             x: newX,
@@ -481,6 +525,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return CGSize(width: inlineSneakPeekWidth, height: vm.effectiveClosedNotchHeight)
         }
 
+        if let recordingHUDSize = recordingHUDLayoutForSizing().size(
+            closedNotchSize: vm.closedNotchSize,
+            effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+        ) {
+            return addShadowPadding(to: recordingHUDSize, isMinimalistic: Defaults[.enableMinimalisticUI])
+        }
+
         // Check for battery HUD expansion
         if vm.notchState == .closed && 
            coordinator.expandingView.show && 
@@ -524,13 +575,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Use a consistent height for different view types
         if coordinator.currentView == .timer {
             baseSize.height = 250 // Extra space for timer presets
-        } else if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
+        } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
             baseSize.height = max(baseSize.height, preferredHeight)
+        } else if coordinator.currentView == .clipboard {
+            // Clipboard has its own fixed height source; don't inherit the notes layout state.
+            baseSize.height = max(baseSize.height, NotesLayoutState.list.preferredHeight)
         } else if coordinator.currentView == .terminal {
             let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
             let maxFraction = Defaults[.terminalMaxHeightFraction]
             baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
+        } else if coordinator.currentView == .llmUsage {
+            baseSize.height = max(baseSize.height, llmUsageOpenNotchHeight)
         }
         
         let adjustedContentSize = statsAdjustedNotchSize(
@@ -546,16 +602,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return result
     }
 
-    /// Adjusts a base notch size for a specific screen by adding Dynamic Island
-    /// shadow insets and top-offset only when the screen lacks a physical notch
-    /// and the user has chosen the Dynamic Island style.
+    private func recordingHUDLayoutForSizing() -> RecordingHUDLayout {
+        makeRecordingHUDLayout(
+            notchState: vm.notchState,
+            screenRecordingDetectionEnabled: Defaults[.enableScreenRecordingDetection],
+            showRecordingIndicator: Defaults[.showRecordingIndicator],
+            hideOnClosed: vm.hideOnClosed,
+            isRecording: ScreenRecordingManager.shared.isRecording,
+            closedMusicPairingEligible: closedMusicPairingEligibleForSizing(),
+            recordingControlMode: Defaults[.recordingControlMode],
+            canStopFromHUD: ScreenRecordingManager.shared.shouldShowStopControlsInHUD,
+            enableMinimalisticUI: Defaults[.enableMinimalisticUI],
+            recordingHoverStyle: Defaults[.recordingHoverStyle],
+            suppressHoverExpansion: ScreenRecordingManager.shared.isScreenSharingAppActive,
+            expanded: true
+        )
+    }
+
+    private func closedMusicPairingEligibleForSizing() -> Bool {
+        let musicManager = MusicManager.shared
+        let hasMusicMetadata = !musicManager.songTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !musicManager.artistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasActiveMusicSnapshot = musicManager.isPlaying || (!musicManager.isPlayerIdle && hasMusicMetadata)
+
+        return isClosedMusicPairingEligible(
+            notchState: vm.notchState,
+            hasActiveMusicSnapshot: hasActiveMusicSnapshot,
+            musicLiveActivityEnabled: coordinator.musicLiveActivityEnabled,
+            closedMusicContentEnabled: Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls],
+            hideOnClosed: vm.hideOnClosed,
+            isLocked: LockScreenManager.shared.isLocked,
+            isDeferredAfterUnlock: LockScreenManager.shared.shouldDelayPostUnlockMusicHUD
+        )
+    }
+
+    /// Adds Dynamic Island shadow/top insets on non-notch screens, or top bleed on physical-notch screens.
     private func adjustedSizeForScreen(_ baseSize: CGSize, screen: NSScreen) -> CGSize {
-        guard shouldUseDynamicIslandMode(for: screen.localizedName) else {
-            return baseSize
-        }
         var adjusted = baseSize
-        adjusted.width += dynamicIslandShadowInset * 2
-        adjusted.height += dynamicIslandTopOffset
+        if shouldUseDynamicIslandMode(for: screen.localizedName) {
+            adjusted.width += dynamicIslandShadowInset * 2
+            adjusted.height += dynamicIslandTopOffset
+        } else {
+            adjusted.height += notchTopScreenBleed(for: screen.localizedName)
+        }
         return adjusted
     }
 
@@ -585,14 +674,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func resizeWindow(_ window: NSWindow, on screen: NSScreen, to size: CGSize, animated: Bool) {
         let screenFrame = screen.frame
+        let topBleed = notchTopScreenBleed(for: screen.localizedName)
         // Clamp width to screen width so the notch never extends beyond screen edges on scaled displays
         let clampedWidth = min(size.width, screenFrame.width).rounded()
-        let clampedHeight = min(size.height, screenFrame.height).rounded()
+        let maxHeight = screenFrame.height + topBleed
+        let clampedHeight = min(size.height, maxHeight).rounded()
         let centerX = screenFrame.midX
         let newX = (centerX - (clampedWidth / 2)).rounded()
-        let newY = (screenFrame.origin.y + screenFrame.height - clampedHeight).rounded()
+        let newY = (screenFrame.maxY + topBleed - clampedHeight).rounded()
         let targetFrame = NSRect(x: newX, y: newY, width: clampedWidth, height: clampedHeight)
 
+        // `open()` intentionally requests a forced resize so every display is
+        // considered, but an unchanged frame still needs no AppKit display
+        // transaction. Avoiding that no-op matters during hover/click opens.
+        guard window.frame != targetFrame else { return }
         window.setFrame(targetFrame, display: true, animate: animated)
     }
 
@@ -699,6 +794,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.setupAudioTapMusicObservers()
                 } else {
                     AudioTap.shared.stopCapture()
+                    self?.tearDownAudioTapMusicObservers()
                 }
             }
             .store(in: &cancellables)
@@ -806,8 +902,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }.store(in: &cancellables)
 
-        // Pin/unpin the notch above all spaces when the hide option changes:
-        // "Never hide" joins the max-level CGSSpace, the hide options leave it.
+        // The hide option changes fullscreen visibility, not Spaces pinning.
+        // Re-sync in case the user changes it while macOS is moving Spaces.
         Defaults.publisher(.hideNotchOption, options: []).sink { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.syncNotchSpaceMembership()
@@ -847,6 +943,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.reassertDynamicIslandWindowSpacePresence()
+                self?.adjustWindowPosition()
+            }
+        }
 
         NotificationCenter.default.addObserver(
             forName: Notification.Name.selectedScreenChanged, object: nil, queue: nil
@@ -1249,6 +1356,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // Cancel the auto-close armed by `toggleNotchOpen`. Switching to the clipboard tab
+    // from the header only changes `coordinator.currentView`, so without this the notch
+    // can close mid-copy/drag a few seconds after it was opened.
+    func cancelPendingNotchAutoClose() {
+        closeNotchWorkItem?.cancel()
+        closeNotchWorkItem = nil
+    }
+
     private func registerOptionalShortcutHandlers() {
         guard !optionalShortcutHandlersRegistered else { return }
         optionalShortcutHandlersRegistered = true
@@ -1287,6 +1402,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         vm.close()
                     } else {
                         coordinator.currentView = .notes
+                    }
+                }
+            case .notchTab:
+                // Act on the notch under the cursor, matching toggleNotchOpen: with
+                // showOnAllDisplays the rendered windows use viewModels[screen], so mutating
+                // the primary vm could flip currentView without opening a visible notch.
+                var activeVM = vm
+                if Defaults[.showOnAllDisplays] {
+                    let mouseLocation = NSEvent.mouseLocation
+                    for screen in NSScreen.screens where screen.frame.contains(mouseLocation) {
+                        if let screenViewModel = viewModels[screen] {
+                            activeVM = screenViewModel
+                            break
+                        }
+                    }
+                }
+                // Cancel any pending auto-close armed by toggleNotchOpen, so it can't fire
+                // and close the notch a few seconds after this shortcut opens/switches to it.
+                cancelPendingNotchAutoClose()
+                if activeVM.notchState == .closed {
+                    activeVM.open()
+                    coordinator.currentView = .clipboard
+                } else {
+                    if coordinator.currentView == .clipboard {
+                        activeVM.close()
+                    } else {
+                        coordinator.currentView = .clipboard
                     }
                 }
             }
@@ -1453,15 +1595,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if window == nil {
                 window = createDynamicIslandWindow(for: selectedScreen, with: vm)
             }
-            
             if let window = window {
                 positionWindow(window, on: selectedScreen, changeAlpha: changeAlpha)
-                
+
                 if vm.notchState == .closed {
                     vm.close()
                 }
             }
         }
+
+        syncNotchSpaceMembership()
     }
     
     @objc func togglePopover(_ sender: Any?) {

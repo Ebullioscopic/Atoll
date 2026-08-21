@@ -80,7 +80,13 @@ private final class DynamicIslandArtworkVideoContainerView: NSView {
 
     override func layout() {
         super.layout()
+        // SwiftUI owns the enclosing transition timing. Prevent the video
+        // layer from adding a second implicit frame animation during that
+        // transition, which makes Canvas artwork lag behind static artwork.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         playerLayer.frame = bounds
+        CATransaction.commit()
     }
 }
 
@@ -160,6 +166,112 @@ struct MusicPlayerView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct LyricsSidePanelView: View {
+    @ObservedObject private var musicManager = MusicManager.shared
+    @EnvironmentObject private var vm: DynamicIslandViewModel
+    @State private var suppressionToken = UUID()
+    @State private var isSuppressing = false
+    @State private var lyrics: [(index: Int, lyric: LyricLine)] = []
+
+    private var artistLineColor: Color {
+        Defaults[.playerColorTinting]
+            ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6)
+            : .gray
+    }
+
+    private var currentLyricGradient: LinearGradient {
+        LinearGradient(
+            colors: [artistLineColor, .white, artistLineColor.opacity(0.82)],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    private static func nonEmptyLines(in lines: [LyricLine]) -> [(index: Int, lyric: LyricLine)] {
+        lines.enumerated().compactMap { index, lyric in
+            guard !lyric.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return nil
+            }
+            return (index: index, lyric: lyric)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Lyrics")
+                .font(.headline)
+                .foregroundStyle(artistLineColor)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    if lyrics.isEmpty {
+                        Text(musicManager.currentLyrics.isEmpty ? "Show lyrics here" : musicManager.currentLyrics)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.78))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                    } else {
+                        LazyVStack(alignment: .leading, spacing: 8) {
+                            ForEach(lyrics, id: \.index) { index, lyric in
+                                Text(lyric.text)
+                                    .font(.system(size: 14, weight: index == musicManager.currentLyricIndex ? .semibold : .regular))
+                                    .foregroundStyle(
+                                        index == musicManager.currentLyricIndex
+                                            ? AnyShapeStyle(currentLyricGradient)
+                                            : AnyShapeStyle(Color.white.opacity(0.5))
+                                    )
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 12)
+                                    .id(index)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .scrollIndicators(.never)
+                .onAppear {
+                    lyrics = Self.nonEmptyLines(in: musicManager.syncedLyrics)
+                    let index = musicManager.currentLyricIndex
+                    guard index >= 0, index < musicManager.syncedLyrics.count else { return }
+                    DispatchQueue.main.async {
+                        proxy.scrollTo(index, anchor: .center)
+                    }
+                }
+                .onChange(of: musicManager.currentLyricIndex) { _, index in
+                    guard index >= 0, index < musicManager.syncedLyrics.count else { return }
+                    withAnimation(.smooth(duration: 0.3)) {
+                        proxy.scrollTo(index, anchor: .center)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.black.opacity(0.3))
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .onChange(of: musicManager.syncedLyrics) { _, newLyrics in
+            lyrics = Self.nonEmptyLines(in: newLyrics)
+        }
+        .onHover { hovering in
+            updateSuppression(for: hovering)
+        }
+        .onDisappear {
+            updateSuppression(for: false)
+        }
+    }
+
+    // Prevent lyrics scrolling to close the expanded notch
+    private func updateSuppression(for hovering: Bool) {
+        guard hovering != isSuppressing else { return }
+        isSuppressing = hovering
+        vm.setScrollGestureSuppression(hovering, token: suppressionToken)
     }
 }
 
@@ -289,8 +401,8 @@ struct MusicControlsView: View {
     @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.enableLyrics) private var enableLyrics
+    @Default(.showCalendar) private var showCalendar
     private let seekInterval: TimeInterval = 10
-    private let skipMagnitude: CGFloat = 6
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -339,8 +451,7 @@ struct MusicControlsView: View {
                 frameWidth: width
             )
             .fontWeight(.medium)
-            // Lyrics shown under the author name (same font size as author) when enabled in settings
-            if enableLyrics {
+            if enableLyrics && showCalendar {
                 let transition = AnyTransition.asymmetric(
                     insertion: .move(edge: .bottom).combined(with: .opacity),
                     removal: .move(edge: .top).combined(with: .opacity)
@@ -480,7 +591,24 @@ struct MusicControlsView: View {
     private func syncHUDValueIfNeeded(force: Bool) {
         guard shouldShowControlHUDRow else { return }
         guard force || !hudDragging else { return }
-        hudValue = Double(coordinator.sneakPeek.value)
+
+        let target = Double(coordinator.sneakPeek.value)
+        guard target != hudValue else { return }
+
+        guard !force else {
+            // First sync when the row appears: adopt the current level outright
+            // rather than sliding up to it from wherever the slider last sat.
+            hudValue = target
+            return
+        }
+
+        // The keys deliver discrete steps (1/16 of the range each), and nothing
+        // animated the fill between them, so the track jumped. Glide instead —
+        // short enough to keep up with key auto-repeat, and interruptible, so a
+        // held key reads as one continuous sweep rather than a queue of hops.
+        withAnimation(.easeOut(duration: 0.18)) {
+            hudValue = target
+        }
     }
 
     private func updateControlHUDValue(_ newValue: Double) {
@@ -547,13 +675,9 @@ struct MusicControlsView: View {
         }
     }
 
-    private var isAppleMusicActive: Bool {
-        musicManager.bundleIdentifier == "com.apple.Music"
-    }
-
     private var displayedSlots: [MusicControlButton] {
         if showCustomControls {
-            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive)
+            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, isSpotifyActive: musicManager.isSpotifyActive)
             return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
         }
 
@@ -580,16 +704,18 @@ struct MusicControlsView: View {
         case .trackBackward:
             playbackButton(
                 icon: "backward.fill",
-                press: .nudge(-skipMagnitude),
-                trigger: skipGestureTrigger(for: .trackBackward)
+                press: nil,
+                trigger: skipGestureTrigger(for: .trackBackward),
+                skipDirection: .backward
             ) {
                 musicManager.previousTrack()
             }
         case .trackForward:
             playbackButton(
                 icon: "forward.fill",
-                press: .nudge(skipMagnitude),
-                trigger: skipGestureTrigger(for: .trackForward)
+                press: nil,
+                trigger: skipGestureTrigger(for: .trackForward),
+                skipDirection: .forward
             ) {
                 musicManager.nextTrack()
             }
@@ -637,18 +763,31 @@ struct MusicControlsView: View {
             ) {
                 enableLyrics.toggle()
             }
+        case .likeTrack:
+            LikeTrackControl { presentation, toggle in
+                HoverButton(
+                    icon: presentation.iconName,
+                    iconColor: presentation.isActive ? brandAccentColor : .white,
+                    scale: .medium
+                ) {
+                    toggle()
+                }
+            }
         }
     }
 
     private struct SkipTrigger {
         let token: Int
-        let pressEffect: HoverButton.PressEffect
+        /// nil for the track buttons: the pulse advances the skip glyph rather
+        /// than moving the button.
+        let pressEffect: HoverButton.PressEffect?
     }
 
     private func playbackButton(
         icon: String,
         press: HoverButton.PressEffect?,
         trigger: SkipTrigger?,
+        skipDirection: SkipTrackGlyph.Direction? = nil,
         action: @escaping () -> Void
     ) -> some View {
         HoverButton(
@@ -656,7 +795,8 @@ struct MusicControlsView: View {
             scale: .medium,
             pressEffect: press,
             externalTriggerToken: trigger?.token,
-            externalTriggerEffect: trigger?.pressEffect
+            externalTriggerEffect: trigger?.pressEffect,
+            skipDirection: skipDirection
         ) {
             action()
         }
@@ -667,9 +807,9 @@ struct MusicControlsView: View {
 
         switch control {
         case .trackBackward where pulse.behavior == .track && pulse.direction == .backward:
-            return SkipTrigger(token: pulse.token, pressEffect: .nudge(-skipMagnitude))
+            return SkipTrigger(token: pulse.token, pressEffect: nil)
         case .trackForward where pulse.behavior == .track && pulse.direction == .forward:
-            return SkipTrigger(token: pulse.token, pressEffect: .nudge(skipMagnitude))
+            return SkipTrigger(token: pulse.token, pressEffect: nil)
         case .seekBackward where pulse.behavior == .tenSecond && pulse.direction == .backward:
             return SkipTrigger(token: pulse.token, pressEffect: .wiggle(.counterClockwise))
         case .seekForward where pulse.behavior == .tenSecond && pulse.direction == .forward:
@@ -691,11 +831,19 @@ struct NotchHomeView: View {
     @ObservedObject private var musicManager = MusicManager.shared
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
+    @Default(.showCalendar) private var showCalendar
+    @Default(.enableLyrics) private var enableLyrics
+    @Default(.lyricsPanelWidth) private var lyricsPanelWidth
+    @Default(.lyricsPanelOffset) private var lyricsPanelOffset
     let albumArtNamespace: Namespace.ID
 
     /// Whether the music player should actively display (enabled AND has real content).
     private var shouldShowMusicPlayer: Bool {
         showStandardMediaControls && (!autoHideInactiveNotchMediaPlayer || musicManager.hasActiveSession)
+    }
+
+    private var shouldShowSideLyrics: Bool {
+        shouldShowMusicPlayer && enableLyrics && !showCalendar
     }
     
     var body: some View {
@@ -708,7 +856,7 @@ struct NotchHomeView: View {
     }
 
     private var mainContent: some View {
-        HStack(alignment: .top, spacing: 20) {
+        Group {
             if Defaults[.enableMinimalisticUI] {
                 if let overridePayload = minimalisticOverridePayload {
                     ExtensionMinimalisticExperienceView(
@@ -718,35 +866,34 @@ struct NotchHomeView: View {
                 } else {
                     MinimalisticMusicPlayerView(albumArtNamespace: albumArtNamespace)
                 }
+            } else if shouldShowSideLyrics {
+                sideLyricsContent
             } else {
-                // Normal mode: Show full music player with optional calendar and webcam
-                if shouldShowMusicPlayer {
-                    MusicPlayerView(albumArtNamespace: albumArtNamespace)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                
-                if Defaults[.showCalendar] {
-                    Group {
-                        if shouldShowMusicPlayer {
-                            CalendarView()
-                        } else {
-                            StandaloneCalendarView()
+                HStack(alignment: .top, spacing: SideLyricsLayout.hStackSpacing) {
+                    // Normal mode: Show full music player with optional calendar and webcam
+                    if shouldShowMusicPlayer {
+                        MusicPlayerView(albumArtNamespace: albumArtNamespace)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    if showCalendar {
+                        Group {
+                            if shouldShowMusicPlayer {
+                                CalendarView()
+                            } else {
+                                StandaloneCalendarView()
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .onHover { isHovering in
+                            vm.isHoveringCalendar = isHovering
+                        }
+                        .environmentObject(vm)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .onHover { isHovering in
-                        vm.isHoveringCalendar = isHovering
+
+                    if mirrorIsVisible {
+                        cameraPreview
                     }
-                    .environmentObject(vm)
-                }
-                
-                if Defaults[.showMirror],
-                   webcamManager.cameraAvailable,
-                   vm.notchState == .open {
-                    CameraPreviewView(webcamManager: webcamManager)
-                        .scaledToFit()
-                        .opacity(vm.notchState == .closed ? 0 : 1)
-                        .blur(radius: vm.notchState == .closed ? 20 : 0)
                 }
             }
         }
@@ -755,6 +902,35 @@ struct NotchHomeView: View {
             .combined(with: .move(edge: .top)))
         .blur(radius: vm.notchState == .closed ? 30 : 0)
         .padding(Defaults[.enableMinimalisticUI] ? 0 : 8) //Putting the main padding for home view here for consistency
+    }
+
+    private var sideLyricsContent: some View {
+        HStack(alignment: .top, spacing: SideLyricsLayout.hStackSpacing) {
+            MusicPlayerView(albumArtNamespace: albumArtNamespace)
+                .frame(minWidth: SideLyricsLayout.minimumPlayerWidth, maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
+
+            LyricsSidePanelView()
+                .frame(width: max(0, lyricsPanelWidth), alignment: .topLeading)
+                .padding(.leading, max(0, -lyricsPanelOffset))
+                .offset(x: lyricsPanelOffset)
+
+            if mirrorIsVisible {
+                cameraPreview
+                    .frame(minWidth: SideLyricsLayout.minimumMirrorWidth, maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var mirrorIsVisible: Bool {
+        Defaults[.showMirror] && webcamManager.cameraAvailable && vm.notchState == .open
+    }
+
+    private var cameraPreview: some View {
+        CameraPreviewView(webcamManager: webcamManager)
+            .scaledToFit()
+            .opacity(vm.notchState == .closed ? 0 : 1)
+            .blur(radius: vm.notchState == .closed ? 20 : 0)
     }
 
     private var minimalisticOverridePayload: ExtensionNotchExperiencePayload? {
@@ -779,6 +955,8 @@ struct MusicSliderView: View {
     var trailingLabel: TrailingLabel = .duration
     var restingTrackHeight: CGFloat = 8
     var draggingTrackHeight: CGFloat = 14
+    /// When set, bypasses Defaults[.sliderColor] (used by lock screen appearance).
+    var tintOverride: Color? = nil
 
     enum TimeLabelLayout {
         case stacked
@@ -904,7 +1082,10 @@ struct MusicSliderView: View {
         )
     }
 
-    private var sliderTint: Color {//
+    private var sliderTint: Color {
+        if let tintOverride {
+            return tintOverride
+        }
         switch Defaults[.sliderColor] {
         case .albumArt:
             return Color(nsColor: color).ensureMinimumBrightness(factor: 0.6)
@@ -916,7 +1097,10 @@ struct MusicSliderView: View {
     }
 
     private var timeLabelColor: Color {
-        Defaults[.playerColorTinting]
+        if let tintOverride {
+            return tintOverride
+        }
+        return Defaults[.playerColorTinting]
             ? Color(nsColor: color).ensureMinimumBrightness(factor: 0.6)
             : .gray
     }

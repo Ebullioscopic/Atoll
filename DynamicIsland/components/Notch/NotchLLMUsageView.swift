@@ -19,18 +19,29 @@
 import SwiftUI
 import Defaults
 
+enum AntigravityPool: String, CaseIterable {
+    case gemini = "Gemini"
+    case claude = "Claude"
+}
+
 struct NotchLLMUsageView: View {
     @ObservedObject private var manager = LLMUsageManager.shared
+    @State private var antigravityPool: AntigravityPool = .gemini
 
     private func isEnabled(_ provider: ProviderID) -> Bool { Defaults[provider.enabledKey] }
 
+    private var enabledProviders: [ProviderID] {
+        ProviderID.allCases.filter { isEnabled($0) }
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            ForEach(ProviderID.allCases.filter { isEnabled($0) }) { provider in
+            ForEach(enabledProviders) { provider in
                 card(for: provider)
             }
         }
         .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .environment(\.colorScheme, .dark)
         .onAppear { manager.refreshAll() }
     }
@@ -38,35 +49,102 @@ struct NotchLLMUsageView: View {
     @ViewBuilder
     private func card(for provider: ProviderID) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(provider.displayName).font(.headline)
+            HStack(spacing: 6) {
+                Text(provider.displayName).font(.headline)
+                // Subscription plan badge (e.g. "Max 5x"). Only set for Claude; nil elsewhere.
+                if case .success(let snap) = manager.results[provider] ?? .loading, let plan = snap.plan {
+                    Text(plan)
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.white.opacity(0.12), in: Capsule())
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if provider == .antigravity {
+                    Picker("", selection: $antigravityPool) {
+                        Text("Gemini").tag(AntigravityPool.gemini)
+                        Text("Claude").tag(AntigravityPool.claude)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 120)
+                    .controlSize(.mini)
+                }
+            }
             switch manager.results[provider] ?? .loading {
             case .loading:
                 ProgressView().controlSize(.small)
             case .failure(let reason):
                 Text(reason).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             case .success(let snap):
-                success(snap)
+                success(snap, provider: provider)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
+        .frame(height: llmUsageProviderCardHeight, alignment: .topLeading)
         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
     }
 
     @ViewBuilder
-    private func success(_ snap: UsageSnapshot) -> some View {
+    private func success(_ snap: UsageSnapshot, provider: ProviderID) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            if snap.sessionLimit == nil && snap.weekLimit == nil {
-                window("Today", snap.today, prominent: true)
-                window("Week", snap.week)
-                window("Session", snap.session)
+            if provider == .antigravity {
+                antigravitySuccess(snap)
+            } else if snap.sessionLimit == nil && snap.weekLimit == nil {
+                if provider != .cursor {
+                    window("Today", snap.today, prominent: true)
+                    window("Week", snap.week)
+                    window("Session", snap.session)
+                }
                 Text("quota unavailable").font(.caption2).foregroundStyle(.secondary.opacity(0.7))
             } else {
-                if let limit = snap.sessionLimit { quotaGauge("Session", limit) }
-                if let limit = snap.weekLimit { quotaGauge("Week", limit) }
-                VStack(alignment: .leading, spacing: 2) {
-                    window("Today", snap.today, compact: true)
-                    window("Week", snap.week, compact: true)
+                if provider == .cursor {
+                    if let limit = snap.sessionLimit { quotaGauge("Cursor Models", limit) }
+                    if let limit = snap.weekLimit { quotaGauge("Other Models", limit) }
+                } else {
+                    if let limit = snap.sessionLimit { quotaGauge("Session", limit) }
+                    if let limit = snap.weekLimit { quotaGauge("Week", limit) }
+                    VStack(alignment: .leading, spacing: 2) {
+                        window("Today", snap.today, compact: true)
+                        window("Week", snap.week, compact: true)
+                    }
+                }
+            }
+        }
+    }
+
+    private func antigravitySuccess(_ snap: UsageSnapshot) -> some View {
+        let isGemini = antigravityPool == .gemini
+        let targetPool = isGemini ? "gemini" : "claude"
+        
+        // Filter models by pool
+        let sessionModel = snap.models.first { $0.model == "Session" && $0.pool == targetPool }
+        let weeklyModel = snap.models.first { $0.model == "Weekly" && $0.pool == targetPool }
+        
+        // Helper to create UsageLimit from model
+        func limitFromModel(_ model: ModelUsage?) -> UsageLimit? {
+            guard let model = model else { return nil }
+            let fraction = model.totals.costUSD
+            let usedPct = (1 - max(0, min(1, fraction))) * 100
+            return UsageLimit(used: usedPct, limit: 100, resetsAt: nil)
+        }
+        
+        return VStack(alignment: .leading, spacing: 6) {
+            if let limit = limitFromModel(sessionModel) {
+                quotaGauge("Session", limit)
+            }
+            if let limit = limitFromModel(weeklyModel) {
+                quotaGauge("Weekly", limit)
+            }
+            
+            // Show model breakdown for the selected pool
+            let poolModels = snap.models.filter { $0.pool == targetPool }
+            if !poolModels.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(poolModels) { model in
+                        window(model.model, model.totals, compact: true)
+                    }
                 }
             }
         }
@@ -109,21 +187,54 @@ struct NotchLLMUsageView: View {
         guard let date else { return nil }
         let seconds = Int(date.timeIntervalSinceNow)
         guard seconds > 0 else { return nil }
+        let days = seconds / 86_400
         let hours = seconds / 3600
         let minutes = (seconds % 3600) / 60
+        if days > 0 {
+            return "resets in \(days)d \(hours % 24)h \(minutes)m"
+        }
         return hours > 0 ? "resets in \(hours)h \(minutes)m" : "resets in \(minutes)m"
     }
 
     private func window(_ label: String, _ totals: UsageTotals, prominent: Bool = false, compact: Bool = false) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(label).font(.caption2).foregroundStyle(.secondary).frame(width: compact ? 34 : 48, alignment: .leading)
-            Text(tokens(totals.totalTokens))
+        let displayValue: String
+        if totals.isPercentage {
+            displayValue = "\(totals.totalTokens)%"
+        } else {
+            displayValue = tokens(totals.totalTokens)
+        }
+        
+        return HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: compact ? 56 : 48, alignment: .leading)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Text(displayValue)
                 .font(.system(size: compact ? 11 : (prominent ? 17 : 13), weight: prominent ? .bold : .semibold, design: .rounded))
                 .monospacedDigit()
             Spacer(minLength: 4)
-            Text(totals.hasUnpricedModel ? money(totals.costUSD) + "+" : money(totals.costUSD))
+            Text(costLabel(totals))
                 .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                .help(costHelp(totals))
         }
+    }
+
+    /// Cost is an estimate computed from local token counts against the API price
+    /// table — not a subscription bill. When some models used have no entry in the
+    /// table we cannot price them: show "\(money)+" when a partial amount is known,
+    /// and an explicit "est. n/a" instead of a misleading "$0.00+" when nothing is.
+    private func costLabel(_ totals: UsageTotals) -> String {
+        guard totals.hasUnpricedModel else { return money(totals.costUSD) }
+        return totals.costUSD > 0 ? money(totals.costUSD) + "+" : "est. n/a"
+    }
+
+    private func costHelp(_ totals: UsageTotals) -> String {
+        if totals.hasUnpricedModel {
+            return "Estimated API-equivalent cost from local token counts (not your subscription bill). Some models used do not have usable pricing, so this is partial or unavailable."
+        }
+        return "Estimated API-equivalent cost from local token counts, not your subscription bill."
     }
 
     private func tokens(_ n: Int) -> String {

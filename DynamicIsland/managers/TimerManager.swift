@@ -22,6 +22,7 @@ import SwiftUI
 import AVFoundation
 import AppKit
 import Defaults
+import os
 
 class TimerManager: ObservableObject {
     // MARK: - Properties
@@ -125,13 +126,36 @@ class TimerManager: ObservableObject {
     private var timerInstance: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var soundPlayer: AVAudioPlayer?
+    private var smoothCloseWorkItem: DispatchWorkItem?
+    private var lifecycle = TimerLifecycle()
+    private let logger = os.Logger(subsystem: "com.Ebullioscopic.Atoll", category: "TimerManager")
+
+    /// Identifies the current timer run. Delayed cleanup must match this value
+    /// before changing presentation state.
+    var activeSessionID: UUID? {
+        lifecycle.sessionID
+    }
+
+    /// Session that most recently reached completion. Starting a replacement
+    /// session clears this value before any delayed cleanup can capture it.
+    var completedSessionID: UUID? {
+        lifecycle.completedSessionID
+    }
     // MARK: - Initialization
     private init() {
-        // Simple initialization
+        // Views observe TimerManager, not the bridge; forward capability
+        // changes so allowsManualInteraction reflects Clock app lifecycle.
+        SystemTimerBridge.shared.$canControlClockTimer
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
     
     deinit {
         timerInstance?.invalidate()
+        smoothCloseWorkItem?.cancel()
         soundPlayer?.stop()
         cancellables.removeAll()
     }
@@ -144,6 +168,8 @@ class TimerManager: ObservableObject {
 
         // Stop any existing timer
         timerInstance?.invalidate()
+        soundPlayer?.stop()
+        beginTimerSession()
         
         // Start new timer
         withAnimation(.smooth) {
@@ -195,7 +221,16 @@ class TimerManager: ObservableObject {
     
     func stopTimer() {
         if activeSource == .external {
-            endExternalTimer(triggerSmoothClose: true)
+            if isFinished || isOvertime {
+                endExternalTimer(triggerSmoothClose: true)
+                return
+            }
+            SystemTimerBridge.shared.controlClockTimer(.cancel) { [weak self] success in
+                guard let self else { return }
+                if !success {
+                    self.endExternalTimer(triggerSmoothClose: true)
+                }
+            }
             return
         }
 
@@ -228,6 +263,14 @@ class TimerManager: ObservableObject {
     }
     
     func pauseTimer() {
+        if activeSource == .external {
+            SystemTimerBridge.shared.controlClockTimer(.pause) { [weak self] success in
+                if !success {
+                    self?.logExternalControlFailure("pause")
+                }
+            }
+            return
+        }
         guard activeSource == .manual else { return }
         guard isTimerActive && !isPaused else { return }
         isPaused = true
@@ -236,6 +279,14 @@ class TimerManager: ObservableObject {
     }
     
     func resumeTimer() {
+        if activeSource == .external {
+            SystemTimerBridge.shared.controlClockTimer(.resume) { [weak self] success in
+                if !success {
+                    self?.logExternalControlFailure("resume")
+                }
+            }
+            return
+        }
         guard activeSource == .manual else { return }
         guard isTimerActive && isPaused else { return }
         isPaused = false
@@ -275,6 +326,7 @@ class TimerManager: ObservableObject {
         timerInstance?.invalidate()
         timerInstance = nil
         soundPlayer?.stop()
+        beginTimerSession()
 
         activeSource = .external
 
@@ -298,6 +350,16 @@ class TimerManager: ObservableObject {
     func updateExternalTimer(remaining: TimeInterval, totalDuration: TimeInterval?, isPaused paused: Bool, name: String? = nil) {
         guard activeSource == .external else { return }
 
+        // Clock may reuse both the timer ID and duration. A positive update
+        // after completion is nevertheless a new run and must invalidate the
+        // previous run's delayed close.
+        if remaining > 0 && (isFinished || isOvertime || remainingTime <= 0) {
+            beginTimerSession()
+            withAnimation(.smooth) {
+                isTimerActive = true
+            }
+        }
+
         if let name, !name.isEmpty, name != timerName {
             timerName = name
         }
@@ -319,6 +381,7 @@ class TimerManager: ObservableObject {
     func completeExternalTimer() {
         guard activeSource == .external else { return }
 
+        lifecycle.completeSession()
         remainingTime = 0
         elapsedTime = totalDuration
         isOvertime = false
@@ -342,6 +405,7 @@ class TimerManager: ObservableObject {
     }
     
     private func resetTimer() {
+        endTimerSession()
         withAnimation(.smooth) {
             isTimerActive = false
         }
@@ -371,7 +435,16 @@ class TimerManager: ObservableObject {
     }
 
     var allowsManualInteraction: Bool {
-        activeSource != .external
+        switch activeSource {
+        case .external:
+            return SystemTimerBridge.shared.canControlClockTimer
+        default:
+            return true
+        }
+    }
+
+    private func logExternalControlFailure(_ action: String) {
+        logger.error("Failed to \(action) external Clock timer; state not changed")
     }
 
     enum TimerSource: String {
@@ -381,12 +454,33 @@ class TimerManager: ObservableObject {
     }
 
     private func scheduleSmoothClose() {
+        guard let sessionID = activeSessionID else { return }
+
+        smoothCloseWorkItem?.cancel()
+
         // Wait 3 seconds then smoothly close the live activity
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, self.lifecycle.isCurrent(sessionID) else { return }
+            self.smoothCloseWorkItem = nil
             withAnimation(.easeInOut(duration: 1.0)) {
                 self.isTimerActive = false
             }
         }
+
+        smoothCloseWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: workItem)
+    }
+
+    private func beginTimerSession() {
+        smoothCloseWorkItem?.cancel()
+        smoothCloseWorkItem = nil
+        lifecycle.beginSession()
+    }
+
+    private func endTimerSession() {
+        smoothCloseWorkItem?.cancel()
+        smoothCloseWorkItem = nil
+        lifecycle.endSession()
     }
     
     private func playTimerSound() {

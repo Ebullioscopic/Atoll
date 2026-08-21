@@ -74,6 +74,31 @@ class BluetoothAudioManager: ObservableObject {
     private var isPmsetRefreshInFlight = false
     private var lastPmsetRefreshDate: Date?
     private let pmsetRefreshCooldown: TimeInterval = 5
+    /// The last `system_profiler` reading, shared by everything that needs one.
+    ///
+    /// Spawning that process costs ~200 ms, and it was being spawned once for
+    /// battery levels and again per device for the vendor/product lookup, on
+    /// every connect and every battery refresh. One reading serves them all.
+    private var profilerSnapshot: [String: Any]?
+    private var profilerSnapshotDate: Date?
+    /// Short enough that a stale reading never outlives the event that made it
+    /// interesting; connect and disconnect clear it outright.
+    private let profilerSnapshotTTL: TimeInterval = 30
+    /// Guards the snapshot, which is read from the main thread and written from
+    /// the battery queue.
+    private let profilerSnapshotLock = NSLock()
+
+    /// Where the subprocess half of a battery refresh runs.
+    private let batteryFetchQueue = DispatchQueue(
+        label: "com.dynamicisland.bluetooth.battery", qos: .utility
+    )
+    private var isSubprocessBatteryRefreshInFlight = false
+    private var lastSubprocessBatteryRefresh: Date?
+    /// Last values the subprocesses reported, so the cheap in-process pass can
+    /// keep publishing them instead of dropping a level it already knew.
+    private var subprocessAddressPercentages: [String: Int] = [:]
+    private var subprocessNamePercentages: [String: Int] = [:]
+
     private var hudBatteryWaitTasks: [UUID: Task<Void, Never>] = [:]
     private let hudBatteryWaitInterval: TimeInterval = 0.3
     private let hudBatteryWaitTimeout: TimeInterval = 1.8
@@ -106,8 +131,27 @@ class BluetoothAudioManager: ObservableObject {
         setupBluetoothObservers()
         setupAirPodsListeningModeObservers()
         setupAirPodsListeningModeLogObserver()
-        checkInitialDevices()
         startPollingForChanges()
+
+        // Deliberately deferred rather than called here.
+        //
+        // `checkInitialDevices()` reaches `systemProfilerBluetoothDictionary()`,
+        // which blocks on `Process.waitUntilExit()`. On the main thread that
+        // **spins the run loop**, so a SwiftUI run-loop observer gets to evaluate
+        // `ContentView.body` while this initialiser is still running. That body
+        // reads `BluetoothAudioManager.shared` — it is a default argument of
+        // `InlineHUD.init` — which re-enters the `swift_once` currently
+        // constructing this very instance, and libdispatch traps with
+        // "BUG IN CLIENT OF LIBDISPATCH: trying to lock recursively".
+        //
+        // It only reproduced with a Bluetooth audio device connected, because
+        // that is what makes the `system_profiler` call slow enough to matter.
+        //
+        // Hopping to the next main-queue turn lets `shared` finish publishing
+        // before any of that work runs, so the re-entry cannot happen.
+        DispatchQueue.main.async { [weak self] in
+            self?.checkInitialDevices()
+        }
     }
     
     deinit {
@@ -295,7 +339,11 @@ class BluetoothAudioManager: ObservableObject {
     /// Handles Bluetooth device connection notification from DistributedNotificationCenter
     @objc private func handleDeviceConnectedNotification(_ notification: Notification) {
         print("🎧 [BluetoothAudioManager] 📡 Device connection notification received")
-        
+
+        // The cached `system_profiler` reading describes the world as it was
+        // before this device arrived, and the very next thing that happens is
+        // someone asking about that device.
+        invalidateProfilerSnapshot()
         // Re-check all devices since distributed notification doesn't contain device object
         checkForNewlyConnectedDevices()
     }
@@ -303,7 +351,8 @@ class BluetoothAudioManager: ObservableObject {
     /// Handles Bluetooth device disconnection notification from DistributedNotificationCenter
     @objc private func handleDeviceDisconnectedNotification(_ notification: Notification) {
         print("🎧 [BluetoothAudioManager] 📡 Device disconnection notification received")
-        
+
+        invalidateProfilerSnapshot()
         // Re-check all devices to update connection state
         updateConnectedDevices()
     }
@@ -1172,6 +1221,16 @@ class BluetoothAudioManager: ObservableObject {
         return nil
     }
 
+    /// Republishes battery levels from the sources that cost nothing, and asks
+    /// for the expensive ones in the background.
+    ///
+    /// The IORegistry and the preference files are read in-process in well under
+    /// a millisecond. `system_profiler` and `pmset` are subprocesses; running
+    /// them here meant roughly 200 ms on the main thread, at launch and again on
+    /// every connect, disconnect and refresh — measured at four runs in the
+    /// first twenty seconds of a session. They now run on ``batteryFetchQueue``
+    /// and their last answers are kept, so this pass still publishes everything
+    /// it knew a moment ago rather than briefly forgetting a level.
     private func updateBatteryStatuses(force: Bool = false) {
         let now = Date()
         if !force, let lastBatteryStatusUpdate,
@@ -1179,6 +1238,12 @@ class BluetoothAudioManager: ObservableObject {
             return
         }
 
+        publishBatteryStatuses(now: now)
+        requestSubprocessBatteryRefresh(force: force)
+    }
+
+    /// Merges the cheap sources with the last subprocess answers and publishes.
+    private func publishBatteryStatuses(now: Date = Date()) {
         var combinedAddressPercentages: [String: Int] = [:]
         var combinedNamePercentages: [String: Int] = [:]
 
@@ -1190,12 +1255,8 @@ class BluetoothAudioManager: ObservableObject {
         mergeBatteryLevels(into: &combinedAddressPercentages, from: defaults.addresses)
         mergeBatteryLevels(into: &combinedNamePercentages, from: defaults.names)
 
-        let profiler = collectSystemProfilerBatteryLevels()
-        mergeBatteryLevels(into: &combinedAddressPercentages, from: profiler.addresses)
-        mergeBatteryLevels(into: &combinedNamePercentages, from: profiler.names)
-
-        let pmsetEntries = collectPmsetAccessoryBatteryEntries()
-        mergePmsetEntries(pmsetEntries, into: &combinedNamePercentages, logNewEntries: true)
+        mergeBatteryLevels(into: &combinedAddressPercentages, from: subprocessAddressPercentages)
+        mergeBatteryLevels(into: &combinedNamePercentages, from: subprocessNamePercentages)
 
         var statuses: [String: String] = [:]
         for (key, value) in combinedAddressPercentages {
@@ -1213,6 +1274,38 @@ class BluetoothAudioManager: ObservableObject {
             applyUpdates()
         } else {
             DispatchQueue.main.sync(execute: applyUpdates)
+        }
+    }
+
+    /// Runs `system_profiler` and `pmset` off the main thread, then republishes.
+    private func requestSubprocessBatteryRefresh(force: Bool) {
+        guard !isSubprocessBatteryRefreshInFlight else { return }
+        if !force, let last = lastSubprocessBatteryRefresh,
+           Date().timeIntervalSince(last) < batteryStatusUpdateInterval {
+            return
+        }
+        isSubprocessBatteryRefreshInFlight = true
+
+        batteryFetchQueue.async { [weak self] in
+            guard let self else { return }
+            let profiler = self.collectSystemProfilerBatteryLevels()
+            let pmsetEntries = self.collectPmsetAccessoryBatteryEntries()
+
+            DispatchQueue.main.async {
+                self.isSubprocessBatteryRefreshInFlight = false
+                self.lastSubprocessBatteryRefresh = Date()
+
+                var addresses = self.subprocessAddressPercentages
+                var names = self.subprocessNamePercentages
+                self.mergeBatteryLevels(into: &addresses, from: profiler.addresses)
+                self.mergeBatteryLevels(into: &names, from: profiler.names)
+                self.mergePmsetEntries(pmsetEntries, into: &names, logNewEntries: true)
+
+                self.subprocessAddressPercentages = addresses
+                self.subprocessNamePercentages = names
+                self.publishBatteryStatuses()
+                self.applyConnectedDeviceBatteryLevels(triggerPmsetFallback: false)
+            }
         }
     }
 
@@ -1450,7 +1543,43 @@ class BluetoothAudioManager: ObservableObject {
         return Array(identifiers)
     }
 
+    /// A `system_profiler` reading, from cache when there is a fresh one.
+    ///
+    /// Callers used to each spawn their own; on a connect that meant the process
+    /// ran twice on the main thread before the HUD could appear.
     private func systemProfilerBluetoothDictionary() -> [String: Any]? {
+        profilerSnapshotLock.lock()
+        if let snapshot = profilerSnapshot,
+           let date = profilerSnapshotDate,
+           Date().timeIntervalSince(date) < profilerSnapshotTTL {
+            profilerSnapshotLock.unlock()
+            return snapshot
+        }
+        profilerSnapshotLock.unlock()
+
+        let fresh = runSystemProfilerBluetoothDictionary()
+
+        profilerSnapshotLock.lock()
+        profilerSnapshot = fresh
+        profilerSnapshotDate = fresh == nil ? nil : Date()
+        profilerSnapshotLock.unlock()
+
+        return fresh
+    }
+
+    /// Forgets the cached reading.
+    ///
+    /// Called when a device connects or disconnects: that is exactly the moment
+    /// the previous reading stopped describing reality, and also the moment
+    /// something is about to ask.
+    private func invalidateProfilerSnapshot() {
+        profilerSnapshotLock.lock()
+        profilerSnapshot = nil
+        profilerSnapshotDate = nil
+        profilerSnapshotLock.unlock()
+    }
+
+    private func runSystemProfilerBluetoothDictionary() -> [String: Any]? {
         let process = Process()
         process.launchPath = "/usr/sbin/system_profiler"
         process.arguments = ["SPBluetoothDataType", "-json"]
@@ -2672,6 +2801,138 @@ enum BluetoothAudioDeviceType {
 }
 
 extension BluetoothAudioDeviceType {
+    /// Resolves the bundled looping HUD animation for this device type.
+    ///
+    /// Returns `nil` when the movie is missing *or* when the bundled file is not a real
+    /// QuickTime/MP4 movie (for example an un-fetched Git LFS pointer, which is a small
+    /// text file that ships with the correct name and extension but decodes to nothing).
+    /// Callers can then fall back to the SF Symbol instead of rendering an empty frame.
+    /// Memoised so the validation runs once per device type.
+    ///
+    /// This is read from `body` — `InlineHUD` evaluates it on every HUD render
+    /// — and validation opens the file and walks its atom chain. Bundled
+    /// resources cannot change while the app runs, so the answer is computed
+    /// once and kept, including a negative answer.
+    private static let animationURLCacheLock = NSLock()
+    private static var animationURLCache: [BluetoothAudioDeviceType: URL?] = [:]
+
+    var inlineHUDAnimationURL: URL? {
+        BluetoothAudioDeviceType.animationURLCacheLock.lock()
+        defer { BluetoothAudioDeviceType.animationURLCacheLock.unlock() }
+
+        if let cached = BluetoothAudioDeviceType.animationURLCache[self] {
+            return cached
+        }
+
+        let resolved = resolvedInlineHUDAnimationURL
+        BluetoothAudioDeviceType.animationURLCache[self] = resolved
+        return resolved
+    }
+
+    private var resolvedInlineHUDAnimationURL: URL? {
+        // Each candidate is validated in turn: a stub in the subdirectory must
+        // not mask a real movie sitting at the bundle root.
+        let candidates = [
+            Bundle.main.url(
+                forResource: inlineHUDAnimationBaseName,
+                withExtension: "mov",
+                subdirectory: "BluetoothHUDAnimations"
+            ),
+            Bundle.main.url(
+                forResource: inlineHUDAnimationBaseName,
+                withExtension: "mov"
+            )
+        ].compactMap { $0 }
+
+        return candidates.first { BluetoothAudioDeviceType.isPlayableMovieFile(at: $0) }
+    }
+
+    /// Atom types a QuickTime/ISO BMFF file may legitimately start with. Only
+    /// the *first* atom is checked against this list — enough to reject a text
+    /// file such as an un-fetched Git LFS pointer — because a valid container
+    /// may carry all sorts of top-level atoms after it, and rejecting an
+    /// unfamiliar one would silently disable a perfectly good animation.
+    ///
+    /// The padding and placeholder types (`free`, `skip`, `wide`, `pnot`) are
+    /// included because real files do start with them: QuickTime writers emit
+    /// `wide` before `mdat` to reserve room for a 64-bit size, and editors
+    /// leave `free`/`skip` where data was removed. The assets here begin
+    /// `ftyp` → `wide` → `mdat` → `moov`.
+    private static let leadingAtomTypes: Set<String> = ["ftyp", "moov", "mdat", "free", "skip", "wide", "pnot"]
+
+    /// Upper bound on the atom walk. These are small bundled assets, so a
+    /// chain this long means the file is not what it claims; the bound stops a
+    /// malformed one from being walked indefinitely.
+    private static let maximumAtomCount = 128
+
+    /// Walks the top-level atom chain and reports whether the file is a
+    /// structurally complete movie.
+    ///
+    /// The chain must tile the file exactly and include a `moov`, which is
+    /// where the playable metadata lives; in these assets it is the last atom,
+    /// so the walk necessarily reaches EOF. This rejects both an un-fetched Git
+    /// LFS pointer and a truncated or header-only file, either of which would
+    /// otherwise reach the player and draw nothing.
+    private static func isPlayableMovieFile(at url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+
+        guard let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(UInt64.init),
+              fileSize >= 8 else { return false }
+
+        var offset: UInt64 = 0
+        var sawMovieAtom = false
+        var atomCount = 0
+
+        while offset + 8 <= fileSize {
+            atomCount += 1
+            guard atomCount <= BluetoothAudioDeviceType.maximumAtomCount else { return false }
+
+            guard (try? handle.seek(toOffset: offset)) != nil,
+                  let header = try? handle.read(upToCount: 16),
+                  header.count >= 8 else { return false }
+            let bytes = [UInt8](header)
+
+            // Atom types are four printable ISO 646 characters, so ASCII
+            // decoding is exact rather than an assumption; anything that fails
+            // to decode is not a container header.
+            guard let atomType = String(bytes: bytes[4 ..< 8], encoding: .ascii),
+                  atomType.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value <= 0x7E }) else { return false }
+            if offset == 0, !leadingAtomTypes.contains(atomType) { return false }
+
+            let declaredSize = bytes[0 ..< 4].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+            let extent: UInt64
+
+            switch declaredSize {
+            case 0:
+                // The atom runs to the end of the file.
+                extent = fileSize - offset
+            case 1:
+                // Extended size: the real length is the next 64 bits.
+                guard bytes.count >= 16 else { return false }
+                extent = bytes[8 ..< 16].reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+                guard extent >= 16 else { return false }
+            case 2 ... 7:
+                // Smaller than the header it must contain.
+                return false
+            default:
+                extent = declaredSize
+            }
+
+            // Subtract rather than add: `extent` comes straight off the file
+            // and can be UInt64.max, and `offset + extent` would trap before
+            // the bound is ever tested. The loop condition keeps
+            // `offset <= fileSize`, so this cannot underflow.
+            guard extent >= 8, extent <= fileSize - offset else { return false }
+            if atomType == "moov" { sawMovieAtom = true }
+            offset += extent
+        }
+
+        // The chain has to account for the whole file, with the movie metadata
+        // present — a header-only file tiles cleanly but cannot play.
+        return sawMovieAtom && offset == fileSize
+    }
+
     var isAirPods: Bool {
         switch self {
         case .airpods, .airpodsGen3, .airpodsGen4, .airpodsPro, .airpodsPro3, .airpodsMax:

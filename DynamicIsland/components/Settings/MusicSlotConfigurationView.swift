@@ -34,10 +34,6 @@ struct MusicSlotConfigurationView: View {
 
     private let slotCount = MusicControlButton.slotCount
 
-    private var isAppleMusicActive: Bool {
-        musicManager.bundleIdentifier == "com.apple.Music"
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
@@ -201,7 +197,8 @@ private struct ScrollHintIndicator: View {
 
     private func isControlDisabled(_ control: MusicControlButton) -> Bool {
         if control == .mediaOutput && !showMediaOutputControl { return true }
-        if control.isAppleMusicExclusive && !isAppleMusicActive { return true }
+        if control.isAppleMusicExclusive && !musicManager.isAppleMusicActive { return true }
+        if control.isSpotifyExclusive && !musicManager.isSpotifyActive { return true }
         return false
     }
 
@@ -245,7 +242,7 @@ private struct ScrollHintIndicator: View {
     }
 
     private func slotValue(at index: Int) -> MusicControlButton {
-        let normalized = musicControlSlots.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive)
+        let normalized = musicControlSlots.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, isSpotifyActive: musicManager.isSpotifyActive)
         guard normalized.indices.contains(index) else { return .none }
         return normalized[index]
     }
@@ -255,8 +252,11 @@ private struct ScrollHintIndicator: View {
         if !showMediaOutputControl {
             base = base.filter { $0 != .mediaOutput }
         }
-        if !isAppleMusicActive {
+        if !musicManager.isAppleMusicActive {
             base = base.filter { !$0.isAppleMusicExclusive }
+        }
+        if !musicManager.isSpotifyActive {
+            base = base.filter { !$0.isSpotifyExclusive }
         }
         return base
     }
@@ -269,6 +269,8 @@ private struct ScrollHintIndicator: View {
             return musicManager.repeatMode == .off ? .primary : .red
         case .lyrics:
             return Defaults[.enableLyrics] ? .accentColor : .primary
+        case .likeTrack:
+            return musicManager.isCurrentTrackLiked == true ? .accentColor : .primary
         default:
             return .primary
         }
