@@ -260,7 +260,11 @@ class LockScreenManager: ObservableObject {
                     if !Self.isSessionScreenLocked() {
                         print("[\(self.timestamp())] LockScreenManager: 🔓 Polling detected unlock ahead of notification")
                         self.screenUnlocked()
+                        return
                     }
+
+                    // Still locked: make sure the media panel is actually there.
+                    LockScreenPanelManager.shared.ensurePresentedWhileLocked()
                 }
             }
         }

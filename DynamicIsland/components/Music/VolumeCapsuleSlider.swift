@@ -18,7 +18,7 @@
 
 import SwiftUI
 
-/// The volume control from the iOS Now Playing screen: a thick capsule that
+/// The volume control from the iOS Now Playing screen: a capsule that
 /// fills from the leading edge, flanked by a quiet and a loud speaker glyph,
 /// which swells while it is being dragged and settles back when released.
 ///
@@ -36,7 +36,7 @@ struct VolumeCapsuleSlider: View {
     @State private var isDragging = false
     @State private var isHovering = false
 
-    private var trackHeight: CGFloat { compact ? 14 : 16 }
+    private var trackHeight: CGFloat { compact ? 11 : 13 }
     private var glyphSize: CGFloat { compact ? 10 : 11.5 }
 
     /// iOS dims the glyph you are moving away from and lights the one you are

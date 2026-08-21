@@ -105,7 +105,7 @@ struct LockScreenMusicPanel: View {
     private var playPauseFrameSize: CGFloat { isExpanded ? 84 : 58 }
     private var playPauseIconSize: CGFloat { isExpanded ? 39 : 28 }
 
-    // Room for the volume row: the capsule (14 collapsed / 16 expanded), the
+    // Room for the volume row: the capsule (11 collapsed / 13 expanded), the
     // 14pt gap the controls stack puts above it, and enough left over for the
     // panel's own bottom inset. The original 72/88 was sized for a boxed slider
     // with an icon and a percentage label and left ~40pt of dead space; trimming
