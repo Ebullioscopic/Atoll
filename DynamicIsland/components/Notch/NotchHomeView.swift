@@ -1222,6 +1222,7 @@ private struct MediaOutputPickerButton: View {
     @ObservedObject private var routeManager = AudioRouteManager.shared
     @StateObject private var volumeModel = MediaOutputVolumeViewModel()
     @State private var isPopoverPresented = false
+    @State private var popoverToken = UUID()
     @EnvironmentObject private var vm: DynamicIslandViewModel
 
     var body: some View {
@@ -1249,7 +1250,7 @@ private struct MediaOutputPickerButton: View {
             updatePopoverActivity()
         }
         .onDisappear {
-            vm.isMediaOutputPopoverActive = false
+            vm.setMediaOutputPopoverActive(false, token: popoverToken)
         }
     }
 
@@ -1264,7 +1265,7 @@ private struct MediaOutputPickerButton: View {
         // moment before the popover reported the pointer let the auto-close timer
         // shut the notch and take the popover with it. This is what the stats,
         // timer and clipboard popovers already do.
-        vm.isMediaOutputPopoverActive = isPopoverPresented
+        vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
     }
 }
 
@@ -1272,6 +1273,7 @@ private struct AirPlayPickerButton: View {
     @ObservedObject private var musicManager = MusicManager.shared
     @ObservedObject private var airPlayManager = AppleMusicAirPlayManager.shared
     @State private var isPopoverPresented = false
+    @State private var popoverToken = UUID()
     @EnvironmentObject private var vm: DynamicIslandViewModel
 
     private var isAppleMusicActive: Bool {
@@ -1309,7 +1311,7 @@ private struct AirPlayPickerButton: View {
             }
         }
         .onDisappear {
-            vm.isMediaOutputPopoverActive = false
+            vm.setMediaOutputPopoverActive(false, token: popoverToken)
         }
     }
 
@@ -1320,7 +1322,7 @@ private struct AirPlayPickerButton: View {
         // moment before the popover reported the pointer let the auto-close timer
         // shut the notch and take the popover with it. This is what the stats,
         // timer and clipboard popovers already do.
-        vm.isMediaOutputPopoverActive = isPopoverPresented
+        vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
     }
 }
 

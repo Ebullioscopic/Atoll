@@ -1099,6 +1099,7 @@ private struct MinimalisticReminderDetailsView: View {
         @StateObject private var volumeModel = MediaOutputVolumeViewModel()
         @EnvironmentObject private var vm: DynamicIslandViewModel
         @State private var isPopoverPresented = false
+        @State private var popoverToken = UUID()
 
         var body: some View {
             MinimalisticSquircircleButton(
@@ -1133,7 +1134,7 @@ private struct MinimalisticReminderDetailsView: View {
                 routeManager.refreshDevices()
             }
             .onDisappear {
-                vm.isMediaOutputPopoverActive = false
+                vm.setMediaOutputPopoverActive(false, token: popoverToken)
             }
         }
 
@@ -1141,7 +1142,7 @@ private struct MinimalisticReminderDetailsView: View {
             // Presentation alone -- see MediaOutputPickerButton: also requiring
             // hover let the notch auto-close while the pointer was over the
             // popover, which is a separate window.
-            vm.isMediaOutputPopoverActive = isPopoverPresented
+            vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
         }
     }
 
@@ -1150,6 +1151,7 @@ private struct MinimalisticReminderDetailsView: View {
         @ObservedObject private var airPlayManager = AppleMusicAirPlayManager.shared
         @EnvironmentObject private var vm: DynamicIslandViewModel
         @State private var isPopoverPresented = false
+        @State private var popoverToken = UUID()
 
         private var isAppleMusicActive: Bool {
             musicManager.bundleIdentifier == "com.apple.Music"
@@ -1194,7 +1196,7 @@ private struct MinimalisticReminderDetailsView: View {
                 }
             }
             .onDisappear {
-                vm.isMediaOutputPopoverActive = false
+                vm.setMediaOutputPopoverActive(false, token: popoverToken)
             }
         }
 
@@ -1202,7 +1204,7 @@ private struct MinimalisticReminderDetailsView: View {
             // Presentation alone -- see MediaOutputPickerButton: also requiring
             // hover let the notch auto-close while the pointer was over the
             // popover, which is a separate window.
-            vm.isMediaOutputPopoverActive = isPopoverPresented
+            vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
         }
     }
 

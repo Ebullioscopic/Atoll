@@ -49,7 +49,32 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     @Published var isColorPickerPopoverActive: Bool = false
     @Published var isStatsPopoverActive: Bool = false
     @Published var isReminderPopoverActive: Bool = false
-    @Published var isMediaOutputPopoverActive: Bool = false
+    /// Whether any output picker popover is open.
+    ///
+    /// Four separate views can present one of these -- the media output and
+    /// AirPlay pickers, in both the standard and minimalistic players -- and they
+    /// all used to assign this directly. Whichever ran last won, so closing one
+    /// picker cleared the flag while another was still open and let the notch
+    /// auto-close underneath it. Presenters register instead, and the flag stays
+    /// true while any of them is still open.
+    @Published private(set) var isMediaOutputPopoverActive: Bool = false
+
+    private var activeMediaOutputPopovers: Set<UUID> = []
+
+    /// Registers or withdraws one presenter, identified by a token that is stable
+    /// for the lifetime of the view holding it.
+    func setMediaOutputPopoverActive(_ isActive: Bool, token: UUID) {
+        if isActive {
+            activeMediaOutputPopovers.insert(token)
+        } else {
+            activeMediaOutputPopovers.remove(token)
+        }
+
+        let isAnyActive = !activeMediaOutputPopovers.isEmpty
+        if isMediaOutputPopoverActive != isAnyActive {
+            isMediaOutputPopoverActive = isAnyActive
+        }
+    }
     @Published var isTimerPopoverActive: Bool = false
     @Published var shouldRecheckHover: Bool = false
     @Published var isScrollGestureActive: Bool = false
