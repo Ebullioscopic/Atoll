@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+## [2.3.3] - 2026-07-24
+
+### Added
+
+### Changed
+
+### Fixed
+- Fixed an issue where `BluetoothHUDAnimations` (.mov files) were missing in release builds.
+- Improved the GitHub Actions release workflow to use a monotonic build number allocator and automated patch versioning for stable releases.
+
+### Removed
+
 ## [2.3.2] - 2026-07-20
 
 ### Added
