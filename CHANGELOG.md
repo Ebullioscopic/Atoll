@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Lyrics on the side**: Added ability to show lyrics of the current song when calendar is disabled (#741)
 
 ### Changed
+- The LIVE indicator shown in place of a progress bar on streams now follows Apple's treatment: two thin rules meeting the word in the middle, softening as they run away from it. It was a 10pt capsule with a fill, a centre shade, a stroke and three blend modes, with shadowed text dropped over the top — which reads as a progress bar someone has written on, and a stream has no progress to draw. The notch, the lock screen player and the floating window all draw the same component, so all three change together.
 - Lock screen and notch music controls now follow Apple's sizing and animation: the hover/press highlight fills a circular target roughly 2.2x the glyph instead of hugging it, play/pause shares that highlight with the rest of the row, and the track title and artist scale up to Apple's lock screen proportions. Pressing next/previous marches the chevrons in the direction of travel rather than sliding the whole button (#742).
 - Improved the Dutch localization by adding missing translations, corrected terminology, and wording aligned with Apple's Dutch macOS conventions.
 - Refreshing the LLM Usage card now skips session logs whose last write predates the seven-day window instead of re-reading the whole log history, and counts a repeated record when the copy inside the window would previously have been suppressed by a copy outside it (#691).
