@@ -105,16 +105,26 @@ struct LockScreenMusicPanel: View {
     private var playPauseFrameSize: CGFloat { isExpanded ? 84 : 58 }
     private var playPauseIconSize: CGFloat { isExpanded ? 39 : 28 }
 
-    // Room for the volume row: the capsule (10 collapsed / 13 expanded), the
-    // 14pt gap the controls stack puts above it, and enough left over for the
-    // panel's own bottom inset. The original 72/88 was sized for a boxed slider
-    // with an icon and a percentage label and left ~40pt of dead space; trimming
-    // it to just the content instead pinned the capsule against the bottom edge.
-    // Content is top-aligned in the panel, so anything reserved past what the
-    // row actually draws reads as dead space under the capsule.
-    private let collapsedSliderExtraHeight: CGFloat = 32
-    private let expandedSliderExtraHeight: CGFloat = 36
-    private let collapsedLyricsExtraHeight: CGFloat = 64
+    // What the volume and lyrics rows add to the panel's height. Content is
+    // top-aligned, so whatever is reserved past what a row draws reads as dead
+    // space along the bottom edge, and whatever falls short pins the row
+    // against it.
+    //
+    // Collapsed, the fixed part of the panel already fills its 180pt: a 60pt
+    // header, a 13pt progress row and a 58pt transport row, with the stack's
+    // 12pt gaps and 4pt insets between them, comes to 188 against 152pt of
+    // content height. So the volume row needs its own 13pt capsule and the
+    // 14pt gap above it *plus* the 12pt that fixed part is already over by --
+    // 40, not the 27 the row itself measures. The old 72/88 was sized for a
+    // boxed slider with an icon and a percentage label, which is where the
+    // dead space came from; 32 was this arithmetic done without the overflow,
+    // and pinned the capsule against the bottom edge.
+    //
+    // The lyrics row is 8pt of inset and up to two 15pt lines, plus the same
+    // 14pt gap: 52, with a little over.
+    private let collapsedSliderExtraHeight: CGFloat = 40
+    private let expandedSliderExtraHeight: CGFloat = 44
+    private let collapsedLyricsExtraHeight: CGFloat = 56
     private let expandedLyricsExtraHeight: CGFloat = 96
 
     private var shouldUseFrostedBlur: Bool {
