@@ -2956,8 +2956,8 @@ struct Media: View {
                 .settingsHighlight(id: highlightID("Show lyrics"))
                 Text(
                     showCalendar
-                        ? "Lyrics appear under the artist name, beside the calendar."
-                        : "Lyrics appear in their own panel beside the player."
+                        ? "Lyrics sit on one line under the artist name, since the calendar is using the rest of the notch. Turn the calendar off to give them a full panel beside the player."
+                        : "Lyrics get their own panel beside the player. Turn the calendar on to move them under the artist name instead."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -3287,7 +3287,7 @@ struct CalendarSettings: View {
                 }
                 .settingsHighlight(id: highlightID("Show calendar"))
                 if enableLyrics {
-                    Text("With lyrics on, the calendar shares the notch and lyrics move under the artist name.")
+                    Text("Lyrics are on too, so the two share the notch and lyrics drop to a single line under the artist name.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
