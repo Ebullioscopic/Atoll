@@ -1783,6 +1783,52 @@ final class HUDPreviewViewModel: ObservableObject {
     }
 }
 
+/// Disables a control while the selected external display app is the one actually
+/// handling those keys.
+///
+/// Ownership is not the integration toggle on its own. `resolvedControlFlags()`
+/// hands the keys over only while integration is enabled *and* the provider is
+/// running, so quitting the provider gives them back to Atoll -- and a control
+/// gated on the toggle alone stays greyed out over a setting that has started
+/// working again.
+///
+/// A modifier rather than a computed property per view: it carries the
+/// observation of both providers with it, so a control re-enables the moment the
+/// provider quits without every settings view having to observe them itself.
+private struct ExternalKeyOwnershipModifier: ViewModifier {
+    @Default(.enableThirdPartyDDCIntegration) private var integrationEnabled
+    @Default(.thirdPartyDDCProvider) private var provider
+    @ObservedObject private var betterDisplayManager = BetterDisplayManager.shared
+    @ObservedObject private var lunarManager = LunarManager.shared
+
+    let message: String
+
+    private var providerRunning: Bool {
+        switch provider {
+        case .betterDisplay: return betterDisplayManager.isRunning
+        case .lunar: return lunarManager.isRunning
+        }
+    }
+
+    private var externalOwnsKeys: Bool {
+        integrationEnabled && providerRunning
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .disabled(externalOwnsKeys)
+            .help(externalOwnsKeys ? message : "")
+    }
+}
+
+extension View {
+    /// Greys this control out while the running external display app owns the
+    /// keys it configures.
+    func disabledWhileExternalAppOwnsKeys(_ message: String) -> some View {
+        modifier(ExternalKeyOwnershipModifier(message: message))
+    }
+}
+
 private struct HUDAndOSDSettingsView: View {
     @State private var selectedTab: Tab = {
         if Defaults[.enableSystemHUD] { return .hud }
@@ -2056,8 +2102,7 @@ private struct HUDAndOSDSettingsView: View {
                             Toggle("Volume HUD", isOn: $enableVolumeHUD)
                             Toggle("Brightness HUD", isOn: $enableBrightnessHUD)
                             Toggle("Keyboard Backlight HUD", isOn: $enableKeyboardBacklightHUD)
-                                .disabled(enableThirdPartyDDCIntegration)
-                                .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is active — brightness keys are handled by the external app." : "")
+                                .disabledWhileExternalAppOwnsKeys("Disabled while the external display app is running \u{2014} that app owns the keyboard backlight keys.")
                         } header: {
                             Text("Controls")
                         } footer: {
@@ -2177,8 +2222,7 @@ private struct HUDAndOSDSettingsView: View {
                             Toggle("Volume HUD", isOn: $enableVolumeHUD)
                             Toggle("Brightness HUD", isOn: $enableBrightnessHUD)
                             Toggle("Keyboard Backlight HUD", isOn: $enableKeyboardBacklightHUD)
-                                .disabled(enableThirdPartyDDCIntegration)
-                                .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is active — brightness keys are handled by the external app." : "")
+                                .disabledWhileExternalAppOwnsKeys("Disabled while the external display app is running \u{2014} that app owns the keyboard backlight keys.")
                         } header: {
                             Text("Controls")
                         } footer: {
@@ -2673,8 +2717,7 @@ struct HUD: View {
                     Toggle("Volume HUD", isOn: $enableVolumeHUD)
                     Toggle("Brightness HUD", isOn: $enableBrightnessHUD)
                     Toggle("Keyboard Backlight HUD", isOn: $enableKeyboardBacklightHUD)
-                        .disabled(enableThirdPartyDDCIntegration)
-                        .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is active \u{2014} brightness keys are handled by the external app." : "")
+                        .disabledWhileExternalAppOwnsKeys("Disabled while the external display app is running \u{2014} that app owns the keyboard backlight keys.")
                 } header: {
                     Text("Controls")
                 } footer: {
@@ -8201,8 +8244,7 @@ struct CustomOSDSettings: View {
                         .settingsHighlight(id: highlightID("Brightness OSD"))
                     Toggle("Keyboard Backlight OSD", isOn: $enableOSDKeyboardBacklight)
                         .settingsHighlight(id: highlightID("Keyboard Backlight OSD"))
-                        .disabled(enableThirdPartyDDCIntegration)
-                        .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is active \u{2014} brightness keys are handled by the external app." : "")
+                        .disabledWhileExternalAppOwnsKeys("Disabled while the external display app is running \u{2014} that app owns the keyboard backlight keys.")
                 } header: {
                     Text("Controls")
                 } footer: {
