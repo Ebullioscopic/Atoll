@@ -1138,6 +1138,9 @@ private struct MinimalisticReminderDetailsView: View {
             }
         }
 
+        /// Reports whether this picker's popover is open, so the notch knows not
+        /// to auto-close while it is. Keyed by a token unique to this presenter,
+        /// so one picker closing does not clear the flag for another still open.
         private func updateActivity() {
             // Presentation alone -- see MediaOutputPickerButton: also requiring
             // hover let the notch auto-close while the pointer was over the
@@ -1200,6 +1203,9 @@ private struct MinimalisticReminderDetailsView: View {
             }
         }
 
+        /// Reports whether this picker's popover is open, so the notch knows not
+        /// to auto-close while it is. Keyed by a token unique to this presenter,
+        /// so one picker closing does not clear the flag for another still open.
         private func updateActivity() {
             // Presentation alone -- see MediaOutputPickerButton: also requiring
             // hover let the notch auto-close while the pointer was over the

@@ -1258,6 +1258,13 @@ private struct MediaOutputPickerButton: View {
         routeManager.activeDevice?.iconName ?? "speaker.wave.2"
     }
 
+    /// Reports whether this picker's popover is open, so the notch knows not to
+    /// auto-close while it is.
+    ///
+    /// Keyed by a token unique to this presenter: several pickers can exist at
+    /// once and the notch has to stay open while *any* of them is showing, so
+    /// the view model tracks a set of open popovers rather than one flag that
+    /// the second picker to close would clear on behalf of the first.
     private func updatePopoverActivity() {
         // Presentation alone, deliberately. Also requiring the pointer to be over
         // the popover raced the notch's own hover tracking: the popover is a
@@ -1315,6 +1322,13 @@ private struct AirPlayPickerButton: View {
         }
     }
 
+    /// Reports whether this picker's popover is open, so the notch knows not to
+    /// auto-close while it is.
+    ///
+    /// Keyed by a token unique to this presenter: several pickers can exist at
+    /// once and the notch has to stay open while *any* of them is showing, so
+    /// the view model tracks a set of open popovers rather than one flag that
+    /// the second picker to close would clear on behalf of the first.
     private func updatePopoverActivity() {
         // Presentation alone, deliberately. Also requiring the pointer to be over
         // the popover raced the notch's own hover tracking: the popover is a
