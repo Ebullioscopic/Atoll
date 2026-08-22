@@ -1202,6 +1202,11 @@ struct LockScreenMusicPanel: View {
         "\(Int(round(volumeModel.level * 100)))%"
     }
 
+    /// Opens or closes the output picker, refreshing the device list on the way
+    /// open so the panel never shows a stale set of outputs.
+    ///
+    /// Closes without opening when the output control is switched off, since the
+    /// picker would otherwise be left visible with no way to dismiss it.
     private func toggleOutputPicker() {
         guard showMediaOutputControl else {
             isOutputPickerVisible = false

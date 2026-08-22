@@ -22,6 +22,7 @@ import AppKit
 import Defaults
 import SwiftUI
 import AVFoundation
+import os
 
 enum LockScreenAnimationTimings {
     static let lockExpand: TimeInterval = 0.45
@@ -40,17 +41,31 @@ class LockScreenManager: ObservableObject {
     
     // MARK: - Published Properties
     @Published var isLocked: Bool = false {
-        didSet { LockScreenManager.isLockedSnapshot = isLocked }
+        didSet { LockScreenManager.setLockedSnapshot(isLocked) }
     }
 
     /// Lock state readable off the main actor. The HUD dispatchers run on
     /// whichever thread CoreAudio or the brightness watcher calls them from,
     /// and only need a plain answer to "are we locked".
-    nonisolated(unsafe) private(set) static var isLockedSnapshot = false
+    ///
+    /// Behind a lock rather than `nonisolated(unsafe)`: the writer is the main
+    /// actor, by way of `isLocked`'s `didSet`, and the readers are whatever
+    /// threads CoreAudio and the brightness watcher happen to use, so the
+    /// unsynchronised version was a data race that merely looked benign
+    /// because a Bool is one word wide.
+    nonisolated private static let lockedSnapshot = OSAllocatedUnfairLock(initialState: false)
+
+    nonisolated static var isLockedSnapshot: Bool {
+        lockedSnapshot.withLock { $0 }
+    }
+
+    /// Records the lock state for off-main-actor readers.
+    nonisolated private static func setLockedSnapshot(_ locked: Bool) {
+        lockedSnapshot.withLock { $0 = locked }
+    }
     @Published var isLockIdle: Bool = true
     @Published var shouldDelayPostUnlockMusicHUD: Bool = false
     @Published var lastUpdated: Date = .distantPast
-    private var lastNativeHUDLockState: Bool?
     
     // MARK: - Private Properties
     private var debounceIdleTask: Task<Void, Never>?
@@ -249,6 +264,12 @@ class LockScreenManager: ObservableObject {
         return session["CGSSessionScreenIsLocked"] as? Bool ?? false
     }
 
+    /// Starts the twice-a-second poll of the canonical session lock state.
+    ///
+    /// Runs only while this manager believes the Mac is locked, and does two
+    /// things on each tick: fires `screenUnlocked()` as soon as the OS reports
+    /// the session unlocked, and re-presents the media panel if something has
+    /// taken it down while the Mac is still locked.
     private func startLockStatePolling() {
         lockStatePollTask?.cancel()
         lockStatePollTask = Task { [weak self] in
@@ -270,6 +291,7 @@ class LockScreenManager: ObservableObject {
         }
     }
 
+    /// Cancels the lock state poll. Safe to call when no poll is running.
     private func stopLockStatePolling() {
         lockStatePollTask?.cancel()
         lockStatePollTask = nil
@@ -282,10 +304,11 @@ class LockScreenManager: ObservableObject {
     /// Mac is locked. Whether the music panel is up no longer changes that, so
     /// this only has to run when the lock state itself changes.
     func updateNativeHUDSuppression() {
-        // Handing the HUD over restarts OSDUIHelper, so only act on a change.
-        guard isLocked != lastNativeHUDLockState else { return }
-        lastNativeHUDLockState = isLocked
-
+        // Acting only on a change matters -- handing the HUD over restarts
+        // OSDUIHelper -- but the record of what has been applied belongs with
+        // the code that applies it. Kept here, it was written before a callee
+        // that can decline the request, so a dropped request still counted as
+        // applied and no later one for the same state ever retried.
         SystemHUDManager.shared.updateNativeHUDSuppressionForLockState(isLocked: isLocked)
     }
 

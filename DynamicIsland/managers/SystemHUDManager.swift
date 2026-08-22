@@ -27,6 +27,9 @@ class SystemHUDManager {
     private weak var coordinator: DynamicIslandViewCoordinator?
     private var isSetupComplete = false
     private var isSystemOperationInProgress = false
+    /// The lock state the native HUD has actually been handed over for, so a
+    /// handover that restarts OSDUIHelper only happens when it changes.
+    private var lastNativeHUDLockState: Bool?
     
     private init() {
         // Set up observer for settings changes
@@ -314,6 +317,11 @@ class SystemHUDManager {
             keyboardBacklightEnabled: flags.backlight
         )
         
+        // A fresh observer has none of the old one's suppression applied to it,
+        // so what was handed over before this restart says nothing about what
+        // is in force now.
+        lastNativeHUDLockState = nil
+
         // Force disable system HUD to ensure no duplicates
         SystemOSDManager.disableSystemHUD()
         
@@ -332,7 +340,16 @@ class SystemHUDManager {
     /// screen at once.
     @MainActor
     func updateNativeHUDSuppressionForLockState(isLocked: Bool) {
+        // Readiness first, then the record of what has been applied. The other
+        // order marked a request applied that this guard had in fact dropped,
+        // and every later request for the same state returned early on the
+        // strength of it -- so a lock that arrived before setup finished left
+        // the HUD in the wrong hands for the rest of the session.
         guard isSetupComplete, changesObserver != nil else { return }
+
+        // Handing the HUD over restarts OSDUIHelper, so only act on a change.
+        guard isLocked != lastNativeHUDLockState else { return }
+        lastNativeHUDLockState = isLocked
 
         if SystemHUDPlacement.yieldsToNativeHUD(isLocked: isLocked) {
             SystemOSDManager.enableSystemHUD()

@@ -140,6 +140,14 @@ struct VolumeCapsuleSlider: View {
         }
     }
 
+    /// Sets the volume from a horizontal position within the capsule.
+    ///
+    /// - Parameters:
+    ///   - x: Distance from the capsule's leading edge, in points. Positions
+    ///     outside the capsule are clamped rather than ignored, so a drag that
+    ///     runs off either end pins the volume to that end instead of sticking.
+    ///   - width: The capsule's width. A zero width would divide by nothing, and
+    ///     happens on the first layout pass before the frame is known.
     private func update(to x: CGFloat, width: CGFloat) {
         guard width > 0 else { return }
         value = min(max(Double(x / width), 0), 1)
