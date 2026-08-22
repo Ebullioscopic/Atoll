@@ -131,29 +131,63 @@ struct SyncedLyricsList: View {
             .scrollIndicators(.never)
             .onAppear {
                 lyrics = SyncedLyricsRows.rows(for: musicManager.syncedLyrics, duration: musicManager.songDuration)
-                let index = musicManager.currentLyricIndex
-                // Ask the rows, not the raw lyrics: the intro marker is keyed to
-                // -1, which a lower bound of zero rejects, and blank gap markers
-                // have no row of their own to scroll to.
-                guard lyrics.contains(where: { $0.index == index }) else { return }
+                // Nothing to animate away from: the list has only just appeared.
                 DispatchQueue.main.async {
-                    proxy.scrollTo(index, anchor: .center)
+                    scroll(proxy, to: musicManager.currentLyricIndex, animated: false)
                 }
             }
             .onChange(of: musicManager.currentLyricIndex) { _, index in
-                guard lyrics.contains(where: { $0.index == index }) else { return }
-                withAnimation(.smooth(duration: 0.3)) {
-                    proxy.scrollTo(index, anchor: .center)
+                scroll(proxy, to: index, animated: true)
+            }
+            // Inside the reader, not outside it. Out there these two had no
+            // proxy to scroll with, so a new track rebuilt the rows underneath
+            // a list still parked wherever the last one had scrolled it to.
+            .onChange(of: musicManager.syncedLyrics) { _, newLyrics in
+                lyrics = SyncedLyricsRows.rows(for: newLyrics, duration: musicManager.songDuration)
+                // The rows have to exist before anything can be scrolled to
+                // them, and they are only built on the line above.
+                DispatchQueue.main.async {
+                    scroll(proxy, to: musicManager.currentLyricIndex, animated: false)
                 }
             }
+            .onChange(of: musicManager.songDuration) { _, duration in
+                // Duration closes the last line's window, so a trailing outro is only
+                // marked once it is known -- and it can arrive after the lyrics do.
+                lyrics = SyncedLyricsRows.rows(for: musicManager.syncedLyrics, duration: duration)
+            }
         }
-        .onChange(of: musicManager.syncedLyrics) { _, newLyrics in
-            lyrics = SyncedLyricsRows.rows(for: newLyrics, duration: musicManager.songDuration)
+    }
+
+    /// Brings the row for `index` into view.
+    ///
+    /// Not every index has a row of its own. A blank LRC marker too short to
+    /// count as an instrumental break has none, and neither does -1 -- the
+    /// index a track sits at before its first line -- unless the track opens
+    /// with an intro long enough to be marked with notes.
+    ///
+    /// Mid-track a missing row means staying put, because the words on screen
+    /// are still the right ones. Before the first line it means going to the
+    /// top, and that is the case that was broken: the guard simply gave up, so
+    /// whether a new song rewound the list came down to whether it happened to
+    /// open with a long enough intro to have earned a marker.
+    private func scroll(_ proxy: ScrollViewProxy, to index: Int, animated: Bool) {
+        let target: Int?
+        if lyrics.contains(where: { $0.index == index }) {
+            target = index
+        } else if index < 0 {
+            target = lyrics.first?.index
+        } else {
+            target = nil
         }
-        .onChange(of: musicManager.songDuration) { _, duration in
-            // Duration closes the last line's window, so a trailing outro is only
-            // marked once it is known -- and it can arrive after the lyrics do.
-            lyrics = SyncedLyricsRows.rows(for: musicManager.syncedLyrics, duration: duration)
+
+        guard let target else { return }
+
+        guard animated else {
+            proxy.scrollTo(target, anchor: .center)
+            return
+        }
+        withAnimation(.smooth(duration: 0.3)) {
+            proxy.scrollTo(target, anchor: .center)
         }
     }
 
