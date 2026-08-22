@@ -2255,6 +2255,11 @@ private struct ExternalDisplayIntegrationsSection: View {
     }
 
     /// Whether the selected DDC provider is actually running.
+    ///
+    /// The one place that answers this. Ownership of the keys and everything the
+    /// section says about the provider's state are read from here, so the
+    /// controls and the status beside them cannot disagree about whether the
+    /// provider is up.
     private var ddcProviderRunning: Bool {
         switch thirdPartyDDCProvider {
         case .betterDisplay: return betterDisplayManager.isRunning
@@ -2277,12 +2282,12 @@ private struct ExternalDisplayIntegrationsSection: View {
     private var providerStatusText: String {
         switch thirdPartyDDCProvider {
         case .betterDisplay:
-            if betterDisplayManager.isRunning { return "Running" }
+            if ddcProviderRunning { return "Running" }
             if betterDisplayManager.isDetected { return "Not running" }
             return "Not detected"
         case .lunar:
             if lunarManager.isConnected { return "Connected" }
-            if lunarManager.isRunning { return "Running" }
+            if ddcProviderRunning { return "Running" }
             if lunarManager.isDetected { return "Not running" }
             return "Not detected"
         }
@@ -2291,12 +2296,12 @@ private struct ExternalDisplayIntegrationsSection: View {
     private var providerStatusColor: Color {
         switch thirdPartyDDCProvider {
         case .betterDisplay:
-            if betterDisplayManager.isRunning { return .green }
+            if ddcProviderRunning { return .green }
             if betterDisplayManager.isDetected { return .orange }
             return .secondary
         case .lunar:
             if lunarManager.isConnected { return .green }
-            if lunarManager.isRunning { return .orange }
+            if ddcProviderRunning { return .orange }
             if lunarManager.isDetected { return .orange }
             return .secondary
         }
@@ -2308,7 +2313,7 @@ private struct ExternalDisplayIntegrationsSection: View {
             if !betterDisplayManager.isDetected {
                 return "Install [BetterDisplay](https://betterdisplay.pro) to control external display brightness (and optional volume) through Atoll's HUD."
             }
-            if !betterDisplayManager.isRunning {
+            if !ddcProviderRunning {
                 return "BetterDisplay is installed but not currently running. Launch BetterDisplay to enable integration."
             }
             return "BetterDisplay OSD events will be routed through Atoll's active HUD style. Brightness is always routed; volume is routed when external volume control listener is enabled below. Make sure BetterDisplay's OSD integration is enabled in Settings › Application › Integration."
@@ -2316,7 +2321,7 @@ private struct ExternalDisplayIntegrationsSection: View {
             if !lunarManager.isDetected {
                 return "Install [Lunar](https://lunar.fyi) to control external display brightness, contrast, and optional volume through Atoll's HUD via DDC."
             }
-            if !lunarManager.isRunning {
+            if !ddcProviderRunning {
                 return "Lunar is installed but not currently running. Launch Lunar to enable integration."
             }
             if lunarManager.isConnected {
