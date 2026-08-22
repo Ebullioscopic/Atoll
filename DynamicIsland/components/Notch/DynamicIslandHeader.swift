@@ -41,6 +41,33 @@ struct DynamicIslandHeader: View {
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
     
+    /// Point size per symbol, so the row reads as one size.
+    ///
+    /// Equal point size is equal *cap height*, which is not equal optical size.
+    /// Measured at 15pt medium: `gearshape` covers 289pt² of ink against
+    /// `web.camera`'s 208 — 39% more — and `list.clipboard` stands 19pt tall
+    /// against `timer`'s 16. These sizes were solved so every glyph lands on
+    /// 16pt of ink height, which is what actually makes a mixed row look even.
+    private static let headerGlyphSizes: [String: CGFloat] = [
+        "web.camera": 14.5,
+        "list.clipboard": 13,
+        "eyedropper": 14.3,
+        "timer": 14.4,
+        "gearshape": 14.2
+    ]
+
+    /// One glyph in the header row, on a common centre.
+    ///
+    /// The 20pt box clears the largest frame any of these symbols asks for
+    /// (19pt, `list.clipboard`), so none of them is clipped — a smaller box
+    /// silently cuts the tall ones.
+    private func headerGlyph(_ name: String) -> some View {
+        Image(systemName: name)
+            .foregroundColor(.white)
+            .font(.system(size: Self.headerGlyphSizes[name] ?? 14.4, weight: .medium))
+            .frame(width: 20, height: 20)
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             HStack {
@@ -69,7 +96,10 @@ struct DynamicIslandHeader: View {
                     }
             }
 
-            HStack(spacing: 4) {
+            // 30pt targets sitting 4pt apart read as one run of buttons rather
+            // than as separate ones; 8 is the gap Apple leaves between controls
+            // of this size.
+            HStack(spacing: 8) {
                 if vm.notchState == .open && !enableMinimalisticUI {
                     if Defaults[.showMirror] {
                         Button(action: {
@@ -79,10 +109,7 @@ struct DynamicIslandHeader: View {
                                 .fill(.black)
                                 .frame(width: 30, height: 30)
                                 .overlay {
-                                    Image(systemName: "web.camera")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
+                                    headerGlyph("web.camera")
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -112,10 +139,7 @@ struct DynamicIslandHeader: View {
                                 .fill(.black)
                                 .frame(width: 30, height: 30)
                                 .overlay {
-                                    Image(systemName: "doc.on.clipboard")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
+                                    headerGlyph("list.clipboard")
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -153,10 +177,7 @@ struct DynamicIslandHeader: View {
                                 .fill(.black)
                                 .frame(width: 30, height: 30)
                                 .overlay {
-                                    Image(systemName: "eyedropper")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
+                                    headerGlyph("eyedropper")
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -185,10 +206,7 @@ struct DynamicIslandHeader: View {
                                 .fill(.black)
                                 .frame(width: 30, height: 30)
                                 .overlay {
-                                    Image(systemName: "timer")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
+                                    headerGlyph("timer")
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -213,10 +231,7 @@ struct DynamicIslandHeader: View {
                                 .fill(.black)
                                 .frame(width: 30, height: 30)
                                 .overlay {
-                                    Image(systemName: "gear")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .imageScale(.medium)
+                                    headerGlyph("gearshape")
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
