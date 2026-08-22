@@ -29,7 +29,12 @@ enum LyricRow: Identifiable {
 enum SyncedLyricsRows {
     /// Gaps shorter than this are breaths between lines, not instrumental
     /// breaks, and showing a note for them would flicker.
-    static let instrumentalGapThreshold: TimeInterval = 5
+    ///
+    /// Read from `MusicManager` rather than restated here. The manager decides
+    /// whether playback is *in* a break and this decides which rows are drawn
+    /// as one; two copies of the number would let the notes on screen and the
+    /// state behind them disagree about what counts as a break.
+    static var instrumentalGapThreshold: TimeInterval { MusicManager.instrumentalBreakThreshold }
 
     /// Builds the display rows, inserting an instrumental marker wherever the
     /// track goes long enough without words.
