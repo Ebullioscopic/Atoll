@@ -28,6 +28,14 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     // Stub for now to conform with ControllerProtocol
     func updatePlaybackInfo() async {}
 
+    /// How recent a sender's timestamp has to be for the position beside it to
+    /// count as a reading of now rather than a record of something earlier.
+    ///
+    /// Generous on purpose: it only has to separate a sample taken this moment
+    /// from one a sender has been repeating since it paused, and those are
+    /// minutes apart, not seconds.
+    private static let currentSampleWindow: TimeInterval = 2
+
     // MARK: - Properties
     @Published private(set) var playbackState: PlaybackState = .init(
         bundleIdentifier: "com.apple.Music"
@@ -259,14 +267,47 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         let wasPlaying = self.playbackState.isPlaying
         let isPlayingNow = payload.playing ?? (diff ? wasPlaying : false)
 
-        if payload.resolvedElapsedTime == nil, wasPlaying != isPlayingNow {
-            let transitionInstant = payload.resolvedTimestamp ?? Date()
+        // Whether the sender sent a position is not the question -- whether it
+        // sent a *current* one is. Spotify keeps republishing the exact instant
+        // it paused: four reads six seconds apart returned the same 40.342 with
+        // its timestamp 235, 241, 247 and 254 seconds old, still climbing. That
+        // pair is true, and harmless while paused because nothing extrapolates
+        // a stopped track. It becomes wrong the moment playback resumes, when
+        // the anchor still points to before the pause and the whole stopped
+        // interval gets counted as played.
+        let now = Date()
+        let hasCurrentSample: Bool = {
+            guard payload.resolvedElapsedTime != nil else { return false }
+            // No timestamp means it was stamped on arrival, so it is current
+            // by construction.
+            guard let stamp = payload.resolvedTimestamp else { return true }
+            return abs(now.timeIntervalSince(stamp)) <= Self.currentSampleWindow
+        }()
+
+        if wasPlaying != isPlayingNow, !hasCurrentSample {
+            // The transition is being observed now, so now is when it happened.
+            // The payload's own timestamp is only better than that if it is
+            // about now as well -- and the stale one is what caused this.
+            let transitionInstant: Date = {
+                guard let stamp = payload.resolvedTimestamp,
+                      abs(now.timeIntervalSince(stamp)) <= Self.currentSampleWindow
+                else { return now }
+                return stamp
+            }()
 
             if wasPlaying {
                 let elapsedWhilePlaying = transitionInstant.timeIntervalSince(self.playbackState.lastUpdated)
                 newPlaybackState.currentTime = max(
                     0,
                     self.playbackState.currentTime + (elapsedWhilePlaying * self.playbackState.playbackRate)
+                )
+            } else {
+                // Resuming. The position is wherever it was left, which is what
+                // the sender is still reporting; only the anchor is stale, and
+                // re-stamping it here is what stops the pause being played back.
+                newPlaybackState.currentTime = max(
+                    0,
+                    payload.resolvedElapsedTime ?? self.playbackState.currentTime
                 )
             }
 
