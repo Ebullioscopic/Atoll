@@ -188,6 +188,11 @@ final class LyricsSearchResultsTests: XCTestCase {
             "Crimewave (Slowed + Reverb)",
             "Crimewave (Instrumental)",
             "Crimewave (Bloody Beetroots Remix)",
+            "Crimewave (Remixed)",
+            "Crimewave (Re-Recorded)",
+            "Crimewave (Rerecorded)",
+            "Crimewave (Re-Recording)",
+            "Crimewave (Taylor's Version)",
             "Crimewave (Acapella)"
         ] {
             XCTAssertNil(
@@ -223,6 +228,37 @@ final class LyricsSearchResultsTests: XCTestCase {
                     album: ""
                 ),
                 "\(suffix) is what the request was stripped to find"
+            )
+        }
+    }
+
+    /// A marker covers its own inflections, because only the leading boundary
+    /// is anchored.
+    func testMarkersMatchTheirInflections() {
+        for variant in ["Crimewave (Remixes)", "Crimewave (Re-Recorded Version)", "Crimewave (Karaoke)"] {
+            XCTAssertNil(
+                LyricsSearchResults.bestMatch(
+                    in: [result(title: variant, artist: "Crystal Castles")],
+                    artist: "Crystal Castles",
+                    title: "Crimewave",
+                    album: ""
+                ),
+                "\(variant) is still a variant"
+            )
+        }
+    }
+
+    /// A bare "version" is not a marker: "(Album Version)" is just the track.
+    func testAlbumAndSingleVersionsAreNotVariants() {
+        for title in ["Crimewave (Album Version)", "Crimewave (Single Version)"] {
+            XCTAssertNotNil(
+                LyricsSearchResults.bestMatch(
+                    in: [result(title: title, artist: "Crystal Castles")],
+                    artist: "Crystal Castles",
+                    title: "Crimewave",
+                    album: ""
+                ),
+                "\(title) is the track itself"
             )
         }
     }

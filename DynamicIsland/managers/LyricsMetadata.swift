@@ -138,6 +138,12 @@ enum LyricsSearchResults {
         "slowed",
         "nightcore",
         "remix",
+        "re-record",
+        "rerecord",
+        // The artist-re-records-their-catalogue convention, as in "(Taylor's
+        // Version)". The possessive is what makes this safe to match: a bare
+        // "version" would also catch "(Album Version)", which is just the track.
+        "'s version",
         "cover",
         "tribute",
         "acapella",
@@ -146,8 +152,10 @@ enum LyricsSearchResults {
         "originally performed by"
     ]
 
-    /// Whole-word matching, so "undercover" is not a cover and "remixed" still
-    /// is.
+    /// Matches on a leading word boundary only, deliberately. The trailing end
+    /// is left open so a marker covers its own inflections -- "remix" catches
+    /// "remixed", "re-record" catches "re-recorded" and "re-recording" -- while
+    /// the leading boundary still keeps "undercover" from being a cover.
     private static func containsWord(_ haystack: String, _ needle: String) -> Bool {
         haystack.range(of: "\\b" + NSRegularExpression.escapedPattern(for: needle), options: [.regularExpression]) != nil
     }
