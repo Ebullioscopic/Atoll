@@ -102,7 +102,7 @@ enum AgentEventAdapter {
             return .notification
         case "userpromptsubmit", "beforeprompt", "prompt":
             return .userPromptSubmit
-        case "pretooluse", "beforetool", "pretool", "tooluse":
+        case "pretooluse", "beforetool", "pretool", "tooluse", "beforeshellexecution":
             return .preToolUse
         case "permissionrequest", "permission", "approvalrequest":
             return .permissionRequest

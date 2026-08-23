@@ -273,14 +273,19 @@ enum DestructiveCommandClassifier {
     }
 
     private static func classifyChmod(_ arguments: [String], add: (String, DestructiveRisk, String) -> Void) {
-        let modes = arguments.filter { !$0.hasPrefix("-") }
-        let worldWritable = modes.contains { mode in
+        // The mode is the first non-flag operand; everything after it is a
+        // target path and must not be misread as a mode string.
+        let worldWritable: Bool
+        if let mode = arguments.first(where: { !$0.hasPrefix("-") }) {
             if mode.allSatisfy(\.isNumber), mode.count >= 3 {
                 // Last digit is "other"; 2, 3, 6, 7 all include write.
-                if let other = mode.last, let value = Int(String(other)) { return value & 2 != 0 }
+                worldWritable = mode.last.flatMap { Int(String($0)) }.map { $0 & 2 != 0 } ?? false
+            } else {
+                let lowered = mode.lowercased()
+                worldWritable = lowered.contains("o+w") || lowered.contains("a+w") || lowered.contains("ugo+w")
             }
-            let lowered = mode.lowercased()
-            return lowered.contains("o+w") || lowered.contains("a+w") || lowered.contains("ugo+w")
+        } else {
+            worldWritable = false
         }
         if worldWritable {
             add("chmod-world-writable", .high, String(localized: "Makes files writable by every user on the Mac"))
@@ -307,7 +312,9 @@ enum DestructiveCommandClassifier {
                 add("git-reset-hard", .medium, String(localized: "Discards all uncommitted changes"))
             }
         case "clean":
-            let joined = arguments.joined()
+            // Only flag arguments carry the "f"/"d"/"x" letters; a path like
+            // "drafts/" must not be scanned for them.
+            let joined = arguments.filter { $0.hasPrefix("-") }.joined()
             if joined.contains("f"), joined.contains("d") || joined.contains("x") {
                 add("git-clean", .medium, String(localized: "Deletes untracked files, including ignored ones"))
             }

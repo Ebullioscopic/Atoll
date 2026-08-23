@@ -82,10 +82,11 @@ struct AgentSession: Identifiable, Codable, Equatable, Sendable {
     /// tell a dead session from a quiet one, and later to find its terminal.
     var agentPID: Int32?
 
-    /// Notch-visible label: the project directory, falling back to the agent name.
+    /// Notch-visible label: the title the agent gave itself, falling back to the
+    /// project directory, then the agent name.
     var displayTitle: String {
-        if let projectName, !projectName.isEmpty { return projectName }
         if let title, !title.isEmpty { return title }
+        if let projectName, !projectName.isEmpty { return projectName }
         return kind.displayName
     }
 
@@ -203,6 +204,7 @@ struct AgentSession: Identifiable, Codable, Equatable, Sendable {
             // Claude Code emits Notification both when it needs input and for
             // idle nudges; the manager decides which, so only bump activity here.
             status = .waitingOnUser
+            endedAt = nil
         case .userPromptSubmit, .preToolUse, .postToolUse:
             status = .working
             endedAt = nil

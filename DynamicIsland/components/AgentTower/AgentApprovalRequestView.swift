@@ -32,6 +32,7 @@ struct AgentApprovalRequestView: View {
     let onDecide: (AgentDecision) -> Void
 
     @Default(.agentTowerAllowAlwaysAllowRules) private var allowPersistentRules
+    @Default(.agentTowerFlagDangerousCommands) private var showDangerousCommandWarnings
 
     @State private var isWritingNote = false
     @State private var note = ""
@@ -86,7 +87,7 @@ struct AgentApprovalRequestView: View {
 
     @ViewBuilder
     private var riskBanner: some View {
-        if let worst = request.riskFlags.first {
+        if showDangerousCommandWarnings, let worst = request.riskFlags.first {
             HStack(alignment: .top, spacing: 5) {
                 Image(systemName: request.risk >= .high ? "exclamationmark.triangle.fill" : "exclamationmark.circle")
                     .font(.system(size: 10, weight: .semibold))
@@ -130,8 +131,10 @@ struct AgentApprovalRequestView: View {
             button(String(localized: "Approve"), tint: .green, prominent: true) {
                 onDecide(.allowOnce)
             }
-            button(String(localized: "This session"), tint: .green) {
-                onDecide(.allowForSession)
+            if request.allowsPersistentRule {
+                button(String(localized: "This session"), tint: .green) {
+                    onDecide(.allowForSession)
+                }
             }
             if allowPersistentRules, request.allowsPersistentRule {
                 button(String(localized: "Always"), tint: .green) {

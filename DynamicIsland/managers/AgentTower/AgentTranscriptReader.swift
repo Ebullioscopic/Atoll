@@ -109,7 +109,9 @@ enum AgentTranscriptReader {
                       message["role"] as? String == "assistant",
                       let usage = message["usage"] as? [String: Any]
                 else { continue }
-                contextTokens = self.contextTokens(from: usage)
+                let tokens = self.contextTokens(from: usage)
+                guard tokens > 0 else { continue }
+                contextTokens = tokens
                 model = message["model"] as? String
 
             case "ai-title":

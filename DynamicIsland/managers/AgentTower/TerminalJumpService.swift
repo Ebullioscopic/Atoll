@@ -108,6 +108,10 @@ enum TerminalJumpService {
 
     // MARK: - Tab selection
 
+    /// An unresponsive terminal must not suspend `jump(to:)` indefinitely, so
+    /// tab selection gives up after this long and falls back to raising the app.
+    private static let tabSelectionTimeout: Duration = .seconds(3)
+
     private static func selectTab(host: TerminalHost, tty: String) async -> Bool {
         let script: String
         switch host {
@@ -119,12 +123,23 @@ enum TerminalJumpService {
             return false
         }
 
-        do {
-            let descriptor = try await AppleScriptHelper.execute(script)
-            return descriptor?.stringValue == "ok"
-        } catch {
-            Logger.log("Agent Tower: terminal AppleScript failed: \(error.localizedDescription)", category: .agents)
-            return false
+        return await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                do {
+                    let descriptor = try await AppleScriptHelper.execute(script)
+                    return descriptor?.stringValue == "ok"
+                } catch {
+                    Logger.log("Agent Tower: terminal AppleScript failed: \(error.localizedDescription)", category: .agents)
+                    return false
+                }
+            }
+            group.addTask {
+                try? await Task.sleep(for: tabSelectionTimeout)
+                return false
+            }
+            let result = await group.next() ?? false
+            group.cancelAll()
+            return result
         }
     }
 

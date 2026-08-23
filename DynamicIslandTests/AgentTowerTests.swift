@@ -59,7 +59,7 @@ final class AgentTowerTests: XCTestCase {
         XCTAssertEqual(AgentEventAdapter.normalizedName(for: "BeforeTool"), .preToolUse)
         XCTAssertEqual(AgentEventAdapter.normalizedName(for: "AfterTool"), .postToolUse)
         XCTAssertEqual(AgentEventAdapter.normalizedName(for: "pre_tool_use"), .preToolUse)
-        XCTAssertEqual(AgentEventAdapter.normalizedName(for: "beforeShellExecution"), .unknown)
+        XCTAssertEqual(AgentEventAdapter.normalizedName(for: "beforeShellExecution"), .preToolUse)
     }
 
     func testUnknownEventNameIsUnknownAndExpectsNoDecision() {

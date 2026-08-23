@@ -281,9 +281,12 @@ final class AgentTowerManager: ObservableObject {
             detail = .generic(event.toolDescription ?? event.message ?? event.toolName ?? event.rawEventName)
         }
 
+        // Classification always runs, independent of the "flag destructive
+        // commands" preference: that setting only controls whether the warning
+        // banner is shown, not whether a persistent rule may be offered.
         let cwd = sessions.first { $0.id == event.sessionKey }?.cwd
         let flags: [CommandRiskFlag]
-        if case .shellCommand(let command) = detail, Defaults[.agentTowerFlagDangerousCommands] {
+        if case .shellCommand(let command) = detail {
             flags = DestructiveCommandClassifier.evaluate(command: command, cwd: cwd)
         } else {
             flags = []

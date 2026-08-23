@@ -115,11 +115,18 @@ enum ShellCommandLexer {
 
         func finishCommand() {
             finishWord()
-            if !argv.isEmpty {
-                result.commands.append(
-                    ShellCommand(argv: argv, isPipeTarget: currentIsPipeTarget, hadQuotedWord: hadQuotedWord)
-                )
+            guard !argv.isEmpty else {
+                // No words were collected, so the pending pipe target still
+                // applies to the next real command.
+                if nextIsPipeTarget {
+                    currentIsPipeTarget = true
+                    nextIsPipeTarget = false
+                }
+                return
             }
+            result.commands.append(
+                ShellCommand(argv: argv, isPipeTarget: currentIsPipeTarget, hadQuotedWord: hadQuotedWord)
+            )
             argv = []
             hadQuotedWord = false
             currentIsPipeTarget = nextIsPipeTarget
