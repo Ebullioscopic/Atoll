@@ -558,8 +558,8 @@ class StatsManager: ObservableObject {
     // MARK: - Public Monitoring Controls
     func startMonitoring() {
         guard !isMonitoring else { return }
-        
-        print("StatsManager: Starting monitoring...")
+
+        Logger.log("StatsManager: Starting monitoring...", category: .lifecycle)
         
         // Reset baseline for accurate measurement
         // A failed getifaddrs leaves the baseline at zero, which the first-run
@@ -584,7 +584,7 @@ class StatsManager: ObservableObject {
             self.updateSystemStats()
         }
         
-        print("StatsManager: Monitoring started")
+        Logger.log("StatsManager: Monitoring started", category: .lifecycle)
     }
     
     func stopMonitoring() {
@@ -597,7 +597,7 @@ class StatsManager: ObservableObject {
         delayedStopTimer?.invalidate()
         
         isMonitoring = false
-        print("StatsManager: Monitoring stopped")
+        Logger.log("StatsManager: Monitoring stopped", category: .lifecycle)
         cachedProcessStats.removeAll()
         lastProcessStatsUpdate = .distantPast
         isProcessRefreshInFlight = false
