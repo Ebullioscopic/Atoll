@@ -25,17 +25,18 @@ import Defaults
 import MacroVisionKit
 import SwiftUI
 
-@MainActor
 class FullscreenMediaDetector: ObservableObject {
     static let shared = FullscreenMediaDetector()
-    private let detector = FullScreenMonitor.shared
+    private let detector: MacroVisionKit
     @ObservedObject private var musicManager = MusicManager.shared
-    @Published private(set) var fullscreenStatus: [String: Bool] = [:]
+    @MainActor @Published private(set) var fullscreenStatus: [String: Bool] = [:]
     private var notificationTask: Task<Void, Never>?
 
     private init() {
+        self.detector = MacroVisionKit.shared
+        detector.configuration.includeSystemApps = true
         setupNotificationObservers()
-        Task { await updateFullScreenStatus() }
+        updateFullScreenStatus()
     }
 
     private func setupNotificationObservers() {
@@ -66,10 +67,10 @@ class FullscreenMediaDetector: ObservableObject {
 
     private func handleChange() async {
         try? await Task.sleep(for: .milliseconds(500))
-        await self.updateFullScreenStatus()
+        self.updateFullScreenStatus()
     }
 
-    private func updateFullScreenStatus() async {
+    private func updateFullScreenStatus() {
         guard Defaults[.enableFullscreenMediaDetection] else {
             let reset = Dictionary(uniqueKeysWithValues: NSScreen.screens.map { ($0.localizedName, false) })
             if reset != fullscreenStatus {
@@ -79,17 +80,15 @@ class FullscreenMediaDetector: ObservableObject {
         }
         
 
-        let spaces = await detector.detectFullscreenApps(debug: false)
-        let screens = NSScreen.screens
+        let apps = detector.detectFullscreenApps(debug: false)
+        let names = NSScreen.screens.map { $0.localizedName }
         let hideOption = Defaults[.hideNotchOption]
 
         var newStatus: [String: Bool] = [:]
-        for screen in screens {
-            let screenUUID = Self.uuidString(for: screen)
-            newStatus[screen.localizedName] = spaces.contains { space in
-                guard space.screenUUID == screenUUID else { return false }
-                let bundleIdentifiers = space.runningApps.filter { $0 != "com.apple.finder" }
-                guard !bundleIdentifiers.isEmpty else { return false }
+        for name in names {
+            newStatus[name] = apps.contains { app in
+                guard app.screen.localizedName == name,
+                      app.bundleIdentifier != "com.apple.finder" else { return false }
 
                 // The notch stays on display by default (the window's collectionBehavior
                 // rides along with fullscreen spaces). It only hides when the user's
@@ -97,11 +96,11 @@ class FullscreenMediaDetector: ObservableObject {
                 switch hideOption {
                 case .always:
                     // Hide for any app in genuine native fullscreen on this screen.
-                    return true
+                    return isInNativeFullscreen(app)
                 case .nowPlayingOnly:
                     // Hide only when the currently playing media app is in fullscreen.
-                    guard let currentBundleIdentifier = musicManager.bundleIdentifier else { return false }
-                    return bundleIdentifiers.contains(currentBundleIdentifier)
+                    return app.bundleIdentifier == musicManager.bundleIdentifier
+                        && isInNativeFullscreen(app)
                 case .never:
                     // Always on display; never hide.
                     return false
@@ -115,11 +114,41 @@ class FullscreenMediaDetector: ObservableObject {
         }
     }
 
-    private static func uuidString(for screen: NSScreen) -> String? {
-        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { return nil }
-        let displayID = CGDirectDisplayID(number.uint32Value)
-        guard let uuid = CGDisplayCreateUUIDFromDisplayID(displayID) else { return nil }
-        return CFUUIDCreateString(nil, uuid.takeRetainedValue()) as String
+    /// Confirms an app the detector flagged as screen-filling is in *genuine* native
+    /// fullscreen, not merely maximized/zoomed. On a notched Mac a maximized window and a
+    /// fullscreen window report nearly identical frames, so frame size alone can't tell them
+    /// apart — the Accessibility `AXFullScreen` attribute can. Falls back to the detector's
+    /// frame-based result when Accessibility isn't trusted (so behavior doesn't silently break).
+    private func isInNativeFullscreen(_ app: MacroVisionKit.FullscreenWindowInfo) -> Bool {
+        guard AXIsProcessTrusted() else { return true }
+
+        let appElement = AXUIElementCreateApplication(app.processId)
+
+        // Prefer the focused window, then fall back to scanning all windows.
+        if let focused: AXUIElement = copyAttribute(kAXFocusedWindowAttribute as CFString, from: appElement),
+           isWindowFullscreen(focused) {
+            return true
+        }
+
+        if let windows: [AXUIElement] = copyAttribute(kAXWindowsAttribute as CFString, from: appElement) {
+            return windows.contains { isWindowFullscreen($0) }
+        }
+
+        return false
+    }
+
+    private func isWindowFullscreen(_ window: AXUIElement) -> Bool {
+        // "AXFullScreen" is the (undocumented but stable) attribute set true only in native
+        // fullscreen; maximized/zoomed windows report false or omit it.
+        let value: Bool? = copyAttribute("AXFullScreen" as CFString, from: window)
+        return value ?? false
+    }
+
+    private func copyAttribute<T>(_ attribute: CFString, from element: AXUIElement) -> T? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute, &value) == .success,
+              let typed = value as? T else { return nil }
+        return typed
     }
 
     private func cleanupNotificationObservers() {

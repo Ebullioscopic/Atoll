@@ -827,6 +827,10 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .shelf, title: "Quick Share Service", keywords: ["shelf", "share", "airdrop", "localsend"], highlightID: SettingsTab.shelf.highlightID(for: "Quick Share Service")),
             SettingsSearchEntry(tab: .shelf, title: "LocalSend Device Picker Style", keywords: ["localsend", "glass", "picker", "material"], highlightID: SettingsTab.shelf.highlightID(for: "Device Picker Style")),
 
+            // Social
+            SettingsSearchEntry(tab: .whatsapp, title: "WhatsApp", keywords: ["social", "messages", "notifications", "chat"], highlightID: SettingsTab.whatsapp.highlightID(for: "WhatsApp")),
+            SettingsSearchEntry(tab: .whatsapp, title: "Enable WhatsApp", keywords: ["social", "messages", "notifications", "chat"], highlightID: SettingsTab.whatsapp.highlightID(for: "Enable WhatsApp")),
+
             // Appearance
             SettingsSearchEntry(tab: .appearance, title: "Main screen style", keywords: ["dynamic island", "pill", "non-notch", "display style", "notch style"], highlightID: SettingsTab.appearance.highlightID(for: "Main screen style")),
             SettingsSearchEntry(tab: .appearance, title: "Settings icon in notch", keywords: ["settings button", "toolbar"], highlightID: SettingsTab.appearance.highlightID(for: "Settings icon in notch")),

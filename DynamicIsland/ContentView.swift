@@ -171,17 +171,12 @@ struct ContentView: View {
            coordinator.expandingView.show,
            case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type,
            isWhatsAppExpansionVisible {
-            let contentSize = WhatsAppNotificationLayout.totalSize(
+            return WhatsAppNotificationLayout.windowSize(
                 isReplying: coordinator.isWhatsAppReplying,
                 hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
                 messages: messages,
                 isDynamicIslandMode: isDynamicIslandMode,
                 closedNotchHeight: vm.closedNotchSize.height
-            )
-            // Preserve side insets used by the closed notch shell to avoid lateral clipping.
-            return CGSize(
-                width: contentSize.width + (cornerRadiusInsets.closed.bottom * 2),
-                height: contentSize.height
             )
         }
         
@@ -646,14 +641,14 @@ struct ContentView: View {
     /// Resolves the clip/content shape per-screen: pill on non-notch screens
     /// when dynamic island mode is active, standard notch shape otherwise.
     private var resolvedClipShape: AnyShape {
+        if let activeClosedWhatsAppSurfaceShape {
+            return activeClosedWhatsAppSurfaceShape
+        }
         if let activeClosedRecordingSurfaceShape {
             return activeClosedRecordingSurfaceShape
         }
         if let activeClosedBatterySurfaceShape {
             return activeClosedBatterySurfaceShape
-        }
-        if let activeClosedWhatsAppSurfaceShape {
-            return activeClosedWhatsAppSurfaceShape
         }
         if isDynamicIslandMode {
             return AnyShape(currentPillShape)
@@ -812,44 +807,36 @@ struct ContentView: View {
             }
     }
 
-    private func applyConfiguredMainLayoutAnimations<V: View>(to view: V) -> AnyView {
+    @ViewBuilder
+    private func applyConfiguredMainLayoutAnimations<V: View>(to view: V) -> some View {
         let hoverAnimation = Animation.bouncy.speed(1.2)
-
         if useModernCloseAnimation {
             let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
             let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
             let notchAnimation = vm.notchState == .open ? openAnimation : closeAnimation
-
-            return AnyView(
-                view
-                    .animation(hoverAnimation, value: isHovering)
-                    .animation(notchAnimation, value: vm.notchState)
-                    .animation(.smooth, value: gestureProgress)
-            )
-        }
-
-        let notchStateAnimation = Animation.spring.speed(1.2)
-        return AnyView(
             view
                 .animation(hoverAnimation, value: isHovering)
-                .animation(notchStateAnimation, value: vm.notchState)
+                .animation(notchAnimation, value: vm.notchState)
+                .animation(.smooth, value: gestureProgress)
+        } else {
+            view
+                .animation(hoverAnimation, value: isHovering)
+                .animation(Animation.spring.speed(1.2), value: vm.notchState)
                 .animation(.smooth, value: gestureProgress)
                 .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
-        )
+        }
     }
 
-    private func applyConfiguredMainLayoutInteractions<V: View>(to view: V) -> AnyView {
-        guard interactionsEnabled else {
-            return AnyView(view)
-        }
-
-        let tappableView = view
+    private func applyConfiguredMainLayoutInteractions<V: View>(to view: V) -> some View {
+        view
             .contentShape(resolvedClipShape)
             .onHover { hovering in
+                guard interactionsEnabled else { return }
                 handleHover(hovering)
             }
             .simultaneousGesture(
                 TapGesture().onEnded {
+                    guard interactionsEnabled else { return }
                     // Quando siamo in modalità reply WhatsApp, non intercettare
                     // i tap — lasciarli passare ai Button figli (es. "+")
                     if isWhatsAppExpansionVisible && coordinator.isWhatsAppReplying {
@@ -871,40 +858,31 @@ struct ContentView: View {
                     openNotch()
                 }
             )
-
-        guard Defaults[.enableGestures] else {
-            return AnyView(tappableView)
-        }
-
-        return AnyView(
-            tappableView
-                .panGesture(direction: .down) { translation, phase in
-                    handleDownGesture(translation: translation, phase: phase)
-                }
-                .panGesture(direction: .left) { translation, phase in
-                    handleSkipGesture(direction: .forward, translation: translation, phase: phase)
-                }
-                .panGesture(direction: .right) { translation, phase in
-                    handleSkipGesture(direction: .backward, translation: translation, phase: phase)
-                }
-        )
+            .panGesture(direction: .down) { translation, phase in
+                guard interactionsEnabled, Defaults[.enableGestures] else { return }
+                handleDownGesture(translation: translation, phase: phase)
+            }
+            .panGesture(direction: .left) { translation, phase in
+                guard interactionsEnabled, Defaults[.enableGestures] else { return }
+                handleSkipGesture(direction: .forward, translation: translation, phase: phase)
+            }
+            .panGesture(direction: .right) { translation, phase in
+                guard interactionsEnabled, Defaults[.enableGestures] else { return }
+                handleSkipGesture(direction: .backward, translation: translation, phase: phase)
+            }
     }
 
-    private func applyConfiguredMainLayoutCloseGesture<V: View>(to view: V) -> AnyView {
-        let shouldApplyCloseGesture = (Defaults[.closeGestureEnabled] || Defaults[.reverseScrollGestures])
+    private func applyConfiguredMainLayoutCloseGesture<V: View>(to view: V) -> some View {
+        view
+            .panGesture(direction: .up) { translation, phase in
+                let shouldApplyCloseGesture = (isWhatsAppExpansionVisible
+                    || Defaults[.closeGestureEnabled]
+                    || Defaults[.reverseScrollGestures])
             && Defaults[.enableGestures]
             && interactionsEnabled
-
-        guard shouldApplyCloseGesture else {
-            return AnyView(view)
-        }
-
-        return AnyView(
-            view
-                .panGesture(direction: .up) { translation, phase in
-                    handleUpGesture(translation: translation, phase: phase)
-                }
-        )
+                guard shouldApplyCloseGesture else { return }
+                handleUpGesture(translation: translation, phase: phase)
+            }
     }
 
     private var rootBodyView: some View {
@@ -2444,7 +2422,7 @@ struct ContentView: View {
     private func syncWhatsAppWindowSizeIfNeeded(forReplying overrideReplying: Bool? = nil, animated: Bool = false) {
         guard isWhatsAppExpansionVisible else { return }
         let replying = overrideReplying ?? coordinator.isWhatsAppReplying
-        let contentSize = WhatsAppNotificationLayout.totalSize(
+        let windowSize = WhatsAppNotificationLayout.windowSize(
             isReplying: replying,
             hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
             messages: currentWhatsAppMessages,
@@ -2452,10 +2430,7 @@ struct ContentView: View {
             closedNotchHeight: vm.closedNotchSize.height
         )
         let targetSize = addShadowPadding(
-            to: CGSize(
-                width: contentSize.width + (cornerRadiusInsets.closed.bottom * 2),
-                height: contentSize.height
-            ),
+            to: windowSize,
             isMinimalistic: Defaults[.enableMinimalisticUI]
         )
         if Defaults[.showOnAllDisplays] {

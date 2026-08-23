@@ -100,12 +100,6 @@ extension AppDelegate {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    override init() {
-        print("DEBUG: AppDelegate init started")
-        super.init()
-        print("DEBUG: AppDelegate init finished")
-    }
-
     var statusItem: NSStatusItem?
     var windows: [NSScreen: NSWindow] = [:]
     var viewModels: [NSScreen: DynamicIslandViewModel] = [:]
@@ -489,27 +483,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
            case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type {
             let screenName = screen?.localizedName ?? sizingViewModel.screen
             let isIslandMode = shouldUseDynamicIslandMode(for: screenName)
-            let contentSize = WhatsAppNotificationLayout.totalSize(
+            let targetSize = WhatsAppNotificationLayout.windowSize(
                 isReplying: coordinator.isWhatsAppReplying,
                 hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
                 messages: messages,
                 isDynamicIslandMode: isIslandMode,
                 closedNotchHeight: sizingViewModel.closedNotchSize.height
             )
-            let targetSize = CGSize(
-                width: contentSize.width + (cornerRadiusInsets.closed.bottom * 2),
-                height: contentSize.height
-            )
             return addShadowPadding(to: targetSize, isMinimalistic: Defaults[.enableMinimalisticUI])
         }
 
         // Check if inline sneak peek is showing and notch is closed
-        let airPodsListeningModeSneakActive = vm.notchState == .closed &&
+        let airPodsListeningModeSneakActive = sizingViewModel.notchState == .closed &&
                                       coordinator.sneakPeek.show &&
                                       coordinator.sneakPeek.type == .bluetoothAudio &&
                                       coordinator.sneakPeek.value < 0 &&
                                       AirPodsListeningMode.fromHUDSymbol(coordinator.sneakPeek.icon) != nil
-        let isInlineSneakPeekActive = vm.notchState == .closed && 
+        let isInlineSneakPeekActive = sizingViewModel.notchState == .closed &&
                                       Defaults[.enableSneakPeek] &&
                                       (
                                           coordinator.expandingView.show &&
@@ -523,26 +513,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Calculate required width for inline sneak peek:
             // Album art (~32) + Middle section (380) + Visualizer (~32) + horizontal padding (28) + clip shape margin (12)
             let inlineSneakPeekWidth: CGFloat = 460
-            return CGSize(width: inlineSneakPeekWidth, height: vm.effectiveClosedNotchHeight)
+            return CGSize(width: inlineSneakPeekWidth, height: sizingViewModel.effectiveClosedNotchHeight)
         }
 
-        if let recordingHUDSize = recordingHUDLayoutForSizing().size(
-            closedNotchSize: vm.closedNotchSize,
-            effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+        if let recordingHUDSize = recordingHUDLayoutForSizing(viewModel: sizingViewModel).size(
+            closedNotchSize: sizingViewModel.closedNotchSize,
+            effectiveClosedNotchHeight: sizingViewModel.effectiveClosedNotchHeight
         ) {
             return addShadowPadding(to: recordingHUDSize, isMinimalistic: Defaults[.enableMinimalisticUI])
         }
 
         // Check for battery HUD expansion
-        if vm.notchState == .closed && 
+        if sizingViewModel.notchState == .closed &&
            coordinator.expandingView.show && 
            coordinator.expandingView.type == .battery &&
            Defaults[.showPowerStatusNotifications] {
             
             let batteryModel = BatteryStatusViewModel.shared
             if let kind = batteryModel.activeTemporaryHUDKind {
-                let closedNotchHeight = vm.effectiveClosedNotchHeight
-                let closedNotchWidth = vm.closedNotchSize.width
+                let closedNotchHeight = sizingViewModel.effectiveClosedNotchHeight
+                let closedNotchWidth = sizingViewModel.closedNotchSize.width
                 
                 let style: BatteryNotificationStyle = {
                     switch kind {
@@ -571,7 +561,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Use minimalistic or normal size based on settings
-        var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
+        var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: sizingViewModel.screen)) : openNotchSize
         
         // Use a consistent height for different view types
         if coordinator.currentView == .timer {
@@ -583,7 +573,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Clipboard has its own fixed height source; don't inherit the notes layout state.
             baseSize.height = max(baseSize.height, NotesLayoutState.list.preferredHeight)
         } else if coordinator.currentView == .terminal {
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
+            let screenHeight = screen?.visibleFrame.height ?? NSScreen.main?.visibleFrame.height ?? 800
             let maxFraction = Defaults[.terminalMaxHeightFraction]
             baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
         } else if coordinator.currentView == .llmUsage {
@@ -603,14 +593,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return result
     }
 
-    private func recordingHUDLayoutForSizing() -> RecordingHUDLayout {
+    private func recordingHUDLayoutForSizing(viewModel: DynamicIslandViewModel) -> RecordingHUDLayout {
         makeRecordingHUDLayout(
-            notchState: vm.notchState,
+            notchState: viewModel.notchState,
             screenRecordingDetectionEnabled: Defaults[.enableScreenRecordingDetection],
             showRecordingIndicator: Defaults[.showRecordingIndicator],
-            hideOnClosed: vm.hideOnClosed,
+            hideOnClosed: viewModel.hideOnClosed,
             isRecording: ScreenRecordingManager.shared.isRecording,
-            closedMusicPairingEligible: closedMusicPairingEligibleForSizing(),
+            closedMusicPairingEligible: closedMusicPairingEligibleForSizing(viewModel: viewModel),
             recordingControlMode: Defaults[.recordingControlMode],
             canStopFromHUD: ScreenRecordingManager.shared.shouldShowStopControlsInHUD,
             enableMinimalisticUI: Defaults[.enableMinimalisticUI],
@@ -620,18 +610,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    private func closedMusicPairingEligibleForSizing() -> Bool {
+    private func closedMusicPairingEligibleForSizing(viewModel: DynamicIslandViewModel) -> Bool {
         let musicManager = MusicManager.shared
         let hasMusicMetadata = !musicManager.songTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !musicManager.artistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasActiveMusicSnapshot = musicManager.isPlaying || (!musicManager.isPlayerIdle && hasMusicMetadata)
 
         return isClosedMusicPairingEligible(
-            notchState: vm.notchState,
+            notchState: viewModel.notchState,
             hasActiveMusicSnapshot: hasActiveMusicSnapshot,
             musicLiveActivityEnabled: coordinator.musicLiveActivityEnabled,
             closedMusicContentEnabled: Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls],
-            hideOnClosed: vm.hideOnClosed,
+            hideOnClosed: viewModel.hideOnClosed,
             isLocked: LockScreenManager.shared.isLocked,
             isDeferredAfterUnlock: LockScreenManager.shared.shouldDelayPostUnlockMusicHUD
         )
@@ -650,12 +640,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func ensureWindowSize(_ size: CGSize, animated: Bool, force: Bool = false) {
-        if vm.notchState == .closed,
-           coordinator.expandingView.show,
-           case .whatsApp = coordinator.expandingView.type {
-            resizeWindowsToCurrentRequiredSize(animated: animated, force: force)
-            return
-        }
         resizeWindows(to: size, animated: animated, force: force)
     }
 
@@ -725,7 +709,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if window.frame != topAlignedStartFrame {
                 window.setFrame(topAlignedStartFrame, display: true)
             }
-            window.setFrame(targetFrame, display: true, animate: true)
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.22
+                context.allowsImplicitAnimation = true
+                window.animator().setFrame(targetFrame, display: true)
+            }
         } else {
             window.setFrame(targetFrame, display: true)
         }
@@ -743,7 +731,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("DEBUG: applicationDidFinishLaunching started")
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]
@@ -758,8 +745,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         LockScreenManager.shared.configure(viewModel: vm)
         extensionXPCServiceHost.start()
         extensionRPCServer.start()
-        print("DEBUG: Instantiating WhatsAppManager...")
-        print("DEBUG: WhatsAppManager auth state is \(WhatsAppManager.shared.authState)")
         
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()

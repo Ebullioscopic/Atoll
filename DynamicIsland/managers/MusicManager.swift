@@ -506,7 +506,6 @@ class MusicManager: ObservableObject {
     private var controllerCancellables = Set<AnyCancellable>()
     private var debounceIdleTask: Task<Void, Never>?
     private var optimisticPlayStateTimeoutTask: Task<Void, Never>?
-    private var skipMetadataRefreshTask: Task<Void, Never>?
     @MainActor private var optimisticPlaybackTransition = OptimisticPlaybackTransition()
 
     // Helper to check if macOS has removed support for NowPlayingController
@@ -1448,9 +1447,6 @@ class MusicManager: ObservableObject {
                 beginManualTrackArtworkHandoff()
             }
             await controller.nextTrack()
-            await MainActor.run {
-                schedulePostSkipMetadataRefresh(using: controller)
-            }
         }
     }
 
@@ -1461,25 +1457,6 @@ class MusicManager: ObservableObject {
                 beginManualTrackArtworkHandoff()
             }
             await controller.previousTrack()
-            await MainActor.run {
-                schedulePostSkipMetadataRefresh(using: controller)
-            }
-        }
-    }
-
-    @MainActor
-    private func schedulePostSkipMetadataRefresh(using controller: any MediaControllerProtocol) {
-        skipMetadataRefreshTask?.cancel()
-        skipMetadataRefreshTask = Task {
-            for delay in [0.25, 0.75, 1.35] {
-                do {
-                    try await Task.sleep(for: .seconds(delay))
-                } catch {
-                    return
-                }
-                guard !Task.isCancelled else { return }
-                await controller.updatePlaybackInfo()
-            }
         }
     }
 
