@@ -442,6 +442,11 @@ class StatsManager: ObservableObject {
     // Network monitoring state
     private var previousNetworkStats: (bytesIn: UInt64, bytesOut: UInt64) = (0, 0)
     private var previousTimestamp: Date = Date()
+    /// Advanced only when `getifaddrs` succeeded. Sharing `previousTimestamp` with
+    /// disk meant a failed snapshot still moved the clock forward, so the next
+    /// successful sample divided two intervals of traffic by one interval and
+    /// reported roughly double the real speed.
+    private var previousNetworkTimestamp: Date = Date()
     
     // Disk monitoring state  
     private var previousDiskStats: (bytesRead: UInt64, bytesWritten: UInt64) = (0, 0)
@@ -483,7 +488,8 @@ class StatsManager: ObservableObject {
         let initialStats = snapshotNetworkInterfaces().map { aggregateNetworkStats(from: $0) } ?? (0, 0)
         previousNetworkStats = initialStats
         previousTimestamp = Date()
-        
+        previousNetworkTimestamp = previousTimestamp
+
         // Initialize baseline disk stats
         let initialDiskStats = getDiskStats()
         previousDiskStats = initialDiskStats
@@ -563,9 +569,10 @@ class StatsManager: ObservableObject {
         
         let initialDiskStats = getDiskStats()
         previousDiskStats = initialDiskStats
-        
+
         previousTimestamp = Date()
-        
+        previousNetworkTimestamp = previousTimestamp
+
         isMonitoring = true
         lastUpdated = Date()
         networkTotals = .zero
@@ -685,21 +692,24 @@ class StatsManager: ObservableObject {
             ?? previousNetworkStats
         let currentTime = Date()
         let timeInterval = currentTime.timeIntervalSince(previousTimestamp)
-        
+        // Nil snapshot: the byte counters did not advance either, so keep measuring
+        // from the last successful sample rather than from this tick.
+        let networkInterval = currentTime.timeIntervalSince(previousNetworkTimestamp)
+
         var downloadSpeed: Double = 0.0
         var uploadSpeed: Double = 0.0
         var bytesDownloaded: UInt64 = 0
         var bytesUploaded: UInt64 = 0
-        
+
         // Only calculate speeds if we have a reasonable time interval and this isn't the first run
-        if timeInterval > 0.1 && (previousNetworkStats.bytesIn > 0 || previousNetworkStats.bytesOut > 0) {
-            bytesDownloaded = currentNetworkStats.bytesIn > previousNetworkStats.bytesIn ? 
+        if networkInterval > 0.1 && (previousNetworkStats.bytesIn > 0 || previousNetworkStats.bytesOut > 0) {
+            bytesDownloaded = currentNetworkStats.bytesIn > previousNetworkStats.bytesIn ?
                                 currentNetworkStats.bytesIn - previousNetworkStats.bytesIn : 0
-            bytesUploaded = currentNetworkStats.bytesOut > previousNetworkStats.bytesOut ? 
+            bytesUploaded = currentNetworkStats.bytesOut > previousNetworkStats.bytesOut ?
                                currentNetworkStats.bytesOut - previousNetworkStats.bytesOut : 0
-            
-            downloadSpeed = Double(bytesDownloaded) / timeInterval / 1_048_576 // Convert to MB/s
-            uploadSpeed = Double(bytesUploaded) / timeInterval / 1_048_576 // Convert to MB/s
+
+            downloadSpeed = Double(bytesDownloaded) / networkInterval / 1_048_576 // Convert to MB/s
+            uploadSpeed = Double(bytesUploaded) / networkInterval / 1_048_576 // Convert to MB/s
         }
         
         // Calculate disk speeds
@@ -780,7 +790,8 @@ class StatsManager: ObservableObject {
         previousNetworkStats = currentNetworkStats
         previousDiskStats = currentDiskStats
         previousTimestamp = currentTime
-        networkInterfaces = collectNetworkInterfaces(from: networkSnapshots, deltaTime: timeInterval)
+        if networkSnapshots != nil { previousNetworkTimestamp = currentTime }
+        networkInterfaces = collectNetworkInterfaces(from: networkSnapshots, deltaTime: networkInterval)
         diskDevices = collectDiskDevices()
         // Periodic path: honor the throttle so /bin/ps runs at the intended 0.5Hz, not ~1Hz.
         // force: true is reserved for explicit user-triggered manual refreshes.
