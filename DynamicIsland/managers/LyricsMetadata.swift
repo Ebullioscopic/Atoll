@@ -100,7 +100,56 @@ enum LyricsSearchResults {
     /// closest thing lrclib had. Both fields have to land: agreeing on the
     /// title alone is how covers, remixes and karaoke tracks get through.
     static func agreesOnTitleAndArtist(_ result: [String: Any], artist: String, title: String) -> Bool {
-        overlaps(field(result, "trackName"), title) && overlaps(field(result, "artistName"), artist)
+        let resultTitle = field(result, "trackName")
+
+        guard overlaps(resultTitle, title),
+              overlaps(field(result, "artistName"), artist),
+              !carriesUnrequestedVersion(resultTitle, requested: title)
+        else { return false }
+
+        return true
+    }
+
+    /// Re-recordings whose words are the requested song's but whose *timings*
+    /// are not.
+    ///
+    /// Containment is deliberately loose, so "Crimewave (Sped Up)" agrees with a
+    /// request for "Crimewave". Usually harmless -- an exact title outscores a
+    /// suffixed one, so the plain row wins when it exists -- but when the
+    /// variant is all lrclib has, every line lands at the wrong moment. Better
+    /// no lyrics than lyrics that drift.
+    ///
+    /// Only markers absent from the request count, so playing the sped-up
+    /// version still finds the sped-up lyrics.
+    private static func carriesUnrequestedVersion(_ resultTitle: String, requested: String) -> Bool {
+        versionMarkers.contains { marker in
+            containsWord(resultTitle, marker) && !containsWord(requested, marker)
+        }
+    }
+
+    /// Deliberately excludes remaster, live, mono and stereo: the request title
+    /// has those stripped before it ever gets here, so treating them as markers
+    /// would reject the very rows they were stripped to find.
+    private static let versionMarkers: [String] = [
+        "karaoke",
+        "instrumental",
+        "sped up",
+        "spedup",
+        "slowed",
+        "nightcore",
+        "remix",
+        "cover",
+        "tribute",
+        "acapella",
+        "a cappella",
+        "made popular by",
+        "originally performed by"
+    ]
+
+    /// Whole-word matching, so "undercover" is not a cover and "remixed" still
+    /// is.
+    private static func containsWord(_ haystack: String, _ needle: String) -> Bool {
+        haystack.range(of: "\\b" + NSRegularExpression.escapedPattern(for: needle), options: [.regularExpression]) != nil
     }
 
     static func score(for result: [String: Any], artist: String, title: String, album: String) -> Int {

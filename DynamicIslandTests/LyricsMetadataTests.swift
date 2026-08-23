@@ -177,6 +177,83 @@ final class LyricsSearchResultsTests: XCTestCase {
         )
     }
 
+    // MARK: - Version variants
+
+    /// The words are right but the timings are not, so these drift.
+    func testUnrequestedVersionVariantsAreRefused() {
+        for variant in [
+            "Crimewave (Karaoke Version)",
+            "Crimewave (Sped Up)",
+            "Crimewave - Nightcore",
+            "Crimewave (Slowed + Reverb)",
+            "Crimewave (Instrumental)",
+            "Crimewave (Bloody Beetroots Remix)",
+            "Crimewave (Acapella)"
+        ] {
+            XCTAssertNil(
+                LyricsSearchResults.bestMatch(
+                    in: [result(title: variant, artist: "Crystal Castles")],
+                    artist: "Crystal Castles",
+                    title: "Crimewave",
+                    album: ""
+                ),
+                "\(variant) has different timings than the requested track"
+            )
+        }
+    }
+
+    /// Playing the sped-up version should still find the sped-up lyrics.
+    func testARequestedVariantStillMatches() {
+        let results = [result(title: "Crimewave (Sped Up)", artist: "Crystal Castles")]
+
+        XCTAssertNotNil(
+            LyricsSearchResults.bestMatch(in: results, artist: "Crystal Castles", title: "Crimewave (Sped Up)", album: "")
+        )
+    }
+
+    /// The request has remaster, live, mono and stereo stripped before it gets
+    /// here, so those must not be treated as markers.
+    func testStrippedSuffixesAreNotTreatedAsVariants() {
+        for suffix in ["Crimewave (Remastered)", "Crimewave (Live)", "Crimewave (Mono)", "Crimewave - 2011 Remaster"] {
+            XCTAssertNotNil(
+                LyricsSearchResults.bestMatch(
+                    in: [result(title: suffix, artist: "Crystal Castles")],
+                    artist: "Crystal Castles",
+                    title: "Crimewave",
+                    album: ""
+                ),
+                "\(suffix) is what the request was stripped to find"
+            )
+        }
+    }
+
+    /// Whole-word matching, so a real title is not caught by a substring.
+    func testTitlesContainingMarkerSubstringsSurvive() {
+        for title in ["Undercover Martyn", "Coverdale Blues", "Live and Let Die"] {
+            XCTAssertNotNil(
+                LyricsSearchResults.bestMatch(
+                    in: [result(title: title, artist: "Some Artist")],
+                    artist: "Some Artist",
+                    title: title,
+                    album: ""
+                ),
+                "\(title) is a real title"
+            )
+        }
+    }
+
+    /// The plain row still wins when both exist -- the variant guard is only
+    /// load-bearing when the variant is all there is.
+    func testThePlainRowIsPreferredOverAVariant() {
+        let results = [
+            result(title: "Crimewave (Sped Up)", artist: "Crystal Castles"),
+            result(title: "Crimewave", artist: "Crystal Castles")
+        ]
+
+        let match = LyricsSearchResults.bestMatch(in: results, artist: "Crystal Castles", title: "Crimewave", album: "")
+        XCTAssertEqual(match?["trackName"] as? String, "Crimewave")
+    }
+
     func testEmptyResultsYieldNoMatch() {
         XCTAssertNil(
             LyricsSearchResults.bestMatch(in: [], artist: "Crystal Castles", title: "Crimewave", album: "")
