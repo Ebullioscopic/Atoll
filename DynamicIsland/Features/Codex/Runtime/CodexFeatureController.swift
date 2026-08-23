@@ -123,12 +123,14 @@ final class CodexFeatureController: ObservableObject {
             let completionSessionIDs = Defaults[.codexCompletionNotifications]
                 ? effects.compactMap { effect -> String? in
                     guard case .showCompletion(let sessionID) = effect else { return nil }
+                    guard !activityTrayPreferences.ignoredSessionIDs.contains(sessionID) else { return nil }
                     return sessionID
                 }
                 : []
             presentationCoordinator.update(
                 snapshot: presentationSnapshot(),
-                completionSessionIDs: completionSessionIDs
+                completionSessionIDs: completionSessionIDs,
+                ignoredSessionIDs: activityTrayPreferences.ignoredSessionIDs
             )
             lastError = nil
         } catch {
@@ -141,7 +143,10 @@ final class CodexFeatureController: ObservableObject {
             presentationCoordinator.dismiss()
             return
         }
-        presentationCoordinator.update(snapshot: presentationSnapshot())
+        presentationCoordinator.update(
+            snapshot: presentationSnapshot(),
+            ignoredSessionIDs: activityTrayPreferences.ignoredSessionIDs
+        )
     }
 
     func acknowledgeCompletions() {
@@ -152,17 +157,54 @@ final class CodexFeatureController: ObservableObject {
         do {
             try repository.save(store.snapshot)
             snapshot = store.snapshot
-            presentationCoordinator.update(snapshot: presentationSnapshot())
+            presentationCoordinator.update(
+                snapshot: presentationSnapshot(),
+                ignoredSessionIDs: activityTrayPreferences.ignoredSessionIDs
+            )
             lastError = nil
         } catch {
             lastError = "清除 Codex 已完成计数失败：\(error.localizedDescription)"
         }
     }
 
+    func acknowledgeCompletion(sessionID: String) {
+        guard Defaults[.enableCodexIntegration] else { return }
+        let effects = store.acknowledgeCompletion(sessionID: sessionID)
+        guard !effects.isEmpty else { return }
+
+        do {
+            try repository.save(store.snapshot)
+            snapshot = store.snapshot
+            presentationCoordinator.update(
+                snapshot: presentationSnapshot(),
+                ignoredSessionIDs: activityTrayPreferences.ignoredSessionIDs
+            )
+            lastError = nil
+        } catch {
+            lastError = "更新 Codex 完成状态失败：\(error.localizedDescription)"
+        }
+    }
+
     func openCodexConversation(sessionID: String) {
-        guard let url = CodexAppLink.url(forSessionID: sessionID), NSWorkspace.shared.open(url) else {
+        guard let url = CodexAppLink.url(forSessionID: sessionID) else {
             lastError = "无法打开 Codex 对话"
             return
+        }
+
+        let workspace = NSWorkspace.shared
+        guard let appURL = workspace.urlForApplication(toOpen: url) else {
+            lastError = "找不到可打开 Codex 对话的应用"
+            return
+        }
+
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        workspace.open([url], withApplicationAt: appURL, configuration: configuration) { [weak self] _, error in
+            guard let error else { return }
+            let errorMessage = error.localizedDescription
+            Task { @MainActor [weak self] in
+                self?.lastError = "无法打开 Codex 对话：\(errorMessage)"
+            }
         }
         lastError = nil
     }
@@ -170,6 +212,47 @@ final class CodexFeatureController: ObservableObject {
     func openDataDirectory() {
         try? paths.prepareDirectories()
         NSWorkspace.shared.activateFileViewerSelecting([paths.root])
+    }
+
+    var activityTrayPreferences: CodexActivityTrayPreferences {
+        CodexActivityTrayPreferences(
+            pinnedProjectNames: Set(Defaults[.codexPinnedProjectNames]),
+            collapsedProjectNames: Set(Defaults[.codexCollapsedProjectNames]),
+            ignoredSessionIDs: Set(Defaults[.codexIgnoredSessionIDs])
+        )
+    }
+
+    func setProjectPinned(_ projectName: String, pinned: Bool) {
+        var names = Set(Defaults[.codexPinnedProjectNames])
+        if pinned {
+            names.insert(projectName)
+        } else {
+            names.remove(projectName)
+        }
+        Defaults[.codexPinnedProjectNames] = names.sorted()
+        refreshPresentation()
+    }
+
+    func setProjectCollapsed(_ projectName: String, collapsed: Bool) {
+        var names = Set(Defaults[.codexCollapsedProjectNames])
+        if collapsed {
+            names.insert(projectName)
+        } else {
+            names.remove(projectName)
+        }
+        Defaults[.codexCollapsedProjectNames] = names.sorted()
+        refreshPresentation()
+    }
+
+    func setSessionIgnored(_ sessionID: String, ignored: Bool) {
+        var sessionIDs = Set(Defaults[.codexIgnoredSessionIDs])
+        if ignored {
+            sessionIDs.insert(sessionID)
+        } else {
+            sessionIDs.remove(sessionID)
+        }
+        Defaults[.codexIgnoredSessionIDs] = sessionIDs.sorted()
+        refreshPresentation()
     }
 
     private func enableRuntime(installIfAvailable: Bool) {

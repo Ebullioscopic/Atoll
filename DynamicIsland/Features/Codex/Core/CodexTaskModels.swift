@@ -26,8 +26,8 @@ public struct AppPreferences: Codable, Equatable, Sendable {
     public init(
         previewMode: PreviewMode = .projectAndPreview,
         staleTimeout: TimeInterval = 45 * 60,
-        recentRetention: TimeInterval = 10 * 60,
-        maxRecentCompletions: Int = 20,
+        recentRetention: TimeInterval = 7 * 24 * 60 * 60,
+        maxRecentCompletions: Int = 100,
         completionSneakPeekEnabled: Bool = true,
         approvalReminderEnabled: Bool = true
     ) {

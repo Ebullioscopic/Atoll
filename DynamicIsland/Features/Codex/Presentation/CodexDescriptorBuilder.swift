@@ -55,17 +55,23 @@ public struct CodexPresentationBuilder: Sendable {
 
   public func build(
     from snapshot: CodexTaskStoreSnapshot,
-    context: CodexPresentationContext = .steady
+    context: CodexPresentationContext = .steady,
+    ignoredSessionIDs: Set<String> = []
   ) -> CodexPresentation {
     let active = snapshot.tasks.filter {
-      $0.status == .running || $0.status == .waitingForApproval
+      !ignoredSessionIDs.contains($0.sessionID)
+        && ($0.status == .running || $0.status == .waitingForApproval)
     }
     let waiting = active.filter { $0.status == .waitingForApproval }
     let running = active.filter { $0.status == .running }
-    let recent = snapshot.recentCompletions.sorted { $0.completedAt > $1.completedAt }
-    let unacknowledged = snapshot.unacknowledgedCompletions.sorted {
+    let recent = snapshot.recentCompletions
+      .filter { !ignoredSessionIDs.contains($0.sessionID) }
+      .sorted { $0.completedAt > $1.completedAt }
+    let unacknowledged = snapshot.unacknowledgedCompletions
+      .filter { !ignoredSessionIDs.contains($0.sessionID) }
+      .sorted {
       $0.completedAt > $1.completedAt
-    }
+      }
     let compactStatus = CodexCompactStatus(
       lines: compactStatusLines(
         waiting: waiting,
@@ -104,7 +110,8 @@ public struct CodexPresentationBuilder: Sendable {
         sneakTitle: pulseCompletion?.projectName ?? first?.projectName,
         sneakSubtitle: pulseCompletion?.resultPreview ?? first?.approvalPreview ?? "需要用户批准",
         metadata: statusMetadata,
-        triggersSneakPeekOnUpdate: context != .steady
+        triggersSneakPeekOnUpdate: context != .steady,
+        context: context
       )
     case (true, false, _):
       let isCompletionPulse = context != .steady
@@ -121,7 +128,8 @@ public struct CodexPresentationBuilder: Sendable {
         sneakTitle: pulseCompletion?.projectName ?? running.first?.projectName,
         sneakSubtitle: pulseCompletion?.resultPreview ?? running.first?.promptPreview,
         metadata: statusMetadata,
-        triggersSneakPeekOnUpdate: isCompletionPulse
+        triggersSneakPeekOnUpdate: isCompletionPulse,
+        context: context
       )
     case (true, true, let completion?):
       live = makeLive(
@@ -133,7 +141,8 @@ public struct CodexPresentationBuilder: Sendable {
         sneakTitle: pulseCompletion?.projectName ?? completion.projectName,
         sneakSubtitle: pulseCompletion?.resultPreview ?? completion.resultPreview,
         metadata: statusMetadata,
-        triggersSneakPeekOnUpdate: context != .steady
+        triggersSneakPeekOnUpdate: context != .steady,
+        context: context
       )
     default:
       live = nil
@@ -177,7 +186,8 @@ public struct CodexPresentationBuilder: Sendable {
     sneakTitle: String?,
     sneakSubtitle: String?,
     metadata: [String: String],
-    triggersSneakPeekOnUpdate: Bool
+    triggersSneakPeekOnUpdate: Bool,
+    context: CodexPresentationContext
   ) -> AtollLiveActivityDescriptor {
     var liveMetadata = metadata
     liveMetadata[CodexPresentationConstants.targetExperienceMetadataKey] = CodexPresentationConstants.experienceID
@@ -194,7 +204,10 @@ public struct CodexPresentationBuilder: Sendable {
       centerTextStyle: .inheritUser,
       sneakPeekConfig: AtollSneakPeekConfig(
         enabled: true,
-        duration: 3.5,
+        duration: context == .steady
+          ? CodexPresentationConstants.runningSneakPeekDuration
+          : CodexPresentationConstants.completionPulseDuration,
+        style: .standard,
         showOnUpdate: triggersSneakPeekOnUpdate
       ),
       sneakPeekTitle: sneakTitle ?? title,

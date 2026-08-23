@@ -51,7 +51,9 @@ struct ExtensionLiveActivityStandaloneView: View {
                 accent: accentColor,
                 frameWidth: layout.leadingWidth,
                 frameHeight: contentHeight,
-                defaultIcon: descriptor.leadingIcon
+                defaultIcon: descriptor.leadingIcon,
+                bundleIdentifier: payload.bundleIdentifier,
+                metadata: descriptor.metadata
             )
             .frame(width: layout.leadingWidth, height: contentHeight)
 
@@ -164,35 +166,48 @@ struct ExtensionLeadingContentView: View {
     let frameWidth: CGFloat
     let frameHeight: CGFloat
     let defaultIcon: AtollIconDescriptor
+    let bundleIdentifier: String
+    let metadata: [String: String]
+
+    private var showsCodexBusyIcon: Bool {
+        CodexPresentationConstants.shouldAnimateBusyIcon(
+            bundleIdentifier: bundleIdentifier,
+            metadata: metadata
+        )
+    }
 
     var body: some View {
         Group {
-            switch content {
-            case let .icon(iconDescriptor):
-                ExtensionCompositeIconView(
-                    leading: iconDescriptor,
-                    badge: badge,
-                    accent: accent,
-                    size: frameHeight
-                )
-            case let .animation(data, size):
-                let resolvedSize = CGSize(
-                    width: min(size.width, frameHeight),
-                    height: min(size.height, frameHeight)
-                )
-                ExtensionLottieView(data: data, size: resolvedSize)
-                    .frame(width: frameHeight, height: frameHeight)
-                    .background(
-                        RoundedRectangle(cornerRadius: frameHeight * 0.18, style: .continuous)
-                            .fill(Color.white.opacity(0.08))
+            if showsCodexBusyIcon {
+                CodexBusyIconView(accent: accent, size: frameHeight)
+            } else {
+                switch content {
+                case let .icon(iconDescriptor):
+                    ExtensionCompositeIconView(
+                        leading: iconDescriptor,
+                        badge: badge,
+                        accent: accent,
+                        size: frameHeight
                     )
-            default:
-                ExtensionCompositeIconView(
-                    leading: defaultIcon,
-                    badge: badge,
-                    accent: accent,
-                    size: frameHeight
-                )
+                case let .animation(data, size):
+                    let resolvedSize = CGSize(
+                        width: min(size.width, frameHeight),
+                        height: min(size.height, frameHeight)
+                    )
+                    ExtensionLottieView(data: data, size: resolvedSize)
+                        .frame(width: frameHeight, height: frameHeight)
+                        .background(
+                            RoundedRectangle(cornerRadius: frameHeight * 0.18, style: .continuous)
+                                .fill(Color.white.opacity(0.08))
+                        )
+                default:
+                    ExtensionCompositeIconView(
+                        leading: defaultIcon,
+                        badge: badge,
+                        accent: accent,
+                        size: frameHeight
+                    )
+                }
             }
         }
         .frame(width: frameWidth, height: frameHeight)
@@ -221,7 +236,9 @@ struct ExtensionNotchExperienceTabView: View {
 
     var body: some View {
         Group {
-            if let tabConfiguration {
+            if CodexPresentationConstants.isBuiltInCodex(bundleIdentifier: payload.bundleIdentifier) {
+                CodexActivityTrayView(onOpenURL: onOpenURL)
+            } else if let tabConfiguration {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 18) {
                         header(for: tabConfiguration)

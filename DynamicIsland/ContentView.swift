@@ -1067,22 +1067,32 @@ struct ContentView: View {
                                   let accent = (descriptor?.accentColor.swiftUIColor ?? coordinator.sneakPeek.accentColor ?? .gray)
                                       .ensureMinimumBrightness(factor: 0.7)
                                   GeometryReader { geo in
-                                      HStack(spacing: 6) {
-                                          RoundedRectangle(cornerRadius: 2)
-                                              .fill(accent)
-                                              .frame(width: 8, height: 12)
-                                          MarqueeText(
-                                              .constant(
-                                                  extensionSneakPeekText(
-                                                      preferredTitle: coordinator.sneakPeek.title,
-                                                      preferredSubtitle: coordinator.sneakPeek.subtitle,
-                                                      descriptor: descriptor
-                                                  )
-                                              ),
-                                              textColor: accent,
-                                              minDuration: 1,
-                                              frameWidth: max(0, geo.size.width - 14)
+                                      if isBuiltInCodex {
+                                          CodexSneakPeekView(
+                                              title: coordinator.sneakPeek.title,
+                                              isCompletionPulse: descriptor?.metadata["codex_presentation_phase"] == "completion-pulse",
+                                              isWaitingForApproval: (Int(descriptor?.metadata["codex_waiting_count"] ?? "0") ?? 0) > 0,
+                                              accent: accent,
+                                              availableWidth: max(0, geo.size.width)
                                           )
+                                      } else {
+                                          HStack(spacing: 6) {
+                                              RoundedRectangle(cornerRadius: 2)
+                                                  .fill(accent)
+                                                  .frame(width: 8, height: 12)
+                                              MarqueeText(
+                                                  .constant(
+                                                      extensionSneakPeekText(
+                                                          preferredTitle: coordinator.sneakPeek.title,
+                                                          preferredSubtitle: coordinator.sneakPeek.subtitle,
+                                                          descriptor: descriptor
+                                                      )
+                                                  ),
+                                                  textColor: accent,
+                                                  minDuration: 1,
+                                                  frameWidth: max(0, geo.size.width - 14)
+                                              )
+                                          }
                                       }
                                   }
                                   .padding(.bottom, 10)
@@ -1125,11 +1135,6 @@ struct ContentView: View {
                                         payload: payload,
                                         onOpenURL: { vm.close() }
                                     )
-                                    .onAppear {
-                                        acknowledgeCodexCompletionsIfNeeded(
-                                            bundleIdentifier: payload.bundleIdentifier
-                                        )
-                                    }
                                 } else {
                                     NotchHomeView(albumArtNamespace: albumArtNamespace)
                                 }
@@ -1951,10 +1956,6 @@ struct ContentView: View {
             coordinator.currentView = .extensionExperience
         }
 
-        acknowledgeCodexCompletionsIfNeeded(
-            bundleIdentifier: resolvedLiveActivity?.bundleIdentifier
-        )
-
         withAnimation(.bouncy.speed(1.2)) {
             vm.open()
         }
@@ -1971,16 +1972,6 @@ struct ContentView: View {
             bundleIdentifier: bundleIdentifier,
             activityID: activityID
         )
-    }
-
-    private func acknowledgeCodexCompletionsIfNeeded(bundleIdentifier: String?) {
-        guard let bundleIdentifier,
-              CodexPresentationConstants.isBuiltInCodex(
-                  bundleIdentifier: bundleIdentifier
-              ) else {
-            return
-        }
-        CodexFeatureController.shared.acknowledgeCompletions()
     }
 
     private func shouldShowClosedMusicWaveformPlayPauseOverlay(for secondary: MusicSecondaryLiveActivity?) -> Bool {

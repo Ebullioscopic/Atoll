@@ -8,6 +8,8 @@ public enum CodexPresentationConstants {
     public static let visibleConversationLimit = 6
     public static let targetExperienceMetadataKey = "atoll.targetNotchExperienceID"
     public static let openCodexThreadMetadataPrefix = "atoll.openCodexThread."
+    public static let runningSneakPeekDuration: TimeInterval = 3.5
+    public static let completionPulseDuration: TimeInterval = 3.5
     public nonisolated static let defaultBundleIdentifier = "com.Ebullioscopic.Atoll.builtin.codex"
     public nonisolated static let legacyExternalBundleIdentifiers = [
         "com.codexatoll.app",
@@ -20,5 +22,13 @@ public enum CodexPresentationConstants {
 
     public nonisolated static func isLegacyExternalCodex(bundleIdentifier: String) -> Bool {
         legacyExternalBundleIdentifiers.contains(bundleIdentifier)
+    }
+
+    public nonisolated static func shouldAnimateBusyIcon(
+        bundleIdentifier: String,
+        metadata: [String: String]
+    ) -> Bool {
+        guard isBuiltInCodex(bundleIdentifier: bundleIdentifier) else { return false }
+        return (Int(metadata["codex_running_count"] ?? "0") ?? 0) > 0
     }
 }

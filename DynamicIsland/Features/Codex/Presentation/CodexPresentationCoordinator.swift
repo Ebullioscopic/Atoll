@@ -7,9 +7,10 @@ final class CodexPresentationCoordinator {
     private let liveActivityManager: ExtensionLiveActivityManager
     private let notchExperienceManager: ExtensionNotchExperienceManager
     private var latestSnapshot: CodexTaskStoreSnapshot = .empty
+    private var latestIgnoredSessionIDs: Set<String> = []
     private var pulseGeneration = 0
     private var restoreTask: Task<Void, Never>?
-    private let completionPulseDuration: TimeInterval = 3.5
+    private let completionPulseDuration = CodexPresentationConstants.completionPulseDuration
 
     init(
         builder: CodexPresentationBuilder = CodexPresentationBuilder(),
@@ -23,9 +24,11 @@ final class CodexPresentationCoordinator {
 
     func update(
         snapshot: CodexTaskStoreSnapshot,
-        completionSessionIDs: [String] = []
+        completionSessionIDs: [String] = [],
+        ignoredSessionIDs: Set<String> = []
     ) {
         latestSnapshot = snapshot
+        latestIgnoredSessionIDs = ignoredSessionIDs
         if let sessionID = completionSessionIDs.last {
             pulseGeneration += 1
             let generation = pulseGeneration
@@ -34,11 +37,16 @@ final class CodexPresentationCoordinator {
                 context: .completionPulse(
                     sessionID: sessionID,
                     completedCount: completionSessionIDs.count
-                )
+                ),
+                ignoredSessionIDs: ignoredSessionIDs
             )
             scheduleSteadyRestore(generation: generation)
         } else {
-            apply(snapshot: snapshot, context: .steady)
+            apply(
+                snapshot: snapshot,
+                context: .steady,
+                ignoredSessionIDs: ignoredSessionIDs
+            )
         }
     }
 
@@ -57,9 +65,14 @@ final class CodexPresentationCoordinator {
 
     private func apply(
         snapshot: CodexTaskStoreSnapshot,
-        context: CodexPresentationContext
+        context: CodexPresentationContext,
+        ignoredSessionIDs: Set<String>? = nil
     ) {
-        let presentation = builder.build(from: snapshot, context: context)
+        let presentation = builder.build(
+            from: snapshot,
+            context: context,
+            ignoredSessionIDs: ignoredSessionIDs ?? latestIgnoredSessionIDs
+        )
 
         if Defaults[.codexShowClosedStatus], let live = presentation.liveActivity {
             try? liveActivityManager.presentBuiltIn(
@@ -90,7 +103,12 @@ final class CodexPresentationCoordinator {
         restoreTask?.cancel()
         restoreTask = Task { [weak self] in
             do {
-                try await Task.sleep(for: .seconds(self?.completionPulseDuration ?? 3.5))
+                try await Task.sleep(
+                    for: .seconds(
+                        self?.completionPulseDuration
+                            ?? CodexPresentationConstants.completionPulseDuration
+                    )
+                )
             } catch {
                 return
             }

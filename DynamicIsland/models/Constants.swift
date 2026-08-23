@@ -1175,6 +1175,9 @@ extension Defaults.Keys {
     static let codexCompletionNotifications = Key<Bool>("codexCompletionNotifications", default: true)
     static let codexShowContentPreviews = Key<Bool>("codexShowContentPreviews", default: true)
     static let codexShowInFullscreen = Key<Bool>("codexShowInFullscreen", default: true)
+    static let codexPinnedProjectNames = Key<[String]>("codexPinnedProjectNames", default: [])
+    static let codexCollapsedProjectNames = Key<[String]>("codexCollapsedProjectNames", default: [])
+    static let codexIgnoredSessionIDs = Key<[String]>("codexIgnoredSessionIDs", default: [])
 
     // MARK: Third-Party Extensions
     static let enableThirdPartyExtensions = Key<Bool>("enableThirdPartyExtensions", default: true)

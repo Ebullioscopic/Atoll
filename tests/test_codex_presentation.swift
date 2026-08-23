@@ -159,6 +159,21 @@ struct CodexPresentationTests {
                 ]
             )
         )
+        let completedPriorityWithRunning = CodexPresentationBuilder().build(
+            from: CodexTaskStoreSnapshot(
+                savedAt: now,
+                tasks: [runningTasks[0]],
+                recentCompletions: (1...3).map { index in
+                    CodexCompletionRecord(
+                        sessionID: "completed-priority-\(index)",
+                        projectName: "Atoll-CodexAtoll",
+                        promptPreview: "已完成任务 \(index)",
+                        resultPreview: "完成结果 \(index)",
+                        completedAt: now.addingTimeInterval(TimeInterval(-index))
+                    )
+                }
+            )
+        )
         let runningOnlyStatus = CodexPresentationBuilder().build(
             from: CodexTaskStoreSnapshot(savedAt: now, tasks: runningTasks)
         )
@@ -168,6 +183,11 @@ struct CodexPresentationTests {
               ) else {
             throw TestFailure(message: "running tasks expose a compact closed status")
         }
+        try expect(
+            runningOnlyLiveActivity.sneakPeekConfig?.duration == 3.5
+                && runningOnlyLiveActivity.sneakPeekConfig?.style == .standard,
+            "new running activity keeps the standard 3.5 second presentation window"
+        )
         try expect(
             runningOnlyCompactStatus.lines.map(\.displayText) == ["2 · 进行中"],
             "default closed status contains only the running count"
@@ -217,6 +237,46 @@ struct CodexPresentationTests {
             mixedLiveActivity.metadata["codex_compact_line_0_label"] == "1 · 已完成",
             "completed status replaces the running status in the compact row"
         )
+        guard let completedPriorityLiveActivity = completedPriorityWithRunning.liveActivity else {
+            throw TestFailure(message: "three completions and one running task expose a live activity")
+        }
+        try expect(
+            CodexPresentationConstants.shouldAnimateBusyIcon(
+                bundleIdentifier: completedPriorityLiveActivity.bundleIdentifier,
+                metadata: completedPriorityLiveActivity.metadata
+            ),
+            "one running task keeps the leading busy animation while completions have priority"
+        )
+        try expect(
+            completedPriorityLiveActivity.metadata["codex_running_count"] == "1"
+                && completedPriorityLiveActivity.metadata["codex_compact_line_0_label"] == "3 · 已完成",
+            "three completions keep the trailing priority while one task remains running"
+        )
+        let completionPulse = CodexPresentationBuilder().build(
+            from: CodexTaskStoreSnapshot(
+                savedAt: now,
+                tasks: [runningTasks[0]],
+                recentCompletions: [
+                    CodexCompletionRecord(
+                        sessionID: "pulse-completed",
+                        projectName: "Atoll-CodexAtoll",
+                        promptPreview: "优化 Codex 刘海动效",
+                        resultPreview: "已完成",
+                        completedAt: now
+                    )
+                ]
+            ),
+            context: .completionPulse(sessionID: "pulse-completed", completedCount: 1)
+        )
+        guard let completionPulseLiveActivity = completionPulse.liveActivity else {
+            throw TestFailure(message: "completion pulse exposes a live activity")
+        }
+        try expect(
+            completionPulseLiveActivity.sneakPeekConfig?.duration == 3.5
+                && completionPulseLiveActivity.sneakPeekConfig?.style == .standard
+                && completionPulseLiveActivity.sneakPeekConfig?.showOnUpdate == true,
+            "completion confirmation keeps the standard 3.5 second presentation window"
+        )
         try expect(
             mixedLiveActivity.metadata["codex_compact_line_0_detail"] == nil,
             "completed compact row omits concrete result context"
@@ -224,6 +284,14 @@ struct CodexPresentationTests {
         try expect(
             mixedLiveActivity.metadata["codex_compact_line_1_label"] == nil,
             "running and completed statuses are never shown together"
+        )
+        let ignoredPresentation = CodexPresentationBuilder().build(
+            from: CodexTaskStoreSnapshot(savedAt: now, tasks: runningTasks),
+            ignoredSessionIDs: ["running-1", "running-2"]
+        )
+        try expect(
+            ignoredPresentation.liveActivity == nil,
+            "ignored Codex sessions no longer occupy the compact status"
         )
         guard case let .text(fallbackText, _, _) = mixedLiveActivity.trailingContent else {
             throw TestFailure(message: "compact status uses native text instead of Lottie text layers")
@@ -248,6 +316,171 @@ struct CodexPresentationTests {
         try expect(
             decodedCompactStatus.additionalClosedHeight == 0,
             "single-status presentation does not add closed-notch height"
+        )
+
+        let traySnapshot = CodexTaskStoreSnapshot(
+            savedAt: now,
+            tasks: [
+                CodexTaskRecord(
+                    sessionID: "tray-waiting",
+                    projectName: "Project B",
+                    promptPreview: "等待批准任务",
+                    approvalPreview: "需要允许执行测试",
+                    toolName: "Terminal",
+                    status: .waitingForApproval,
+                    startedAt: now.addingTimeInterval(-80),
+                    lastActivityAt: now.addingTimeInterval(-10)
+                ),
+                CodexTaskRecord(
+                    sessionID: "tray-stale",
+                    projectName: "Project A",
+                    promptPreview: "检查失联任务",
+                    status: .stale,
+                    startedAt: now.addingTimeInterval(-900),
+                    lastActivityAt: now.addingTimeInterval(-600)
+                ),
+                CodexTaskRecord(
+                    sessionID: "tray-running",
+                    projectName: "Project A",
+                    promptPreview: "继续执行任务",
+                    toolName: "读取文件",
+                    status: .running,
+                    startedAt: now.addingTimeInterval(-30),
+                    lastActivityAt: now
+                ),
+            ],
+            recentCompletions: [
+                CodexCompletionRecord(
+                    sessionID: "tray-completed",
+                    projectName: "Project C",
+                    promptPreview: "查看完成结果",
+                    resultPreview: "测试已通过",
+                    completedAt: now.addingTimeInterval(-20)
+                )
+            ]
+        )
+        let tray = CodexActivityTrayBuilder().build(
+            from: traySnapshot,
+            preferences: CodexActivityTrayPreferences(
+                pinnedProjectNames: ["Project A"],
+                collapsedProjectNames: ["Project A"],
+                ignoredSessionIDs: ["tray-completed"]
+            )
+        )
+        try expect(
+            tray.buckets.map(\.bucket) == [.needsAttention, .blocked, .running],
+            "activity tray groups tasks by attention priority and hides ignored sessions"
+        )
+        try expect(
+            tray.buckets[0].groups.map(\.projectName) == ["Project B"]
+                && tray.buckets[1].groups.map(\.projectName) == ["Project A"],
+            "activity tray keeps project groups independent"
+        )
+        try expect(
+            tray.buckets[2].groups.first?.projectName == "Project A"
+                && tray.buckets[2].groups.first?.isPinned == true
+                && tray.buckets[2].groups.first?.isCollapsed == true,
+            "activity tray applies project pinning and collapse preferences"
+        )
+        try expect(
+            tray.buckets[0].groups.first?.items.first?.nextAction == "打开 Codex 处理"
+                && tray.buckets[1].groups.first?.items.first?.nextAction == "检查会话"
+                && tray.buckets[2].groups.first?.items.first?.nextAction == "继续等待",
+            "activity tray exposes a next action for each task state"
+        )
+        try expect(
+            tray.ignoredItems.map(\.sessionID) == ["tray-completed"],
+            "activity tray keeps ignored tasks recoverable"
+        )
+
+        let historyCompletions = (0..<12).map { index in
+            CodexCompletionRecord(
+                sessionID: "history-\(index)",
+                projectName: "History Project",
+                promptPreview: "历史对话 \(index)",
+                resultPreview: "结果 \(index)",
+                completedAt: now.addingTimeInterval(TimeInterval(-index))
+            )
+        }
+        let viewedHistory = CodexActivityTrayBuilder().build(
+            from: CodexTaskStoreSnapshot(
+                savedAt: now,
+                recentCompletions: historyCompletions,
+                acknowledgedCompletionIDs: historyCompletions.map(\.id)
+            )
+        )
+        try expect(
+            viewedHistory.buckets.first?.bucket == .readHistory
+                && viewedHistory.buckets.first?.itemCount == 12,
+            "viewing completed notifications does not remove completed history"
+        )
+        try expect(
+            viewedHistory.buckets.first?.limited(to: 10).itemCount == 10,
+            "activity tray can limit completed history to the default ten rows"
+        )
+        try expect(
+            AppPreferences().recentRetention == 7 * 24 * 60 * 60
+                && AppPreferences().maxRecentCompletions == 100,
+            "completed history keeps a week of compact records with a bounded cap"
+        )
+
+        let recoveredHistory = CodexActivityTrayBuilder().build(
+            from: CodexTaskStoreSnapshot(
+                savedAt: now,
+                tasks: [
+                    CodexTaskRecord(
+                        sessionID: "legacy-completed",
+                        projectName: "Legacy Project",
+                        promptPreview: "旧版本完成任务",
+                        resultPreview: "旧版本结果仍可恢复",
+                        status: .completed,
+                        lastActivityAt: now,
+                        completedAt: now
+                    )
+                ]
+            )
+        )
+        try expect(
+            recoveredHistory.buckets.first?.bucket == .readHistory
+                && recoveredHistory.buckets.first?.items.first?.sessionID == "legacy-completed",
+            "completed task records recover history when old completion summaries were pruned"
+        )
+
+        let unreadCompletion = CodexCompletionRecord(
+            sessionID: "unread-completion",
+            projectName: "Unread Project",
+            promptPreview: "最新完成任务",
+            resultPreview: "刚刚完成",
+            completedAt: now.addingTimeInterval(-5)
+        )
+        let readCompletion = CodexCompletionRecord(
+            sessionID: "read-completion",
+            projectName: "Read Project",
+            promptPreview: "更早完成任务",
+            resultPreview: "历史结果",
+            completedAt: now.addingTimeInterval(-100)
+        )
+        let orderedTray = CodexActivityTrayBuilder().build(
+            from: CodexTaskStoreSnapshot(
+                savedAt: now,
+                tasks: [runningTasks[0]],
+                recentCompletions: [readCompletion, unreadCompletion],
+                acknowledgedCompletionIDs: [readCompletion.id]
+            )
+        )
+        try expect(
+            orderedTray.buckets.map(\.bucket) == [.unreadCompleted, .running, .readHistory],
+            "unread completions appear before running tasks and read history"
+        )
+        try expect(
+            orderedTray.buckets[0].items.first?.isRead == false
+                && orderedTray.buckets[0].items.first?.sessionID == "unread-completion"
+                && orderedTray.buckets[2].items.first?.isRead == true,
+            "completion items expose read state and newest completion comes first"
+        )
+        try expect(
+            orderedTray.buckets[2].items.first?.bucket == .readHistory,
+            "acknowledged completions use the grey history bucket"
         )
 
         print("CodexPresentationTests: PASS")
