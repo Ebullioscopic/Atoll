@@ -9,6 +9,7 @@ ENTITLEMENTS = ROOT / "DynamicIsland" / "DynamicIsland.entitlements"
 PROJECT = ROOT / "DynamicIsland.xcodeproj" / "project.pbxproj"
 RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+TR_INFOPLIST_STRINGS = ROOT / "DynamicIsland" / "tr.lproj" / "InfoPlist.strings"
 
 
 class PrivacyConfigurationTests(unittest.TestCase):
@@ -45,6 +46,22 @@ class PrivacyConfigurationTests(unittest.TestCase):
         for text in descriptions:
             for app in ("Spotify", "Apple Music", "Notes"):
                 self.assertIn(app, text)
+
+    def test_turkish_automation_usage_text_names_the_automated_apps(self):
+        strings = TR_INFOPLIST_STRINGS.read_text(encoding="utf-8")
+
+        match = re.search(
+            r'"NSAppleEventsUsageDescription"\s*=\s*"([^"]+)";', strings
+        )
+        self.assertIsNotNone(
+            match, "tr.lproj/InfoPlist.strings has no NSAppleEventsUsageDescription"
+        )
+        text = match.group(1)
+
+        # App names stay in Latin script even in the Turkish localization; only
+        # "Notes" is actually translated, to "Notlar".
+        for app in ("Spotify", "Apple Music", "Notlar", "Terminal", "iTerm2"):
+            self.assertIn(app, text)
 
     def test_full_access_reminder_api_has_matching_usage_text(self):
         project = PROJECT.read_text()
