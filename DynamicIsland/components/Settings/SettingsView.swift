@@ -781,7 +781,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .media, title: "Music Source", keywords: ["media source", "controller"], highlightID: SettingsTab.media.highlightID(for: "Music Source")),
             SettingsSearchEntry(tab: .media, title: "Skip buttons", keywords: ["skip", "controls", "±10"], highlightID: SettingsTab.media.highlightID(for: "Skip buttons")),
             SettingsSearchEntry(tab: .media, title: "Sneak Peek Style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak Peek Style")),
-            SettingsSearchEntry(tab: .media, title: "Show lyrics on the side (requires calendar off)", keywords: ["lyrics", "song text", "side panel", "calendar"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics on the side (requires calendar off)")),
+            SettingsSearchEntry(tab: .media, title: "Show lyrics", keywords: ["lyrics", "song text", "side panel", "calendar", "inline"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
             SettingsSearchEntry(tab: .media, title: "Side lyrics width", keywords: ["lyrics", "width", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics width")),
             SettingsSearchEntry(tab: .media, title: "Side lyrics horizontal offset", keywords: ["lyrics", "offset", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics horizontal offset")),
             SettingsSearchEntry(tab: .media, title: "Show live canvas in Dynamic Island", keywords: ["canvas", "live canvas", "album art", "dynamic island", "spotify canvas"], highlightID: SettingsTab.media.highlightID(for: "Show live canvas in Dynamic Island")),
@@ -849,7 +849,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .lockScreen, title: "Timer liquid mode", keywords: ["timer", "standard", "custom"], highlightID: SettingsTab.lockScreen.highlightID(for: "Timer liquid mode")),
             SettingsSearchEntry(tab: .lockScreen, title: "Timer widget variant", keywords: ["timer variant", "liquid"], highlightID: SettingsTab.lockScreen.highlightID(for: "Timer widget variant")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen weather", keywords: ["weather widget"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen weather")),
-            SettingsSearchEntry(tab: .lockScreen, title: "Layout", keywords: ["inline", "circular", "weather layout"], highlightID: SettingsTab.lockScreen.highlightID(for: "Layout")),
+            SettingsSearchEntry(tab: .lockScreen, title: "Widget layout", keywords: ["inline", "circular", "widget layout", "weather layout", "status widget"], highlightID: SettingsTab.lockScreen.highlightID(for: "Widget layout")),
             SettingsSearchEntry(tab: .lockScreen, title: "Weather data provider", keywords: ["wttr", "open meteo"], highlightID: SettingsTab.lockScreen.highlightID(for: "Weather data provider")),
             SettingsSearchEntry(tab: .lockScreen, title: "Temperature unit", keywords: ["celsius", "fahrenheit"], highlightID: SettingsTab.lockScreen.highlightID(for: "Temperature unit")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show location label", keywords: ["location", "weather"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show location label")),
@@ -1787,6 +1787,52 @@ final class HUDPreviewViewModel: ObservableObject {
     }
 }
 
+/// Disables a control while the selected external display app is the one actually
+/// handling those keys.
+///
+/// Ownership is not the integration toggle on its own. `resolvedControlFlags()`
+/// hands the keys over only while integration is enabled *and* the provider is
+/// running, so quitting the provider gives them back to Atoll -- and a control
+/// gated on the toggle alone stays greyed out over a setting that has started
+/// working again.
+///
+/// A modifier rather than a computed property per view: it carries the
+/// observation of both providers with it, so a control re-enables the moment the
+/// provider quits without every settings view having to observe them itself.
+private struct ExternalKeyOwnershipModifier: ViewModifier {
+    @Default(.enableThirdPartyDDCIntegration) private var integrationEnabled
+    @Default(.thirdPartyDDCProvider) private var provider
+    @ObservedObject private var betterDisplayManager = BetterDisplayManager.shared
+    @ObservedObject private var lunarManager = LunarManager.shared
+
+    let message: String
+
+    private var providerRunning: Bool {
+        switch provider {
+        case .betterDisplay: return betterDisplayManager.isRunning
+        case .lunar: return lunarManager.isRunning
+        }
+    }
+
+    private var externalOwnsKeys: Bool {
+        integrationEnabled && providerRunning
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .disabled(externalOwnsKeys)
+            .help(externalOwnsKeys ? message : "")
+    }
+}
+
+extension View {
+    /// Greys this control out while the running external display app owns the
+    /// keys it configures.
+    func disabledWhileExternalAppOwnsKeys(_ message: String) -> some View {
+        modifier(ExternalKeyOwnershipModifier(message: message))
+    }
+}
+
 private struct HUDAndOSDSettingsView: View {
     @State private var selectedTab: Tab = {
         if Defaults[.enableSystemHUD] { return .hud }
@@ -2060,8 +2106,7 @@ private struct HUDAndOSDSettingsView: View {
                             Toggle("Volume HUD", isOn: $enableVolumeHUD)
                             Toggle("Brightness HUD", isOn: $enableBrightnessHUD)
                             Toggle("Keyboard Backlight HUD", isOn: $enableKeyboardBacklightHUD)
-                                .disabled(enableThirdPartyDDCIntegration)
-                                .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is active — brightness keys are handled by the external app." : "")
+                                .disabledWhileExternalAppOwnsKeys("Disabled while the external display app is running \u{2014} that app owns the keyboard backlight keys.")
                         } header: {
                             Text("Controls")
                         } footer: {
@@ -2181,8 +2226,7 @@ private struct HUDAndOSDSettingsView: View {
                             Toggle("Volume HUD", isOn: $enableVolumeHUD)
                             Toggle("Brightness HUD", isOn: $enableBrightnessHUD)
                             Toggle("Keyboard Backlight HUD", isOn: $enableKeyboardBacklightHUD)
-                                .disabled(enableThirdPartyDDCIntegration)
-                                .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is active — brightness keys are handled by the external app." : "")
+                                .disabledWhileExternalAppOwnsKeys("Disabled while the external display app is running \u{2014} that app owns the keyboard backlight keys.")
                         } header: {
                             Text("Controls")
                         } footer: {
@@ -2258,15 +2302,40 @@ private struct ExternalDisplayIntegrationsSection: View {
         SettingsTab.hudAndOSD.highlightID(for: title)
     }
 
+    /// Whether the selected DDC provider is actually running.
+    ///
+    /// The one place that answers this. Ownership of the keys and everything the
+    /// section says about the provider's state are read from here, so the
+    /// controls and the status beside them cannot disagree about whether the
+    /// provider is up.
+    private var ddcProviderRunning: Bool {
+        switch thirdPartyDDCProvider {
+        case .betterDisplay: return betterDisplayManager.isRunning
+        case .lunar: return lunarManager.isRunning
+        }
+    }
+
+    /// Mirrors `SystemHUDManager.resolvedControlFlags()`: ownership only transfers
+    /// while integration is enabled *and* the provider is running. When the
+    /// provider is quit, Atoll handles the keys again and the saved step sizes
+    /// apply, so the controls have to come back with it.
+    private var externalOwnsBrightness: Bool {
+        enableThirdPartyDDCIntegration && ddcProviderRunning
+    }
+
+    private var externalOwnsVolume: Bool {
+        externalOwnsBrightness && enableExternalVolumeControlListener
+    }
+
     private var providerStatusText: String {
         switch thirdPartyDDCProvider {
         case .betterDisplay:
-            if betterDisplayManager.isRunning { return "Running" }
+            if ddcProviderRunning { return "Running" }
             if betterDisplayManager.isDetected { return "Not running" }
             return "Not detected"
         case .lunar:
             if lunarManager.isConnected { return "Connected" }
-            if lunarManager.isRunning { return "Running" }
+            if ddcProviderRunning { return "Running" }
             if lunarManager.isDetected { return "Not running" }
             return "Not detected"
         }
@@ -2275,12 +2344,12 @@ private struct ExternalDisplayIntegrationsSection: View {
     private var providerStatusColor: Color {
         switch thirdPartyDDCProvider {
         case .betterDisplay:
-            if betterDisplayManager.isRunning { return .green }
+            if ddcProviderRunning { return .green }
             if betterDisplayManager.isDetected { return .orange }
             return .secondary
         case .lunar:
             if lunarManager.isConnected { return .green }
-            if lunarManager.isRunning { return .orange }
+            if ddcProviderRunning { return .orange }
             if lunarManager.isDetected { return .orange }
             return .secondary
         }
@@ -2292,7 +2361,7 @@ private struct ExternalDisplayIntegrationsSection: View {
             if !betterDisplayManager.isDetected {
                 return "Install [BetterDisplay](https://betterdisplay.pro) to control external display brightness (and optional volume) through Atoll's HUD."
             }
-            if !betterDisplayManager.isRunning {
+            if !ddcProviderRunning {
                 return "BetterDisplay is installed but not currently running. Launch BetterDisplay to enable integration."
             }
             return "BetterDisplay OSD events will be routed through Atoll's active HUD style. Brightness is always routed; volume is routed when external volume control listener is enabled below. Make sure BetterDisplay's OSD integration is enabled in Settings › Application › Integration."
@@ -2300,7 +2369,7 @@ private struct ExternalDisplayIntegrationsSection: View {
             if !lunarManager.isDetected {
                 return "Install [Lunar](https://lunar.fyi) to control external display brightness, contrast, and optional volume through Atoll's HUD via DDC."
             }
-            if !lunarManager.isRunning {
+            if !ddcProviderRunning {
                 return "Lunar is installed but not currently running. Launch Lunar to enable integration."
             }
             if lunarManager.isConnected {
@@ -2332,7 +2401,8 @@ private struct ExternalDisplayIntegrationsSection: View {
                     }
                 }
                 .settingsHighlight(id: highlightID("Volume step"))
-                .disabled(enableExternalVolumeControlListener)
+                .disabled(externalOwnsVolume)
+                .help(externalOwnsVolume ? "Disabled while \"Enable external volume control listener\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
 
                 Stepper(value: $volumeFineStepPercent, in: 1...25) {
                     HStack {
@@ -2344,9 +2414,10 @@ private struct ExternalDisplayIntegrationsSection: View {
                     }
                 }
                 .settingsHighlight(id: highlightID("Volume fine step"))
-                .disabled(enableExternalVolumeControlListener)
+                .disabled(externalOwnsVolume)
+                .help(externalOwnsVolume ? "Disabled while \"Enable external volume control listener\" is on in External Display Integrations \u{2014} that app owns the volume keys." : "")
 
-                if enableExternalVolumeControlListener {
+                if externalOwnsVolume {
                     Text("Disabled while external display volume integration is active.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -2362,7 +2433,8 @@ private struct ExternalDisplayIntegrationsSection: View {
                     }
                 }
                 .settingsHighlight(id: highlightID("Brightness step"))
-                .disabled(enableThirdPartyDDCIntegration)
+                .disabled(externalOwnsBrightness)
+                .help(externalOwnsBrightness ? "Disabled while external display integration is on \u{2014} that app owns the brightness keys." : "")
 
                 Stepper(value: $brightnessFineStepPercent, in: 1...25) {
                     HStack {
@@ -2374,9 +2446,10 @@ private struct ExternalDisplayIntegrationsSection: View {
                     }
                 }
                 .settingsHighlight(id: highlightID("Brightness fine step"))
-                .disabled(enableThirdPartyDDCIntegration)
+                .disabled(externalOwnsBrightness)
+                .help(externalOwnsBrightness ? "Disabled while external display integration is on \u{2014} that app owns the brightness keys." : "")
 
-                if enableThirdPartyDDCIntegration {
+                if externalOwnsBrightness {
                     Text("Disabled while external display brightness integration is active.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -2648,8 +2721,7 @@ struct HUD: View {
                     Toggle("Volume HUD", isOn: $enableVolumeHUD)
                     Toggle("Brightness HUD", isOn: $enableBrightnessHUD)
                     Toggle("Keyboard Backlight HUD", isOn: $enableKeyboardBacklightHUD)
-                        .disabled(enableThirdPartyDDCIntegration)
-                        .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is active \u{2014} brightness keys are handled by the external app." : "")
+                        .disabledWhileExternalAppOwnsKeys("Disabled while the external display app is running \u{2014} that app owns the keyboard backlight keys.")
                 } header: {
                     Text("Controls")
                 } footer: {
@@ -2886,7 +2958,7 @@ struct Media: View {
                         Text("Show \"Change Media Output\" control")
                     }
                     .settingsHighlight(id: highlightID("Show Change Media Output control"))
-                    .help("Adds the AirPlay/route picker button back to the customizable controls palette.")
+                    .help("Adds the AirPlay/route picker button back to the customizable controls palette. The lock screen panel also uses this button for its volume slider, so turning it off leaves that panel with no volume control.")
                     MusicSlotConfigurationView()
                 } else {
                     Text("Turn on customizable controls to rearrange media buttons.")
@@ -2907,22 +2979,24 @@ struct Media: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if musicControlWindowEnabled {
-                Section {
-                    Picker("Skip buttons", selection: $musicSkipBehavior) {
-                        ForEach(MusicSkipBehavior.allCases) { behavior in
-                            Text(behavior.displayName).tag(behavior)
-                        }
+            Section {
+                Picker("Skip buttons", selection: $musicSkipBehavior) {
+                    ForEach(MusicSkipBehavior.allCases) { behavior in
+                        Text(behavior.displayName).tag(behavior)
                     }
-                    .pickerStyle(.segmented)
-                    .settingsHighlight(id: highlightID("Skip buttons"))
-
-                    Text(musicSkipBehavior.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("Floating window panel skip behaviour")
                 }
+                .pickerStyle(.segmented)
+                .settingsHighlight(id: highlightID("Skip buttons"))
+
+                Text(musicSkipBehavior.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Skip button behaviour")
+            } footer: {
+                Text("Applies everywhere the transport controls appear: the notch player, the lock screen panel, and the floating window.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section {
                 Toggle(
@@ -2940,32 +3014,33 @@ struct Media: View {
                 Toggle("Show sneak peek on playback changes", isOn: $showSneakPeekOnTrackChange)
                     .disabled(!enableSneakPeek)
                 Defaults.Toggle(key: .enableLyrics) {
-                    Text("Show lyrics on the side (requires calendar off)")
+                    Text("Show lyrics")
                 }
-                .disabled(showCalendar || enableMinimalisticUI || !showStandardMediaControls)
-                .opacity(showCalendar || enableMinimalisticUI || !showStandardMediaControls ? 0.5 : 1)
+                .disabled(enableMinimalisticUI || !showStandardMediaControls)
+                .opacity(enableMinimalisticUI || !showStandardMediaControls ? 0.5 : 1)
                 .help(
-                    showCalendar
-                        ? "Disable the calendar to show lyrics in the side panel."
-                        : enableMinimalisticUI
-                            ? "Disable Minimalistic UI to show lyrics in the side panel."
-                            : !showStandardMediaControls
-                                ? "Enable Dynamic Island media controls to show lyrics in the side panel."
-                                : ""
+                    enableMinimalisticUI
+                        ? "Disable Minimalistic UI to show lyrics."
+                        : !showStandardMediaControls
+                            ? "Enable Dynamic Island media controls to show lyrics."
+                            : ""
                 )
-                .settingsHighlight(id: highlightID("Show lyrics on the side (requires calendar off)"))
-                if showCalendar {
-                    Text("Disable the calendar to use side lyrics.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                .settingsHighlight(id: highlightID("Show lyrics"))
+                Text(
+                    showCalendar
+                        ? "Lyrics sit on one line under the artist name, since the calendar is using the rest of the notch. Turn the calendar off to give them a full panel beside the player."
+                        : "Lyrics get their own panel beside the player. Turn the calendar on to move them under the artist name instead."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 if enableMinimalisticUI {
-                    Text("Disable Minimalistic UI to use side lyrics.")
+                    Text("Disable Minimalistic UI to use lyrics.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 if !showStandardMediaControls {
-                    Text("Enable Dynamic Island media controls to use side lyrics.")
+                    Text("Enable Dynamic Island media controls to use lyrics.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -3282,14 +3357,12 @@ struct CalendarSettings: View {
                 Defaults.Toggle(key: .showCalendar) {
                     Text("Show calendar")
                 }
-                .disabled(enableLyrics)
-                .opacity(enableLyrics ? 0.5 : 1)
-                .help(enableLyrics ? "Disable side lyrics to show the calendar." : "")
                 .settingsHighlight(id: highlightID("Show calendar"))
                 if enableLyrics {
-                    Text("Disable side lyrics to use the calendar.")
+                    Text("Lyrics are on too, so the two share the notch and lyrics drop to a single line under the artist name.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Section(header: Text("Event List")) {
@@ -3361,7 +3434,15 @@ struct CalendarSettings: View {
                     Defaults.Toggle(key: .enableLockScreenReminderWidget) {
                         Text("Show lock screen reminder")
                     }
+                    .disabled(!enableReminderLiveActivity)
+                    .help(enableReminderLiveActivity ? "" : "Requires the reminder live activity, which is off in Live Activities settings.")
                     .settingsHighlight(id: highlightID("Show lock screen reminder"))
+
+                    if !enableReminderLiveActivity {
+                        Text("The lock screen reminder is produced by the reminder live activity, which is currently off above.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
                     Picker("Chip color", selection: $lockScreenReminderChipStyle) {
                         ForEach(LockScreenReminderChipStyle.allCases) { style in
@@ -5137,6 +5218,7 @@ struct Appearance: View {
 }
 
 struct LockScreenSettings: View {
+    @Default(.enableReminderLiveActivity) private var enableReminderLiveActivity
     @ObservedObject private var calendarManager = CalendarManager.shared
     @ObservedObject private var previewManager = LockScreenWidgetPreviewManager.shared
     @Default(.lockScreenGlassStyle) private var lockScreenGlassStyle
@@ -5315,10 +5397,24 @@ struct LockScreenSettings: View {
                 }
                 .pickerStyle(.segmented)
                 .settingsHighlight(id: highlightID("Widget appearance"))
+
+                Picker("Widget layout", selection: $lockScreenWeatherWidgetStyle) {
+                    ForEach(LockScreenWeatherWidgetStyle.allCases) { style in
+                        Text(style.localizedName).tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .settingsHighlight(id: highlightID("Widget layout"))
+
+                if lockScreenWeatherWidgetStyle == .circular {
+                    Text("The circular layout has no room for the location label or sunrise time, and draws the battery gauge as a ring.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("Use Light when the wallpaper is bright so titles and labels stay readable.")
+                Text("Applies to the whole status widget \u{2014} weather, battery, focus, location and the next-event row are all drawn in the chosen appearance and layout. Use Light when the wallpaper is bright so titles and labels stay readable.")
             }
 
             Section {
@@ -5522,14 +5618,6 @@ struct LockScreenSettings: View {
                 .settingsHighlight(id: highlightID("Show lock screen weather"))
 
                 if enableLockScreenWeatherWidget {
-                    Picker("Layout", selection: $lockScreenWeatherWidgetStyle) {
-                        ForEach(LockScreenWeatherWidgetStyle.allCases) { style in
-                            Text(style.localizedName).tag(style)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .settingsHighlight(id: highlightID("Layout"))
-
                     Picker("Weather data provider", selection: $lockScreenWeatherProviderSource) {
                         ForEach(LockScreenWeatherProviderSource.allCases) { source in
                             Text(source.displayName).tag(source)
@@ -5550,12 +5638,14 @@ struct LockScreenSettings: View {
                         Text("Show location label")
                     }
                     .disabled(lockScreenWeatherWidgetStyle == .circular)
+                    .help(lockScreenWeatherWidgetStyle == .circular ? "Available in the inline layout only." : "")
                     .settingsHighlight(id: highlightID("Show location label"))
 
                     Defaults.Toggle(key: .lockScreenWeatherShowsSunrise) {
                         Text("Show sunrise time")
                     }
                     .disabled(lockScreenWeatherWidgetStyle != .inline)
+                    .help(lockScreenWeatherWidgetStyle != .inline ? "Available in the inline layout only." : "")
                     .settingsHighlight(id: highlightID("Show sunrise time"))
 
                     Defaults.Toggle(key: .lockScreenWeatherShowsAQI) {
@@ -5588,14 +5678,22 @@ struct LockScreenSettings: View {
             } header: {
                 Text("Weather Widget")
             } footer: {
-                Text("Enable the weather capsule and configure its layout, provider, units, and optional battery/AQI indicators.")
+                Text("Enable the weather capsule and configure its provider, units, and optional AQI indicator. Its layout is set by \"Widget layout\" under Appearance, which covers the whole status widget.")
             }
 
             Section {
                 Defaults.Toggle(key: .enableLockScreenReminderWidget) {
                     Text("Show lock screen reminder")
                 }
+                .disabled(!enableReminderLiveActivity)
+                .help(enableReminderLiveActivity ? "" : "Requires the reminder live activity, which is off in Live Activities settings.")
                 .settingsHighlight(id: highlightID("Show lock screen reminder"))
+
+                if !enableReminderLiveActivity {
+                    Text("The lock screen reminder is produced by the reminder live activity, which is currently off in Live Activities settings.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Picker("Chip color", selection: $lockScreenReminderChipStyle) {
                     ForEach(LockScreenReminderChipStyle.allCases) { style in
@@ -5603,7 +5701,7 @@ struct LockScreenSettings: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .disabled(!enableLockScreenReminderWidget)
+                .disabled(!enableLockScreenReminderWidget || !enableReminderLiveActivity)
                 .settingsHighlight(id: highlightID("Chip color"))
 
                 Picker("Alignment", selection: $lockScreenReminderWidgetHorizontalAlignment) {
@@ -5612,7 +5710,7 @@ struct LockScreenSettings: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .disabled(!enableLockScreenReminderWidget)
+                .disabled(!enableLockScreenReminderWidget || !enableReminderLiveActivity)
                 .settingsHighlight(id: highlightID("Reminder alignment"))
 
                 HStack {
@@ -5622,7 +5720,7 @@ struct LockScreenSettings: View {
                         in: -160...160,
                         step: 2
                     )
-                    .disabled(!enableLockScreenReminderWidget)
+                    .disabled(!enableLockScreenReminderWidget || !enableReminderLiveActivity)
                     Text("\(Int(lockScreenReminderWidgetVerticalOffset)) px")
                         .foregroundStyle(.secondary)
                         .frame(width: 70, alignment: .trailing)
@@ -8150,8 +8248,7 @@ struct CustomOSDSettings: View {
                         .settingsHighlight(id: highlightID("Brightness OSD"))
                     Toggle("Keyboard Backlight OSD", isOn: $enableOSDKeyboardBacklight)
                         .settingsHighlight(id: highlightID("Keyboard Backlight OSD"))
-                        .disabled(enableThirdPartyDDCIntegration)
-                        .help(enableThirdPartyDDCIntegration ? "Disabled while external display integration is active \u{2014} brightness keys are handled by the external app." : "")
+                        .disabledWhileExternalAppOwnsKeys("Disabled while the external display app is running \u{2014} that app owns the keyboard backlight keys.")
                 } header: {
                     Text("Controls")
                 } footer: {
