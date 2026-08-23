@@ -215,60 +215,65 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         let payload = update.payload
         let diff = update.diff ?? false
 
-        var newPlaybackState = PlaybackState(bundleIdentifier: playbackState.bundleIdentifier)
-        
-        newPlaybackState.title = payload.title ?? (diff ? self.playbackState.title : "")
-        newPlaybackState.artist = payload.artist ?? (diff ? self.playbackState.artist : "")
-        newPlaybackState.album = payload.album ?? (diff ? self.playbackState.album : "")
-        newPlaybackState.duration = payload.duration ?? (diff ? self.playbackState.duration : 0)
-        
-        // Match boring.notch behavior: if elapsedTime is provided use it,
-        // if this update is a diff keep the previous currentTime, otherwise default to 0.
-        newPlaybackState.currentTime = payload.elapsedTime ?? (diff ? self.playbackState.currentTime : 0)
-
-        
-        if let shuffleMode = payload.shuffleMode {
-            newPlaybackState.isShuffled = shuffleMode != 1
-        } else if !diff {
-            newPlaybackState.isShuffled = false
-        } else {
-            newPlaybackState.isShuffled = self.playbackState.isShuffled
-        }
-        if let repeatModeValue = payload.repeatMode {
-            newPlaybackState.repeatMode = RepeatMode(rawValue: repeatModeValue) ?? .off
-        } else if !diff {
-            newPlaybackState.repeatMode = .off
-        } else {
-            newPlaybackState.repeatMode = self.playbackState.repeatMode
-        }
-
-        if let artworkDataString = payload.artworkData {
-            newPlaybackState.artwork = Data(
-                base64Encoded: artworkDataString.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-        } else if !diff {
-            newPlaybackState.artwork = nil
-        }
-
-        if let dateString = payload.timestamp,
-           let date = Self.iso8601Formatter.date(from: dateString) {
-            newPlaybackState.lastUpdated = date
-        } else if !diff {
-            newPlaybackState.lastUpdated = Date()
-        } else {
-            newPlaybackState.lastUpdated = self.playbackState.lastUpdated
-        }
-
-        newPlaybackState.playbackRate = payload.playbackRate ?? (diff ? self.playbackState.playbackRate : 1.0)
-        newPlaybackState.isPlaying = payload.playing ?? (diff ? self.playbackState.isPlaying : false)
-        newPlaybackState.bundleIdentifier = (
-            payload.parentApplicationBundleIdentifier ??
-            payload.bundleIdentifier ??
-            (diff ? self.playbackState.bundleIdentifier : "")
-        )
-
+        // Merge and publish inside one main-actor transaction. Reading the
+        // baseline out here and publishing a whole snapshot later left a window
+        // where a command or a later stream update could land on the main
+        // actor and then be overwritten by this older, fuller snapshot.
         await MainActor.run { [weak self] in
-            self?.playbackState = newPlaybackState
+            guard let self else { return }
+
+            var newPlaybackState = PlaybackState(bundleIdentifier: self.playbackState.bundleIdentifier)
+
+            newPlaybackState.title = payload.title ?? (diff ? self.playbackState.title : "")
+            newPlaybackState.artist = payload.artist ?? (diff ? self.playbackState.artist : "")
+            newPlaybackState.album = payload.album ?? (diff ? self.playbackState.album : "")
+            newPlaybackState.duration = payload.duration ?? (diff ? self.playbackState.duration : 0)
+
+            // Match boring.notch behavior: if elapsedTime is provided use it,
+            // if this update is a diff keep the previous currentTime, otherwise default to 0.
+            newPlaybackState.currentTime = payload.elapsedTime ?? (diff ? self.playbackState.currentTime : 0)
+
+            if let shuffleMode = payload.shuffleMode {
+                newPlaybackState.isShuffled = shuffleMode != 1
+            } else if !diff {
+                newPlaybackState.isShuffled = false
+            } else {
+                newPlaybackState.isShuffled = self.playbackState.isShuffled
+            }
+            if let repeatModeValue = payload.repeatMode {
+                newPlaybackState.repeatMode = RepeatMode(rawValue: repeatModeValue) ?? .off
+            } else if !diff {
+                newPlaybackState.repeatMode = .off
+            } else {
+                newPlaybackState.repeatMode = self.playbackState.repeatMode
+            }
+
+            if let artworkDataString = payload.artworkData {
+                newPlaybackState.artwork = Data(
+                    base64Encoded: artworkDataString.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            } else if !diff {
+                newPlaybackState.artwork = nil
+            }
+
+            if let dateString = payload.timestamp,
+               let date = Self.iso8601Formatter.date(from: dateString) {
+                newPlaybackState.lastUpdated = date
+            } else if !diff {
+                newPlaybackState.lastUpdated = Date()
+            } else {
+                newPlaybackState.lastUpdated = self.playbackState.lastUpdated
+            }
+
+            newPlaybackState.playbackRate = payload.playbackRate ?? (diff ? self.playbackState.playbackRate : 1.0)
+            newPlaybackState.isPlaying = payload.playing ?? (diff ? self.playbackState.isPlaying : false)
+            newPlaybackState.bundleIdentifier = (
+                payload.parentApplicationBundleIdentifier ??
+                payload.bundleIdentifier ??
+                (diff ? self.playbackState.bundleIdentifier : "")
+            )
+
+            self.playbackState = newPlaybackState
         }
     }
 }

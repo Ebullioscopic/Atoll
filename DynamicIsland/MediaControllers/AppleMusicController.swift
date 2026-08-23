@@ -137,34 +137,46 @@ class AppleMusicController: MediaControllerProtocol {
     func updatePlaybackInfo() async {
         guard let descriptor = try? await fetchPlaybackInfoAsync() else { return }
         guard descriptor.numberOfItems >= 8 else { return }
-        var updatedState = self.playbackState
 
-        updatedState.isPlaying = descriptor.atIndex(1)?.booleanValue ?? false
-        updatedState.title = descriptor.atIndex(2)?.stringValue ?? "Unknown"
-        updatedState.artist = descriptor.atIndex(3)?.stringValue ?? "Unknown"
-        updatedState.album = descriptor.atIndex(4)?.stringValue ?? "Unknown"
-        updatedState.currentTime = descriptor.atIndex(5)?.doubleValue ?? 0
-        updatedState.duration = descriptor.atIndex(6)?.doubleValue ?? 0
-        updatedState.isShuffled = descriptor.atIndex(7)?.booleanValue ?? false
+        let isPlaying = descriptor.atIndex(1)?.booleanValue ?? false
+        let title = descriptor.atIndex(2)?.stringValue ?? "Unknown"
+        let artist = descriptor.atIndex(3)?.stringValue ?? "Unknown"
+        let album = descriptor.atIndex(4)?.stringValue ?? "Unknown"
+        let currentTime = descriptor.atIndex(5)?.doubleValue ?? 0
+        let duration = descriptor.atIndex(6)?.doubleValue ?? 0
+        let isShuffled = descriptor.atIndex(7)?.booleanValue ?? false
         let repeatModeValue = descriptor.atIndex(8)?.int32Value ?? 0
-        updatedState.repeatMode = RepeatMode(rawValue: Int(repeatModeValue)) ?? .off
+        let repeatMode = RepeatMode(rawValue: Int(repeatModeValue)) ?? .off
 
         // AppleScript returns artwork data for library tracks. For streamed
         // content not in the library it returns an empty descriptor, so we
         // fall back to the iTunes Search API to fetch artwork by metadata.
+        let artwork: Data?
         if let artworkData = descriptor.atIndex(9)?.data as Data?,
            artworkData.count > Self.minimumArtworkSize {
-            updatedState.artwork = artworkData
+            artwork = artworkData
         } else {
-            updatedState.artwork = await fetchArtworkFromCatalog(
-                title: updatedState.title, artist: updatedState.artist, album: updatedState.album
-            )
+            artwork = await fetchArtworkFromCatalog(title: title, artist: artist, album: album)
         }
 
-        updatedState.lastUpdated = Date()
-        let finalState = updatedState
+        // Merge into the freshest baseline on the main actor rather than the
+        // copy taken before this function's awaits (the catalog artwork fetch
+        // in particular can take a while), so a command or another update that
+        // landed in the meantime is not overwritten by a stale snapshot.
         await MainActor.run { [weak self] in
-            self?.playbackState = finalState
+            guard let self else { return }
+            var updatedState = self.playbackState
+            updatedState.isPlaying = isPlaying
+            updatedState.title = title
+            updatedState.artist = artist
+            updatedState.album = album
+            updatedState.currentTime = currentTime
+            updatedState.duration = duration
+            updatedState.isShuffled = isShuffled
+            updatedState.repeatMode = repeatMode
+            updatedState.artwork = artwork
+            updatedState.lastUpdated = Date()
+            self.playbackState = updatedState
         }
     }
 

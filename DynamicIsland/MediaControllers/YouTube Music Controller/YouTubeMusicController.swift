@@ -405,49 +405,53 @@ final class YouTubeMusicController: MediaControllerProtocol {
     }
     
     private func updatePlaybackState(with response: PlaybackResponse) async {
-        var newState = playbackState
-        
-        newState.isPlaying = !response.isPaused
-
-        if let title = response.title {
-            newState.title = title
-        }
-
-        if let artist = response.artist {
-            newState.artist = artist
-        }
-
-        if let album = response.album {
-            newState.album = album
-        }
-
-        if let elapsed = response.elapsedSeconds {
-            newState.currentTime = elapsed
-        }
-
-        if let duration = response.songDuration {
-            newState.duration = duration
-        }
-
-        newState.lastUpdated = Date()
-        
-        if let shuffled = response.isShuffled {
-            newState.isShuffled = shuffled
-        }
-        
-        if let mode = response.repeatMode {
-            switch mode {
-            case 0: newState.repeatMode = .off
-            case 1: newState.repeatMode = .all
-            case 2: newState.repeatMode = .one
-            default: break
-            }
-        }
-
-        // Always update - removed comparison since PlaybackState doesn't conform to Equatable
-        let resolvedState = newState
+        // Merge and publish inside one main-actor transaction. Reading the
+        // baseline out here and publishing a whole snapshot later left a
+        // window where another update (a command, or the WebSocket handlers
+        // above) could land on the main actor and then be overwritten by this
+        // older, fuller snapshot.
         await MainActor.run { [weak self] in
-            self?.playbackState = resolvedState
+            guard let self else { return }
+            var newState = self.playbackState
+
+            newState.isPlaying = !response.isPaused
+
+            if let title = response.title {
+                newState.title = title
+            }
+
+            if let artist = response.artist {
+                newState.artist = artist
+            }
+
+            if let album = response.album {
+                newState.album = album
+            }
+
+            if let elapsed = response.elapsedSeconds {
+                newState.currentTime = elapsed
+            }
+
+            if let duration = response.songDuration {
+                newState.duration = duration
+            }
+
+            newState.lastUpdated = Date()
+
+            if let shuffled = response.isShuffled {
+                newState.isShuffled = shuffled
+            }
+
+            if let mode = response.repeatMode {
+                switch mode {
+                case 0: newState.repeatMode = .off
+                case 1: newState.repeatMode = .all
+                case 2: newState.repeatMode = .one
+                default: break
+                }
+            }
+
+            self.playbackState = newState
         }
 
         artworkFetchTask?.cancel()
