@@ -17,9 +17,11 @@
  */
 
 import SwiftUI
+import Defaults
 
 struct LockScreenReminderWidget: View {
     let snapshot: LockScreenReminderWidgetSnapshot
+    @Default(.lockScreenWidgetAppearance) private var appearance
 
     private let primaryFont = Font.system(size: 19, weight: .semibold, design: .rounded)
     private let iconSize: CGFloat = 20
@@ -29,7 +31,7 @@ struct LockScreenReminderWidget: View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: snapshot.iconName)
                 .font(.system(size: iconSize, weight: .semibold))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(appearance.primary())
 
             RoundedRectangle(cornerRadius: 2)
                 .fill(chipColor)
@@ -77,9 +79,9 @@ struct LockScreenReminderWidget: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(minWidth: 240, idealWidth: 360, maxWidth: 520, alignment: .leading)
-        .foregroundStyle(Color.white)
+        .foregroundStyle(appearance.primary())
         .background(Color.clear)
-        .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 3)
+        .shadow(color: appearance.contentShadow, radius: 8, x: 0, y: 3)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
     }
@@ -94,22 +96,24 @@ struct LockScreenReminderWidget: View {
         }
         switch snapshot.chipStyle {
         case .eventColor:
-            return accentColor.ensureMinimumBrightness(factor: 0.7)
+            return appearance.usesLightGlyphs
+                ? accentColor.ensureMinimumBrightness(factor: 0.7)
+                : accentColor
         case .monochrome:
-            return Color.white.opacity(0.85)
+            return appearance.primary(opacity: 0.85)
         }
     }
 
     private var primaryTextColor: Color {
-        Color.white.opacity(0.92)
+        appearance.primary(opacity: 0.92)
     }
 
     private var secondaryTextColor: Color {
-        snapshot.isCritical ? Color.white : Color.white.opacity(0.78)
+        snapshot.isCritical ? appearance.primary() : appearance.primary(opacity: 0.78)
     }
 
     private var separatorColor: Color {
-        Color.white.opacity(0.65)
+        appearance.primary(opacity: 0.65)
     }
 
     private var accessibilityLabel: String {

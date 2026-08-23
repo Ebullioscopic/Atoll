@@ -29,8 +29,15 @@
 		7EE1D73F2E6B1E1200997219 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EE1D73E2E6B1E1200997219 /* IOKit.framework */; };
 		7EF10C122F817ECF004229A0 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EF10C112F817ECF004229A0 /* Accelerate.framework */; };
 		7EF19C172F577040005B9929 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 7EF19C162F577040005B9929 /* SwiftTerm */; };
+		A1B2C3D4E5F60718293A4B5C /* ExtensionRPCServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */; };
 		A3C83CAF84544DCE386C3BB8 /* DynamicIslandUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54078F29304A9DBBEFBDF932 /* DynamicIslandUITests.swift */; };
+		A4B5C6D7E8F90123456789AB /* AppleMusicControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */; };
 		B4777BB9FE29243B253B8306 /* SpotifyLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */; };
+		D1A2B3C4D5E6F70819AB2C4D /* SystemHUDPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A2B3C4D5E6F70819AB2C4E /* SystemHUDPlacementTests.swift */; };
+		C0DECAFE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */; };
+		B1C2D3E4F5A60718293A4B01 /* MediaKeyTapRetryPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5A60718293A4B02 /* MediaKeyTapRetryPolicyTests.swift */; };
+		F1E2D3C4B5A6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */; };
+		F3E4D5C6B7A8E9F0A1B2C3D4 /* Contents/Helpers/NowPlayingTestClient in CopyFiles */ = {isa = PBXBuildFile; fileRef = F2E3D4C5B6A7E8F9A0B1C2D3 /* Contents/Helpers/NowPlayingTestClient */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		F910B9C812C7AEFE2293F7D2 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 47C39E67B09152F6665ED683 /* Cocoa.framework */; };
 /* End PBXBuildFile section */
 
@@ -47,12 +54,13 @@
 /* Begin PBXCopyFilesBuildPhase section */
 		7EA69B1B2F5AE13500EB2D16 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 8;
+			buildActionMask = 2147483647;
 			dstPath = Contents/Helpers;
 			dstSubfolderSpec = 1;
 			files = (
+				F3E4D5C6B7A8E9F0A1B2C3D4 /* Contents/Helpers/NowPlayingTestClient in CopyFiles */,
 			);
-			runOnlyForDeploymentPostprocessing = 1;
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
@@ -74,8 +82,15 @@
 		7EF10C112F817ECF004229A0 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		957599910322B546D91E6F96 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A058D80A7EF44593B0F24EB7 /* DynamicIslandUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicIslandUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExtensionRPCServerTests.swift; sourceTree = "<group>"; };
+		A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleMusicControllerTests.swift; sourceTree = "<group>"; };
+		C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlyoutFrameCalculatorTests.swift; sourceTree = "<group>"; };
+		B1C2D3E4F5A60718293A4B02 /* MediaKeyTapRetryPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MediaKeyTapRetryPolicyTests.swift; sourceTree = "<group>"; };
 		DAA671E7B1B26733F02166C5 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpotifyLibraryTests.swift; sourceTree = "<group>"; };
+		D1A2B3C4D5E6F70819AB2C4E /* SystemHUDPlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemHUDPlacementTests.swift; sourceTree = "<group>"; };
+		E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JSONLUsageParserTests.swift; sourceTree = "<group>"; };
+		F2E3D4C5B6A7E8F9A0B1C2D3 /* Contents/Helpers/NowPlayingTestClient */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.executable"; path = Contents/Helpers/NowPlayingTestClient; sourceTree = "<group>"; };
 		F4C1DD09EC134302938E84F6 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = Frameworks/MediaRemoteAdapter.framework; sourceTree = SOURCE_ROOT; };
 		F54406E72CD4987A00C7AFD9 /* Atoll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atoll.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -97,22 +112,11 @@
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
-/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		7EA69B202F5AE63200EB2D16 /* Exceptions for "Contents" folder in "" build phase */ = {
-			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
-			buildPhase = 7EA69B1B2F5AE13500EB2D16 /* CopyFiles */;
-			membershipExceptions = (
-				Helpers/NowPlayingTestClient,
-			);
-		};
-/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		7EA69B1C2F5AE15C00EB2D16 /* Contents */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				7EA69B1E2F5AE61200EB2D16 /* Exceptions for "Contents" folder in "DynamicIsland" target */,
-				7EA69B202F5AE63200EB2D16 /* Exceptions for "Contents" folder in "" build phase */,
 			);
 			path = Contents;
 			sourceTree = "<group>";
@@ -179,10 +183,15 @@
 		50983E4A1FCC1F5E2220FF8A /* DynamicIslandTests */ = {
 			isa = PBXGroup;
 			children = (
+				A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */,
+				C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */,
+				B1C2D3E4F5A60718293A4B02 /* MediaKeyTapRetryPolicyTests.swift */,
 				DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */,
+				A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */,
+				D1A2B3C4D5E6F70819AB2C4E /* SystemHUDPlacementTests.swift */,
+				E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */,
 				957599910322B546D91E6F96 /* Info.plist */,
 			);
-			name = DynamicIslandTests;
 			path = DynamicIslandTests;
 			sourceTree = "<group>";
 		};
@@ -221,6 +230,14 @@
 			path = LottieAnimations;
 			sourceTree = "<group>";
 		};
+		8A5BBA1D30357EBF00E3B99D /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				F2E3D4C5B6A7E8F9A0B1C2D3 /* Contents/Helpers/NowPlayingTestClient */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		BF9102C8771E45168EF97D18 /* DynamicIslandUITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -241,6 +258,7 @@
 				F54406E82CD4987A00C7AFD9 /* Products */,
 				BF9102C8771E45168EF97D18 /* DynamicIslandUITests */,
 				50983E4A1FCC1F5E2220FF8A /* DynamicIslandTests */,
+				8A5BBA1D30357EBF00E3B99D /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -441,7 +459,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A4B5C6D7E8F90123456789AB /* AppleMusicControllerTests.swift in Sources */,
 				B4777BB9FE29243B253B8306 /* SpotifyLibraryTests.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* ExtensionRPCServerTests.swift in Sources */,
+				D1A2B3C4D5E6F70819AB2C4D /* SystemHUDPlacementTests.swift in Sources */,
+				F1E2D3C4B5A6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift in Sources */,
+				C0DECAFE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift in Sources */,
+				B1C2D3E4F5A60718293A4B01 /* MediaKeyTapRetryPolicyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -697,7 +721,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1196;
+				CURRENT_PROJECT_VERSION = 1257;
 				DEVELOPMENT_ASSET_PATHS = "\"DynamicIsland/Preview Content\"";
 				DEVELOPMENT_TEAM = 9Y64TRM77N;
 				ENABLE_APP_SANDBOX = NO;
@@ -732,6 +756,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Atoll needs microphone access to record voice questions for the AI assistant feature.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Atoll needs Reminders access to show your reminders";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -770,7 +795,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1196;
+				CURRENT_PROJECT_VERSION = 1257;
 				DEVELOPMENT_ASSET_PATHS = "\"DynamicIsland/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = 9Y64TRM77N;
@@ -806,6 +831,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Atoll needs microphone access to record voice questions for the AI assistant feature.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Atoll needs Reminders access to show your reminders";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (
