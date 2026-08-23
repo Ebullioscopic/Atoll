@@ -605,8 +605,6 @@ final class SystemBrightnessController {
     }
 
     func adjust(by delta: Float) {
-        markUserInitiated()
-
         // Do not synchronously query CoreBrightness/DisplayServices here. This
         // method is reached from hardware-key handling, and those calls can be
         // slow enough for macOS to disable the event tap. beginBrightnessAnimation
@@ -618,14 +616,19 @@ final class SystemBrightnessController {
         DispatchQueue.main.async { [weak self] in
             guard let self, let target = self.pendingAdjustTarget else { return }
             self.pendingAdjustTarget = nil
+            // markUserInitiated (and the polling/gate state it touches) must run on
+            // main: this method is reached from the hardware-key thread, and pollTimer/
+            // backgroundWorkSuspended/gateCancellable are otherwise only ever touched
+            // from main (the timer callback and the gate's @MainActor sink).
+            self.markUserInitiated()
             self.beginBrightnessAnimation(to: target)
         }
     }
 
     func setBrightness(_ value: Float) {
         let clamped = max(0, min(1, value))
-        markUserInitiated()
         DispatchQueue.main.async { [weak self] in
+            self?.markUserInitiated()
             self?.beginBrightnessAnimation(to: clamped)
         }
     }
