@@ -1889,8 +1889,22 @@ class MusicManager: ObservableObject {
     /// zero however far playback has actually got, which pegs every lyric at the
     /// start of the track. Elapsed time is the better answer there.
     private func lyricPlaybackPosition(at date: Date = Date()) -> TimeInterval {
-        max(estimatedPlaybackPosition(at: date), elapsedTime)
+        max(estimatedPlaybackPosition(at: date), elapsedTime) + Self.lyricLeadTime
     }
+
+    /// How far ahead of the voice the lyrics run.
+    ///
+    /// A line that arrives exactly on its timestamp arrives too late to read:
+    /// the word is already being sung by the time the eye finds it. Every
+    /// karaoke display leads the voice slightly, and so did this one before the
+    /// playback anchor was fixed -- a stale anchor made the estimate run ahead,
+    /// which is why the lyrics used to feel better timed while the clock beside
+    /// them was wrong.
+    ///
+    /// So the lead is kept, and made deliberate: a quarter second, applied to
+    /// the position every lyric decision is made from, rather than left to
+    /// depend on how badly the position was drifting.
+    static let lyricLeadTime: TimeInterval = 0.25
 
     /// Gaps shorter than this are breaths between lines rather than instrumental
     /// breaks; marking them would flicker.
