@@ -252,11 +252,10 @@ class SystemOSDManager {
             guard isCurrentTransition(generation, active: true) else { return }
             suspendOSDUIHelper()
 
-            // If the user disabled Atoll's HUD replacement while SIGSTOP was in
-            // flight, undo that stale suppression immediately. The current
-            // restoration transition will still perform its clean restart.
+            // If this transition went stale while the SIGSTOP was in flight,
+            // hand the helper over rather than assuming it should be resumed.
             guard isCurrentTransition(generation, active: true) else {
-                resumeOSDUIHelperProcess()
+                relinquishStaleSuspension()
                 return
             }
 
@@ -270,12 +269,35 @@ class SystemOSDManager {
         guard isCurrentTransition(generation, active: true) else { return }
 
         do {
+            // Freeze whatever is already running, first and synchronously.
+            //
+            // The kickstart below carries `-k`, which kills the current helper
+            // and starts a live replacement — and every millisecond between the
+            // two is a window where the native HUD draws. That was tolerable
+            // when suppression ran once at startup, but lock-state changes now
+            // re-run it, so the window reopened on every unlock and the native
+            // HUD reappeared on the home screen. A helper that is already
+            // SIGSTOPped needs no replacing; freezing it in place closes the
+            // window entirely, and the watcher still catches any process macOS
+            // swaps in later.
+            if let existing = osduiHelperPID() {
+                suspendOSDUIHelper()
+                guard isCurrentTransition(generation, active: true) else {
+                    relinquishStaleSuspension()
+                    return
+                }
+                suppressionState.withLock { $0.lastSuspendedPID = existing }
+                await MainActor.run {
+                    print("✅ System HUD disabled (suspended running helper \(existing))")
+                }
+                return
+            }
+
             let kickstart = Process()
             kickstart.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            // Force a clean helper instance. A plain kickstart is a no-op when
-            // OSDUIHelper is already running, and macOS may replace that lingering
-            // process on the first media key, briefly exposing the native HUD.
-            kickstart.arguments = ["kickstart", "-k", "gui/\(getuid())/com.apple.OSDUIHelper"]
+            // No helper running — ask launchd for one so there is something to
+            // freeze before the next media key arrives.
+            kickstart.arguments = ["kickstart", "gui/\(getuid())/com.apple.OSDUIHelper"]
             try kickstart.run()
             kickstart.waitUntilExit()
 
@@ -452,6 +474,26 @@ class SystemOSDManager {
         } catch {
             NSLog("Suppression watcher: failed to SIGSTOP OSDUIHelper: \(error)")
         }
+    }
+
+    /// Undoes a SIGSTOP this transition just issued, having discovered it is
+    /// stale.
+    ///
+    /// A failed `isCurrentTransition(_, active: true)` means one of two very
+    /// different things: suppression was cancelled, or a *newer* suppression
+    /// transition took ownership. Only the first calls for SIGCONT. Resuming in
+    /// the second case hands the native HUD back while suppression is still
+    /// active, and the watcher will not undo it — the helper's PID already
+    /// matches `lastSuspendedPID`, so it is skipped as already handled. Clear
+    /// that PID instead, so the watcher re-examines the helper on its next poll.
+    private static func relinquishStaleSuspension() {
+        let supersededBySuppression = suppressionState.withLock { state -> Bool in
+            guard state.active else { return false }
+            state.lastSuspendedPID = -1
+            return true
+        }
+        guard !supersededBySuppression else { return }
+        resumeOSDUIHelperProcess()
     }
 
     private static func resumeOSDUIHelperProcess() {
