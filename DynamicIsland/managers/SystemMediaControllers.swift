@@ -136,9 +136,24 @@ final class SystemVolumeController {
         if isMuted {
             setMuted(false)
         }
-        var newValue = currentVolume + delta
-        newValue = max(0, min(1, newValue))
-        setVolume(newValue)
+
+        let deviceID = currentDeviceID
+        // Reads on the way through, so a device that can answer populates its
+        // own entry before the check below.
+        let current = currentVolume
+
+        // A relative change needs a real level to be relative to. `getVolume`
+        // will happily answer with another device's level rather than report a
+        // zero it does not mean -- fine for showing a slider, not fine as the
+        // base for a write, where being 60 points out moves the volume 60
+        // points. Absolute sets from the slider still work; only the delta is
+        // refused.
+        guard volumeMemory.withLock({ $0.byDevice[deviceID] != nil }) else {
+            NSLog("⚠️ Not adjusting volume on \(deviceID): no confirmed level to adjust from")
+            return
+        }
+
+        setVolume(max(0, min(1, current + delta)))
     }
 
     func toggleMute() {
