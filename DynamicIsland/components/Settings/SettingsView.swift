@@ -1279,15 +1279,20 @@ struct GeneralSettings: View {
                 }
                 .settingsHighlight(id: highlightID("Reverse scroll gestures"))
 
-                Defaults.Toggle(key: .arrowKeySeekEnabled) {
-                    Text("Seek with arrow keys while the notch is open")
-                }
-                .settingsHighlight(id: highlightID("Arrow key seek"))
-
-                Text("Left and right seek by 10 seconds. Only while the notch is open, so the keys stay yours everywhere else. Seeking from another app needs Accessibility; without it this works while Atoll is frontmost.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
+
+            // Outside the gestures block on purpose: an arrow key is a keyboard
+            // shortcut, not a gesture, and NotchSeekKeyMonitor does not consult
+            // `enableGestures`. Nesting it there would hide the switch while the
+            // feature carried on working.
+            Defaults.Toggle(key: .arrowKeySeekEnabled) {
+                Text("Seek with arrow keys while the notch is open")
+            }
+            .settingsHighlight(id: highlightID("Arrow key seek"))
+
+            Text("Left and right seek by 10 seconds. Only while the notch is open, so the keys stay yours everywhere else. Seeking from another app needs Accessibility; without it this works while Atoll is frontmost.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         } header: {
             HStack {
                 Text("Gesture control")
