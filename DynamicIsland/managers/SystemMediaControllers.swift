@@ -69,6 +69,13 @@ final class SystemVolumeController {
     private let callbackQueue = DispatchQueue(label: "com.dynamicisland.volume-listener")
     private var currentDeviceID: AudioDeviceID = 0
     private var listenersInstalled = false
+    private struct InstalledListener {
+        let deviceID: AudioDeviceID
+        let address: AudioObjectPropertyAddress
+        let block: AudioObjectPropertyListenerBlock
+    }
+
+    private var installedListeners: [InstalledListener] = []
     private var volumeElement: AudioObjectPropertyElement?
     private var muteElement: AudioObjectPropertyElement?
     private let silenceThreshold: Float = 0.001 // Treat very low values as mute requests.
@@ -80,13 +87,25 @@ final class SystemVolumeController {
     /// and built-in speakers on some Macs -- but still answer this one.
     private let virtualMainVolumeSelector = AudioObjectPropertySelector(0x766D_7663)
 
-    /// The last level actually read from the hardware.
+    /// The last level actually read from the hardware, per device.
     ///
     /// A failed read used to be reported as zero, which is a real volume and
     /// therefore indistinguishable from silence: the slider dropped to the
     /// bottom and stayed there. Holding the last known level makes a failed
     /// read do nothing instead of lying.
-    private let lastKnownVolume = OSAllocatedUnfairLock(initialState: Float(0))
+    ///
+    /// Keyed by device because levels are not shared: headphones at 20% and
+    /// speakers at 80% are two different facts, and answering one with the
+    /// other after a route change would be a fresh way of being wrong. The
+    /// most recent reading of any device is kept as the last resort, for a
+    /// device that has never yet answered -- "unchanged" is a better guess
+    /// than "silent" when the truth is "unknown".
+    private struct VolumeMemory {
+        var byDevice: [AudioDeviceID: Float] = [:]
+        var mostRecent: Float = 0
+    }
+
+    private let volumeMemory = OSAllocatedUnfairLock(initialState: VolumeMemory())
 
     private let candidateElements: [AudioObjectPropertyElement] = [
         kAudioObjectPropertyElementMain,
@@ -240,21 +259,56 @@ final class SystemVolumeController {
     }
 
     private func installVolumeListeners(for deviceID: AudioDeviceID) {
+        // Route changes call this again. Without taking the old ones down
+        // first, every change left another live pair listening to a device we
+        // no longer read, each still calling notifyCurrentState.
+        removeVolumeListeners()
+
         if let element = resolveElement(selector: kAudioDevicePropertyVolumeScalar, deviceID: deviceID) {
             volumeElement = element
-            var address = makeAddress(selector: kAudioDevicePropertyVolumeScalar, element: element)
-            AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue) { [weak self] _, _ in
-                self?.notifyCurrentState()
-            }
+            addVolumeListener(selector: kAudioDevicePropertyVolumeScalar, element: element, deviceID: deviceID)
         }
 
         if let element = resolveElement(selector: kAudioDevicePropertyMute, deviceID: deviceID) {
             muteElement = element
-            var address = makeAddress(selector: kAudioDevicePropertyMute, element: element)
-            AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue) { [weak self] _, _ in
-                self?.notifyCurrentState()
-            }
+            addVolumeListener(selector: kAudioDevicePropertyMute, element: element, deviceID: deviceID)
         }
+
+        // The devices this fallback exists for are exactly the ones with no
+        // scalar element to listen on, so without this they would read
+        // correctly once and then never hear about a change made anywhere
+        // else -- the keyboard keys, Control Centre, another app.
+        var virtualAddress = makeAddress(selector: virtualMainVolumeSelector, element: kAudioObjectPropertyElementMain)
+        if propertyExists(deviceID: deviceID, address: &virtualAddress) {
+            addVolumeListener(selector: virtualMainVolumeSelector, element: kAudioObjectPropertyElementMain, deviceID: deviceID)
+        }
+    }
+
+    private func addVolumeListener(
+        selector: AudioObjectPropertySelector,
+        element: AudioObjectPropertyElement,
+        deviceID: AudioDeviceID
+    ) {
+        var address = makeAddress(selector: selector, element: element)
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            self?.notifyCurrentState()
+        }
+
+        let status = AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue, block)
+        guard status == noErr else {
+            NSLog("⚠️ Failed to observe volume property on \(deviceID): \(status)")
+            return
+        }
+
+        installedListeners.append(InstalledListener(deviceID: deviceID, address: address, block: block))
+    }
+
+    private func removeVolumeListeners() {
+        for listener in installedListeners {
+            var address = listener.address
+            AudioObjectRemovePropertyListenerBlock(listener.deviceID, &address, callbackQueue, listener.block)
+        }
+        installedListeners.removeAll()
     }
 
     private func handleDefaultDeviceChanged() {
@@ -281,16 +335,21 @@ final class SystemVolumeController {
     }
 
     private func getVolume() -> Float {
+        let deviceID = currentDeviceID
+
         if let value = readScalarVolume() ?? readVirtualMainVolume() {
-            lastKnownVolume.withLock { $0 = value }
+            volumeMemory.withLock {
+                $0.byDevice[deviceID] = value
+                $0.mostRecent = value
+            }
             return value
         }
 
         // Every read failed. That is not the same as the volume being zero,
         // and reporting zero pins the slider to the bottom for as long as the
         // device stays unreadable.
-        NSLog("⚠️ Unable to fetch volume; holding the last known level")
-        return lastKnownVolume.withLock { $0 }
+        NSLog("⚠️ Unable to fetch volume for \(deviceID); holding the last known level")
+        return volumeMemory.withLock { $0.byDevice[deviceID] ?? $0.mostRecent }
     }
 
     /// The per-element `VolumeScalar` reading, or nil when the device exposes
