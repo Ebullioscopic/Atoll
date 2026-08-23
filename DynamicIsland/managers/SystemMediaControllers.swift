@@ -160,7 +160,7 @@ final class SystemVolumeController {
             return
         }
 
-        setVolume(max(0, min(1, current + delta)))
+        setVolume(max(0, min(1, current + delta)), on: deviceID)
     }
 
     func toggleMute() {
@@ -176,27 +176,38 @@ final class SystemVolumeController {
     }
 
     func setVolume(_ value: Float) {
+        setVolume(value, on: currentDeviceID)
+    }
+
+    /// Writes a level to one named device.
+    ///
+    /// The device is a parameter rather than something each step looks up for
+    /// itself, because the steps are not instantaneous: elements are discovered
+    /// on whatever device is default at that moment, and the write happens
+    /// after. A route change in between had the write aiming the old device's
+    /// elements at the new device.
+    private func setVolume(_ value: Float, on deviceID: AudioDeviceID) {
         let clamped = max(0, min(1, value))
-        let currentlyMuted = isMuted
+        let currentlyMuted = getMuteState(on: deviceID)
 
         if clamped <= silenceThreshold {
             if !currentlyMuted {
-                setMuted(true)
+                setMuted(true, on: deviceID)
             }
         } else if currentlyMuted {
-            setMuted(false)
+            setMuted(false, on: deviceID)
         }
 
-        let elements = volumeElements()
+        let elements = volumeElements(on: deviceID)
         var wrote = false
 
         if elements.isEmpty {
             var volume = clamped
-            wrote = setData(selector: kAudioDevicePropertyVolumeScalar, data: &volume) == noErr
+            wrote = setData(selector: kAudioDevicePropertyVolumeScalar, on: deviceID, data: &volume) == noErr
         } else {
             for element in elements {
                 var volume = clamped
-                let status = setData(selector: kAudioDevicePropertyVolumeScalar, element: element, data: &volume)
+                let status = setData(selector: kAudioDevicePropertyVolumeScalar, element: element, on: deviceID, data: &volume)
                 if status == noErr {
                     cache(element: element, for: kAudioDevicePropertyVolumeScalar)
                     wrote = true
@@ -208,23 +219,37 @@ final class SystemVolumeController {
 
         // Same fallback the read side uses, for the same devices: a scalar
         // nobody accepted does not mean the volume cannot be set.
-        if !wrote, writeVirtualMainVolume(clamped) {
+        if !wrote, writeVirtualMainVolume(clamped, on: deviceID) {
             wrote = true
         }
 
-        if !wrote {
-            NSLog("⚠️ Failed to set volume on \(currentDeviceID)")
+        if wrote {
+            // The device has just been told what its level is, so that is what
+            // it is until a read says otherwise. Without this, the read that
+            // `notifyCurrentState` is about to do can fail and hand back the
+            // level from before the write -- and the slider springs back to
+            // where the user just dragged it from.
+            volumeMemory.withLock {
+                $0.byDevice[deviceID] = clamped
+                $0.mostRecent = clamped
+            }
+        } else {
+            NSLog("⚠️ Failed to set volume on \(deviceID)")
         }
 
         notifyCurrentState()
     }
 
     func setMuted(_ muted: Bool) {
+        setMuted(muted, on: currentDeviceID)
+    }
+
+    private func setMuted(_ muted: Bool, on deviceID: AudioDeviceID) {
         var muteFlag: UInt32 = muted ? 1 : 0
-        let elements = muteElements()
+        let elements = muteElements(on: deviceID)
 
         if elements.isEmpty {
-            let status = setData(selector: kAudioDevicePropertyMute, data: &muteFlag)
+            let status = setData(selector: kAudioDevicePropertyMute, on: deviceID, data: &muteFlag)
             if status != noErr {
                 NSLog("⚠️ Failed to set mute state: \(status)")
             }
@@ -233,7 +258,7 @@ final class SystemVolumeController {
 
         for element in elements {
             var value = muteFlag
-            let status = setData(selector: kAudioDevicePropertyMute, element: element, data: &value)
+            let status = setData(selector: kAudioDevicePropertyMute, element: element, on: deviceID, data: &value)
             if status != noErr {
                 NSLog("⚠️ Failed to set mute state for element \(element): \(status)")
             } else {
@@ -419,21 +444,25 @@ final class SystemVolumeController {
         return status == noErr ? value : nil
     }
 
-    private func writeVirtualMainVolume(_ value: Float) -> Bool {
+    private func writeVirtualMainVolume(_ value: Float, on deviceID: AudioDeviceID) -> Bool {
         var address = makeAddress(selector: virtualMainVolumeSelector, element: kAudioObjectPropertyElementMain)
-        guard propertyExists(deviceID: currentDeviceID, address: &address) else { return false }
+        guard propertyExists(deviceID: deviceID, address: &address) else { return false }
 
         var volume = Float32(value)
         let size = UInt32(MemoryLayout<Float32>.size)
-        return AudioObjectSetPropertyData(currentDeviceID, &address, 0, nil, size, &volume) == noErr
+        return AudioObjectSetPropertyData(deviceID, &address, 0, nil, size, &volume) == noErr
     }
 
     private func getMuteState() -> Bool {
-        let elements = muteElements()
+        getMuteState(on: currentDeviceID)
+    }
+
+    private func getMuteState(on deviceID: AudioDeviceID) -> Bool {
+        let elements = muteElements(on: deviceID)
 
         if elements.isEmpty {
             var mute: UInt32 = 0
-            let status = getData(selector: kAudioDevicePropertyMute, data: &mute)
+            let status = getData(selector: kAudioDevicePropertyMute, on: deviceID, data: &mute)
             if status != noErr {
                 return false
             }
@@ -445,7 +474,7 @@ final class SystemVolumeController {
 
         for element in elements {
             var value: UInt32 = 0
-            let status = getData(selector: kAudioDevicePropertyMute, element: element, data: &value)
+            let status = getData(selector: kAudioDevicePropertyMute, element: element, on: deviceID, data: &value)
             if status == noErr {
                 retrieved = true
                 if value == 0 {
@@ -540,13 +569,14 @@ final class SystemVolumeController {
         return lastStatus
     }
 
-    private func setData<T>(selector: AudioObjectPropertySelector, data: inout T) -> OSStatus {
+    private func setData<T>(selector: AudioObjectPropertySelector, on deviceID: AudioDeviceID? = nil, data: inout T) -> OSStatus {
+        let target = deviceID ?? currentDeviceID
         var lastStatus: OSStatus = kAudioHardwareUnspecifiedError
         for element in preferredElements(for: selector) {
             var address = makeAddress(selector: selector, element: element)
-            guard propertyExists(deviceID: currentDeviceID, address: &address) else { continue }
+            guard propertyExists(deviceID: target, address: &address) else { continue }
             let size = UInt32(MemoryLayout<T>.size)
-            lastStatus = AudioObjectSetPropertyData(currentDeviceID, &address, 0, nil, size, &data)
+            lastStatus = AudioObjectSetPropertyData(target, &address, 0, nil, size, &data)
             if lastStatus == noErr {
                 cache(element: element, for: selector)
                 return lastStatus
@@ -565,13 +595,14 @@ final class SystemVolumeController {
         return AudioObjectGetPropertyData(target, &address, 0, nil, &size, &data)
     }
 
-    private func setData<T>(selector: AudioObjectPropertySelector, element: AudioObjectPropertyElement, data: inout T) -> OSStatus {
+    private func setData<T>(selector: AudioObjectPropertySelector, element: AudioObjectPropertyElement, on deviceID: AudioDeviceID? = nil, data: inout T) -> OSStatus {
+        let target = deviceID ?? currentDeviceID
         var address = makeAddress(selector: selector, element: element)
-        guard propertyExists(deviceID: currentDeviceID, address: &address) else {
+        guard propertyExists(deviceID: target, address: &address) else {
             return kAudioHardwareUnknownPropertyError
         }
         let size = UInt32(MemoryLayout<T>.size)
-        return AudioObjectSetPropertyData(currentDeviceID, &address, 0, nil, size, &data)
+        return AudioObjectSetPropertyData(target, &address, 0, nil, size, &data)
     }
 
     private func volumeElements(on deviceID: AudioDeviceID? = nil) -> [AudioObjectPropertyElement] {
@@ -582,10 +613,11 @@ final class SystemVolumeController {
         }
     }
 
-    private func muteElements() -> [AudioObjectPropertyElement] {
-        candidateElements.filter { element in
+    private func muteElements(on deviceID: AudioDeviceID? = nil) -> [AudioObjectPropertyElement] {
+        let target = deviceID ?? currentDeviceID
+        return candidateElements.filter { element in
             var address = makeAddress(selector: kAudioDevicePropertyMute, element: element)
-            return propertyExists(deviceID: currentDeviceID, address: &address)
+            return propertyExists(deviceID: target, address: &address)
         }
     }
 }
