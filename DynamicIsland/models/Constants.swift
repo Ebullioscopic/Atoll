@@ -22,6 +22,7 @@
 
 import SwiftUI
 import Defaults
+import KeyboardShortcuts
 import Lottie
 import Foundation
 
@@ -1359,6 +1360,7 @@ extension Defaults.Keys {
     static let capsLockIndicatorUseGreenColor = Key<Bool>("capsLockIndicatorUseGreenColor", default: false) // Legacy toggle
     static let capsLockIndicatorTintMode = Key<CapsLockIndicatorTintMode>("capsLockIndicatorTintMode", default: .white)
     static let didMigrateCapsLockTintMode = Key<Bool>("didMigrateCapsLockTintMode", default: false)
+    static let didMigrateClipboardShortcutToV = Key<Bool>("didMigrateClipboardShortcutToV", default: false)
     static let showCapsLockLabel = Key<Bool>("showCapsLockLabel", default: false)
     
     // MARK: ImageService
@@ -1414,6 +1416,31 @@ extension Defaults.Keys {
         }
 
         normalizeMusicAuxControls()
+    }
+
+    /// Move the clipboard shortcut off the old Cmd+Shift+C default.
+    ///
+    /// Settings has always documented Cmd+Shift+V ("similar to Windows+V on PC") while the
+    /// shortcut was registered as Cmd+Shift+C. Changing the default alone fixes nothing for
+    /// anyone who has already launched Atoll: `KeyboardShortcuts.Name` writes its default into
+    /// UserDefaults on first run and never overwrites it, so the old value would win forever.
+    ///
+    /// Only a shortcut still sitting on the old default is moved. Anyone who picked their own
+    /// keeps it — including, unavoidably, anyone who deliberately chose Cmd+Shift+C.
+    ///
+    /// The marker is written last: if this crashed between marking and moving, the migration
+    /// would be considered done while the shortcut still sat on the old key, with no second
+    /// chance to correct it. Running twice is harmless by comparison, since the second run
+    /// finds Cmd+Shift+V rather than the legacy default and changes nothing.
+    static func migrateClipboardShortcutToV() {
+        guard Defaults[.didMigrateClipboardShortcutToV] == false else { return }
+
+        let legacyDefault = KeyboardShortcuts.Shortcut(.c, modifiers: [.shift, .command])
+        if KeyboardShortcuts.getShortcut(for: .clipboardHistoryPanel) == legacyDefault {
+            KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.shift, .command]), for: .clipboardHistoryPanel)
+        }
+
+        Defaults[.didMigrateClipboardShortcutToV] = true
     }
 
     static func migrateCapsLockTintMode() {
