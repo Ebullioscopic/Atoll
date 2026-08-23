@@ -18,6 +18,7 @@
 
 import Foundation
 import CoreAudio
+import os
 import CoreGraphics
 import IOKit
 
@@ -71,6 +72,21 @@ final class SystemVolumeController {
     private var volumeElement: AudioObjectPropertyElement?
     private var muteElement: AudioObjectPropertyElement?
     private let silenceThreshold: Float = 0.001 // Treat very low values as mute requests.
+
+    /// `kAudioHardwareServiceDeviceProperty_VirtualMainVolume` ('vmvc').
+    ///
+    /// The property macOS's own volume UI works through. Some outputs publish
+    /// no per-channel `VolumeScalar` at all -- HDMI and DisplayPort commonly,
+    /// and built-in speakers on some Macs -- but still answer this one.
+    private let virtualMainVolumeSelector = AudioObjectPropertySelector(0x766D_7663)
+
+    /// The last level actually read from the hardware.
+    ///
+    /// A failed read used to be reported as zero, which is a real volume and
+    /// therefore indistinguishable from silence: the slider dropped to the
+    /// bottom and stayed there. Holding the last known level makes a failed
+    /// read do nothing instead of lying.
+    private let lastKnownVolume = OSAllocatedUnfairLock(initialState: Float(0))
 
     private let candidateElements: [AudioObjectPropertyElement] = [
         kAudioObjectPropertyElementMain,
@@ -131,24 +147,34 @@ final class SystemVolumeController {
         }
 
         let elements = volumeElements()
+        var wrote = false
 
         if elements.isEmpty {
             var volume = clamped
-            let status = setData(selector: kAudioDevicePropertyVolumeScalar, data: &volume)
-            if status != noErr {
-                NSLog("⚠️ Failed to set volume: \(status)")
-            }
+            wrote = setData(selector: kAudioDevicePropertyVolumeScalar, data: &volume) == noErr
         } else {
             for element in elements {
                 var volume = clamped
                 let status = setData(selector: kAudioDevicePropertyVolumeScalar, element: element, data: &volume)
-                if status != noErr {
-                    NSLog("⚠️ Failed to set volume for element \(element): \(status)")
-                } else {
+                if status == noErr {
                     cache(element: element, for: kAudioDevicePropertyVolumeScalar)
+                    wrote = true
+                } else {
+                    NSLog("⚠️ Failed to set volume for element \(element): \(status)")
                 }
             }
         }
+
+        // Same fallback the read side uses, for the same devices: a scalar
+        // nobody accepted does not mean the volume cannot be set.
+        if !wrote, writeVirtualMainVolume(clamped) {
+            wrote = true
+        }
+
+        if !wrote {
+            NSLog("⚠️ Failed to set volume on \(currentDeviceID)")
+        }
+
         notifyCurrentState()
     }
 
@@ -255,15 +281,27 @@ final class SystemVolumeController {
     }
 
     private func getVolume() -> Float {
+        if let value = readScalarVolume() ?? readVirtualMainVolume() {
+            lastKnownVolume.withLock { $0 = value }
+            return value
+        }
+
+        // Every read failed. That is not the same as the volume being zero,
+        // and reporting zero pins the slider to the bottom for as long as the
+        // device stays unreadable.
+        NSLog("⚠️ Unable to fetch volume; holding the last known level")
+        return lastKnownVolume.withLock { $0 }
+    }
+
+    /// The per-element `VolumeScalar` reading, or nil when the device exposes
+    /// none that can be read.
+    private func readScalarVolume() -> Float? {
         let elements = volumeElements()
 
         if elements.isEmpty {
             var volume = Float32(0)
             let status = getData(selector: kAudioDevicePropertyVolumeScalar, data: &volume)
-            if status != noErr {
-                NSLog("⚠️ Unable to fetch volume: \(status)")
-            }
-            return volume
+            return status == noErr ? volume : nil
         }
 
         var masterVolume: Float?
@@ -274,7 +312,7 @@ final class SystemVolumeController {
             var value = Float32(0)
             let status = getData(selector: kAudioDevicePropertyVolumeScalar, element: element, data: &value)
             if status == noErr {
-                if element == kAudioObjectPropertyElementMaster {
+                if element == kAudioObjectPropertyElementMain {
                     masterVolume = value
                 }
                 accumulator += value
@@ -282,20 +320,27 @@ final class SystemVolumeController {
             }
         }
 
-        if let masterVolume {
-            return masterVolume
-        }
+        if let masterVolume { return masterVolume }
+        return count > 0 ? accumulator / count : nil
+    }
 
-        if count > 0 {
-            return accumulator / count
-        }
+    private func readVirtualMainVolume() -> Float? {
+        var address = makeAddress(selector: virtualMainVolumeSelector, element: kAudioObjectPropertyElementMain)
+        guard propertyExists(deviceID: currentDeviceID, address: &address) else { return nil }
 
-        var fallback = Float32(0)
-        let status = getData(selector: kAudioDevicePropertyVolumeScalar, data: &fallback)
-        if status != noErr {
-            NSLog("⚠️ Unable to fetch fallback volume: \(status)")
-        }
-        return fallback
+        var value = Float32(0)
+        var size = UInt32(MemoryLayout<Float32>.size)
+        let status = AudioObjectGetPropertyData(currentDeviceID, &address, 0, nil, &size, &value)
+        return status == noErr ? value : nil
+    }
+
+    private func writeVirtualMainVolume(_ value: Float) -> Bool {
+        var address = makeAddress(selector: virtualMainVolumeSelector, element: kAudioObjectPropertyElementMain)
+        guard propertyExists(deviceID: currentDeviceID, address: &address) else { return false }
+
+        var volume = Float32(value)
+        let size = UInt32(MemoryLayout<Float32>.size)
+        return AudioObjectSetPropertyData(currentDeviceID, &address, 0, nil, size, &volume) == noErr
     }
 
     private func getMuteState() -> Bool {
