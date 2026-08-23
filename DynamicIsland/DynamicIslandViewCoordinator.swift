@@ -21,14 +21,14 @@ import Defaults
 import Foundation
 import SwiftUI
 
-enum WhatsAppIncomingMediaKind: String, Equatable {
+enum ChatIncomingMediaKind: String, Equatable {
     case image
     case sticker
     case video
     case gif
 }
 
-struct WhatsAppIncomingPollOption: Equatable, Identifiable {
+struct ChatIncomingPollOption: Equatable, Identifiable {
     let id: String
     let text: String
     let isSelected: Bool
@@ -42,7 +42,7 @@ struct WhatsAppIncomingPollOption: Equatable, Identifiable {
     }
 }
 
-struct WhatsAppIncomingLinkPreview: Equatable {
+struct ChatIncomingLinkPreview: Equatable {
     let url: String
     let title: String
     let domain: String
@@ -50,33 +50,33 @@ struct WhatsAppIncomingLinkPreview: Equatable {
     let appleMapsUrl: String?
 }
 
-struct WhatsAppIncomingDocumentPreview: Equatable {
+struct ChatIncomingDocumentPreview: Equatable {
     let fileName: String
     let detail: String
     let mimeType: String?
     let thumbnailDataUrl: String?
 }
 
-struct WhatsAppIncomingMessage: Equatable, Identifiable {
+struct ChatIncomingMessage: Equatable, Identifiable {
     let id: String
     let text: String
-    let mediaKind: WhatsAppIncomingMediaKind?
+    let mediaKind: ChatIncomingMediaKind?
     let mediaDataUrl: String?
-    let linkPreview: WhatsAppIncomingLinkPreview?
-    let documentPreview: WhatsAppIncomingDocumentPreview?
+    let linkPreview: ChatIncomingLinkPreview?
+    let documentPreview: ChatIncomingDocumentPreview?
     let groupSender: String?
-    let pollOptions: [WhatsAppIncomingPollOption]
+    let pollOptions: [ChatIncomingPollOption]
     let pollAllowsMultipleSelection: Bool
 
     init(
         id: String = UUID().uuidString,
         text: String,
-        mediaKind: WhatsAppIncomingMediaKind? = nil,
+        mediaKind: ChatIncomingMediaKind? = nil,
         mediaDataUrl: String? = nil,
-        linkPreview: WhatsAppIncomingLinkPreview? = nil,
-        documentPreview: WhatsAppIncomingDocumentPreview? = nil,
+        linkPreview: ChatIncomingLinkPreview? = nil,
+        documentPreview: ChatIncomingDocumentPreview? = nil,
         groupSender: String? = nil,
-        pollOptions: [WhatsAppIncomingPollOption] = [],
+        pollOptions: [ChatIncomingPollOption] = [],
         pollAllowsMultipleSelection: Bool = false
     ) {
         self.id = id
@@ -108,7 +108,7 @@ enum SneakContentType: Equatable {
     case lockScreen
     case capsLock
     case extensionLiveActivity(bundleID: String, activityID: String)
-    case whatsApp(senderName: String, messages: [WhatsAppIncomingMessage], chatId: String, avatarUrl: String?)
+    case chat(service: ChatService, senderName: String, messages: [ChatIncomingMessage], chatId: String, avatarUrl: String?)
 }
 
 extension SneakContentType {
@@ -132,8 +132,8 @@ extension SneakContentType {
             return true
         case let (.extensionLiveActivity(lb, la), .extensionLiveActivity(rb, ra)):
             return lb == rb && la == ra
-        case let (.whatsApp(ls, lm, lc, la), .whatsApp(rs, rm, rc, ra)):
-            return ls == rs && lm == rm && lc == rc && la == ra
+        case let (.chat(lsvc, ls, lm, lc, la), .chat(rsvc, rs, rm, rc, ra)):
+            return lsvc == rsvc && ls == rs && lm == rm && lc == rc && la == ra
         default:
             return false
         }
@@ -242,7 +242,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
     @Published var selectedScreen: String = NSScreen.main?.localizedName ?? "Unknown"
 
     @Published var optionKeyPressed: Bool = true
-    @Published var whatsAppSelectedPollOptionsByMessage: [String: Set<String>] = [:]
+    @Published var chatSelectedPollOptionsByMessage: [String: Set<String>] = [:]
     private let extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     
     private init() {
@@ -496,10 +496,10 @@ class DynamicIslandViewCoordinator: ObservableObject {
         }
     }
     
-    @Published var isWhatsAppReplying: Bool = false
-    @Published var isWhatsAppFilePreviewVisible: Bool = false
+    @Published var isChatReplying: Bool = false
+    @Published var isChatFilePreviewVisible: Bool = false
     /// Blocca auto-dismiss mentre è aperto NSOpenPanel o altre interazioni modali.
-    @Published var suppressWhatsAppAutoDismiss: Bool = false
+    @Published var suppressChatAutoDismiss: Bool = false
     
     @Published var sneakPeek: sneakPeek = .init() {
         didSet {
@@ -507,7 +507,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
                 scheduleSneakPeekHide(after: sneakPeekDuration)
             } else {
                 sneakPeekTask?.cancel()
-                isWhatsAppReplying = false
+                isChatReplying = false
             }
         }
     }
@@ -523,8 +523,8 @@ class DynamicIslandViewCoordinator: ObservableObject {
             let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
             let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
 
-            if case .whatsApp = type {
-                isWhatsAppReplying = status
+            if case .chat = type {
+                isChatReplying = status
             }
 
             withAnimation(status ? openAnimation : closeAnimation) {
@@ -553,9 +553,9 @@ class DynamicIslandViewCoordinator: ObservableObject {
                 scheduleExpandingViewHide(after: duration, type: expandingView.type)
             } else {
                 expandingViewTask?.cancel()
-                isWhatsAppReplying = false
-                isWhatsAppFilePreviewVisible = false
-                suppressWhatsAppAutoDismiss = false
+                isChatReplying = false
+                isChatFilePreviewVisible = false
+                suppressChatAutoDismiss = false
             }
         }
     }
@@ -575,7 +575,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
     private func dismissExpandingViewIfAllowed(type dismissType: SneakContentType) {
         guard expandingView.show, expandingView.type == dismissType else { return }
 
-        if case .whatsApp = dismissType, suppressWhatsAppAutoDismiss {
+        if case .chat = dismissType, suppressChatAutoDismiss {
             scheduleExpandingViewHide(after: 1, type: dismissType)
             return
         }

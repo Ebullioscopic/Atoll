@@ -126,6 +126,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let extensionXPCServiceHost = ExtensionXPCServiceHost.shared
     let extensionRPCServer = ExtensionRPCServer.shared
     let whatsAppManager = WhatsAppManager.shared
+    let telegramManager = TelegramManager.shared
     var closeNotchWorkItem: DispatchWorkItem?
     private var previousScreens: [NSScreen]?
     private var onboardingWindowController: NSWindowController?
@@ -483,15 +484,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func calculateRequiredNotchSize(for screen: NSScreen? = nil, viewModel: DynamicIslandViewModel? = nil) -> CGSize {
         let sizingViewModel = viewModel ?? screen.flatMap { viewModels[$0] } ?? vm
 
-        // Check if WhatsApp expanding HUD is showing
+        // Check if a chat expanding HUD is showing
         if sizingViewModel.notchState == .closed,
            coordinator.expandingView.show,
-           case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type {
+           case .chat(_, _, let messages, _, _) = coordinator.expandingView.type {
             let screenName = screen?.localizedName ?? sizingViewModel.screen
             let isIslandMode = shouldUseDynamicIslandMode(for: screenName)
-            let contentSize = WhatsAppNotificationLayout.totalSize(
-                isReplying: coordinator.isWhatsAppReplying,
-                hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
+            let contentSize = ChatNotificationLayout.totalSize(
+                isReplying: coordinator.isChatReplying,
+                hasFilePreview: coordinator.isChatFilePreviewVisible,
                 messages: messages,
                 isDynamicIslandMode: isIslandMode,
                 closedNotchHeight: sizingViewModel.closedNotchSize.height
@@ -652,7 +653,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func ensureWindowSize(_ size: CGSize, animated: Bool, force: Bool = false) {
         if vm.notchState == .closed,
            coordinator.expandingView.show,
-           case .whatsApp = coordinator.expandingView.type {
+           case .chat = coordinator.expandingView.type {
             resizeWindowsToCurrentRequiredSize(animated: animated, force: force)
             return
         }
@@ -733,7 +734,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func shouldAnimateResize(for newSize: CGSize) -> Bool {
         if coordinator.expandingView.show,
-           case .whatsApp = coordinator.expandingView.type {
+           case .chat = coordinator.expandingView.type {
             return true
         }
         if Defaults[.enableMinimalisticUI] && !ReminderLiveActivityManager.shared.activeWindowReminders.isEmpty {
@@ -758,8 +759,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         LockScreenManager.shared.configure(viewModel: vm)
         extensionXPCServiceHost.start()
         extensionRPCServer.start()
-        print("DEBUG: Instantiating WhatsAppManager...")
-        print("DEBUG: WhatsAppManager auth state is \(WhatsAppManager.shared.authState)")
+        print("DEBUG: WhatsApp auth state is \(WhatsAppManager.shared.authState)")
+        print("DEBUG: Telegram auth state is \(TelegramManager.shared.authState)")
         
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()

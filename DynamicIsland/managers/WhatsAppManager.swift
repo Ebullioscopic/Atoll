@@ -19,7 +19,7 @@ import UniformTypeIdentifiers
 /// `WhatsAppWebEngine`. All message interception and reply-sending
 /// is handled by the engine; this class only manages lifecycle.
 @MainActor
-public final class WhatsAppManager: ObservableObject {
+public final class WhatsAppManager: ObservableObject, ChatMessagingProvider {
     public static let shared = WhatsAppManager()
 
     static let previewChatId = "__atoll_whatsapp_preview__"
@@ -203,10 +203,11 @@ public final class WhatsAppManager: ObservableObject {
     /// Shows a sample WhatsApp notification in the Dynamic Island for animation and layout testing.
     public func showPreviewNotification() {
         let coordinator = DynamicIslandViewCoordinator.shared
-        let previewType: SneakContentType = .whatsApp(
+        let previewType: SneakContentType = .chat(
+            service: .whatsApp,
             senderName: "Atoll Preview",
             messages: [
-                WhatsAppIncomingMessage(text: "Notifica di prova: tocca per rispondere e attendi per chiudere.")
+                ChatIncomingMessage(text: "Notifica di prova: tocca per rispondere e attendi per chiudere.")
             ],
             chatId: Self.previewChatId,
             avatarUrl: nil
@@ -215,7 +216,7 @@ public final class WhatsAppManager: ObservableObject {
         coordinator.cancelExpandingViewHide()
 
         if coordinator.expandingView.show,
-           case .whatsApp(_, _, let chatId, _) = coordinator.expandingView.type,
+           case .chat(_, _, _, let chatId, _) = coordinator.expandingView.type,
            chatId == Self.previewChatId {
             coordinator.toggleExpandingView(status: false, type: previewType)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {

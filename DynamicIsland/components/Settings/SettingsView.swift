@@ -89,6 +89,18 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Whether the sidebar marks this tab as beta.
+    ///
+    /// The tab's own answer rather than a list inside the row: the row drew one
+    /// badge per tab in a chain of branches, each a copy of the same capsule,
+    /// so marking a tab meant pasting the badge again.
+    var isBeta: Bool {
+        switch self {
+        case .extensions, .whatsapp: return true
+        default: return false
+        }
+    }
+
     var title: String {
         switch self {
         case .general: return String(localized: "General")
@@ -458,18 +470,7 @@ struct SettingsView: View {
         HStack(spacing: 10) {
             sidebarIcon(for: tab)
             Text(LocalizedStringKey(tab.title))
-            if tab == .downloads {
-                Spacer()
-                Text("BETA")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(Color.blue)
-                    )
-            } else if tab == .extensions {
+            if tab.isBeta {
                 Spacer()
                 Text("BETA")
                     .font(.system(size: 9, weight: .bold))
@@ -8837,10 +8838,13 @@ struct TerminalSettings: View {
 
 struct SocialSettingsView: View {
     @ObservedObject private var manager = WhatsAppManager.shared
+    @ObservedObject private var telegramManager = TelegramManager.shared
 
     @Default(.whatsAppEnabled) var whatsAppEnabled
     @Default(.isWhatsAppAnimEnabled) var isWhatsAppAnimEnabled
+    @Default(.telegramEnabled) var telegramEnabled
     @State private var disconnecting = false
+    @State private var telegramDisconnecting = false
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.whatsapp.highlightID(for: title)
@@ -8949,9 +8953,150 @@ struct SocialSettingsView: View {
                 } footer: {
                     Text(footerText)
                 }
+
+                Section {
+                    HStack(spacing: 10) {
+                        Image("Telegram")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 28, height: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Telegram")
+                                .font(.headline)
+                            Text("Native notifications in the Dynamic Island")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Defaults.Toggle(key: .telegramEnabled) {
+                        Text("Enable Telegram")
+                    }
+                    .settingsHighlight(id: highlightID("Enable Telegram"))
+
+                    if telegramEnabled {
+                        HStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .fill(telegramStatusColor.opacity(0.15))
+                                    .frame(width: 24, height: 24)
+                                Image(systemName: telegramStatusIcon)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(telegramStatusColor)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(telegramStatusTitle)
+                                    .font(.subheadline.weight(.medium))
+                                Text(telegramStatusSubtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+
+                        if telegramManager.authState != .authenticated {
+                            Button {
+                                telegramManager.connect()
+                            } label: {
+                                Label("Connect Telegram", systemImage: "qrcode")
+                            }
+                            .settingsHighlight(id: highlightID("Connect Telegram"))
+
+                            NativeStepRow(
+                                number: 1,
+                                icon: "qrcode.viewfinder",
+                                title: "Click \"Connect Telegram\"",
+                                subtitle: "A window with Telegram Web will open"
+                            )
+                            NativeStepRow(
+                                number: 2,
+                                icon: "iphone",
+                                title: "Scan the code, or sign in with your number",
+                                subtitle: "Telegram → Settings → Devices → Link Desktop Device"
+                            )
+                            NativeStepRow(
+                                number: 3,
+                                icon: "bell.badge.fill",
+                                title: "Receive notifications in the Dynamic Island",
+                                subtitle: "Reply directly from the notch, without opening any app"
+                            )
+                        } else {
+                            Button {
+                                telegramDisconnecting = true
+                                telegramManager.disconnect()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { telegramDisconnecting = false }
+                            } label: {
+                                if telegramDisconnecting {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Label("Disconnect", systemImage: "person.crop.circle.badge.minus")
+                                }
+                            }
+                            .foregroundStyle(.red)
+                            .disabled(telegramDisconnecting)
+                        }
+
+                        Button {
+                            telegramManager.showPreviewNotification()
+                        } label: {
+                            Label("Preview notification", systemImage: "sparkles.rectangle.stack")
+                        }
+                    }
+                } header: {
+                    Text("Telegram")
+                } footer: {
+                    Text("Atoll reads the chat list Telegram Web keeps up to date, so a card carries the same one-line preview Telegram itself shows. Replies are typed straight into that chat.")
+                }
             }
             .navigationTitle("Social")
         }
+
+    // MARK: - Telegram status
+
+    private var telegramStatusTitle: String {
+        switch telegramManager.authState {
+        case .idle: return String(localized: "Not connected")
+        case .loading: return String(localized: "Connecting…")
+        case .signInRequired: return String(localized: "Sign-in required")
+        case .authenticated: return String(localized: "Connected")
+        case .error: return String(localized: "Connection error")
+        }
+    }
+
+    private var telegramStatusSubtitle: String {
+        switch telegramManager.authState {
+        case .idle:
+            return String(localized: "Open the connection window to sign in to Telegram Web.")
+        case .loading:
+            return String(localized: "Loading Telegram Web…")
+        case .signInRequired:
+            return String(localized: "Open the connection window and scan the code, or sign in with your number.")
+        case .authenticated:
+            return String(localized: "Messages will appear in the notch as they arrive.")
+        case .error(let message):
+            return message
+        }
+    }
+
+    private var telegramStatusIcon: String {
+        switch telegramManager.authState {
+        case .authenticated: return "checkmark.circle.fill"
+        case .error: return "exclamationmark.triangle.fill"
+        case .signInRequired: return "qrcode"
+        default: return "circle.dashed"
+        }
+    }
+
+    private var telegramStatusColor: Color {
+        switch telegramManager.authState {
+        case .authenticated: return .green
+        case .error: return .red
+        case .signInRequired: return .orange
+        default: return .secondary
+        }
+    }
+
 
     // MARK: - Computed
 

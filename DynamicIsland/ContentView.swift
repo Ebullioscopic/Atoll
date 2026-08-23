@@ -169,11 +169,11 @@ struct ContentView: View {
 
         if vm.notchState == .closed,
            coordinator.expandingView.show,
-           case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type,
-           isWhatsAppExpansionVisible {
-            let contentSize = WhatsAppNotificationLayout.totalSize(
-                isReplying: coordinator.isWhatsAppReplying,
-                hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
+           case .chat(_, _, let messages, _, _) = coordinator.expandingView.type,
+           isChatExpansionVisible {
+            let contentSize = ChatNotificationLayout.totalSize(
+                isReplying: coordinator.isChatReplying,
+                hasFilePreview: coordinator.isChatFilePreviewVisible,
                 messages: messages,
                 isDynamicIslandMode: isDynamicIslandMode,
                 closedNotchHeight: vm.closedNotchSize.height
@@ -243,7 +243,7 @@ struct ContentView: View {
     
 
     @State private var hoverTask: Task<Void, Never>?
-    @State private var whatsAppDismissTask: Task<Void, Never>?
+    @State private var chatDismissTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
     @State private var lastHapticTime: Date = Date()
     @State private var hoverClickMonitor: Any?
@@ -307,7 +307,7 @@ struct ContentView: View {
     private let statsAdditionalRowHeight: CGFloat = statsSecondRowContentHeight + statsGridSpacingHeight
     private let musicControlPauseGrace: TimeInterval = 5
     private let musicControlResumeDelay: TimeInterval = 0.24
-    private let whatsAppDismissDelayAfterMouseExit: TimeInterval = 2.1
+    private let chatDismissDelayAfterMouseExit: TimeInterval = 2.1
 
     // MARK: - Tab switch direction for smooth transitions
     
@@ -449,7 +449,7 @@ struct ContentView: View {
             && isNonNotchScreen
             && vm.notchState == .closed
             && !isSneakPeekVisibleOnCurrentScreen
-            && !isWhatsAppExpansionVisible
+            && !isChatExpansionVisible
     }
 
     /// Whether the fallback top-edge hover detector should run.
@@ -500,21 +500,21 @@ struct ContentView: View {
         if coordinator.expandingView.type == .battery {
             return isBatteryHUDVisibleOnCurrentScreen
         }
-        if case .whatsApp = coordinator.expandingView.type {
-            return isWhatsAppExpansionVisible
+        if case .chat = coordinator.expandingView.type {
+            return isChatExpansionVisible
         }
         return true
     }
 
-    private var isWhatsAppExpansionVisible: Bool {
+    private var isChatExpansionVisible: Bool {
         guard coordinator.expandingView.show,
-              case .whatsApp = coordinator.expandingView.type,
+              case .chat = coordinator.expandingView.type,
               vm.notchState == .closed else { return false }
         return true
     }
 
-    private var currentWhatsAppMessages: [WhatsAppIncomingMessage] {
-        guard case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type else { return [] }
+    private var currentChatMessages: [ChatIncomingMessage] {
+        guard case .chat(_, _, let messages, _, _) = coordinator.expandingView.type else { return [] }
         return messages
     }
 
@@ -580,9 +580,9 @@ struct ContentView: View {
     }
 
 
-    private var activeClosedWhatsAppSurfaceShape: AnyShape? {
+    private var activeClosedChatSurfaceShape: AnyShape? {
         guard vm.notchState == .closed else { return nil }
-        guard isWhatsAppExpansionVisible else { return nil }
+        guard isChatExpansionVisible else { return nil }
 
         if isDynamicIslandMode {
             let radius = dynamicIslandPillCornerRadiusInsets.opened
@@ -590,7 +590,7 @@ struct ContentView: View {
         }
 
         let topRadius = activeCornerRadiusInsets.closed.top
-        let bottomRadius = WhatsAppNotificationLayout.bottomCornerRadius(isReplying: coordinator.isWhatsAppReplying)
+        let bottomRadius = ChatNotificationLayout.bottomCornerRadius(isReplying: coordinator.isChatReplying)
         return AnyShape(NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius))
     }
 
@@ -652,8 +652,8 @@ struct ContentView: View {
         if let activeClosedBatterySurfaceShape {
             return activeClosedBatterySurfaceShape
         }
-        if let activeClosedWhatsAppSurfaceShape {
-            return activeClosedWhatsAppSurfaceShape
+        if let activeClosedChatSurfaceShape {
+            return activeClosedChatSurfaceShape
         }
         if isDynamicIslandMode {
             return AnyShape(currentPillShape)
@@ -675,7 +675,7 @@ struct ContentView: View {
             .clipShape(resolvedClipShape)
             .compositingGroup()
             .shadow(
-                color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow] && !isWhatsAppExpansionVisible)
+                color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow] && !isChatExpansionVisible)
                     ? .black.opacity(0.6)
                     : .clear,
                 radius: Defaults[.cornerRadiusScaling] ? 10 : 5
@@ -771,18 +771,18 @@ struct ContentView: View {
             }
             .onChange(of: coordinator.expandingView.show) { _, expanding in
                 if !expanding {
-                    cancelWhatsAppDismissTask()
-                    coordinator.isWhatsAppReplying = false
+                    cancelChatDismissTask()
+                    coordinator.isChatReplying = false
                 }
-                if case .whatsApp = coordinator.expandingView.type {
+                if case .chat = coordinator.expandingView.type {
                     NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
                 }
             }
-            .onChange(of: coordinator.isWhatsAppReplying) { _, replying in
-                syncWhatsAppWindowSizeIfNeeded(forReplying: replying)
+            .onChange(of: coordinator.isChatReplying) { _, replying in
+                syncChatWindowSizeIfNeeded(forReplying: replying)
             }
-            .onChange(of: coordinator.isWhatsAppFilePreviewVisible) { _, _ in
-                syncWhatsAppWindowSizeIfNeeded()
+            .onChange(of: coordinator.isChatFilePreviewVisible) { _, _ in
+                syncChatWindowSizeIfNeeded()
             }
             .onChange(of: coordinator.currentView) { _, newValue in
                 if enableStatsFeature {
@@ -850,14 +850,14 @@ struct ContentView: View {
             }
             .simultaneousGesture(
                 TapGesture().onEnded {
-                    // Quando siamo in modalità reply WhatsApp, non intercettare
+                    // While a chat reply is being typed, do not intercept
                     // i tap — lasciarli passare ai Button figli (es. "+")
-                    if isWhatsAppExpansionVisible && coordinator.isWhatsAppReplying {
+                    if isChatExpansionVisible && coordinator.isChatReplying {
                         return
                     }
-                    if isWhatsAppExpansionVisible {
-                        if !coordinator.isWhatsAppReplying {
-                            activateWhatsAppReplyMode(animated: false)
+                    if isChatExpansionVisible {
+                        if !coordinator.isChatReplying {
+                            activateChatReplyMode(animated: false)
                         }
                         return
                     }
@@ -915,21 +915,21 @@ struct ContentView: View {
             + (vm.notchState == .open ? 12 : 0)
             + (isIslandMode ? 0 : notchTopScreenBleedAmount)
             + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)
-        let whatsAppRootWidth = dynamicNotchSize.width
+        let chatRootWidth = dynamicNotchSize.width
             + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)
-        let whatsAppRootHeight = dynamicNotchSize.height
+        let chatRootHeight = dynamicNotchSize.height
             + currentShadowPadding
             + (isIslandMode ? 0 : notchTopScreenBleedAmount)
             + (isDynamicIslandMode ? dynamicIslandTopOffset : 0)
-        let rootWidth = isWhatsAppExpansionVisible ? whatsAppRootWidth : standardRootWidth
-        let rootHeight = isWhatsAppExpansionVisible ? whatsAppRootHeight : standardRootHeight
+        let rootWidth = isChatExpansionVisible ? chatRootWidth : standardRootWidth
+        let rootHeight = isChatExpansionVisible ? chatRootHeight : standardRootHeight
 
         return ZStack(alignment: .top) {
             configuredMainLayout
         }
         .frame(
-            width: isWhatsAppExpansionVisible ? rootWidth : nil,
-            height: isWhatsAppExpansionVisible ? rootHeight : nil,
+            width: isChatExpansionVisible ? rootWidth : nil,
+            height: isChatExpansionVisible ? rootHeight : nil,
             alignment: .top
         )
         .frame(
@@ -1148,14 +1148,15 @@ struct ContentView: View {
                             styleOverride: batteryModel.activeTemporaryHUDKind.map { resolvedBatteryNotificationStyle(for: $0) }
                         )
                         .id(batteryModel.activeTemporaryHUDToken)
-                      } else if isWhatsAppExpansionVisible,
-                                case .whatsApp(let senderName, let messages, let chatId, let avatarUrl) = coordinator.expandingView.type {
-                        WhatsAppTemporaryActivityView(
+                      } else if isChatExpansionVisible,
+                                case .chat(let service, let senderName, let messages, let chatId, let avatarUrl) = coordinator.expandingView.type {
+                        ChatTemporaryActivityView(
+                                    service: service,
                                     senderName: senderName,
                                     messages: messages,
                                     chatId: chatId,
                                     avatarUrl: avatarUrl,
-                                    isReplying: $coordinator.isWhatsAppReplying,
+                                    isReplying: $coordinator.isChatReplying,
                                     closedNotchHeight: vm.closedNotchSize.height,
                                     isDynamicIslandMode: isDynamicIslandMode
                         )
@@ -2178,7 +2179,7 @@ struct ContentView: View {
     /// `.onDisappear` and from `vm.onViewTeardown` on window close. Idempotent.
     private func performViewTeardown() {
         hoverTask?.cancel()
-        cancelWhatsAppDismissTask()
+        cancelChatDismissTask()
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
         stopHiddenEdgeHoverPolling()
@@ -2246,7 +2247,7 @@ struct ContentView: View {
                 guard !self.recordingOpenGestureLocked else { return }
                 guard !self.coordinator.isHoverOpenSuppressed else { return }
                 guard self.isHovering else { return }
-                guard !self.isWhatsAppExpansionVisible else { return }
+                guard !self.isChatExpansionVisible else { return }
                 guard !self.handleClosedMusicWaveformTapIfNeeded() else { return }
                 if Defaults[.enableHaptics] {
                     self.triggerHapticIfAllowed()
@@ -2334,12 +2335,12 @@ struct ContentView: View {
         hoverTask?.cancel()
 
         if hovering {
-            cancelWhatsAppDismissTask()
+            cancelChatDismissTask()
             if !recordingLiveActivityVisibleOnClosedNotch {
                 startHoverClickMonitor()
             }
             removeStickyTerminalClickMonitor()
-            if isWhatsAppExpansionVisible {
+            if isChatExpansionVisible {
                 coordinator.cancelExpandingViewHide()
             }
         } else {
@@ -2349,9 +2350,9 @@ struct ContentView: View {
                     isHoveringClosedMusicWaveformControl = false
                 }
             }
-            if isWhatsAppExpansionVisible {
-                collapseWhatsAppReplyIfNeeded()
-                scheduleWhatsAppDismissAfterMouseExit()
+            if isChatExpansionVisible {
+                collapseChatReplyIfNeeded()
+                scheduleChatDismissAfterMouseExit()
             }
         }
 
@@ -2367,7 +2368,7 @@ struct ContentView: View {
             let shouldFocusTimerTab = enableTimerFeature && timerDisplayMode == .tab && timerManager.isTimerActive && !enableMinimalisticUI
 
             guard vm.notchState == .closed,
-                !isWhatsAppExpansionVisible,
+                !isChatExpansionVisible,
                 !isSneakPeekVisibleOnCurrentScreen,
                 !recordingLiveActivityVisibleOnClosedNotch,
                 (Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
@@ -2407,47 +2408,47 @@ struct ContentView: View {
         }
     }
 
-    private func cancelWhatsAppDismissTask() {
-        whatsAppDismissTask?.cancel()
-        whatsAppDismissTask = nil
+    private func cancelChatDismissTask() {
+        chatDismissTask?.cancel()
+        chatDismissTask = nil
     }
 
-    private func collapseWhatsAppReplyIfNeeded() {
-        guard coordinator.isWhatsAppReplying else { return }
+    private func collapseChatReplyIfNeeded() {
+        guard coordinator.isChatReplying else { return }
         withAnimation(.smooth(duration: 0.18)) {
-            coordinator.isWhatsAppReplying = false
+            coordinator.isChatReplying = false
         }
     }
 
-    private func scheduleWhatsAppDismissAfterMouseExit() {
-        guard isWhatsAppExpansionVisible,
-              case .whatsApp = coordinator.expandingView.type,
-              !coordinator.suppressWhatsAppAutoDismiss else { return }
+    private func scheduleChatDismissAfterMouseExit() {
+        guard isChatExpansionVisible,
+              case .chat = coordinator.expandingView.type,
+              !coordinator.suppressChatAutoDismiss else { return }
 
-        cancelWhatsAppDismissTask()
+        cancelChatDismissTask()
         let activeType = coordinator.expandingView.type
 
-        whatsAppDismissTask = Task {
-            try? await Task.sleep(for: .seconds(whatsAppDismissDelayAfterMouseExit))
+        chatDismissTask = Task {
+            try? await Task.sleep(for: .seconds(chatDismissDelayAfterMouseExit))
             guard !Task.isCancelled else { return }
 
             await MainActor.run {
-                guard self.isWhatsAppExpansionVisible else { return }
+                guard self.isChatExpansionVisible else { return }
                 guard !self.isHovering else { return }
-                guard !self.coordinator.suppressWhatsAppAutoDismiss else { return }
+                guard !self.coordinator.suppressChatAutoDismiss else { return }
                 guard self.coordinator.expandingView.type == activeType else { return }
                 self.coordinator.toggleExpandingView(status: false, type: activeType)
             }
         }
     }
 
-    private func syncWhatsAppWindowSizeIfNeeded(forReplying overrideReplying: Bool? = nil, animated: Bool = false) {
-        guard isWhatsAppExpansionVisible else { return }
-        let replying = overrideReplying ?? coordinator.isWhatsAppReplying
-        let contentSize = WhatsAppNotificationLayout.totalSize(
+    private func syncChatWindowSizeIfNeeded(forReplying overrideReplying: Bool? = nil, animated: Bool = false) {
+        guard isChatExpansionVisible else { return }
+        let replying = overrideReplying ?? coordinator.isChatReplying
+        let contentSize = ChatNotificationLayout.totalSize(
             isReplying: replying,
-            hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
-            messages: currentWhatsAppMessages,
+            hasFilePreview: coordinator.isChatFilePreviewVisible,
+            messages: currentChatMessages,
             isDynamicIslandMode: isDynamicIslandMode,
             closedNotchHeight: vm.closedNotchSize.height
         )
@@ -2465,20 +2466,20 @@ struct ContentView: View {
         }
     }
 
-    private func activateWhatsAppReplyMode(animated: Bool) {
-        guard isWhatsAppExpansionVisible,
-              case .whatsApp = coordinator.expandingView.type,
-              !coordinator.isWhatsAppReplying else { return }
+    private func activateChatReplyMode(animated: Bool) {
+        guard isChatExpansionVisible,
+              case .chat = coordinator.expandingView.type,
+              !coordinator.isChatReplying else { return }
 
-        cancelWhatsAppDismissTask()
+        cancelChatDismissTask()
 
         // Pre-size with reply height before the state flip so the HUD keeps
         // its notch anchor and doesn't "detach" on first activation.
-        syncWhatsAppWindowSizeIfNeeded(forReplying: true, animated: animated)
+        syncChatWindowSizeIfNeeded(forReplying: true, animated: animated)
 
         if animated {
             withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
-                coordinator.isWhatsAppReplying = true
+                coordinator.isChatReplying = true
             }
             return
         }
@@ -2486,7 +2487,7 @@ struct ContentView: View {
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            coordinator.isWhatsAppReplying = true
+            coordinator.isChatReplying = true
         }
     }
 
@@ -2574,7 +2575,7 @@ struct ContentView: View {
         // Without this, the hover-exit timer closes the panel mid-drag, tearing
         // down the NSView that is acting as the drag source and cancelling the
         // session — an independent second cause of "drag-out doesn't work".
-        coordinator.isWhatsAppReplying || coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || ShelfSelectionModel.shared.isDragging || ClipboardManager.shared.isDraggingItem || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
+        coordinator.isChatReplying || coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || ShelfSelectionModel.shared.isDragging || ClipboardManager.shared.isDraggingItem || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
     }
     
     // Helper to prevent rapid haptic feedback
@@ -2686,17 +2687,17 @@ struct ContentView: View {
         if shouldOpen {
             handleOpenScrollGesture(translation: translation, phase: phase)
         } else {
-            guard isWhatsAppExpansionVisible || Defaults[.closeGestureEnabled] else { return }
+            guard isChatExpansionVisible || Defaults[.closeGestureEnabled] else { return }
             handleCloseScrollGesture(translation: translation, phase: phase)
         }
     }
 
-    private func dismissWhatsAppExpansion() {
-        guard isWhatsAppExpansionVisible,
-              case .whatsApp = coordinator.expandingView.type else { return }
+    private func dismissChatExpansion() {
+        guard isChatExpansionVisible,
+              case .chat = coordinator.expandingView.type else { return }
 
         let activeType = coordinator.expandingView.type
-        cancelWhatsAppDismissTask()
+        cancelChatDismissTask()
         coordinator.cancelExpandingViewHide()
 
         if Defaults[.enableHaptics] {
@@ -2705,14 +2706,14 @@ struct ContentView: View {
 
         withAnimation(.smooth) {
             gestureProgress = .zero
-            coordinator.isWhatsAppReplying = false
+            coordinator.isChatReplying = false
         }
         coordinator.toggleExpandingView(status: false, type: activeType)
     }
 
     private func handleOpenScrollGesture(translation: CGFloat, phase: NSEvent.Phase) {
-        if isWhatsAppExpansionVisible,
-           case .whatsApp = coordinator.expandingView.type {
+        if isChatExpansionVisible,
+           case .chat = coordinator.expandingView.type {
             withAnimation(.smooth) {
                 gestureProgress = (translation / Defaults[.gestureSensitivity]) * 20
             }
@@ -2728,7 +2729,7 @@ struct ContentView: View {
                 withAnimation(.smooth) {
                     gestureProgress = .zero
                 }
-                activateWhatsAppReplyMode(animated: false)
+                activateChatReplyMode(animated: false)
             }
             return
         }
@@ -2762,14 +2763,14 @@ struct ContentView: View {
     }
 
     private func handleCloseScrollGesture(translation: CGFloat, phase: NSEvent.Phase) {
-        if isWhatsAppExpansionVisible,
-           case .whatsApp = coordinator.expandingView.type {
+        if isChatExpansionVisible,
+           case .chat = coordinator.expandingView.type {
             withAnimation(.smooth) {
                 gestureProgress = (translation / Defaults[.gestureSensitivity]) * -20
             }
             if phase == .ended {
                 if translation > Defaults[.gestureSensitivity] * 0.55 {
-                    dismissWhatsAppExpansion()
+                    dismissChatExpansion()
                 } else {
                     withAnimation(.smooth) {
                         gestureProgress = .zero
@@ -2777,7 +2778,7 @@ struct ContentView: View {
                 }
             }
             if translation > Defaults[.gestureSensitivity] {
-                dismissWhatsAppExpansion()
+                dismissChatExpansion()
             }
             return
         }

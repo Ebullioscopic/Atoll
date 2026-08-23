@@ -53,7 +53,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
     // Queue for incoming messages that arrive while one is already displayed
     private struct PendingMessage {
         let sender: String
-        let messages: [WhatsAppIncomingMessage]
+        let messages: [ChatIncomingMessage]
         let chatId: String
         let avatarUrl: String?
     }
@@ -902,7 +902,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
     }
 
     private func deliverIncomingMessages(
-        _ incomingMessages: [WhatsAppIncomingMessage],
+        _ incomingMessages: [ChatIncomingMessage],
         sender: String,
         chatId: String,
         avatar: String?,
@@ -916,7 +916,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
 
             // If a WhatsApp card is already visible, queue the new message
             if coordinator.expandingView.show,
-               case .whatsApp(let visibleSender, let visibleMessages, let visibleChatId, let visibleAvatarUrl) = coordinator.expandingView.type {
+               case .chat(.whatsApp, let visibleSender, let visibleMessages, let visibleChatId, let visibleAvatarUrl) = coordinator.expandingView.type {
                 if visibleChatId == chatId || visibleSender == sender {
                     var updatedMessages = visibleMessages
                     let uniqueNewMessages = incomingMessages.filter { incoming in
@@ -940,7 +940,8 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
                     }
                     coordinator.toggleExpandingView(
                         status: true,
-                        type: .whatsApp(
+                        type: .chat(
+                            service: .whatsApp,
                             senderName: visibleSender,
                             messages: updatedMessages,
                             chatId: visibleChatId,
@@ -990,7 +991,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         coordinator.cancelExpandingViewHide()
         coordinator.toggleExpandingView(
             status: true,
-            type: .whatsApp(senderName: msg.sender, messages: msg.messages, chatId: msg.chatId, avatarUrl: msg.avatarUrl),
+            type: .chat(service: .whatsApp, senderName: msg.sender, messages: msg.messages, chatId: msg.chatId, avatarUrl: msg.avatarUrl),
             autoHideDuration: 15
         )
         NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
@@ -1025,11 +1026,11 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
     }
 
     private func enrichedMessagesWithMediaSnapshots(
-        _ messages: [WhatsAppIncomingMessage],
+        _ messages: [ChatIncomingMessage],
         rawMessages: [[String: Any]],
         fallbackRawMessage: [String: Any]
-    ) async -> [WhatsAppIncomingMessage] {
-        var enrichedMessages: [WhatsAppIncomingMessage] = []
+    ) async -> [ChatIncomingMessage] {
+        var enrichedMessages: [ChatIncomingMessage] = []
         for (index, message) in messages.enumerated() {
             guard (message.mediaKind != nil || message.mediaDataUrl != nil),
                   !isDisplayableMediaDataUrl(message.mediaDataUrl) else {
@@ -1067,8 +1068,8 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
             || value.hasPrefix("data:image/bmp")
     }
 
-    private func copyMessage(_ message: WhatsAppIncomingMessage, mediaDataUrl: String?) -> WhatsAppIncomingMessage {
-        WhatsAppIncomingMessage(
+    private func copyMessage(_ message: ChatIncomingMessage, mediaDataUrl: String?) -> ChatIncomingMessage {
+        ChatIncomingMessage(
             id: message.id,
             text: message.text,
             mediaKind: message.mediaKind,
@@ -1128,9 +1129,9 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         fallbackBody: String,
         sender: String,
         chatId: String
-    ) -> [WhatsAppIncomingMessage] {
+    ) -> [ChatIncomingMessage] {
         let rawMessages = dict["messages"] as? [[String: Any]] ?? []
-        let parsedMessages = rawMessages.compactMap { raw -> WhatsAppIncomingMessage? in
+        let parsedMessages = rawMessages.compactMap { raw -> ChatIncomingMessage? in
             let rawBody = raw["body"] as? String ?? raw["text"] as? String ?? ""
             let providedGroupSender = raw["groupSender"] as? String ?? dict["groupSender"] as? String
             let resolvedGroupSender = resolveGroupSender(
@@ -1140,7 +1141,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
             let text = normalizedIncomingMessageBody(
                 messageBodyWithoutGroupSender(rawBody, groupSender: resolvedGroupSender)
             )
-            let mediaKind = (raw["mediaKind"] as? String).flatMap(WhatsAppIncomingMediaKind.init(rawValue:))
+            let mediaKind = (raw["mediaKind"] as? String).flatMap(ChatIncomingMediaKind.init(rawValue:))
             let rawMediaDataUrl = nonEmptyString(raw["mediaDataUrl"])
             let mediaDataUrl = isDisplayableMediaDataUrl(rawMediaDataUrl) ? rawMediaDataUrl : nil
             let linkPreview = parseLinkPreview(raw["linkPreview"]) ?? linkPreviewFromMessageText(text)
@@ -1152,7 +1153,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
                 ?? stableMessageID(sender: sender, chatId: chatId, text: text, groupSender: resolvedGroupSender, mediaKind: mediaKind, linkPreview: linkPreview, documentPreview: documentPreview, pollOptions: pollOptions)
 
             guard text != "📨 Nuovo messaggio" || mediaKind != nil || mediaDataUrl != nil || linkPreview != nil || documentPreview != nil || !pollOptions.isEmpty else { return nil }
-            return WhatsAppIncomingMessage(
+            return ChatIncomingMessage(
                 id: id,
                 text: text,
                 mediaKind: mediaKind,
@@ -1170,7 +1171,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
             return uniqueParsedMessages
         }
 
-        let mediaKind = (dict["mediaKind"] as? String).flatMap(WhatsAppIncomingMediaKind.init(rawValue:))
+        let mediaKind = (dict["mediaKind"] as? String).flatMap(ChatIncomingMediaKind.init(rawValue:))
         let rawMediaDataUrl = nonEmptyString(dict["mediaDataUrl"])
         let mediaDataUrl = isDisplayableMediaDataUrl(rawMediaDataUrl) ? rawMediaDataUrl : nil
         let providedFallbackGroupSender = dict["groupSender"] as? String
@@ -1187,7 +1188,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         let pollAllowsMultipleSelection = dict["pollAllowsMultipleSelection"] as? Bool ?? false
         let messageID = nonEmptyString(dict["messageId"])
         return [
-            WhatsAppIncomingMessage(
+            ChatIncomingMessage(
                 id: messageID ?? stableMessageID(sender: sender, chatId: chatId, text: fallbackText, groupSender: fallbackGroupSender, mediaKind: mediaKind, linkPreview: linkPreview, documentPreview: documentPreview, pollOptions: pollOptions),
                 text: fallbackText,
                 mediaKind: mediaKind,
@@ -1201,18 +1202,18 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         ]
     }
 
-    private func parsePollOptions(_ value: Any?) -> [WhatsAppIncomingPollOption] {
+    private func parsePollOptions(_ value: Any?) -> [ChatIncomingPollOption] {
         guard let rawOptions = value as? [[String: Any]] else { return [] }
         return rawOptions.compactMap { raw in
             guard let text = nonEmptyString(raw["text"]) else { return nil }
             let id = nonEmptyString(raw["id"]) ?? text.lowercased()
             let selected = raw["selected"] as? Bool ?? raw["isSelected"] as? Bool ?? false
             let voteCount = raw["voteCount"] as? Int ?? raw["votes"] as? Int ?? 0
-            return WhatsAppIncomingPollOption(id: id, text: text, isSelected: selected, voteCount: voteCount)
+            return ChatIncomingPollOption(id: id, text: text, isSelected: selected, voteCount: voteCount)
         }
     }
 
-    private func parseLinkPreview(_ value: Any?) -> WhatsAppIncomingLinkPreview? {
+    private func parseLinkPreview(_ value: Any?) -> ChatIncomingLinkPreview? {
         guard let raw = value as? [String: Any],
               let url = normalizedLinkURL(nonEmptyString(raw["url"])) else { return nil }
         let domain = nonEmptyString(raw["domain"]) ?? displayDomain(for: url)
@@ -1221,7 +1222,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
             domain: domain,
             url: url
         )
-        return WhatsAppIncomingLinkPreview(
+        return ChatIncomingLinkPreview(
             url: url,
             title: title,
             domain: domain,
@@ -1231,10 +1232,10 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         )
     }
 
-    private func parseDocumentPreview(_ value: Any?) -> WhatsAppIncomingDocumentPreview? {
+    private func parseDocumentPreview(_ value: Any?) -> ChatIncomingDocumentPreview? {
         guard let raw = value as? [String: Any],
               let fileName = nonEmptyString(raw["fileName"]) else { return nil }
-        return WhatsAppIncomingDocumentPreview(
+        return ChatIncomingDocumentPreview(
             fileName: fileName,
             detail: nonEmptyString(raw["detail"]) ?? "FILE",
             mimeType: nonEmptyString(raw["mimeType"]),
@@ -1242,14 +1243,14 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         )
     }
 
-    private func linkPreviewFromMessageText(_ text: String) -> WhatsAppIncomingLinkPreview? {
+    private func linkPreviewFromMessageText(_ text: String) -> ChatIncomingLinkPreview? {
         guard let match = text.range(
             of: #"(https?://[^\s<>"']+|www\.[^\s<>"']+)"#,
             options: .regularExpression
         ) else { return nil }
         guard let url = normalizedLinkURL(String(text[match])) else { return nil }
         let domain = displayDomain(for: url)
-        return WhatsAppIncomingLinkPreview(
+        return ChatIncomingLinkPreview(
             url: url,
             title: domain,
             domain: domain,
@@ -1384,10 +1385,10 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         chatId: String,
         text: String,
         groupSender: String?,
-        mediaKind: WhatsAppIncomingMediaKind?,
-        linkPreview: WhatsAppIncomingLinkPreview?,
-        documentPreview: WhatsAppIncomingDocumentPreview?,
-        pollOptions: [WhatsAppIncomingPollOption]
+        mediaKind: ChatIncomingMediaKind?,
+        linkPreview: ChatIncomingLinkPreview?,
+        documentPreview: ChatIncomingDocumentPreview?,
+        pollOptions: [ChatIncomingPollOption]
     ) -> String {
         let resolvedGroupSender = resolveGroupSender(providedGroupSender: groupSender, messageBody: text)
         let normalizedText = normalizedStableMessagePart(
@@ -1405,7 +1406,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         ].joined(separator: "||")
     }
 
-    private func stableMessageKey(_ message: WhatsAppIncomingMessage, sender: String, chatId: String) -> String {
+    private func stableMessageKey(_ message: ChatIncomingMessage, sender: String, chatId: String) -> String {
         let baseKey = stableMessageID(
             sender: sender,
             chatId: chatId,
@@ -1427,10 +1428,10 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
     }
 
     private func deduplicatedIncomingMessages(
-        _ messages: [WhatsAppIncomingMessage],
+        _ messages: [ChatIncomingMessage],
         sender: String,
         chatId: String
-    ) -> [WhatsAppIncomingMessage] {
+    ) -> [ChatIncomingMessage] {
         var seen = Set<String>()
         return messages.filter { message in
             let key = stableMessageKey(message, sender: sender, chatId: chatId)
@@ -1459,7 +1460,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         ].joined(separator: ":")
     }
 
-    private func isMediaOnlyMessage(_ message: WhatsAppIncomingMessage) -> Bool {
+    private func isMediaOnlyMessage(_ message: ChatIncomingMessage) -> Bool {
         guard message.mediaKind != nil || message.mediaDataUrl != nil else { return false }
         let normalizedText = normalizedStableMessagePart(message.text)
             .replacingOccurrences(of: "📨", with: "")
