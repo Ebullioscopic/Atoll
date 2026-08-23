@@ -8,6 +8,7 @@
  * (at your option) any later version.
  */
 
+import Defaults
 import SwiftUI
 
 /// The highlight that travels across a lyric line as it is sung.
@@ -121,7 +122,25 @@ struct SweptLyricText: View {
         }
     }
 
+    @Default(.lyricHighlightStyle) private var highlightStyle
+
     var body: some View {
+        switch highlightStyle {
+        case .sweep: sweptLine
+        case .solid: solidLine
+        }
+    }
+
+    /// The whole line lit at once, which is how this looked before the sweep.
+    /// One `Text` rather than the word layout, so it wraps the way the text
+    /// engine wraps and costs nothing to animate.
+    private var solidLine: some View {
+        Text(text)
+            .font(.system(size: fontSize, weight: weight))
+            .foregroundStyle(isCurrent ? sung : idle)
+    }
+
+    private var sweptLine: some View {
         WordFlowLayout(spacing: spaceWidth, lineSpacing: fontSize * 0.28) {
             ForEach(Array(words.enumerated()), id: \.offset) { _, word in
                 Text(word.text)

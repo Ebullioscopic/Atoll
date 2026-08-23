@@ -404,6 +404,30 @@ extension Notification.Name {
 }
 
 // Media controller types for selection in settings
+/// How the line being sung is picked out from the rest.
+enum LyricHighlightStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case sweep = "Sweep"
+    case solid = "Solid"
+
+    var id: String { rawValue }
+
+    var localizedName: String {
+        switch self {
+        case .sweep: return String(localized: "Sweep")
+        case .solid: return String(localized: "Solid")
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .sweep:
+            return String(localized: "The highlight travels across the line in time with the singing.")
+        case .solid:
+            return String(localized: "The whole line lights at once, as it did before.")
+        }
+    }
+}
+
 enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializable {
     case nowPlaying = "Now Playing"
     case appleMusic = "Apple Music"
@@ -1374,6 +1398,9 @@ extension Defaults.Keys {
     
     // MARK: Lyrics Feature
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
+
+    /// Whether the sung line is swept or simply lit.
+    static let lyricHighlightStyle = Key<LyricHighlightStyle>("lyricHighlightStyle", default: .sweep)
     static let lyricsPanelWidth = Key<CGFloat>("lyricsPanelWidth", default: 280)
     static let lyricsPanelOffset = Key<CGFloat>("lyricsPanelOffset", default: 0)
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)
