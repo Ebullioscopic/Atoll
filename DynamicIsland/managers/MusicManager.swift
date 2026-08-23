@@ -974,7 +974,21 @@ class MusicManager: ObservableObject {
         
         updateLiveStreamState(with: state)
         self.refreshLikedFlag(for: state)
-        self.timestampDate = state.lastUpdated
+
+        // Guarded like every other assignment in this method, and for the same
+        // reason. This is a published property that several views read, so an
+        // unconditional assign republishes MusicManager on every delivery from
+        // the media stream and invalidates all of them.
+        //
+        // It is not a clock, it is the playback anchor: it moves when the
+        // player re-anchors, which Spotify does roughly once a track. While
+        // paused it re-sends the same instant indefinitely -- four samples six
+        // seconds apart during this work carried a byte-identical timestamp.
+        // Nearly every one of those assignments was writing a value that had
+        // not changed.
+        if state.lastUpdated != self.timestampDate {
+            self.timestampDate = state.lastUpdated
+        }
 
         // Manage lyric sync task based on playback/lyrics availability
         if Defaults[.enableLyrics] && !self.syncedLyrics.isEmpty {

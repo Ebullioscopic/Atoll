@@ -59,6 +59,24 @@ class LockScreenLiveActivityWindowManager {
         return formatter.string(from: Date())
     }
 
+    /// Rounds the notch up to whole points.
+    ///
+    /// `safeAreaInsets.top` is fractional on notched hardware -- 33.5pt on a
+    /// 14-inch -- and AppKit rounds a window's frame to whole points while
+    /// SwiftUI lays the content out at whatever size it was handed. Asking for a
+    /// 33.5pt window yields a 34pt one holding 33.5pt of content, and because the
+    /// content view is anchored at the bottom-left the leftover half point sits
+    /// along the top edge, showing as a hairline of wallpaper above the notch.
+    ///
+    /// Rounding here keeps the window, the content view and the shape all on the
+    /// same whole-point height, so there is no leftover to show.
+    private func snappedNotchSize(_ notchSize: CGSize) -> CGSize {
+        CGSize(
+            width: notchSize.width.rounded(.up),
+            height: notchSize.height.rounded(.up)
+        )
+    }
+
     private func windowSize(for notchSize: CGSize) -> CGSize {
         let indicatorWidth = max(0, notchSize.height - 12)
         let horizontalPadding = isDynamicIslandMode ? 8 : cornerRadiusInsets.closed.bottom
@@ -157,15 +175,16 @@ class LockScreenLiveActivityWindowManager {
         guard window.isVisible || window.alphaValue > 0.01 else { return }
         guard let context = lockContext() else { return }
 
-        let windowSize = windowSize(for: context.notchSize)
+        let notchSize = snappedNotchSize(context.notchSize)
+        let windowSize = windowSize(for: notchSize)
         let targetFrame = frame(for: windowSize, on: context.screen)
         if window.frame != targetFrame {
             window.setFrame(targetFrame, display: true)
         }
 
         if let hostingView {
-            hostingView.frame = CGRect(origin: .zero, size: targetFrame.size)
-            hostingView.rootView = LockScreenLiveActivityOverlay(model: overlayModel, animator: overlayAnimator, notchSize: context.notchSize, isDynamicIslandMode: isDynamicIslandMode)
+            hostingView.frame = CGRect(origin: .zero, size: window.frame.size)
+            hostingView.rootView = LockScreenLiveActivityOverlay(model: overlayModel, animator: overlayAnimator, notchSize: notchSize, isDynamicIslandMode: isDynamicIslandMode)
         }
 
         currentNotchSize = context.notchSize
@@ -179,6 +198,7 @@ class LockScreenLiveActivityWindowManager {
             return
         }
 
+        let notchSize = snappedNotchSize(notchSize)
         let windowSize = windowSize(for: notchSize)
         let window = ensureWindow(windowSize: windowSize, screen: screen)
         let targetFrame = frame(for: windowSize, on: screen)
@@ -186,12 +206,17 @@ class LockScreenLiveActivityWindowManager {
 
         let overlayView = LockScreenLiveActivityOverlay(model: overlayModel, animator: overlayAnimator, notchSize: notchSize, isDynamicIslandMode: isDynamicIslandMode)
 
+        // Sized from the window's own frame rather than the requested one: if
+        // AppKit adjusted it, the content view has to follow, or the difference
+        // shows as a seam at the top.
+        let contentSize = window.frame.size
+
         if let hostingView {
             hostingView.rootView = overlayView
-            hostingView.frame = CGRect(origin: .zero, size: targetFrame.size)
+            hostingView.frame = CGRect(origin: .zero, size: contentSize)
         } else {
             let view = NSHostingView(rootView: overlayView)
-            view.frame = CGRect(origin: .zero, size: targetFrame.size)
+            view.frame = CGRect(origin: .zero, size: contentSize)
             hostingView = view
             window.contentView = view
         }
