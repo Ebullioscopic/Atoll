@@ -477,7 +477,10 @@ class StatsManager: ObservableObject {
     private var lastSlowMetricsUpdate: Date = .distantPast
     private var slowMetricsNeedsBaseline = true
     private var isSlowRefreshInFlight = false
-    
+    // Bumped on every start/stop so a slow refresh launched by a prior session can't
+    // land its result into a session that has since stopped and restarted.
+    private var monitoringGeneration = 0
+
     // MARK: - Initialization
     private init() {
         // Initialize with empty history
@@ -563,9 +566,10 @@ class StatsManager: ObservableObject {
     // MARK: - Public Monitoring Controls
     func startMonitoring() {
         guard !isMonitoring else { return }
-        
+
         print("StatsManager: Starting monitoring...")
-        
+        monitoringGeneration += 1
+
         // Reset baseline for accurate measurement
         // A failed getifaddrs leaves the baseline at zero, which the first-run
         // guard in updateSystemStats reads as "no baseline yet" and re-samples.
@@ -604,6 +608,7 @@ class StatsManager: ObservableObject {
         delayedStopTimer?.invalidate()
         
         isMonitoring = false
+        monitoringGeneration += 1
         print("StatsManager: Monitoring stopped")
         cachedProcessStats.removeAll()
         lastProcessStatsUpdate = .distantPast
@@ -626,7 +631,7 @@ class StatsManager: ObservableObject {
         cpuFrequency = nil
         // Reset slow-path scheduling so the next session rebaselines cleanly. Any
         // in-flight slow refresh that lands after this is dropped by the
-        // `isMonitoring` guard in `applySlowMetrics(_:)`.
+        // `isMonitoring`/generation guard in `applySlowMetrics(_:generation:)`.
         slowMetricsNeedsBaseline = true
         lastSlowMetricsUpdate = .distantPast
         isSlowRefreshInFlight = false
@@ -780,7 +785,7 @@ class StatsManager: ObservableObject {
     /// Kicks off an off-main collection of the heavy metrics when due (~every
     /// `slowMetricsInterval`, or immediately on the first tick after start). Guarded so at
     /// most one refresh is in flight; the final @Published assignments happen on main via
-    /// `applySlowMetrics(_:)`.
+    /// `applySlowMetrics(_:generation:)`.
     @MainActor
     private func maybeRefreshSlowMetrics() {
         let now = Date()
@@ -791,12 +796,13 @@ class StatsManager: ObservableObject {
         slowMetricsNeedsBaseline = false
         lastSlowMetricsUpdate = now
         isSlowRefreshInFlight = true
+        let generation = monitoringGeneration
 
         Task { [weak self] in
             guard let self else { return }
             let snapshot = await self.slowCollector.collect(resetBaseline: resetBaseline)
             await MainActor.run {
-                self.applySlowMetrics(snapshot)
+                self.applySlowMetrics(snapshot, generation: generation)
                 self.isSlowRefreshInFlight = false
             }
         }
@@ -805,9 +811,10 @@ class StatsManager: ObservableObject {
     /// Applies a slow-metrics snapshot to the @Published properties on the main actor.
     /// Mirrors the assignment logic the fast path used to perform inline.
     @MainActor
-    private func applySlowMetrics(_ snapshot: SlowMetricsSnapshot) {
-        // Drop stale results that land after monitoring stopped.
-        guard isMonitoring else { return }
+    private func applySlowMetrics(_ snapshot: SlowMetricsSnapshot, generation: Int) {
+        // Drop stale results from a session that has since stopped and/or restarted —
+        // `isMonitoring` alone doesn't catch a stop+restart that happened while this was in flight.
+        guard isMonitoring, generation == monitoringGeneration else { return }
 
         gpuUsage = snapshot.gpuUsage
         gpuBreakdown = snapshot.gpuBreakdown
