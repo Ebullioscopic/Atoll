@@ -51,8 +51,14 @@ private struct LyricsLookupKey: Hashable {
     let artist: String
     let album: String
 
+    /// Whether this is worth searching for.
+    ///
+    /// Empty fields are the obvious case. The subtler one is metadata that is
+    /// filled in but identifies nothing -- an untagged rip playing as "Track 7"
+    /// by "Unknown Artist" matches lrclib's twenty *other* untagged rips
+    /// exactly, and one of them wins. Not searching is the right answer there.
     var isValid: Bool {
-        !title.isEmpty && !artist.isEmpty
+        !LyricsMetadata.namesNoParticularTrack(title: title, artist: artist)
     }
 }
 
@@ -1763,10 +1769,35 @@ class MusicManager: ObservableObject {
         let normalizedTitle = title.lowercased()
         let normalizedAlbum = album.lowercased()
 
-        return results.max { lhs, rhs in
+        let best = results.max { lhs, rhs in
             lyricsMatchScore(for: lhs, artist: normalizedArtist, title: normalizedTitle, album: normalizedAlbum)
                 < lyricsMatchScore(for: rhs, artist: normalizedArtist, title: normalizedTitle, album: normalizedAlbum)
         }
+
+        // The best of a bad set is still a bad set. Search is a ranking, not a
+        // filter, so lrclib will happily return a different artist's song when
+        // it has nothing closer -- and without a floor here, that song is what
+        // scrolls past during the chorus.
+        guard let best,
+              agreesOnTitleAndArtist(best, artist: normalizedArtist, title: normalizedTitle)
+        else { return nil }
+
+        return best
+    }
+
+    /// Whether a result is plausibly the same recording, rather than merely the
+    /// closest thing lrclib had. Both fields have to land: agreeing on the
+    /// title alone is how covers, remixes and karaoke tracks get through.
+    private func agreesOnTitleAndArtist(_ result: [String: Any], artist: String, title: String) -> Bool {
+        let resultArtist = ((result["artistName"] as? String) ?? "").lowercased()
+        let resultTitle = ((result["trackName"] as? String) ?? "").lowercased()
+
+        func overlaps(_ lhs: String, _ rhs: String) -> Bool {
+            guard !lhs.isEmpty, !rhs.isEmpty else { return false }
+            return lhs == rhs || lhs.contains(rhs) || rhs.contains(lhs)
+        }
+
+        return overlaps(resultTitle, title) && overlaps(resultArtist, artist)
     }
 
     private func lyricsMatchScore(for result: [String: Any], artist: String, title: String, album: String) -> Int {
