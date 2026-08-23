@@ -1889,7 +1889,20 @@ class MusicManager: ObservableObject {
     /// zero however far playback has actually got, which pegs every lyric at the
     /// start of the track. Elapsed time is the better answer there.
     private func lyricPlaybackPosition(at date: Date = Date()) -> TimeInterval {
-        max(estimatedPlaybackPosition(at: date), elapsedTime) + Self.lyricLeadTime
+        // `estimatedPlaybackPosition` clamps to the duration, so a sender that
+        // reports none -- a live stream, or a player that simply does not --
+        // pins every estimate to zero and the lyrics stop moving between
+        // deliveries. Extrapolate from the anchor directly in that case; a
+        // paused track has nothing to extrapolate and stays where it is.
+        let position: TimeInterval
+        if songDuration > 0 {
+            position = max(estimatedPlaybackPosition(at: date), elapsedTime)
+        } else if isPlaying {
+            position = max(0, elapsedTime + date.timeIntervalSince(timestampDate) * playbackRate)
+        } else {
+            position = max(0, elapsedTime)
+        }
+        return position + Self.lyricLeadTime
     }
 
     /// How far ahead of the voice the lyrics run.

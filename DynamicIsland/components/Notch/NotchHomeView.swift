@@ -186,7 +186,8 @@ struct LyricsSidePanelView: View {
         SyncedLyricsStyle(
             sung: .white,
             unsung: artistLineColor.opacity(0.55),
-            idle: .white.opacity(0.5)
+            idle: .white.opacity(0.5),
+            tint: artistLineColor
         )
     }
 

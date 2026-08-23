@@ -9,6 +9,7 @@
  */
 
 import Defaults
+import os
 import SwiftUI
 
 /// The highlight that travels across a lyric line as it is sung.
@@ -96,6 +97,8 @@ struct SweptLyricText: View {
     let sung: Color
     let unsung: Color
     let idle: Color
+    /// The accent the gradient style runs from and back into.
+    var tint: Color = .white
 
     /// A word and the stretch of the line's progress that belongs to it.
     private struct Word {
@@ -104,7 +107,35 @@ struct SweptLyricText: View {
         let end: Double
     }
 
-    private var words: [Word] {
+    /// The word slices and the space width for one line, worked out once.
+    ///
+    /// `SweptLyricText` is rebuilt on every frame of the timeline that drives
+    /// the sweep, and none of this depends on `progress` -- only on the text
+    /// and the face it is set in. Recomputing it per frame meant splitting the
+    /// string, allocating the weights and measuring a glyph through `NSFont`
+    /// sixty times a second, for every visible line.
+    private struct Layout {
+        let words: [Word]
+        let spaceWidth: CGFloat
+    }
+
+    private static let layoutCache = OSAllocatedUnfairLock(initialState: [String: Layout]())
+
+    private var layout: Layout {
+        let key = "\(text)|\(fontSize)|\(weight)"
+        if let cached = Self.layoutCache.withLock({ $0[key] }) { return cached }
+
+        let built = Layout(words: Self.words(in: text), spaceWidth: Self.spaceWidth(fontSize: fontSize, weight: weight))
+        Self.layoutCache.withLock { cache in
+            // A song is a few dozen lines; anything past that is old tracks,
+            // and dropping the lot is cheaper than tracking which.
+            if cache.count > 400 { cache.removeAll() }
+            cache[key] = built
+        }
+        return built
+    }
+
+    private static func words(in text: String) -> [Word] {
         let pieces = text.split(whereSeparator: \.isWhitespace).map(String.init)
         guard !pieces.isEmpty else { return [] }
 
@@ -127,13 +158,34 @@ struct SweptLyricText: View {
     var body: some View {
         switch highlightStyle {
         case .sweep: sweptLine
+        case .gradient: gradientLine
         case .solid: solidLine
         }
     }
 
-    /// The whole line lit at once, which is how this looked before the sweep.
-    /// One `Text` rather than the word layout, so it wraps the way the text
-    /// engine wraps and costs nothing to animate.
+    /// The current line lit by one fixed gradient, which is how lyrics were
+    /// marked before any of this swept: tint into white and back, painted the
+    /// same way for the whole time the line is current. Nothing here follows
+    /// the singing -- that is the point of choosing it.
+    private var gradientLine: some View {
+        Text(text)
+            .font(.system(size: fontSize, weight: weight))
+            .foregroundStyle(
+                isCurrent
+                    ? AnyShapeStyle(
+                        LinearGradient(
+                            colors: [tint, sung, tint.opacity(0.82)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    : AnyShapeStyle(idle)
+            )
+    }
+
+    /// The current line in one flat colour. One `Text` rather than the word
+    /// layout, so it wraps the way the text engine wraps and costs nothing to
+    /// animate.
     private var solidLine: some View {
         Text(text)
             .font(.system(size: fontSize, weight: weight))
@@ -141,13 +193,15 @@ struct SweptLyricText: View {
     }
 
     private var sweptLine: some View {
-        WordFlowLayout(spacing: spaceWidth, lineSpacing: fontSize * 0.28) {
-            ForEach(Array(words.enumerated()), id: \.offset) { _, word in
+        let layout = self.layout
+        return WordFlowLayout(spacing: layout.spaceWidth, lineSpacing: fontSize * 0.28) {
+            ForEach(Array(layout.words.enumerated()), id: \.offset) { _, word in
+                let wordProgress = localProgress(for: word)
                 Text(word.text)
                     .font(.system(size: fontSize, weight: weight))
                     .lyricSweep(
-                        progress: localProgress(for: word),
-                        isCurrent: isCurrent && localProgress(for: word) > 0,
+                        progress: wordProgress,
+                        isCurrent: isCurrent && wordProgress > 0,
                         sung: sung,
                         unsung: unsung,
                         idle: isCurrent ? unsung : idle
@@ -164,7 +218,7 @@ struct SweptLyricText: View {
 
     /// The real width of a space in this face, so the words sit where the text
     /// engine would have put them.
-    private var spaceWidth: CGFloat {
+    private static func spaceWidth(fontSize: CGFloat, weight: Font.Weight) -> CGFloat {
         let font = NSFont.systemFont(ofSize: fontSize, weight: weight.nsWeight)
         return (" " as NSString).size(withAttributes: [.font: font]).width
     }
@@ -191,8 +245,21 @@ private struct WordFlowLayout: Layout {
     let spacing: CGFloat
     let lineSpacing: CGFloat
 
+    /// The width both passes wrap at.
+    ///
+    /// `sizeThatFits` used to fall back to infinity when the proposal carried
+    /// no width, reporting a single row, while `placeSubviews` wrapped at the
+    /// bounds it was actually given. When those disagreed the layout wrapped
+    /// to several rows inside a box measured for one, and the rest was
+    /// clipped.
+    private func wrapWidth(_ proposal: ProposedViewSize) -> CGFloat {
+        proposal.replacingUnspecifiedDimensions(
+            by: CGSize(width: CGFloat.greatestFiniteMagnitude, height: 0)
+        ).width
+    }
+
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
+        let maxWidth = wrapWidth(proposal)
         var x: CGFloat = 0
         var y: CGFloat = 0
         var lineHeight: CGFloat = 0
@@ -215,13 +282,17 @@ private struct WordFlowLayout: Layout {
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        // The same width the size was measured against, not whatever bounds
+        // arrived: measuring at one width and wrapping at another is how rows
+        // end up outside the box that was reserved for them.
+        let maxWidth = min(wrapWidth(proposal), bounds.width)
         var x: CGFloat = 0
         var y: CGFloat = 0
         var lineHeight: CGFloat = 0
 
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
-            if x > 0, x + size.width > bounds.width {
+            if x > 0, x + size.width > maxWidth {
                 y += lineHeight + lineSpacing
                 x = 0
                 lineHeight = 0

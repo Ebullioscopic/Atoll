@@ -782,7 +782,11 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .media, title: "Skip buttons", keywords: ["skip", "controls", "±10"], highlightID: SettingsTab.media.highlightID(for: "Skip buttons")),
             SettingsSearchEntry(tab: .media, title: "Sneak Peek Style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak Peek Style")),
             SettingsSearchEntry(tab: .media, title: "Show lyrics", keywords: ["lyrics", "song text", "side panel", "calendar", "inline"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
-            SettingsSearchEntry(tab: .media, title: "Lyric highlight", keywords: ["lyrics", "highlight", "sweep", "solid", "karaoke", "animation"], highlightID: SettingsTab.media.highlightID(for: "Lyric highlight")),
+            // Targets the lyrics toggle rather than the Highlight picker: the picker
+            // only exists while lyrics are on, so a search result pointing at it
+            // scrolls to nothing for anyone who has not turned them on yet -- which
+            // is everyone, by default.
+            SettingsSearchEntry(tab: .media, title: "Lyric highlight", keywords: ["lyrics", "highlight", "sweep", "gradient", "solid", "karaoke", "animation"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
             SettingsSearchEntry(tab: .media, title: "Side lyrics width", keywords: ["lyrics", "width", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics width")),
             SettingsSearchEntry(tab: .media, title: "Side lyrics horizontal offset", keywords: ["lyrics", "offset", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics horizontal offset")),
             SettingsSearchEntry(tab: .media, title: "Show live canvas in Dynamic Island", keywords: ["canvas", "live canvas", "album art", "dynamic island", "spotify canvas"], highlightID: SettingsTab.media.highlightID(for: "Show live canvas in Dynamic Island")),
@@ -3026,18 +3030,25 @@ struct Media: View {
                 .settingsHighlight(id: highlightID("Show lyrics"))
 
                 if enableLyrics && !enableMinimalisticUI && showStandardMediaControls {
-                    Picker("Highlight", selection: $lyricHighlightStyle) {
-                        ForEach(LyricHighlightStyle.allCases) { style in
-                            Text(style.localizedName).tag(style)
+                    // Caption inside the row rather than after it: a Form gives
+                    // every top-level view its own row and a divider, so the
+                    // explanation was being ruled off from the control it
+                    // explains and read as belonging to nothing.
+                    VStack(alignment: .leading, spacing: 6) {
+                        Picker("Highlight", selection: $lyricHighlightStyle) {
+                            ForEach(LyricHighlightStyle.allCases) { style in
+                                Text(style.localizedName).tag(style)
+                            }
                         }
-                    }
-                    .pickerStyle(.segmented)
-                    .settingsHighlight(id: highlightID("Lyric highlight"))
+                        .pickerStyle(.segmented)
 
-                    Text(lyricHighlightStyle.explanation)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text(lyricHighlightStyle.explanation)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .settingsHighlight(id: highlightID("Lyric highlight"))
                 }
 
                 Text(

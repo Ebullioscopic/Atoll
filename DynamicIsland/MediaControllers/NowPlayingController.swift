@@ -302,13 +302,13 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
                     self.playbackState.currentTime + (elapsedWhilePlaying * self.playbackState.playbackRate)
                 )
             } else {
-                // Resuming. The position is wherever it was left, which is what
-                // the sender is still reporting; only the anchor is stale, and
-                // re-stamping it here is what stops the pause being played back.
-                newPlaybackState.currentTime = max(
-                    0,
-                    payload.resolvedElapsedTime ?? self.playbackState.currentTime
-                )
+                // Resuming. The position is wherever it was left, and the
+                // frozen one is what this controller worked out when the pause
+                // was observed -- the payload's is the sample already known to
+                // be stale, which for some senders is a repeated zero that
+                // would restart the track. A seek while paused publishes a
+                // fresh sample, so it never reaches this branch.
+                newPlaybackState.currentTime = max(0, self.playbackState.currentTime)
             }
 
             newPlaybackState.lastUpdated = transitionInstant

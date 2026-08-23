@@ -377,6 +377,15 @@ struct LockScreenMusicPanel: View {
                 updatePanelSize()
             }
         }
+        // The Spotify-canvas fallback hands its lyrics to a window of their own
+        // and drops the inline artwork, so entering or leaving it moves the
+        // panel between the column layout and the stacked one -- a change of
+        // width, which nothing was asking the window for.
+        .onChange(of: fullscreenArtworkManager.isShowingSpotifyCanvasFallback) { _, _ in
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                updatePanelSize()
+            }
+        }
         .onChange(of: lockScreenGlassStyle) { _, _ in
             logGlassState(reason: "Glass style updated")
         }
@@ -1058,6 +1067,7 @@ struct LockScreenMusicPanel: View {
                     sung: widgetAppearance.primary(),
                     unsung: widgetAppearance.primary(opacity: 0.35),
                     idle: widgetAppearance.primary(opacity: 0.35),
+                    tint: widgetAppearance.primary(opacity: 0.6),
                     placeholder: "No lyrics for this track"
                 )
             )
@@ -1102,6 +1112,7 @@ struct LockScreenMusicPanel: View {
                         .lyricSweep(
                             progress: progress,
                             isCurrent: true,
+                            sung: widgetAppearance.primary(opacity: 1),
                             unsung: widgetAppearance.primary(opacity: 0.45),
                             idle: widgetAppearance.primary(opacity: 0.45)
                         )

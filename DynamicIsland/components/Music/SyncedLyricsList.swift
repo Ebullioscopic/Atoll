@@ -90,6 +90,10 @@ struct SyncedLyricsStyle {
     var unsung: Color
     /// Colour every line that is not the current one is drawn in.
     var idle: Color
+    /// The host's own accent, at full strength. The gradient highlight runs
+    /// from it into `sung` and back, so it needs the colour undimmed rather
+    /// than the faded `unsung` the sweep leaves behind it.
+    var tint: Color = .white
     /// Shown when the track has no synced lyrics at all.
     var placeholder: String = "Show lyrics here"
 }
@@ -213,7 +217,8 @@ struct SyncedLyricsList: View {
                 isCurrent: isCurrent,
                 sung: style.sung,
                 unsung: style.unsung,
-                idle: style.idle
+                idle: style.idle,
+                tint: style.tint
             )
 
         case .instrumental:

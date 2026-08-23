@@ -407,6 +407,7 @@ extension Notification.Name {
 /// How the line being sung is picked out from the rest.
 enum LyricHighlightStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
     case sweep = "Sweep"
+    case gradient = "Gradient"
     case solid = "Solid"
 
     var id: String { rawValue }
@@ -414,6 +415,7 @@ enum LyricHighlightStyle: String, CaseIterable, Identifiable, Defaults.Serializa
     var localizedName: String {
         switch self {
         case .sweep: return String(localized: "Sweep")
+        case .gradient: return String(localized: "Gradient")
         case .solid: return String(localized: "Solid")
         }
     }
@@ -421,9 +423,11 @@ enum LyricHighlightStyle: String, CaseIterable, Identifiable, Defaults.Serializa
     var explanation: String {
         switch self {
         case .sweep:
-            return String(localized: "The highlight travels across the line in time with the singing.")
+            return String(localized: "The highlight travels across the line word by word, in reading order.")
+        case .gradient:
+            return String(localized: "The current line is lit by one fixed gradient that does not move, the way lyrics were marked before the sweep.")
         case .solid:
-            return String(localized: "The whole line lights at once, as it did before.")
+            return String(localized: "The current line is lit in one flat colour, with nothing crossing it.")
         }
     }
 }
