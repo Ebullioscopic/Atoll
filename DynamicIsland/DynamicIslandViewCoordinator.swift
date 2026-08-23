@@ -65,6 +65,10 @@ struct ChatIncomingMessage: Equatable, Identifiable {
     let linkPreview: ChatIncomingLinkPreview?
     let documentPreview: ChatIncomingDocumentPreview?
     let groupSender: String?
+    /// The time the service itself put against this message, already formatted
+    /// the way that service writes it -- "11:40", "Yesterday". Absent for a
+    /// message that arrived without one, and the card says "now" instead.
+    let timeLabel: String?
     let pollOptions: [ChatIncomingPollOption]
     let pollAllowsMultipleSelection: Bool
 
@@ -76,6 +80,7 @@ struct ChatIncomingMessage: Equatable, Identifiable {
         linkPreview: ChatIncomingLinkPreview? = nil,
         documentPreview: ChatIncomingDocumentPreview? = nil,
         groupSender: String? = nil,
+        timeLabel: String? = nil,
         pollOptions: [ChatIncomingPollOption] = [],
         pollAllowsMultipleSelection: Bool = false
     ) {
@@ -86,6 +91,7 @@ struct ChatIncomingMessage: Equatable, Identifiable {
         self.linkPreview = linkPreview
         self.documentPreview = documentPreview
         self.groupSender = groupSender
+        self.timeLabel = timeLabel
         self.pollOptions = pollOptions
         self.pollAllowsMultipleSelection = pollAllowsMultipleSelection
     }

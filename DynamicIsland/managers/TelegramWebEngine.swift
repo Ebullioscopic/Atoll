@@ -109,14 +109,12 @@ public final class TelegramWebEngine: NSObject, ObservableObject {
         drainTask?.cancel(); drainTask = nil
         messageQueue.removeAll()
         webView.stopLoading()
-        // orderOut, not close. An NSWindow made in code is released when it is
-        // closed unless told otherwise, and this one is also held here -- so
-        // closing it released it twice over, and the app died later in whatever
-        // autorelease pool happened to be draining. `isReleasedWhenClosed` is
-        // set false where the window is made, which makes close() safe too;
-        // ordering out and dropping the reference is what was meant regardless.
+        // Ordered out, never released. The web view is this window's content
+        // view and outlives it -- the engine holds it across a stop -- so
+        // letting the window go left the view pointing at a dead window, and
+        // the app died in whatever timer's autorelease pool drained next.
+        // The window costs nothing while hidden, so it is made once and kept.
         offscreenWindow?.orderOut(nil)
-        offscreenWindow = nil
         authenticationTime = nil
         isMonitorInjectedForCurrentDocument = false
         signInWebView = nil
@@ -255,7 +253,11 @@ public final class TelegramWebEngine: NSObject, ObservableObject {
     /// far too little for anyone to see. It ignores the mouse, so that one
     /// point cannot be clicked either.
     private func attachToOffscreenWindow() {
-        guard offscreenWindow == nil else { return }
+        if let existing = offscreenWindow {
+            existing.setFrame(Self.hiddenWindowFrame(), display: false)
+            existing.orderFrontRegardless()
+            return
+        }
 
         let win = NSWindow(
             contentRect: Self.hiddenWindowFrame(),
@@ -274,8 +276,9 @@ public final class TelegramWebEngine: NSObject, ObservableObject {
         // occluded window is a hidden page.
         win.alphaValue = 0.01
         win.ignoresMouseEvents = true
-        // This object is held by the engine, so AppKit must not release it on
-        // close as it does by default for a window created in code.
+        // This object is held by the engine for the life of the process, so
+        // AppKit must not release it on close as it does by default for a
+        // window created in code.
         win.isReleasedWhenClosed = false
         win.orderFrontRegardless()
         offscreenWindow = win
@@ -420,7 +423,8 @@ public final class TelegramWebEngine: NSObject, ObservableObject {
             let incoming = ChatIncomingMessage(
                 id: dict["messageId"] as? String ?? "\(chatId)|\(body.hashValue)",
                 text: body,
-                groupSender: (dict["groupSender"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                groupSender: (dict["groupSender"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                timeLabel: (dict["time"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             )
 
             deliver(
@@ -671,6 +675,15 @@ private enum JS {
             return text(clone);
         }
 
+        // The time Telegram itself stamped the row with -- "11:40", or a day
+        // name once it is older than that. It lives in the details column the
+        // title deliberately excludes, so it is read from there by name and
+        // shown as the service wrote it rather than reformatted here.
+        function stamp(row) {
+            var el = row.querySelector('.row-title-right .message-time, .message-time, .dialog-title-details .time');
+            return el ? text(el) : '';
+        }
+
         // Somebody typing is not a message. Telegram writes the indicator into
         // the same subtitle the preview comes from, so without this a card
         // announces "typing", and then announces the message underneath it as
@@ -703,8 +716,11 @@ private enum JS {
                 var row = rows[i];
                 var peerId = row.dataset ? (row.dataset.peerId || '') : '';
                 if (!peerId) continue;
-                // A chat opened on screen is one the user is already reading.
-                if (row.classList.contains('active')) { seen[peerId] = null; }
+                // No check for `.active` here. This client is Atoll's own and
+                // nobody looks at it, so an open chat never means the user is
+                // reading it -- it means Atoll just replied there. Treating
+                // that as read discarded the chat's history every scan, and
+                // the conversation you had just answered went quiet.
 
                 if (isTyping(row)) continue;
 
@@ -728,6 +744,7 @@ private enum JS {
                     sender: title(row) || 'Telegram',
                     groupSender: p.from,
                     body: p.body,
+                    time: stamp(row),
                     avatarUrl: avatarUrl(row)
                 });
             }
@@ -785,23 +802,47 @@ private enum JS {
         return (input.textContent || '').trim();
     }
 
+    // The chat list opens a chat on mousedown, not on click -- so `.click()`
+    // is heard by the handler that cancels the row's link and by nothing that
+    // opens anything, which is why every reply failed with the chat never
+    // opening. The whole press has to be delivered, with a button and
+    // coordinates, since the handler reads both.
+    function press(el) {
+        var box = el.getBoundingClientRect();
+        var x = box.left + box.width / 2;
+        var y = box.top + box.height / 2;
+        ['mousedown', 'mouseup', 'click'].forEach(function(type) {
+            el.dispatchEvent(new MouseEvent(type, {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                button: 0,
+                buttons: type === 'mousedown' ? 1 : 0,
+                clientX: x,
+                clientY: y
+            }));
+        });
+    }
+
     var target = row();
-    if (target) { target.click(); } else { location.hash = '#' + chatId; }
+    if (target) { press(target); } else { location.hash = '#' + chatId; }
 
     // Wait for this chat to be the open one, then for its composer. A chat
     // with no composer at all -- a channel you cannot post in -- gives up
     // rather than typing into the chat that was open before.
     var input = null;
+    var everOpened = false;
     for (var waited = 0; waited < 8000; waited += 100) {
         var current = row();
         var isOpen = current ? current.classList.contains('active') : (location.hash === '#' + chatId);
         if (isOpen) {
+            everOpened = true;
             input = composer();
             if (input) break;
         }
         await sleep(100);
     }
-    if (!input) return 'chat-did-not-open';
+    if (!input) return everOpened ? 'no-composer-in-chat' : 'chat-did-not-open';
 
     input.focus();
     try {
@@ -827,10 +868,35 @@ private enum JS {
     // Telegram empties the composer when it accepts a message, so an empty box
     // is the confirmation. Anything else and the words are still sitting there
     // unsent, which the card should say rather than claim success.
+    // Leaving the chat again is not tidiness, it is the whole point. While
+    // this client sits in a conversation Telegram marks everything that
+    // arrives there as read -- on the account, so it reads as read on the
+    // phone too -- and the row's unread badge never leaves zero, which is
+    // what the monitor watches. Replying to somebody once would otherwise
+    // silence them for good. Opening a chat pushes a navigation item whose
+    // pop closes it, and Escape is what pops it.
+    async function leaveChat() {
+        try { input.blur(); } catch (e) {}
+        for (var tries = 0; tries < 8; tries++) {
+            window.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
+                bubbles: true, cancelable: true
+            }));
+            await sleep(150);
+            var open = row();
+            if (!open || !open.classList.contains('active')) return true;
+        }
+        return false;
+    }
+
     for (var settle = 0; settle < 3000; settle += 100) {
-        if (!contents(input)) return 'sent';
+        if (!contents(input)) {
+            await leaveChat();
+            return 'sent';
+        }
         await sleep(100);
     }
+    await leaveChat();
     return 'still-in-composer';
     """
 }

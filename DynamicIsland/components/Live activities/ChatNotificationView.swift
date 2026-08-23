@@ -19,6 +19,12 @@ import PDFKit
 enum ChatNotificationLayout {
     static let width: CGFloat = 420
     private static let textMeasurementWidth: CGFloat = 332
+    /// The card is a notification, not a reader: past this many lines a
+    /// message is truncated rather than allowed to push the card past the
+    /// height measured for it. The measurement clamps to the same number, so
+    /// what is drawn is always what was reserved.
+    static let maxTextLines: Int = 6
+    private static let textLineHeight: CGFloat = 15
     private static let notificationTopPadding: CGFloat = 14
     private static let notificationBottomPadding: CGFloat = 10
 
@@ -28,9 +34,12 @@ enum ChatNotificationLayout {
         messages: [ChatIncomingMessage]
     ) -> CGFloat {
         let messagesHeight = messages.reduce(CGFloat.zero) { total, message in
-            total + messageHeight(message) + (total > 0 ? 3 : 0)
+            total + messageHeight(message) + (total > 0 ? 4 : 0)
         }
-        let headerContentHeight = max(38, 17 + (messagesHeight > 0 ? 3 + messagesHeight : 0))
+        // 17 for the name row, then the 5pt gap the VStack actually uses --
+        // measuring a smaller gap than is drawn is how the card ended up
+        // shorter than its own contents.
+        let headerContentHeight = max(38, 17 + (messagesHeight > 0 ? 5 + messagesHeight : 0))
         let headerHeight = 12 + headerContentHeight
         let replyHeight: CGFloat = isReplying ? 44 : 0
         let filePreviewHeight: CGFloat = hasFilePreview ? 40 : 0
@@ -114,11 +123,11 @@ enum ChatNotificationLayout {
             .paragraphStyle: paragraph
         ]
         let boundingRect = (cleaned as NSString).boundingRect(
-            with: CGSize(width: textMeasurementWidth, height: .greatestFiniteMagnitude),
+            with: CGSize(width: textMeasurementWidth, height: CGFloat(maxTextLines) * textLineHeight),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: attributes
         )
-        return max(17, ceil(boundingRect.height) + 1)
+        return max(17, min(ceil(boundingRect.height), CGFloat(maxTextLines) * textLineHeight) + 1)
     }
 
     static func isEmojiOnly(_ text: String) -> Bool {
@@ -317,6 +326,13 @@ struct ChatNotificationView: View {
         }
     }
 
+    /// The time against the newest message on the card, as the service wrote
+    /// it. A message that came in without one is one that just arrived.
+    private var timestampLabel: String {
+        let stamp = visibleMessages.last?.timeLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return stamp.isEmpty ? "now" : stamp
+    }
+
     private var headerSection: some View {
         HStack(alignment: .top, spacing: 12) {
             avatarView
@@ -328,12 +344,18 @@ struct ChatNotificationView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
+                        .truncationMode(.tail)
 
                     Spacer(minLength: 4)
 
-                    Text("now")
+                    // The time never wraps or shrinks: a long name gives way
+                    // to it instead, since half a name still reads as the name
+                    // and half a time reads as nothing.
+                    Text(timestampLabel)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .lineLimit(1)
+                        .fixedSize()
                         .opacity(isReplying ? 0 : 1)
                 }
 
@@ -410,7 +432,8 @@ struct ChatNotificationView: View {
     private func messageTextView(text: String, groupSender: String?) -> some View {
         let isEmojiOnly = ChatNotificationLayout.isEmojiOnly(text)
         Text(linkifiedMessageText(sender: groupSender, text: text, isEmojiOnly: isEmojiOnly))
-            .lineLimit(isEmojiOnly ? 1 : nil)
+            .lineLimit(isEmojiOnly ? 1 : ChatNotificationLayout.maxTextLines)
+            .truncationMode(.tail)
             .environment(\.openURL, OpenURLAction { url in
                 NSWorkspace.shared.open(url)
                 return .handled
@@ -759,7 +782,7 @@ struct ChatNotificationView: View {
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle")
                     .font(.system(size: 10, weight: .semibold))
-                Text(message.pollAllowsMultipleSelection ? "Seleziona una o più opzioni" : "Seleziona un'opzione")
+                Text(message.pollAllowsMultipleSelection ? "Select one or more options" : "Select an option")
                     .font(.system(size: 10.5, weight: .semibold))
             }
             .foregroundStyle(.white.opacity(0.45))
