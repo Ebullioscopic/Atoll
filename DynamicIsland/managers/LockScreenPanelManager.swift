@@ -259,6 +259,27 @@ class LockScreenPanelManager {
         LockScreenTimerWidgetManager.shared.notifyMusicPanelFrameChanged(animated: animated)
     }
 
+    /// Re-presents the panel if it has gone while the screen is still locked.
+    ///
+    /// `hidePanel` clears the window's content view, so anything that hides the
+    /// panel mid-lock leaves it gone until the next lock — there is nothing that
+    /// brings it back. Rather than chase every route that can hide it, check that
+    /// what should be on screen still is, and restore it if not. `showPanel`
+    /// already returns early when the widget is switched off, so this cannot
+    /// resurrect a panel the user disabled.
+    func ensurePresentedWhileLocked() {
+        guard Defaults[.enableLockScreenMediaWidget] else { return }
+        guard LockScreenManager.shared.isLocked else { return }
+
+        let isMissing = panelWindow == nil
+            || panelWindow?.isVisible != true
+            || panelWindow?.contentView == nil
+        guard isMissing else { return }
+
+        print("[\(timestamp())] LockScreenPanelManager: panel missing while locked, re-presenting")
+        showPanel()
+    }
+
     func hidePanel() {
         print("[\(timestamp())] LockScreenPanelManager: hidePanel")
 
@@ -382,7 +403,11 @@ class LockScreenPanelManager {
         let collapsedSize = LockScreenMusicPanel.collapsedSize
         let originX = screenFrame.midX - (collapsedSize.width / 2)
         let baseOriginY = screenFrame.origin.y + (screenFrame.height / 2) - collapsedSize.height - 32
-        let defaultLowering: CGFloat = -28
+        // Sits a little below the vertical centre, clear of the clock above it.
+        // The panel grows upward as the volume and lyrics rows appear, so the
+        // resting position has to leave room for them without drifting up into
+        // the time. Fine tuning is the vertical offset setting, below.
+        let defaultLowering: CGFloat = -68
         let userOffset = CGFloat(Defaults[.lockScreenMusicVerticalOffset])
         let clampedOffset = min(max(userOffset, -160), 160)
         var originY = baseOriginY + defaultLowering + clampedOffset
