@@ -333,18 +333,37 @@ struct ModelSelectionView: View {
     private func saveConfiguration() {
         ensureValidModelSelection()
 
-        // Write the credentials first. If the Keychain refuses, closing the panel
-        // would report success while later requests keep reading the previous
-        // key — so nothing is committed until every write has landed.
-        let writes: [(AIKeyAccount, OSStatus)] = [
-            (.gemini, keyStore.save(geminiApiKey, account: .gemini)),
-            (.openai, keyStore.save(openaiApiKey, account: .openai)),
-            (.claude, keyStore.save(claudeApiKey, account: .claude)),
-            (.groq, keyStore.save(groqApiKey, account: .groq))
+        // Snapshot what is there before writing anything, so a failure partway
+        // through the four accounts can be rolled back instead of leaving some
+        // accounts on the new value and others still on the old one.
+        let previousValues: [AIKeyAccount: String] = Dictionary(
+            uniqueKeysWithValues: AIKeyAccount.allCases.map { ($0, keyStore.value($0)) }
+        )
+        let pending: [(AIKeyAccount, String)] = [
+            (.gemini, geminiApiKey),
+            (.openai, openaiApiKey),
+            (.claude, claudeApiKey),
+            (.groq, groqApiKey)
         ]
 
-        let failed = writes.filter { $0.1 != errSecSuccess }
+        var succeeded: [AIKeyAccount] = []
+        var failed: [(AIKeyAccount, OSStatus)] = []
+        for (account, value) in pending {
+            let status = keyStore.save(value, account: account)
+            if status == errSecSuccess {
+                succeeded.append(account)
+            } else {
+                failed.append((account, status))
+            }
+        }
+
         guard failed.isEmpty else {
+            // Best-effort rollback: restore every account that did succeed to
+            // what it held before this save, so the failure does not leave a
+            // partial mix of new and old credentials.
+            for account in succeeded {
+                keyStore.save(previousValues[account] ?? "", account: account)
+            }
             for (account, status) in failed {
                 Logger.log(
                     "Could not save the \(account.rawValue) key to the Keychain (OSStatus \(status)).",
