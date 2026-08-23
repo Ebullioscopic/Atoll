@@ -265,10 +265,17 @@ func inlineLyricsAdjustedNotchSize(
     from baseSize: CGSize,
     isHomeTabActive: Bool
 ) -> CGSize {
+    // The same conditions `sideLyricsRequiredNotchWidth` tests, for the same
+    // reason: the extra line belongs to the standard player, so it is only
+    // owed when that player is on screen to draw it. Without the last two the
+    // notch grew for a line nobody could see whenever the player was switched
+    // off, or hidden by auto-hide with nothing playing.
     guard isHomeTabActive,
           !Defaults[.enableMinimalisticUI],
           Defaults[.enableLyrics],
-          Defaults[.showCalendar]
+          Defaults[.showCalendar],
+          Defaults[.showStandardMediaControls],
+          (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
     else {
         return baseSize
     }
