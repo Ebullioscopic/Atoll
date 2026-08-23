@@ -166,6 +166,19 @@ struct ContentView: View {
                 return CGSize(width: width, height: height)
             }
         }
+
+        if vm.notchState == .closed,
+           coordinator.expandingView.show,
+           case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type,
+           isWhatsAppExpansionVisible {
+            return WhatsAppNotificationLayout.windowSize(
+                isReplying: coordinator.isWhatsAppReplying,
+                hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
+                messages: messages,
+                isDynamicIslandMode: isDynamicIslandMode,
+                closedNotchHeight: vm.closedNotchSize.height
+            )
+        }
         
         if coordinator.currentView == .timer {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
@@ -225,6 +238,7 @@ struct ContentView: View {
     
 
     @State private var hoverTask: Task<Void, Never>?
+    @State private var whatsAppDismissTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
     @State private var lastHapticTime: Date = Date()
     @State private var hoverClickMonitor: Any?
@@ -288,6 +302,7 @@ struct ContentView: View {
     private let statsAdditionalRowHeight: CGFloat = statsSecondRowContentHeight + statsGridSpacingHeight
     private let musicControlPauseGrace: TimeInterval = 5
     private let musicControlResumeDelay: TimeInterval = 0.24
+    private let whatsAppDismissDelayAfterMouseExit: TimeInterval = 2.1
 
     // MARK: - Tab switch direction for smooth transitions
     
@@ -425,7 +440,11 @@ struct ContentView: View {
     /// Whether the notch/island should hide off-screen when closed on a non-notch display.
     /// Temporarily reveals the notch when a sneakPeek HUD (volume, brightness, music, etc.) is active.
     private var shouldHideUntilHover: Bool {
-        hideNonNotchUntilHover && isNonNotchScreen && vm.notchState == .closed && !isSneakPeekVisibleOnCurrentScreen
+        hideNonNotchUntilHover
+            && isNonNotchScreen
+            && vm.notchState == .closed
+            && !isSneakPeekVisibleOnCurrentScreen
+            && !isWhatsAppExpansionVisible
     }
 
     /// Whether the fallback top-edge hover detector should run.
@@ -476,7 +495,22 @@ struct ContentView: View {
         if coordinator.expandingView.type == .battery {
             return isBatteryHUDVisibleOnCurrentScreen
         }
+        if case .whatsApp = coordinator.expandingView.type {
+            return isWhatsAppExpansionVisible
+        }
         return true
+    }
+
+    private var isWhatsAppExpansionVisible: Bool {
+        guard coordinator.expandingView.show,
+              case .whatsApp = coordinator.expandingView.type,
+              vm.notchState == .closed else { return false }
+        return true
+    }
+
+    private var currentWhatsAppMessages: [WhatsAppIncomingMessage] {
+        guard case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type else { return [] }
+        return messages
     }
 
     private var currentScreenExpansionType: SneakContentType? {
@@ -541,6 +575,20 @@ struct ContentView: View {
     }
 
 
+    private var activeClosedWhatsAppSurfaceShape: AnyShape? {
+        guard vm.notchState == .closed else { return nil }
+        guard isWhatsAppExpansionVisible else { return nil }
+
+        if isDynamicIslandMode {
+            let radius = dynamicIslandPillCornerRadiusInsets.opened
+            return AnyShape(DynamicIslandPillShape(cornerRadius: radius))
+        }
+
+        let topRadius = activeCornerRadiusInsets.closed.top
+        let bottomRadius = WhatsAppNotificationLayout.bottomCornerRadius(isReplying: coordinator.isWhatsAppReplying)
+        return AnyShape(NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius))
+    }
+
     private var activeClosedBatterySurfaceShape: AnyShape? {
         guard vm.notchState == .closed else { return nil }
         guard isBatteryHUDVisibleOnCurrentScreen else { return nil }
@@ -593,6 +641,9 @@ struct ContentView: View {
     /// Resolves the clip/content shape per-screen: pill on non-notch screens
     /// when dynamic island mode is active, standard notch shape otherwise.
     private var resolvedClipShape: AnyShape {
+        if let activeClosedWhatsAppSurfaceShape {
+            return activeClosedWhatsAppSurfaceShape
+        }
         if let activeClosedRecordingSurfaceShape {
             return activeClosedRecordingSurfaceShape
         }
@@ -619,7 +670,7 @@ struct ContentView: View {
             .clipShape(resolvedClipShape)
             .compositingGroup()
             .shadow(
-                color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
+                color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow] && !isWhatsAppExpansionVisible)
                     ? .black.opacity(0.6)
                     : .clear,
                 radius: Defaults[.cornerRadiusScaling] ? 10 : 5
@@ -633,64 +684,11 @@ struct ContentView: View {
     }
 
     private var configuredMainLayout: some View {
-        mainLayoutBase
-            .conditionalModifier(!useModernCloseAnimation) { view in
-                let hoverAnimation = Animation.bouncy.speed(1.2)
-                let notchStateAnimation = Animation.spring(response: 0.42, dampingFraction: 1.0, blendDuration: 0)
-                return view
-                    .animation(hoverAnimation, value: isHovering)
-                    .animation(notchStateAnimation, value: vm.notchState)
-                    .animation(.smooth, value: gestureProgress)
-                    .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
-            }
-            .conditionalModifier(useModernCloseAnimation) { view in
-                let hoverAnimation = Animation.bouncy.speed(1.2)
-                let openAnimation = Animation.spring(response: 0.42, dampingFraction: 1.0, blendDuration: 0)
-                let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
-                let notchAnimation = vm.notchState == .open ? openAnimation : closeAnimation
-                return view
-                    .animation(hoverAnimation, value: isHovering)
-                    .animation(notchAnimation, value: vm.notchState)
-                    .animation(.smooth, value: gestureProgress)
-            }
-            .conditionalModifier(interactionsEnabled) { view in
-                view
-                    .contentShape(resolvedClipShape)
-                    .onHover { hovering in
-                        handleHover(hovering)
-                    }
-                    .onTapGesture {
-                        guard !recordingOpenGestureLocked else { return }
-                        if handleClosedMusicWaveformTapIfNeeded() {
-                            return
-                        }
-                        if vm.notchState == .closed && Defaults[.enableHaptics] {
-                            triggerHapticIfAllowed()
-                        }
-                        openNotch()
-                    }
-                    .conditionalModifier(Defaults[.enableGestures]) { view in
-                        view
-                            .panGesture(direction: .down) { translation, phase in
-                                handleDownGesture(translation: translation, phase: phase)
-                            }
-                            .panGesture(direction: .left) { translation, phase in
-                                handleSkipGesture(direction: .forward, translation: translation, phase: phase)
-                            }
-                            .panGesture(direction: .right) { translation, phase in
-                                handleSkipGesture(direction: .backward, translation: translation, phase: phase)
-                            }
-                    }
-            }
-            .conditionalModifier((Defaults[.closeGestureEnabled] || Defaults[.reverseScrollGestures]) && Defaults[.enableGestures] && interactionsEnabled) { view in
-                view
-                    .panGesture(direction: .up) { translation, phase in
-                        handleUpGesture(translation: translation, phase: phase)
-                    }
-            }
-            // Shadow bottom padding and hide-until-hover offset applied AFTER
-            // interaction modifiers so .contentShape / .onHover only covers
-            // the actual notch content, not the shadow clearance below it.
+        let animatedLayout = applyConfiguredMainLayoutAnimations(to: mainLayoutBase)
+        let interactiveLayout = applyConfiguredMainLayoutInteractions(to: animatedLayout)
+        let closeGestureLayout = applyConfiguredMainLayoutCloseGesture(to: interactiveLayout)
+
+        return closeGestureLayout
             .padding(.bottom, notchBottomPadding)
             .offset(y: shouldHideUntilHover && !isHovering
                 ? -(vm.closedNotchSize.height + pillTopOffset + currentShadowPadding + 10)
@@ -698,14 +696,12 @@ struct ContentView: View {
             )
             .onAppear(perform: {
                 if coordinator.firstLaunch {
-                    // Single open during first launch; closeHello() handles the timed close.
                     runAfter(1) {
                         openNotch()
                     }
                 }
             })
             .onChange(of: vm.notchState) { _, newState in
-                // Update smart monitoring based on notch state
                 if enableStatsFeature {
                     let currentViewString = coordinator.currentView == .stats ? "stats" : "other"
                     statsManager.updateMonitoringState(
@@ -714,7 +710,6 @@ struct ContentView: View {
                     )
                 }
 
-                // Reset hover state when notch state changes
                 if newState == .closed && isHovering {
                     withAnimation {
                         isHovering = false
@@ -747,7 +742,6 @@ struct ContentView: View {
                 }
             }
             .onChange(of: vm.shouldRecheckHover) { _, _ in
-                // Recheck hover state when popovers are closed
                 runAfter(0.1) {
                     if vm.notchState == .open && !shouldPreventAutoClose() && !isHovering {
                         vm.close()
@@ -762,7 +756,6 @@ struct ContentView: View {
                 }
             }
             .onChange(of: coordinator.sneakPeek.show) { _, sneakPeekShowing in
-                // When sneak peek finishes, check if user is still hovering and open notch if needed
                 if !sneakPeekShowing {
                     runAfter(0.2) {
                         if isHovering && vm.notchState == .closed && !coordinator.isHoverOpenSuppressed {
@@ -770,6 +763,21 @@ struct ContentView: View {
                         }
                     }
                 }
+            }
+            .onChange(of: coordinator.expandingView.show) { _, expanding in
+                if !expanding {
+                    cancelWhatsAppDismissTask()
+                    coordinator.isWhatsAppReplying = false
+                }
+                if case .whatsApp = coordinator.expandingView.type {
+                    NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
+                }
+            }
+            .onChange(of: coordinator.isWhatsAppReplying) { _, replying in
+                syncWhatsAppWindowSizeIfNeeded(forReplying: replying)
+            }
+            .onChange(of: coordinator.isWhatsAppFilePreviewVisible) { _, _ in
+                syncWhatsAppWindowSizeIfNeeded()
             }
             .onChange(of: coordinator.currentView) { _, newValue in
                 if enableStatsFeature {
@@ -799,13 +807,112 @@ struct ContentView: View {
             }
     }
 
+    @ViewBuilder
+    private func applyConfiguredMainLayoutAnimations<V: View>(to view: V) -> some View {
+        let hoverAnimation = Animation.bouncy.speed(1.2)
+        if useModernCloseAnimation {
+            let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
+            let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
+            let notchAnimation = vm.notchState == .open ? openAnimation : closeAnimation
+            view
+                .animation(hoverAnimation, value: isHovering)
+                .animation(notchAnimation, value: vm.notchState)
+                .animation(.smooth, value: gestureProgress)
+        } else {
+            view
+                .animation(hoverAnimation, value: isHovering)
+                .animation(Animation.spring.speed(1.2), value: vm.notchState)
+                .animation(.smooth, value: gestureProgress)
+                .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
+        }
+    }
+
+    private func applyConfiguredMainLayoutInteractions<V: View>(to view: V) -> some View {
+        view
+            .contentShape(resolvedClipShape)
+            .onHover { hovering in
+                guard interactionsEnabled else { return }
+                handleHover(hovering)
+            }
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    guard interactionsEnabled else { return }
+                    // Quando siamo in modalità reply WhatsApp, non intercettare
+                    // i tap — lasciarli passare ai Button figli (es. "+")
+                    if isWhatsAppExpansionVisible && coordinator.isWhatsAppReplying {
+                        return
+                    }
+                    if isWhatsAppExpansionVisible {
+                        if !coordinator.isWhatsAppReplying {
+                            activateWhatsAppReplyMode(animated: false)
+                        }
+                        return
+                    }
+                    guard !recordingOpenGestureLocked else { return }
+                    if handleClosedMusicWaveformTapIfNeeded() {
+                        return
+                    }
+                    if vm.notchState == .closed && Defaults[.enableHaptics] {
+                        triggerHapticIfAllowed()
+                    }
+                    openNotch()
+                }
+            )
+            .panGesture(direction: .down) { translation, phase in
+                guard interactionsEnabled, Defaults[.enableGestures] else { return }
+                handleDownGesture(translation: translation, phase: phase)
+            }
+            .panGesture(direction: .left) { translation, phase in
+                guard interactionsEnabled, Defaults[.enableGestures] else { return }
+                handleSkipGesture(direction: .forward, translation: translation, phase: phase)
+            }
+            .panGesture(direction: .right) { translation, phase in
+                guard interactionsEnabled, Defaults[.enableGestures] else { return }
+                handleSkipGesture(direction: .backward, translation: translation, phase: phase)
+            }
+    }
+
+    private func applyConfiguredMainLayoutCloseGesture<V: View>(to view: V) -> some View {
+        view
+            .panGesture(direction: .up) { translation, phase in
+                let shouldApplyCloseGesture = (isWhatsAppExpansionVisible
+                    || Defaults[.closeGestureEnabled]
+                    || Defaults[.reverseScrollGestures])
+            && Defaults[.enableGestures]
+            && interactionsEnabled
+                guard shouldApplyCloseGesture else { return }
+                handleUpGesture(translation: translation, phase: phase)
+            }
+    }
+
     private var rootBodyView: some View {
-        ZStack(alignment: .top) {
+        let standardRootWidth = dynamicNotchSize.width
+            + (vm.notchState == .open ? 24 : 0)
+            + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)
+        let standardRootHeight = dynamicNotchSize.height
+            + (vm.notchState == .open ? 12 : 0)
+            + (isIslandMode ? 0 : notchTopScreenBleedAmount)
+            + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)
+        let whatsAppRootWidth = dynamicNotchSize.width
+            + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)
+        let whatsAppRootHeight = dynamicNotchSize.height
+            + currentShadowPadding
+            + (isIslandMode ? 0 : notchTopScreenBleedAmount)
+            + (isDynamicIslandMode ? dynamicIslandTopOffset : 0)
+        let rootWidth = isWhatsAppExpansionVisible ? whatsAppRootWidth : standardRootWidth
+        let rootHeight = isWhatsAppExpansionVisible ? whatsAppRootHeight : standardRootHeight
+
+        return ZStack(alignment: .top) {
             configuredMainLayout
         }
         .frame(
-            maxWidth: (dynamicNotchSize.width + (vm.notchState == .open ? 24 : 0) + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)).rounded(),
-            maxHeight: (dynamicNotchSize.height + (vm.notchState == .open ? 12 : 0) + (isIslandMode ? 0 : notchTopScreenBleedAmount) + (isDynamicIslandMode ? dynamicIslandTopOffset + dynamicIslandShadowInset * 2 : currentShadowPadding)).rounded(),
+            width: isWhatsAppExpansionVisible ? rootWidth : nil,
+            height: isWhatsAppExpansionVisible ? rootHeight : nil,
+            alignment: .top
+        )
+        .frame(
+            maxWidth: rootWidth.rounded(),
+            maxHeight: rootHeight.rounded(),
             alignment: .top
         )
         .animation(nil, value: vm.notchState)
@@ -1019,6 +1126,18 @@ struct ContentView: View {
                             styleOverride: batteryModel.activeTemporaryHUDKind.map { resolvedBatteryNotificationStyle(for: $0) }
                         )
                         .id(batteryModel.activeTemporaryHUDToken)
+                      } else if isWhatsAppExpansionVisible,
+                                case .whatsApp(let senderName, let messages, let chatId, let avatarUrl) = coordinator.expandingView.type {
+                        WhatsAppTemporaryActivityView(
+                                    senderName: senderName,
+                                    messages: messages,
+                                    chatId: chatId,
+                                    avatarUrl: avatarUrl,
+                                    isReplying: $coordinator.isWhatsAppReplying,
+                                    closedNotchHeight: vm.closedNotchSize.height,
+                                    isDynamicIslandMode: isDynamicIslandMode
+                        )
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                       } else if isSneakPeekVisibleOnCurrentScreen && (Defaults[.inlineHUD] || isAirPodsListeningModeSneak) && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && !coordinator.sneakPeek.type.isExtensionPayload && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(
@@ -1343,6 +1462,7 @@ struct ContentView: View {
                                 frameWidth: max(0, (effectiveCenterWidth - vm.closedNotchSize.width) / 2 - 12),
                                 badgeHeight: 13
                             )
+                            .id("inline-title-\(musicManager.songTitle)|\(musicManager.artistName)|\(musicManager.isCurrentTrackExplicit)")
                             .padding(.leading, 8)
                             .opacity((coordinator.expandingView.show && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
                             Spacer(minLength: vm.closedNotchSize.width)
@@ -1375,6 +1495,7 @@ struct ContentView: View {
                                 minDuration: 3,
                                 frameWidth: max(0, effectiveCenterWidth - 16)
                             )
+                            .id("closed-title-\(musicManager.songTitle)|\(musicManager.artistName)")
                             .padding(.horizontal, 8)
                         }
                     }
@@ -2035,6 +2156,7 @@ struct ContentView: View {
     /// `.onDisappear` and from `vm.onViewTeardown` on window close. Idempotent.
     private func performViewTeardown() {
         hoverTask?.cancel()
+        cancelWhatsAppDismissTask()
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
         stopHiddenEdgeHoverPolling()
@@ -2102,6 +2224,7 @@ struct ContentView: View {
                 guard !self.recordingOpenGestureLocked else { return }
                 guard !self.coordinator.isHoverOpenSuppressed else { return }
                 guard self.isHovering else { return }
+                guard !self.isWhatsAppExpansionVisible else { return }
                 guard !self.handleClosedMusicWaveformTapIfNeeded() else { return }
                 if Defaults[.enableHaptics] {
                     self.triggerHapticIfAllowed()
@@ -2189,16 +2312,24 @@ struct ContentView: View {
         hoverTask?.cancel()
 
         if hovering {
+            cancelWhatsAppDismissTask()
             if !recordingLiveActivityVisibleOnClosedNotch {
                 startHoverClickMonitor()
             }
             removeStickyTerminalClickMonitor()
+            if isWhatsAppExpansionVisible {
+                coordinator.cancelExpandingViewHide()
+            }
         } else {
             stopHoverClickMonitor()
             if isHoveringClosedMusicWaveformControl {
                 withAnimation(.smooth(duration: 0.16)) {
                     isHoveringClosedMusicWaveformControl = false
                 }
+            }
+            if isWhatsAppExpansionVisible {
+                collapseWhatsAppReplyIfNeeded()
+                scheduleWhatsAppDismissAfterMouseExit()
             }
         }
 
@@ -2214,6 +2345,7 @@ struct ContentView: View {
             let shouldFocusTimerTab = enableTimerFeature && timerDisplayMode == .tab && timerManager.isTimerActive && !enableMinimalisticUI
 
             guard vm.notchState == .closed,
+                !isWhatsAppExpansionVisible,
                 !isSneakPeekVisibleOnCurrentScreen,
                 !recordingLiveActivityVisibleOnClosedNotch,
                 (Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
@@ -2250,6 +2382,86 @@ struct ContentView: View {
                     self.finishHoverExit()
                 }
             }
+        }
+    }
+
+    private func cancelWhatsAppDismissTask() {
+        whatsAppDismissTask?.cancel()
+        whatsAppDismissTask = nil
+    }
+
+    private func collapseWhatsAppReplyIfNeeded() {
+        guard coordinator.isWhatsAppReplying else { return }
+        withAnimation(.smooth(duration: 0.18)) {
+            coordinator.isWhatsAppReplying = false
+        }
+    }
+
+    private func scheduleWhatsAppDismissAfterMouseExit() {
+        guard isWhatsAppExpansionVisible,
+              case .whatsApp = coordinator.expandingView.type,
+              !coordinator.suppressWhatsAppAutoDismiss else { return }
+
+        cancelWhatsAppDismissTask()
+        let activeType = coordinator.expandingView.type
+
+        whatsAppDismissTask = Task {
+            try? await Task.sleep(for: .seconds(whatsAppDismissDelayAfterMouseExit))
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                guard self.isWhatsAppExpansionVisible else { return }
+                guard !self.isHovering else { return }
+                guard !self.coordinator.suppressWhatsAppAutoDismiss else { return }
+                guard self.coordinator.expandingView.type == activeType else { return }
+                self.coordinator.toggleExpandingView(status: false, type: activeType)
+            }
+        }
+    }
+
+    private func syncWhatsAppWindowSizeIfNeeded(forReplying overrideReplying: Bool? = nil, animated: Bool = false) {
+        guard isWhatsAppExpansionVisible else { return }
+        let replying = overrideReplying ?? coordinator.isWhatsAppReplying
+        let windowSize = WhatsAppNotificationLayout.windowSize(
+            isReplying: replying,
+            hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
+            messages: currentWhatsAppMessages,
+            isDynamicIslandMode: isDynamicIslandMode,
+            closedNotchHeight: vm.closedNotchSize.height
+        )
+        let targetSize = addShadowPadding(
+            to: windowSize,
+            isMinimalistic: Defaults[.enableMinimalisticUI]
+        )
+        if Defaults[.showOnAllDisplays] {
+            NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
+        } else {
+            AppDelegate.shared?.ensureWindowSize(targetSize, animated: animated, force: true)
+        }
+    }
+
+    private func activateWhatsAppReplyMode(animated: Bool) {
+        guard isWhatsAppExpansionVisible,
+              case .whatsApp = coordinator.expandingView.type,
+              !coordinator.isWhatsAppReplying else { return }
+
+        cancelWhatsAppDismissTask()
+
+        // Pre-size with reply height before the state flip so the HUD keeps
+        // its notch anchor and doesn't "detach" on first activation.
+        syncWhatsAppWindowSizeIfNeeded(forReplying: true, animated: animated)
+
+        if animated {
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
+                coordinator.isWhatsAppReplying = true
+            }
+            return
+        }
+
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            coordinator.isWhatsAppReplying = true
         }
     }
 
@@ -2337,7 +2549,7 @@ struct ContentView: View {
         // Without this, the hover-exit timer closes the panel mid-drag, tearing
         // down the NSView that is acting as the drag source and cancelling the
         // session — an independent second cause of "drag-out doesn't work".
-        coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || ShelfSelectionModel.shared.isDragging || ClipboardManager.shared.isDraggingItem || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
+        coordinator.isWhatsAppReplying || coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || ShelfSelectionModel.shared.isDragging || ClipboardManager.shared.isDraggingItem || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
     }
     
     // Helper to prevent rapid haptic feedback
@@ -2449,12 +2661,53 @@ struct ContentView: View {
         if shouldOpen {
             handleOpenScrollGesture(translation: translation, phase: phase)
         } else {
-            guard Defaults[.closeGestureEnabled] else { return }
+            guard isWhatsAppExpansionVisible || Defaults[.closeGestureEnabled] else { return }
             handleCloseScrollGesture(translation: translation, phase: phase)
         }
     }
 
+    private func dismissWhatsAppExpansion() {
+        guard isWhatsAppExpansionVisible,
+              case .whatsApp = coordinator.expandingView.type else { return }
+
+        let activeType = coordinator.expandingView.type
+        cancelWhatsAppDismissTask()
+        coordinator.cancelExpandingViewHide()
+
+        if Defaults[.enableHaptics] {
+            triggerHapticIfAllowed()
+        }
+
+        withAnimation(.smooth) {
+            gestureProgress = .zero
+            coordinator.isWhatsAppReplying = false
+        }
+        coordinator.toggleExpandingView(status: false, type: activeType)
+    }
+
     private func handleOpenScrollGesture(translation: CGFloat, phase: NSEvent.Phase) {
+        if isWhatsAppExpansionVisible,
+           case .whatsApp = coordinator.expandingView.type {
+            withAnimation(.smooth) {
+                gestureProgress = (translation / Defaults[.gestureSensitivity]) * 20
+            }
+            if phase == .ended {
+                withAnimation(.smooth) {
+                    gestureProgress = .zero
+                }
+            }
+            if translation > Defaults[.gestureSensitivity] {
+                if Defaults[.enableHaptics] {
+                    triggerHapticIfAllowed()
+                }
+                withAnimation(.smooth) {
+                    gestureProgress = .zero
+                }
+                activateWhatsAppReplyMode(animated: false)
+            }
+            return
+        }
+
         guard vm.notchState == .closed else { return }
         guard !recordingOpenGestureLocked else { return }
 
@@ -2484,6 +2737,26 @@ struct ContentView: View {
     }
 
     private func handleCloseScrollGesture(translation: CGFloat, phase: NSEvent.Phase) {
+        if isWhatsAppExpansionVisible,
+           case .whatsApp = coordinator.expandingView.type {
+            withAnimation(.smooth) {
+                gestureProgress = (translation / Defaults[.gestureSensitivity]) * -20
+            }
+            if phase == .ended {
+                if translation > Defaults[.gestureSensitivity] * 0.55 {
+                    dismissWhatsAppExpansion()
+                } else {
+                    withAnimation(.smooth) {
+                        gestureProgress = .zero
+                    }
+                }
+            }
+            if translation > Defaults[.gestureSensitivity] {
+                dismissWhatsAppExpansion()
+            }
+            return
+        }
+
         guard vm.notchState == .open, !vm.isHoveringCalendar, !vm.isScrollGestureActive else { return }
 
         withAnimation(.smooth) {
@@ -2776,6 +3049,8 @@ struct ContentView: View {
         let isPlaying: Bool
         let isPlayerIdle: Bool
         let bundleIdentifier: String?
+        let songTitle: String
+        let artistName: String
         let skipBehavior: String
         let skipGestureToken: Int?
     }
@@ -2786,6 +3061,8 @@ struct ContentView: View {
                 isPlaying: musicManager.isPlaying,
                 isPlayerIdle: musicManager.isPlayerIdle,
                 bundleIdentifier: musicManager.bundleIdentifier,
+                songTitle: musicManager.songTitle,
+                artistName: musicManager.artistName,
                 skipBehavior: Defaults[.musicSkipBehavior].rawValue,
                 skipGestureToken: musicManager.skipGesturePulse?.token
             )
@@ -2840,7 +3117,7 @@ struct ContentView: View {
     private func shouldFixSizeForSneakPeek() -> Bool {
         guard isSneakPeekVisibleOnCurrentScreen else { return false }
         let style = resolvedSneakPeekStyle()
-        
+
         // Check for extension sneak peek
         if case .extensionLiveActivity = coordinator.sneakPeek.type {
             return vm.notchState == .closed && style == .standard

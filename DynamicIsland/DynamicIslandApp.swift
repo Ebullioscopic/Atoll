@@ -119,6 +119,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let systemTimerBridge = SystemTimerBridge.shared
     let extensionXPCServiceHost = ExtensionXPCServiceHost.shared
     let extensionRPCServer = ExtensionRPCServer.shared
+    let whatsAppManager = WhatsAppManager.shared
     var closeNotchWorkItem: DispatchWorkItem?
     private var previousScreens: [NSScreen]?
     private var onboardingWindowController: NSWindowController?
@@ -407,7 +408,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         -> NSWindow
     {
         // Use the current required size instead of always using openNotchSize
-        let baseSize = calculateRequiredNotchSize()
+        let baseSize = calculateRequiredNotchSize(for: screen, viewModel: viewModel)
         let requiredSize = adjustedSizeForScreen(baseSize, screen: screen)
         let roundedWidth = requiredSize.width.rounded()
         let roundedHeight = requiredSize.height.rounded()
@@ -466,22 +467,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Calculate required size based on current state
         let requiredSize = calculateRequiredNotchSize()
         let animateResize = shouldAnimateResize(for: requiredSize)
-        resizeWindows(to: requiredSize, animated: animateResize, force: false)
+        resizeWindowsToCurrentRequiredSize(animated: animateResize, force: false)
     }
 
     private func updateWindowSizeForTabSwitch() {
-        let requiredSize = calculateRequiredNotchSize()
-        resizeWindows(to: requiredSize, animated: false, force: true)
+        resizeWindowsToCurrentRequiredSize(animated: false, force: true)
     }
     
-    private func calculateRequiredNotchSize() -> CGSize {
+    private func calculateRequiredNotchSize(for screen: NSScreen? = nil, viewModel: DynamicIslandViewModel? = nil) -> CGSize {
+        let sizingViewModel = viewModel ?? screen.flatMap { viewModels[$0] } ?? vm
+
+        // Check if WhatsApp expanding HUD is showing
+        if sizingViewModel.notchState == .closed,
+           coordinator.expandingView.show,
+           case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type {
+            let screenName = screen?.localizedName ?? sizingViewModel.screen
+            let isIslandMode = shouldUseDynamicIslandMode(for: screenName)
+            let targetSize = WhatsAppNotificationLayout.windowSize(
+                isReplying: coordinator.isWhatsAppReplying,
+                hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
+                messages: messages,
+                isDynamicIslandMode: isIslandMode,
+                closedNotchHeight: sizingViewModel.closedNotchSize.height
+            )
+            return addShadowPadding(to: targetSize, isMinimalistic: Defaults[.enableMinimalisticUI])
+        }
+
         // Check if inline sneak peek is showing and notch is closed
-        let airPodsListeningModeSneakActive = vm.notchState == .closed &&
+        let airPodsListeningModeSneakActive = sizingViewModel.notchState == .closed &&
                                       coordinator.sneakPeek.show &&
                                       coordinator.sneakPeek.type == .bluetoothAudio &&
                                       coordinator.sneakPeek.value < 0 &&
                                       AirPodsListeningMode.fromHUDSymbol(coordinator.sneakPeek.icon) != nil
-        let isInlineSneakPeekActive = vm.notchState == .closed && 
+        let isInlineSneakPeekActive = sizingViewModel.notchState == .closed &&
                                       Defaults[.enableSneakPeek] &&
                                       (
                                           coordinator.expandingView.show &&
@@ -495,26 +513,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Calculate required width for inline sneak peek:
             // Album art (~32) + Middle section (380) + Visualizer (~32) + horizontal padding (28) + clip shape margin (12)
             let inlineSneakPeekWidth: CGFloat = 460
-            return CGSize(width: inlineSneakPeekWidth, height: vm.effectiveClosedNotchHeight)
+            return CGSize(width: inlineSneakPeekWidth, height: sizingViewModel.effectiveClosedNotchHeight)
         }
 
-        if let recordingHUDSize = recordingHUDLayoutForSizing().size(
-            closedNotchSize: vm.closedNotchSize,
-            effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+        if let recordingHUDSize = recordingHUDLayoutForSizing(viewModel: sizingViewModel).size(
+            closedNotchSize: sizingViewModel.closedNotchSize,
+            effectiveClosedNotchHeight: sizingViewModel.effectiveClosedNotchHeight
         ) {
             return addShadowPadding(to: recordingHUDSize, isMinimalistic: Defaults[.enableMinimalisticUI])
         }
 
         // Check for battery HUD expansion
-        if vm.notchState == .closed && 
+        if sizingViewModel.notchState == .closed &&
            coordinator.expandingView.show && 
            coordinator.expandingView.type == .battery &&
            Defaults[.showPowerStatusNotifications] {
             
             let batteryModel = BatteryStatusViewModel.shared
             if let kind = batteryModel.activeTemporaryHUDKind {
-                let closedNotchHeight = vm.effectiveClosedNotchHeight
-                let closedNotchWidth = vm.closedNotchSize.width
+                let closedNotchHeight = sizingViewModel.effectiveClosedNotchHeight
+                let closedNotchWidth = sizingViewModel.closedNotchSize.width
                 
                 let style: BatteryNotificationStyle = {
                     switch kind {
@@ -543,7 +561,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Use minimalistic or normal size based on settings
-        var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
+        var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: sizingViewModel.screen)) : openNotchSize
         
         // Use a consistent height for different view types
         if coordinator.currentView == .timer {
@@ -555,7 +573,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Clipboard has its own fixed height source; don't inherit the notes layout state.
             baseSize.height = max(baseSize.height, NotesLayoutState.list.preferredHeight)
         } else if coordinator.currentView == .terminal {
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
+            let screenHeight = screen?.visibleFrame.height ?? NSScreen.main?.visibleFrame.height ?? 800
             let maxFraction = Defaults[.terminalMaxHeightFraction]
             baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
         } else if coordinator.currentView == .llmUsage {
@@ -575,14 +593,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return result
     }
 
-    private func recordingHUDLayoutForSizing() -> RecordingHUDLayout {
+    private func recordingHUDLayoutForSizing(viewModel: DynamicIslandViewModel) -> RecordingHUDLayout {
         makeRecordingHUDLayout(
-            notchState: vm.notchState,
+            notchState: viewModel.notchState,
             screenRecordingDetectionEnabled: Defaults[.enableScreenRecordingDetection],
             showRecordingIndicator: Defaults[.showRecordingIndicator],
-            hideOnClosed: vm.hideOnClosed,
+            hideOnClosed: viewModel.hideOnClosed,
             isRecording: ScreenRecordingManager.shared.isRecording,
-            closedMusicPairingEligible: closedMusicPairingEligibleForSizing(),
+            closedMusicPairingEligible: closedMusicPairingEligibleForSizing(viewModel: viewModel),
             recordingControlMode: Defaults[.recordingControlMode],
             canStopFromHUD: ScreenRecordingManager.shared.shouldShowStopControlsInHUD,
             enableMinimalisticUI: Defaults[.enableMinimalisticUI],
@@ -592,18 +610,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    private func closedMusicPairingEligibleForSizing() -> Bool {
+    private func closedMusicPairingEligibleForSizing(viewModel: DynamicIslandViewModel) -> Bool {
         let musicManager = MusicManager.shared
         let hasMusicMetadata = !musicManager.songTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !musicManager.artistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasActiveMusicSnapshot = musicManager.isPlaying || (!musicManager.isPlayerIdle && hasMusicMetadata)
 
         return isClosedMusicPairingEligible(
-            notchState: vm.notchState,
+            notchState: viewModel.notchState,
             hasActiveMusicSnapshot: hasActiveMusicSnapshot,
             musicLiveActivityEnabled: coordinator.musicLiveActivityEnabled,
             closedMusicContentEnabled: Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls],
-            hideOnClosed: vm.hideOnClosed,
+            hideOnClosed: viewModel.hideOnClosed,
             isLocked: LockScreenManager.shared.isLocked,
             isDeferredAfterUnlock: LockScreenManager.shared.shouldDelayPostUnlockMusicHUD
         )
@@ -623,6 +641,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func ensureWindowSize(_ size: CGSize, animated: Bool, force: Bool = false) {
         resizeWindows(to: size, animated: animated, force: force)
+    }
+
+    private func resizeWindowsToCurrentRequiredSize(animated: Bool, force: Bool) {
+        if Defaults[.showOnAllDisplays] {
+            for (screen, window) in windows {
+                let baseSize = calculateRequiredNotchSize(for: screen)
+                let screenSize = adjustedSizeForScreen(baseSize, screen: screen)
+                if force || window.frame.size != screenSize {
+                    resizeWindow(window, on: screen, to: screenSize, animated: animated)
+                }
+            }
+        } else if let window {
+            let screen = window.screen ?? NSScreen.screens.first { $0.frame.intersects(window.frame) } ?? NSScreen.main ?? NSScreen.screens.first
+            guard let screen else { return }
+            let baseSize = calculateRequiredNotchSize(for: screen)
+            let screenSize = adjustedSizeForScreen(baseSize, screen: screen)
+            if force || window.frame.size != screenSize {
+                resizeWindow(window, on: screen, to: screenSize, animated: animated)
+            }
+        }
     }
 
     private func resizeWindows(to size: CGSize, animated: Bool, force: Bool) {
@@ -661,10 +699,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // considered, but an unchanged frame still needs no AppKit display
         // transaction. Avoiding that no-op matters during hover/click opens.
         guard window.frame != targetFrame else { return }
-        window.setFrame(targetFrame, display: true)
+        if animated {
+            let topAlignedStartFrame = NSRect(
+                x: window.frame.origin.x,
+                y: targetFrame.maxY - window.frame.height,
+                width: window.frame.width,
+                height: window.frame.height
+            )
+            if window.frame != topAlignedStartFrame {
+                window.setFrame(topAlignedStartFrame, display: true)
+            }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.22
+                context.allowsImplicitAnimation = true
+                window.animator().setFrame(targetFrame, display: true)
+            }
+        } else {
+            window.setFrame(targetFrame, display: true)
+        }
     }
 
     private func shouldAnimateResize(for newSize: CGSize) -> Bool {
+        if coordinator.expandingView.show,
+           case .whatsApp = coordinator.expandingView.type {
+            return true
+        }
         if Defaults[.enableMinimalisticUI] && !ReminderLiveActivityManager.shared.activeWindowReminders.isEmpty {
             return false
         }
@@ -931,6 +990,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             forName: Notification.Name.notchHeightChanged, object: nil, queue: nil
         ) { [weak self] _ in
+            self?.updateWindowSizeIfNeeded()
             self?.adjustWindowPosition()
         }
 
