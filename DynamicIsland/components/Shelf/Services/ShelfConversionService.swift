@@ -362,12 +362,24 @@ enum ShelfConversionService {
         // which is the only way AppKit will paginate an attributed string.
         let pageSize = NSSize(width: 612, height: 792)
         let inset: CGFloat = 36
-        let textView = NSTextView(frame: NSRect(
-            x: 0, y: 0,
-            width: pageSize.width - inset * 2,
-            height: pageSize.height - inset * 2
-        ))
+        let contentWidth = pageSize.width - inset * 2
+        let contentHeight = pageSize.height - inset * 2
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: contentWidth, height: contentHeight))
         textView.textStorage?.setAttributedString(text)
+
+        // NSTextView only paginates automatically when it is sized to its full
+        // content: leaving the frame at one page's height clips everything past
+        // the first page instead of flowing it onto later ones.
+        textView.isVerticallyResizable = true
+        textView.minSize = NSSize(width: contentWidth, height: contentHeight)
+        textView.maxSize = NSSize(width: contentWidth, height: .greatestFiniteMagnitude)
+        if let textContainer = textView.textContainer, let layoutManager = textView.layoutManager {
+            textContainer.heightTracksTextView = false
+            textContainer.containerSize = NSSize(width: contentWidth, height: .greatestFiniteMagnitude)
+            layoutManager.ensureLayout(for: textContainer)
+            let usedHeight = layoutManager.usedRect(for: textContainer).height
+            textView.frame.size.height = max(usedHeight, contentHeight)
+        }
 
         guard let printInfo = NSPrintInfo.shared.copy() as? NSPrintInfo else {
             throw ShelfConversionError.writeFailed
