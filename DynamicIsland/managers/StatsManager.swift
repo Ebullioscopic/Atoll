@@ -441,6 +441,11 @@ class StatsManager: ObservableObject {
     
     // Network monitoring state
     private var previousNetworkStats: (bytesIn: UInt64, bytesOut: UInt64) = (0, 0)
+    /// Whether `previousNetworkStats` came from an actual snapshot rather than
+    /// the zero-initialized default. `(0, 0)` is also what a genuinely idle
+    /// interface reports, so testing the byte values themselves cannot tell
+    /// "no baseline yet" from "baseline is legitimately zero".
+    private var hasNetworkBaseline = false
     private var previousTimestamp: Date = Date()
     /// Advanced only when `getifaddrs` succeeded. Sharing `previousTimestamp` with
     /// disk meant a failed snapshot still moved the clock forward, so the next
@@ -483,10 +488,9 @@ class StatsManager: ObservableObject {
         diskWriteHistory = Array(repeating: 0.0, count: maxHistoryPoints)
         
         // Initialize baseline network stats
-        // A failed getifaddrs leaves the baseline at zero, which the first-run
-        // guard in updateSystemStats reads as "no baseline yet" and re-samples.
-        let initialStats = snapshotNetworkInterfaces().map { aggregateNetworkStats(from: $0) } ?? (0, 0)
-        previousNetworkStats = initialStats
+        let initialSnapshot = snapshotNetworkInterfaces()
+        previousNetworkStats = initialSnapshot.map { aggregateNetworkStats(from: $0) } ?? (0, 0)
+        hasNetworkBaseline = initialSnapshot != nil
         previousTimestamp = Date()
         previousNetworkTimestamp = previousTimestamp
         
@@ -562,10 +566,9 @@ class StatsManager: ObservableObject {
         print("StatsManager: Starting monitoring...")
         
         // Reset baseline for accurate measurement
-        // A failed getifaddrs leaves the baseline at zero, which the first-run
-        // guard in updateSystemStats reads as "no baseline yet" and re-samples.
-        let initialStats = snapshotNetworkInterfaces().map { aggregateNetworkStats(from: $0) } ?? (0, 0)
-        previousNetworkStats = initialStats
+        let initialSnapshot = snapshotNetworkInterfaces()
+        previousNetworkStats = initialSnapshot.map { aggregateNetworkStats(from: $0) } ?? (0, 0)
+        hasNetworkBaseline = initialSnapshot != nil
         
         let initialDiskStats = getDiskStats()
         previousDiskStats = initialDiskStats
@@ -702,7 +705,7 @@ class StatsManager: ObservableObject {
         var bytesUploaded: UInt64 = 0
         
         // Only calculate speeds if we have a reasonable time interval and this isn't the first run
-        if networkInterval > 0.1 && (previousNetworkStats.bytesIn > 0 || previousNetworkStats.bytesOut > 0) {
+        if networkInterval > 0.1 && hasNetworkBaseline {
             bytesDownloaded = currentNetworkStats.bytesIn > previousNetworkStats.bytesIn ? 
                                 currentNetworkStats.bytesIn - previousNetworkStats.bytesIn : 0
             bytesUploaded = currentNetworkStats.bytesOut > previousNetworkStats.bytesOut ? 
@@ -790,7 +793,10 @@ class StatsManager: ObservableObject {
         previousNetworkStats = currentNetworkStats
         previousDiskStats = currentDiskStats
         previousTimestamp = currentTime
-        if networkSnapshots != nil { previousNetworkTimestamp = currentTime }
+        if networkSnapshots != nil {
+            previousNetworkTimestamp = currentTime
+            hasNetworkBaseline = true
+        }
         networkInterfaces = collectNetworkInterfaces(from: networkSnapshots, deltaTime: networkInterval)
         diskDevices = collectDiskDevices()
         // Periodic path: honor the throttle so /bin/ps runs at the intended 0.5Hz, not ~1Hz.
