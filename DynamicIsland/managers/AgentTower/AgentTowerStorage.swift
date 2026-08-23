@@ -83,7 +83,8 @@ enum AgentTowerStorage {
         let dir = (support ?? fm.temporaryDirectory)
             .appendingPathComponent("DynamicIsland", isDirectory: true)
             .appendingPathComponent("AgentTower", isDirectory: true)
-        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
         return dir
     }()
 
@@ -104,15 +105,20 @@ enum AgentTowerStorage {
         return dir
     }
 
+    /// The agent name is folded in because several agents use the same
+    /// `hooks.json` / `settings.json` filename. Agent config directories are
+    /// hidden (`.claude`, `.codex`, …), so this may start with a dot — callers
+    /// pruning backups by this label must not split on "." to recover it.
+    static func backupLabel(for configURL: URL) -> String {
+        configURL.deletingLastPathComponent().lastPathComponent
+            + "-" + configURL.lastPathComponent
+    }
+
     static func backupURL(for configURL: URL, at date: Date) -> URL {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withYear, .withMonth, .withDay, .withTime]
         let stamp = formatter.string(from: date).replacingOccurrences(of: ":", with: "-")
-        // The agent name is folded in because several agents use the same
-        // `hooks.json` / `settings.json` filename.
-        let label = configURL.deletingLastPathComponent().lastPathComponent
-            + "-" + configURL.lastPathComponent
-        return backupsDirectory.appendingPathComponent("\(label).\(stamp).bak")
+        return backupsDirectory.appendingPathComponent("\(backupLabel(for: configURL)).\(stamp).bak")
     }
 
     // MARK: - Preparation

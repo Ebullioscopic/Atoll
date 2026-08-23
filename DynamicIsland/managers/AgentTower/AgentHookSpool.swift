@@ -398,10 +398,29 @@ final class AgentHookSpool: @unchecked Sendable {
             }
         }
 
-        // Keep the bookkeeping sets from growing without bound over a long uptime.
+        // Keep the bookkeeping sets from growing without bound over a long
+        // uptime, but only by dropping ids whose file is already gone — a
+        // wholesale clear would let a still-pending request be processed twice,
+        // or let its answered decision body be overwritten.
         lock.lock()
-        if seenRequestIDs.count > 4096 { seenRequestIDs.removeAll() }
-        if answeredRequestIDs.count > 4096 { answeredRequestIDs.removeAll() }
+        if seenRequestIDs.count > 4096 {
+            let live = Self.requestIDs(inFilesNamed: (try? fm.contentsOfDirectory(atPath: AgentTowerStorage.inboxDirectory.path)) ?? [])
+            seenRequestIDs.formIntersection(live)
+        }
+        if answeredRequestIDs.count > 4096 {
+            let live = Self.requestIDs(inFilesNamed: (try? fm.contentsOfDirectory(atPath: AgentTowerStorage.outboxDirectory.path)) ?? [])
+            answeredRequestIDs.formIntersection(live)
+        }
         lock.unlock()
+    }
+
+    /// Recovers request ids from spool filenames (`<id>.json`, `<id>.done`).
+    private static func requestIDs(inFilesNamed names: [String]) -> Set<String> {
+        Set(names.compactMap { name in
+            for suffix in [".json", ".done"] where name.hasSuffix(suffix) {
+                return String(name.dropLast(suffix.count))
+            }
+            return nil
+        })
     }
 }

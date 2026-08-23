@@ -141,8 +141,26 @@ final class AgentApprovalRuleStore {
         encoder.outputFormatting = [.prettyPrinted]
         encoder.dateEncodingStrategy = .iso8601
         guard let data = try? encoder.encode(durable) else { return }
-        try? data.write(to: fileURL, options: .atomic)
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+
+        // Written 0o600 from the moment it exists: `Data.write(to:options:
+        // .atomic)` publishes a fresh inode, so a chmod afterwards would leave a
+        // window where the file carries the umask's default permissions.
+        let fm = FileManager.default
+        let tempURL = fileURL.appendingPathExtension("tmp-\(UUID().uuidString)")
+        guard fm.createFile(atPath: tempURL.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
+            Logger.log("Agent Tower: failed to write approval rules to a temporary file", category: .agents)
+            return
+        }
+        do {
+            if fm.fileExists(atPath: fileURL.path) {
+                _ = try fm.replaceItemAt(fileURL, withItemAt: tempURL)
+            } else {
+                try fm.moveItem(at: tempURL, to: fileURL)
+            }
+        } catch {
+            Logger.log("Agent Tower: failed to persist approval rules: \(error.localizedDescription)", category: .agents)
+            try? fm.removeItem(at: tempURL)
+        }
     }
 
     private static func load(from url: URL) -> [AgentApprovalRule] {

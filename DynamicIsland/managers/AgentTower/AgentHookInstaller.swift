@@ -324,11 +324,17 @@ enum AgentHookInstaller {
         if [ "$MODE" = "wait" ]; then WAIT=true; else WAIT=false; fi
 
         # The payload is already JSON, so it is embedded as a value verbatim —
-        # no escaping, no reformatting, nothing to get wrong.
+        # no escaping, no reformatting, nothing to get wrong. The terminal hints
+        # come from the environment, though, so anything that could break out of
+        # a JSON string is stripped before they are embedded.
+        sanitize() { printf '%s' "$1" | tr -d '"\\\\[:cntrl:]' | cut -c1-128; }
+        TERM_HINT=$(sanitize "${TERM_PROGRAM:-}")
+        TERM_BID=$(sanitize "${__CFBundleIdentifier:-}")
+
         {
           printf '{"v":%s,"id":"%s","event":"%s","agent":"%s","wait":%s,"pid":%s,"term":"%s","termbid":"%s","payload":' \\
             '\(AgentHookSpool.protocolVersion)' "$REQ" "$EVENT" "$AGENT" "$WAIT" "$PPID" \\
-            "${TERM_PROGRAM:-}" "${__CFBundleIdentifier:-}"
+            "$TERM_HINT" "$TERM_BID"
           printf '%s' "$payload"
           printf '}'
         } > "$IN.tmp" 2>/dev/null || { rm -f "$IN.tmp"; exit 0; }
@@ -408,8 +414,11 @@ enum AgentHookInstaller {
         let foreignAfter = reread.map { foreignHooksFingerprint(of: $0, shimPath: shimPath) }
         guard let foreignAfter, foreignAfter == foreignBefore else {
             if let backup {
-                try? FileManager.default.removeItem(at: descriptor.configURL)
-                try? FileManager.default.copyItem(at: backup, to: descriptor.configURL)
+                // Restore via an atomic replacement rather than deleting first —
+                // a failed copyItem must not leave the user with no config at all.
+                if let restored = try? Data(contentsOf: backup) {
+                    try? restored.write(to: descriptor.configURL, options: .atomic)
+                }
             }
             throw InstallError.verificationFailed(descriptor.configURL)
         }
@@ -584,10 +593,10 @@ enum AgentHookInstaller {
         try data.write(to: url, options: .atomic)
 
         // An atomic write replaces the inode, so the original mode has to be
-        // reapplied or a 0600 config silently becomes world-readable.
-        if let existingPermissions {
-            try? fm.setAttributes([.posixPermissions: existingPermissions], ofItemAtPath: url.path)
-        }
+        // reapplied or a 0600 config silently becomes world-readable. A brand
+        // new config has no prior mode to preserve, so it defaults private
+        // rather than whatever the write left behind after umask.
+        try? fm.setAttributes([.posixPermissions: existingPermissions ?? 0o600], ofItemAtPath: url.path)
     }
 
     /// Copies the config aside before a write and prunes old copies.
@@ -603,7 +612,7 @@ enum AgentHookInstaller {
         try? fm.copyItem(at: url, to: destination)
 
         let directory = AgentTowerStorage.backupsDirectory
-        let prefix = destination.lastPathComponent.components(separatedBy: ".").first ?? ""
+        let prefix = AgentTowerStorage.backupLabel(for: url) + "."
         let existing = ((try? fm.contentsOfDirectory(atPath: directory.path)) ?? [])
             .filter { $0.hasPrefix(prefix) }
             .sorted()
