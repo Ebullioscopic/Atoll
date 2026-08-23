@@ -774,10 +774,8 @@ struct ContentView: View {
                     cancelWhatsAppDismissTask()
                     coordinator.isWhatsAppReplying = false
                 }
-                if expanding || !expanding {
-                    if case .whatsApp = coordinator.expandingView.type {
-                        NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
-                    }
+                if case .whatsApp = coordinator.expandingView.type {
+                    NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
                 }
             }
             .onChange(of: coordinator.isWhatsAppReplying) { _, replying in
@@ -921,6 +919,7 @@ struct ContentView: View {
             + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0)
         let whatsAppRootHeight = dynamicNotchSize.height
             + currentShadowPadding
+            + (isIslandMode ? 0 : notchTopScreenBleedAmount)
             + (isDynamicIslandMode ? dynamicIslandTopOffset : 0)
         let rootWidth = isWhatsAppExpansionVisible ? whatsAppRootWidth : standardRootWidth
         let rootHeight = isWhatsAppExpansionVisible ? whatsAppRootHeight : standardRootHeight
@@ -1158,9 +1157,8 @@ struct ContentView: View {
                                     avatarUrl: avatarUrl,
                                     isReplying: $coordinator.isWhatsAppReplying,
                                     closedNotchHeight: vm.closedNotchSize.height,
-                                    isDynamicIslandMode: isDynamicIslandMode,
-                                    topCornerRadius: activeCornerRadiusInsets.closed.top
-                                )
+                                    isDynamicIslandMode: isDynamicIslandMode
+                        )
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                       } else if isSneakPeekVisibleOnCurrentScreen && (Defaults[.inlineHUD] || isAirPodsListeningModeSneak) && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && !coordinator.sneakPeek.type.isExtensionPayload && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
@@ -1486,6 +1484,7 @@ struct ContentView: View {
                                 frameWidth: max(0, (effectiveCenterWidth - vm.closedNotchSize.width) / 2 - 12),
                                 badgeHeight: 13
                             )
+                            .id("inline-title-\(musicManager.songTitle)|\(musicManager.artistName)|\(musicManager.isCurrentTrackExplicit)")
                             .padding(.leading, 8)
                             .opacity((coordinator.expandingView.show && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
                             Spacer(minLength: vm.closedNotchSize.width)
@@ -1518,6 +1517,7 @@ struct ContentView: View {
                                 minDuration: 3,
                                 frameWidth: max(0, effectiveCenterWidth - 16)
                             )
+                            .id("closed-title-\(musicManager.songTitle)|\(musicManager.artistName)")
                             .padding(.horizontal, 8)
                         }
                     }
@@ -2458,7 +2458,11 @@ struct ContentView: View {
             ),
             isMinimalistic: Defaults[.enableMinimalisticUI]
         )
-        AppDelegate.shared?.ensureWindowSize(targetSize, animated: animated, force: true)
+        if Defaults[.showOnAllDisplays] {
+            NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
+        } else {
+            AppDelegate.shared?.ensureWindowSize(targetSize, animated: animated, force: true)
+        }
     }
 
     private func activateWhatsAppReplyMode(animated: Bool) {
@@ -2724,7 +2728,7 @@ struct ContentView: View {
                 withAnimation(.smooth) {
                     gestureProgress = .zero
                 }
-                activateWhatsAppReplyMode(animated: true)
+                activateWhatsAppReplyMode(animated: false)
             }
             return
         }
@@ -3070,6 +3074,8 @@ struct ContentView: View {
         let isPlaying: Bool
         let isPlayerIdle: Bool
         let bundleIdentifier: String?
+        let songTitle: String
+        let artistName: String
         let skipBehavior: String
         let skipGestureToken: Int?
     }
@@ -3080,6 +3086,8 @@ struct ContentView: View {
                 isPlaying: musicManager.isPlaying,
                 isPlayerIdle: musicManager.isPlayerIdle,
                 bundleIdentifier: musicManager.bundleIdentifier,
+                songTitle: musicManager.songTitle,
+                artistName: musicManager.artistName,
                 skipBehavior: Defaults[.musicSkipBehavior].rawValue,
                 skipGestureToken: musicManager.skipGesturePulse?.token
             )

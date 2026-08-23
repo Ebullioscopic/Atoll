@@ -18,6 +18,9 @@ import PDFKit
 
 enum WhatsAppNotificationLayout {
     static let width: CGFloat = 420
+    private static let textMeasurementWidth: CGFloat = 332
+    private static let notificationTopPadding: CGFloat = 14
+    private static let notificationBottomPadding: CGFloat = 10
 
     static func contentHeight(
         isReplying: Bool,
@@ -38,9 +41,8 @@ enum WhatsAppNotificationLayout {
         var height: CGFloat = 0
         let text = cleanedText(message.text)
         if shouldMeasureText(text, for: message) || cleanedText(message.groupSender ?? "").isEmpty == false {
-            let explicitLines = max(1, text.components(separatedBy: .newlines).count)
-            let estimatedWrappedLines = max(1, Int(ceil(Double(text.count) / 48.0)))
-            height += CGFloat(max(explicitLines, estimatedWrappedLines)) * (isEmojiOnly(text) ? 19 : 16)
+            let measuredText = measuredMessageText(message)
+            height += measuredTextHeight(measuredText, isEmojiOnly: isEmojiOnly(text))
         }
         if let linkPreview = message.linkPreview {
             height += (height > 0 ? 5 : 0) + (linkPreview.appleMapsUrl == nil ? 56 : 76)
@@ -52,13 +54,16 @@ enum WhatsAppNotificationLayout {
             height += (height > 0 ? 5 : 0) + (message.mediaKind == .sticker ? 58 : 66)
         }
         if !message.pollOptions.isEmpty {
-            height += (height > 0 ? 6 : 0) + 16 + CGFloat(min(message.pollOptions.count, 4)) * 39 + 8
+            height += (height > 0 ? 6 : 0) + 18 + CGFloat(message.pollOptions.count) * 39 + 8
         }
         return max(17, height)
     }
 
     private static func shouldMeasureText(_ text: String, for message: WhatsAppIncomingMessage) -> Bool {
         guard !text.isEmpty else { return false }
+        if isLikelyInlineMediaPayload(text) {
+            return false
+        }
         if let document = message.documentPreview {
             let normalizedText = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             let normalizedFileName = document.fileName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -68,10 +73,52 @@ enum WhatsAppNotificationLayout {
         }
         if message.mediaDataUrl != nil || message.mediaKind != nil {
             let lowered = text.lowercased()
-            let mediaOnlyLabels: Set<String> = ["sticker", "adesivo", "immagine", "image", "photo", "foto", "📨 nuovo messaggio"]
+            let mediaOnlyLabels: Set<String> = ["sticker", "adesivo", "immagine", "image", "photo", "foto", "video", "gif", "📨 nuovo messaggio"]
             return !mediaOnlyLabels.contains(lowered)
         }
         return true
+    }
+
+    fileprivate static func isLikelyInlineMediaPayload(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > 180 else { return false }
+        let lowercased = trimmed.lowercased()
+        if lowercased.hasPrefix("data:image/") || lowercased.hasPrefix("data:video/") {
+            return true
+        }
+        if trimmed.hasPrefix("/9j/") || trimmed.hasPrefix("iVBOR") || trimmed.hasPrefix("R0lGOD") || trimmed.hasPrefix("UklGR") {
+            return true
+        }
+        let sample = trimmed.prefix(240)
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\r\n")
+        return sample.unicodeScalars.allSatisfy { allowed.contains($0) }
+    }
+
+    private static func measuredMessageText(_ message: WhatsAppIncomingMessage) -> String {
+        let text = cleanedText(message.text)
+        let groupSender = cleanedText(message.groupSender ?? "")
+        guard !groupSender.isEmpty else { return text }
+        return text.isEmpty ? "\(groupSender):" : "\(groupSender): \(text)"
+    }
+
+    private static func measuredTextHeight(_ text: String, isEmojiOnly: Bool) -> CGFloat {
+        let cleaned = cleanedText(text)
+        guard !cleaned.isEmpty else { return isEmojiOnly ? 19 : 17 }
+        if isEmojiOnly { return 19 }
+
+        let font = NSFont.systemFont(ofSize: 12.5)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byWordWrapping
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .paragraphStyle: paragraph
+        ]
+        let boundingRect = (cleaned as NSString).boundingRect(
+            with: CGSize(width: textMeasurementWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes
+        )
+        return max(17, ceil(boundingRect.height) + 1)
     }
 
     static func isEmojiOnly(_ text: String) -> Bool {
@@ -98,6 +145,14 @@ enum WhatsAppNotificationLayout {
         isDynamicIslandMode ? 0 : closedNotchHeight
     }
 
+    static func topContentPadding(isDynamicIslandMode: Bool) -> CGFloat {
+        notificationTopPadding
+    }
+
+    static func bottomContentPadding(isDynamicIslandMode: Bool) -> CGFloat {
+        notificationBottomPadding
+    }
+
     static func totalSize(
         isReplying: Bool,
         hasFilePreview: Bool,
@@ -111,6 +166,8 @@ enum WhatsAppNotificationLayout {
             messages: messages
         )
             + topOffset(isDynamicIslandMode: isDynamicIslandMode, closedNotchHeight: closedNotchHeight)
+            + topContentPadding(isDynamicIslandMode: isDynamicIslandMode)
+            + bottomContentPadding(isDynamicIslandMode: isDynamicIslandMode)
         return CGSize(width: width, height: height)
     }
 
@@ -123,6 +180,8 @@ private struct WhatsAppHUDMetrics {
     let width: CGFloat
     let height: CGFloat
     let topOffset: CGFloat
+    let topContentPadding: CGFloat
+    let bottomContentPadding: CGFloat
     let bottomRadius: CGFloat
 }
 
@@ -144,8 +203,13 @@ private enum WhatsAppHUDMetricsFactory {
                 isReplying: isReplying,
                 hasFilePreview: hasFilePreview,
                 messages: messages
-            ) + topOffset,
+            )
+                + topOffset
+                + WhatsAppNotificationLayout.topContentPadding(isDynamicIslandMode: isDynamicIslandMode)
+                + WhatsAppNotificationLayout.bottomContentPadding(isDynamicIslandMode: isDynamicIslandMode),
             topOffset: topOffset,
+            topContentPadding: WhatsAppNotificationLayout.topContentPadding(isDynamicIslandMode: isDynamicIslandMode),
+            bottomContentPadding: WhatsAppNotificationLayout.bottomContentPadding(isDynamicIslandMode: isDynamicIslandMode),
             bottomRadius: WhatsAppNotificationLayout.bottomCornerRadius(isReplying: isReplying)
         )
     }
@@ -161,7 +225,6 @@ struct WhatsAppTemporaryActivityView: View {
     @Binding var isReplying: Bool
     let closedNotchHeight: CGFloat
     let isDynamicIslandMode: Bool
-    let topCornerRadius: CGFloat
 
     @ObservedObject private var coordinator = DynamicIslandViewCoordinator.shared
 
@@ -175,13 +238,6 @@ struct WhatsAppTemporaryActivityView: View {
         )
     }
 
-    private var surfaceShape: AnyShape {
-        if isDynamicIslandMode {
-            return AnyShape(DynamicIslandPillShape(cornerRadius: dynamicIslandPillCornerRadiusInsets.opened))
-        }
-        return AnyShape(NotchShape(topCornerRadius: topCornerRadius, bottomCornerRadius: metrics.bottomRadius))
-    }
-
     var body: some View {
         WhatsAppNotificationView(
             senderName: senderName,
@@ -190,9 +246,9 @@ struct WhatsAppTemporaryActivityView: View {
             avatarUrl: avatarUrl,
             isReplying: $isReplying
         )
-        .padding(.top, metrics.topOffset)
+        .padding(.top, metrics.topOffset + metrics.topContentPadding)
+        .padding(.bottom, metrics.bottomContentPadding)
         .frame(width: metrics.width, height: metrics.height, alignment: .top)
-        .clipShape(surfaceShape)
     }
 }
 
@@ -214,12 +270,17 @@ struct WhatsAppNotificationView: View {
     @State private var isSending: Bool = false
     @State private var sendSuccess: Bool = false
     @State private var sendErrorText: String?
-    @State private var selectedPollOptionsByMessage: [String: Set<String>] = [:]
     @State private var pollOptionSendingKey: String?
     @State private var documentDownloadKey: String?
+    @State private var reactionMessageId: String?
+    @State private var reactionSendingKey: String?
+    @State private var reactionsByMessageId: [String: String] = [:]
+    @State private var reactionPulseMessageId: String?
+    @State private var reactionPaletteDismissTask: Task<Void, Never>?
     @FocusState private var isInputFocused: Bool
 
     private var isPreview: Bool { chatId == WhatsAppManager.previewChatId }
+    private let quickReactionEmojis = ["👍", "❤️", "😂", "😮", "😢", "🙏"]
     private var visibleMessages: [WhatsAppIncomingMessage] {
         messages.isEmpty ? [WhatsAppIncomingMessage(text: "📨 Nuovo messaggio")] : messages
     }
@@ -244,6 +305,13 @@ struct WhatsAppNotificationView: View {
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .top)
         .contentShape(Rectangle())
+        .onDisappear {
+            reactionPaletteDismissTask?.cancel()
+            reactionPaletteDismissTask = nil
+            if reactionMessageId != nil || reactionSendingKey != nil {
+                endWhatsAppInteraction()
+            }
+        }
     }
 
     private var headerSection: some View {
@@ -312,32 +380,79 @@ struct WhatsAppNotificationView: View {
                 pollOptionsView(for: message)
             }
         }
+        .contentShape(Rectangle())
+        .onLongPressGesture(minimumDuration: 0.45) {
+            showReactionPalette(for: message)
+        }
+        .overlay(alignment: .topTrailing) {
+            if reactionMessageId == message.id {
+                reactionPalette(for: message)
+                    .offset(x: -2, y: -6)
+                    .transition(.scale(scale: 0.92, anchor: .topTrailing).combined(with: .opacity))
+                    .zIndex(20)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if let reaction = reactionsByMessageId[message.id] {
+                reactionBadge(reaction, isSending: reactionSendingKey?.hasPrefix("\(message.id)|") == true)
+                    .offset(x: 4, y: -8)
+                    .scaleEffect(reactionPulseMessageId == message.id ? 1.24 : 1.0)
+                    .transition(.scale(scale: 0.2, anchor: .center).combined(with: .opacity))
+                    .zIndex(10)
+            }
+        }
     }
 
     @ViewBuilder
     private func messageTextView(text: String, groupSender: String?) -> some View {
         let isEmojiOnly = WhatsAppNotificationLayout.isEmojiOnly(text)
-        Group {
-            if let groupSender {
-                groupMessageText(sender: groupSender, text: text)
-                    .lineLimit(isEmojiOnly ? 1 : nil)
-            } else {
-                Text(text)
-                    .font(.system(size: isEmojiOnly ? 18 : 12.5))
-                    .lineLimit(isEmojiOnly ? 1 : nil)
-            }
-        }
-        .foregroundStyle(.white.opacity(0.62))
+        Text(linkifiedMessageText(sender: groupSender, text: text, isEmojiOnly: isEmojiOnly))
+            .lineLimit(isEmojiOnly ? 1 : nil)
+            .environment(\.openURL, OpenURLAction { url in
+                NSWorkspace.shared.open(url)
+                return .handled
+            })
         .multilineTextAlignment(.leading)
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    private func groupMessageText(sender: String, text: String) -> Text {
-        Text("\(sender):")
-            .font(.system(size: 12.5, weight: .semibold))
-        + Text(text.isEmpty ? "" : " \(text)")
-            .font(.system(size: WhatsAppNotificationLayout.isEmojiOnly(text) ? 16 : 12.5))
+    private func linkifiedMessageText(sender: String?, text: String, isEmojiOnly: Bool) -> AttributedString {
+        let baseColor = Color.white.opacity(0.62)
+        let linkColor = Color(red: 37 / 255, green: 211 / 255, blue: 102 / 255).opacity(0.92)
+        let bodyFont = Font.system(size: isEmojiOnly ? 18 : 12.5)
+        let groupBodyFont = Font.system(size: isEmojiOnly ? 16 : 12.5)
+        var output = AttributedString()
+
+        if let sender {
+            var senderText = AttributedString("\(sender):")
+            senderText.font = .system(size: 12.5, weight: .semibold)
+            senderText.foregroundColor = baseColor
+            output += senderText
+
+            guard !text.isEmpty else { return output }
+
+            var spacer = AttributedString(" ")
+            spacer.font = groupBodyFont
+            spacer.foregroundColor = baseColor
+            output += spacer
+        }
+
+        var body = AttributedString(text)
+        body.font = sender == nil ? bodyFont : groupBodyFont
+        body.foregroundColor = baseColor
+
+        for match in WhatsAppMessageLinkDetector.matches(in: text) {
+            guard let lower = AttributedString.Index(match.range.lowerBound, within: body),
+                  let upper = AttributedString.Index(match.range.upperBound, within: body) else {
+                continue
+            }
+            body[lower..<upper].link = match.url
+            body[lower..<upper].foregroundColor = linkColor
+        }
+
+        output += body
+        return output
     }
 
     private func groupSenderName(for message: WhatsAppIncomingMessage) -> String? {
@@ -346,6 +461,9 @@ struct WhatsAppNotificationView: View {
     }
 
     private func shouldShowText(_ text: String, for message: WhatsAppIncomingMessage) -> Bool {
+        if WhatsAppNotificationLayout.isLikelyInlineMediaPayload(text) {
+            return false
+        }
         if let linkPreview = message.linkPreview {
             let normalizedText = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             let previewTexts = [
@@ -370,7 +488,7 @@ struct WhatsAppNotificationView: View {
         }
         guard message.mediaDataUrl != nil || message.mediaKind != nil else { return true }
         let lowered = text.lowercased()
-        let mediaOnlyLabels: Set<String> = ["sticker", "adesivo", "immagine", "image", "photo", "foto", "📨 nuovo messaggio"]
+        let mediaOnlyLabels: Set<String> = ["sticker", "adesivo", "immagine", "image", "photo", "foto", "video", "gif", "📨 nuovo messaggio"]
         return !mediaOnlyLabels.contains(lowered)
     }
 
@@ -424,6 +542,9 @@ struct WhatsAppNotificationView: View {
             }
         }
         .contentShape(Rectangle())
+        .onTapGesture {
+            openLinkPreview(preview)
+        }
     }
 
     @ViewBuilder
@@ -483,17 +604,28 @@ struct WhatsAppNotificationView: View {
             }
         }
         .contentShape(Rectangle())
+        .onTapGesture {
+            openAppleMaps(preview)
+        }
     }
 
     @ViewBuilder
     private func messageMediaView(for message: WhatsAppIncomingMessage) -> some View {
         let kind = message.mediaKind
-        if let dataUrl = message.mediaDataUrl, let image = imageFromDataUrl(dataUrl) {
-            Image(nsImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: kind == .sticker ? 76 : 96, maxHeight: kind == .sticker ? 58 : 66, alignment: .leading)
-                .clipShape(RoundedRectangle(cornerRadius: kind == .sticker ? 0 : 10, style: .continuous))
+        if kind == .sticker,
+           let dataUrl = message.mediaDataUrl,
+           let payload = dataPayload(from: dataUrl),
+           payload.mimeType.lowercased() == "application/x-atoll-lottie+json" {
+            ExtensionLottieView(data: payload.data, size: CGSize(width: 76, height: 58))
+                .overlay {
+                    SecondaryClickCapture {
+                        downloadMedia(for: message)
+                    }
+                }
+                .contentShape(Rectangle())
+                .help("Tasto destro: scarica")
+        } else if let dataUrl = message.mediaDataUrl, let image = imageFromDataUrl(dataUrl) {
+            mediaThumbnail(image: image, kind: kind)
                 .overlay {
                     SecondaryClickCapture {
                         downloadMedia(for: message)
@@ -503,11 +635,64 @@ struct WhatsAppNotificationView: View {
                 .help("Tasto destro: scarica")
         } else {
             HStack(spacing: 6) {
-                Image(systemName: kind == .sticker ? "face.smiling.inverse" : "photo")
-                Text(kind == .sticker ? "Sticker" : "Immagine")
+                Image(systemName: mediaPlaceholderIcon(for: kind))
+                Text(mediaPlaceholderLabel(for: kind))
             }
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(.white.opacity(0.56))
+        }
+    }
+
+    @ViewBuilder
+    private func mediaThumbnail(image: NSImage, kind: WhatsAppIncomingMediaKind?) -> some View {
+        let isSticker = kind == .sticker
+        let isMotion = kind == .video || kind == .gif
+        ZStack {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFit()
+
+            if isMotion {
+                Group {
+                    if kind == .gif {
+                        Text("GIF")
+                            .font(.system(size: 9, weight: .bold))
+                    } else {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                }
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(Color.black.opacity(0.58))
+                .clipShape(Circle())
+            }
+        }
+        .frame(maxWidth: isSticker ? 76 : 96, maxHeight: isSticker ? 58 : 66, alignment: .leading)
+        .clipShape(RoundedRectangle(cornerRadius: isSticker ? 0 : 10, style: .continuous))
+    }
+
+    private func mediaPlaceholderIcon(for kind: WhatsAppIncomingMediaKind?) -> String {
+        switch kind {
+        case .sticker:
+            return "face.smiling.inverse"
+        case .video, .gif:
+            return "play.rectangle"
+        case .image, .none:
+            return "photo"
+        }
+    }
+
+    private func mediaPlaceholderLabel(for kind: WhatsAppIncomingMediaKind?) -> String {
+        switch kind {
+        case .sticker:
+            return "Sticker"
+        case .video:
+            return "Video"
+        case .gif:
+            return "GIF"
+        case .image, .none:
+            return "Immagine"
         }
     }
 
@@ -576,7 +761,7 @@ struct WhatsAppNotificationView: View {
             }
             .foregroundStyle(.white.opacity(0.45))
 
-            ForEach(message.pollOptions.prefix(4)) { option in
+            ForEach(Array(message.pollOptions.enumerated()), id: \.offset) { _, option in
                 Button {
                     selectPollOption(option, for: message)
                 } label: {
@@ -594,10 +779,6 @@ struct WhatsAppNotificationView: View {
 
                             Spacer(minLength: 4)
 
-                            Text("\(option.voteCount)")
-                                .font(.system(size: 11.5, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.76))
-
                             if pollOptionSendingKey == "\(message.id)|\(option.id)" {
                                 ProgressView()
                                     .controlSize(.mini)
@@ -605,31 +786,24 @@ struct WhatsAppNotificationView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                         .contentShape(Rectangle())
-
-                        GeometryReader { proxy in
-                            Capsule()
-                                .fill(Color.white.opacity(0.12))
-                                .overlay(alignment: .leading) {
-                                    Capsule()
-                                        .fill(Color.white.opacity(isPollOptionSelected(option, for: message) ? 0.34 : 0.18))
-                                        .frame(width: proxy.size.width * pollShare(for: option, in: message))
-                                }
-                        }
-                        .frame(height: 4)
-                        .padding(.leading, 24)
                     }
                     .padding(.vertical, 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
                 .contentShape(Rectangle())
                 .disabled(isPreview || pollOptionSendingKey != nil)
             }
         }
         .frame(maxWidth: 280, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .layoutPriority(2)
     }
 
     @ViewBuilder
@@ -928,13 +1102,170 @@ struct WhatsAppNotificationView: View {
         coordinator.suppressWhatsAppAutoDismiss = false
     }
 
-    private func isPollOptionSelected(_ option: WhatsAppIncomingPollOption, for message: WhatsAppIncomingMessage) -> Bool {
-        selectedPollOptionsByMessage[message.id]?.contains(option.text) == true || option.isSelected
+    private func pollSelectionKey(for message: WhatsAppIncomingMessage) -> String {
+        "\(chatId)|\(message.id)"
     }
 
-    private func pollShare(for option: WhatsAppIncomingPollOption, in message: WhatsAppIncomingMessage) -> CGFloat {
-        let totalVotes = max(message.pollOptions.map(\.voteCount).reduce(0, +), 1)
-        return CGFloat(option.voteCount) / CGFloat(totalVotes)
+    private func selectedPollOptions(for message: WhatsAppIncomingMessage) -> Set<String> {
+        coordinator.whatsAppSelectedPollOptionsByMessage[pollSelectionKey(for: message)]
+            ?? Set(message.pollOptions.filter(\.isSelected).map(\.text))
+    }
+
+    private func isPollOptionSelected(_ option: WhatsAppIncomingPollOption, for message: WhatsAppIncomingMessage) -> Bool {
+        selectedPollOptions(for: message).contains(option.text)
+    }
+
+    private func showReactionPalette(for message: WhatsAppIncomingMessage) {
+        guard reactionSendingKey == nil else { return }
+        reactionPaletteDismissTask?.cancel()
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.82)) {
+            reactionMessageId = reactionMessageId == message.id ? nil : message.id
+        }
+        if reactionMessageId != nil {
+            beginWhatsAppInteraction()
+            reactionPaletteDismissTask = Task {
+                try? await Task.sleep(for: .seconds(6))
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard reactionSendingKey == nil else { return }
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        reactionMessageId = nil
+                    }
+                    endWhatsAppInteraction()
+                    reactionPaletteDismissTask = nil
+                }
+            }
+        } else {
+            endWhatsAppInteraction()
+            reactionPaletteDismissTask = nil
+        }
+    }
+
+    private func reactionKey(for message: WhatsAppIncomingMessage, reaction: String) -> String {
+        "\(message.id)|\(reaction)"
+    }
+
+    @ViewBuilder
+    private func reactionBadge(_ reaction: String, isSending: Bool) -> some View {
+        HStack(spacing: 4) {
+            Text(reaction)
+                .font(.system(size: 13))
+
+            if isSending {
+                ProgressView()
+                    .controlSize(.mini)
+                    .scaleEffect(0.42)
+                    .frame(width: 8, height: 8)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(Color.black.opacity(0.9))
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.28), radius: 6, x: 0, y: 3)
+    }
+
+    @ViewBuilder
+    private func reactionPalette(for message: WhatsAppIncomingMessage) -> some View {
+        HStack(spacing: 2) {
+            ForEach(quickReactionEmojis, id: \.self) { emoji in
+                Button {
+                    sendReaction(emoji, for: message)
+                } label: {
+                    ZStack {
+                        Text(emoji)
+                            .font(.system(size: 15))
+                            .frame(width: 26, height: 26)
+                            .opacity(reactionSendingKey == reactionKey(for: message, reaction: emoji) ? 0 : 1)
+
+                        if reactionSendingKey == reactionKey(for: message, reaction: emoji) {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .scaleEffect(0.45)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(reactionSendingKey != nil)
+            }
+        }
+        .padding(.horizontal, 5)
+        .padding(.vertical, 4)
+        .background(Color.black.opacity(0.88))
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 4)
+    }
+
+    private func sendReaction(_ reaction: String, for message: WhatsAppIncomingMessage) {
+        guard reactionSendingKey == nil else { return }
+        guard !isPreview else {
+            reactionPaletteDismissTask?.cancel()
+            reactionPaletteDismissTask = nil
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.82)) {
+                reactionMessageId = nil
+                reactionsByMessageId[message.id] = reaction
+                reactionPulseMessageId = message.id
+            }
+            clearReactionPulse(for: message)
+            endWhatsAppInteraction()
+            return
+        }
+
+        let key = reactionKey(for: message, reaction: reaction)
+        reactionPaletteDismissTask?.cancel()
+        reactionPaletteDismissTask = nil
+        reactionSendingKey = key
+        sendErrorText = nil
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.7)) {
+            reactionMessageId = nil
+            reactionsByMessageId[message.id] = reaction
+            reactionPulseMessageId = message.id
+        }
+        clearReactionPulse(for: message)
+        beginWhatsAppInteraction()
+
+        WhatsAppManager.shared.reactToMessage(
+            chatId: chatId,
+            messageId: message.id,
+            messageText: message.text,
+            reaction: reaction
+        ) { result in
+            DispatchQueue.main.async {
+                reactionSendingKey = nil
+                endWhatsAppInteraction()
+                switch result {
+                case .success:
+                    withAnimation(.spring(response: 0.22, dampingFraction: 0.82)) {
+                        reactionMessageId = nil
+                    }
+                case .failure(let error):
+                    print("Error sending WhatsApp reaction: \(error.localizedDescription)")
+                    withAnimation(.easeOut(duration: 0.16)) {
+                        if reactionsByMessageId[message.id] == reaction {
+                            reactionsByMessageId.removeValue(forKey: message.id)
+                        }
+                    }
+                    sendErrorText = "Reazione non inviata"
+                }
+            }
+        }
+    }
+
+    private func clearReactionPulse(for message: WhatsAppIncomingMessage) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+            guard reactionPulseMessageId == message.id else { return }
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.82)) {
+                reactionPulseMessageId = nil
+            }
+        }
     }
 
     private func sendMessage() {
@@ -982,19 +1313,22 @@ struct WhatsAppNotificationView: View {
         guard !isPreview else { return }
         guard pollOptionSendingKey == nil else { return }
         let sendingKey = "\(message.id)|\(option.id)"
+        let selectionKey = pollSelectionKey(for: message)
+        let previousSelection = coordinator.whatsAppSelectedPollOptionsByMessage[selectionKey]
         pollOptionSendingKey = sendingKey
         beginWhatsAppInteraction()
-        var selectedOptions = selectedPollOptionsByMessage[message.id]
-            ?? Set(message.pollOptions.filter(\.isSelected).map(\.text))
+        var selectedOptions = selectedPollOptions(for: message)
+        let wasSelected = selectedOptions.contains(option.text)
         if message.pollAllowsMultipleSelection {
-            if selectedOptions.contains(option.text) {
+            if wasSelected {
                 selectedOptions.remove(option.text)
             } else {
                 selectedOptions.insert(option.text)
             }
         } else {
-            selectedOptions = [option.text]
+            selectedOptions = wasSelected ? [] : [option.text]
         }
+        coordinator.whatsAppSelectedPollOptionsByMessage[selectionKey] = selectedOptions
 
         WhatsAppManager.shared.selectPollOption(
             chatId: chatId,
@@ -1008,8 +1342,13 @@ struct WhatsAppNotificationView: View {
                 pollOptionSendingKey = nil
                 switch result {
                 case .success:
-                    selectedPollOptionsByMessage[message.id] = selectedOptions
+                    coordinator.whatsAppSelectedPollOptionsByMessage[selectionKey] = selectedOptions
                 case .failure(let error):
+                    if let previousSelection {
+                        coordinator.whatsAppSelectedPollOptionsByMessage[selectionKey] = previousSelection
+                    } else {
+                        coordinator.whatsAppSelectedPollOptionsByMessage.removeValue(forKey: selectionKey)
+                    }
                     print("Error selecting WhatsApp poll option: \(error.localizedDescription)")
                     sendErrorText = "Sondaggio non selezionato"
                 }
@@ -1061,7 +1400,17 @@ struct WhatsAppNotificationView: View {
     }
 
     private func mediaDownloadFileName(for message: WhatsAppIncomingMessage, mimeType: String) -> String {
-        let kind = message.mediaKind == .sticker ? "Sticker" : "Image"
+        let kind: String
+        switch message.mediaKind {
+        case .sticker:
+            kind = "Sticker"
+        case .video:
+            kind = "Video Thumbnail"
+        case .gif:
+            kind = "GIF Thumbnail"
+        case .image, .none:
+            kind = "Image"
+        }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
         let extensionLabel = mediaFileExtension(for: mimeType, kind: message.mediaKind)
@@ -1233,6 +1582,69 @@ private struct DefaultMapPreviewThumbnail: View {
                 control2: CGPoint(x: size.width * 0.50, y: size.height * 0.30)
             )
         }
+    }
+}
+
+private enum WhatsAppMessageLinkDetector {
+    struct Match {
+        let range: Range<String.Index>
+        let url: URL
+    }
+
+    private static let expression = try? NSRegularExpression(
+        pattern: #"(?i)\b((?:https?://|www\.)[^\s<>"']+|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?::\d+)?(?:/[^\s<>"']*)?)"#,
+        options: []
+    )
+
+    static func matches(in text: String) -> [Match] {
+        guard let expression else { return [] }
+        let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+        return expression.matches(in: text, options: [], range: nsRange).compactMap { result in
+            guard let rawRange = Range(result.range(at: 1), in: text) else { return nil }
+            let range = trimmedRange(rawRange, in: text)
+            guard range.isEmpty == false,
+                  !isEmailDomainMatch(range, in: text),
+                  let url = normalizedURL(String(text[range])) else {
+                return nil
+            }
+            return Match(range: range, url: url)
+        }
+    }
+
+    private static func trimmedRange(_ range: Range<String.Index>, in text: String) -> Range<String.Index> {
+        var upper = range.upperBound
+        let trailingCharacters = CharacterSet(charactersIn: ".,;:!?)]}\"'")
+        while range.lowerBound < upper {
+            let previous = text.index(before: upper)
+            guard let scalar = text[previous].unicodeScalars.first,
+                  trailingCharacters.contains(scalar) else {
+                break
+            }
+            upper = previous
+        }
+        return range.lowerBound..<upper
+    }
+
+    private static func isEmailDomainMatch(_ range: Range<String.Index>, in text: String) -> Bool {
+        guard range.lowerBound > text.startIndex else { return false }
+        let previous = text.index(before: range.lowerBound)
+        return text[previous] == "@"
+    }
+
+    private static func normalizedURL(_ rawURL: String) -> URL? {
+        var value = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.isEmpty == false else { return nil }
+        let lowercased = value.lowercased()
+        if !lowercased.hasPrefix("http://") && !lowercased.hasPrefix("https://") {
+            value = "https://" + value
+        }
+        guard let url = URL(string: value),
+              let scheme = url.scheme?.lowercased(),
+              (scheme == "http" || scheme == "https"),
+              url.host?.isEmpty == false else {
+            return nil
+        }
+        return url
     }
 }
 

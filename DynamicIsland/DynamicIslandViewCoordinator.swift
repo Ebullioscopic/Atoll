@@ -24,6 +24,8 @@ import SwiftUI
 enum WhatsAppIncomingMediaKind: String, Equatable {
     case image
     case sticker
+    case video
+    case gif
 }
 
 struct WhatsAppIncomingPollOption: Equatable, Identifiable {
@@ -240,6 +242,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
     @Published var selectedScreen: String = NSScreen.main?.localizedName ?? "Unknown"
 
     @Published var optionKeyPressed: Bool = true
+    @Published var whatsAppSelectedPollOptionsByMessage: [String: Set<String>] = [:]
     private let extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     
     private init() {

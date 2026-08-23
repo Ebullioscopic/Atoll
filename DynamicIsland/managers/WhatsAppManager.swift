@@ -68,6 +68,22 @@ public final class WhatsAppManager: ObservableObject {
         )
     }
 
+    public func reactToMessage(
+        chatId: String,
+        messageId: String,
+        messageText: String,
+        reaction: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        WhatsAppWebEngine.shared.reactToMessage(
+            chatId: chatId,
+            messageId: messageId,
+            messageText: messageText,
+            reaction: reaction,
+            completion: completion
+        )
+    }
+
     public func sendDocument(chatId: String, fileURL: URL, completion: @escaping (Result<Void, Error>) -> Void) {
         WhatsAppWebEngine.shared.sendDocument(chatId: chatId, fileURL: fileURL, completion: completion)
     }

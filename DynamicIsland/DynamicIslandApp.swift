@@ -414,7 +414,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         -> NSWindow
     {
         // Use the current required size instead of always using openNotchSize
-        let baseSize = calculateRequiredNotchSize()
+        let baseSize = calculateRequiredNotchSize(for: screen, viewModel: viewModel)
         let requiredSize = adjustedSizeForScreen(baseSize, screen: screen)
         let roundedWidth = requiredSize.width.rounded()
         let roundedHeight = requiredSize.height.rounded()
@@ -473,27 +473,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Calculate required size based on current state
         let requiredSize = calculateRequiredNotchSize()
         let animateResize = shouldAnimateResize(for: requiredSize)
-        resizeWindows(to: requiredSize, animated: animateResize, force: false)
+        resizeWindowsToCurrentRequiredSize(animated: animateResize, force: false)
     }
 
     private func updateWindowSizeForTabSwitch() {
-        let requiredSize = calculateRequiredNotchSize()
-        resizeWindows(to: requiredSize, animated: false, force: true)
+        resizeWindowsToCurrentRequiredSize(animated: false, force: true)
     }
     
-    private func calculateRequiredNotchSize() -> CGSize {
+    private func calculateRequiredNotchSize(for screen: NSScreen? = nil, viewModel: DynamicIslandViewModel? = nil) -> CGSize {
+        let sizingViewModel = viewModel ?? screen.flatMap { viewModels[$0] } ?? vm
+
         // Check if WhatsApp expanding HUD is showing
-        if vm.notchState == .closed,
+        if sizingViewModel.notchState == .closed,
            coordinator.expandingView.show,
            case .whatsApp(_, let messages, _, _) = coordinator.expandingView.type {
-            let screen: NSScreen = NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
-            let isIslandMode = shouldUseDynamicIslandMode(for: screen.localizedName)
+            let screenName = screen?.localizedName ?? sizingViewModel.screen
+            let isIslandMode = shouldUseDynamicIslandMode(for: screenName)
             let contentSize = WhatsAppNotificationLayout.totalSize(
                 isReplying: coordinator.isWhatsAppReplying,
                 hasFilePreview: coordinator.isWhatsAppFilePreviewVisible,
                 messages: messages,
                 isDynamicIslandMode: isIslandMode,
-                closedNotchHeight: vm.closedNotchSize.height
+                closedNotchHeight: sizingViewModel.closedNotchSize.height
             )
             let targetSize = CGSize(
                 width: contentSize.width + (cornerRadiusInsets.closed.bottom * 2),
@@ -649,7 +650,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func ensureWindowSize(_ size: CGSize, animated: Bool, force: Bool = false) {
+        if vm.notchState == .closed,
+           coordinator.expandingView.show,
+           case .whatsApp = coordinator.expandingView.type {
+            resizeWindowsToCurrentRequiredSize(animated: animated, force: force)
+            return
+        }
         resizeWindows(to: size, animated: animated, force: force)
+    }
+
+    private func resizeWindowsToCurrentRequiredSize(animated: Bool, force: Bool) {
+        if Defaults[.showOnAllDisplays] {
+            for (screen, window) in windows {
+                let baseSize = calculateRequiredNotchSize(for: screen)
+                let screenSize = adjustedSizeForScreen(baseSize, screen: screen)
+                if force || window.frame.size != screenSize {
+                    resizeWindow(window, on: screen, to: screenSize, animated: animated)
+                }
+            }
+        } else if let window {
+            let screen = window.screen ?? NSScreen.screens.first { $0.frame.intersects(window.frame) } ?? NSScreen.main ?? NSScreen.screens.first
+            guard let screen else { return }
+            let baseSize = calculateRequiredNotchSize(for: screen)
+            let screenSize = adjustedSizeForScreen(baseSize, screen: screen)
+            if force || window.frame.size != screenSize {
+                resizeWindow(window, on: screen, to: screenSize, animated: animated)
+            }
+        }
     }
 
     private func resizeWindows(to size: CGSize, animated: Bool, force: Bool) {
@@ -688,13 +715,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // considered, but an unchanged frame still needs no AppKit display
         // transaction. Avoiding that no-op matters during hover/click opens.
         guard window.frame != targetFrame else { return }
-        window.setFrame(targetFrame, display: true, animate: animated)
+        if animated {
+            let topAlignedStartFrame = NSRect(
+                x: window.frame.origin.x,
+                y: targetFrame.maxY - window.frame.height,
+                width: window.frame.width,
+                height: window.frame.height
+            )
+            if window.frame != topAlignedStartFrame {
+                window.setFrame(topAlignedStartFrame, display: true)
+            }
+            window.setFrame(targetFrame, display: true, animate: true)
+        } else {
+            window.setFrame(targetFrame, display: true)
+        }
     }
 
     private func shouldAnimateResize(for newSize: CGSize) -> Bool {
         if coordinator.expandingView.show,
            case .whatsApp = coordinator.expandingView.type {
-            return false
+            return true
         }
         if Defaults[.enableMinimalisticUI] && !ReminderLiveActivityManager.shared.activeWindowReminders.isEmpty {
             return false

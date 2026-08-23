@@ -146,6 +146,25 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         }
     }
 
+    public func reactToMessage(
+        chatId: String,
+        messageId: String,
+        messageText: String,
+        reaction: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        prepareDesktopViewportForReply()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.executeReactToMessage(
+                chatId: chatId,
+                messageId: messageId,
+                messageText: messageText,
+                reaction: reaction,
+                completion: completion
+            )
+        }
+    }
+
     public func downloadDocument(
         chatId: String,
         messageId: String,
@@ -491,6 +510,57 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         }
     }
 
+    private func executeReactToMessage(
+        chatId: String,
+        messageId: String,
+        messageText: String,
+        reaction: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        let script = """
+        if (typeof window.atollReactToMessage !== 'function') {
+            throw new Error('message-reaction-function-not-injected');
+        }
+        return await window.atollReactToMessage(chatId, messageId, messageText, reaction);
+        """
+
+        if #available(macOS 12.0, *) {
+            webView.callAsyncJavaScript(
+                script,
+                arguments: ["chatId": chatId, "messageId": messageId, "messageText": messageText, "reaction": reaction],
+                in: nil,
+                in: .page
+            ) { result in
+                Task { @MainActor in
+                    switch result {
+                    case .success:
+                        self.restoreMonitoringViewport()
+                        completion(.success(()))
+                    case .failure(let error):
+                        self.restoreMonitoringViewport()
+                        let nsError = error as NSError
+                        let jsReason = (nsError.userInfo["WKJavaScriptExceptionMessage"] as? String)
+                            ?? (nsError.userInfo[NSLocalizedDescriptionKey] as? String)
+                            ?? nsError.localizedDescription
+                        print("WhatsAppWebEngine: reactToMessage failed -> \(jsReason)")
+                        completion(.failure(NSError(
+                            domain: "WhatsAppWebEngine",
+                            code: 9025,
+                            userInfo: [NSLocalizedDescriptionKey: jsReason]
+                        )))
+                    }
+                }
+            }
+        } else {
+            restoreMonitoringViewport()
+            completion(.failure(NSError(
+                domain: "WhatsAppWebEngine",
+                code: 9026,
+                userInfo: [NSLocalizedDescriptionKey: "Async JavaScript bridge unavailable on this macOS version"]
+            )))
+        }
+    }
+
     private func executeDownloadDocument(
         chatId: String,
         messageId: String,
@@ -809,7 +879,35 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
                 sender: sender,
                 chatId: chatId
             )
+            let rawMessages = dict["messages"] as? [[String: Any]] ?? []
 
+            Task { @MainActor in
+                let enrichedMessages = await self.enrichedMessagesWithMediaSnapshots(
+                    incomingMessages,
+                    rawMessages: rawMessages,
+                    fallbackRawMessage: dict
+                )
+                self.deliverIncomingMessages(
+                    enrichedMessages,
+                    sender: sender,
+                    chatId: chatId,
+                    avatar: avatar,
+                    resolvedGroupSender: resolvedGroupSender
+                )
+            }
+            return
+
+        default: break
+        }
+    }
+
+    private func deliverIncomingMessages(
+        _ incomingMessages: [WhatsAppIncomingMessage],
+        sender: String,
+        chatId: String,
+        avatar: String?,
+        resolvedGroupSender: String?
+    ) {
             let coordinator = DynamicIslandViewCoordinator.shared
             let pending = PendingMessage(sender: sender, messages: incomingMessages, chatId: chatId, avatarUrl: avatar)
             if resolvedGroupSender != nil || incomingMessages.contains(where: { $0.groupSender != nil }) {
@@ -830,9 +928,13 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
                         print("WhatsAppWebEngine: ⏭ duplicate, skip \(sender)")
                         return
                     }
-                    updatedMessages.append(contentsOf: uniqueNewMessages)
+                    if incomingMessages.contains(where: isMediaOnlyMessage) {
+                        updatedMessages = incomingMessages
+                    } else {
+                        updatedMessages.append(contentsOf: uniqueNewMessages)
+                    }
                     updatedMessages = deduplicatedIncomingMessages(updatedMessages, sender: visibleSender, chatId: visibleChatId)
-                    guard updatedMessages.count > visibleMessages.count else {
+                    guard updatedMessages != visibleMessages else {
                         print("WhatsAppWebEngine: ⏭ duplicate after normalization, skip \(sender)")
                         return
                     }
@@ -869,9 +971,6 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
             }
 
             showMessage(pending, coordinator: coordinator)
-
-        default: break
-        }
     }
 
     // MARK: - Message Queue helpers
@@ -879,7 +978,11 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
     private func showMessage(_ msg: PendingMessage, coordinator: DynamicIslandViewCoordinator) {
         let summary = msg.messages.map { message in
             if message.pollOptions.isEmpty {
-                return message.text
+                let mediaSummary = [message.mediaKind?.rawValue, mediaDataFingerprint(message.mediaDataUrl)]
+                    .compactMap { $0 }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: ":")
+                return mediaSummary.isEmpty ? message.text : "\(message.text) [media: \(mediaSummary)]"
             }
             return "\(message.text) [poll: \(message.pollOptions.map(\.text).joined(separator: " | "))]"
         }.joined(separator: " / ")
@@ -921,6 +1024,105 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         }
     }
 
+    private func enrichedMessagesWithMediaSnapshots(
+        _ messages: [WhatsAppIncomingMessage],
+        rawMessages: [[String: Any]],
+        fallbackRawMessage: [String: Any]
+    ) async -> [WhatsAppIncomingMessage] {
+        var enrichedMessages: [WhatsAppIncomingMessage] = []
+        for (index, message) in messages.enumerated() {
+            guard (message.mediaKind != nil || message.mediaDataUrl != nil),
+                  !isDisplayableMediaDataUrl(message.mediaDataUrl) else {
+                enrichedMessages.append(message)
+                continue
+            }
+
+            let rawMessage = rawMessages.first(where: { raw in
+                guard let rawId = nonEmptyString(raw["id"]) ?? nonEmptyString(raw["messageId"]) else { return false }
+                return rawId == message.id || rawId.contains(message.id) || message.id.contains(rawId)
+            }) ?? (rawMessages.indices.contains(index) ? rawMessages[index] : fallbackRawMessage)
+
+            guard let rect = mediaSnapshotRect(from: rawMessage),
+                  let snapshotDataUrl = await mediaSnapshotDataUrl(for: rect) else {
+                enrichedMessages.append(message)
+                continue
+            }
+
+            print("WhatsAppWebEngine: 📸 media snapshot \(message.mediaKind?.rawValue ?? "media") \(mediaDataFingerprint(snapshotDataUrl))")
+            enrichedMessages.append(copyMessage(message, mediaDataUrl: snapshotDataUrl))
+        }
+        return enrichedMessages
+    }
+
+    private func isDisplayableMediaDataUrl(_ dataUrl: String?) -> Bool {
+        guard let value = nonEmptyString(dataUrl)?.lowercased() else { return false }
+        return value.hasPrefix("data:image/png")
+            || value.hasPrefix("data:image/jpeg")
+            || value.hasPrefix("data:image/jpg")
+            || value.hasPrefix("data:image/gif")
+            || value.hasPrefix("data:image/webp")
+            || value.hasPrefix("data:application/x-atoll-lottie+json")
+            || value.hasPrefix("data:image/heic")
+            || value.hasPrefix("data:image/tiff")
+            || value.hasPrefix("data:image/bmp")
+    }
+
+    private func copyMessage(_ message: WhatsAppIncomingMessage, mediaDataUrl: String?) -> WhatsAppIncomingMessage {
+        WhatsAppIncomingMessage(
+            id: message.id,
+            text: message.text,
+            mediaKind: message.mediaKind,
+            mediaDataUrl: mediaDataUrl,
+            linkPreview: message.linkPreview,
+            documentPreview: message.documentPreview,
+            groupSender: message.groupSender,
+            pollOptions: message.pollOptions,
+            pollAllowsMultipleSelection: message.pollAllowsMultipleSelection
+        )
+    }
+
+    private func mediaSnapshotRect(from rawMessage: [String: Any]) -> CGRect? {
+        guard let rawRect = rawMessage["mediaSnapshotRect"] as? [String: Any] else { return nil }
+        guard let x = cgFloatValue(rawRect["x"]),
+              let y = cgFloatValue(rawRect["y"]),
+              let width = cgFloatValue(rawRect["width"]),
+              let height = cgFloatValue(rawRect["height"]),
+              width > 8,
+              height > 8 else { return nil }
+
+        let padded = CGRect(x: x - 2, y: y - 2, width: width + 4, height: height + 4)
+        let bounds = webView.bounds
+        guard bounds.width > 0, bounds.height > 0 else { return padded }
+        let clamped = padded.intersection(bounds)
+        return clamped.width > 8 && clamped.height > 8 ? clamped : nil
+    }
+
+    private func cgFloatValue(_ value: Any?) -> CGFloat? {
+        if let number = value as? NSNumber { return CGFloat(truncating: number) }
+        if let double = value as? Double { return CGFloat(double) }
+        if let int = value as? Int { return CGFloat(int) }
+        if let string = value as? String, let double = Double(string) { return CGFloat(double) }
+        return nil
+    }
+
+    private func mediaSnapshotDataUrl(for rect: CGRect) async -> String? {
+        await withCheckedContinuation { continuation in
+            let configuration = WKSnapshotConfiguration()
+            configuration.rect = rect
+            webView.takeSnapshot(with: configuration) { image, error in
+                guard error == nil,
+                      let image,
+                      let tiffData = image.tiffRepresentation,
+                      let bitmap = NSBitmapImageRep(data: tiffData),
+                      let pngData = bitmap.representation(using: .png, properties: [:]) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: "data:image/png;base64,\(pngData.base64EncodedString())")
+            }
+        }
+    }
+
     private func parseIncomingMessages(
         from dict: [String: Any],
         fallbackBody: String,
@@ -939,7 +1141,8 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
                 messageBodyWithoutGroupSender(rawBody, groupSender: resolvedGroupSender)
             )
             let mediaKind = (raw["mediaKind"] as? String).flatMap(WhatsAppIncomingMediaKind.init(rawValue:))
-            let mediaDataUrl = nonEmptyString(raw["mediaDataUrl"])
+            let rawMediaDataUrl = nonEmptyString(raw["mediaDataUrl"])
+            let mediaDataUrl = isDisplayableMediaDataUrl(rawMediaDataUrl) ? rawMediaDataUrl : nil
             let linkPreview = parseLinkPreview(raw["linkPreview"]) ?? linkPreviewFromMessageText(text)
             let documentPreview = parseDocumentPreview(raw["documentPreview"]) ?? parseDocumentPreview(raw["document"])
             let pollOptions = parsePollOptions(raw["pollOptions"])
@@ -968,7 +1171,8 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
         }
 
         let mediaKind = (dict["mediaKind"] as? String).flatMap(WhatsAppIncomingMediaKind.init(rawValue:))
-        let mediaDataUrl = nonEmptyString(dict["mediaDataUrl"])
+        let rawMediaDataUrl = nonEmptyString(dict["mediaDataUrl"])
+        let mediaDataUrl = isDisplayableMediaDataUrl(rawMediaDataUrl) ? rawMediaDataUrl : nil
         let providedFallbackGroupSender = dict["groupSender"] as? String
         let fallbackGroupSender = resolveGroupSender(
             providedGroupSender: providedFallbackGroupSender,
@@ -1202,7 +1406,7 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
     }
 
     private func stableMessageKey(_ message: WhatsAppIncomingMessage, sender: String, chatId: String) -> String {
-        stableMessageID(
+        let baseKey = stableMessageID(
             sender: sender,
             chatId: chatId,
             text: message.text,
@@ -1212,6 +1416,14 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
             documentPreview: message.documentPreview,
             pollOptions: message.pollOptions
         )
+        guard message.mediaKind != nil || message.mediaDataUrl != nil else {
+            return baseKey
+        }
+        return [
+            baseKey,
+            normalizedStableMessagePart(message.id),
+            mediaDataFingerprint(message.mediaDataUrl)
+        ].joined(separator: "||")
     }
 
     private func deduplicatedIncomingMessages(
@@ -1236,6 +1448,36 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .lowercased()
+    }
+
+    private func mediaDataFingerprint(_ dataUrl: String?) -> String {
+        guard let dataUrl, !dataUrl.isEmpty else { return "" }
+        return [
+            String(dataUrl.count),
+            String(dataUrl.prefix(96)),
+            String(dataUrl.suffix(96))
+        ].joined(separator: ":")
+    }
+
+    private func isMediaOnlyMessage(_ message: WhatsAppIncomingMessage) -> Bool {
+        guard message.mediaKind != nil || message.mediaDataUrl != nil else { return false }
+        let normalizedText = normalizedStableMessagePart(message.text)
+            .replacingOccurrences(of: "📨", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return [
+            "",
+            "nuovo messaggio",
+            "new message",
+            "sticker",
+            "adesivo",
+            "immagine",
+            "image",
+            "photo",
+            "foto",
+            "video",
+            "filmato",
+            "gif"
+        ].contains(normalizedText)
     }
 
     private func nonEmptyString(_ value: Any?) -> String? {
@@ -1287,7 +1529,25 @@ public final class WhatsAppWebEngine: NSObject, ObservableObject {
             .replacingOccurrences(of: "\u{200B}", with: "")
             .replacingOccurrences(of: "\u{200C}", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        if isLikelyInlineMediaPayload(cleaned) {
+            return "📨 Nuovo messaggio"
+        }
         return cleaned.isEmpty ? "📨 Nuovo messaggio" : cleaned
+    }
+
+    private func isLikelyInlineMediaPayload(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > 180 else { return false }
+        let lowercased = trimmed.lowercased()
+        if lowercased.hasPrefix("data:image/") || lowercased.hasPrefix("data:video/") {
+            return true
+        }
+        if trimmed.hasPrefix("/9j/") || trimmed.hasPrefix("iVBOR") || trimmed.hasPrefix("R0lGOD") || trimmed.hasPrefix("UklGR") {
+            return true
+        }
+        let sample = trimmed.prefix(240)
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\\r\\n")
+        return sample.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
 
     private func shouldIgnoreInformationalMessage(sender: String, body: String) -> Bool {
@@ -1406,10 +1666,10 @@ private enum JS {
 
     static let messageMonitor = """
     (function() {
-        if (window.__atollMonitorV3) return;
-        window.__atollMonitorV3 = true;
+        if (window.__atollMonitorV6) return;
+        window.__atollMonitorV6 = true;
 
-        console.log('[Atoll] Inizializzazione monitor v3...');
+        console.log('[Atoll] Inizializzazione monitor v6...');
 
         // Snapshot dei sender già non letti all'avvio → da ignorare
         var ignoredSenders = new Set();
@@ -1417,8 +1677,17 @@ private enum JS {
         var lastBodyBySender = {};
         // Set di chiavi già notificate
         var notified = new Set();
-        var chatRowSelector = '[data-testid="cell-frame-container"], #pane-side [role="listitem"]';
+        // Snapshot degli ID realmente visibili nell'ultima scansione di ogni chat.
+        // Serve a legare una notifica al nodo appena aggiunto, senza scegliere
+        // per somiglianza tra tutti i media non letti della cronologia.
+                var visibleMessageIdsBySender = {};
+                // ID dei messaggi già "risolti" tramite lo Store per ciascun sender:
+                // evita di ri-processare lo stesso messaggio due volte e permette di
+                // trovare sempre il PROSSIMO messaggio più recente non ancora visto.
+                var lastSeenMessageIdBySender = {};
+                var chatRowSelector = '[data-testid="cell-frame-container"], #pane-side [role="listitem"]';
         var documentPreviewDataUrlByKey = {};
+        var knownAvatarSrcs = new Set();
 
         function postPollDebug(message) {
             console.log('[Atoll] ' + message);
@@ -1605,6 +1874,24 @@ private enum JS {
                 .trim();
         }
 
+        function normalizedReactionEchoText(value) {
+            return cleanMessageText(value || '')
+                .replace(/["“”'‘’]+$/g, '')
+                .replace(/\\s+/g, ' ')
+                .trim()
+                .toLowerCase();
+        }
+
+        function isReactionEchoBody(body, previousBody) {
+            var current = normalizedReactionEchoText(body);
+            var previous = normalizedReactionEchoText(previousBody);
+            if (!current || !previous) return false;
+            if (current === previous) return true;
+            if (current === (previous + ' ' + previous)) return true;
+            if (current.indexOf(previous + ' ' + previous) === 0) return true;
+            return false;
+        }
+
         function isValidGroupSenderCandidate(value) {
             var candidate = cleanMessageText(value || '').replace(/:$/, '').trim();
             if (!candidate || candidate.length > 40) return false;
@@ -1675,13 +1962,24 @@ private enum JS {
 
         function mediaKindFromRow(row) {
             var label = ((row.getAttribute('aria-label') || '') + ' ' + textWithEmoji(row)).toLowerCase();
+            if (isViewOnceMediaText(label)) return '';
             if (row.querySelector('[data-icon*="sticker"], [aria-label*="sticker" i], [aria-label*="adesivo" i]') || /\\b(sticker|adesivo)\\b/.test(label)) {
                 return 'sticker';
             }
-            if (row.querySelector('[data-icon*="image"], [data-icon*="photo"], [aria-label*="image" i], [aria-label*="photo" i], [aria-label*="immagine" i]')) {
+            if (row.querySelector('[data-icon*="gif"], [aria-label*="gif" i]') || /\\bgif\\b/.test(label)) {
+                return 'gif';
+            }
+            if (row.querySelector('[data-icon*="video"], [data-icon*="play"], [aria-label*="video" i]') || /\\b(video|filmato)\\b/.test(label)) {
+                return 'video';
+            }
+            if (row.querySelector('[data-icon*="image"], [data-icon*="photo"], [aria-label*="image" i], [aria-label*="photo" i], [aria-label*="immagine" i], [aria-label*="foto" i]') || /\\b(foto|photo|image|immagine)\\b/.test(label)) {
                 return 'image';
             }
             return '';
+        }
+
+        function isViewOnceMediaText(value) {
+            return /visualizza\\s+una\\s+volta|una\\s+sola\\s+volta|view\\s+once|view-once|single\\s+view|one-time/i.test(String(value || ''));
         }
 
         function mediaMarkerForElement(element) {
@@ -1702,13 +2000,44 @@ private enum JS {
 
         function mediaKindFromElement(element, fallbackKind) {
             var marker = mediaMarkerForElement(element);
+            if (isViewOnceMediaText(marker)) return '';
             if (/\\b(sticker|adesivo)\\b/.test(marker)) return 'sticker';
+            if (/\\bgif\\b/.test(marker)) return 'gif';
+            if (/\\b(video|filmato|play)\\b/.test(marker)) return 'video';
             if (/\\b(image|photo|picture|immagine|foto)\\b/.test(marker)) return 'image';
             return fallbackKind || '';
         }
 
         function isAvatarImage(img) {
-            return !!(img.closest('[data-testid="avatar"]') || img.closest('[aria-label*="profile" i]'));
+            if (!img) return false;
+            var src = img.currentSrc || img.src || '';
+            var marker = mediaMarkerForElement(img);
+            if (src && knownAvatarSrcs.has(src)) return true;
+            return !!(
+                img.closest('[data-testid="avatar"], [data-testid*="avatar"], [data-testid*="cell-frame"]')
+                || img.closest('[aria-label*="profile" i]')
+                || img.closest('[aria-label*="profilo" i]')
+                || img.closest('header')
+                || img.closest('#pane-side')
+                || /\\b(avatar|profile|profilo|foto profilo|profile photo|contact-photo|chat-avatar)\\b/i.test(marker)
+            );
+        }
+
+        function rememberAvatarImages(root) {
+            try {
+                var scope = root || document;
+                scope.querySelectorAll('header img, #pane-side img, [data-testid="avatar"] img, [data-testid*="avatar"] img, [data-testid*="cell-frame"] img').forEach(function(img) {
+                    var src = img.currentSrc || img.src || '';
+                    if (src && !src.includes('emoji')) knownAvatarSrcs.add(src);
+                });
+            } catch (e) {}
+        }
+
+        function elementInsideMessageBubble(element) {
+            if (!element) return false;
+            if (!element.closest('#main')) return false;
+            if (element.closest('header') || element.closest('#pane-side') || element.closest('[data-testid="avatar"]')) return false;
+            return !!element.closest('.message-in, .message-out, [data-id]');
         }
 
         function isEmojiImage(img) {
@@ -1726,6 +2055,22 @@ private enum JS {
             return src.includes('emoji')
                 || /emoji|emoticon/i.test(marker)
                 || (!!alt && looksLikeEmojiLabel(alt) && !src.startsWith('blob:') && !src.startsWith('data:image'));
+        }
+
+        function imageLooksLikeMessageMedia(img, fallbackKind) {
+            if (!img || isAvatarImage(img) || isEmojiImage(img)) return false;
+            var rect = img.getBoundingClientRect();
+            if (rect.width < 28 || rect.height < 28) return false;
+            var isMessageBubbleImage = elementInsideMessageBubble(img);
+            if (!isMessageBubbleImage) return false;
+            var marker = mediaMarkerForElement(img);
+            var hasMediaMarker = /\\b(sticker|adesivo|image|photo|picture|immagine|foto|video|filmato|gif|media)\\b/i.test(marker);
+            if (fallbackKind === 'sticker') {
+                return true;
+            }
+            if (hasMediaMarker) return true;
+            if (rect.width <= 88 && rect.height <= 88 && Math.abs(rect.width - rect.height) <= 10) return false;
+            return true;
         }
 
         function urlToDataUrl(url) {
@@ -1786,6 +2131,25 @@ private enum JS {
                         ? value
                         : value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
                     dataUrl = 'data:' + (mimeType || 'image/png') + ';base64,' + base64FromArrayBuffer(imageBuffer);
+                } else if (typeof value === 'object') {
+                    var nestedMimeType = value.mimetype || value.mimeType || value.type || mimeType;
+                    var nestedCandidates = [
+                        value.data,
+                        value.body,
+                        value.base64,
+                        value.thumbnail,
+                        value.jpegThumbnail,
+                        value.preview,
+                        value.previewImage,
+                        value.mediaBlob,
+                        value._mediaBlob,
+                        value.blob,
+                        value.file
+                    ];
+                    for (var nestedIndex = 0; nestedIndex < nestedCandidates.length; nestedIndex++) {
+                        dataUrl = await imageDataUrlFromUnknownValue(nestedCandidates[nestedIndex], nestedMimeType, maxEdge);
+                        if (dataUrl) break;
+                    }
                 } else if (typeof value === 'string') {
                     var raw = value.trim();
                     if (raw.indexOf('data:image') === 0) {
@@ -1830,23 +2194,35 @@ private enum JS {
 
         async function storeImageFallbackDataUrl(msg, maxEdge) {
             if (!msg) return '';
+            if (storeMessageIsViewOnce(msg)) return '';
             var mimeType = msg.mimetype || (msg.type === 'sticker' ? 'image/webp' : 'image/png');
             var mediaData = msg.mediaData || {};
+            var interactiveData = msg.interactiveData || {};
             var candidates = [
                 msg.jpegThumbnail,
                 msg.thumbnail,
                 msg.thumbnailUrl,
+                msg.preview,
                 msg.previewImage,
+                msg.previewUrl,
+                msg.poster,
+                msg.posterUrl,
                 msg.body && msg.type === 'sticker' ? msg.body : null,
                 mediaData.jpegThumbnail,
                 mediaData.thumbnail,
                 mediaData.thumbnailUrl,
                 mediaData.preview,
                 mediaData.previewImage,
+                mediaData.previewUrl,
+                mediaData.poster,
+                mediaData.posterUrl,
                 mediaData.mediaBlob,
                 mediaData._mediaBlob,
                 mediaData.blob,
                 mediaData.file,
+                interactiveData.thumbnail,
+                interactiveData.jpegThumbnail,
+                interactiveData.previewImage,
                 msg.stickerData && msg.stickerData.url,
                 msg.stickerData && msg.stickerData.thumbnail,
                 msg.stickerData && msg.stickerData.mediaBlob
@@ -1950,10 +2326,77 @@ private enum JS {
             }
         }
 
-        async function extractMedia(row) {
-            var kind = mediaKindFromRow(row);
-            var imgs = Array.from(row.querySelectorAll('img')).filter(function(img) {
+        function rectPayloadForElement(element) {
+            if (!element) return null;
+            var rect = element.getBoundingClientRect();
+            if (rect.width <= 8 || rect.height <= 8) return null;
+            return {
+                x: rect.left,
+                y: rect.top,
+                width: rect.width,
+                height: rect.height
+            };
+        }
+    
+        function nodeHasRenderedVisual(node) {
+            if (!node) return false;
+            var imgs = Array.from(node.querySelectorAll('img')).filter(function(img) {
                 if (isAvatarImage(img) || isEmojiImage(img)) return false;
+                var rect = img.getBoundingClientRect();
+                if (rect.width < 20 || rect.height < 20) return false;
+                return img.complete && img.naturalWidth > 4 && img.naturalHeight > 4;
+            });
+            if (imgs.length) return true;
+            var bgNodes = Array.from(node.querySelectorAll('[style*="background-image"]')).filter(function(el) {
+                var rect = el.getBoundingClientRect();
+                if (rect.width < 20 || rect.height < 20) return false;
+                var bg = window.getComputedStyle(el).backgroundImage || '';
+                return bg && bg !== 'none' && /url\\(/.test(bg);
+            });
+            if (bgNodes.length) return true;
+            var canvases = Array.from(node.querySelectorAll('canvas')).filter(function(c) {
+                var rect = c.getBoundingClientRect();
+                return rect.width >= 20 && rect.height >= 20;
+            });
+            return canvases.length > 0;
+        }
+    
+        function mediaSnapshotRectForNode(row, kind) {
+            var candidates = [];
+            Array.from(row.querySelectorAll('img')).forEach(function(img) {
+                if (imageLooksLikeMessageMedia(img, kind)) candidates.push(img);
+            });
+            Array.from(row.querySelectorAll('video, canvas, [style*="background-image"]')).forEach(function(el) {
+                if (elementInsideMessageBubble(el)) candidates.push(el);
+            });
+            if (kind === 'sticker') {
+                Array.from(row.querySelectorAll('div, span')).forEach(function(el) {
+                    if (!elementInsideMessageBubble(el)) return;
+                    var rect = el.getBoundingClientRect();
+                    if (rect.width >= 24 && rect.height >= 24 && rect.width <= 260 && rect.height <= 260) {
+                        candidates.push(el);
+                    }
+                });
+            }
+            candidates = candidates.filter(function(el) {
+                var rect = el.getBoundingClientRect();
+                return rect.width > 8 && rect.height > 8 && !isViewOnceMediaText(mediaMarkerForElement(el));
+            }).sort(function(a, b) {
+                var ar = a.getBoundingClientRect();
+                var br = b.getBoundingClientRect();
+                return (br.width * br.height) - (ar.width * ar.height);
+            });
+            return rectPayloadForElement(candidates[0]) || ((kind || mediaKindFromRow(row)) ? rectPayloadForElement(row) : null);
+        }
+
+        async function extractMedia(row) {
+            rememberAvatarImages(document);
+            var kind = mediaKindFromRow(row);
+            if (isViewOnceMediaText((row.getAttribute('aria-label') || '') + ' ' + textWithEmoji(row) + ' ' + mediaMarkerForElement(row))) {
+                return { kind: '', dataUrl: '', mediaSnapshotRect: null };
+            }
+            var imgs = Array.from(row.querySelectorAll('img')).filter(function(img) {
+                if (!imageLooksLikeMessageMedia(img, kind)) return false;
                 var rect = img.getBoundingClientRect();
                 return rect.width >= 12 && rect.height >= 12;
             }).sort(function(a, b) {
@@ -1970,7 +2413,7 @@ private enum JS {
                 var imageKind = mediaKindFromElement(img, kind);
                 var dataUrl = await imageElementToDataUrl(img);
                 if (dataUrl) {
-                    return { kind: imageKind || kind || 'image', dataUrl: dataUrl };
+                    return { kind: imageKind || kind || 'image', dataUrl: dataUrl, mediaSnapshotRect: rectPayloadForElement(img) };
                 }
             }
 
@@ -1979,22 +2422,31 @@ private enum JS {
                 return rect.width >= 12 && rect.height >= 12;
             });
             for (var v = 0; v < videos.length; v++) {
+                var resolvedVideoKind = mediaKindFromElement(videos[v], kind) || kind || 'video';
                 var videoDataUrl = await videoElementToDataUrl(videos[v]);
-                if (videoDataUrl) {
-                    return { kind: mediaKindFromElement(videos[v], kind) || kind || 'sticker', dataUrl: videoDataUrl };
-                }
+                // I frame neri/trasparenti prodotti prima che il video sia pronto
+                // sono PNG validi ma minuscoli. Non inviarli alla UI: conserviamo
+                // il rect e lasciamo che WKWebView fotografi il frame renderizzato.
+                return {
+                    kind: resolvedVideoKind,
+                    dataUrl: isUsefulVisualMediaDataUrl(videoDataUrl, resolvedVideoKind) ? videoDataUrl : '',
+                    mediaSnapshotRect: rectPayloadForElement(videos[v])
+                };
             }
 
-            var backgroundNodes = row.querySelectorAll('[style*="background-image"]');
+            var backgroundNodes = Array.from(row.querySelectorAll('[style*="background-image"]')).filter(function(el) {
+                return elementInsideMessageBubble(el) && !isViewOnceMediaText(mediaMarkerForElement(el));
+            });
             for (var b = 0; b < backgroundNodes.length; b++) {
                 var bgDataUrl = await backgroundImageToDataUrl(backgroundNodes[b]);
                 if (bgDataUrl) {
-                    return { kind: mediaKindFromElement(backgroundNodes[b], kind) || kind || 'image', dataUrl: bgDataUrl };
+                    return { kind: mediaKindFromElement(backgroundNodes[b], kind) || kind || 'image', dataUrl: bgDataUrl, mediaSnapshotRect: rectPayloadForElement(backgroundNodes[b]) };
                 }
             }
 
             if (kind === 'sticker') {
                 var visualNodes = Array.from(row.querySelectorAll('div, span')).filter(function(el) {
+                    if (!elementInsideMessageBubble(el)) return false;
                     var rect = el.getBoundingClientRect();
                     return rect.width >= 24 && rect.height >= 24 && rect.width <= 260 && rect.height <= 260;
                 }).sort(function(a, b) {
@@ -2005,7 +2457,7 @@ private enum JS {
                 for (var c = 0; c < Math.min(visualNodes.length, 24); c++) {
                     var computedDataUrl = await backgroundImageToDataUrl(visualNodes[c]);
                     if (computedDataUrl) {
-                        return { kind: 'sticker', dataUrl: computedDataUrl };
+                        return { kind: 'sticker', dataUrl: computedDataUrl, mediaSnapshotRect: rectPayloadForElement(visualNodes[c]) };
                     }
                 }
             }
@@ -2013,11 +2465,11 @@ private enum JS {
             var canvas = row.querySelector('canvas');
             if (canvas) {
                 try {
-                    return { kind: mediaKindFromElement(canvas, kind) || kind || 'image', dataUrl: canvas.toDataURL('image/png') };
+                    return { kind: mediaKindFromElement(canvas, kind) || kind || 'image', dataUrl: canvas.toDataURL('image/png'), mediaSnapshotRect: rectPayloadForElement(canvas) };
                 } catch (e) {}
             }
 
-            return { kind: kind, dataUrl: '' };
+            return { kind: kind, dataUrl: '', mediaSnapshotRect: mediaSnapshotRectForNode(row, kind) };
         }
 
         function firstUrlFromText(value) {
@@ -2783,9 +3235,21 @@ private enum JS {
             try {
                 var collections = waRequire('WAWebCollections');
                 if (!collections || !collections.Msg) return null;
-                return collections.Msg.get(messageId)
+                var directMessage = collections.Msg.get(messageId)
                     || ((await collections.Msg.getMessagesById([messageId])) || {}).messages?.[0]
                     || null;
+                if (directMessage) return directMessage;
+
+                var wanted = String(messageId);
+                var messages = recentStoreMessages();
+                for (var i = messages.length - 1; i >= 0; i--) {
+                    var candidateId = serializedId(messages[i].id);
+                    if (!candidateId) continue;
+                    if (candidateId === wanted || candidateId.indexOf(wanted) >= 0 || wanted.indexOf(candidateId) >= 0) {
+                        return messages[i];
+                    }
+                }
+                return null;
             } catch (e) {
                 return null;
             }
@@ -2803,6 +3267,126 @@ private enum JS {
                 if (msgCollection._index) return Object.values(msgCollection._index).slice(-250);
             } catch (e) {}
             return [];
+        }
+
+        function storeModelValue(model, key) {
+            if (!model) return null;
+            try {
+                if (typeof model.get === 'function') {
+                    var value = model.get(key);
+                    if (value !== undefined && value !== null) return value;
+                }
+            } catch (e) {}
+            try {
+                var internalKey = '__x_' + key;
+                if (Object.prototype.hasOwnProperty.call(model, internalKey)) return model[internalKey];
+            } catch (e) {}
+            try {
+                if (model.attributes && Object.prototype.hasOwnProperty.call(model.attributes, key)) return model.attributes[key];
+            } catch (e) {}
+            try {
+                if (model._data && Object.prototype.hasOwnProperty.call(model._data, key)) return model._data[key];
+            } catch (e) {}
+            return model[key];
+        }
+
+        function storeMessageRemoteWid(msg) {
+            if (!msg) return null;
+            return (msg.id && msg.id.remote)
+                || storeModelValue(msg, 'remote')
+                || storeModelValue(msg, 'from')
+                || storeModelValue(msg, 'chatId')
+                || storeModelValue(msg, 'to')
+                || null;
+        }
+
+        function storeMessageMatchesChatSender(msg, sender) {
+            var target = comparableMessageText(sender || '');
+            if (!msg || !target) return false;
+
+            var remote = storeMessageRemoteWid(msg);
+            var directName = comparableMessageText(displayNameFromWid(remote));
+            if (directName && directName === target) return true;
+
+            var nameCandidates = [
+                storeModelValue(msg, 'senderName'),
+                storeModelValue(msg, 'senderPushName'),
+                storeModelValue(msg, 'notifyName'),
+                storeModelValue(msg, 'pushname'),
+                storeModelValue(msg, 'chatName'),
+                storeModelValue(msg, 'formattedTitle'),
+                groupSenderFromStoreMessage(msg, '')
+            ];
+            for (var i = 0; i < nameCandidates.length; i++) {
+                var candidate = comparableMessageText(nameCandidates[i] || '');
+                if (candidate && candidate === target) return true;
+            }
+            return false;
+        }
+    
+            function isMessageIdSeen(sender, id) {
+                if (!id) return false;
+                var seen = lastSeenMessageIdBySender[sender];
+                return !!seen && seen.indexOf(id) >= 0;
+            }
+
+            function markMessageIdSeen(sender, id) {
+                if (!id) return;
+                var seen = lastSeenMessageIdBySender[sender] || [];
+                if (seen.indexOf(id) < 0) {
+                    seen.push(id);
+                    if (seen.length > 40) seen = seen.slice(seen.length - 40);
+                }
+                lastSeenMessageIdBySender[sender] = seen;
+            }
+
+            function newestUnseenIncomingStoreMessageForSender(sender) {
+                var messages = recentStoreMessages();
+                var bestMessage = null;
+                var bestTimestamp = -1;
+                for (var i = messages.length - 1; i >= 0; i--) {
+                    var msg = messages[i];
+                    if (!msg || isOutgoingStoreMessage(msg) || storeMessageIsViewOnce(msg)) continue;
+                    if (!storeMessageMatchesChatSender(msg, sender)) continue;
+                    var id = serializedId(msg.id);
+                    if (isMessageIdSeen(sender, id)) continue;
+                    var timestamp = Number(
+                        storeModelValue(msg, 't')
+                            || storeModelValue(msg, 'timestamp')
+                            || storeModelValue(msg, 'messageTimestamp')
+                            || 0
+                    );
+                    if (!bestMessage || timestamp > bestTimestamp) {
+                        bestMessage = msg;
+                        bestTimestamp = timestamp;
+                    }
+                }
+                return bestMessage;
+            }
+
+        function latestIncomingStoreMessageForSender(sender) {
+            var messages = recentStoreMessages();
+            var bestMessage = null;
+            var bestTimestamp = -1;
+            for (var i = messages.length - 1; i >= 0; i--) {
+                var msg = messages[i];
+                if (!msg || isOutgoingStoreMessage(msg) || storeMessageIsViewOnce(msg)) continue;
+                if (!storeMessageMatchesChatSender(msg, sender)) continue;
+                var timestamp = Number(
+                    storeModelValue(msg, 't')
+                        || storeModelValue(msg, 'timestamp')
+                        || storeModelValue(msg, 'messageTimestamp')
+                        || 0
+                );
+                // La collection viene percorsa dal più recente al più vecchio.
+                // A parità di timestamp (o se WhatsApp non lo espone) mantieni
+                // il primo trovato, cioè quello realmente più nuovo.
+                if (!bestMessage || timestamp > bestTimestamp) {
+                    bestMessage = msg;
+                    bestTimestamp = timestamp;
+                }
+            }
+            return bestMessage;
         }
 
         function storePollMessageByQuestion(questionText) {
@@ -2845,15 +3429,58 @@ private enum JS {
             }
         }
 
-        function storeMediaMessageByKind(kind) {
+        function messageIdMatchesAny(candidateId, ids) {
+            if (!ids || !ids.length) return true;
+            if (!candidateId) return false;
+            var serialized = String(candidateId);
+            for (var i = 0; i < ids.length; i++) {
+                var target = String(ids[i] || '');
+                if (!target) continue;
+                if (serialized === target || serialized.indexOf(target) >= 0 || target.indexOf(serialized) >= 0) return true;
+            }
+            return false;
+        }
+
+        function storeMediaKind(msg) {
+            if (!msg) return '';
+            if (msg.type === 'sticker') return 'sticker';
+            if (msg.type === 'image') return 'image';
+            if (msg.type === 'video') return storeMessageLooksLikeGif(msg) ? 'gif' : 'video';
+            return '';
+        }
+
+        function storeMediaMessageByKind(kind, candidateMessageIds, requireCandidateIds) {
+            if (requireCandidateIds && (!candidateMessageIds || !candidateMessageIds.length)) return null;
             var messages = recentStoreMessages();
             for (var i = messages.length - 1; i >= 0; i--) {
                 var msg = messages[i];
                 if (!msg || isOutgoingStoreMessage(msg)) continue;
-                if (kind === 'sticker' && msg.type === 'sticker') return msg;
-                if (kind === 'image' && (msg.type === 'image' || msg.type === 'video')) return msg;
+                if (storeMessageIsViewOnce(msg)) continue;
+                if (!messageIdMatchesAny(serializedId(msg.id), candidateMessageIds || [])) continue;
+                var mediaKind = storeMediaKind(msg);
+                if ((kind === 'media' || !kind) && mediaKind) return msg;
+                if (kind === mediaKind) return msg;
             }
             return null;
+        }
+
+        function storeMessageIsViewOnce(msg) {
+            if (!msg) return false;
+            var marker = [
+                msg.type || '',
+                msg.subtype || '',
+                msg.mediaType || '',
+                msg.caption || '',
+                msg.body || ''
+            ].join(' ');
+            return !!(msg.isViewOnce || msg.viewOnce || msg.isViewOnceMsg || msg.isViewOnceMessage || msg.isEphemeralViewOnce || isViewOnceMediaText(marker));
+        }
+
+        function storeMessageLooksLikeGif(msg) {
+            if (!msg) return false;
+            var mime = String(msg.mimetype || '').toLowerCase();
+            var caption = String(msg.caption || msg.body || '').toLowerCase();
+            return !!(msg.isGif || msg.isGIF || msg.gifAttribution || msg.gifPlayback || msg.isAnimated || mime.indexOf('gif') >= 0 || caption.indexOf('.gif') >= 0);
         }
 
         function base64FromArrayBuffer(buffer) {
@@ -2865,6 +3492,70 @@ private enum JS {
                 binary += String.fromCharCode.apply(null, chunk);
             }
             return btoa(binary);
+        }
+
+        function bytesFromBase64(value) {
+            var binary = atob(String(value || '').replace(/\\s+/g, ''));
+            var bytes = new Uint8Array(binary.length);
+            for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return bytes;
+        }
+
+        async function lottieDataUrlFromStickerZipBase64(base64) {
+            if (String(base64 || '').slice(0, 5) !== 'UEsDB') return '';
+            try {
+                var bytes = bytesFromBase64(base64);
+                var view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+                var eocdOffset = -1;
+                for (var cursor = bytes.length - 22; cursor >= Math.max(0, bytes.length - 65557); cursor--) {
+                    if (view.getUint32(cursor, true) === 0x06054b50) {
+                        eocdOffset = cursor;
+                        break;
+                    }
+                }
+                if (eocdOffset < 0) throw new Error('zip-eocd-not-found');
+
+                var entryCount = view.getUint16(eocdOffset + 10, true);
+                var entry = view.getUint32(eocdOffset + 16, true);
+                for (var index = 0; index < entryCount; index++) {
+                    if (view.getUint32(entry, true) !== 0x02014b50) throw new Error('zip-central-entry-invalid');
+                    var method = view.getUint16(entry + 10, true);
+                    var compressedSize = view.getUint32(entry + 20, true);
+                    var nameLength = view.getUint16(entry + 28, true);
+                    var extraLength = view.getUint16(entry + 30, true);
+                    var commentLength = view.getUint16(entry + 32, true);
+                    var localOffset = view.getUint32(entry + 42, true);
+                    var nameBytes = bytes.subarray(entry + 46, entry + 46 + nameLength);
+                    var name = new TextDecoder('utf-8').decode(nameBytes);
+
+                    if (name === 'animation/animation.json' || /\\/animation\\.json$/i.test(name)) {
+                        if (view.getUint32(localOffset, true) !== 0x04034b50) throw new Error('zip-local-entry-invalid');
+                        var localNameLength = view.getUint16(localOffset + 26, true);
+                        var localExtraLength = view.getUint16(localOffset + 28, true);
+                        var dataOffset = localOffset + 30 + localNameLength + localExtraLength;
+                        var compressed = bytes.slice(dataOffset, dataOffset + compressedSize);
+                        var jsonBytes;
+                        if (method === 0) {
+                            jsonBytes = compressed;
+                        } else if (method === 8 && typeof DecompressionStream === 'function') {
+                            var inflatedStream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+                            jsonBytes = new Uint8Array(await new Response(inflatedStream).arrayBuffer());
+                        } else {
+                            throw new Error('zip-compression-unsupported-' + method);
+                        }
+
+                        var jsonText = new TextDecoder('utf-8').decode(jsonBytes);
+                        JSON.parse(jsonText);
+                        var exactBuffer = jsonBytes.buffer.slice(jsonBytes.byteOffset, jsonBytes.byteOffset + jsonBytes.byteLength);
+                        return 'data:application/x-atoll-lottie+json;base64,' + base64FromArrayBuffer(exactBuffer);
+                    }
+                    entry += 46 + nameLength + extraLength + commentLength;
+                }
+                throw new Error('lottie-json-not-found');
+            } catch (e) {
+                postPollDebug('sticker lottie extraction failed: ' + e);
+                return '';
+            }
         }
 
         function rasterizeImageDataUrl(dataUrl, maxEdge) {
@@ -2884,57 +3575,107 @@ private enum JS {
                             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                             resolve(canvas.toDataURL('image/png'));
                         } catch (e) {
-                            resolve(dataUrl);
+                            resolve(isDisplayableMediaDataUrl(dataUrl) ? dataUrl : '');
                         }
                     };
-                    img.onerror = function() { resolve(dataUrl); };
+                    img.onerror = function() { resolve(isDisplayableMediaDataUrl(dataUrl) ? dataUrl : ''); };
                     img.src = dataUrl;
                 } catch (e) {
-                    resolve(dataUrl);
+                    resolve(isDisplayableMediaDataUrl(dataUrl) ? dataUrl : '');
                 }
             });
         }
 
-        async function mediaDataUrlFromStoreMessage(msg) {
-            if (!msg) return '';
-            var fallbackDataUrl = await storeImageFallbackDataUrl(msg, msg.type === 'sticker' ? 240 : 360);
-            if (fallbackDataUrl && msg.type === 'sticker') return fallbackDataUrl;
-            if (!msg.directPath || !msg.mediaKey) return fallbackDataUrl || '';
-            try {
-                if (msg.mediaData && msg.mediaData.mediaStage && msg.mediaData.mediaStage !== 'RESOLVED' && typeof msg.downloadMedia === 'function') {
-                    var downloaded = await msg.downloadMedia({ downloadEvenIfExpensive: true, rmrReason: 1 });
-                    var downloadedImage = await imageDataUrlFromUnknownValue(downloaded, msg.mimetype || (msg.type === 'sticker' ? 'image/webp' : 'image/png'), msg.type === 'sticker' ? 240 : 360);
-                    if (downloadedImage) return downloadedImage;
-                }
+                async function mediaDataUrlFromStoreMessage(msg) {
+                    if (!msg) return '';
+                    if (storeMessageIsViewOnce(msg)) return '';
 
-                var downloadManagerModule = waRequire('WAWebDownloadManager');
-                var downloadManager = downloadManagerModule && downloadManagerModule.downloadManager;
-                if (!downloadManager || typeof downloadManager.downloadAndMaybeDecrypt !== 'function') return fallbackDataUrl || '';
-
-                var decryptedMedia = await downloadManager.downloadAndMaybeDecrypt({
-                    directPath: msg.directPath,
-                    encFilehash: msg.encFilehash,
-                    filehash: msg.filehash,
-                    mediaKey: msg.mediaKey,
-                    mediaKeyTimestamp: msg.mediaKeyTimestamp,
-                    type: msg.type,
-                    signal: new AbortController().signal,
-                    downloadQpl: {
-                        addAnnotations: function() { return this; },
-                        addPoint: function() { return this; }
+                    // Gli sticker sono webp e WebKit spesso non riesce a decodificarli
+                    // (vedi errori 'WEBP'-_reader->initImage nel log console). Niente
+                    // canvas/rasterizzazione qui: mandiamo i byte grezzi a Swift, che
+                    // li decodifica con ImageIO nativo di macOS invece del motore
+                    // immagini di WebKit.
+                    if (msg.type === 'sticker' && msg.directPath && msg.mediaKey) {
+                        try {
+                            var downloadManagerModule = waRequire('WAWebDownloadManager');
+                            var downloadManager = downloadManagerModule && downloadManagerModule.downloadManager;
+                            if (downloadManager && typeof downloadManager.downloadAndMaybeDecrypt === 'function') {
+                                var decryptedSticker = await downloadManager.downloadAndMaybeDecrypt({
+                                    directPath: msg.directPath,
+                                    encFilehash: msg.encFilehash,
+                                    filehash: msg.filehash,
+                                    mediaKey: msg.mediaKey,
+                                    mediaKeyTimestamp: msg.mediaKeyTimestamp,
+                                    type: msg.type,
+                                    signal: new AbortController().signal,
+                                    downloadQpl: {
+                                        addAnnotations: function() { return this; },
+                                        addPoint: function() { return this; }
+                                    }
+                                });
+                                var stickerBase64 = window.WWebJS && typeof window.WWebJS.arrayBufferToBase64Async === 'function'
+                                    ? await window.WWebJS.arrayBufferToBase64Async(decryptedSticker)
+                                    : base64FromArrayBuffer(decryptedSticker);
+                                var lottieStickerDataUrl = await lottieDataUrlFromStickerZipBase64(stickerBase64);
+                                if (lottieStickerDataUrl) {
+                                    postPollDebug('sticker lottie json bytes=' + lottieStickerDataUrl.length);
+                                    return lottieStickerDataUrl;
+                                }
+                                var rawStickerDataUrl = 'data:image/webp;base64,' + stickerBase64;
+                                postPollDebug('sticker raw webp bytes=' + stickerBase64.length);
+                                return rawStickerDataUrl;
+                            }
+                        } catch (e) {
+                            postPollDebug('sticker raw download failed: ' + e);
+                        }
                     }
-                });
 
-                var base64 = window.WWebJS && typeof window.WWebJS.arrayBufferToBase64Async === 'function'
-                    ? await window.WWebJS.arrayBufferToBase64Async(decryptedMedia)
-                    : base64FromArrayBuffer(decryptedMedia);
-                var mimetype = msg.mimetype || (msg.type === 'sticker' ? 'image/webp' : 'image/png');
-                var dataUrl = 'data:' + mimetype + ';base64,' + base64;
-                return await rasterizeImageDataUrl(dataUrl, msg.type === 'sticker' ? 240 : 360);
-            } catch (e) {
-                return fallbackDataUrl || '';
-            }
-        }
+                    var fallbackDataUrl = await storeImageFallbackDataUrl(msg, msg.type === 'sticker' ? 240 : 360);
+                    if (fallbackDataUrl && isDisplayableMediaDataUrl(fallbackDataUrl) && (msg.type === 'sticker' || msg.type === 'video')) return fallbackDataUrl;
+                    if ((msg.type === 'sticker' || msg.type === 'image') && typeof msg.downloadMedia === 'function') {
+                        try {
+                            var directDownloaded = await msg.downloadMedia({ downloadEvenIfExpensive: true, rmrReason: 1 });
+                            var directDownloadedImage = await imageDataUrlFromUnknownValue(directDownloaded, msg.mimetype || (msg.type === 'sticker' ? 'image/webp' : 'image/png'), msg.type === 'sticker' ? 240 : 360);
+                            if (directDownloadedImage && isDisplayableMediaDataUrl(directDownloadedImage)) return directDownloadedImage;
+                        } catch (e) {}
+                    }
+                    if (!msg.directPath || !msg.mediaKey) return fallbackDataUrl || '';
+                    try {
+                        if (msg.mediaData && msg.mediaData.mediaStage && msg.mediaData.mediaStage !== 'RESOLVED' && typeof msg.downloadMedia === 'function') {
+                            var downloaded = await msg.downloadMedia({ downloadEvenIfExpensive: true, rmrReason: 1 });
+                            var downloadedImage = await imageDataUrlFromUnknownValue(downloaded, msg.mimetype || (msg.type === 'sticker' ? 'image/webp' : 'image/png'), msg.type === 'sticker' ? 240 : 360);
+                            if (downloadedImage && isDisplayableMediaDataUrl(downloadedImage)) return downloadedImage;
+                        }
+
+                        var downloadManagerModule = waRequire('WAWebDownloadManager');
+                        var downloadManager = downloadManagerModule && downloadManagerModule.downloadManager;
+                        if (!downloadManager || typeof downloadManager.downloadAndMaybeDecrypt !== 'function') return fallbackDataUrl || '';
+
+                        var decryptedMedia = await downloadManager.downloadAndMaybeDecrypt({
+                            directPath: msg.directPath,
+                            encFilehash: msg.encFilehash,
+                            filehash: msg.filehash,
+                            mediaKey: msg.mediaKey,
+                            mediaKeyTimestamp: msg.mediaKeyTimestamp,
+                            type: msg.type,
+                            signal: new AbortController().signal,
+                            downloadQpl: {
+                                addAnnotations: function() { return this; },
+                                addPoint: function() { return this; }
+                            }
+                        });
+
+                        var base64 = window.WWebJS && typeof window.WWebJS.arrayBufferToBase64Async === 'function'
+                            ? await window.WWebJS.arrayBufferToBase64Async(decryptedMedia)
+                            : base64FromArrayBuffer(decryptedMedia);
+                        var mimetype = msg.mimetype || (msg.type === 'sticker' ? 'image/webp' : 'image/png');
+                        var dataUrl = 'data:' + mimetype + ';base64,' + base64;
+                        var rasterizedDataUrl = await rasterizeImageDataUrl(dataUrl, msg.type === 'sticker' ? 240 : 360);
+                        return isDisplayableMediaDataUrl(rasterizedDataUrl) ? rasterizedDataUrl : '';
+                    } catch (e) {
+                        return isDisplayableMediaDataUrl(fallbackDataUrl) ? fallbackDataUrl : '';
+                    }
+                }
 
         async function fileDataUrlFromStoreMessage(msg) {
             if (!msg) return '';
@@ -3087,7 +3828,10 @@ private enum JS {
             var text = cleanMessageText(
                 pollOptions.length ? (msg.pollName || msg.body || '') : (msg.body || msg.caption || msg.pollName || msg.eventName || '')
             );
-            var mediaKind = type === 'sticker' ? 'sticker' : ((type === 'image' || type === 'video') ? 'image' : '');
+            var mediaKind = type === 'sticker' ? 'sticker' : (type === 'image' ? 'image' : (type === 'video' ? (storeMessageLooksLikeGif(msg) ? 'gif' : 'video') : ''));
+            if (mediaKind && isLikelyInlineMediaPayloadText(text)) {
+                text = '';
+            }
             var mediaDataUrl = '';
             var linkPreview = linkPreviewFromStoreMessage(msg);
             var documentPreview = await documentPreviewFromStoreMessage(msg);
@@ -3095,14 +3839,17 @@ private enum JS {
                 text = documentPreview.fileName;
             }
 
-            if (type === 'sticker' || type === 'image') {
+            if (type === 'sticker' || type === 'image' || type === 'video') {
                 mediaDataUrl = await mediaDataUrlFromStoreMessage(msg);
+                if (!isUsefulVisualMediaDataUrl(mediaDataUrl, mediaKind)) {
+                    mediaDataUrl = '';
+                }
             }
 
-            if (!text && !mediaDataUrl && !documentPreview && pollOptions.length === 0) return null;
+            if (!text && !mediaDataUrl && !documentPreview && pollOptions.length === 0 && !mediaKind) return null;
             return {
                 id: serializedId(msg.id) || (text + '|' + type),
-                body: text || (mediaKind === 'sticker' ? 'Sticker' : '📨 Nuovo messaggio'),
+                body: text || (mediaKind === 'sticker' ? 'Sticker' : (mediaKind === 'video' ? 'Video' : (mediaKind === 'gif' ? 'GIF' : '📨 Nuovo messaggio'))),
                 mediaKind: mediaKind,
                 mediaDataUrl: mediaDataUrl,
                 linkPreview: linkPreview,
@@ -3276,7 +4023,16 @@ private enum JS {
                 .trim();
         }
 
-        function messageMatchesFallback(message, fallbackBody) {
+        function mediaKindFromFallbackText(value) {
+            var fallback = comparableMessageText(value || '');
+            if (/^(📨\\s*)?(sticker|adesivo)$/i.test(fallback)) return 'sticker';
+            if (/^(📨\\s*)?gif$/i.test(fallback)) return 'gif';
+            if (/^(📨\\s*)?(video|filmato)$/i.test(fallback)) return 'video';
+            if (/^(📨\\s*)?(immagine|image|photo|foto)$/i.test(fallback)) return 'image';
+            return '';
+        }
+
+        function messageMatchesFallback(message, fallbackBody, fallbackMediaKind) {
             if (!message) return false;
             var body = comparableMessageText(message.body || '');
             var fallback = comparableMessageText(fallbackBody || '');
@@ -3287,8 +4043,13 @@ private enum JS {
                 var documentFile = comparableMessageText(message.documentPreview.fileName);
                 if (documentFile && (fallback.indexOf(documentFile) >= 0 || body.indexOf(documentFile) >= 0)) return true;
             }
-            var fallbackIsMediaLabel = /^(📨\\s*)?(nuovo messaggio|new message|sticker|adesivo|immagine|image|photo|foto)$/i.test(fallback || '');
-            if (fallbackIsMediaLabel && (message.mediaDataUrl || message.mediaKind)) return true;
+            var fallbackIsMediaLabel = /^(📨\\s*)?(nuovo messaggio|new message|sticker|adesivo|immagine|image|photo|foto|video|filmato|gif)$/i.test(fallback || '');
+            if (fallbackIsMediaLabel) {
+                if (!isDisplayableMediaDataUrl(message.mediaDataUrl) && !message.mediaSnapshotRect) return false;
+                var expectedMediaKind = fallbackMediaKind || mediaKindFromFallbackText(fallback);
+                if (expectedMediaKind && message.mediaKind !== expectedMediaKind) return false;
+                return true;
+            }
             if (!fallback) return true;
             if (!body) return false;
             if (body === fallback) return true;
@@ -3297,7 +4058,50 @@ private enum JS {
 
         function isMediaOnlyFallbackText(value) {
             var fallback = comparableMessageText(value || '');
-            return /^(📨\\s*)?(nuovo messaggio|new message|sticker|adesivo|immagine|image|photo|foto)$/i.test(fallback || '');
+            return /^(📨\\s*)?(nuovo messaggio|new message|sticker|adesivo|immagine|image|photo|foto|video|filmato|gif)$/i.test(fallback || '');
+        }
+
+        function mediaDebugFingerprint(dataUrl) {
+            if (!dataUrl) return 'none';
+            return String(dataUrl.length) + ':' + dataUrl.slice(0, 26) + ':' + dataUrl.slice(-18);
+        }
+
+    function isDisplayableMediaDataUrl(dataUrl) {
+        return /^data:image\\/(png|jpe?g|gif|heic|tiff|bmp|webp)/i.test(String(dataUrl || ''))
+            || /^data:application\\/x-atoll-lottie\\+json;base64,/i.test(String(dataUrl || ''));
+    }
+    
+        function isUsefulVisualMediaDataUrl(dataUrl, mediaKind) {
+            if (!isDisplayableMediaDataUrl(dataUrl)) return false;
+            // Un frame video/GIF reale a 320 px supera normalmente questa soglia;
+            // i placeholder neri osservati nei log erano ~2 KB.
+            if ((mediaKind === 'gif' || mediaKind === 'video') && String(dataUrl).length < 4096) return false;
+            return true;
+        }
+
+        function isLikelyInlineMediaPayloadText(value) {
+            var text = cleanMessageText(value || '');
+            if (text.length <= 180) return false;
+            if (/^data:(image|video)\\//i.test(text)) return true;
+            if (/^(\\/9j\\/|iVBOR|R0lGOD|UklGR)/.test(text)) return true;
+            return /^[A-Za-z0-9+/=\\s]+$/.test(text.slice(0, 240));
+        }
+
+        function mediaNodeDebug(node) {
+            if (!node) return 'node=null';
+            var id = messageIdFromNode(node);
+            var marker = mediaMarkerForElement(node).replace(/\\s+/g, ' ').slice(0, 120);
+            var rect = node.getBoundingClientRect();
+            return [
+                'id=' + (id ? id.slice(-32) : 'none'),
+                'kind=' + (mediaKindFromRow(node) || 'none'),
+                'img=' + node.querySelectorAll('img').length,
+                'video=' + node.querySelectorAll('video').length,
+                'canvas=' + node.querySelectorAll('canvas').length,
+                'bg=' + node.querySelectorAll('[style*="background-image"]').length,
+                'rect=' + Math.round(rect.width) + 'x' + Math.round(rect.height),
+                'marker=' + marker
+            ].join(',');
         }
 
         function fallbackCaptionForDocument(fallbackBody, documentPreview) {
@@ -3339,6 +4143,8 @@ private enum JS {
             var hydrated = Object.assign({}, message);
             var fallbackText = cleanMessageText(fallbackBody || hydrated.body || '');
             var allowDocumentCaption = !options || options.allowDocumentCaption !== false;
+            var candidateMessageIds = (options && options.candidateMessageIds) || [];
+            var requireCandidateIds = !!(options && options.requireCandidateIds);
 
             if (!hydrated.documentPreview) {
                 hydrated.documentPreview = documentPreviewFromText(hydrated.body || '') || (allowDocumentCaption ? documentPreviewFromText(fallbackText) : null);
@@ -3373,13 +4179,38 @@ private enum JS {
                 || isStickerFallbackText(hydrated.body)
                 || isStickerFallbackText(fallbackText);
             if (wantsSticker && !hydrated.mediaDataUrl) {
-                var stickerMsg = storeMediaMessageByKind('sticker');
+                var stickerMsg = storeMediaMessageByKind('sticker', candidateMessageIds, requireCandidateIds);
                 var stickerDataUrl = await mediaDataUrlFromStoreMessage(stickerMsg);
                 if (stickerDataUrl) {
                     hydrated.id = hydrated.id || serializedId(stickerMsg && stickerMsg.id) || hydrated.body || 'Sticker';
                     hydrated.body = hydrated.body || 'Sticker';
                     hydrated.mediaKind = 'sticker';
                     hydrated.mediaDataUrl = stickerDataUrl;
+                }
+            }
+
+            var wantsVisualMedia = hydrated.mediaKind === 'image'
+                || hydrated.mediaKind === 'video'
+                || hydrated.mediaKind === 'gif'
+                || isMediaOnlyFallbackText(hydrated.body || fallbackText)
+                || /^(📨\\s*)?(immagine|image|photo|foto|video|filmato|gif)$/i.test(comparableMessageText(hydrated.body || fallbackText || ''));
+            if (wantsVisualMedia && !hydrated.mediaDataUrl) {
+                var visualKind = hydrated.mediaKind || (isMediaOnlyFallbackText(hydrated.body || fallbackText) ? 'media' : '');
+                if (!visualKind) visualKind = 'image';
+                var visualMsg = storeMediaMessageByKind(visualKind, candidateMessageIds, requireCandidateIds);
+                if (!visualMsg && visualKind === 'media') {
+                    visualMsg = storeMediaMessageByKind('image', candidateMessageIds, requireCandidateIds)
+                        || storeMediaMessageByKind('sticker', candidateMessageIds, requireCandidateIds)
+                        || storeMediaMessageByKind('video', candidateMessageIds, requireCandidateIds)
+                        || storeMediaMessageByKind('gif', candidateMessageIds, requireCandidateIds);
+                }
+                var visualDataUrl = await mediaDataUrlFromStoreMessage(visualMsg);
+                if (visualDataUrl) {
+                    var resolvedKind = storeMediaKind(visualMsg) || (visualKind === 'media' ? 'image' : visualKind);
+                    hydrated.id = hydrated.id || serializedId(visualMsg && visualMsg.id) || hydrated.body || resolvedKind;
+                    hydrated.body = hydrated.body || (resolvedKind === 'sticker' ? 'Sticker' : (resolvedKind === 'video' ? 'Video' : (resolvedKind === 'gif' ? 'GIF' : 'Immagine')));
+                    hydrated.mediaKind = resolvedKind;
+                    hydrated.mediaDataUrl = visualDataUrl;
                 }
             }
 
@@ -3670,6 +4501,9 @@ private enum JS {
                 text = cleanMessageText(emojiAltText(node));
             }
             var media = await extractMedia(node);
+            if (media.kind && isLikelyInlineMediaPayloadText(text)) {
+                text = '';
+            }
             var linkPreview = await extractLinkPreview(node, text);
             var documentPreview = await extractDocumentPreview(node, storeMessage);
             var resolvedNodeGroupSender = (storePayload && storePayload.groupSender) || nodeGroupSender || fallbackGroupSender || '';
@@ -3695,6 +4529,9 @@ private enum JS {
             }
             if (storePayload && !storePayload.isPoll && !poll) {
                 var storeBody = cleanMessageText(storePayload.body || '');
+                if ((storePayload.mediaKind || media.kind) && isLikelyInlineMediaPayloadText(storeBody)) {
+                    storeBody = '';
+                }
                 if (!text && storeBody && storeBody !== '📨 Nuovo messaggio') {
                     text = storeBody;
                 }
@@ -3735,7 +4572,7 @@ private enum JS {
                     mergedLinkPreview.imageDataUrl = mergedMediaDataUrl;
                 }
                 if (!text && mergedMediaKind) {
-                    text = mergedMediaKind === 'sticker' ? 'Sticker' : 'Immagine';
+                    text = mergedMediaKind === 'sticker' ? 'Sticker' : (mergedMediaKind === 'video' ? 'Video' : (mergedMediaKind === 'gif' ? 'GIF' : 'Immagine'));
                 }
                 if (text || mergedMediaDataUrl || mergedMediaKind || mergedLinkPreview || mergedDocumentPreview) {
                     return {
@@ -3743,6 +4580,7 @@ private enum JS {
                         body: text || (mergedDocumentPreview ? mergedDocumentPreview.fileName : '📨 Nuovo messaggio'),
                         mediaKind: mergedLinkPreview ? '' : mergedMediaKind,
                         mediaDataUrl: mergedLinkPreview ? '' : mergedMediaDataUrl,
+                        mediaSnapshotRect: mergedLinkPreview ? null : (media.mediaSnapshotRect || null),
                         linkPreview: mergedLinkPreview,
                         documentPreview: mergedDocumentPreview,
                         pollOptions: [],
@@ -3757,6 +4595,7 @@ private enum JS {
                     body: text || storePayload.body || '📨 Nuovo messaggio',
                     mediaKind: storePayload.mediaKind || media.kind || '',
                     mediaDataUrl: storePayload.mediaDataUrl || media.dataUrl || '',
+                    mediaSnapshotRect: media.mediaSnapshotRect || null,
                     linkPreview: storePayload.linkPreview || linkPreview,
                     documentPreview: storePayload.documentPreview || documentPreview,
                     pollOptions: poll.options,
@@ -3768,7 +4607,7 @@ private enum JS {
                   || (node.querySelector('[data-id]') ? node.querySelector('[data-id]').getAttribute('data-id') : '')
                   || (text + '|' + (media.kind || '') + '|' + (media.dataUrl || '').slice(0, 24) + '|' + (poll ? poll.options.map(function(o) { return o.text; }).join('|') : ''));
             if (!text && media.kind) {
-                text = media.kind === 'sticker' ? 'Sticker' : 'Immagine';
+                text = media.kind === 'sticker' ? 'Sticker' : (media.kind === 'video' ? 'Video' : (media.kind === 'gif' ? 'GIF' : 'Immagine'));
             }
             if (!text && documentPreview) {
                 text = documentPreview.fileName;
@@ -3779,6 +4618,7 @@ private enum JS {
                 body: text || '📨 Nuovo messaggio',
                 mediaKind: linkPreview || documentPreview ? '' : (media.kind || ''),
                 mediaDataUrl: linkPreview || documentPreview ? '' : (media.dataUrl || ''),
+                mediaSnapshotRect: linkPreview || documentPreview ? null : (media.mediaSnapshotRect || null),
                 linkPreview: linkPreview,
                 documentPreview: documentPreview,
                 pollOptions: poll ? poll.options : [],
@@ -3787,19 +4627,75 @@ private enum JS {
             };
         }
 
-        async function extractLatestMessagesFromChat(row, unreadCount, fallbackMessage) {
+        async function extractLatestMessagesFromChat(row, unreadCount, fallbackMessage, sender) {
             var fallbackLinkUrl = (fallbackMessage.linkPreview && fallbackMessage.linkPreview.url) || firstUrlFromText(fallbackMessage.body || '');
             var fallbackDocumentPreview = fallbackMessage.documentPreview || documentPreviewFromText(fallbackMessage.body || '');
             var fallbackDocumentFile = fallbackDocumentPreview && fallbackDocumentPreview.fileName;
             var fallbackExpectsDocument = !!fallbackMessage.expectsDocument || !!fallbackDocumentFile;
-            var shouldOpenChat = unreadCount >= 1 || (!!fallbackMessage.mediaKind && !fallbackMessage.mediaDataUrl) || !!fallbackLinkUrl || fallbackExpectsDocument;
+            var fallbackExpectsMedia = !!fallbackMessage.mediaKind || isMediaOnlyFallbackText(fallbackMessage.body || '');
+            var fallbackExpectsSticker = fallbackMessage.mediaKind === 'sticker'
+                || isStickerFallbackText(fallbackMessage.body || '');
+            var shouldOpenChat = unreadCount >= 1 || fallbackExpectsMedia || (!!fallbackMessage.mediaKind && !fallbackMessage.mediaDataUrl) || !!fallbackLinkUrl || fallbackExpectsDocument;
             if (!shouldOpenChat) return [fallbackMessage];
+            var senderKey = sender || extractSender(row) || '';
+            var hadVisibleMessageSnapshot = !!(senderKey && Array.isArray(visibleMessageIdsBySender[senderKey]));
+            var previouslyVisibleMessageIds = new Set(
+                hadVisibleMessageSnapshot ? visibleMessageIdsBySender[senderKey] : []
+            );
 
             clickElement(row);
+
+            // --- STORE-FIRST DETECTION ---
+            // Lo Store di WhatsApp Web è la fonte di verità autoritativa su tipo
+            // e contenuto del messaggio (campo `type`), aggiornato più in fretta
+            // e in modo più affidabile del DOM della sidebar/dei nodi visibili,
+            // che WhatsApp ricicla e può lasciare associati al messaggio
+            // precedente per una frazione di secondo (causa dei mix-up
+            // testo/gif/sticker/foto osservati). Proviamolo per primo.
+            var storeFirstAttempts = 0;
+            while (storeFirstAttempts < 8) {
+                await sleep(storeFirstAttempts === 0 ? 700 : 350);
+                var candidateStoreMessage = newestUnseenIncomingStoreMessageForSender(sender);
+                if (candidateStoreMessage) {
+                    var storePayload = await messageFromStoreModel(candidateStoreMessage, fallbackMessage.groupSender || '');
+                    if (storePayload) {
+                        var stillLoadingMedia = !!storePayload.mediaKind && !storePayload.mediaDataUrl && !storePayload.documentPreview;
+                        postPollDebug('DIAG kind=' + (storePayload.mediaKind||'none') + ' hasUrl=' + (!!storePayload.mediaDataUrl) + ' urlLen=' + (storePayload.mediaDataUrl ? storePayload.mediaDataUrl.length : 0) + ' hasDoc=' + (!!storePayload.documentPreview) + ' stillLoading=' + stillLoadingMedia + ' attempt=' + storeFirstAttempts);
+                            if (stillLoadingMedia && storeFirstAttempts >= 5) {
+                                scrollChatToBottom();
+                                await sleep(200);
+                                var idForRect = serializedId(candidateStoreMessage.id);
+                                var domNodeForRect = idForRect ? document.querySelector('[data-id="' + idForRect + '"]') : null;
+                                domNodeForRect = domNodeForRect ? expandedMessageNode(domNodeForRect) : null;
+                                if (!domNodeForRect) {
+                                    var visibleForRect = uniqueMessageNodes(visibleMessageNodes());
+                                    domNodeForRect = visibleForRect.length ? visibleForRect[visibleForRect.length - 1] : null;
+                                }
+                                if (domNodeForRect) {
+                                    var renderWaitAttempts = 0;
+                                    while (renderWaitAttempts < 6 && !nodeHasRenderedVisual(domNodeForRect)) {
+                                        await sleep(300);
+                                        renderWaitAttempts++;
+                                    }
+                                    storePayload.mediaSnapshotRect = mediaSnapshotRectForNode(domNodeForRect, storePayload.mediaKind);
+                                }
+                            }
+                        if (!stillLoadingMedia || storeFirstAttempts >= 5) {
+                            markMessageIdSeen(sender, serializedId(candidateStoreMessage.id));
+                            postPollDebug('store-first match sender="' + sender + '" body="' + cleanMessageText(storePayload.body) + '" media=' + (storePayload.mediaKind || 'none') + ' fp=' + mediaDebugFingerprint(storePayload.mediaDataUrl) + ' snap=' + (storePayload.mediaSnapshotRect ? 'yes' : 'no') + ' attempts=' + storeFirstAttempts);
+                            return [storePayload];
+                        }
+                    }
+                }
+                storeFirstAttempts++;
+            }
+            // --- FINE STORE-FIRST DETECTION: se non ha trovato nulla in ~3s,
+            // si passa alla vecchia logica DOM come rete di sicurezza (invariata) ---
+
             var nodes = [];
             var pollNodes = [];
             var scanNotes = [];
-            var scanLimit = (fallbackLinkUrl || fallbackExpectsDocument) ? 8 : 4;
+            var scanLimit = (fallbackLinkUrl || fallbackExpectsDocument || fallbackExpectsMedia) ? 8 : 4;
             for (var scanAttempt = 0; scanAttempt < scanLimit; scanAttempt++) {
                 await sleep(scanAttempt === 0 ? 650 : 350);
                 scrollChatToBottom();
@@ -3807,6 +4703,17 @@ private enum JS {
                 nodes = visibleMessageNodes();
                 pollNodes = visiblePollMessageNodes();
                 scanNotes.push('try' + scanAttempt + ':nodes=' + nodes.length + ',poll=' + pollNodes.length);
+                if (fallbackExpectsMedia) {
+                    var mediaSearchLimit = Math.max(1, unreadCount || 1);
+                    var mediaNodes = uniqueMessageNodes(nodes).slice(-mediaSearchLimit);
+                    if (scanAttempt === 0 || scanAttempt === scanLimit - 1) {
+                        scanNotes.push('mediaNodes=' + mediaNodes.map(mediaNodeDebug).join(' || '));
+                    }
+                    // Non fermarti sul primo media già visibile: subito dopo il click
+                    // WhatsApp lascia per alcuni istanti il messaggio precedente come
+                    // ultimo nodo. Completiamo tutti i tentativi e scegliamo soltanto
+                    // dall'ultimo snapshot della conversazione.
+                }
                 if (fallbackLinkUrl) {
                     var previewReady = false;
                     var previewNodes = uniqueMessageNodes(nodes.concat(pollNodes));
@@ -3838,17 +4745,70 @@ private enum JS {
                     }
                     if (documentReady) break;
                 }
-                if (pollNodes.length > 0 || (scanAttempt >= 2 && nodes.length >= Math.max(1, unreadCount || 1) && !fallbackLinkUrl && !fallbackExpectsDocument)) {
+                if (!fallbackExpectsMedia && !fallbackLinkUrl && !fallbackExpectsDocument && (pollNodes.length > 0 || (scanAttempt >= 2 && nodes.length >= Math.max(1, unreadCount || 1)))) {
                     break;
                 }
             }
             var fallbackBody = cleanMessageText(fallbackMessage.body || '');
-            var candidateNodes = uniqueMessageNodes(nodes.concat(pollNodes));
+            var allCandidateNodes = uniqueMessageNodes(nodes.concat(pollNodes));
+            var currentVisibleMessageIds = allCandidateNodes.map(function(node) {
+                return messageIdFromNode(node);
+            }).filter(function(id) {
+                return !!id;
+            });
+            var newlyVisibleNodes = allCandidateNodes.filter(function(node) {
+                var id = messageIdFromNode(node);
+                return !!id && !previouslyVisibleMessageIds.has(id);
+            });
+            // Se questa è la prima scansione della chat non abbiamo una baseline:
+            // in quel caso l'unico candidato sensato è comunque l'ultimo nodo.
+            if (!hadVisibleMessageSnapshot && newlyVisibleNodes.length > 1) {
+                newlyVisibleNodes = newlyVisibleNodes.slice(-1);
+            }
+            var newlyVisibleMessageIds = newlyVisibleNodes.map(function(node) {
+                return messageIdFromNode(node);
+            }).filter(function(id) {
+                return !!id;
+            });
+            var newestVisibleNode = newlyVisibleNodes.length ? newlyVisibleNodes[newlyVisibleNodes.length - 1] : null;
+            var newestVisibleMessageId = newestVisibleNode ? messageIdFromNode(newestVisibleNode) : '';
+            var exactNewStoreMessage = newestVisibleMessageId
+                ? await storeMessageById(newestVisibleMessageId)
+                : null;
+            var exactNewStoreKind = storeMediaKind(exactNewStoreMessage);
+            var exactNewDomKind = newestVisibleNode ? mediaKindFromRow(newestVisibleNode) : '';
+            var exactNewMediaKind = exactNewStoreKind || exactNewDomKind;
+            var shouldHandleSticker = exactNewMediaKind === 'sticker';
+            var exactStickerStoreMessage = shouldHandleSticker ? exactNewStoreMessage : null;
+            var expectsExactMedia = !fallbackLinkUrl
+                && !fallbackExpectsDocument
+                && (fallbackExpectsMedia || !!exactNewMediaKind);
+            // Un media viene associato esclusivamente al nuovo ID DOM. Il lookup
+            // generale per contatto può restituire un messaggio precedente e non
+            // deve mai essere usato per foto, GIF o sticker.
+            var targetStoreMessage = (!expectsExactMedia && senderKey)
+                ? latestIncomingStoreMessageForSender(senderKey)
+                : null;
+            var targetStoreMessageId = serializedId(targetStoreMessage && targetStoreMessage.id);
+            var targetMessageNodes = targetStoreMessageId ? allCandidateNodes.filter(function(node) {
+                return messageIdMatchesAny(messageIdFromNode(node), [targetStoreMessageId]);
+            }) : [];
+            if (senderKey) {
+                visibleMessageIdsBySender[senderKey] = currentVisibleMessageIds;
+            }
+            var candidateNodes = expectsExactMedia
+                ? newlyVisibleNodes.slice(-1)
+                : allCandidateNodes;
+            var candidateMessageIds = candidateNodes.map(function(node) {
+                return messageIdFromNode(node);
+            }).filter(function(id) {
+                return !!id;
+            });
             var candidateMessages = [];
             for (var i = candidateNodes.length - 1; i >= 0; i--) {
                 var candidateMessage = await messageFromNode(candidateNodes[i], fallbackMessage.groupSender || '');
                 if (!candidateMessage) continue;
-                candidateMessages.push(await hydrateFallbackOrMessage(candidateMessage, fallbackBody, { allowDocumentCaption: false }));
+                candidateMessages.push(await hydrateFallbackOrMessage(candidateMessage, fallbackBody, { allowDocumentCaption: false, candidateMessageIds: candidateMessageIds, requireCandidateIds: expectsExactMedia }));
             }
             var storePollFallback = await messageFromStoreModel(storePollMessageByQuestion(fallbackBody), fallbackMessage.groupSender || '');
             if (storePollFallback && (storePollFallback.pollOptions || []).length > 0) {
@@ -3856,9 +4816,58 @@ private enum JS {
             }
 
             var messages = [];
+            if (shouldHandleSticker && candidateNodes.length > 0) {
+                var exactStickerPayload = await messageFromStoreModel(
+                    exactStickerStoreMessage,
+                    fallbackMessage.groupSender || ''
+                );
+                var stickerDomPayload = candidateMessages.find(function(message) {
+                    return message && messageIdMatchesAny(message.id, candidateMessageIds);
+                }) || null;
+                var stickerNode = candidateNodes[candidateNodes.length - 1];
+                var stickerSnapshotRect = (stickerDomPayload && stickerDomPayload.mediaSnapshotRect)
+                    || mediaSnapshotRectForNode(stickerNode, 'sticker');
+
+                if (exactStickerPayload || stickerDomPayload || stickerSnapshotRect) {
+                    messages = [{
+                        id: (exactStickerPayload && exactStickerPayload.id)
+                            || (stickerDomPayload && stickerDomPayload.id)
+                            || messageIdFromNode(stickerNode)
+                            || fallbackMessage.id,
+                        body: 'Sticker',
+                        mediaKind: 'sticker',
+                        // Le thumbnail WebP dello Store possono essere riciclate
+                        // mentre il messaggio è ancora in caricamento. Lo snapshot
+                        // del nodo con questo ID è l'unica sorgente visuale usata.
+                        mediaDataUrl: '',
+                        mediaSnapshotRect: stickerSnapshotRect || null,
+                        linkPreview: null,
+                        documentPreview: null,
+                        pollOptions: [],
+                        pollAllowsMultipleSelection: false,
+                        groupSender: (exactStickerPayload && exactStickerPayload.groupSender)
+                            || (stickerDomPayload && stickerDomPayload.groupSender)
+                            || fallbackMessage.groupSender
+                            || ''
+                    }];
+                }
+            }
+            // Per i media l'ID nuovo è la fonte di verità. Non confrontiamo il
+            // tipo della sidebar perché i suoi icon/label vengono riciclati e
+            // possono descrivere il messaggio precedente.
+            if (!messages.length && expectsExactMedia && newlyVisibleNodes.length > 0) {
+                for (var newMediaIndex = 0; newMediaIndex < candidateMessages.length; newMediaIndex++) {
+                    var newMediaCandidate = candidateMessages[newMediaIndex];
+                    if (newMediaCandidate && (newMediaCandidate.mediaKind || isDisplayableMediaDataUrl(newMediaCandidate.mediaDataUrl) || newMediaCandidate.mediaSnapshotRect)) {
+                        messages = [newMediaCandidate];
+                        break;
+                    }
+                }
+            }
             for (var pollMatchIndex = 0; pollMatchIndex < candidateMessages.length; pollMatchIndex++) {
+                if (messages.length) break;
                 var pollCandidate = candidateMessages[pollMatchIndex];
-                if (pollCandidate && (pollCandidate.pollOptions || []).length > 0 && messageMatchesFallback(pollCandidate, fallbackBody)) {
+                if (pollCandidate && (pollCandidate.pollOptions || []).length > 0 && messageMatchesFallback(pollCandidate, fallbackBody, fallbackMessage.mediaKind || '')) {
                     messages = [pollCandidate];
                     break;
                 }
@@ -3867,7 +4876,7 @@ private enum JS {
             var textMatchCandidate = null;
             if (!documentPreviewFromText(fallbackBody)) {
                 for (var textMatchIndex = 0; textMatchIndex < candidateMessages.length; textMatchIndex++) {
-                    if (!candidateMessages[textMatchIndex].documentPreview && !((candidateMessages[textMatchIndex].pollOptions || []).length > 0) && messageMatchesFallback(candidateMessages[textMatchIndex], fallbackBody)) {
+                    if (!candidateMessages[textMatchIndex].documentPreview && !((candidateMessages[textMatchIndex].pollOptions || []).length > 0) && messageMatchesFallback(candidateMessages[textMatchIndex], fallbackBody, fallbackMessage.mediaKind || '')) {
                         textMatchCandidate = candidateMessages[textMatchIndex];
                         break;
                     }
@@ -3891,7 +4900,7 @@ private enum JS {
             for (var documentMatchIndex = 0; documentMatchIndex < candidateMessages.length; documentMatchIndex++) {
                 if (messages.length) break;
                 if (!fallbackExpectsDocument) break;
-                if (candidateMessages[documentMatchIndex].documentPreview && messageMatchesFallback(candidateMessages[documentMatchIndex], fallbackBody)) {
+                if (candidateMessages[documentMatchIndex].documentPreview && messageMatchesFallback(candidateMessages[documentMatchIndex], fallbackBody, fallbackMessage.mediaKind || '')) {
                     messages = [mergeFallbackCaptionIntoDocument(candidateMessages[documentMatchIndex], fallbackBody)];
                     break;
                 }
@@ -3900,18 +4909,38 @@ private enum JS {
             if (!messages.length) {
                 for (var matchIndex = 0; matchIndex < candidateMessages.length; matchIndex++) {
                     if (candidateMessages[matchIndex].documentPreview && !fallbackExpectsDocument) continue;
-                    if (messageMatchesFallback(candidateMessages[matchIndex], fallbackBody)) {
+                    if (messageMatchesFallback(candidateMessages[matchIndex], fallbackBody, fallbackMessage.mediaKind || '')) {
                         messages = [candidateMessages[matchIndex]];
                         break;
                     }
                 }
             }
 
-            postPollDebug('chat scan fallback="' + fallbackBody + '" viewport=' + window.innerWidth + 'x' + window.innerHeight + ' ' + scanNotes.join(';') + ' candidates=' + candidateNodes.length + ' messages=' + messages.map(function(message) {
-                return cleanMessageText(message.body) + ' options=' + ((message.pollOptions || []).map(function(option) { return option.text; }).join('|') || '0');
+            postPollDebug('chat scan fallback="' + fallbackBody + '" expectedKind=' + (fallbackMessage.mediaKind || 'none') + ' previewStickerHint=' + fallbackExpectsSticker + ' exactStoreKind=' + (exactNewStoreKind || 'none') + ' exactDomKind=' + (exactNewDomKind || 'none') + ' stickerBranch=' + shouldHandleSticker + ' viewport=' + window.innerWidth + 'x' + window.innerHeight + ' ' + scanNotes.join(';') + ' candidates=' + candidateNodes.length + '/' + allCandidateNodes.length + ' targetId=' + (targetStoreMessageId || 'none') + ' stickerStoreId=' + (serializedId(exactStickerStoreMessage && exactStickerStoreMessage.id) || 'none') + ' newIds=' + newlyVisibleNodes.map(function(node) { return messageIdFromNode(node); }).join('|') + ' ids=' + candidateMessageIds.length + ' messages=' + messages.map(function(message) {
+                return cleanMessageText(message.body) + ' media=' + (message.mediaKind || 'none') + ' fp=' + mediaDebugFingerprint(message.mediaDataUrl) + ' snap=' + (message.mediaSnapshotRect ? 'yes' : 'no') + ' options=' + ((message.pollOptions || []).map(function(option) { return option.text; }).join('|') || '0');
             }).join(' / '));
 
-            return messages.length ? messages : [await hydrateFallbackOrMessage(fallbackMessage, fallbackBody)];
+            if (messages.length) return messages;
+            // Se il media corrente non è ancora disponibile, non idratare il
+            // fallback con gli ID già presenti: potrebbero appartenere proprio
+            // al media precedente. È preferibile il placeholder corretto a una
+            // miniatura vecchia associata alla nuova notifica.
+            if (shouldHandleSticker) {
+                return [Object.assign({}, fallbackMessage, {
+                    body: 'Sticker',
+                    mediaKind: 'sticker',
+                    mediaDataUrl: ''
+                })];
+            }
+            if (exactNewMediaKind) {
+                return [Object.assign({}, fallbackMessage, {
+                    body: exactNewMediaKind === 'gif' ? 'GIF' : (exactNewMediaKind === 'video' ? 'Video' : '📨 Nuovo messaggio'),
+                    mediaKind: exactNewMediaKind,
+                    mediaDataUrl: ''
+                })];
+            }
+            if (fallbackExpectsMedia) return [fallbackMessage];
+            return [await hydrateFallbackOrMessage(fallbackMessage, fallbackBody, { candidateMessageIds: candidateMessageIds, requireCandidateIds: false })];
         }
 
         function extractAvatar(row) {
@@ -3927,8 +4956,10 @@ private enum JS {
                     }
                 }
             }
-            if (img && img.src && !img.src.includes('emoji') && !img.src.includes('data:image')) {
-                return img.src;
+            if (img && img.src && !img.src.includes('emoji')) {
+                knownAvatarSrcs.add(img.src);
+                if (img.currentSrc) knownAvatarSrcs.add(img.currentSrc);
+                if (!img.src.includes('data:image')) return img.src;
             }
             return null;
         }
@@ -3977,6 +5008,7 @@ private enum JS {
                 if (ignoredSenders.has(sender)) {
                     // Ignora se corpo e count non sono cambiati (nessuna novità)
                     if (body === prevBody && unreadCount <= prevCount) return;
+                    if (unreadCount <= prevCount && isReactionEchoBody(body, prevBody)) return;
                 } else {
                     ignoredSenders.add(sender);
                 }
@@ -3992,7 +5024,10 @@ private enum JS {
                 // Non puliamo più notified in automatico, contiamo su unreadCount e body per capire se è cambiato
 
                 var avatar = extractAvatar(row);
-                var media = { kind: mediaKindFromRow(row), dataUrl: '' };
+                // Il testo visibile della preview ("Foto", "Sticker", "GIF") è più
+                // aggiornato degli attributi/icon DOM, che WhatsApp ricicla e può
+                // lasciare associati al media precedente.
+                var media = { kind: mediaKindFromFallbackText(body) || mediaKindFromRow(row), dataUrl: '' };
                 var linkPreview = linkPreviewFromTextOnly(body);
                 var documentPreview = documentPreviewFromText(body);
                 var expectsDocument = rowLikelyHasDocument(row) || !!documentPreview;
@@ -4003,6 +5038,7 @@ private enum JS {
                 var fallbackMessage = {
                     id: messageId,
                     body: body,
+                    avatarUrl: avatar,
                     mediaKind: media.kind || '',
                     mediaDataUrl: media.dataUrl || '',
                     linkPreview: linkPreview,
@@ -4014,7 +5050,7 @@ private enum JS {
                 };
                 var messages = [fallbackMessage];
                 try {
-                    messages = await extractLatestMessagesFromChat(row, unreadCount, fallbackMessage);
+                    messages = await extractLatestMessagesFromChat(row, unreadCount, fallbackMessage, sender);
                 } catch (e) {
                     postPollDebug('message extraction failed for "' + sender + '": ' + e);
                 }
@@ -4048,17 +5084,24 @@ private enum JS {
             }
             console.log('[Atoll] MutationObserver attaccato a #pane-side');
             var debounceTimer = null;
-            new MutationObserver(function() {
+            if (window.__atollMonitorObserver && typeof window.__atollMonitorObserver.disconnect === 'function') {
+                window.__atollMonitorObserver.disconnect();
+            }
+            if (window.__atollMonitorInterval) {
+                clearInterval(window.__atollMonitorInterval);
+            }
+            window.__atollMonitorObserver = new MutationObserver(function() {
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(checkForNew, 200);
-            }).observe(pane, {
+            });
+            window.__atollMonitorObserver.observe(pane, {
                 childList: true,
                 subtree: true,
                 characterData: true
             });
             
             // Affidabilità al 100%: poll aggiuntivo a bassa latenza
-            setInterval(checkForNew, 2000);
+            window.__atollMonitorInterval = setInterval(checkForNew, 2000);
         }
         attachObserver();
 
@@ -4311,6 +5354,330 @@ private enum JS {
             });
         };
 
+        window.atollReactToMessage = function(chatId, messageId, messageText, reaction) {
+            var targetSender = chatId.replace(/@(c|g)\\.us$/, '').trim();
+
+            function normalize(value) {
+                return (value || '').trim().toLowerCase();
+            }
+
+            function debug(message) {
+                try {
+                    window.webkit.messageHandlers.atollWA.postMessage({
+                        type: 'sendDebug',
+                        message: 'reaction: ' + message
+                    });
+                } catch (e) {}
+            }
+
+            function currentChatMatchesTarget() {
+                var main = document.querySelector('#main');
+                if (!main) return false;
+                var header = main.querySelector('header');
+                var headerText = cleanMessageText((header && (header.innerText || header.textContent || textWithEmoji(header))) || '');
+                var target = normalize(targetSender);
+                if (!target || !headerText) return false;
+                var normalizedHeader = normalize(headerText);
+                return normalizedHeader === target
+                    || normalizedHeader.indexOf(target) >= 0
+                    || target.indexOf(normalizedHeader) >= 0;
+            }
+
+            function openTargetRow() {
+                var rows = document.querySelectorAll(chatRowSelector);
+                for (var i = 0; i < rows.length; i++) {
+                    var s = extractSender(rows[i]);
+                    if (s && normalize(s) === normalize(targetSender)) {
+                        var clickable = rows[i].querySelector('[role="button"]')
+                            || rows[i].querySelector('[role="gridcell"]')
+                            || rows[i].querySelector('[tabindex="0"]')
+                            || rows[i].querySelector('[tabindex="-1"]')
+                            || rows[i];
+                        var didClick = clickElement(clickable);
+                        try {
+                            clickable.dispatchEvent(new KeyboardEvent('keydown', {
+                                bubbles: true,
+                                cancelable: true,
+                                key: 'Enter',
+                                code: 'Enter',
+                                keyCode: 13,
+                                which: 13
+                            }));
+                            clickable.dispatchEvent(new KeyboardEvent('keyup', {
+                                bubbles: true,
+                                cancelable: true,
+                                key: 'Enter',
+                                code: 'Enter',
+                                keyCode: 13,
+                                which: 13
+                            }));
+                        } catch (e) {}
+                        return didClick;
+                    }
+                }
+                debug('chat row not found for target="' + targetSender + '" rows=' + rows.length + ' currentMatches=' + currentChatMatchesTarget());
+                return false;
+            }
+
+            async function sendReactionToStoreMessage(msg) {
+                if (!msg) return false;
+                var action = waRequire('WAWebSendReactionMsgAction');
+                if (!action || typeof action.sendReactionToMsg !== 'function') {
+                    throw 'reaction-module-not-available';
+                }
+                await action.sendReactionToMsg(msg, reaction || '');
+                return true;
+            }
+
+            function isVisibleElement(element) {
+                if (!element) return false;
+                var rect = element.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) return false;
+                var style = window.getComputedStyle(element);
+                return style.visibility !== 'hidden' && style.display !== 'none' && style.opacity !== '0';
+            }
+
+            function dispatchHover(element) {
+                if (!element) return false;
+                try { element.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (e) {}
+                var rect = element.getBoundingClientRect();
+                var x = Math.max(1, Math.floor(rect.left + Math.min(rect.width / 2, rect.width - 2)));
+                var y = Math.max(1, Math.floor(rect.top + Math.min(rect.height / 2, rect.height - 2)));
+                var target = document.elementFromPoint(x, y) || element;
+                var options = {
+                    bubbles: true,
+                    cancelable: true,
+                    composed: true,
+                    view: window,
+                    clientX: x,
+                    clientY: y,
+                    screenX: x,
+                    screenY: y
+                };
+                try {
+                    if (typeof PointerEvent === 'function') {
+                        target.dispatchEvent(new PointerEvent('pointerover', Object.assign({ pointerId: 1, pointerType: 'mouse', isPrimary: true }, options)));
+                        target.dispatchEvent(new PointerEvent('pointerenter', Object.assign({ pointerId: 1, pointerType: 'mouse', isPrimary: true }, options)));
+                        target.dispatchEvent(new PointerEvent('pointermove', Object.assign({ pointerId: 1, pointerType: 'mouse', isPrimary: true }, options)));
+                    }
+                    target.dispatchEvent(new MouseEvent('mouseover', options));
+                    target.dispatchEvent(new MouseEvent('mouseenter', options));
+                    target.dispatchEvent(new MouseEvent('mousemove', options));
+                    element.dispatchEvent(new MouseEvent('mouseover', options));
+                    element.dispatchEvent(new MouseEvent('mouseenter', options));
+                    element.dispatchEvent(new MouseEvent('mousemove', options));
+                } catch (e) {}
+                return true;
+            }
+
+            function visibleText(element) {
+                return cleanMessageText(textWithEmoji(element) || element.innerText || element.textContent || '');
+            }
+
+            function buttonLabel(element) {
+                return [
+                    element.getAttribute('aria-label') || '',
+                    element.getAttribute('title') || '',
+                    element.getAttribute('data-testid') || '',
+                    element.getAttribute('data-icon') || '',
+                    visibleText(element)
+                ].join(' ').toLowerCase();
+            }
+
+            function reactionTriggerNearNode(node) {
+                var nodeRect = node.getBoundingClientRect();
+                var selectors = [
+                    'button',
+                    '[role="button"]',
+                    '[aria-label]',
+                    '[title]',
+                    '[data-icon]',
+                    '[data-testid]'
+                ].join(',');
+                var candidates = Array.from(document.querySelectorAll(selectors)).filter(function(el) {
+                    if (!isVisibleElement(el)) return false;
+                    var label = buttonLabel(el);
+                    if (!/(react|reaction|reagisci|reazione|emoji|smiley|smilie)/i.test(label)) return false;
+                    var rect = el.getBoundingClientRect();
+                    return rect.bottom >= nodeRect.top - 34
+                        && rect.top <= nodeRect.bottom + 34
+                        && rect.left <= nodeRect.right + 80
+                        && rect.right >= nodeRect.left - 80;
+                });
+                candidates.sort(function(a, b) {
+                    var ar = a.getBoundingClientRect();
+                    var br = b.getBoundingClientRect();
+                    var ay = Math.abs((ar.top + ar.bottom) / 2 - (nodeRect.top + nodeRect.bottom) / 2);
+                    var by = Math.abs((br.top + br.bottom) / 2 - (nodeRect.top + nodeRect.bottom) / 2);
+                    return ay - by;
+                });
+                return candidates[0] || null;
+            }
+
+            function emojiPickerCandidate(element, emoji) {
+                if (!isVisibleElement(element)) return false;
+                var text = visibleText(element);
+                var label = [
+                    text,
+                    element.getAttribute('aria-label') || '',
+                    element.getAttribute('title') || ''
+                ].join(' ');
+                return label.indexOf(emoji) >= 0;
+            }
+
+            async function clickNativeReactionFromVisibleNode(node) {
+                if (!node || !reaction) return false;
+                dispatchHover(node);
+                await sleep(120);
+
+                var trigger = reactionTriggerNearNode(node);
+                if (!trigger) {
+                    dispatchHover(node);
+                    await sleep(180);
+                    trigger = reactionTriggerNearNode(node);
+                }
+                if (!trigger || !clickElement(trigger)) return false;
+
+                await sleep(220);
+                var pickerSelectors = [
+                    'button',
+                    '[role="button"]',
+                    '[aria-label]',
+                    '[title]',
+                    'span'
+                ].join(',');
+                var candidates = Array.from(document.querySelectorAll(pickerSelectors)).filter(function(el) {
+                    return emojiPickerCandidate(el, reaction);
+                });
+                candidates.sort(function(a, b) {
+                    var ar = a.getBoundingClientRect();
+                    var br = b.getBoundingClientRect();
+                    return (br.width * br.height) - (ar.width * ar.height);
+                });
+                if (!candidates[0]) return false;
+                return clickElement(candidates[0].closest('button, [role="button"]') || candidates[0]);
+            }
+
+            function nodeMatchesMessageText(node) {
+                var expected = comparableMessageText(messageText || '');
+                if (!expected) return true;
+                var visible = comparableMessageText(cleanMessageText(node.innerText || node.textContent || textWithEmoji(node) || ''));
+                if (!visible) return false;
+                return visible === expected || visible.indexOf(expected) >= 0 || expected.indexOf(visible) >= 0;
+            }
+
+            function storeMessageMatchesReactionText(msg) {
+                if (!msg) return false;
+                var expected = comparableMessageText(messageText || '');
+                if (!expected) return true;
+                var body = comparableMessageText(msg.body || msg.caption || msg.pollName || '');
+                if (!body && (msg.type === 'image' || msg.type === 'video' || msg.type === 'sticker')) {
+                    body = comparableMessageText(msg.type === 'sticker' ? 'Sticker' : (msg.type === 'video' ? (storeMessageLooksLikeGif(msg) ? 'GIF' : 'Video') : '📨 Nuovo messaggio'));
+                }
+                if (!body) return false;
+                return body === expected || body.indexOf(expected) >= 0 || expected.indexOf(body) >= 0;
+            }
+
+            function storeMessageMatchesChat(msg) {
+                if (!msg || !msg.id) return false;
+                if (currentChatMatchesTarget()) return true;
+                var remote = serializedId(msg.id.remote || msg.from || msg.chatId || '');
+                if (!remote && msg.id.remote) remote = String(msg.id.remote);
+                return !remote || remote === chatId || remote.indexOf(chatId) >= 0 || chatId.indexOf(remote) >= 0;
+            }
+
+            function recentStoreMessageForReaction() {
+                var messages = recentStoreMessages();
+                for (var i = messages.length - 1; i >= 0; i--) {
+                    var msg = messages[i];
+                    if (msg && msg.id && msg.id.fromMe) continue;
+                    if (!storeMessageMatchesChat(msg)) continue;
+                    if (storeMessageMatchesReactionText(msg)) return msg;
+                }
+                return null;
+            }
+
+            async function sendReactionFromVisibleNode(node) {
+                if (!node) return false;
+                var nodeId = messageIdFromNode(node);
+                var hasSyntheticMessageId = (messageId || '').indexOf('||') >= 0;
+                if (messageId && nodeId && !hasSyntheticMessageId && messageId !== nodeId && messageId.indexOf(nodeId) < 0 && nodeId.indexOf(messageId) < 0) {
+                    return false;
+                }
+                if (hasSyntheticMessageId && !nodeMatchesMessageText(node)) {
+                    return false;
+                }
+                return await sendReactionToStoreMessage(await storeMessageById(nodeId));
+            }
+
+            function nodeMatchesReactionTarget(node) {
+                if (!node) return false;
+                var nodeId = messageIdFromNode(node);
+                var hasSyntheticMessageId = (messageId || '').indexOf('||') >= 0;
+                if (messageId && nodeId && !hasSyntheticMessageId) {
+                    return messageId === nodeId || messageId.indexOf(nodeId) >= 0 || nodeId.indexOf(messageId) >= 0;
+                }
+                return nodeMatchesMessageText(node);
+            }
+
+            return new Promise(async function(resolve, reject) {
+                try {
+                    debug('start target="' + targetSender + '" messageId="' + (messageId || '') + '" text="' + (messageText || '') + '"');
+                    openTargetRow();
+                    var attempts = 0;
+                    var isTrying = false;
+                    var poll = setInterval(async function() {
+                        if (isTrying) return;
+                        isTrying = true;
+                        attempts += 1;
+                        try {
+                            scrollChatToBottom();
+                            var nodes = uniqueMessageNodes(visibleMessageNodes()).reverse();
+                            if (attempts === 1 || attempts === 8 || attempts === 16 || attempts === 24) {
+                                debug('attempt=' + attempts + ' currentMatches=' + currentChatMatchesTarget() + ' nodes=' + nodes.length + ' store=' + recentStoreMessages().length);
+                            }
+                            for (var n = 0; n < nodes.length; n++) {
+                                if (nodeMatchesReactionTarget(nodes[n]) && await clickNativeReactionFromVisibleNode(nodes[n])) {
+                                    clearInterval(poll);
+                                    resolve('reaction-sent');
+                                    return;
+                                }
+                                if (await sendReactionFromVisibleNode(nodes[n])) {
+                                    clearInterval(poll);
+                                    resolve('reaction-sent');
+                                    return;
+                                }
+                            }
+
+                            if (messageId && messageId.indexOf('||') < 0 && await sendReactionToStoreMessage(await storeMessageById(messageId))) {
+                                clearInterval(poll);
+                                resolve('reaction-sent');
+                                return;
+                            }
+
+                            if (await sendReactionToStoreMessage(recentStoreMessageForReaction())) {
+                                clearInterval(poll);
+                                resolve('reaction-sent');
+                                return;
+                            }
+
+                            if (attempts >= 25) {
+                                clearInterval(poll);
+                                reject('reaction-message-not-found');
+                            }
+                        } catch (e) {
+                            clearInterval(poll);
+                            reject(String(e && (e.message || e) || 'reaction-failed'));
+                        } finally {
+                            isTrying = false;
+                        }
+                    }, 180);
+                } catch (e) {
+                    reject(String(e && (e.message || e) || 'reaction-failed'));
+                }
+            });
+        };
+
         window.atollDownloadDocument = function(chatId, messageId, fileName) {
             var targetSender = chatId.replace(/@(c|g)\\.us$/, '').trim();
 
@@ -4493,13 +5860,13 @@ private enum JS {
                 var labelRect = labelNode.getBoundingClientRect();
                 if (labelRect.width <= 0 || labelRect.height <= 0) return null;
 
-                var row = labelNode.closest('[role="radio"], [role="checkbox"], [aria-checked], [role="button"], [tabindex]');
+                var closestRow = labelNode.closest('[role="radio"], [role="checkbox"], [aria-checked], [role="button"], [tabindex]');
+                var row = closestRow && optionTargetMatches(closestRow, expectedText) ? closestRow : null;
                 if (!row) {
                     var cursor = labelNode;
                     for (var depth = 0; depth < 6 && cursor && cursor.parentElement; depth++) {
                         var parent = cursor.parentElement;
                         var rect = parent.getBoundingClientRect();
-                        var parentText = optionLabelFromElement(parent);
                         if (rect.width >= labelRect.width && rect.height >= labelRect.height && rect.height <= 90 && optionTargetMatches(parent, expectedText)) {
                             row = parent;
                         }
@@ -4511,7 +5878,7 @@ private enum JS {
                 var rowRect = row.getBoundingClientRect();
                 var x = Math.max(rowRect.left + 12, labelRect.left - 22);
                 var y = labelRect.top + (labelRect.height / 2);
-                var checked = row.closest('[aria-checked]') || row.querySelector('[aria-checked]');
+                var checked = row.matches && row.matches('[aria-checked]') ? row : row.querySelector('[aria-checked]');
                 if (checked) {
                     var checkedRect = checked.getBoundingClientRect();
                     if (checkedRect.width > 0 && checkedRect.height > 0) {
@@ -4580,19 +5947,11 @@ private enum JS {
                 var target = findOptionClickTarget(root, expectedText);
                 if (!target || !target.element) return false;
                 clickPoint(target.x, target.y, target.element);
-                clickElement(target.element);
-                try {
-                    target.element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32, which: 32 }));
-                    target.element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32, which: 32 }));
-                    target.element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }));
-                    target.element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }));
-                } catch (e) {}
                 await sleep(450);
                 if (!targetLooksSelected(target.element)) {
                     var refreshed = findOptionClickTarget(root, expectedText);
                     if (refreshed && refreshed.element) {
                         clickPoint(refreshed.x, refreshed.y, refreshed.element);
-                        clickElement(refreshed.element);
                         target = refreshed;
                     }
                 }
@@ -4606,11 +5965,6 @@ private enum JS {
                 var target = findOptionClickTarget(root, expectedText);
                 if (!target || !target.element) return false;
                 clickPoint(target.x, target.y, target.element);
-                clickElement(target.element);
-                try {
-                    target.element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32, which: 32 }));
-                    target.element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32, which: 32 }));
-                } catch (e) {}
                 await sleep(650);
                 postPollDebug('vote dom toggled option="' + (expectedText || optionText) + '" question="' + (questionText || '') + '" target=' + target.tag + '[role=' + target.role + ',checked=' + target.ariaChecked + ']');
                 return true;
@@ -4669,14 +6023,32 @@ private enum JS {
                             continue;
                         }
 
+                        if (intendedOptionTexts.length === 0) {
+                            if (await togglePollOptionInDom(node, optionText)) {
+                                clearInterval(poll);
+                                resolve('poll-option-selected');
+                                return;
+                            }
+                            if (nodeId && await sendVoteFromStoreId(nodeId)) {
+                                clearInterval(poll);
+                                resolve('poll-option-selected');
+                                return;
+                            }
+                            if (await sendVoteFromStoreQuestion()) {
+                                clearInterval(poll);
+                                resolve('poll-option-selected');
+                                return;
+                            }
+                        }
+
                         var nodePoll = extractPoll(node);
                         var nodeAllowsMultiple = !!(nodePoll && nodePoll.allowsMultipleSelection);
-                        if (nodeAllowsMultiple && nodeId && await sendVoteFromStoreId(nodeId)) {
+                        if (nodeAllowsMultiple && await syncMultiplePollOptionsInDom(node)) {
                             clearInterval(poll);
                             resolve('poll-option-selected');
                             return;
                         }
-                        if (nodeAllowsMultiple && await syncMultiplePollOptionsInDom(node)) {
+                        if (nodeAllowsMultiple && nodeId && await sendVoteFromStoreId(nodeId)) {
                             clearInterval(poll);
                             resolve('poll-option-selected');
                             return;
