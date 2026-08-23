@@ -157,6 +157,26 @@ final class LyricsSearchResultsTests: XCTestCase {
         )
     }
 
+    /// Nothing filters on the album, so an empty one must simply score
+    /// nothing rather than earning a containment bonus against an empty needle.
+    func testAnEmptyAlbumEarnsNoBonus() {
+        let withAlbum = result(title: "Crimewave", artist: "Crystal Castles", album: "Crimewave EP")
+        let withoutAlbum = result(title: "Crimewave", artist: "Crystal Castles", album: "")
+
+        let match = LyricsSearchResults.bestMatch(
+            in: [withoutAlbum, withAlbum],
+            artist: "Crystal Castles",
+            title: "Crimewave",
+            album: "Crimewave EP"
+        )
+
+        XCTAssertEqual(match?["albumName"] as? String, "Crimewave EP")
+        XCTAssertGreaterThan(
+            LyricsSearchResults.score(for: withAlbum, artist: "crystal castles", title: "crimewave", album: "crimewave ep"),
+            LyricsSearchResults.score(for: withoutAlbum, artist: "crystal castles", title: "crimewave", album: "crimewave ep")
+        )
+    }
+
     func testEmptyResultsYieldNoMatch() {
         XCTAssertNil(
             LyricsSearchResults.bestMatch(in: [], artist: "Crystal Castles", title: "Crimewave", album: "")

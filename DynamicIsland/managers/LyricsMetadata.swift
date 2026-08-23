@@ -116,7 +116,11 @@ enum LyricsSearchResults {
         if resultArtist == artist { score += 8 }
         else if resultArtist.contains(artist) || artist.contains(resultArtist) { score += 4 }
 
-        if !album.isEmpty {
+        // Both sides have to carry text. The title and artist are already
+        // non-empty by the time a result is a candidate, but nothing filters on
+        // the album, and containment against an empty needle is a coin flip
+        // decided by which overload resolves.
+        if !album.isEmpty, !resultAlbum.isEmpty {
             if resultAlbum == album { score += 4 }
             else if resultAlbum.contains(album) || album.contains(resultAlbum) { score += 2 }
         }
