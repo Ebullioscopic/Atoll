@@ -386,6 +386,8 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         notchSize = targetSize
         notchState = .open
 
+        NotchSeekKeyMonitor.shared.start()
+
         // Force music information update when notch is opened
         MusicManager.shared.forceUpdate()
         focusClipboardTabIfNeeded()
@@ -418,6 +420,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         notchSize = targetSize
         closedNotchSize = targetSize
         notchState = .closed
+        NotchSeekKeyMonitor.shared.stop()
         resetScrollGestureSuppression()
         resetAutoCloseSuppression()
 
@@ -436,6 +439,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             notchSize = targetSize
             closedNotchSize = targetSize
             notchState = .closed
+            NotchSeekKeyMonitor.shared.stop()
             resetScrollGestureSuppression()
             resetAutoCloseSuppression()
         }

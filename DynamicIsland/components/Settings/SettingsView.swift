@@ -1278,6 +1278,15 @@ struct GeneralSettings: View {
                     Text("Reverse open/close scroll gestures")
                 }
                 .settingsHighlight(id: highlightID("Reverse scroll gestures"))
+
+                Defaults.Toggle(key: .arrowKeySeekEnabled) {
+                    Text("Seek with arrow keys while the notch is open")
+                }
+                .settingsHighlight(id: highlightID("Arrow key seek"))
+
+                Text("Left and right seek by 10 seconds. Only while the notch is open, so the keys stay yours everywhere else. Seeking from another app needs Accessibility; without it this works while Atoll is frontmost.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         } header: {
             HStack {
