@@ -52,8 +52,12 @@ public struct CodexEventReducer: Sendable {
       task.model = event.model ?? task.model
       task.status = task.status == .ended ? .registered : task.status
       task.lastActivityAt = max(task.lastActivityAt, now)
+      if event.source == "resume" {
+        _ = acknowledgeCompletionIDs(sessionID: event.sessionID, state: &state, now: now)
+      }
 
     case "UserPromptSubmit":
+      _ = acknowledgeCompletionIDs(sessionID: event.sessionID, state: &state, now: now)
       if task.status == .running || task.status == .waitingForApproval {
         task.status = .failedOrInterrupted
       }
@@ -162,12 +166,45 @@ public struct CodexEventReducer: Sendable {
     return [.persist, .refreshPresentation]
   }
 
+  public func acknowledgeCompletion(
+    sessionID: String,
+    state: inout CodexTaskStoreSnapshot,
+    now: Date
+  ) -> [CodexStateEffect] {
+    guard acknowledgeCompletionIDs(sessionID: sessionID, state: &state, now: now) else {
+      return []
+    }
+    return [.persist, .refreshPresentation]
+  }
+
   private func upsert(_ task: CodexTaskRecord, into tasks: inout [CodexTaskRecord]) {
     if let index = tasks.firstIndex(where: { $0.sessionID == task.sessionID }) {
       tasks[index] = task
     } else {
       tasks.append(task)
     }
+  }
+
+  private func acknowledgeCompletionIDs(
+    sessionID: String,
+    state: inout CodexTaskStoreSnapshot,
+    now: Date
+  ) -> Bool {
+    guard !sessionID.isEmpty else { return false }
+    let completionIDs = state.recentCompletions
+      .filter { $0.sessionID == sessionID }
+      .map(\.id)
+    guard !completionIDs.isEmpty else { return false }
+
+    var acknowledged = state.acknowledgedCompletionIDs ?? []
+    let existing = Set(acknowledged)
+    let newIDs = completionIDs.filter { !existing.contains($0) }
+    guard !newIDs.isEmpty else { return false }
+
+    acknowledged.append(contentsOf: newIDs)
+    state.acknowledgedCompletionIDs = acknowledged
+    state.savedAt = now
+    return true
   }
 
   private func markStaleTasks(
@@ -257,5 +294,13 @@ public struct CodexTaskStore: Sendable {
   @discardableResult
   public mutating func acknowledgeCompletions(now: Date = Date()) -> [CodexStateEffect] {
     reducer.acknowledgeCompletions(state: &snapshot, now: now)
+  }
+
+  @discardableResult
+  public mutating func acknowledgeCompletion(
+    sessionID: String,
+    now: Date = Date()
+  ) -> [CodexStateEffect] {
+    reducer.acknowledgeCompletion(sessionID: sessionID, state: &snapshot, now: now)
   }
 }

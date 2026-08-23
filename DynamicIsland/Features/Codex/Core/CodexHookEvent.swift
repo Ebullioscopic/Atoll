@@ -3,6 +3,7 @@ import Foundation
 public struct CodexHookEvent: Codable, Equatable, Sendable {
     public let hookEventName: String
     public let sessionID: String
+    public let source: String?
     public let turnID: String?
     public let transcriptPath: String?
     public let cwd: String?
@@ -17,6 +18,7 @@ public struct CodexHookEvent: Codable, Equatable, Sendable {
     public init(
         hookEventName: String,
         sessionID: String,
+        source: String? = nil,
         turnID: String? = nil,
         transcriptPath: String? = nil,
         cwd: String? = nil,
@@ -30,6 +32,7 @@ public struct CodexHookEvent: Codable, Equatable, Sendable {
     ) {
         self.hookEventName = hookEventName
         self.sessionID = sessionID
+        self.source = source
         self.turnID = turnID
         self.transcriptPath = transcriptPath
         self.cwd = cwd
@@ -45,6 +48,7 @@ public struct CodexHookEvent: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case hookEventName = "hook_event_name"
         case sessionID = "session_id"
+        case source
         case turnID = "turn_id"
         case transcriptPath = "transcript_path"
         case cwd
@@ -71,6 +75,7 @@ public struct CodexHookEvent: Codable, Equatable, Sendable {
         self.init(
             hookEventName: hookEventName,
             sessionID: sessionID,
+            source: try container.decodeIfPresent(String.self, forKey: .source),
             turnID: try container.decodeIfPresent(String.self, forKey: .turnID),
             transcriptPath: try container.decodeIfPresent(String.self, forKey: .transcriptPath),
             cwd: try container.decodeIfPresent(String.self, forKey: .cwd),

@@ -73,6 +73,119 @@ struct CodexCompletionAcknowledgementTests {
             "a completion created after acknowledgement becomes visible again"
         )
 
+        let third = CodexCompletionRecord(
+            sessionID: "completed-3",
+            projectName: "Atoll-CodexAtoll",
+            promptPreview: "验证按会话清除",
+            resultPreview: "第三条完成",
+            completedAt: now.addingTimeInterval(2)
+        )
+        var perSessionSnapshot = CodexTaskStoreSnapshot(
+            savedAt: now,
+            recentCompletions: [first, second, third]
+        )
+        let perSessionEffects = reducer.acknowledgeCompletion(
+            sessionID: second.sessionID,
+            state: &perSessionSnapshot,
+            now: now
+        )
+        try expect(
+            perSessionEffects == [.persist, .refreshPresentation],
+            "acknowledging one session persists and refreshes presentation"
+        )
+        try expect(
+            perSessionSnapshot.unacknowledgedCompletions.map(\.sessionID)
+                == [first.sessionID, third.sessionID],
+            "acknowledging one session leaves other completion counts visible"
+        )
+        try expect(
+            perSessionSnapshot.recentCompletions.count == 3,
+            "acknowledging one session keeps all recent conversation history"
+        )
+        try expect(
+            reducer.acknowledgeCompletion(
+                sessionID: second.sessionID,
+                state: &perSessionSnapshot,
+                now: now
+            ).isEmpty,
+            "repeated per-session acknowledgement is idempotent"
+        )
+
+        var resumedSnapshot = CodexTaskStoreSnapshot(
+            savedAt: now,
+            recentCompletions: [third]
+        )
+        let resumeEnvelope = CodexHookEnvelope(
+            receivedAt: now.addingTimeInterval(3),
+            payload: CodexHookEvent(
+                hookEventName: "SessionStart",
+                sessionID: third.sessionID,
+                source: "resume",
+                cwd: "/tmp/atoll-codex"
+            )
+        )
+        let resumeEffects = reducer.reduce(
+            state: &resumedSnapshot,
+            envelope: resumeEnvelope,
+            preferences: AppPreferences()
+        )
+        try expect(
+            resumeEffects.contains(.refreshPresentation),
+            "resuming a completed Codex session refreshes the presentation"
+        )
+        try expect(
+            resumedSnapshot.unacknowledgedCompletions.isEmpty,
+            "resuming a completed Codex session acknowledges only that session"
+        )
+
+        let continuedCompletion = CodexCompletionRecord(
+            sessionID: "continued-session",
+            projectName: "Atoll-CodexAtoll",
+            promptPreview: "上一轮任务",
+            resultPreview: "上一轮已完成",
+            completedAt: now
+        )
+        var continuedSnapshot = CodexTaskStoreSnapshot(
+            savedAt: now,
+            tasks: [
+                CodexTaskRecord(
+                    sessionID: continuedCompletion.sessionID,
+                    projectName: continuedCompletion.projectName,
+                    status: .completed,
+                    lastActivityAt: now,
+                    completedAt: now
+                )
+            ],
+            recentCompletions: [continuedCompletion]
+        )
+        let continuedPrompt = CodexHookEnvelope(
+            receivedAt: now.addingTimeInterval(4),
+            payload: CodexHookEvent(
+                hookEventName: "UserPromptSubmit",
+                sessionID: continuedCompletion.sessionID,
+                turnID: "continued-turn",
+                cwd: "/tmp/atoll-codex",
+                prompt: "继续当前对话"
+            )
+        )
+        _ = reducer.reduce(
+            state: &continuedSnapshot,
+            envelope: continuedPrompt,
+            preferences: AppPreferences()
+        )
+        try expect(
+            continuedSnapshot.tasks.first?.status == .running,
+            "a new prompt in a completed session returns the task to running"
+        )
+        try expect(
+            continuedSnapshot.unacknowledgedCompletions.isEmpty,
+            "a new prompt acknowledges the previous completion for that session"
+        )
+        try expect(
+            continuedSnapshot.recentCompletions == [continuedCompletion],
+            "continuing a session keeps the previous completion in history"
+        )
+
         print("CodexCompletionAcknowledgementTests: PASS")
     }
 
