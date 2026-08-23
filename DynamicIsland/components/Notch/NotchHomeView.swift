@@ -957,6 +957,10 @@ struct MusicSliderView: View {
     var draggingTrackHeight: CGFloat = 14
     /// When set, bypasses Defaults[.sliderColor] (used by lock screen appearance).
     var tintOverride: Color? = nil
+    /// Greys the track out until it is reached for, the way Apple's transport
+    /// sliders do. Opt-in: the notch's own slider is meant to carry the album
+    /// colour at rest.
+    var desaturatesWhenIdle: Bool = false
 
     enum TimeLabelLayout {
         case stacked
@@ -1078,7 +1082,8 @@ struct MusicSliderView: View {
             lastDragged: $lastDragged,
             onValueChange: onValueChange,
             restingTrackHeight: restingTrackHeight,
-            draggingTrackHeight: draggingTrackHeight
+            draggingTrackHeight: draggingTrackHeight,
+            desaturatesWhenIdle: desaturatesWhenIdle
         )
     }
 
@@ -1149,10 +1154,23 @@ struct CustomSlider: View {
     var thumbSize: CGFloat = 12
     var restingTrackHeight: CGFloat = 8
     var draggingTrackHeight: CGFloat = 14
+    /// See `MusicSliderView.desaturatesWhenIdle`.
+    var desaturatesWhenIdle: Bool = false
     
     @State private var isHovering: Bool = false
     @Default(.enableRealTimeWaveform) var enableRealTimeWaveform
     @Default(.enableWaveformScrubber) var enableWaveformScrubber
+
+    private var isEngaged: Bool { dragging || isHovering }
+
+    private var trackSaturation: Double {
+        desaturatesWhenIdle && !isEngaged ? 0 : 1
+    }
+
+    private var trackOpacity: Double {
+        guard desaturatesWhenIdle else { return 1 }
+        return isEngaged ? 1 : 0.82
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -1191,7 +1209,15 @@ struct CustomSlider: View {
                         .cornerRadius(trackHeight / 2)
                 }
             }
-            .frame(height: max(restingTrackHeight, draggingTrackHeight), alignment: .bottom)
+            // The track swells from its middle, so it grows into the space
+            // above and below equally instead of climbing off the baseline --
+            // which is also what leaves it level with the times beside it.
+            // The waveform scrubber is the exception: it is 3.5x the track and
+            // is drawn to rise out of the bar, so it stays bottom-anchored.
+            .frame(
+                height: max(restingTrackHeight, draggingTrackHeight),
+                alignment: showScrubber ? .bottom : .center
+            )
             .contentShape(Rectangle())
             .highPriorityGesture(
                 DragGesture(minimumDistance: 0)
@@ -1208,6 +1234,12 @@ struct CustomSlider: View {
                         lastDragged = Date()
                     }
             )
+            .saturation(trackSaturation)
+            // Kept well above the volume bar's resting brightness: a seek bar
+            // that fades as far as that one reads as disabled rather than idle.
+            .opacity(trackOpacity)
+            .animation(.easeOut(duration: 0.2), value: trackSaturation)
+            .animation(.easeOut(duration: 0.2), value: trackOpacity)
             .animation(.bouncy.speed(1.4), value: dragging)
             .onHover { hovering in
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -1354,8 +1386,11 @@ struct MediaOutputSelectorPopover: View {
                 Button {
                     volumeModel.toggleMute()
                 } label: {
+                    // Half the chip, which is about where Apple puts a glyph
+                    // inside a circular one. At 18pt the speaker's waves ran
+                    // right up against the edge of the circle.
                     Image(systemName: volumeIconName)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.primary)
                         .frame(width: 28, height: 28)
                         .background(

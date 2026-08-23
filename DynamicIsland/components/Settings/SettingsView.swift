@@ -6044,7 +6044,8 @@ private struct LockScreenPositioningControls: View {
     @Default(.lockScreenMusicPanelWidth) private var musicWidth
     @Default(.lockScreenTimerWidgetWidth) private var timerWidth
     private let offsetRange: ClosedRange<Double> = -160...160
-    private let musicWidthRange: ClosedRange<Double> = 320...Double(LockScreenMusicPanel.defaultCollapsedWidth)
+    // Upper bound sits above the default so the panel can still be widened.
+    private let musicWidthRange: ClosedRange<Double> = 320...460
     private let timerWidthRange: ClosedRange<Double> = 320...LockScreenTimerWidget.defaultWidth
 
     var body: some View {
