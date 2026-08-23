@@ -26,12 +26,13 @@ import Defaults
 ///
 /// Every browser names its temporary file after the destination and adds an
 /// extension: Chromium writes `archive.zip.crdownload`, Safari an
-/// `archive.zip.download` bundle, Firefox `archive.zip.part`. Stripping that
-/// extension therefore names the file the download is aiming at, whichever
-/// browser produced it.
+/// `archive.zip.download` bundle, Firefox `archive.zip.part`, and Opera --
+/// Chromium underneath, but with its own name for this -- `archive.zip.opdownload`.
+/// Stripping that extension therefore names the file the download is aiming at,
+/// whichever browser produced it.
 enum PartialDownload {
     /// Extensions that mark a file as still being written, lowercased.
-    static let extensions: Set<String> = ["crdownload", "download", "part"]
+    static let extensions: Set<String> = ["crdownload", "download", "opdownload", "part"]
 
     /// Whether `name` is a download in progress rather than a finished file.
     static func isInProgress(_ name: String) -> Bool {

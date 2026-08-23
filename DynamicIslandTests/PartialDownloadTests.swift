@@ -37,12 +37,14 @@ final class PartialDownloadTests: XCTestCase {
         XCTAssertTrue(PartialDownload.isInProgress("archive.zip.crdownload"))
         XCTAssertTrue(PartialDownload.isInProgress("archive.zip.download"))
         XCTAssertTrue(PartialDownload.isInProgress("archive.zip.part"))
+        XCTAssertTrue(PartialDownload.isInProgress("archive.zip.opdownload"))
     }
 
     /// Extensions come off disks in whatever case the browser felt like.
     func testRecognisesTemporaryFilesRegardlessOfCase() {
         XCTAssertTrue(PartialDownload.isInProgress("archive.zip.CRDownload"))
         XCTAssertTrue(PartialDownload.isInProgress("archive.zip.PART"))
+        XCTAssertTrue(PartialDownload.isInProgress("archive.zip.OPDownload"))
     }
 
     /// A finished file is not a download, however much it looks like one.
@@ -57,6 +59,7 @@ final class PartialDownloadTests: XCTestCase {
         XCTAssertEqual(PartialDownload.destination(of: "archive.zip.crdownload"), "archive.zip")
         XCTAssertEqual(PartialDownload.destination(of: "archive.zip.download"), "archive.zip")
         XCTAssertEqual(PartialDownload.destination(of: "archive.zip.part"), "archive.zip")
+        XCTAssertEqual(PartialDownload.destination(of: "archive.zip.opdownload"), "archive.zip")
         XCTAssertEqual(PartialDownload.destination(of: "report.2026.01.pdf.part"), "report.2026.01.pdf")
     }
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Opera downloads are noticed too. Opera is Chromium underneath but names its half-finished files `.opdownload` rather than `.crdownload`, so nothing it downloaded ever raised a live activity.
 - **Firefox downloads**: download detection now notices Firefox downloads as well as Chromium and Safari ones. Firefox writes its in-progress file as `.part`, which was not among the extensions watched, so its downloads produced no live activity at all. It also creates the destination file up front as an empty placeholder, which the old completion test read as a cancellation — so a Firefox download that *did* finish would have had its activity yanked away instead of showing the completion animation. Completion is now decided by whether the destination holds data once the temporary file goes, which is the same question for every browser.
 - Spotify "Like Song" media control: save or remove the current track from your Liked Songs directly from the notch, lock screen, and minimalist player, using the official Spotify Web API (OAuth 2.0 PKCE). Add the control to any media slot in settings. (#579)
 

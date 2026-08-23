@@ -1650,7 +1650,7 @@ struct Downloads: View {
             } header: {
                 Text("Download Detection")
             } footer: {
-                Text("Shows a live activity in the Dynamic Island while a file is downloading. Works with Safari, Firefox, and Chrome and the browsers built on it — Edge, Brave, Arc and Vivaldi. Only your Downloads folder is watched, so a file saved anywhere else will not appear.")
+                Text("Shows a live activity in the Dynamic Island while a file is downloading. Works with Safari, Firefox, and Chrome and the browsers built on it — Edge, Brave, Arc, Vivaldi and Opera. Only your Downloads folder is watched, so a file saved anywhere else will not appear.")
             }
         }
         .navigationTitle("Downloads")
