@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- **Lock screen volume slider sat on the panel's edge**: the collapsed panel reserved half a point less height than its content needed, so the volume capsule was clipped by the bottom border while the transport row above it kept about 33pt of air. The reserved height is now measured rather than derived, and the capsule has around 20pt of room beneath it.
+
 - **Volume slider stuck at the bottom**: a volume the system would not report was being shown as a volume of zero, so on outputs that publish no readable per-channel level the lock screen and notch sliders sat empty and the speaker glyph showed muted. The level is now also read through the virtual main volume that macOS's own volume UI uses, and a read that fails holds the last known level instead of reporting silence. Setting the volume takes the same fallback.
 
 - The keyboard backlight HUD and OSD toggles come back when the external display app is quit. They were greyed out by the integration setting alone, but the keys are only handed over while that setting is on *and* the provider is actually running — so quitting it returned the keys to Atoll and left the toggles disabled over a setting that had started working again.
