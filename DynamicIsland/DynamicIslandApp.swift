@@ -551,7 +551,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else if coordinator.currentView == .agentTower {
             // Must stay in step with the same branch in `ContentView`, or the
             // window and its content disagree about how tall the tab is.
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
+            // Resolved against this window's own screen, not always the main
+            // one, so a secondary display does not clip the session grid.
+            let targetScreen = NSScreen.screens.first { $0.localizedName == vm.screen }
+            let screenHeight = (targetScreen ?? NSScreen.main)?.visibleFrame.height ?? 800
             baseSize.height = max(280, screenHeight * Defaults[.agentTowerMaxHeightFraction])
         }
         
@@ -774,6 +777,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }.store(in: &cancellables)
 
         Defaults.publisher(.terminalMaxHeightFraction, options: []).sink { [weak self] _ in
+            self?.debouncedUpdateWindowSize()
+        }.store(in: &cancellables)
+
+        Defaults.publisher(.agentTowerMaxHeightFraction, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 

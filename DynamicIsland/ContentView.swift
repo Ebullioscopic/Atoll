@@ -190,8 +190,11 @@ struct ContentView: View {
 
         if coordinator.currentView == .agentTower {
             // Same screen-fraction approach as the terminal tab: a grid of session
-            // cards needs more room than the 200pt default.
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
+            // cards needs more room than the 200pt default. Resolved against the
+            // notch's own screen, not always the main one, so a secondary display
+            // with a different visible height does not clip the session grid.
+            let targetScreen = NSScreen.screens.first { $0.localizedName == currentScreenName }
+            let screenHeight = (targetScreen ?? NSScreen.main)?.visibleFrame.height ?? 800
             let fraction = Defaults[.agentTowerMaxHeightFraction]
             return CGSize(width: baseSize.width, height: max(280, screenHeight * fraction))
         }
