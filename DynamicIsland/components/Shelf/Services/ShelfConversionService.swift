@@ -251,6 +251,16 @@ enum ShelfConversionService {
             writerInput.requestMediaDataWhenReady(on: queue) {
                 while writerInput.isReadyForMoreMediaData {
                     guard let buffer = readerOutput.copyNextSampleBuffer() else {
+                        // `copyNextSampleBuffer` returns nil both at normal EOF
+                        // and after a reader failure; reader.status is the only
+                        // way to tell those apart. Finishing the writer on a
+                        // failed reader would turn a partial file into a
+                        // reported success.
+                        guard reader.status == .completed else {
+                            writer.cancelWriting()
+                            continuation.resume()
+                            return
+                        }
                         writerInput.markAsFinished()
                         writer.finishWriting { continuation.resume() }
                         return
