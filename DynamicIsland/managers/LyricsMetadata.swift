@@ -64,3 +64,90 @@ enum LyricsMetadata {
             .lowercased()
     }
 }
+
+/// Picking the right row out of an lrclib search response.
+///
+/// Two things have to be true of the row that wins: it has to be the best of
+/// the candidates, and it has to be a candidate at all. Search *ranks*, it does
+/// not filter — lrclib returns its closest guess even when that guess shares
+/// nothing with the track playing, so without a floor the best of a bad set is
+/// accepted silently.
+enum LyricsSearchResults {
+
+    static func bestMatch(
+        in results: [[String: Any]],
+        artist: String,
+        title: String,
+        album: String
+    ) -> [String: Any]? {
+        let artist = normalizedForMatching(artist)
+        let title = normalizedForMatching(title)
+        let album = normalizedForMatching(album)
+
+        // Filter first, then rank. Ranking first and checking the winner
+        // afterwards throws away a good row whenever a bad one outscores it --
+        // a wrong artist with an exactly matching title, album and synced
+        // lyrics outscores a right artist matched only by containment.
+        return results
+            .filter { agreesOnTitleAndArtist($0, artist: artist, title: title) }
+            .max { lhs, rhs in
+                score(for: lhs, artist: artist, title: title, album: album)
+                    < score(for: rhs, artist: artist, title: title, album: album)
+            }
+    }
+
+    /// Whether a result is plausibly the same recording, rather than merely the
+    /// closest thing lrclib had. Both fields have to land: agreeing on the
+    /// title alone is how covers, remixes and karaoke tracks get through.
+    static func agreesOnTitleAndArtist(_ result: [String: Any], artist: String, title: String) -> Bool {
+        overlaps(field(result, "trackName"), title) && overlaps(field(result, "artistName"), artist)
+    }
+
+    static func score(for result: [String: Any], artist: String, title: String, album: String) -> Int {
+        let resultArtist = field(result, "artistName")
+        let resultTitle = field(result, "trackName")
+        let resultAlbum = field(result, "albumName")
+
+        var score = 0
+
+        if resultTitle == title { score += 8 }
+        else if resultTitle.contains(title) || title.contains(resultTitle) { score += 4 }
+
+        if resultArtist == artist { score += 8 }
+        else if resultArtist.contains(artist) || artist.contains(resultArtist) { score += 4 }
+
+        if !album.isEmpty {
+            if resultAlbum == album { score += 4 }
+            else if resultAlbum.contains(album) || album.contains(resultAlbum) { score += 2 }
+        }
+
+        if !(result["syncedLyrics"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            score += 3
+        }
+
+        return score
+    }
+
+    private static func overlaps(_ lhs: String, _ rhs: String) -> Bool {
+        guard !lhs.isEmpty, !rhs.isEmpty else { return false }
+        return lhs == rhs || lhs.contains(rhs) || rhs.contains(lhs)
+    }
+
+    private static func field(_ result: [String: Any], _ key: String) -> String {
+        normalizedForMatching((result[key] as? String) ?? "")
+    }
+
+    /// Both sides of every comparison have to come through here.
+    ///
+    /// The request is diacritic-folded before it is sent -- lrclib is searched
+    /// for "Beyonce" -- but the response comes back spelled "Beyoncé". Folding
+    /// only one side made the two disagree, which cost a scoring bonus quietly
+    /// and, once agreement became mandatory, rejected the correct lyrics
+    /// outright.
+    static func normalizedForMatching(_ value: String) -> String {
+        value
+            .folding(options: .diacriticInsensitive, locale: .current)
+            .lowercased()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}

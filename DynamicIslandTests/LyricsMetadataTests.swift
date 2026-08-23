@@ -76,3 +76,90 @@ final class LyricsMetadataTests: XCTestCase {
         }
     }
 }
+
+/// Picking a row out of an lrclib search response.
+final class LyricsSearchResultsTests: XCTestCase {
+
+    private func result(
+        title: String,
+        artist: String,
+        album: String = "",
+        synced: String = "[00:01.00] la"
+    ) -> [String: Any] {
+        [
+            "trackName": title,
+            "artistName": artist,
+            "albumName": album,
+            "syncedLyrics": synced
+        ]
+    }
+
+    // MARK: - Accented fields
+
+    /// The request is folded to "Beyonce" before it is sent, but lrclib answers
+    /// "Beyoncé". Folding one side only used to reject the correct lyrics.
+    func testAccentedResultFieldsStillMatchAFoldedRequest() {
+        let results = [result(title: "If I Were a Boy", artist: "Beyoncé")]
+
+        XCTAssertNotNil(
+            LyricsSearchResults.bestMatch(in: results, artist: "Beyonce", title: "If I Were a Boy", album: "")
+        )
+    }
+
+    func testAccentsAreFoldedInBothDirections() {
+        let results = [result(title: "Déjà Vu", artist: "Olivia Rodrigo")]
+
+        XCTAssertNotNil(
+            LyricsSearchResults.bestMatch(in: results, artist: "Olivia Rodrigo", title: "Deja Vu", album: "")
+        )
+        XCTAssertNotNil(
+            LyricsSearchResults.bestMatch(in: results, artist: "Olivia Rodrigo", title: "Déjà Vu", album: "")
+        )
+    }
+
+    // MARK: - Filter before ranking
+
+    /// A wrong artist can outscore a right one: an exact title, an exact album
+    /// and synced lyrics beat an artist matched only by containment. Ranking
+    /// first and checking the winner afterwards threw the good row away.
+    func testAHighScoringWrongArtistDoesNotHideAValidResult() {
+        let results = [
+            result(title: "Crimewave", artist: "HEALTH", album: "Crimewave EP"),
+            result(title: "Crimewave", artist: "Crystal Castles (Alice Glass)", album: "")
+        ]
+
+        let match = LyricsSearchResults.bestMatch(
+            in: results,
+            artist: "Crystal Castles",
+            title: "Crimewave",
+            album: "Crimewave EP"
+        )
+
+        XCTAssertEqual(match?["artistName"] as? String, "Crystal Castles (Alice Glass)")
+    }
+
+    // MARK: - The floor
+
+    func testAResultAgreeingOnNeitherFieldIsRefused() {
+        let results = [result(title: "Some Other Song", artist: "Another Band")]
+
+        XCTAssertNil(
+            LyricsSearchResults.bestMatch(in: results, artist: "Crystal Castles", title: "Crimewave", album: "")
+        )
+    }
+
+    /// Agreeing on the title alone is how covers and karaoke versions get in.
+    func testATitleOnlyAgreementIsRefused() {
+        let results = [result(title: "Crimewave", artist: "Karaoke Hits Vol 3")]
+
+        XCTAssertNil(
+            LyricsSearchResults.bestMatch(in: results, artist: "Crystal Castles", title: "Crimewave", album: "")
+        )
+    }
+
+    func testEmptyResultsYieldNoMatch() {
+        XCTAssertNil(
+            LyricsSearchResults.bestMatch(in: [], artist: "Crystal Castles", title: "Crimewave", album: "")
+        )
+    }
+}

@@ -1765,64 +1765,7 @@ class MusicManager: ObservableObject {
     }
 
     private func bestLyricsMatch(in results: [[String: Any]], artist: String, title: String, album: String) -> [String: Any]? {
-        let normalizedArtist = artist.lowercased()
-        let normalizedTitle = title.lowercased()
-        let normalizedAlbum = album.lowercased()
-
-        let best = results.max { lhs, rhs in
-            lyricsMatchScore(for: lhs, artist: normalizedArtist, title: normalizedTitle, album: normalizedAlbum)
-                < lyricsMatchScore(for: rhs, artist: normalizedArtist, title: normalizedTitle, album: normalizedAlbum)
-        }
-
-        // The best of a bad set is still a bad set. Search is a ranking, not a
-        // filter, so lrclib will happily return a different artist's song when
-        // it has nothing closer -- and without a floor here, that song is what
-        // scrolls past during the chorus.
-        guard let best,
-              agreesOnTitleAndArtist(best, artist: normalizedArtist, title: normalizedTitle)
-        else { return nil }
-
-        return best
-    }
-
-    /// Whether a result is plausibly the same recording, rather than merely the
-    /// closest thing lrclib had. Both fields have to land: agreeing on the
-    /// title alone is how covers, remixes and karaoke tracks get through.
-    private func agreesOnTitleAndArtist(_ result: [String: Any], artist: String, title: String) -> Bool {
-        let resultArtist = ((result["artistName"] as? String) ?? "").lowercased()
-        let resultTitle = ((result["trackName"] as? String) ?? "").lowercased()
-
-        func overlaps(_ lhs: String, _ rhs: String) -> Bool {
-            guard !lhs.isEmpty, !rhs.isEmpty else { return false }
-            return lhs == rhs || lhs.contains(rhs) || rhs.contains(lhs)
-        }
-
-        return overlaps(resultTitle, title) && overlaps(resultArtist, artist)
-    }
-
-    private func lyricsMatchScore(for result: [String: Any], artist: String, title: String, album: String) -> Int {
-        let resultArtist = ((result["artistName"] as? String) ?? "").lowercased()
-        let resultTitle = ((result["trackName"] as? String) ?? "").lowercased()
-        let resultAlbum = ((result["albumName"] as? String) ?? "").lowercased()
-
-        var score = 0
-
-        if resultTitle == title { score += 8 }
-        else if resultTitle.contains(title) || title.contains(resultTitle) { score += 4 }
-
-        if resultArtist == artist { score += 8 }
-        else if resultArtist.contains(artist) || artist.contains(resultArtist) { score += 4 }
-
-        if !album.isEmpty {
-            if resultAlbum == album { score += 4 }
-            else if resultAlbum.contains(album) || album.contains(resultAlbum) { score += 2 }
-        }
-
-        if !(result["syncedLyrics"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            score += 3
-        }
-
-        return score
+        LyricsSearchResults.bestMatch(in: results, artist: artist, title: title, album: album)
     }
 
     private func applyLyricsToDisplay(_ lyrics: [LyricLine]) {
