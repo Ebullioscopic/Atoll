@@ -1032,18 +1032,30 @@ struct MusicSliderView: View {
         }
     }
 
+    @ViewBuilder
     private var sliderCore: some View {
-        CustomSlider(
-            value: $sliderValue,
-            range: 0 ... duration,
-            color: sliderTint,
-            dragging: $dragging,
-            lastDragged: $lastDragged,
-            onValueChange: onValueChange,
-            restingTrackHeight: restingTrackHeight,
-            draggingTrackHeight: draggingTrackHeight,
-            desaturatesWhenIdle: desaturatesWhenIdle
-        )
+        if hasUsableDuration {
+            CustomSlider(
+                value: $sliderValue,
+                range: 0 ... duration,
+                color: sliderTint,
+                dragging: $dragging,
+                lastDragged: $lastDragged,
+                onValueChange: onValueChange,
+                restingTrackHeight: restingTrackHeight,
+                draggingTrackHeight: draggingTrackHeight,
+                desaturatesWhenIdle: desaturatesWhenIdle
+            )
+        } else {
+            // `0 ... duration` traps when the upper bound is below the lower
+            // one, so a negative duration crashes here before any of the
+            // formatting guards get a look at it. A length nobody has reported
+            // also has nothing to scrub within, so the track is inert.
+            Capsule(style: .continuous)
+                .fill(sliderTint.opacity(0.18))
+                .frame(height: restingTrackHeight)
+                .frame(maxWidth: .infinity)
+        }
     }
 
     private var sliderTint: Color {
@@ -1069,13 +1081,37 @@ struct MusicSliderView: View {
             : .gray
     }
 
+    /// Whether the reported duration is one a track could actually have.
+    ///
+    /// Senders do not always report a usable one — a live stream has none to
+    /// give, and some hand back a sentinel or an epoch timestamp instead. The
+    /// remaining-time label subtracts the position from it and formats the
+    /// result as hours, so an epoch came out on screen as `-1732919508:00:54`.
+    /// A day is well past any track and well short of any of those.
+    private var hasUsableDuration: Bool {
+        duration.isFinite && duration > 0 && duration <= 24 * 60 * 60
+    }
+
+    /// Shown in place of a time there is no sensible value for, rather than a
+    /// formatted impossibility.
+    private static let unknownTime = "--:--"
+
     private var trailingTimeText: String {
+        guard hasUsableDuration else { return Self.unknownTime }
+
         switch trailingLabel {
         case .duration:
             return timeString(from: duration)
         case .remaining:
-            let remaining = max(duration - sliderValue, 0)
-            return "-" + timeString(from: remaining)
+            // A position that is not a position cannot be subtracted from
+            // anything, and a negative one would inflate what is left rather
+            // than reduce it.
+            guard sliderValue.isFinite, sliderValue >= 0 else { return Self.unknownTime }
+
+            let remaining = timeString(from: max(duration - sliderValue, 0))
+            // The minus belongs to a time, not to the absence of one: prefixing
+            // it unconditionally turned --:-- into ---:--.
+            return remaining == Self.unknownTime ? remaining : "-" + remaining
         }
     }
 
@@ -1088,6 +1124,12 @@ struct MusicSliderView: View {
     }
 
     func timeString(from seconds: Double) -> String {
+        // Int(_:) traps on a value too large to represent, and NaN has no
+        // meaning here either; neither belongs on screen as a time.
+        guard seconds.isFinite, seconds >= 0, seconds < Double(Int.max) else {
+            return Self.unknownTime
+        }
+
         let totalMinutes = Int(seconds) / 60
         let remainingSeconds = Int(seconds) % 60
         let hours = totalMinutes / 60
