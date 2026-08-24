@@ -2883,13 +2883,23 @@ private struct MusicSourceCard: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 9) {
-                AppIconImage(
-                    bundleIdentifiers: controller.applicationBundleIdentifiers,
-                    symbolFallback: controller.fallbackSymbol,
-                    symbolColor: controller.fallbackColor,
-                    size: 42
-                )
-                .font(.system(size: 24, weight: .semibold))
+                Group {
+                    if let logoAssetName = controller.officialLogoAssetName {
+                        Image(logoAssetName)
+                            .resizable()
+                            .scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    } else {
+                        AppIconImage(
+                            bundleIdentifiers: controller.applicationBundleIdentifiers,
+                            symbolFallback: controller.fallbackSymbol,
+                            symbolColor: controller.fallbackColor,
+                            size: 42
+                        )
+                        .font(.system(size: 24, weight: .semibold))
+                    }
+                }
+                .frame(width: 42, height: 42)
 
                 Text(controller.localizedName)
                     .font(.system(size: 12, weight: .semibold))
@@ -2937,6 +2947,15 @@ private struct MusicSourceCard: View {
 }
 
 private extension MediaControllerType {
+    var officialLogoAssetName: String? {
+        switch self {
+        case .youtubeMusic: return "YouTubeMusicLogo"
+        case .amazonMusic: return "AmazonMusicLogo"
+        case .cider: return "CiderLogo"
+        default: return nil
+        }
+    }
+
     var applicationBundleIdentifiers: [String] {
         switch self {
         case .nowPlaying:
