@@ -1213,7 +1213,7 @@ private struct MediaOutputPickerButton: View {
     @ObservedObject private var routeManager = AudioRouteManager.shared
     @StateObject private var volumeModel = MediaOutputVolumeViewModel()
     @State private var isPopoverPresented = false
-    @State private var isHoveringPopover = false
+    @State private var popoverToken = UUID()
     @EnvironmentObject private var vm: DynamicIslandViewModel
 
     var body: some View {
@@ -1228,27 +1228,20 @@ private struct MediaOutputPickerButton: View {
             MediaOutputSelectorPopover(
                 routeManager: routeManager,
                 volumeModel: volumeModel,
-                onHoverChanged: { hovering in
-                    isHoveringPopover = hovering
-                    updatePopoverActivity()
-                }
+                onHoverChanged: { _ in }
             ) {
                 isPopoverPresented = false
-                isHoveringPopover = false
                 updatePopoverActivity()
             }
         }
         .onAppear {
             routeManager.refreshDevices()
         }
-        .onChange(of: isPopoverPresented) { _, presented in
-            if !presented {
-                isHoveringPopover = false
-            }
+        .onChange(of: isPopoverPresented) { _, _ in
             updatePopoverActivity()
         }
         .onDisappear {
-            vm.isMediaOutputPopoverActive = false
+            vm.setMediaOutputPopoverActive(false, token: popoverToken)
         }
     }
 
@@ -1256,8 +1249,21 @@ private struct MediaOutputPickerButton: View {
         routeManager.activeDevice?.iconName ?? "speaker.wave.2"
     }
 
+    /// Reports whether this picker's popover is open, so the notch knows not to
+    /// auto-close while it is.
+    ///
+    /// Keyed by a token unique to this presenter: several pickers can exist at
+    /// once and the notch has to stay open while *any* of them is showing, so
+    /// the view model tracks a set of open popovers rather than one flag that
+    /// the second picker to close would clear on behalf of the first.
     private func updatePopoverActivity() {
-        vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+        // Presentation alone, deliberately. Also requiring the pointer to be over
+        // the popover raced the notch's own hover tracking: the popover is a
+        // separate window, so moving into it reads as leaving the notch, and any
+        // moment before the popover reported the pointer let the auto-close timer
+        // shut the notch and take the popover with it. This is what the stats,
+        // timer and clipboard popovers already do.
+        vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
     }
 }
 
@@ -1265,7 +1271,7 @@ private struct AirPlayPickerButton: View {
     @ObservedObject private var musicManager = MusicManager.shared
     @ObservedObject private var airPlayManager = AppleMusicAirPlayManager.shared
     @State private var isPopoverPresented = false
-    @State private var isHoveringPopover = false
+    @State private var popoverToken = UUID()
     @EnvironmentObject private var vm: DynamicIslandViewModel
 
     private var isAppleMusicActive: Bool {
@@ -1283,13 +1289,9 @@ private struct AirPlayPickerButton: View {
         .popover(isPresented: $isPopoverPresented, arrowEdge: .bottom) {
             AirPlaySelectorPopover(
                 airPlayManager: airPlayManager,
-                onHoverChanged: { hovering in
-                    isHoveringPopover = hovering
-                    updatePopoverActivity()
-                }
+                onHoverChanged: { _ in }
             ) {
                 isPopoverPresented = false
-                isHoveringPopover = false
                 updatePopoverActivity()
             }
         }
@@ -1298,8 +1300,7 @@ private struct AirPlayPickerButton: View {
                 Task { await airPlayManager.refreshDevices() }
             }
         }
-        .onChange(of: isPopoverPresented) { _, presented in
-            if !presented { isHoveringPopover = false }
+        .onChange(of: isPopoverPresented) { _, _ in
             updatePopoverActivity()
         }
         .onChange(of: musicManager.bundleIdentifier) { _, newBundle in
@@ -1308,12 +1309,25 @@ private struct AirPlayPickerButton: View {
             }
         }
         .onDisappear {
-            vm.isMediaOutputPopoverActive = false
+            vm.setMediaOutputPopoverActive(false, token: popoverToken)
         }
     }
 
+    /// Reports whether this picker's popover is open, so the notch knows not to
+    /// auto-close while it is.
+    ///
+    /// Keyed by a token unique to this presenter: several pickers can exist at
+    /// once and the notch has to stay open while *any* of them is showing, so
+    /// the view model tracks a set of open popovers rather than one flag that
+    /// the second picker to close would clear on behalf of the first.
     private func updatePopoverActivity() {
-        vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+        // Presentation alone, deliberately. Also requiring the pointer to be over
+        // the popover raced the notch's own hover tracking: the popover is a
+        // separate window, so moving into it reads as leaving the notch, and any
+        // moment before the popover reported the pointer let the auto-close timer
+        // shut the notch and take the popover with it. This is what the stats,
+        // timer and clipboard popovers already do.
+        vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
     }
 }
 
@@ -1580,7 +1594,17 @@ final class MediaOutputVolumeViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// How long the volume HUD stays suppressed after a change made from one of
+    /// our own controls. Refreshed on every change, so a drag holds it off until
+    /// shortly after the last movement.
+    private static let ownControlHUDSuppression: TimeInterval = 1.5
+
     func setVolume(_ value: Float) {
+        // The user is already looking at a volume control. Letting the change
+        // raise the notch's volume HUD puts a second slider on screen and swaps
+        // out the content this one is anchored to, tearing the popover down
+        // mid-drag -- which is why the slider could not be dragged at all.
+        HUDSuppressionCoordinator.shared.suppressVolumeHUD(for: Self.ownControlHUDSuppression)
         level = value
         if value > 0 {
             isMuted = false
@@ -1589,6 +1613,7 @@ final class MediaOutputVolumeViewModel: ObservableObject {
     }
 
     func toggleMute() {
+        HUDSuppressionCoordinator.shared.suppressVolumeHUD(for: Self.ownControlHUDSuppression)
         isMuted.toggle()
         controller.toggleMute()
     }
