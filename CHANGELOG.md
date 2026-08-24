@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Fingerprint lock screen activity**: choose the lock, an animated fingerprint scan, or both from Lock Screen settings. The fingerprint uses an attributed Lottie animation and completes its green scan while the Mac unlocks. (#774)
+
 - **Choose how the sung line is marked**: a Highlight setting beside Show lyrics picks between Sweep, where the highlight travels across the line in time with the singing, and Solid, where the whole line lights at once as it did before.
 
 - **Lyrics follow the music**: the current line in the side lyrics panel and the lock screen music player is now lit by a highlight that sweeps across it in time with playback, instead of the whole line changing colour at once. Stretches of a track with no words are shown as music notes rather than as a gap — LRC marks where singing stops with a bare timestamp, so the break is read from the lyrics themselves rather than guessed, and only breaks of five seconds or more are marked so breaths between lines do not flicker.
@@ -25,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Lyrics on the side**: Added ability to show lyrics of the current song when calendar is disabled (#741)
 
 ### Changed
+- Lock screen live activity timings now follow the selected icons: the fingerprint remains visible through its scan, while the open lock gets its own brief confirmation beat before the island contracts. (#774)
+
 - The LIVE indicator shown in place of a progress bar on streams now follows Apple's treatment: two thin rules meeting the word in the middle, softening as they run away from it. It was a 10pt capsule with a fill, a centre shade, a stroke and three blend modes. Shadowed text was dropped over the top of all that. The result read as a progress bar someone had written on, and a stream has no progress to draw. The notch, the lock screen player and the floating window all draw the same component, so all three change together.
 - Lock screen and notch music controls now follow Apple's sizing and animation: the hover/press highlight fills a circular target roughly 2.2x the glyph instead of hugging it, play/pause shares that highlight with the rest of the row, and the track title and artist scale up to Apple's lock screen proportions. Pressing next/previous marches the chevrons in the direction of travel rather than sliding the whole button (#742).
 - Improved the Dutch localization by adding missing translations, corrected terminology, and wording aligned with Apple's Dutch macOS conventions.
@@ -33,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- The lock screen Dynamic Island now completes one clean unlock contraction instead of disappearing early or showing a second island that closes immediately afterward. (#774)
+
 - The keyboard backlight HUD and OSD toggles come back when the external display app is quit. They were greyed out by the integration setting alone, but the keys are only handed over while that setting is on *and* the provider is actually running — so quitting it returned the keys to Atoll and left the toggles disabled over a setting that had started working again.
 - **Lyrics for untagged tracks**: An untagged file playing as "Track 7" by "Unknown artist" no longer shows a stranger's lyrics. lrclib holds many different songs filed under exactly that placeholder title and artist, so the search returned a perfect-scoring match that was somebody else's song. Metadata that names no particular track is now recognised as such and skipped, and a result that agrees with neither the title nor the artist is no longer accepted as the best of a bad set. Search results are also matched with the same diacritic folding used to build the query, so lrclib's "Beyoncé" no longer fails to match the "Beyonce" that was searched for. A karaoke, instrumental, remix or sped-up version is also no longer accepted in place of the track playing, since its words are right but its timings are not.
 - A swipe across the notch skips one track instead of sometimes several. A trackpad delivers a flick as a run of touch events followed by a run of momentum ones, and the gesture was ended between the two — so the momentum tail started accumulating again from zero against the same threshold the touch had just crossed, and fired the skip a second time. Momentum is the end of a flick the user has already let go of, so it no longer counts as new input. The same double-firing applied to the open and close gestures.
