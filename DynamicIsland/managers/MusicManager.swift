@@ -51,8 +51,14 @@ private struct LyricsLookupKey: Hashable {
     let artist: String
     let album: String
 
+    /// Whether this is worth searching for.
+    ///
+    /// Empty fields are the obvious case. The subtler one is metadata that is
+    /// filled in but identifies nothing -- an untagged rip playing as "Track 7"
+    /// by "Unknown Artist" matches lrclib's twenty *other* untagged rips
+    /// exactly, and one of them wins. Not searching is the right answer there.
     var isValid: Bool {
-        !title.isEmpty && !artist.isEmpty
+        !LyricsMetadata.namesNoParticularTrack(title: title, artist: artist)
     }
 }
 
@@ -1773,39 +1779,7 @@ class MusicManager: ObservableObject {
     }
 
     private func bestLyricsMatch(in results: [[String: Any]], artist: String, title: String, album: String) -> [String: Any]? {
-        let normalizedArtist = artist.lowercased()
-        let normalizedTitle = title.lowercased()
-        let normalizedAlbum = album.lowercased()
-
-        return results.max { lhs, rhs in
-            lyricsMatchScore(for: lhs, artist: normalizedArtist, title: normalizedTitle, album: normalizedAlbum)
-                < lyricsMatchScore(for: rhs, artist: normalizedArtist, title: normalizedTitle, album: normalizedAlbum)
-        }
-    }
-
-    private func lyricsMatchScore(for result: [String: Any], artist: String, title: String, album: String) -> Int {
-        let resultArtist = ((result["artistName"] as? String) ?? "").lowercased()
-        let resultTitle = ((result["trackName"] as? String) ?? "").lowercased()
-        let resultAlbum = ((result["albumName"] as? String) ?? "").lowercased()
-
-        var score = 0
-
-        if resultTitle == title { score += 8 }
-        else if resultTitle.contains(title) || title.contains(resultTitle) { score += 4 }
-
-        if resultArtist == artist { score += 8 }
-        else if resultArtist.contains(artist) || artist.contains(resultArtist) { score += 4 }
-
-        if !album.isEmpty {
-            if resultAlbum == album { score += 4 }
-            else if resultAlbum.contains(album) || album.contains(resultAlbum) { score += 2 }
-        }
-
-        if !(result["syncedLyrics"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            score += 3
-        }
-
-        return score
+        LyricsSearchResults.bestMatch(in: results, artist: artist, title: title, album: album)
     }
 
     private func applyLyricsToDisplay(_ lyrics: [LyricLine]) {
