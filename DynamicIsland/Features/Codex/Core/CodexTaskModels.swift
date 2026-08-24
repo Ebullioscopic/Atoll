@@ -128,6 +128,7 @@ public struct CodexTaskStoreSnapshot: Codable, Equatable, Sendable {
     public var tasks: [CodexTaskRecord]
     public var recentCompletions: [CodexCompletionRecord]
     public var acknowledgedCompletionIDs: [UUID]?
+    public var presentedCompletionIDs: [UUID]?
     public var processedEventIDs: [UUID]
 
     public init(
@@ -136,6 +137,7 @@ public struct CodexTaskStoreSnapshot: Codable, Equatable, Sendable {
         tasks: [CodexTaskRecord] = [],
         recentCompletions: [CodexCompletionRecord] = [],
         acknowledgedCompletionIDs: [UUID] = [],
+        presentedCompletionIDs: [UUID] = [],
         processedEventIDs: [UUID] = []
     ) {
         self.schemaVersion = schemaVersion
@@ -143,12 +145,36 @@ public struct CodexTaskStoreSnapshot: Codable, Equatable, Sendable {
         self.tasks = tasks
         self.recentCompletions = recentCompletions
         self.acknowledgedCompletionIDs = acknowledgedCompletionIDs
+        self.presentedCompletionIDs = presentedCompletionIDs
         self.processedEventIDs = processedEventIDs
     }
 
     public var unacknowledgedCompletions: [CodexCompletionRecord] {
         let acknowledged = Set(acknowledgedCompletionIDs ?? [])
-        return recentCompletions.filter { !acknowledged.contains($0.id) }
+        let unreadSessionIDs = Set(
+            recentCompletions
+                .filter { !acknowledged.contains($0.id) }
+                .map(\.sessionID)
+        )
+        let latestCompletionIDs = Set(latestRecentCompletions().map(\.id))
+        return recentCompletions.filter {
+            latestCompletionIDs.contains($0.id)
+                && unreadSessionIDs.contains($0.sessionID)
+        }
+    }
+
+    public func latestRecentCompletions(
+        excludingSessionIDs excludedSessionIDs: Set<String> = []
+    ) -> [CodexCompletionRecord] {
+        var latestBySession: [String: CodexCompletionRecord] = [:]
+        for completion in recentCompletions where !excludedSessionIDs.contains(completion.sessionID) {
+            if let current = latestBySession[completion.sessionID],
+               current.completedAt >= completion.completedAt {
+                continue
+            }
+            latestBySession[completion.sessionID] = completion
+        }
+        return latestBySession.values.sorted { $0.completedAt > $1.completedAt }
     }
 
     public static var empty: CodexTaskStoreSnapshot { CodexTaskStoreSnapshot() }

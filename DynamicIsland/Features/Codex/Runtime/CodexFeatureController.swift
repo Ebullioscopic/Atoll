@@ -127,8 +127,14 @@ final class CodexFeatureController: ObservableObject {
                     return sessionID
                 }
                 : []
+            let runningSessionIDs = effects.compactMap { effect -> String? in
+                guard case .showRunning(let sessionID) = effect else { return nil }
+                guard !activityTrayPreferences.ignoredSessionIDs.contains(sessionID) else { return nil }
+                return sessionID
+            }
             presentationCoordinator.update(
                 snapshot: presentationSnapshot(),
+                runningSessionIDs: runningSessionIDs,
                 completionSessionIDs: completionSessionIDs,
                 ignoredSessionIDs: activityTrayPreferences.ignoredSessionIDs
             )
@@ -145,7 +151,8 @@ final class CodexFeatureController: ObservableObject {
         }
         presentationCoordinator.update(
             snapshot: presentationSnapshot(),
-            ignoredSessionIDs: activityTrayPreferences.ignoredSessionIDs
+            ignoredSessionIDs: activityTrayPreferences.ignoredSessionIDs,
+            interruptActivePulse: true
         )
     }
 
@@ -159,7 +166,8 @@ final class CodexFeatureController: ObservableObject {
             snapshot = store.snapshot
             presentationCoordinator.update(
                 snapshot: presentationSnapshot(),
-                ignoredSessionIDs: activityTrayPreferences.ignoredSessionIDs
+                ignoredSessionIDs: activityTrayPreferences.ignoredSessionIDs,
+                interruptActivePulse: true
             )
             lastError = nil
         } catch {
@@ -168,9 +176,32 @@ final class CodexFeatureController: ObservableObject {
     }
 
     func acknowledgeCompletion(sessionID: String) {
+        acknowledgeCompletions(sessionIDs: [sessionID])
+    }
+
+    func recordCompletionPresentations(completionIDs: Set<UUID>) {
         guard Defaults[.enableCodexIntegration] else { return }
-        let effects = store.acknowledgeCompletion(sessionID: sessionID)
+        let effects = store.recordCompletionPresentations(completionIDs: completionIDs)
         guard !effects.isEmpty else { return }
+
+        do {
+            try repository.save(store.snapshot)
+            snapshot = store.snapshot
+            lastError = nil
+        } catch {
+            lastError = "记录 Codex 完成展示状态失败：\(error.localizedDescription)"
+        }
+    }
+
+    func acknowledgeCompletions(sessionIDs: Set<String>) {
+        guard Defaults[.enableCodexIntegration] else { return }
+        var didChange = false
+        for sessionID in sessionIDs where !sessionID.isEmpty {
+            if !store.acknowledgeCompletion(sessionID: sessionID).isEmpty {
+                didChange = true
+            }
+        }
+        guard didChange else { return }
 
         do {
             try repository.save(store.snapshot)
@@ -192,7 +223,9 @@ final class CodexFeatureController: ObservableObject {
         }
 
         let workspace = NSWorkspace.shared
-        guard let appURL = workspace.urlForApplication(toOpen: url) else {
+        guard let appURL = workspace.urlForApplication(
+            withBundleIdentifier: CodexAppLink.appBundleIdentifier
+        ) ?? workspace.urlForApplication(toOpen: url) else {
             lastError = "找不到可打开 Codex 对话的应用"
             return
         }
@@ -217,7 +250,6 @@ final class CodexFeatureController: ObservableObject {
     var activityTrayPreferences: CodexActivityTrayPreferences {
         CodexActivityTrayPreferences(
             pinnedProjectNames: Set(Defaults[.codexPinnedProjectNames]),
-            collapsedProjectNames: Set(Defaults[.codexCollapsedProjectNames]),
             ignoredSessionIDs: Set(Defaults[.codexIgnoredSessionIDs])
         )
     }
@@ -230,17 +262,6 @@ final class CodexFeatureController: ObservableObject {
             names.remove(projectName)
         }
         Defaults[.codexPinnedProjectNames] = names.sorted()
-        refreshPresentation()
-    }
-
-    func setProjectCollapsed(_ projectName: String, collapsed: Bool) {
-        var names = Set(Defaults[.codexCollapsedProjectNames])
-        if collapsed {
-            names.insert(projectName)
-        } else {
-            names.remove(projectName)
-        }
-        Defaults[.codexCollapsedProjectNames] = names.sorted()
         refreshPresentation()
     }
 

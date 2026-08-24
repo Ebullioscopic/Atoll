@@ -166,7 +166,9 @@ struct CodexBusyIconView: View {
 
 struct CodexSneakPeekView: View {
   let title: String
+  let subtitle: String
   let isCompletionPulse: Bool
+  let isRunningPulse: Bool
   let isWaitingForApproval: Bool
   let accent: Color
   let availableWidth: CGFloat
@@ -177,10 +179,17 @@ struct CodexSneakPeekView: View {
   @State private var pulseOpacity = 0.0
 
   var body: some View {
-    HStack(spacing: 7) {
+    HStack(spacing: isCompletionPulse ? 9 : 7) {
       ZStack {
         Circle()
-          .fill(accent.opacity(0.12))
+          .fill(
+            RadialGradient(
+              colors: [accent.opacity(isCompletionPulse ? 0.30 : 0.12), accent.opacity(0.04)],
+              center: .center,
+              startRadius: 0,
+              endRadius: isCompletionPulse ? 15 : 10
+            )
+          )
 
         if !reduceMotion, isCompletionPulse {
           Circle()
@@ -190,18 +199,18 @@ struct CodexSneakPeekView: View {
                 colors: [accent.opacity(0.08), accent, accent.opacity(0.08)],
                 center: .center
               ),
-              style: StrokeStyle(lineWidth: 1.2, lineCap: .round)
+              style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
             )
             .rotationEffect(.degrees(-90 + Double(pulseProgress) * 110))
-            .scaleEffect(0.70 + pulseProgress * 0.50)
+            .scaleEffect(0.72 + pulseProgress * 0.68)
             .opacity(pulseOpacity)
 
           ForEach(Array(sparkAngles.enumerated()), id: \.offset) { _, angle in
             let radians = angle * .pi / 180
-            let distance = 7 + pulseProgress * 5
+            let distance = 10 + pulseProgress * 7
             Circle()
               .fill(accent)
-              .frame(width: 2, height: 2)
+              .frame(width: 2.6, height: 2.6)
               .offset(
                 x: CGFloat(cos(radians)) * distance,
                 y: CGFloat(sin(radians)) * distance
@@ -216,18 +225,28 @@ struct CodexSneakPeekView: View {
         }
 
         Image(systemName: symbolName)
-          .font(.system(size: 10, weight: .bold))
+          .font(.system(size: isCompletionPulse ? 13 : 10, weight: .bold))
           .foregroundStyle(accent)
           .scaleEffect(isCompletionPulse && !reduceMotion ? 0.88 + pulseProgress * 0.12 : 1)
       }
-      .frame(width: 18, height: 18)
+      .frame(width: isCompletionPulse ? 26 : 18, height: isCompletionPulse ? 26 : 18)
+      .shadow(
+        color: accent.opacity(isCompletionPulse ? 0.34 : 0.12),
+        radius: isCompletionPulse ? 8 : 2
+      )
 
-      Text(displayText)
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(Color.white.opacity(0.86))
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      if isCompletionPulse {
+        completionContent
+      } else if isRunningPulse {
+        runningContent
+      } else {
+        Text(displayText)
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(Color.white.opacity(0.86))
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
     }
     .frame(width: availableWidth, alignment: .leading)
     .offset(y: appeared ? 0 : 3)
@@ -253,7 +272,7 @@ struct CodexSneakPeekView: View {
       }
     }
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel(displayText)
+    .accessibilityLabel(accessibilityText)
   }
 
   private var normalizedTitle: String {
@@ -261,10 +280,127 @@ struct CodexSneakPeekView: View {
     return trimmed.isEmpty ? "Codex" : trimmed
   }
 
+  private var normalizedSubtitle: String {
+    let trimmed = subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty { return trimmed }
+    return isCompletionPulse ? "对话已完成" : "开始执行新的 Codex 对话"
+  }
+
+  @ViewBuilder
+  private var runningContent: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      HStack(spacing: 4) {
+        Circle()
+          .fill(accent.opacity(0.72))
+          .frame(width: 3, height: 3)
+
+        Text(normalizedTitle)
+          .font(.system(size: 8.5, weight: .medium))
+          .foregroundStyle(Color.white.opacity(0.48))
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      GeometryReader { geometry in
+        MarqueeText(
+          .constant(normalizedSubtitle),
+          font: .system(size: 11.5, weight: .medium),
+          nsFont: .caption1,
+          textColor: Color.white.opacity(0.86),
+          minDuration: 0.28,
+          frameWidth: max(40, geometry.size.width),
+          pointsPerSecond: 58
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .overlay(alignment: .trailing) {
+          LinearGradient(
+            colors: [.clear, .black.opacity(0.88)],
+            startPoint: .leading,
+            endPoint: .trailing
+          )
+          .frame(width: 12)
+          .allowsHitTesting(false)
+        }
+      }
+      .frame(height: 15)
+    }
+    .frame(maxWidth: .infinity, minHeight: 25, alignment: .leading)
+  }
+
+  @ViewBuilder
+  private var completionContent: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      HStack(spacing: 5) {
+        Text(normalizedTitle)
+          .font(.system(size: 9.5, weight: .semibold))
+          .foregroundStyle(Color.white.opacity(0.58))
+          .lineLimit(1)
+          .truncationMode(.middle)
+
+        Spacer(minLength: 4)
+
+        HStack(spacing: 3) {
+          Image(systemName: "checkmark")
+            .font(.system(size: 7.5, weight: .bold))
+          Text("已完成")
+            .font(.system(size: 8.5, weight: .bold))
+        }
+        .foregroundStyle(accent)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2.5)
+        .background(
+          Capsule(style: .continuous)
+            .fill(accent.opacity(0.14))
+            .overlay(
+              Capsule(style: .continuous)
+                .stroke(accent.opacity(0.28), lineWidth: 0.7)
+            )
+        )
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      GeometryReader { geometry in
+        MarqueeText(
+          .constant(normalizedSubtitle),
+          font: .system(size: 12.5, weight: .semibold),
+          nsFont: .caption1,
+          textColor: Color.white.opacity(0.92),
+          minDuration: 0.34,
+          frameWidth: max(40, geometry.size.width),
+          pointsPerSecond: 54
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .overlay(alignment: .trailing) {
+          LinearGradient(
+            colors: [.clear, .black.opacity(0.92)],
+            startPoint: .leading,
+            endPoint: .trailing
+          )
+          .frame(width: 16)
+          .allowsHitTesting(false)
+        }
+      }
+      .frame(height: 17)
+    }
+    .frame(maxWidth: .infinity, minHeight: 33, alignment: .leading)
+  }
+
   private var displayText: String {
     if isCompletionPulse { return "\(normalizedTitle) · 已完成" }
+    if isRunningPulse { return "\(normalizedTitle) · 正在处理" }
     if isWaitingForApproval { return "\(normalizedTitle) · 等待批准" }
     return "\(normalizedTitle) · 正在处理"
+  }
+
+  private var accessibilityText: String {
+    if isCompletionPulse {
+      return "项目 \(normalizedTitle)，对话 \(normalizedSubtitle)，已完成"
+    }
+    if isRunningPulse {
+      return "项目 \(normalizedTitle)，开始执行 \(normalizedSubtitle)"
+    }
+    return displayText
   }
 
   private var symbolName: String {

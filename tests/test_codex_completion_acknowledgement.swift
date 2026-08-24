@@ -17,6 +17,40 @@ struct CodexCompletionAcknowledgementTests {
         )
         let reducer = CodexEventReducer()
 
+        var exposureSnapshot = CodexTaskStoreSnapshot(
+            savedAt: now,
+            recentCompletions: [first]
+        )
+        let exposureEffects = reducer.recordCompletionPresentations(
+            completionIDs: [first.id],
+            state: &exposureSnapshot,
+            now: now
+        )
+        try expect(
+            exposureEffects == [.persist]
+                && exposureSnapshot.presentedCompletionIDs == [first.id]
+                && exposureSnapshot.unacknowledgedCompletions == [first],
+            "the first presentation persists exposure without clearing the unread completion"
+        )
+        try expect(
+            reducer.recordCompletionPresentations(
+                completionIDs: [first.id],
+                state: &exposureSnapshot,
+                now: now
+            ).isEmpty,
+            "repeated exposure recording is idempotent within one presentation"
+        )
+        _ = reducer.acknowledgeCompletion(
+            sessionID: first.sessionID,
+            state: &exposureSnapshot,
+            now: now
+        )
+        try expect(
+            exposureSnapshot.unacknowledgedCompletions.isEmpty
+                && exposureSnapshot.presentedCompletionIDs?.isEmpty == true,
+            "the second presentation acknowledgement clears both unread and exposure state"
+        )
+
         let effects = reducer.acknowledgeCompletions(state: &snapshot, now: now)
         try expect(
             effects == [.persist, .refreshPresentation],
@@ -50,14 +84,16 @@ struct CodexCompletionAcknowledgementTests {
             with: encoder.encode(snapshot)
         ) as? [String: Any] ?? [:]
         legacyObject.removeValue(forKey: "acknowledgedCompletionIDs")
+        legacyObject.removeValue(forKey: "presentedCompletionIDs")
         let legacySnapshot = try decoder.decode(
             CodexTaskStoreSnapshot.self,
             from: JSONSerialization.data(withJSONObject: legacyObject)
         )
         try expect(
             legacySnapshot.acknowledgedCompletionIDs == nil
+                && legacySnapshot.presentedCompletionIDs == nil
                 && legacySnapshot.unacknowledgedCompletions == [first],
-            "state written before acknowledgement support remains readable"
+            "state written before acknowledgement and exposure support remains readable"
         )
 
         let second = CodexCompletionRecord(
@@ -168,10 +204,14 @@ struct CodexCompletionAcknowledgementTests {
                 prompt: "继续当前对话"
             )
         )
-        _ = reducer.reduce(
+        let continuedEffects = reducer.reduce(
             state: &continuedSnapshot,
             envelope: continuedPrompt,
             preferences: AppPreferences()
+        )
+        try expect(
+            continuedEffects.contains(.showRunning(sessionID: continuedCompletion.sessionID)),
+            "a new prompt emits an explicit running reminder even when completion history exists"
         )
         try expect(
             continuedSnapshot.tasks.first?.status == .running,

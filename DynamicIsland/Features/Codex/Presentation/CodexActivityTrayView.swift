@@ -1,15 +1,28 @@
 import Defaults
 import SwiftUI
 
+private struct CodexActivityItemFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
 struct CodexActivityTrayView: View {
     @ObservedObject private var controller = CodexFeatureController.shared
     @Default(.codexPinnedProjectNames) private var pinnedProjectNames
-    @Default(.codexCollapsedProjectNames) private var collapsedProjectNames
     @Default(.codexIgnoredSessionIDs) private var ignoredSessionIDs
     @Default(.codexShowContentPreviews) private var showContentPreviews
     @State private var showAllHistory = false
+    @State private var collapsedBuckets: Set<CodexActivityBucket> =
+        CodexActivityTrayExpansionPolicy.defaultCollapsedBuckets()
+    @State private var collapsedProjects: Set<String> = []
+    @State private var handledCompletionIDsThisPresentation: Set<UUID> = []
+    @State private var exposedCompletionSessionIDsThisPresentation: Set<String> = []
 
     private let defaultHistoryLimit = 10
+    private static let scrollCoordinateSpace = "codex-activity-tray-scroll"
 
     let onOpenURL: (() -> Void)?
 
@@ -18,7 +31,6 @@ struct CodexActivityTrayView: View {
             from: controller.snapshot,
             preferences: CodexActivityTrayPreferences(
                 pinnedProjectNames: Set(pinnedProjectNames),
-                collapsedProjectNames: Set(collapsedProjectNames),
                 ignoredSessionIDs: Set(ignoredSessionIDs),
                 showContentPreviews: showContentPreviews
             )
@@ -26,24 +38,39 @@ struct CodexActivityTrayView: View {
     }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 14) {
-                header
+        GeometryReader { viewportProxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 14) {
+                    header
 
-                if model.buckets.isEmpty && model.ignoredItems.isEmpty {
-                    emptyState
-                } else {
-                    ForEach(model.buckets) { bucketGroup in
-                        bucketView(bucketGroup)
-                    }
+                    if model.buckets.isEmpty && model.ignoredItems.isEmpty {
+                        emptyState
+                    } else {
+                        ForEach(model.buckets) { bucketGroup in
+                            bucketView(bucketGroup)
+                        }
 
-                    if !model.ignoredItems.isEmpty {
-                        ignoredItemsView
+                        if !model.ignoredItems.isEmpty {
+                            ignoredItemsView
+                        }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .coordinateSpace(name: Self.scrollCoordinateSpace)
+            .onPreferenceChange(CodexActivityItemFramePreferenceKey.self) { itemFrames in
+                acknowledgeVisibleCompletions(
+                    itemFrames: itemFrames,
+                    viewportSize: viewportProxy.size
+                )
+            }
+        }
+        .onAppear {
+            resetPresentationState()
+        }
+        .onDisappear {
+            acknowledgeCompletionsViewedDuringPresentation()
         }
         .accessibilityIdentifier("codex-activity-tray")
     }
@@ -98,78 +125,117 @@ struct CodexActivityTrayView: View {
         let displayedBucket = isHistory && !showAllHistory
             ? bucketGroup.limited(to: defaultHistoryLimit)
             : bucketGroup
+        let isCollapsed = collapsedBuckets.contains(displayedBucket.bucket)
 
         return VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 6) {
-                Image(systemName: displayedBucket.bucket.symbolName)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(displayedBucket.bucket.swiftUIColor)
-                Text(displayedBucket.bucket.title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.82))
-                Text("\(displayedBucket.itemCount)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(displayedBucket.bucket.swiftUIColor)
-                Spacer(minLength: 0)
-            }
-            .accessibilityIdentifier("codex-activity-bucket-\(displayedBucket.bucket.rawValue)")
-
-            ForEach(displayedBucket.groups) { projectGroup in
-                projectView(projectGroup, bucket: displayedBucket.bucket)
-            }
-
-            if isHistory && bucketGroup.itemCount > defaultHistoryLimit {
-                Button {
-                    showAllHistory.toggle()
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: showAllHistory ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
-                        Text(showAllHistory ? "收起历史对话" : "查看更多历史对话（\(bucketGroup.itemCount - defaultHistoryLimit)）")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .foregroundStyle(Color.white.opacity(0.72))
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 7)
-                    .background(Color.white.opacity(0.045))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            Button {
+                toggleBucket(displayedBucket.bucket)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.62))
+                        .frame(width: 14, height: 18)
+                    Image(systemName: displayedBucket.bucket.symbolName)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(displayedBucket.bucket.swiftUIColor)
+                    Text(displayedBucket.bucket.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.82))
+                    Text("\(displayedBucket.itemCount)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(displayedBucket.bucket.swiftUIColor)
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("codex-activity-history-more")
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(isCollapsed ? "展开此分组" : "折叠此分组")
+            .accessibilityIdentifier("codex-activity-bucket-\(displayedBucket.bucket.rawValue)")
+            .accessibilityHint(isCollapsed ? "点击标题展开分组" : "点击标题折叠分组")
+
+            if !isCollapsed {
+                ForEach(displayedBucket.groups) { projectGroup in
+                    projectView(projectGroup, bucket: displayedBucket.bucket)
+                }
+
+                if isHistory && bucketGroup.itemCount > defaultHistoryLimit {
+                    Button {
+                        showAllHistory.toggle()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: showAllHistory ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                            Text(showAllHistory ? "收起历史对话" : "查看更多历史对话（\(bucketGroup.itemCount - defaultHistoryLimit)）")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.white.opacity(0.72))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 7)
+                        .background(Color.white.opacity(0.045))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("codex-activity-history-more")
+                }
             }
         }
+    }
+
+    private func toggleBucket(_ bucket: CodexActivityBucket) {
+        if collapsedBuckets.contains(bucket) {
+            collapsedBuckets.remove(bucket)
+        } else {
+            collapsedBuckets.insert(bucket)
+        }
+    }
+
+    private func toggleProject(_ projectID: String) {
+        if collapsedProjects.contains(projectID) {
+            collapsedProjects.remove(projectID)
+        } else {
+            collapsedProjects.insert(projectID)
+        }
+    }
+
+    private func resetPresentationState() {
+        showAllHistory = false
+        collapsedBuckets = CodexActivityTrayExpansionPolicy.defaultCollapsedBuckets()
+        collapsedProjects.removeAll()
     }
 
     private func projectView(
         _ projectGroup: CodexActivityTrayProjectGroup,
         bucket: CodexActivityBucket
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let isCollapsed = collapsedProjects.contains(projectGroup.id)
+
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
                 Button {
-                    controller.setProjectCollapsed(
-                        projectGroup.projectName,
-                        collapsed: !projectGroup.isCollapsed
-                    )
+                    toggleProject(projectGroup.id)
                 } label: {
-                    Image(systemName: projectGroup.isCollapsed ? "chevron.right" : "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.66))
-                        .frame(width: 18, height: 18)
+                    HStack(spacing: 7) {
+                        Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.66))
+                            .frame(width: 18, height: 18)
+
+                        Text(projectGroup.projectName)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+
+                        Text("\(projectGroup.items.count)")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.52))
+
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(projectGroup.isCollapsed ? "展开项目任务" : "折叠项目任务")
-
-                Text(projectGroup.projectName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-
-                Text("\(projectGroup.items.count)")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.52))
-
-                Spacer(minLength: 0)
+                .help(isCollapsed ? "展开项目任务" : "折叠项目任务")
 
                 Button {
                     controller.setProjectPinned(
@@ -188,7 +254,7 @@ struct CodexActivityTrayView: View {
             .padding(.horizontal, 3)
             .accessibilityIdentifier("codex-activity-project-\(projectGroup.id)")
 
-            if !projectGroup.isCollapsed {
+            if !isCollapsed {
                 ForEach(projectGroup.items) { item in
                     itemView(item, bucket: bucket)
                 }
@@ -251,6 +317,64 @@ struct CodexActivityTrayView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .opacity(item.bucket == .readHistory ? 0.78 : 1)
+        .background {
+            if item.bucket == .unreadCompleted {
+                GeometryReader { itemProxy in
+                    Color.clear.preference(
+                        key: CodexActivityItemFramePreferenceKey.self,
+                        value: [
+                            item.id: itemProxy.frame(in: .named(Self.scrollCoordinateSpace))
+                        ]
+                    )
+                }
+            }
+        }
+    }
+
+    private func acknowledgeVisibleCompletions(
+        itemFrames: [String: CGRect],
+        viewportSize: CGSize
+    ) {
+        let visibleItemIDs = CodexActivityTrayVisibilityPolicy.visibleItemIDs(
+            itemFrames: itemFrames,
+            viewportBounds: CGRect(origin: .zero, size: viewportSize)
+        )
+        let unreadItems = model.buckets
+            .first { $0.bucket == .unreadCompleted }?
+            .items ?? []
+        let visibleItems = unreadItems.filter { visibleItemIDs.contains($0.id) }
+        let previouslyPresentedIDs = Set(controller.snapshot.presentedCompletionIDs ?? [])
+        let decision = CodexActivityTrayExposurePolicy.decision(
+            for: visibleItems,
+            previouslyPresentedIDs: previouslyPresentedIDs,
+            handledCompletionIDs: handledCompletionIDsThisPresentation
+        )
+        guard !decision.handledCompletionIDs.isEmpty else { return }
+
+        handledCompletionIDsThisPresentation.formUnion(decision.handledCompletionIDs)
+        exposedCompletionSessionIDsThisPresentation.formUnion(
+            CodexActivityTrayExposurePolicy.sessionIDsToAcknowledgeOnDismiss(
+                for: visibleItems
+            )
+        )
+        Task { @MainActor in
+            if !decision.completionIDsToRecord.isEmpty {
+                controller.recordCompletionPresentations(
+                    completionIDs: decision.completionIDsToRecord
+                )
+            }
+        }
+    }
+
+    private func acknowledgeCompletionsViewedDuringPresentation() {
+        let sessionIDs = exposedCompletionSessionIDsThisPresentation
+        handledCompletionIDsThisPresentation.removeAll()
+        exposedCompletionSessionIDsThisPresentation.removeAll()
+        guard !sessionIDs.isEmpty else { return }
+
+        Task { @MainActor in
+            controller.acknowledgeCompletions(sessionIDs: sessionIDs)
+        }
     }
 
     private var ignoredItemsView: some View {

@@ -3,6 +3,7 @@ import Foundation
 public enum CodexStateEffect: Equatable, Sendable {
   case persist
   case refreshPresentation
+  case showRunning(sessionID: String)
   case showCompletion(sessionID: String)
   case log(String)
 }
@@ -75,6 +76,7 @@ public struct CodexEventReducer: Sendable {
       task.endedAt = nil
       task.lastActivityAt = now
       task.model = event.model ?? task.model
+      effects.append(.showRunning(sessionID: task.sessionID))
 
     case "PermissionRequest":
       task.status = .waitingForApproval
@@ -162,8 +164,32 @@ public struct CodexEventReducer: Sendable {
     guard Set(visibleCompletionIDs) != Set(acknowledgedCompletionIDs) else { return [] }
 
     state.acknowledgedCompletionIDs = visibleCompletionIDs
+    state.presentedCompletionIDs = []
     state.savedAt = now
     return [.persist, .refreshPresentation]
+  }
+
+  public func recordCompletionPresentations(
+    completionIDs: Set<UUID>,
+    state: inout CodexTaskStoreSnapshot,
+    now: Date
+  ) -> [CodexStateEffect] {
+    guard !completionIDs.isEmpty else { return [] }
+    let retainedCompletionIDs = Set(state.recentCompletions.map(\.id))
+    let acknowledgedCompletionIDs = Set(state.acknowledgedCompletionIDs ?? [])
+    var presented = state.presentedCompletionIDs ?? []
+    let existing = Set(presented)
+    let newIDs = completionIDs.filter {
+      retainedCompletionIDs.contains($0)
+        && !acknowledgedCompletionIDs.contains($0)
+        && !existing.contains($0)
+    }
+    guard !newIDs.isEmpty else { return [] }
+
+    presented.append(contentsOf: newIDs)
+    state.presentedCompletionIDs = presented
+    state.savedAt = now
+    return [.persist]
   }
 
   public func acknowledgeCompletion(
@@ -203,6 +229,10 @@ public struct CodexEventReducer: Sendable {
 
     acknowledged.append(contentsOf: newIDs)
     state.acknowledgedCompletionIDs = acknowledged
+    let acknowledgedSet = Set(completionIDs)
+    state.presentedCompletionIDs = (state.presentedCompletionIDs ?? []).filter {
+      !acknowledgedSet.contains($0)
+    }
     state.savedAt = now
     return true
   }
@@ -231,6 +261,7 @@ public struct CodexEventReducer: Sendable {
   ) -> Bool {
     let previous = state.recentCompletions
     let previousAcknowledgedCompletionIDs = state.acknowledgedCompletionIDs ?? []
+    let previousPresentedCompletionIDs = state.presentedCompletionIDs ?? []
     let cutoff = now.addingTimeInterval(-preferences.recentRetention)
     state.recentCompletions = state.recentCompletions
       .filter { $0.completedAt > cutoff }
@@ -241,8 +272,12 @@ public struct CodexEventReducer: Sendable {
     state.acknowledgedCompletionIDs = previousAcknowledgedCompletionIDs.filter {
       retainedCompletionIDs.contains($0)
     }
+    state.presentedCompletionIDs = previousPresentedCompletionIDs.filter {
+      retainedCompletionIDs.contains($0)
+    }
     return state.recentCompletions != previous
       || state.acknowledgedCompletionIDs != previousAcknowledgedCompletionIDs
+      || state.presentedCompletionIDs != previousPresentedCompletionIDs
   }
 
   private func projectName(from cwd: String?) -> String {
@@ -294,6 +329,18 @@ public struct CodexTaskStore: Sendable {
   @discardableResult
   public mutating func acknowledgeCompletions(now: Date = Date()) -> [CodexStateEffect] {
     reducer.acknowledgeCompletions(state: &snapshot, now: now)
+  }
+
+  @discardableResult
+  public mutating func recordCompletionPresentations(
+    completionIDs: Set<UUID>,
+    now: Date = Date()
+  ) -> [CodexStateEffect] {
+    reducer.recordCompletionPresentations(
+      completionIDs: completionIDs,
+      state: &snapshot,
+      now: now
+    )
   }
 
   @discardableResult

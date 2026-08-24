@@ -16,12 +16,15 @@ public struct CodexPresentation: Equatable, Sendable {
 
 public enum CodexPresentationContext: Equatable, Sendable {
   case steady
+  case runningPulse(sessionID: String)
   case completionPulse(sessionID: String, completedCount: Int)
 
   fileprivate var phaseName: String {
     switch self {
     case .steady:
       return "steady"
+    case .runningPulse:
+      return "running-pulse"
     case .completionPulse:
       return "completion-pulse"
     }
@@ -31,18 +34,70 @@ public enum CodexPresentationContext: Equatable, Sendable {
     switch self {
     case .steady:
       return 0
+    case .runningPulse:
+      return 0
     case .completionPulse(_, let completedCount):
       return max(1, completedCount)
     }
   }
 
-  fileprivate var sessionID: String? {
+  fileprivate var runningSessionID: String? {
     switch self {
-    case .steady:
+    case .steady, .completionPulse:
+      return nil
+    case .runningPulse(let sessionID):
+      return sessionID
+    }
+  }
+
+  fileprivate var completionSessionID: String? {
+    switch self {
+    case .steady, .runningPulse:
       return nil
     case .completionPulse(let sessionID, _):
       return sessionID
     }
+  }
+
+  fileprivate var isCompletionPulse: Bool {
+    if case .completionPulse = self { return true }
+    return false
+  }
+
+  fileprivate var sneakPeekDuration: TimeInterval {
+    switch self {
+    case .steady:
+      return CodexPresentationConstants.defaultSneakPeekDuration
+    case .runningPulse:
+      return CodexPresentationConstants.runningSneakPeekDuration
+    case .completionPulse:
+      return CodexPresentationConstants.completionPulseDuration
+    }
+  }
+}
+
+struct CodexPresentationPulseGate: Equatable, Sendable {
+  private var nextGeneration = 0
+  private var activeGeneration: Int?
+
+  var isActive: Bool {
+    activeGeneration != nil
+  }
+
+  mutating func begin() -> Int {
+    nextGeneration += 1
+    activeGeneration = nextGeneration
+    return nextGeneration
+  }
+
+  mutating func finish(generation: Int) -> Bool {
+    guard activeGeneration == generation else { return false }
+    activeGeneration = nil
+    return true
+  }
+
+  mutating func cancel() {
+    activeGeneration = nil
   }
 }
 
@@ -64,11 +119,16 @@ public struct CodexPresentationBuilder: Sendable {
     }
     let waiting = active.filter { $0.status == .waitingForApproval }
     let running = active.filter { $0.status == .running }
-    let recent = snapshot.recentCompletions
+    let currentSessionIDs = Set(active.map(\.sessionID))
+    let recent = snapshot.latestRecentCompletions(
+      excludingSessionIDs: currentSessionIDs
+    )
       .filter { !ignoredSessionIDs.contains($0.sessionID) }
-      .sorted { $0.completedAt > $1.completedAt }
     let unacknowledged = snapshot.unacknowledgedCompletions
-      .filter { !ignoredSessionIDs.contains($0.sessionID) }
+      .filter {
+        !currentSessionIDs.contains($0.sessionID)
+          && !ignoredSessionIDs.contains($0.sessionID)
+      }
       .sorted {
       $0.completedAt > $1.completedAt
       }
@@ -81,9 +141,12 @@ public struct CodexPresentationBuilder: Sendable {
     )
     let trailingContent = compactTrailingContent(status: compactStatus)
     let pulseCompletion =
-      context.sessionID.flatMap { sessionID in
+      context.completionSessionID.flatMap { sessionID in
         unacknowledged.first { $0.sessionID == sessionID }
-      } ?? (context == .steady ? nil : unacknowledged.first)
+      } ?? (context.isCompletionPulse ? unacknowledged.first : nil)
+    let pulseRunning = context.runningSessionID.flatMap { sessionID in
+      running.first { $0.sessionID == sessionID }
+    }
     var statusMetadata = [
       "codex_waiting_count": String(waiting.count),
       "codex_running_count": String(running.count),
@@ -107,14 +170,17 @@ public struct CodexPresentationBuilder: Sendable {
         icon: .symbol(name: "exclamationmark.triangle.fill"),
         color: .orange,
         trailingContent: trailingContent,
-        sneakTitle: pulseCompletion?.projectName ?? first?.projectName,
-        sneakSubtitle: pulseCompletion?.resultPreview ?? first?.approvalPreview ?? "需要用户批准",
+        sneakTitle: pulseCompletion?.projectName ?? pulseRunning?.projectName ?? first?.projectName,
+        sneakSubtitle: pulseCompletion.flatMap(completionSneakPeekText)
+          ?? pulseRunning?.promptPreview
+          ?? first?.approvalPreview
+          ?? "需要用户批准",
         metadata: statusMetadata,
         triggersSneakPeekOnUpdate: context != .steady,
         context: context
       )
     case (true, false, _):
-      let isCompletionPulse = context != .steady
+      let isCompletionPulse = context.isCompletionPulse
       live = makeLive(
         title: "Codex",
         subtitle: statusSummary(
@@ -125,10 +191,12 @@ public struct CodexPresentationBuilder: Sendable {
         icon: .symbol(name: isCompletionPulse ? "checkmark.circle.fill" : "terminal.fill"),
         color: isCompletionPulse ? .green : .blue,
         trailingContent: trailingContent,
-        sneakTitle: pulseCompletion?.projectName ?? running.first?.projectName,
-        sneakSubtitle: pulseCompletion?.resultPreview ?? running.first?.promptPreview,
+        sneakTitle: pulseCompletion?.projectName ?? pulseRunning?.projectName ?? running.first?.projectName,
+        sneakSubtitle: pulseCompletion.flatMap(completionSneakPeekText)
+          ?? pulseRunning?.promptPreview
+          ?? running.first?.promptPreview,
         metadata: statusMetadata,
-        triggersSneakPeekOnUpdate: isCompletionPulse,
+        triggersSneakPeekOnUpdate: context != .steady,
         context: context
       )
     case (true, true, let completion?):
@@ -139,7 +207,8 @@ public struct CodexPresentationBuilder: Sendable {
         color: .green,
         trailingContent: trailingContent,
         sneakTitle: pulseCompletion?.projectName ?? completion.projectName,
-        sneakSubtitle: pulseCompletion?.resultPreview ?? completion.resultPreview,
+        sneakSubtitle: pulseCompletion.flatMap(completionSneakPeekText)
+          ?? completionSneakPeekText(completion),
         metadata: statusMetadata,
         triggersSneakPeekOnUpdate: context != .steady,
         context: context
@@ -204,9 +273,7 @@ public struct CodexPresentationBuilder: Sendable {
       centerTextStyle: .inheritUser,
       sneakPeekConfig: AtollSneakPeekConfig(
         enabled: true,
-        duration: context == .steady
-          ? CodexPresentationConstants.runningSneakPeekDuration
-          : CodexPresentationConstants.completionPulseDuration,
+        duration: context.sneakPeekDuration,
         style: .standard,
         showOnUpdate: triggersSneakPeekOnUpdate
       ),
@@ -418,6 +485,11 @@ public struct CodexPresentationBuilder: Sendable {
       return projectName
     }
     return fallback
+  }
+
+  private func completionSneakPeekText(_ completion: CodexCompletionRecord) -> String? {
+    PreviewSanitizer.sanitizePrompt(completion.promptPreview)
+      ?? PreviewSanitizer.sanitize(completion.resultPreview)
   }
 
 }

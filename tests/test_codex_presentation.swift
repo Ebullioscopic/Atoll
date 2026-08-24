@@ -144,21 +144,20 @@ struct CodexPresentationTests {
                 lastActivityAt: now
             ),
         ]
-        let mixedStatus = CodexPresentationBuilder().build(
-            from: CodexTaskStoreSnapshot(
-                savedAt: now,
-                tasks: runningTasks,
-                recentCompletions: [
-                    CodexCompletionRecord(
-                        sessionID: "completed-1",
-                        projectName: "Atoll-CodexAtoll",
-                        promptPreview: "验证完成状态",
-                        resultPreview: "已完成纵向展示",
-                        completedAt: now.addingTimeInterval(-10)
-                    )
-                ]
-            )
+        let mixedStatusSnapshot = CodexTaskStoreSnapshot(
+            savedAt: now,
+            tasks: runningTasks,
+            recentCompletions: [
+                CodexCompletionRecord(
+                    sessionID: "completed-1",
+                    projectName: "Atoll-CodexAtoll",
+                    promptPreview: "验证完成状态",
+                    resultPreview: "已完成纵向展示",
+                    completedAt: now.addingTimeInterval(-10)
+                )
+            ]
         )
+        let mixedStatus = CodexPresentationBuilder().build(from: mixedStatusSnapshot)
         let completedPriorityWithRunning = CodexPresentationBuilder().build(
             from: CodexTaskStoreSnapshot(
                 savedAt: now,
@@ -278,6 +277,42 @@ struct CodexPresentationTests {
             "completion confirmation keeps the standard 3.5 second presentation window"
         )
         try expect(
+            completionPulseLiveActivity.sneakPeekTitle == "Atoll-CodexAtoll"
+                && completionPulseLiveActivity.sneakPeekSubtitle == "优化 Codex 刘海动效",
+            "completion pulse identifies the completed conversation instead of only the project"
+        )
+        let runningPulse = CodexPresentationBuilder().build(
+            from: mixedStatusSnapshot,
+            context: .runningPulse(sessionID: "running-1")
+        )
+        guard let runningPulseLiveActivity = runningPulse.liveActivity else {
+            throw TestFailure(message: "a new conversation exposes a running pulse")
+        }
+        try expect(
+            runningPulseLiveActivity.metadata["codex_presentation_phase"] == "running-pulse"
+                && runningPulseLiveActivity.sneakPeekConfig?.showOnUpdate == true
+                && runningPulseLiveActivity.sneakPeekConfig?.duration == 6.0,
+            "a new conversation triggers an immediate six second update even when completions exist"
+        )
+        try expect(
+            runningPulseLiveActivity.sneakPeekTitle == "Atoll-CodexAtoll"
+                && runningPulseLiveActivity.sneakPeekSubtitle == "修复关闭态任务摘要",
+            "running pulse content comes from the new conversation instead of an older completion"
+        )
+        var pulseGate = CodexPresentationPulseGate()
+        let firstPulseGeneration = pulseGate.begin()
+        try expect(
+            pulseGate.isActive,
+            "ordinary refreshes are deferred while a completion pulse is active"
+        )
+        let replacementPulseGeneration = pulseGate.begin()
+        try expect(
+            !pulseGate.finish(generation: firstPulseGeneration)
+                && pulseGate.finish(generation: replacementPulseGeneration)
+                && !pulseGate.isActive,
+            "a newer completion owns the full presentation window and stale restores are ignored"
+        )
+        try expect(
             mixedLiveActivity.metadata["codex_compact_line_0_detail"] == nil,
             "completed compact row omits concrete result context"
         )
@@ -363,7 +398,6 @@ struct CodexPresentationTests {
             from: traySnapshot,
             preferences: CodexActivityTrayPreferences(
                 pinnedProjectNames: ["Project A"],
-                collapsedProjectNames: ["Project A"],
                 ignoredSessionIDs: ["tray-completed"]
             )
         )
@@ -379,8 +413,16 @@ struct CodexPresentationTests {
         try expect(
             tray.buckets[2].groups.first?.projectName == "Project A"
                 && tray.buckets[2].groups.first?.isPinned == true
-                && tray.buckets[2].groups.first?.isCollapsed == true,
-            "activity tray applies project pinning and collapse preferences"
+                && tray.buckets[2].groups.first?.isCollapsed == false,
+            "activity tray applies project pinning while project groups default expanded"
+        )
+        try expect(
+            CodexActivityTrayExpansionPolicy.isExpandedByDefault(.needsAttention)
+                && CodexActivityTrayExpansionPolicy.isExpandedByDefault(.blocked)
+                && CodexActivityTrayExpansionPolicy.isExpandedByDefault(.unreadCompleted)
+                && CodexActivityTrayExpansionPolicy.isExpandedByDefault(.running)
+                && !CodexActivityTrayExpansionPolicy.isExpandedByDefault(.readHistory),
+            "activity tray expands actionable buckets by default and folds read history"
         )
         try expect(
             tray.buckets[0].groups.first?.items.first?.nextAction == "打开 Codex 处理"
@@ -418,6 +460,7 @@ struct CodexPresentationTests {
             viewedHistory.buckets.first?.limited(to: 10).itemCount == 10,
             "activity tray can limit completed history to the default ten rows"
         )
+
         try expect(
             AppPreferences().recentRetention == 7 * 24 * 60 * 60
                 && AppPreferences().maxRecentCompletions == 100,
@@ -481,6 +524,52 @@ struct CodexPresentationTests {
         try expect(
             orderedTray.buckets[2].items.first?.bucket == .readHistory,
             "acknowledged completions use the grey history bucket"
+        )
+
+        let previousTurnCompletion = CodexCompletionRecord(
+            sessionID: "continued-conversation",
+            projectName: "Atoll-CodexAtoll",
+            promptPreview: "上一轮已经完成",
+            resultPreview: "上一轮结果",
+            completedAt: now.addingTimeInterval(-60)
+        )
+        let latestRunningTurn = CodexTaskRecord(
+            sessionID: previousTurnCompletion.sessionID,
+            currentTurnID: "latest-turn",
+            projectName: previousTurnCompletion.projectName,
+            promptPreview: "当前最新一轮",
+            status: .running,
+            startedAt: now.addingTimeInterval(-10),
+            lastActivityAt: now
+        )
+        let continuedConversationSnapshot = CodexTaskStoreSnapshot(
+            savedAt: now,
+            tasks: [latestRunningTurn],
+            recentCompletions: [previousTurnCompletion]
+        )
+        let continuedConversationTray = CodexActivityTrayBuilder().build(
+            from: continuedConversationSnapshot
+        )
+        try expect(
+            continuedConversationTray.visibleItemCount == 1
+                && continuedConversationTray.buckets.map(\.bucket) == [.running]
+                && continuedConversationTray.buckets.first?.items.first?.title == "当前最新一轮",
+            "one Codex conversation shows only its latest running turn instead of an older completed turn"
+        )
+
+        let continuedConversationPresentation = CodexPresentationBuilder().build(
+            from: continuedConversationSnapshot
+        )
+        guard let continuedLiveActivity = continuedConversationPresentation.liveActivity,
+              let continuedTab = continuedConversationPresentation.notchExperience?.tab else {
+            throw TestFailure(message: "a continued conversation exposes one current presentation")
+        }
+        try expect(
+            continuedLiveActivity.metadata["codex_running_count"] == "1"
+                && continuedLiveActivity.metadata["codex_completed_count"] == "0"
+                && continuedTab.sections.count == 1
+                && continuedTab.sections.first?.title == "当前最新一轮",
+            "compact counts and expanded sections both use the latest turn for one conversation"
         )
 
         print("CodexPresentationTests: PASS")

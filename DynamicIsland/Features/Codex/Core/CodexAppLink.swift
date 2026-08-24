@@ -4,6 +4,7 @@ import Foundation
 public enum CodexAppLink {
     public static let scheme = "codex"
     public static let threadsHost = "threads"
+    public static let appBundleIdentifier = "com.openai.codex"
 
     public static func url(forSessionID sessionID: String) -> URL? {
         guard !sessionID.isEmpty else { return nil }

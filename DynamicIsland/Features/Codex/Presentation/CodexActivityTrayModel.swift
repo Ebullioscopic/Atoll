@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 public enum CodexActivityBucket: String, CaseIterable, Equatable, Hashable, Sendable {
@@ -40,18 +41,15 @@ public enum CodexActivityBucket: String, CaseIterable, Equatable, Hashable, Send
 
 public struct CodexActivityTrayPreferences: Equatable, Sendable {
     public var pinnedProjectNames: Set<String>
-    public var collapsedProjectNames: Set<String>
     public var ignoredSessionIDs: Set<String>
     public var showContentPreviews: Bool
 
     public init(
         pinnedProjectNames: Set<String> = [],
-        collapsedProjectNames: Set<String> = [],
         ignoredSessionIDs: Set<String> = [],
         showContentPreviews: Bool = true
     ) {
         self.pinnedProjectNames = pinnedProjectNames
-        self.collapsedProjectNames = collapsedProjectNames
         self.ignoredSessionIDs = ignoredSessionIDs
         self.showContentPreviews = showContentPreviews
     }
@@ -68,6 +66,7 @@ public struct CodexActivityTrayItem: Equatable, Identifiable, Sendable {
     public let bucket: CodexActivityBucket
     public let lastActivityAt: Date
     public let completedAt: Date?
+    public let completionID: UUID?
     public let isRead: Bool
 
     public init(
@@ -81,6 +80,7 @@ public struct CodexActivityTrayItem: Equatable, Identifiable, Sendable {
         bucket: CodexActivityBucket,
         lastActivityAt: Date,
         completedAt: Date? = nil,
+        completionID: UUID? = nil,
         isRead: Bool = false
     ) {
         self.id = id
@@ -93,6 +93,7 @@ public struct CodexActivityTrayItem: Equatable, Identifiable, Sendable {
         self.bucket = bucket
         self.lastActivityAt = lastActivityAt
         self.completedAt = completedAt
+        self.completionID = completionID
         self.isRead = isRead
     }
 }
@@ -173,6 +174,73 @@ public struct CodexActivityTrayModel: Equatable, Sendable {
     }
 }
 
+struct CodexActivityTrayExpansionPolicy {
+    static func defaultCollapsedBuckets() -> Set<CodexActivityBucket> {
+        [.readHistory]
+    }
+
+    static func isExpandedByDefault(_ bucket: CodexActivityBucket) -> Bool {
+        bucket != .readHistory
+    }
+}
+
+struct CodexActivityTrayVisibilityPolicy {
+    static func visibleItemIDs(
+        itemFrames: [String: CGRect],
+        viewportBounds: CGRect,
+        minimumVisibleFraction: CGFloat = 0.5
+    ) -> Set<String> {
+        let threshold = min(max(minimumVisibleFraction, 0), 1)
+        return Set(itemFrames.compactMap { itemID, frame in
+            guard frame.width > 0, frame.height > 0 else { return nil }
+            let intersection = frame.intersection(viewportBounds)
+            guard !intersection.isNull, intersection.width > 0 else { return nil }
+            return intersection.height / frame.height >= threshold ? itemID : nil
+        })
+    }
+}
+
+struct CodexActivityTrayExposureDecision: Equatable {
+    let completionIDsToRecord: Set<UUID>
+    // Kept in the decision shape for callers that already consume it. Read
+    // acknowledgement is committed when the tray is dismissed, never while
+    // the current presentation is still open.
+    let sessionIDsToAcknowledge: Set<String>
+    let handledCompletionIDs: Set<UUID>
+}
+
+struct CodexActivityTrayExposurePolicy {
+    static func decision(
+        for visibleItems: [CodexActivityTrayItem],
+        previouslyPresentedIDs: Set<UUID>,
+        handledCompletionIDs: Set<UUID>
+    ) -> CodexActivityTrayExposureDecision {
+        let eligibleItems = visibleItems.filter { item in
+            guard let completionID = item.completionID else { return false }
+            return !handledCompletionIDs.contains(completionID)
+        }
+        let eligibleCompletionIDs = Set(eligibleItems.compactMap(\.completionID))
+        return CodexActivityTrayExposureDecision(
+            completionIDsToRecord: eligibleCompletionIDs.subtracting(previouslyPresentedIDs),
+            sessionIDsToAcknowledge: [],
+            handledCompletionIDs: eligibleCompletionIDs
+        )
+    }
+
+    static func sessionIDsToAcknowledgeOnDismiss(
+        for exposedItems: [CodexActivityTrayItem]
+    ) -> Set<String> {
+        Set(
+            exposedItems.compactMap { item in
+                guard item.bucket == .unreadCompleted,
+                      item.completionID != nil,
+                      !item.sessionID.isEmpty else { return nil }
+                return item.sessionID
+            }
+        )
+    }
+}
+
 public struct CodexActivityTrayBuilder: Sendable {
     public init() {}
 
@@ -181,9 +249,11 @@ public struct CodexActivityTrayBuilder: Sendable {
         preferences: CodexActivityTrayPreferences = .init()
     ) -> CodexActivityTrayModel {
         var itemsByBucket: [CodexActivityBucket: [CodexActivityTrayItem]] = [:]
+        var currentSessionIDs: Set<String> = []
 
         for task in snapshot.tasks {
             guard let bucket = bucket(for: task.status) else { continue }
+            currentSessionIDs.insert(task.sessionID)
             let item = makeItem(
                 for: task,
                 bucket: bucket,
@@ -193,14 +263,20 @@ public struct CodexActivityTrayBuilder: Sendable {
         }
 
         let acknowledgedCompletionIDs = Set(snapshot.acknowledgedCompletionIDs ?? [])
-        let recentCompletions = snapshot.recentCompletions
+        let unacknowledgedSessionIDs = Set(
+            snapshot.recentCompletions
+                .filter { !acknowledgedCompletionIDs.contains($0.id) }
+                .map(\.sessionID)
+        )
+        let recentCompletions = snapshot.latestRecentCompletions(
+            excludingSessionIDs: currentSessionIDs
+        )
         for completion in recentCompletions {
+            let isRead = !unacknowledgedSessionIDs.contains(completion.sessionID)
             let item = makeItem(
                 for: completion,
-                bucket: acknowledgedCompletionIDs.contains(completion.id)
-                    ? .readHistory
-                    : .unreadCompleted,
-                isRead: acknowledgedCompletionIDs.contains(completion.id),
+                bucket: isRead ? .readHistory : .unreadCompleted,
+                isRead: isRead,
                 showContentPreviews: preferences.showContentPreviews
             )
             itemsByBucket[item.bucket, default: []].append(item)
@@ -275,7 +351,7 @@ public struct CodexActivityTrayBuilder: Sendable {
                     projectName: projectName,
                     items: projectItems.sorted { $0.lastActivityAt > $1.lastActivityAt },
                     isPinned: preferences.pinnedProjectNames.contains(projectName),
-                    isCollapsed: preferences.collapsedProjectNames.contains(projectName)
+                    isCollapsed: false
                 )
             }
             .sorted { lhs, rhs in
@@ -368,6 +444,7 @@ public struct CodexActivityTrayBuilder: Sendable {
             bucket: bucket,
             lastActivityAt: completion.completedAt,
             completedAt: completion.completedAt,
+            completionID: completion.id,
             isRead: isRead
         )
     }

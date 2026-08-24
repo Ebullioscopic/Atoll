@@ -45,12 +45,13 @@ struct MarqueeText: View {
     let backgroundColor: Color
     let minDuration: Double
     let frameWidth: CGFloat
+    let pointsPerSecond: CGFloat
     
     @State private var textSize: CGSize = .zero
     @State private var offset: CGFloat = 0
     @State private var isAnimating: Bool = false
     
-    init(_ text: Binding<String>, font: Font = .body, nsFont: NSFont.TextStyle = .body, textColor: Color = .primary, backgroundColor: Color = .clear, minDuration: Double = 3.0, frameWidth: CGFloat = 200) {
+    init(_ text: Binding<String>, font: Font = .body, nsFont: NSFont.TextStyle = .body, textColor: Color = .primary, backgroundColor: Color = .clear, minDuration: Double = 3.0, frameWidth: CGFloat = 200, pointsPerSecond: CGFloat = 30) {
         _text = text
         self.font = font
         self.nsFont = nsFont
@@ -58,6 +59,7 @@ struct MarqueeText: View {
         self.backgroundColor = backgroundColor
         self.minDuration = minDuration
         self.frameWidth = frameWidth
+        self.pointsPerSecond = max(1, pointsPerSecond)
     }
     
     private var needsScrolling: Bool {
@@ -115,7 +117,7 @@ struct MarqueeText: View {
         guard isAnimating && needsScrolling else { return }
         
         // Duration based on speed (approx 30 pts per second)
-        let duration = Double(textSize.width / 30)
+        let duration = Double(textSize.width / pointsPerSecond)
         
         // 1. Initial/Restart Pause
         DispatchQueue.main.asyncAfter(deadline: .now() + minDuration) {

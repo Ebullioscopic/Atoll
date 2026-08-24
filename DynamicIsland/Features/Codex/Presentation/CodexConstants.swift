@@ -8,7 +8,8 @@ public enum CodexPresentationConstants {
     public static let visibleConversationLimit = 6
     public static let targetExperienceMetadataKey = "atoll.targetNotchExperienceID"
     public static let openCodexThreadMetadataPrefix = "atoll.openCodexThread."
-    public static let runningSneakPeekDuration: TimeInterval = 3.5
+    public static let defaultSneakPeekDuration: TimeInterval = 3.5
+    public static let runningSneakPeekDuration: TimeInterval = 6.0
     public static let completionPulseDuration: TimeInterval = 3.5
     public nonisolated static let defaultBundleIdentifier = "com.Ebullioscopic.Atoll.builtin.codex"
     public nonisolated static let legacyExternalBundleIdentifiers = [

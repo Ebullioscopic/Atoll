@@ -266,6 +266,8 @@ struct ContentView: View {
     
     private let zeroHeightHoverPadding: CGFloat = 10
     private let statsAdditionalRowHeight: CGFloat = statsSecondRowContentHeight + statsGridSpacingHeight
+    private let codexRunningSneakPeekContentHeight: CGFloat = 30
+    private let codexCompletionSneakPeekContentHeight: CGFloat = 38
     private let musicControlPauseGrace: TimeInterval = 5
     private let musicControlResumeDelay: TimeInterval = 0.24
 
@@ -1064,15 +1066,27 @@ struct ContentView: View {
                                   && activeSneakPeekStyle == .standard {
                                   let payload = extensionLiveActivityManager.payload(bundleIdentifier: bundleID, activityID: activityID)
                                   let descriptor = payload?.descriptor
+                                  let presentationPhase = descriptor?.metadata["codex_presentation_phase"]
+                                  let isCodexRunningPulse = isBuiltInCodex && presentationPhase == "running-pulse"
+                                  let isCodexCompletionPulse = isBuiltInCodex && presentationPhase == "completion-pulse"
                                   let accent = (descriptor?.accentColor.swiftUIColor ?? coordinator.sneakPeek.accentColor ?? .gray)
                                       .ensureMinimumBrightness(factor: 0.7)
                                   GeometryReader { geo in
                                       if isBuiltInCodex {
+                                          let transientAccent: Color = {
+                                              switch presentationPhase {
+                                              case "completion-pulse": return .green
+                                              case "running-pulse": return .blue
+                                              default: return accent
+                                              }
+                                          }()
                                           CodexSneakPeekView(
                                               title: coordinator.sneakPeek.title,
-                                              isCompletionPulse: descriptor?.metadata["codex_presentation_phase"] == "completion-pulse",
+                                              subtitle: coordinator.sneakPeek.subtitle,
+                                              isCompletionPulse: presentationPhase == "completion-pulse",
+                                              isRunningPulse: presentationPhase == "running-pulse",
                                               isWaitingForApproval: (Int(descriptor?.metadata["codex_waiting_count"] ?? "0") ?? 0) > 0,
-                                              accent: accent,
+                                              accent: transientAccent.ensureMinimumBrightness(factor: 0.7),
                                               availableWidth: max(0, geo.size.width)
                                           )
                                       } else {
@@ -1095,6 +1109,11 @@ struct ContentView: View {
                                           }
                                       }
                                   }
+                                  .frame(
+                                      height: isCodexRunningPulse
+                                          ? codexRunningSneakPeekContentHeight
+                                          : (isCodexCompletionPulse ? codexCompletionSneakPeekContentHeight : nil)
+                                  )
                                   .padding(.bottom, 10)
                               }
                           }

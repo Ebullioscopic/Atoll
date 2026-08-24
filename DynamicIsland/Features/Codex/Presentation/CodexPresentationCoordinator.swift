@@ -8,9 +8,8 @@ final class CodexPresentationCoordinator {
     private let notchExperienceManager: ExtensionNotchExperienceManager
     private var latestSnapshot: CodexTaskStoreSnapshot = .empty
     private var latestIgnoredSessionIDs: Set<String> = []
-    private var pulseGeneration = 0
+    private var pulseGate = CodexPresentationPulseGate()
     private var restoreTask: Task<Void, Never>?
-    private let completionPulseDuration = CodexPresentationConstants.completionPulseDuration
 
     init(
         builder: CodexPresentationBuilder = CodexPresentationBuilder(),
@@ -24,14 +23,20 @@ final class CodexPresentationCoordinator {
 
     func update(
         snapshot: CodexTaskStoreSnapshot,
+        runningSessionIDs: [String] = [],
         completionSessionIDs: [String] = [],
-        ignoredSessionIDs: Set<String> = []
+        ignoredSessionIDs: Set<String> = [],
+        interruptActivePulse: Bool = false
     ) {
         latestSnapshot = snapshot
         latestIgnoredSessionIDs = ignoredSessionIDs
+        if interruptActivePulse {
+            restoreTask?.cancel()
+            restoreTask = nil
+            pulseGate.cancel()
+        }
         if let sessionID = completionSessionIDs.last {
-            pulseGeneration += 1
-            let generation = pulseGeneration
+            let generation = pulseGate.begin()
             apply(
                 snapshot: snapshot,
                 context: .completionPulse(
@@ -40,8 +45,23 @@ final class CodexPresentationCoordinator {
                 ),
                 ignoredSessionIDs: ignoredSessionIDs
             )
-            scheduleSteadyRestore(generation: generation)
+            scheduleSteadyRestore(
+                generation: generation,
+                duration: CodexPresentationConstants.completionPulseDuration
+            )
+        } else if let sessionID = runningSessionIDs.last {
+            let generation = pulseGate.begin()
+            apply(
+                snapshot: snapshot,
+                context: .runningPulse(sessionID: sessionID),
+                ignoredSessionIDs: ignoredSessionIDs
+            )
+            scheduleSteadyRestore(
+                generation: generation,
+                duration: CodexPresentationConstants.runningSneakPeekDuration
+            )
         } else {
+            guard !pulseGate.isActive else { return }
             apply(
                 snapshot: snapshot,
                 context: .steady,
@@ -53,6 +73,7 @@ final class CodexPresentationCoordinator {
     func dismiss() {
         restoreTask?.cancel()
         restoreTask = nil
+        pulseGate.cancel()
         liveActivityManager.dismissBuiltIn(
             activityID: CodexPresentationConstants.liveActivityID,
             bundleIdentifier: builder.bundleIdentifier
@@ -99,20 +120,16 @@ final class CodexPresentationCoordinator {
         }
     }
 
-    private func scheduleSteadyRestore(generation: Int) {
+    private func scheduleSteadyRestore(generation: Int, duration: TimeInterval) {
         restoreTask?.cancel()
         restoreTask = Task { [weak self] in
             do {
-                try await Task.sleep(
-                    for: .seconds(
-                        self?.completionPulseDuration
-                            ?? CodexPresentationConstants.completionPulseDuration
-                    )
-                )
+                try await Task.sleep(for: .seconds(duration))
             } catch {
                 return
             }
-            guard let self, generation == self.pulseGeneration else { return }
+            guard let self, self.pulseGate.finish(generation: generation) else { return }
+            self.restoreTask = nil
             self.apply(snapshot: self.latestSnapshot, context: .steady)
         }
     }
