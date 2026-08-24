@@ -921,15 +921,6 @@ enum ColorExtractionMode: String, CaseIterable, Identifiable, Defaults.Serializa
     var id: Self { self }
 }
 
-enum LockScreenLiveActivityIconStyle: String, Defaults.Serializable {
-    case lock
-    case fingerprint
-    case both
-
-    var showsLock: Bool { self == .lock || self == .both }
-    var showsFingerprint: Bool { self == .fingerprint || self == .both }
-}
-
 extension Defaults.Keys {
         // MARK: General
     static let updateChannel = Key<UpdateChannel>("updateChannel", default: .stable)
@@ -1393,7 +1384,6 @@ extension Defaults.Keys {
     
     // MARK: Lock Screen Features
     static let enableLockScreenLiveActivity = Key<Bool>("enableLockScreenLiveActivity", default: true)
-    static let lockScreenLiveActivityIconStyle = Key<LockScreenLiveActivityIconStyle>("lockScreenLiveActivityIconStyle", default: .lock)
     static let enableLockSounds = Key<Bool>("enableLockSounds", default: true)
     
     // MARK: Caps Lock Indicator

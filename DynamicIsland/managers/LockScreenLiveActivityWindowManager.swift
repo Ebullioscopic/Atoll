@@ -20,6 +20,7 @@ import AppKit
 import Defaults
 import SkyLightWindow
 import SwiftUI
+import QuartzCore
 import Combine
 
 @MainActor
@@ -273,29 +274,24 @@ class LockScreenLiveActivityWindowManager {
         overlayAnimator.update(isLocked: false)
 
         hideTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(LockScreenAnimationTimings.currentUnlockHold))
+            try? await Task.sleep(for: .seconds(LockScreenAnimationTimings.unlockCollapse))
             guard let self, !Task.isCancelled else { return }
-
-            self.beginCollapseAnimation()
-
-            try? await Task.sleep(
-                for: .seconds(
-                    LockScreenAnimationTimings.unlockCollapse
-                        + LockScreenAnimationTimings.unlockRemovalPadding
-                )
-            )
-            guard !Task.isCancelled else { return }
-            self.finishHide()
+            await MainActor.run {
+                self.hideWithAnimation()
+            }
         }
     }
 
     func hideImmediately() {
         hideTask?.cancel()
         hideTask = nil
-        finishHide()
+
+        hideWithAnimation()
     }
 
-    private func beginCollapseAnimation() {
+    private func hideWithAnimation() {
+        guard let window else { return }
+
         let targetScale: CGFloat
         if let notchSize = currentNotchSize {
             targetScale = LockScreenLiveActivityOverlay.collapsedScale(for: notchSize, isDynamicIslandMode: isDynamicIslandMode)
@@ -304,23 +300,20 @@ class LockScreenLiveActivityWindowManager {
         }
 
         withAnimation(.smooth(duration: LockScreenAnimationTimings.unlockCollapse)) {
+            overlayModel.opacity = 0
             overlayModel.scale = targetScale
         }
 
-        // Keep both the SwiftUI content and the NSWindow fully opaque while the
-        // pill contracts. Fading here made the icon disappear before the shape
-        // had actually reached its closed width.
-        overlayModel.opacity = 1
-        window?.alphaValue = 1
-    }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = LockScreenAnimationTimings.unlockCollapse
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().alphaValue = 0
+        }
 
-    private func finishHide() {
-        guard let window else { return }
-
-        window.alphaValue = 0
-        window.orderOut(nil)
-        overlayModel.opacity = 0
-        currentNotchSize = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + LockScreenAnimationTimings.unlockCollapse + 0.02) {
+            window.orderOut(nil)
+            self.currentNotchSize = nil
+        }
 
         print("[\(timestamp())] LockScreenLiveActivityWindowManager: HUD hidden")
     }

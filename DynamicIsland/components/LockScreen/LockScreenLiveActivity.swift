@@ -26,7 +26,6 @@ struct LockScreenLiveActivity: View {
     @State private var isHovering: Bool = false
     @State private var gestureProgress: CGFloat = 0
     @State private var isExpanded: Bool = false
-    @State private var unlockCollapseTask: Task<Void, Never>?
 
     private var expandAnimation: Animation {
         .smooth(duration: LockScreenAnimationTimings.lockExpand)
@@ -85,20 +84,9 @@ struct LockScreenLiveActivity: View {
                 .fill(.black)
                 .frame(width: vm.closedNotchSize.width + (isHovering ? 8 : 0))
             
-            // Right - Optional fingerprint confirmation. It shares the lock
-            // progress so its success effect starts at the unlock threshold.
+            // Right - Empty for symmetry with animation
             Color.clear
-                .overlay(alignment: .trailing) {
-                    LockScreenFingerprintProgressView(
-                        progress: iconAnimator.progress,
-                        iconColor: iconColor
-                    )
-                    .frame(width: indicatorDimension, height: indicatorDimension)
-                    .opacity(indicatorOpacity)
-                    .scaleEffect(0.96 + (indicatorVisibilityProgress * 0.04))
-                }
                 .frame(width: indicatorSideWidth, height: indicatorSideHeight)
-                .clipped()
         }
         .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0))
         .onAppear {
@@ -110,7 +98,6 @@ struct LockScreenLiveActivity: View {
         }
         .onDisappear {
             // Collapse immediately when removed from hierarchy
-            unlockCollapseTask?.cancel()
             isExpanded = false
         }
         .onChange(of: lockScreenManager.isLockIdle) { _, newValue in
@@ -127,21 +114,12 @@ struct LockScreenLiveActivity: View {
         .onChange(of: lockScreenManager.isLocked) { _, newValue in
             iconAnimator.update(isLocked: newValue)
             if newValue {
-                unlockCollapseTask?.cancel()
                 withAnimation(expandAnimation) {
                     isExpanded = true
                 }
             } else {
-                unlockCollapseTask?.cancel()
-                let holdDuration = LockScreenAnimationTimings.currentUnlockHold
-                unlockCollapseTask = Task { @MainActor in
-                    if holdDuration > 0 {
-                        try? await Task.sleep(for: .seconds(holdDuration))
-                    }
-                    guard !Task.isCancelled else { return }
-                    withAnimation(collapseAnimation) {
-                        isExpanded = false
-                    }
+                withAnimation(collapseAnimation) {
+                    isExpanded = false
                 }
             }
         }

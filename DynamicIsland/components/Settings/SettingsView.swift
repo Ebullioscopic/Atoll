@@ -842,7 +842,6 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .lockScreen, title: "Preview lock screen widgets", keywords: ["preview", "lock screen", "widgets"], highlightID: SettingsTab.lockScreen.highlightID(for: "Preview lock screen widgets")),
             SettingsSearchEntry(tab: .lockScreen, title: "Widget appearance", keywords: ["appearance", "theme", "dark", "light", "contrast", "wallpaper"], highlightID: SettingsTab.lockScreen.highlightID(for: "Widget appearance")),
             SettingsSearchEntry(tab: .lockScreen, title: "Enable lock screen live activity", keywords: ["lock screen", "live activity"], highlightID: SettingsTab.lockScreen.highlightID(for: "Enable lock screen live activity")),
-            SettingsSearchEntry(tab: .lockScreen, title: "Live activity icon", keywords: ["lock", "fingerprint", "touch id", "unlock", "biometric", "icon style"], highlightID: SettingsTab.lockScreen.highlightID(for: "Live activity icon")),
             SettingsSearchEntry(tab: .lockScreen, title: "Play lock/unlock sounds", keywords: ["chime", "sound"], highlightID: SettingsTab.lockScreen.highlightID(for: "Play lock/unlock sounds")),
             SettingsSearchEntry(tab: .lockScreen, title: "Material", keywords: ["glass", "frosted", "liquid"], highlightID: SettingsTab.lockScreen.highlightID(for: "Material")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen media panel", keywords: ["media panel", "lock screen media"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen media panel")),
@@ -5249,7 +5248,6 @@ struct Appearance: View {
 
 struct LockScreenSettings: View {
     @Default(.enableReminderLiveActivity) private var enableReminderLiveActivity
-    @Default(.lockScreenLiveActivityIconStyle) private var lockScreenLiveActivityIconStyle
     @ObservedObject private var calendarManager = CalendarManager.shared
     @ObservedObject private var previewManager = LockScreenWidgetPreviewManager.shared
     @Default(.lockScreenGlassStyle) private var lockScreenGlassStyle
@@ -5380,45 +5378,6 @@ struct LockScreenSettings: View {
                     Text("Enable lock screen live activity")
                 }
                 .settingsHighlight(id: highlightID("Enable lock screen live activity"))
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Live activity icon")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-
-                    HStack(spacing: 16) {
-                        Spacer(minLength: 0)
-                        LockScreenIconStyleCard(
-                            title: "Lock",
-                            systemImage: "lock.fill",
-                            isSelected: lockScreenLiveActivityIconStyle.showsLock
-                        ) {
-                            if lockScreenLiveActivityIconStyle.showsLock {
-                                if lockScreenLiveActivityIconStyle.showsFingerprint {
-                                    lockScreenLiveActivityIconStyle = .fingerprint
-                                }
-                            } else {
-                                lockScreenLiveActivityIconStyle = .both
-                            }
-                        }
-                        LockScreenIconStyleCard(
-                            title: "Fingerprint",
-                            systemImage: "touchid",
-                            isSelected: lockScreenLiveActivityIconStyle.showsFingerprint
-                        ) {
-                            if lockScreenLiveActivityIconStyle.showsFingerprint {
-                                if lockScreenLiveActivityIconStyle.showsLock {
-                                    lockScreenLiveActivityIconStyle = .lock
-                                }
-                            } else {
-                                lockScreenLiveActivityIconStyle = .both
-                            }
-                        }
-                        Spacer(minLength: 0)
-                    }
-                }
-                .settingsHighlight(id: highlightID("Live activity icon"))
-
                 Defaults.Toggle(key: .enableLockSounds) {
                     Text("Play lock/unlock sounds")
                 }
@@ -5426,7 +5385,7 @@ struct LockScreenSettings: View {
             } header: {
                 Text("Live Activity & Feedback")
             } footer: {
-                Text("Select the lock, the fingerprint, or both icons. When the fingerprint is selected, the live activity stays open long enough to complete its unlock animation.")
+                Text("Controls whether Dynamic Island mirrors lock/unlock events with its own live activity and audible chimes.")
             }
 
             Section {
@@ -6054,60 +6013,6 @@ extension LockScreenSettings {
         .settingsHighlight(id: highlight)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.4)
-    }
-}
-
-private struct LockScreenIconStyleCard: View {
-    let title: String
-    let systemImage: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(backgroundColor)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(borderColor, lineWidth: isSelected ? 2 : 1)
-                        }
-
-                    Image(systemName: systemImage)
-                        .font(.system(size: 13, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                }
-                .frame(width: 72, height: 50)
-
-                Text(title)
-                    .font(.caption)
-                    .fontWeight(.medium)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isHovering = hovering
-            }
-        }
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private var backgroundColor: Color {
-        if isSelected { return Color.accentColor.opacity(0.12) }
-        if isHovering { return Color.primary.opacity(0.05) }
-        return Color(nsColor: .controlBackgroundColor)
-    }
-
-    private var borderColor: Color {
-        if isSelected { return Color.accentColor }
-        if isHovering { return Color.primary.opacity(0.1) }
-        return Color.clear
     }
 }
 

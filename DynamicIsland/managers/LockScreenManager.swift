@@ -27,35 +27,8 @@ import os
 enum LockScreenAnimationTimings {
     static let lockExpand: TimeInterval = 0.45
     static let unlockCollapse: TimeInterval = 0.82
-    // The lock animator needs 0.35 seconds to move from the closed to the open
-    // symbol. Leave a small settling beat before the island starts contracting.
-    static let lockUnlockHold: TimeInterval = 0.82
-    // FingerprintScan.json plays through its completed scan at 5x speed in
-    // roughly 1.4 seconds. Keep the island fully open until that point.
-    static let fingerprintUnlockHold: TimeInterval = 1.45
-    static let fingerprintScanReset: TimeInterval = 1.55
-    // SwiftUI and the delegated AppKit overlay both need one rendered frame
-    // after reaching their collapsed size before their content is unmounted.
-    static let unlockRemovalPadding: TimeInterval = 0.14
     static let postUnlockMusicHUDPause: TimeInterval = 1.0
     static let postUnlockMusicHUDReveal: TimeInterval = 0.34
-
-    static var currentUnlockHold: TimeInterval {
-        switch Defaults[.lockScreenLiveActivityIconStyle] {
-        case .lock:
-            return lockUnlockHold
-        case .fingerprint, .both:
-            return fingerprintUnlockHold
-        }
-    }
-
-    static var currentUnlockSequenceDuration: TimeInterval {
-        currentUnlockHold + unlockCollapse
-    }
-
-    static var currentUnlockRemovalDelay: TimeInterval {
-        currentUnlockSequenceDuration + unlockRemovalPadding
-    }
 }
 
 @MainActor
@@ -93,15 +66,12 @@ class LockScreenManager: ObservableObject {
     @Published var isLockIdle: Bool = true
     @Published var shouldDelayPostUnlockMusicHUD: Bool = false
     @Published var lastUpdated: Date = .distantPast
-    @Published private(set) var fingerprintScanToken: Int = 0
     
     // MARK: - Private Properties
     private var debounceIdleTask: Task<Void, Never>?
     private var collapseTask: Task<Void, Never>?
     private var postUnlockMusicHUDTask: Task<Void, Never>?
     private var lockStatePollTask: Task<Void, Never>?
-    private var powerKeyMonitors: [Any] = []
-    private var lastPowerKeyEventDate: Date = .distantPast
     
     // MARK: - Helpers
     
@@ -124,7 +94,6 @@ class LockScreenManager: ObservableObject {
         collapseTask?.cancel()
         postUnlockMusicHUDTask?.cancel()
         lockStatePollTask?.cancel()
-        powerKeyMonitors.forEach(NSEvent.removeMonitor)
     }
     
     // MARK: - Setup
@@ -157,42 +126,7 @@ class LockScreenManager: ObservableObject {
             object: nil
         )
 
-        // Power/Touch ID presses arrive as system-defined power-key events on
-        // Macs that expose them outside Secure Input. Listen locally and
-        // globally: global monitors do not receive events delivered to Atoll,
-        // while local monitors only receive those events.
-        if let localMonitor = NSEvent.addLocalMonitorForEvents(matching: .systemDefined) { [weak self] event in
-            if event.subtype.rawValue == 1 {
-                Task { @MainActor in
-                    self?.handlePowerKeyEvent()
-                }
-            }
-            return event
-        } {
-            powerKeyMonitors.append(localMonitor)
-        }
-
-        if let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .systemDefined) { [weak self] event in
-            guard event.subtype.rawValue == 1 else { return }
-            Task { @MainActor in
-                self?.handlePowerKeyEvent()
-            }
-        } {
-            powerKeyMonitors.append(globalMonitor)
-        }
-
         print("LockScreenManager: ✅ Observers registered for lock/unlock events")
-    }
-
-    private func handlePowerKeyEvent() {
-        guard isLocked,
-              Defaults[.enableLockScreenLiveActivity],
-              Defaults[.lockScreenLiveActivityIconStyle].showsFingerprint else { return }
-
-        let now = Date()
-        guard now.timeIntervalSince(lastPowerKeyEventDate) > 0.2 else { return }
-        lastPowerKeyEventDate = now
-        fingerprintScanToken &+= 1
     }
     
     // MARK: - Event Handlers
@@ -265,13 +199,12 @@ class LockScreenManager: ObservableObject {
         stopLockStatePolling()
         postUnlockMusicHUDTask?.cancel()
         shouldDelayPostUnlockMusicHUD = Defaults[.enableLockScreenLiveActivity]
-        let unlockRemovalDelay = LockScreenAnimationTimings.currentUnlockRemovalDelay
 
         if shouldDelayPostUnlockMusicHUD {
             postUnlockMusicHUDTask = Task { [weak self] in
                 try? await Task.sleep(
                     for: .seconds(
-                        unlockRemovalDelay
+                        LockScreenAnimationTimings.unlockCollapse
                             + LockScreenAnimationTimings.postUnlockMusicHUDPause
                     )
                 )
@@ -304,7 +237,7 @@ class LockScreenManager: ObservableObject {
         if Defaults[.enableLockScreenLiveActivity] {
             collapseTask?.cancel()
             collapseTask = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(unlockRemovalDelay))
+                try? await Task.sleep(for: .seconds(LockScreenAnimationTimings.unlockCollapse))
                 guard let self = self, !Task.isCancelled else { return }
                 await MainActor.run {
                     self.coordinator.toggleExpandingView(status: false, type: .lockScreen)
@@ -388,14 +321,12 @@ class LockScreenManager: ObservableObject {
             debounceIdleTask = Task { [weak self] in
                 // Keep the lock live activity mounted until the collapse animation finishes,
                 // otherwise the content disappears before the island fully closes.
-                let idleDelay = LockScreenAnimationTimings.currentUnlockRemovalDelay
+                let idleDelay = LockScreenAnimationTimings.unlockCollapse
                 try? await Task.sleep(for: .seconds(idleDelay))
                 guard let self = self, !Task.isCancelled else { return }
                 await MainActor.run {
                     if self.lastUpdated.timeIntervalSinceNow < -idleDelay {
-                        var transaction = Transaction()
-                        transaction.disablesAnimations = true
-                        withTransaction(transaction) {
+                        withAnimation(.smooth(duration: 0.3)) {
                             self.isLockIdle = !self.isLocked
                         }
                     }
