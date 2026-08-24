@@ -210,7 +210,10 @@ struct ContentView: View {
         }
         
         guard coordinator.currentView == .stats else {
-            return baseSize
+            return inlineLyricsAdjustedNotchSize(
+                from: baseSize,
+                isHomeTabActive: coordinator.currentView == .home && vm.notchState == .open
+            )
         }
         
         let rows = statsRowCount()

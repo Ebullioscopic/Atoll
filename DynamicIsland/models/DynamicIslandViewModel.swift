@@ -431,6 +431,11 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             return adjustedSize
         }
 
+        adjustedSize = inlineLyricsAdjustedNotchSize(
+            from: adjustedSize,
+            isHomeTabActive: coordinator.currentView == .home
+        )
+
         return statsAdjustedNotchSize(
             from: adjustedSize,
             isStatsTabActive: coordinator.currentView == .stats,
