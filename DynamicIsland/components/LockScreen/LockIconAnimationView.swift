@@ -86,19 +86,18 @@ struct LockIconProgressView: View {
     var progress: CGFloat
     var iconColor: Color = .white
 
+    private var isLocked: Bool { progress >= 0.5 }
+
     var body: some View {
-        if LockIconLottieView.isAvailable {
-            Rectangle()
-                .fill(iconColor)
-                .mask {
-                    LockIconLottieView(progress: 1 - progress)
-                        .scaleEffect(1.12)
-                }
-        } else {
-            Image(systemName: progress >= 0.5 ? "lock.fill" : "lock.open.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(iconColor)
-        }
+        // The system lock symbol rather than the bundled Lottie: the drawn one is
+        // noticeably lighter in the stroke and reads as a different icon next to
+        // everything else macOS puts on the lock screen. `.replace` gives the
+        // open-to-closed change the shackle movement the animation was there for.
+        Image(systemName: isLocked ? "lock.fill" : "lock.open.fill")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(iconColor)
+            .contentTransition(.symbolEffect(.replace.downUp))
+            .animation(.snappy(duration: 0.28), value: isLocked)
     }
 }
 
