@@ -174,29 +174,21 @@ struct LyricsSidePanelView: View {
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @State private var suppressionToken = UUID()
     @State private var isSuppressing = false
-    @State private var lyrics: [(index: Int, lyric: LyricLine)] = []
-
     private var artistLineColor: Color {
         Defaults[.playerColorTinting]
             ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6)
             : .gray
     }
 
-    private var currentLyricGradient: LinearGradient {
-        LinearGradient(
-            colors: [artistLineColor, .white, artistLineColor.opacity(0.82)],
-            startPoint: .leading,
-            endPoint: .trailing
+    /// The colour a line has yet to be sung in. Tinted rather than plain grey so
+    /// the unsung remainder still reads as part of the current line.
+    private var lyricsStyle: SyncedLyricsStyle {
+        SyncedLyricsStyle(
+            sung: .white,
+            unsung: artistLineColor.opacity(0.55),
+            idle: .white.opacity(0.5),
+            tint: artistLineColor
         )
-    }
-
-    private static func nonEmptyLines(in lines: [LyricLine]) -> [(index: Int, lyric: LyricLine)] {
-        lines.enumerated().compactMap { index, lyric in
-            guard !lyric.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return nil
-            }
-            return (index: index, lyric: lyric)
-        }
     }
 
     var body: some View {
@@ -208,57 +200,11 @@ struct LyricsSidePanelView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 6)
 
-            ScrollViewReader { proxy in
-                ScrollView(.vertical) {
-                    if lyrics.isEmpty {
-                        Text(musicManager.currentLyrics.isEmpty ? "Show lyrics here" : musicManager.currentLyrics)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.78))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                    } else {
-                        LazyVStack(alignment: .leading, spacing: 8) {
-                            ForEach(lyrics, id: \.index) { index, lyric in
-                                Text(lyric.text)
-                                    .font(.system(size: 14, weight: index == musicManager.currentLyricIndex ? .semibold : .regular))
-                                    .foregroundStyle(
-                                        index == musicManager.currentLyricIndex
-                                            ? AnyShapeStyle(currentLyricGradient)
-                                            : AnyShapeStyle(Color.white.opacity(0.5))
-                                    )
-                                    .lineLimit(2)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 12)
-                                    .id(index)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-                .scrollIndicators(.never)
-                .onAppear {
-                    lyrics = Self.nonEmptyLines(in: musicManager.syncedLyrics)
-                    let index = musicManager.currentLyricIndex
-                    guard index >= 0, index < musicManager.syncedLyrics.count else { return }
-                    DispatchQueue.main.async {
-                        proxy.scrollTo(index, anchor: .center)
-                    }
-                }
-                .onChange(of: musicManager.currentLyricIndex) { _, index in
-                    guard index >= 0, index < musicManager.syncedLyrics.count else { return }
-                    withAnimation(.smooth(duration: 0.3)) {
-                        proxy.scrollTo(index, anchor: .center)
-                    }
-                }
-            }
+            SyncedLyricsList(musicManager: musicManager, style: lyricsStyle)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.black.opacity(0.3))
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-        .onChange(of: musicManager.syncedLyrics) { _, newLyrics in
-            lyrics = Self.nonEmptyLines(in: newLyrics)
-        }
         .onHover { hovering in
             updateSuppression(for: hovering)
         }
@@ -458,8 +404,21 @@ struct MusicControlsView: View {
                 )
 
                 let line = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
+                let isInstrumentalBreak = musicManager.isInInstrumentalBreak
 
-                if !line.isEmpty {
+                if isInstrumentalBreak {
+                    // The track is between verses, so mark it the way the side
+                    // panel does instead of leaving a hole in the layout. Driven
+                    // by the break itself rather than by the line being blank:
+                    // during an intro there is no current line to blank out, so
+                    // testing the text would miss it.
+                    InstrumentalBreakNotes(fontSize: 10, weight: .regular)
+                        .foregroundStyle(.white.opacity(0.7))
+                    .padding(.top, 2)
+                    .transition(transition)
+                }
+
+                if !isInstrumentalBreak, !line.isEmpty {
                     let lyricsBinding = Binding<String>(
                         get: { musicManager.currentLyrics },
                         set: { _ in }
@@ -1254,7 +1213,7 @@ private struct MediaOutputPickerButton: View {
     @ObservedObject private var routeManager = AudioRouteManager.shared
     @StateObject private var volumeModel = MediaOutputVolumeViewModel()
     @State private var isPopoverPresented = false
-    @State private var isHoveringPopover = false
+    @State private var popoverToken = UUID()
     @EnvironmentObject private var vm: DynamicIslandViewModel
 
     var body: some View {
@@ -1269,27 +1228,20 @@ private struct MediaOutputPickerButton: View {
             MediaOutputSelectorPopover(
                 routeManager: routeManager,
                 volumeModel: volumeModel,
-                onHoverChanged: { hovering in
-                    isHoveringPopover = hovering
-                    updatePopoverActivity()
-                }
+                onHoverChanged: { _ in }
             ) {
                 isPopoverPresented = false
-                isHoveringPopover = false
                 updatePopoverActivity()
             }
         }
         .onAppear {
             routeManager.refreshDevices()
         }
-        .onChange(of: isPopoverPresented) { _, presented in
-            if !presented {
-                isHoveringPopover = false
-            }
+        .onChange(of: isPopoverPresented) { _, _ in
             updatePopoverActivity()
         }
         .onDisappear {
-            vm.isMediaOutputPopoverActive = false
+            vm.setMediaOutputPopoverActive(false, token: popoverToken)
         }
     }
 
@@ -1297,8 +1249,21 @@ private struct MediaOutputPickerButton: View {
         routeManager.activeDevice?.iconName ?? "speaker.wave.2"
     }
 
+    /// Reports whether this picker's popover is open, so the notch knows not to
+    /// auto-close while it is.
+    ///
+    /// Keyed by a token unique to this presenter: several pickers can exist at
+    /// once and the notch has to stay open while *any* of them is showing, so
+    /// the view model tracks a set of open popovers rather than one flag that
+    /// the second picker to close would clear on behalf of the first.
     private func updatePopoverActivity() {
-        vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+        // Presentation alone, deliberately. Also requiring the pointer to be over
+        // the popover raced the notch's own hover tracking: the popover is a
+        // separate window, so moving into it reads as leaving the notch, and any
+        // moment before the popover reported the pointer let the auto-close timer
+        // shut the notch and take the popover with it. This is what the stats,
+        // timer and clipboard popovers already do.
+        vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
     }
 }
 
@@ -1306,7 +1271,7 @@ private struct AirPlayPickerButton: View {
     @ObservedObject private var musicManager = MusicManager.shared
     @ObservedObject private var airPlayManager = AppleMusicAirPlayManager.shared
     @State private var isPopoverPresented = false
-    @State private var isHoveringPopover = false
+    @State private var popoverToken = UUID()
     @EnvironmentObject private var vm: DynamicIslandViewModel
 
     private var isAppleMusicActive: Bool {
@@ -1324,13 +1289,9 @@ private struct AirPlayPickerButton: View {
         .popover(isPresented: $isPopoverPresented, arrowEdge: .bottom) {
             AirPlaySelectorPopover(
                 airPlayManager: airPlayManager,
-                onHoverChanged: { hovering in
-                    isHoveringPopover = hovering
-                    updatePopoverActivity()
-                }
+                onHoverChanged: { _ in }
             ) {
                 isPopoverPresented = false
-                isHoveringPopover = false
                 updatePopoverActivity()
             }
         }
@@ -1339,8 +1300,7 @@ private struct AirPlayPickerButton: View {
                 Task { await airPlayManager.refreshDevices() }
             }
         }
-        .onChange(of: isPopoverPresented) { _, presented in
-            if !presented { isHoveringPopover = false }
+        .onChange(of: isPopoverPresented) { _, _ in
             updatePopoverActivity()
         }
         .onChange(of: musicManager.bundleIdentifier) { _, newBundle in
@@ -1349,12 +1309,25 @@ private struct AirPlayPickerButton: View {
             }
         }
         .onDisappear {
-            vm.isMediaOutputPopoverActive = false
+            vm.setMediaOutputPopoverActive(false, token: popoverToken)
         }
     }
 
+    /// Reports whether this picker's popover is open, so the notch knows not to
+    /// auto-close while it is.
+    ///
+    /// Keyed by a token unique to this presenter: several pickers can exist at
+    /// once and the notch has to stay open while *any* of them is showing, so
+    /// the view model tracks a set of open popovers rather than one flag that
+    /// the second picker to close would clear on behalf of the first.
     private func updatePopoverActivity() {
-        vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+        // Presentation alone, deliberately. Also requiring the pointer to be over
+        // the popover raced the notch's own hover tracking: the popover is a
+        // separate window, so moving into it reads as leaving the notch, and any
+        // moment before the popover reported the pointer let the auto-close timer
+        // shut the notch and take the popover with it. This is what the stats,
+        // timer and clipboard popovers already do.
+        vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
     }
 }
 
@@ -1621,7 +1594,17 @@ final class MediaOutputVolumeViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// How long the volume HUD stays suppressed after a change made from one of
+    /// our own controls. Refreshed on every change, so a drag holds it off until
+    /// shortly after the last movement.
+    private static let ownControlHUDSuppression: TimeInterval = 1.5
+
     func setVolume(_ value: Float) {
+        // The user is already looking at a volume control. Letting the change
+        // raise the notch's volume HUD puts a second slider on screen and swaps
+        // out the content this one is anchored to, tearing the popover down
+        // mid-drag -- which is why the slider could not be dragged at all.
+        HUDSuppressionCoordinator.shared.suppressVolumeHUD(for: Self.ownControlHUDSuppression)
         level = value
         if value > 0 {
             isMuted = false
@@ -1630,6 +1613,7 @@ final class MediaOutputVolumeViewModel: ObservableObject {
     }
 
     func toggleMute() {
+        HUDSuppressionCoordinator.shared.suppressVolumeHUD(for: Self.ownControlHUDSuppression)
         isMuted.toggle()
         controller.toggleMute()
     }

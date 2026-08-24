@@ -782,6 +782,11 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .media, title: "Skip buttons", keywords: ["skip", "controls", "±10"], highlightID: SettingsTab.media.highlightID(for: "Skip buttons")),
             SettingsSearchEntry(tab: .media, title: "Sneak Peek Style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak Peek Style")),
             SettingsSearchEntry(tab: .media, title: "Show lyrics", keywords: ["lyrics", "song text", "side panel", "calendar", "inline"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
+            // Targets the lyrics toggle rather than the Highlight picker: the picker
+            // only exists while lyrics are on, so a search result pointing at it
+            // scrolls to nothing for anyone who has not turned them on yet -- which
+            // is everyone, by default.
+            SettingsSearchEntry(tab: .media, title: "Lyric highlight", keywords: ["lyrics", "highlight", "sweep", "gradient", "solid", "karaoke", "animation"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
             SettingsSearchEntry(tab: .media, title: "Side lyrics width", keywords: ["lyrics", "width", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics width")),
             SettingsSearchEntry(tab: .media, title: "Side lyrics horizontal offset", keywords: ["lyrics", "offset", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics horizontal offset")),
             SettingsSearchEntry(tab: .media, title: "Show live canvas in Dynamic Island", keywords: ["canvas", "live canvas", "album art", "dynamic island", "spotify canvas"], highlightID: SettingsTab.media.highlightID(for: "Show live canvas in Dynamic Island")),
@@ -2853,6 +2858,7 @@ struct Media: View {
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
     @Default(.showCalendar) private var showCalendar
     @Default(.enableLyrics) private var enableLyrics
+    @Default(.lyricHighlightStyle) private var lyricHighlightStyle
     @Default(.lyricsPanelWidth) private var lyricsPanelWidth
     @Default(.lyricsPanelOffset) private var lyricsPanelOffset
     @Default(.visualizerBarCount) private var visualizerBarCount
@@ -3026,6 +3032,29 @@ struct Media: View {
                             : ""
                 )
                 .settingsHighlight(id: highlightID("Show lyrics"))
+
+                if enableLyrics && !enableMinimalisticUI && showStandardMediaControls {
+                    // Caption inside the row rather than after it: a Form gives
+                    // every top-level view its own row and a divider, so the
+                    // explanation was being ruled off from the control it
+                    // explains and read as belonging to nothing.
+                    VStack(alignment: .leading, spacing: 6) {
+                        Picker("Highlight", selection: $lyricHighlightStyle) {
+                            ForEach(LyricHighlightStyle.allCases) { style in
+                                Text(style.localizedName).tag(style)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        Text(lyricHighlightStyle.explanation)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .settingsHighlight(id: highlightID("Lyric highlight"))
+                }
+
                 Text(
                     showCalendar
                         ? "Lyrics sit on one line under the artist name, since the calendar is using the rest of the notch. Turn the calendar off to give them a full panel beside the player."
