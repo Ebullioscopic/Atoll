@@ -770,6 +770,8 @@ class MusicManager: ObservableObject {
             newController = YouTubeMusicController()
         case .amazonMusic:
             newController = AmazonMusicController()
+        case .tidal:
+            newController = TidalController()
         case .cider:
             newController = CiderController()
         }
@@ -2048,7 +2050,7 @@ extension MusicManager {
             return spotifyGreen
         case .amazonMusic:
             return amazonOrange
-        case .cider:
+        case .tidal, .cider:
             return .accentColor
         case .nowPlaying:
             if let bundleIdentifier,
@@ -2069,6 +2071,8 @@ extension MusicManager {
             return spotifyGreen
         case AmazonMusicController.bundleIdentifier:
             return amazonOrange
+        case TidalController.bundleIdentifier:
+            return .accentColor
         case CiderController.bundleIdentifier:
             return .accentColor
         default:

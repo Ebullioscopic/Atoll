@@ -100,6 +100,102 @@ private func getAudioObjectID(for pid: pid_t) -> AudioObjectID? {
     return nil
 }
 
+private func getAudioProcessObjectIDs() -> [AudioObjectID] {
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyProcessObjectList,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    let systemObject = AudioObjectID(kAudioObjectSystemObject)
+    var size: UInt32 = 0
+
+    guard AudioObjectGetPropertyDataSize(systemObject, &address, 0, nil, &size) == noErr,
+          size >= UInt32(MemoryLayout<AudioObjectID>.size) else {
+        return []
+    }
+
+    var processObjects = [AudioObjectID](
+        repeating: kAudioObjectUnknown,
+        count: Int(size) / MemoryLayout<AudioObjectID>.size
+    )
+    guard AudioObjectGetPropertyData(
+        systemObject,
+        &address,
+        0,
+        nil,
+        &size,
+        &processObjects
+    ) == noErr else {
+        return []
+    }
+
+    return processObjects.filter { $0 != kAudioObjectUnknown }
+}
+
+private func getBundleIdentifier(for audioProcessObject: AudioObjectID) -> String? {
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioProcessPropertyBundleID,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var unmanagedBundleIdentifier: Unmanaged<CFString>?
+    var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+
+    guard AudioObjectGetPropertyData(
+        audioProcessObject,
+        &address,
+        0,
+        nil,
+        &size,
+        &unmanagedBundleIdentifier
+    ) == noErr,
+          let unmanagedBundleIdentifier else {
+        return nil
+    }
+
+    return unmanagedBundleIdentifier.takeRetainedValue() as String
+}
+
+private func getPID(for audioProcessObject: AudioObjectID) -> pid_t? {
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioProcessPropertyPID,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var pid: pid_t = 0
+    var size = UInt32(MemoryLayout<pid_t>.size)
+
+    guard AudioObjectGetPropertyData(
+        audioProcessObject,
+        &address,
+        0,
+        nil,
+        &size,
+        &pid
+    ) == noErr else {
+        return nil
+    }
+
+    return pid
+}
+
+enum AudioTapTargetMatcher {
+    /// CoreAudio exposes helper processes separately from their parent app. A
+    /// player such as TIDAL therefore appears as `com.tidal.desktop.player`
+    /// even though the app selected by the user is `com.tidal.desktop`.
+    static func targetBundleIdentifier(
+        for audioProcessBundleIdentifier: String,
+        among targetBundleIdentifiers: [String]
+    ) -> String? {
+        let processIdentifier = audioProcessBundleIdentifier.lowercased()
+        return targetBundleIdentifiers.first { targetIdentifier in
+            let normalizedTarget = targetIdentifier.lowercased()
+            return processIdentifier == normalizedTarget
+                || processIdentifier.hasPrefix(normalizedTarget + ".")
+        }
+    }
+}
+
 /// Singleton class for real-time audio capture from music apps
 class AudioTap: NSObject {
     static let shared = AudioTap()
@@ -170,8 +266,7 @@ class AudioTap: NSObject {
             return
         }
 
-        let runningApps = NSWorkspace.shared.runningApplications
-        var targetPIDs: [AudioDeviceID] = []
+        var targetProcessObjects = Set<AudioObjectID>()
 
         // AirPods/Bluetooth output + Spotify don't mix: process-tapping Spotify into our
         // private aggregate device disturbs the system Now Playing / AVRCP session, so the
@@ -182,30 +277,57 @@ class AudioTap: NSObject {
         // for Spotify on wired/built-in output and for every other app on any output.
         let bluetoothOutputActive = AudioRouteManager.shared.isDefaultOutputBluetooth()
 
-        for app in runningApps {
-            if let bundleID = app.bundleIdentifier, targetBundleIDs.contains(bundleID) {
-                if bundleID == SpotifyController.bundleIdentifier, bluetoothOutputActive {
-                    print("⏭️ [AudioTap] Bluetooth output active — skipping Spotify tap to preserve AirPods media control")
-                    continue
-                }
-                if let deviceID = getAudioObjectID(for: app.processIdentifier) {
-                    targetPIDs.append(deviceID)
-                    print("🎯 [AudioTap] Found \(app.localizedName ?? "App") with PID: \(app.processIdentifier), AudioObjectID: \(deviceID)")
-                }
+        // Enumerate CoreAudio's process objects rather than relying only on
+        // NSRunningApplication. Electron players commonly render and play from
+        // nested helpers; TIDAL, for example, emits audio from
+        // `com.tidal.desktop.player`, while its main app PID has no audio object.
+        for processObject in getAudioProcessObjectIDs() {
+            guard let processBundleIdentifier = getBundleIdentifier(for: processObject),
+                  let targetBundleIdentifier = AudioTapTargetMatcher.targetBundleIdentifier(
+                    for: processBundleIdentifier,
+                    among: targetBundleIDs
+                  ) else {
+                continue
+            }
+
+            if targetBundleIdentifier.caseInsensitiveCompare(SpotifyController.bundleIdentifier) == .orderedSame,
+               bluetoothOutputActive {
+                print("⏭️ [AudioTap] Bluetooth output active — skipping Spotify tap to preserve AirPods media control")
+                continue
+            }
+
+            targetProcessObjects.insert(processObject)
+            let pidDescription = getPID(for: processObject).map(String.init) ?? "unknown"
+            print("🎯 [AudioTap] Found audio process \(processBundleIdentifier) with PID: \(pidDescription), AudioObjectID: \(processObject)")
+        }
+
+        // Preserve the previous PID translation as a fallback for applications
+        // whose CoreAudio process does not publish a bundle identifier.
+        for app in NSWorkspace.shared.runningApplications {
+            guard let bundleIdentifier = app.bundleIdentifier,
+                  targetBundleIDs.contains(bundleIdentifier) else { continue }
+            if bundleIdentifier == SpotifyController.bundleIdentifier, bluetoothOutputActive {
+                continue
+            }
+            if let processObject = getAudioObjectID(for: app.processIdentifier),
+               targetProcessObjects.insert(processObject).inserted {
+                print("🎯 [AudioTap] Found \(app.localizedName ?? "App") with PID: \(app.processIdentifier), AudioObjectID: \(processObject)")
             }
         }
 
-        if targetPIDs.isEmpty {
+        if targetProcessObjects.isEmpty {
             print("⚠️ [AudioTap] None of our target apps are running right now.")
             return
         }
 
+        let sortedTargetProcessObjects = targetProcessObjects.sorted()
+
         let description = CATapDescription()
-        description.processes = targetPIDs
+        description.processes = sortedTargetProcessObjects
         description.isMixdown = true
         description.isMono = true
         
-        print("📋 [AudioTap] Creating tap for \(targetPIDs.count) processes: \(targetPIDs)")
+        print("📋 [AudioTap] Creating tap for \(sortedTargetProcessObjects.count) processes: \(sortedTargetProcessObjects)")
 
         tapID = AudioObjectID(kAudioObjectUnknown)
         var status = AudioHardwareCreateProcessTap(description, &tapID)
