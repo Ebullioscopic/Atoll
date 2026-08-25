@@ -39,7 +39,7 @@ Atoll 通过包内的 `CodexHookHelper` 接收 Codex Hook 事件，并按会话�
 
 如果没有任何活跃任务或未读完成记录，关闭态不占用 Codex 状态位，但展开页仍可以保留 Codex 任务标签和明确的空状态。
 
-![刘海关闭态中的进行中摘要：左侧为 Codex 忙碌图标，右侧显示“1 · 进行中”](docs/assets/codex-notch-running-summary.jpg)
+![刘海关闭态中的进行中摘要：左侧为 Codex 忙碌图标，右侧显示“1 · 进行中”](https://raw.githubusercontent.com/liusong881002-bit/Atoll-CodexAtoll/main/docs/assets/codex-notch-running-summary.jpg)
 
 *图：关闭态只保留一条高优先级计数摘要；截图中 Codex 正在进行 1 个任务。*
 
@@ -88,7 +88,7 @@ Atoll 不代替用户批准或拒绝操作。点击卡片只负责打开对应 C
 
 同一 Codex 会话多轮完成时，活动托盘只保留该会话最新的一张完成卡片；当该会话再次开始新一轮任务，旧完成记录会被确认，新一轮重新进入“进行中”。
 
-![Codex 完成提示：绿色勾选、项目名、完成标签和右侧“1 · 已完成”计数](docs/assets/codex-notch-completed.jpg)
+![Codex 完成提示：绿色勾选、项目名、完成标签和右侧“1 · 已完成”计数](https://raw.githubusercontent.com/liusong881002-bit/Atoll-CodexAtoll/main/docs/assets/codex-notch-completed.jpg)
 
 *图：任务完成后的绿色提示。它用于把注意力带回刘海；随后可从 Codex 任务页或活动托盘打开对应会话。*
 
@@ -134,7 +134,7 @@ Atoll 不代替用户批准或拒绝操作。点击卡片只负责打开对应 C
 
 抽屉关闭时才提交未读确认，因此用户只是打开抽屉、还没真正看到底部内容时，不会误把所有完成任务标记为已读。
 
-![Codex 活动托盘：项目分组、进行中任务、历史完成记录和点击进入会话的任务卡片](docs/assets/codex-notch-activity-tray.jpg)
+![Codex 活动托盘：项目分组、进行中任务、历史完成记录和点击进入会话的任务卡片](https://raw.githubusercontent.com/liusong881002-bit/Atoll-CodexAtoll/main/docs/assets/codex-notch-activity-tray.jpg)
 
 *图：活动托盘按任务状态和项目分组。截图中的运行中卡片显示状态时长、项目名、任务摘要和“继续等待”提示；点击卡片即可回到对应 Codex 对话。*
 
@@ -174,9 +174,9 @@ codex://threads/<sessionID>
 
 ### 十、完整录屏演示
 
-[![点击打开完整录屏：从刘海进行中摘要进入活动托盘，再展示完成提示](docs/assets/codex-notch-activity-tray.jpg)](docs/assets/codex-notch-demo.mp4)
+[![点击打开完整录屏：从刘海进行中摘要进入活动托盘，再展示完成提示](https://raw.githubusercontent.com/liusong881002-bit/Atoll-CodexAtoll/main/docs/assets/codex-notch-activity-tray.jpg)](https://github.com/liusong881002-bit/Atoll-CodexAtoll/blob/main/docs/assets/codex-notch-demo.mp4)
 
-上图可点击打开完整录屏：[`codex-notch-demo.mp4`](docs/assets/codex-notch-demo.mp4)（约 64 秒，720p，约 57 MB）。录屏串联展示了关闭态“进行中”提示、展开后的活动托盘，以及任务完成后的绿色提示；README 中的三张截图分别对应这三个关键状态。
+上图可点击打开完整录屏：[`codex-notch-demo.mp4`](https://github.com/liusong881002-bit/Atoll-CodexAtoll/blob/main/docs/assets/codex-notch-demo.mp4)（约 64 秒，720p，约 57 MB）。录屏串联展示了关闭态“进行中”提示、展开后的活动托盘，以及任务完成后的绿色提示；README 中的三张截图分别对应这三个关键状态。
 
 ## 上游 Atoll 基础能力
 
