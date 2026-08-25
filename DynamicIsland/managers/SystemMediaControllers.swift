@@ -70,7 +70,14 @@ final class SystemVolumeController {
     private var listenersInstalled = false
     private var volumeElement: AudioObjectPropertyElement?
     private var muteElement: AudioObjectPropertyElement?
+    private var volumeListenerRegistrations: [VolumeListenerRegistration] = []
     private let silenceThreshold: Float = 0.001 // Treat very low values as mute requests.
+
+    private struct VolumeListenerRegistration {
+        let deviceID: AudioDeviceID
+        var address: AudioObjectPropertyAddress
+        let block: AudioObjectPropertyListenerBlock
+    }
 
     private let candidateElements: [AudioObjectPropertyElement] = [
         kAudioObjectPropertyElementMain,
@@ -214,21 +221,48 @@ final class SystemVolumeController {
     }
 
     private func installVolumeListeners(for deviceID: AudioDeviceID) {
+        // Remove any previously registered listeners (e.g. from a prior output
+        // device) before re-installing, otherwise the old HAL listeners leak and
+        // deliver duplicate notifications on every route change.
+        removeVolumeListeners()
+
         if let element = resolveElement(selector: kAudioDevicePropertyVolumeScalar, deviceID: deviceID) {
             volumeElement = element
-            var address = makeAddress(selector: kAudioDevicePropertyVolumeScalar, element: element)
-            AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue) { [weak self] _, _ in
-                self?.notifyCurrentState()
-            }
+            addVolumeListener(selector: kAudioDevicePropertyVolumeScalar, element: element, deviceID: deviceID)
         }
 
         if let element = resolveElement(selector: kAudioDevicePropertyMute, deviceID: deviceID) {
             muteElement = element
-            var address = makeAddress(selector: kAudioDevicePropertyMute, element: element)
-            AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue) { [weak self] _, _ in
-                self?.notifyCurrentState()
+            addVolumeListener(selector: kAudioDevicePropertyMute, element: element, deviceID: deviceID)
+        }
+    }
+
+    private func addVolumeListener(selector: AudioObjectPropertySelector, element: AudioObjectPropertyElement, deviceID: AudioDeviceID) {
+        var address = makeAddress(selector: selector, element: element)
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            self?.notifyCurrentState()
+        }
+        let status = AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue, block)
+        if status == noErr {
+            volumeListenerRegistrations.append(VolumeListenerRegistration(deviceID: deviceID, address: address, block: block))
+        } else {
+            NSLog("⚠️ Failed to install volume/mute listener for selector \(selector): \(status)")
+        }
+    }
+
+    private func removeVolumeListeners() {
+        for var registration in volumeListenerRegistrations {
+            let status = AudioObjectRemovePropertyListenerBlock(
+                registration.deviceID,
+                &registration.address,
+                callbackQueue,
+                registration.block
+            )
+            if status != noErr {
+                NSLog("⚠️ Failed to remove volume/mute listener: \(status)")
             }
         }
+        volumeListenerRegistrations.removeAll()
     }
 
     private func handleDefaultDeviceChanged() {
@@ -442,6 +476,9 @@ final class SystemVolumeController {
         return AudioObjectSetPropertyData(currentDeviceID, &address, 0, nil, size, &data)
     }
 
+    // Computed on each access rather than cached: these are called synchronously
+    // from the public API on arbitrary threads while `refreshPropertyElements()`
+    // runs on `callbackQueue`, so a shared cache would race. The probe is cheap.
     private func volumeElements() -> [AudioObjectPropertyElement] {
         candidateElements.filter { element in
             var address = makeAddress(selector: kAudioDevicePropertyVolumeScalar, element: element)
