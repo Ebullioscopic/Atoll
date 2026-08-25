@@ -93,6 +93,8 @@ final class NewAPIUsageTests: XCTestCase {
         )
 
         XCTAssertEqual(snapshot.balanceQuota, 1_500_000)
+        XCTAssertEqual(snapshot.usedQuota, 500_000)
+        XCTAssertEqual(snapshot.requestCount, 12)
         XCTAssertEqual(snapshot.todayQuota, 1_234)
         XCTAssertEqual(snapshot.weekQuota, 5_678)
         XCTAssertEqual(snapshot.currentRPM, 3)
@@ -106,15 +108,40 @@ final class NewAPIUsageTests: XCTestCase {
 
         let statRequests = recorder.requests.filter { $0.url?.path.hasSuffix("/api/log/self/stat") == true }
         XCTAssertEqual(statRequests.count, 3)
+
+        let expectedStats: [Int64: (quota: Int, rpm: Int, tpm: Int)] = [
+            todayStart: (quota: 1_234, rpm: 7, tpm: 9_876),
+            weekStart: (quota: 5_678, rpm: 70, tpm: 98_760),
+            throughputStart: (quota: 9, rpm: 3, tpm: 321)
+        ]
+
         for request in statRequests {
-            let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
-            XCTAssertEqual(items.first(where: { $0.name == "type" })?.value, "2")
-            XCTAssertEqual(items.first(where: { $0.name == "end_timestamp" })?.value, String(end))
+            let items = URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)?.queryItems ?? []
+            let values = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value) })
+            XCTAssertEqual(values["type"], "2")
+            XCTAssertEqual(values["end_timestamp"], String(end))
+
+            let start = try XCTUnwrap(Int64(try XCTUnwrap(values["start_timestamp"])))
+            let expected = try XCTUnwrap(expectedStats[start])
+            switch start {
+            case todayStart:
+                XCTAssertEqual(snapshot.todayQuota, expected.quota)
+            case weekStart:
+                XCTAssertEqual(snapshot.weekQuota, expected.quota)
+            case throughputStart:
+                XCTAssertEqual(snapshot.currentRPM, expected.rpm)
+                XCTAssertEqual(snapshot.currentTPM, expected.tpm)
+            default:
+                XCTFail("Unexpected statistic start timestamp: \(start)")
+            }
         }
-        let starts = Set(statRequests.compactMap { request in
-            URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "start_timestamp" })?.value
-        })
-        XCTAssertEqual(starts, Set([String(todayStart), String(weekStart), String(throughputStart)]))
+        XCTAssertEqual(
+            Set(statRequests.compactMap { request in
+                URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?
+                    .first(where: { $0.name == "start_timestamp" })?.value
+            }),
+            Set([String(todayStart), String(weekStart), String(throughputStart)])
+        )
     }
 
     func testProviderAggregatesMultipleAccountsAndKeepsFailuresIsolated() async throws {
