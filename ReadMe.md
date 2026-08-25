@@ -1,57 +1,31 @@
 <p align="center">
   <img src=".github/assets/atoll-logo.png" alt="Atoll logo" width="120">
 </p>
-<h1 align="center">Atoll - DynamicIsland for macOS</h1>
-<p align="center">
-<a href="https://trendshift.io/repositories/15291" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15291" alt="Ebullioscopic%2FAtoll | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
-<p align="center">
-  <a href="https://github.com/Ebullioscopic/Atoll/stargazers">
-    <img src="https://img.shields.io/github/stars/Ebullioscopic/Atoll?style=social" alt="GitHub stars"/>
-  </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/network/members">
-    <img src="https://img.shields.io/github/forks/Ebullioscopic/Atoll?style=social" alt="GitHub forks"/>
-  </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/releases">
-    <img src="https://img.shields.io/github/downloads/Ebullioscopic/Atoll/total?label=Downloads" alt="GitHub downloads"/>
-  </a>
-  <a href="https://discord.gg/PaqFkRTDF8">
-    <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/PaqFkRTDF8?style=flat" alt="Discord server"/>
-  </a>
-</p>
+<h1 align="center">Atoll Codex Integration</h1>
+<p align="center">基于 Atoll 的本地 Codex 任务状态模块</p>
 
-<p align="center">
-  <a href="https://github.com/sponsors/Ebullioscopic">
-    <img src="https://img.shields.io/badge/Sponsor-Ebullioscopic-ff69b4?style=for-the-badge&logo=github" alt="Sponsor Ebullioscopic"/>
-  </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/releases/latest">
-    <img src="https://img.shields.io/badge/Download-Atoll%20for%20macOS-0A84FF?style=for-the-badge&logo=apple" alt="Download Atoll for macOS"/>
-  </a>
-  <a href="https://www.buymeacoffee.com/kryoscopic">
-    <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-kryoscopic-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=000000" alt="Buy Me a Coffee for kryoscopic"/>
-  </a>
-</p>
+> **本项目不是官方 Atoll。** 它基于 [Ebullioscopic/Atoll](https://github.com/Ebullioscopic/Atoll) 开源，并将 Codex 集成作为主要新增能力。
 
-<p align="center">
-  <a href="https://discord.gg/PaqFkRTDF8">Join our Discord community</a>
-</p>
+如果你只想了解这个仓库新增了什么，请先看下面的 **Codex 模块**。上游 Atoll 的原始介绍和功能列表已放到后面的“上游 Atoll 基础能力”章节。来源、许可证和差异说明见 [UPSTREAM.md](UPSTREAM.md)、[NOTICE](NOTICE) 和 [LICENSE](LICENSE)。
 
-> **This is an independent open-source derivative of [Ebullioscopic/Atoll](https://github.com/Ebullioscopic/Atoll), not the official Atoll repository.**
-> The upstream project and its existing attributions remain the foundation of this codebase. See [UPSTREAM.md](UPSTREAM.md), [NOTICE](NOTICE), and [LICENSE](LICENSE) for the source and licensing details.
+## Codex 模块
 
-Atoll turns the MacBook notch into a focused command surface for media, system insight, and quick utilities. It stays out of the way until needed, then expands with responsive, native SwiftUI animations. This project keeps that Atoll experience and adds a built-in Codex utility for local coding-agent status.
+Codex 是本项目面向本地 coding agent 工作流的状态入口。它把 Codex Hook 事件转换为 Atoll 刘海中的轻量状态提示，让用户在切换到浏览器、编辑器或其他应用时，仍能看到 Codex 是否正在运行、等待批准或刚刚完成。
 
-## Built-in Codex Utility
+- **任务状态**：展示运行中、等待批准、已完成等状态。
+- **刘海提示**：在紧凑态显示 Codex 状态，在展开态展示任务列表。
+- **会话跳转**：从任务卡片打开对应 Codex 会话。
+- **完成提醒**：对新完成任务提供可确认的提示。
+- **可配置**：在 **Atoll Settings → Utilities → Codex** 中控制启用、任务页、预览、全屏显示和通知。
+- **单应用交付**：Codex 是 Atoll 内置实用工具，不需要独立的 CodexAtoll 菜单栏 App、第二个安装包或第三方扩展授权。
 
-This project adds Codex task status as a native Atoll utility. Codex is the local coding-agent workflow being surfaced by Atoll; this integration is not a replacement for Codex and does not turn Atoll into an AI service. It uses local Codex Hooks and an Atoll-bundled `CodexHookHelper`; there is no separate CodexAtoll app, menu-bar item, extension authorization flow, or second package to install.
+### 数据边界
 
-- Configure it from **Atoll Settings → Utilities → Codex**.
-- Show running, approval-waiting, and recently completed tasks in the notch.
-- Open the matching Codex conversation from the expanded task view.
-- Choose whether task previews and fullscreen Codex status are shown.
-- Build and distribute the feature as part of the single Atoll app.
+集成使用本地 Codex Hooks 和本地状态文件；不解析 transcript，不上传 prompt、源码或终端输出，也不启动用于 Atoll 集成的网络服务。Atoll 只负责把 Codex 的状态做成可见、可回到会话的提示，不替代 Codex 本身。
 
-The integration is intentionally local-first: it consumes Codex Hook events, keeps the displayed state focused on task metadata and status, and does not parse transcripts, upload prompts or source code, or start a network service.
+## 上游 Atoll 基础能力
+
+本项目保留上游 Atoll 的 macOS 刘海体验，包括媒体控制、系统信息、Live Activities、计时器、剪贴板和其他快捷工具。这些属于上游 Atoll 的基础能力；本仓库的主要新增能力是上面的 Codex 模块。
 
 <p align="center">
   <img src="https://i.postimg.cc/t49mW5yN/Screenshot-2026-03-02-at-6-00-22-PM.png" alt="Atoll lock screen" width="920">
@@ -61,7 +35,7 @@ The integration is intentionally local-first: it consumes Codex Hook events, kee
 
 
 
-## Highlights
+### 上游 Atoll 功能概览
 - Media controls for Apple Music, Spotify, Cider, and more with inline previews.
 - Live Activities for media playback, Focus, screen recording, privacy indicators, downloads (beta), and battery/charging.
 - Lock screen widgets for media, timers, charging, Bluetooth devices, and weather.
@@ -117,9 +91,7 @@ To remove historical caches, logs, test binaries, and old release artifacts whil
 Use `--dry-run` to inspect the candidates first. Use `--all` only when a complete rebuild is intentional; it also removes `DerivedData/Dev`. The script moves candidates to a recoverable Trash quarantine instead of permanently deleting them.
 
 ## Installation
-1) Download the latest DMG [here](https://github.com/Ebullioscopic/Atoll/releases/latest).
-2) Open the DMG and drag Atoll into Applications.
-3) Launch Atoll and grant the requested permissions.
+当前仓库暂未发布独立 DMG。请先按 [Development Run](#development-run) 从源码运行，或使用 Xcode 构建当前分支；这样运行的才是包含 Codex 模块的版本。
 
 ## Quick Start
 - Hover near the notch to expand; click to enter controls.
