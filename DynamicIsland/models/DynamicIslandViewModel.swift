@@ -49,7 +49,32 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     @Published var isColorPickerPopoverActive: Bool = false
     @Published var isStatsPopoverActive: Bool = false
     @Published var isReminderPopoverActive: Bool = false
-    @Published var isMediaOutputPopoverActive: Bool = false
+    /// Whether any output picker popover is open.
+    ///
+    /// Four separate views can present one of these -- the media output and
+    /// AirPlay pickers, in both the standard and minimalistic players -- and they
+    /// all used to assign this directly. Whichever ran last won, so closing one
+    /// picker cleared the flag while another was still open and let the notch
+    /// auto-close underneath it. Presenters register instead, and the flag stays
+    /// true while any of them is still open.
+    @Published private(set) var isMediaOutputPopoverActive: Bool = false
+
+    private var activeMediaOutputPopovers: Set<UUID> = []
+
+    /// Registers or withdraws one presenter, identified by a token that is stable
+    /// for the lifetime of the view holding it.
+    func setMediaOutputPopoverActive(_ isActive: Bool, token: UUID) {
+        if isActive {
+            activeMediaOutputPopovers.insert(token)
+        } else {
+            activeMediaOutputPopovers.remove(token)
+        }
+
+        let isAnyActive = !activeMediaOutputPopovers.isEmpty
+        if isMediaOutputPopoverActive != isAnyActive {
+            isMediaOutputPopoverActive = isAnyActive
+        }
+    }
     @Published var isTimerPopoverActive: Bool = false
     @Published var shouldRecheckHover: Bool = false
     @Published var isScrollGestureActive: Bool = false
@@ -262,6 +287,40 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        Publishers.MergeMany(
+            Defaults.publisher(.enableLyrics, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.showCalendar, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.showStandardMediaControls, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.autoHideInactiveNotchMediaPlayer, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.showMirror, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.lyricsPanelWidth, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.lyricsPanelOffset, options: []).map { _ in () }.eraseToAnyPublisher(),
+            MusicManager.shared.$isPlaying.map { _ in () }.eraseToAnyPublisher(),
+            MusicManager.shared.$songTitle.map { _ in () }.eraseToAnyPublisher(),
+            MusicManager.shared.$artistName.map { _ in () }.eraseToAnyPublisher(),
+            WebcamManager.shared.$cameraAvailable.map { _ in () }.eraseToAnyPublisher()
+        )
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateSideLyricsNotchSizeIfNeeded()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func updateSideLyricsNotchSizeIfNeeded() {
+        guard notchState == .open, !Defaults[.enableMinimalisticUI] else { return }
+
+        let updatedTarget = calculateDynamicNotchSize()
+        guard notchSize != updatedTarget else { return }
+        withAnimation(.smooth) {
+            notchSize = updatedTarget
+        }
+        AppDelegate.shared?.ensureWindowSize(
+            addShadowPadding(to: updatedTarget, isMinimalistic: false),
+            animated: true,
+            force: false
+        )
     }
 
     private func handleMinimalisticTimerHeightChange() {
@@ -366,6 +425,16 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             adjustedSize.height = max(adjustedSize.height, preferred)
             return adjustedSize
         }
+
+        if coordinator.currentView == .llmUsage {
+            adjustedSize.height = max(adjustedSize.height, llmUsageOpenNotchHeight)
+            return adjustedSize
+        }
+
+        adjustedSize = inlineLyricsAdjustedNotchSize(
+            from: adjustedSize,
+            isHomeTabActive: coordinator.currentView == .home
+        )
 
         return statsAdjustedNotchSize(
             from: adjustedSize,
