@@ -1,5 +1,13 @@
 Atoll (DynamicIsland) - NOTICE
 
+This repository is an independent derivative work based on the official
+Atoll (DynamicIsland) project by Ebullioscopic:
+https://github.com/Ebullioscopic/Atoll
+
+It is not an official Atoll distribution. The primary project-specific
+addition in this repository is a built-in Codex utility that surfaces local
+Codex Hook task status inside Atoll.
+
 This product includes software derived from the boring.notch project,
 modified and adapted for Atoll (DynamicIsland). The boring.notch project
 is licensed under the GNU General Public License v3.0.

@@ -36,17 +36,22 @@
   <a href="https://discord.gg/PaqFkRTDF8">Join our Discord community</a>
 </p>
 
-Atoll turns the MacBook notch into a focused command surface for media, system insight, and quick utilities. It stays out of the way until needed, then expands with responsive, native SwiftUI animations.
+> **This is an independent open-source derivative of [Ebullioscopic/Atoll](https://github.com/Ebullioscopic/Atoll), not the official Atoll repository.**
+> The upstream project and its existing attributions remain the foundation of this codebase. See [UPSTREAM.md](UPSTREAM.md), [NOTICE](NOTICE), and [LICENSE](LICENSE) for the source and licensing details.
+
+Atoll turns the MacBook notch into a focused command surface for media, system insight, and quick utilities. It stays out of the way until needed, then expands with responsive, native SwiftUI animations. This project keeps that Atoll experience and adds a built-in Codex utility for local coding-agent status.
 
 ## Built-in Codex Utility
 
-This product branch includes Codex task status as a native Atoll utility. It uses local Codex Hooks and an Atoll-bundled `CodexHookHelper`; there is no separate CodexAtoll app, menu-bar item, extension authorization flow, or second package to install.
+This project adds Codex task status as a native Atoll utility. Codex is the local coding-agent workflow being surfaced by Atoll; this integration is not a replacement for Codex and does not turn Atoll into an AI service. It uses local Codex Hooks and an Atoll-bundled `CodexHookHelper`; there is no separate CodexAtoll app, menu-bar item, extension authorization flow, or second package to install.
 
 - Configure it from **Atoll Settings → Utilities → Codex**.
 - Show running, approval-waiting, and recently completed tasks in the notch.
 - Open the matching Codex conversation from the expanded task view.
 - Choose whether task previews and fullscreen Codex status are shown.
 - Build and distribute the feature as part of the single Atoll app.
+
+The integration is intentionally local-first: it consumes Codex Hook events, keeps the displayed state focused on task metadata and status, and does not parse transcripts, upload prompts or source code, or start a network service.
 
 <p align="center">
   <img src="https://i.postimg.cc/t49mW5yN/Screenshot-2026-03-02-at-6-00-22-PM.png" alt="Atoll lock screen" width="920">
@@ -140,6 +145,8 @@ Use `--dry-run` to inspect the candidates first. Use `--all` only when a complet
 
 ## License
 Atoll is released under the GPL v3 License. Refer to [LICENSE](LICENSE) for the full terms.
+
+This repository is a derivative work of Atoll. The Atoll source, its upstream notices, and the GPL v3 terms remain applicable. Changes specific to the Codex utility are maintained in this repository and should not be presented as part of the official upstream Atoll project.
 
 ## Acknowledgments
 
