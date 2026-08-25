@@ -83,10 +83,14 @@ class RealTimeAudioSpectrum: NSView {
 
     private func startAnimating() {
         guard animationTimer == nil else { return }
-        // Use a timer at ~30fps for smooth animation
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { [weak self] _ in
+        // Use a timer at ~30fps for smooth animation.
+        // The timer only runs while the view is in a window (see viewDidMoveToWindow)
+        // and playback is active; tolerance lets the OS coalesce wakeups to save CPU.
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { [weak self] _ in
             self?.updateBarsFromAudio()
         }
+        timer.tolerance = 1.0/60.0
+        animationTimer = timer
     }
     
     private func stopAnimating() {

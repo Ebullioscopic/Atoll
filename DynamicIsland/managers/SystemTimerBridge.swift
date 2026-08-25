@@ -260,7 +260,8 @@ final class SystemTimerBridge: ObservableObject {
 
     private func setupTicker() {
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now(), repeating: .seconds(1), leeway: .milliseconds(150))
+        // Larger leeway lets the scheduler coalesce this fallback ticker with other wake-ups.
+        timer.schedule(deadline: .now(), repeating: .seconds(1), leeway: .milliseconds(500))
         timer.setEventHandler { [weak self] in
             self?.pollMenuExtra()
         }
@@ -458,6 +459,14 @@ final class SystemTimerBridge: ObservableObject {
         guard Defaults[.mirrorSystemTimer] else { return }
         guard !TimerManager.shared.hasManualTimerRunning else {
             logDebug("Skipping AX poll: manual timer running")
+            return
+        }
+
+        // Only walk the AX tree while a system timer is actually active in the UI. The preferences
+        // file monitor sets `metadata` the moment a timer is created (the plist is written on
+        // start), so a freshly started timer is still picked up on the next tick — but an idle
+        // machine no longer pays for a system-wide AX search every second.
+        guard metadata != nil || menuExtra != nil || TimerManager.shared.isExternalTimerActive else {
             return
         }
 

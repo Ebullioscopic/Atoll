@@ -169,6 +169,12 @@ final class MediaKeyInterceptor {
             return true
         }
 
+        // Don't install a global CGEvent tap unless at least one interception feature is enabled.
+        // An idle tap still routes every system-defined key event through this process for nothing.
+        guard shouldEnableTap else {
+            return true
+        }
+
 #if canImport(ApplicationServices)
         requestAccessibilityPermissionIfNeeded()
 #endif
@@ -315,8 +321,23 @@ final class MediaKeyInterceptor {
     }
 
     private func updateTapState() {
-        guard let tap = eventTap else { return }
         let shouldEnable = shouldEnableTap
+
+        guard let tap = eventTap else {
+            // No tap installed. Install one now if a feature was just enabled.
+            if shouldEnable {
+                start()
+            }
+            return
+        }
+
+        if !shouldEnable {
+            // All interception features are off — tear the tap down entirely so it stops
+            // waking this process on every media key.
+            stop()
+            return
+        }
+
         if shouldEnable != isTapEnabled {
             CGEvent.tapEnable(tap: tap, enable: shouldEnable)
             isTapEnabled = shouldEnable

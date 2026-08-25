@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshing the LLM Usage card now skips session logs whose last write predates the seven-day window instead of re-reading the whole log history, and counts a repeated record when the copy inside the window would previously have been suppressed by a copy outside it (#691).
 - Completed the Simplified Chinese (zh-Hans) localization, filling in all remaining untranslated strings.
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
+- **Performance (phase 3)**: Moved the heavy 1 Hz stats collection (GPU, disk, temperature, frequency) to a background actor, gated the music visualizers on visibility so they no longer drive the run loop off-screen, made the now-playing helper process start on demand instead of at launch, and pushed icon/drag-preview rendering and LLM-usage file reads off the main thread.
+- **Performance (phase 2)**: Background work now pauses while the display or system is asleep and slows down under low-power/thermal pressure. Bluetooth, brightness, and clipboard polling became event-driven or far less frequent, Do Not Disturb detection switched from a 2 s poll to filesystem events, and the global media-key tap is only installed when an interception feature is actually enabled.
 
 ### Fixed
 - The lock screen Dynamic Island now completes one clean unlock contraction instead of disappearing early or showing a second island that closes immediately afterward. (#774)
@@ -135,6 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Canvas desync during Notch transitions. Static artwork is rendered by SwiftUI, while Spotify Canvas uses an `AVPlayerLayer` hosted in an `NSViewRepresentable`. During close, the video layer implicitly animated its own frame in a separate Core Animation transaction, creating a second, slower slide-out that conflicted with SwiftUI’s transition (#741).
 
 - Fixed the clipboard history shortcut being registered as Cmd+Shift+C while Settings documented Cmd+Shift+V ("similar to Windows+V on PC"). The default is now Cmd+Shift+V, and a one-time migration moves persisted Cmd+Shift+C values, since `KeyboardShortcuts` persists a default on first launch and would otherwise keep the old key forever, and a stored value does not record whether it came from that default or from a deliberate Cmd+Shift+C choice. Every other custom shortcut is left alone.
+- **Performance (phase 1)**: Plugged a CoreAudio property-listener leak on every output-device change, bounded the Shelf thumbnail cache (200 items / 64 MB) so long sessions stop growing, moved all media `playbackState` publishing onto the main actor, and fixed the battery observer ids shifting on removal.
 
 ### Removed
 

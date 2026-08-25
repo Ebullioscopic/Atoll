@@ -134,10 +134,14 @@ struct JSONLUsageParser {
             if chunk.isEmpty { break }
             buffer.append(chunk)
 
-            // Process complete lines from buffer
-            while let newlineRange = buffer.firstIndex(of: UInt8(ascii: "\n")) {
-                let lineData = buffer.subdata(in: buffer.startIndex..<newlineRange)
-                buffer.removeSubrange(buffer.startIndex...newlineRange)
+            // Process complete lines from buffer. Scan the whole chunk advancing a
+            // cursor, then trim the consumed prefix once — removing each line as it
+            // is found shifted the remainder of the buffer for every newline, which
+            // is quadratic on newline-dense JSONL.
+            var searchStart = buffer.startIndex
+            while let newlineIndex = buffer[searchStart...].firstIndex(of: UInt8(ascii: "\n")) {
+                let lineData = buffer[searchStart..<newlineIndex]
+                searchStart = buffer.index(after: newlineIndex)
 
                 if discardingOversized {
                     // We were discarding an oversized record; this newline ends it.
@@ -152,6 +156,9 @@ struct JSONLUsageParser {
 
                 guard let line = String(data: lineData, encoding: .utf8) else { continue }
                 processLine(line)
+            }
+            if searchStart != buffer.startIndex {
+                buffer.removeSubrange(buffer.startIndex..<searchStart)
             }
 
             // Bound buffer growth: if buffer exceeds maxRecordSize without a newline,

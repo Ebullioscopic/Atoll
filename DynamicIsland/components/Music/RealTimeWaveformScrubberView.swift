@@ -1,77 +1,79 @@
 import SwiftUI
 import Defaults
 
+/// Applies exponential smoothing to AudioTap magnitudes across frames.
+///
+/// A reference type so `TimelineView` can advance it during body evaluation
+/// without triggering SwiftUI "modifying state during view update" warnings.
+private final class WaveformSmoother {
+    private var magnitudes: [Float] = Array(repeating: 0.1, count: 6)
+
+    func next(barCount: Int) -> [Float] {
+        let tapMagnitudes = AudioTap.shared.getSmoothedMagnitudes()
+        let newMags: [Float] = tapMagnitudes.count >= barCount
+            ? Array(tapMagnitudes.prefix(barCount))
+            : tapMagnitudes
+
+        var smoothedMags = [Float](repeating: 0.1, count: newMags.count)
+        for i in 0..<newMags.count {
+            if i < magnitudes.count {
+                smoothedMags[i] = magnitudes[i] * 0.85 + newMags[i] * 0.15
+            } else {
+                smoothedMags[i] = newMags[i]
+            }
+        }
+        magnitudes = smoothedMags
+        return smoothedMags
+    }
+}
+
 struct RealTimeWaveformScrubberView: View {
     let color: Color
     let secondaryColor: Color?
     let progress: Double
     let minHeight: CGFloat
-    
-    @State private var timer: Timer? = nil
-    @State private var magnitudes: [Float] = Array(repeating: 0.1, count: 6)
+
+    // Hoisted out of the per-frame update path: these are read reactively via the
+    // Defaults property wrapper instead of a dictionary subscript on every tick.
+    @Default(.visualizerBarCount) private var barCount
+    @Default(.sliderColor) private var sliderColor
+    @Default(.colorExtractionMode) private var colorExtractionMode
+
+    @State private var smoother = WaveformSmoother()
+
+    private var fillStyle: AnyShapeStyle {
+        (sliderColor == .albumArt && colorExtractionMode == .vibrant)
+            ? AnyShapeStyle(color.spectrogramGradient(secondary: secondaryColor))
+            : AnyShapeStyle(color)
+    }
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                // Background (Unplayed portion)
-                WaveformShape(magnitudes: magnitudes, minHeight: minHeight)
-                    .fill(Color.gray.opacity(0.3))
-                
-                // Foreground (Played portion)
-                WaveformShape(magnitudes: magnitudes, minHeight: minHeight)
-                    .fill(Defaults[.sliderColor] == .albumArt && Defaults[.colorExtractionMode] == .vibrant ? AnyShapeStyle(color.spectrogramGradient(secondary: secondaryColor)) : AnyShapeStyle(color))
-                    .opacity(0.8)
-                    .mask(
-                        HStack {
-                            RoundedRectangle(cornerRadius: minHeight / 2)
-                                .frame(width: max(0, geometry.size.width * CGFloat(progress)))
-                            Spacer(minLength: 0)
-                        }
-                    )
-            }
-            .clipShape(RoundedRectangle(cornerRadius: minHeight / 2))
-        }
-        .onAppear {
-            startTimer()
-        }
-        .onDisappear {
-            stopTimer()
-        }
-    }
-    
-    private func startTimer() {
-        timer?.invalidate()
-        let newTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
-            let tapMagnitudes = AudioTap.shared.getSmoothedMagnitudes()
-            let barCount = Defaults[.visualizerBarCount]
-            var newMags: [Float] = []
-            if tapMagnitudes.count >= barCount {
-                newMags = Array(tapMagnitudes.prefix(barCount))
-            } else {
-                newMags = tapMagnitudes
-            }
-            
-            var smoothedMags = [Float](repeating: 0.1, count: newMags.count)
-            for i in 0..<newMags.count {
-                if i < magnitudes.count {
-                    smoothedMags[i] = magnitudes[i] * 0.85 + newMags[i] * 0.15
-                } else {
-                    smoothedMags[i] = newMags[i]
+        // TimelineView(.animation) drives redraws in sync with the display refresh
+        // and automatically pauses when the view is offscreen / the notch is closed,
+        // replacing the always-on 60fps Timer that ran on the main runloop.
+        TimelineView(.animation) { _ in
+            let magnitudes = smoother.next(barCount: barCount)
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // Background (Unplayed portion)
+                    WaveformShape(magnitudes: magnitudes, minHeight: minHeight)
+                        .fill(Color.gray.opacity(0.3))
+
+                    // Foreground (Played portion)
+                    WaveformShape(magnitudes: magnitudes, minHeight: minHeight)
+                        .fill(fillStyle)
+                        .opacity(0.8)
+                        .mask(
+                            HStack {
+                                RoundedRectangle(cornerRadius: minHeight / 2)
+                                    .frame(width: max(0, geometry.size.width * CGFloat(progress)))
+                                Spacer(minLength: 0)
+                            }
+                        )
                 }
-            }
-            
-            // Smoothly animate the path update
-            withAnimation(.linear(duration: 1.0 / 60.0)) {
-                magnitudes = smoothedMags
+                .clipShape(RoundedRectangle(cornerRadius: minHeight / 2))
             }
         }
-        RunLoop.main.add(newTimer, forMode: .common)
-        timer = newTimer
-    }
-    
-    private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
     }
 }
 

@@ -16,9 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import Foundation
+import Combine
 import CoreAudio
 import CoreGraphics
+import Foundation
 import IOKit
 
 extension Notification.Name {
@@ -66,11 +67,39 @@ final class SystemVolumeController {
     var onRouteChange: (() -> Void)?
 
     private let callbackQueue = DispatchQueue(label: "com.dynamicisland.volume-listener")
-    private var currentDeviceID: AudioDeviceID = 0
+    /// Guards the three fields below. They are written from `callbackQueue` when the
+    /// default device changes, and read synchronously by the public API (setVolume,
+    /// getVolume, setMuted, …) on whatever thread the caller is on. The computed
+    /// accessors keep every existing call site unchanged.
+    private let deviceStateLock = NSLock()
+    private var _currentDeviceID: AudioDeviceID = 0
+    private var _volumeElement: AudioObjectPropertyElement?
+    private var _muteElement: AudioObjectPropertyElement?
+
+    private var currentDeviceID: AudioDeviceID {
+        get { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; return _currentDeviceID }
+        set { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; _currentDeviceID = newValue }
+    }
+
+    private var volumeElement: AudioObjectPropertyElement? {
+        get { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; return _volumeElement }
+        set { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; _volumeElement = newValue }
+    }
+
+    private var muteElement: AudioObjectPropertyElement? {
+        get { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; return _muteElement }
+        set { deviceStateLock.lock(); defer { deviceStateLock.unlock() }; _muteElement = newValue }
+    }
+
     private var listenersInstalled = false
-    private var volumeElement: AudioObjectPropertyElement?
-    private var muteElement: AudioObjectPropertyElement?
+    private var volumeListenerRegistrations: [VolumeListenerRegistration] = []
     private let silenceThreshold: Float = 0.001 // Treat very low values as mute requests.
+
+    private struct VolumeListenerRegistration {
+        let deviceID: AudioDeviceID
+        var address: AudioObjectPropertyAddress
+        let block: AudioObjectPropertyListenerBlock
+    }
 
     private let candidateElements: [AudioObjectPropertyElement] = [
         kAudioObjectPropertyElementMain,
@@ -214,21 +243,48 @@ final class SystemVolumeController {
     }
 
     private func installVolumeListeners(for deviceID: AudioDeviceID) {
+        // Remove any previously registered listeners (e.g. from a prior output
+        // device) before re-installing, otherwise the old HAL listeners leak and
+        // deliver duplicate notifications on every route change.
+        removeVolumeListeners()
+
         if let element = resolveElement(selector: kAudioDevicePropertyVolumeScalar, deviceID: deviceID) {
             volumeElement = element
-            var address = makeAddress(selector: kAudioDevicePropertyVolumeScalar, element: element)
-            AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue) { [weak self] _, _ in
-                self?.notifyCurrentState()
-            }
+            addVolumeListener(selector: kAudioDevicePropertyVolumeScalar, element: element, deviceID: deviceID)
         }
 
         if let element = resolveElement(selector: kAudioDevicePropertyMute, deviceID: deviceID) {
             muteElement = element
-            var address = makeAddress(selector: kAudioDevicePropertyMute, element: element)
-            AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue) { [weak self] _, _ in
-                self?.notifyCurrentState()
+            addVolumeListener(selector: kAudioDevicePropertyMute, element: element, deviceID: deviceID)
+        }
+    }
+
+    private func addVolumeListener(selector: AudioObjectPropertySelector, element: AudioObjectPropertyElement, deviceID: AudioDeviceID) {
+        var address = makeAddress(selector: selector, element: element)
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            self?.notifyCurrentState()
+        }
+        let status = AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue, block)
+        if status == noErr {
+            volumeListenerRegistrations.append(VolumeListenerRegistration(deviceID: deviceID, address: address, block: block))
+        } else {
+            NSLog("⚠️ Failed to install volume/mute listener for selector \(selector): \(status)")
+        }
+    }
+
+    private func removeVolumeListeners() {
+        for var registration in volumeListenerRegistrations {
+            let status = AudioObjectRemovePropertyListenerBlock(
+                registration.deviceID,
+                &registration.address,
+                callbackQueue,
+                registration.block
+            )
+            if status != noErr {
+                NSLog("⚠️ Failed to remove volume/mute listener: \(status)")
             }
         }
+        volumeListenerRegistrations.removeAll()
     }
 
     private func handleDefaultDeviceChanged() {
@@ -442,6 +498,9 @@ final class SystemVolumeController {
         return AudioObjectSetPropertyData(currentDeviceID, &address, 0, nil, size, &data)
     }
 
+    // Computed on each access rather than cached: these are called synchronously
+    // from the public API on arbitrary threads while `refreshPropertyElements()`
+    // runs on `callbackQueue`, so a shared cache would race. The probe is cheap.
     private func volumeElements() -> [AudioObjectPropertyElement] {
         candidateElements.filter { element in
             var address = makeAddress(selector: kAudioDevicePropertyVolumeScalar, element: element)
@@ -479,7 +538,19 @@ final class SystemBrightnessController {
     private var pendingAdjustTarget: Float?
     private let coreBrightnessClient = CoreBrightnessDisplayClient.shared
     private var pollTimer: Timer?
+    /// The energy gate, mirrored into a plain Bool. The tick used to read it via
+    /// `MainActor.assumeIsolated`, which traps if the timer was ever scheduled off
+    /// the main thread — `Timer` fires on the run loop it was scheduled on, so that
+    /// safety depended on a startup detail rather than on anything enforced here.
+    private var backgroundWorkSuspended = false
+    private var gateCancellable: AnyCancellable?
+    // Fast, self-terminating poll used only inside the user-initiated window
+    // (after a brightness key press) to capture the settled value.
     private let pollInterval: TimeInterval = 0.15
+    // Slower continuous poll used only as a fallback when CoreBrightness
+    // notifications are unavailable. Gated by ActivityGate per tick.
+    private let fallbackPollInterval: TimeInterval = 0.5
+    private var continuousFallbackPolling = false
     private let pollChangeThreshold: Float = 0.005
 
     // MARK: - User-initiated brightness gate
@@ -507,11 +578,14 @@ final class SystemBrightnessController {
             NSLog("⚠️ SystemBrightnessController: CoreBrightnessDisplayClient unavailable; will rely on DisplayServices / IODisplay + polling fallback")
         }
         notifyCurrentBrightness()
-        // Only start polling as a fallback when CoreBrightness notifications
-        // are unavailable.  When CoreBrightness IS available the distributed
-        // notifications (registerExternalNotifications) handle detection.
+        // Only start continuous polling as a fallback when CoreBrightness
+        // notifications are unavailable.  When CoreBrightness IS available the
+        // distributed notifications (registerExternalNotifications) handle
+        // detection and we stay fully event-driven — a short windowed poll is
+        // started on demand from markUserInitiated() after a key press.
         if !coreBrightnessClient.isAvailable {
-            startPolling()
+            continuousFallbackPolling = true
+            startPolling(interval: fallbackPollInterval)
         }
     }
 
@@ -521,15 +595,16 @@ final class SystemBrightnessController {
         brightnessAnimationTimer = nil
         pollTimer?.invalidate()
         pollTimer = nil
+        gateCancellable?.cancel()
+        gateCancellable = nil
         userInitiatedResetTimer?.invalidate()
         userInitiatedResetTimer = nil
         userInitiatedBrightnessChange = false
+        continuousFallbackPolling = false
         pendingAdjustTarget = nil
     }
 
     func adjust(by delta: Float) {
-        markUserInitiated()
-
         // Do not synchronously query CoreBrightness/DisplayServices here. This
         // method is reached from hardware-key handling, and those calls can be
         // slow enough for macOS to disable the event tap. beginBrightnessAnimation
@@ -541,14 +616,19 @@ final class SystemBrightnessController {
         DispatchQueue.main.async { [weak self] in
             guard let self, let target = self.pendingAdjustTarget else { return }
             self.pendingAdjustTarget = nil
+            // markUserInitiated (and the polling/gate state it touches) must run on
+            // main: this method is reached from the hardware-key thread, and pollTimer/
+            // backgroundWorkSuspended/gateCancellable are otherwise only ever touched
+            // from main (the timer callback and the gate's @MainActor sink).
+            self.markUserInitiated()
             self.beginBrightnessAnimation(to: target)
         }
     }
 
     func setBrightness(_ value: Float) {
         let clamped = max(0, min(1, value))
-        markUserInitiated()
         DispatchQueue.main.async { [weak self] in
+            self?.markUserInitiated()
             self?.beginBrightnessAnimation(to: clamped)
         }
     }
@@ -559,9 +639,25 @@ final class SystemBrightnessController {
     /// Automatically resets after `userInitiatedWindow` seconds.
     private func markUserInitiated() {
         userInitiatedBrightnessChange = true
+        // In the event-driven (CoreBrightness) path we normally never poll.
+        // Run a short, self-terminating poll during the user window so the
+        // brightness the display settles on is still captured for the HUD,
+        // then stop again. The continuous fallback poll (if active) is left
+        // untouched.
+        if !continuousFallbackPolling {
+            startPolling(interval: pollInterval)
+        }
         userInitiatedResetTimer?.invalidate()
         userInitiatedResetTimer = Timer.scheduledTimer(withTimeInterval: userInitiatedWindow, repeats: false) { [weak self] _ in
-            self?.userInitiatedBrightnessChange = false
+            guard let self else { return }
+            self.userInitiatedBrightnessChange = false
+            // Tear down the windowed poll; keep the continuous fallback running.
+            if !self.continuousFallbackPolling {
+                self.pollTimer?.invalidate()
+                self.pollTimer = nil
+                self.gateCancellable?.cancel()
+                self.gateCancellable = nil
+            }
         }
     }
 
@@ -772,11 +868,20 @@ final class SystemBrightnessController {
         notificationsInstalled = true
     }
 
-    private func startPolling() {
+    private func startPolling(interval: TimeInterval) {
         guard pollTimer == nil else { return }
-        NSLog("ℹ️ SystemBrightnessController: Starting polling-driven brightness detection as fallback (interval: %.2fs)", pollInterval)
-        pollTimer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
+        NSLog("ℹ️ SystemBrightnessController: Starting %@ brightness polling (interval: %.2fs)",
+              continuousFallbackPolling ? "fallback" : "windowed", interval)
+        // The gate's published projection is @MainActor, so subscribe from there.
+        Task { @MainActor [weak self] in
             guard let self else { return }
+            self.gateCancellable = ActivityGate.shared.$shouldSuspendBackgroundWork
+                .sink { [weak self] suspended in self?.backgroundWorkSuspended = suspended }
+        }
+        let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            // Energy gate: skip ticks while the screen/system is asleep.
+            if self.backgroundWorkSuspended { return }
             // Skip polling while an animation is actively running — the
             // animation timer already handles emission during key presses.
             guard self.brightnessAnimationTimer == nil else { return }
@@ -786,7 +891,7 @@ final class SystemBrightnessController {
             if self.userInitiatedBrightnessChange {
                 // User recently pressed a brightness key — show the HUD.
                 if !self.didLogPollingFallback {
-                    NSLog("ℹ️ SystemBrightnessController: Brightness change detected via polling fallback (value: %.3f)", system)
+                    NSLog("ℹ️ SystemBrightnessController: Brightness change detected via polling (value: %.3f)", system)
                     self.didLogPollingFallback = true
                 }
                 self.emitBrightnessChange(value: system)
@@ -795,10 +900,13 @@ final class SystemBrightnessController {
                 self.lastEmittedBrightness = max(0, min(1, system))
             }
         }
+        timer.tolerance = interval * 0.2
+        pollTimer = timer
     }
 
     deinit {
         brightnessAnimationTimer?.invalidate()
+        gateCancellable?.cancel()
         pollTimer?.invalidate()
         userInitiatedResetTimer?.invalidate()
         observers.forEach { DistributedNotificationCenter.default().removeObserver($0) }

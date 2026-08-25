@@ -82,9 +82,13 @@ class AudioSpectrum: NSView {
 
     private func startAnimating() {
         guard animationTimer == nil else { return }
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
+        // The timer only runs while the view is in a window (see viewDidMoveToWindow)
+        // and playback is active; tolerance lets the OS coalesce wakeups to save CPU.
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
             self?.updateBars()
         }
+        timer.tolerance = 0.1
+        animationTimer = timer
     }
     
     private func stopAnimating() {
