@@ -172,6 +172,21 @@ codex://threads/<sessionID>
 
 集成使用本地 Codex Hooks 和本地状态文件；不解析 transcript，不上传 prompt、源码或终端输出，也不启动用于 Atoll 集成的网络服务。关闭任务内容摘要后，展示层会主动去除提示、批准和结果文本，只保留项目名、状态和时间信息。实现状态、验证证据和仍需人工验收的边界见 [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)。
 
+### 绑定 Codex：重点设置
+
+要真正收到 Codex 消息，必须同时满足：
+
+```text
+启用 Codex 状态集成 = 开
+Codex Hooks = 已安装
+```
+
+进入 **Atoll 设置 → 实用工具 → Codex**，打开集成后点击 **安装或修复**。截图中的 `Codex Hooks：已安装` 是关键：Helper 只负责接收事件，Hooks 才负责让 Codex 把事件发送给 Atoll。只打开显示开关、没有安装 Hooks 时，Atoll 不会凭空收到任务。
+
+![Codex 设置：启用集成并确认 Codex Hooks 已安装](https://raw.githubusercontent.com/liusong881002-bit/Atoll-CodexAtoll/main/docs/assets/codex-settings-hooks.png)
+
+完整绑定步骤、默认路径、首次验收和故障排查见 [Codex 绑定与消息接收设置](docs/CODEX_SETUP.md)。
+
 ### 十、完整录屏演示
 
 [![点击打开完整录屏：从刘海进行中摘要进入活动托盘，再展示完成提示](https://raw.githubusercontent.com/liusong881002-bit/Atoll-CodexAtoll/main/docs/assets/codex-notch-activity-tray.jpg)](https://github.com/liusong881002-bit/Atoll-CodexAtoll/blob/main/docs/assets/codex-notch-demo.mp4)
