@@ -2837,6 +2837,169 @@ struct HUD: View {
     }
 }
 
+private struct MusicSourceSelector: View {
+    @Binding var selection: MediaControllerType
+    let controllers: [MediaControllerType]
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(controllers) { controller in
+                        MusicSourceCard(
+                            controller: controller,
+                            isSelected: selection == controller
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selection = controller
+                            }
+                        }
+                        .id(controller)
+                    }
+                }
+                .padding(.horizontal, 2)
+                .padding(.vertical, 3)
+            }
+            .onAppear {
+                proxy.scrollTo(selection, anchor: .center)
+            }
+            .onChange(of: selection) { _, controller in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(controller, anchor: .center)
+                }
+            }
+        }
+        .frame(height: 112)
+    }
+}
+
+private struct MusicSourceCard: View {
+    let controller: MediaControllerType
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 9) {
+                Group {
+                    if let logoAssetName = controller.officialLogoAssetName {
+                        Image(logoAssetName)
+                            .resizable()
+                            .scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    } else {
+                        AppIconImage(
+                            bundleIdentifiers: controller.applicationBundleIdentifiers,
+                            symbolFallback: controller.fallbackSymbol,
+                            symbolColor: controller.fallbackColor,
+                            size: 42
+                        )
+                        .font(.system(size: 24, weight: .semibold))
+                    }
+                }
+                .frame(width: 42, height: 42)
+
+                Text(controller.localizedName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .frame(width: 112, height: 92)
+            .background {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(backgroundColor)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(borderColor, lineWidth: isSelected ? 2.5 : 1)
+            }
+            .scaleEffect(isHovering && !isSelected ? 1.015 : 1)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = hovering
+            }
+        }
+        .accessibilityLabel(controller.localizedName)
+    }
+
+    private var backgroundColor: Color {
+        if isSelected {
+            return Color.accentColor.opacity(0.16)
+        }
+        if isHovering {
+            return Color(nsColor: .controlBackgroundColor).opacity(0.92)
+        }
+        return Color(nsColor: .controlBackgroundColor).opacity(0.7)
+    }
+
+    private var borderColor: Color {
+        if isSelected {
+            return .accentColor
+        }
+        return Color(nsColor: .separatorColor).opacity(isHovering ? 0.8 : 0.45)
+    }
+}
+
+private extension MediaControllerType {
+    var officialLogoAssetName: String? {
+        switch self {
+        case .youtubeMusic: return "YouTubeMusicLogo"
+        case .amazonMusic: return "AmazonMusicLogo"
+        case .cider: return "CiderLogo"
+        default: return nil
+        }
+    }
+
+    var applicationBundleIdentifiers: [String] {
+        switch self {
+        case .nowPlaying:
+            return []
+        case .appleMusic:
+            return ["com.apple.Music"]
+        case .spotify:
+            return ["com.spotify.client"]
+        case .youtubeMusic:
+            return ["com.github.th-ch.youtube-music"]
+        case .amazonMusic:
+            return ["com.amazon.music"]
+        case .tidal:
+            return [TidalController.bundleIdentifier]
+        case .cider:
+            return ["sh.cider.genten.mac"]
+        }
+    }
+
+    var fallbackSymbol: String {
+        switch self {
+        case .nowPlaying: return "waveform"
+        case .appleMusic: return "music.note"
+        case .spotify: return "dot.radiowaves.left.and.right"
+        case .youtubeMusic: return "play.rectangle.fill"
+        case .amazonMusic: return "music.note.list"
+        case .tidal: return "waveform.path"
+        case .cider: return "cup.and.saucer.fill"
+        }
+    }
+
+    var fallbackColor: Color {
+        switch self {
+        case .nowPlaying: return .accentColor
+        case .appleMusic: return .pink
+        case .spotify: return .green
+        case .youtubeMusic: return .red
+        case .amazonMusic: return .cyan
+        case .tidal: return .primary
+        case .cider: return .orange
+        }
+    }
+}
+
 struct Media: View {
     @Default(.waitInterval) var waitInterval
     @Default(.mediaController) var mediaController
@@ -2884,10 +3047,14 @@ struct Media: View {
     var body: some View {
         Form {
             Section {
-                Picker("Music Source", selection: $mediaController) {
-                    ForEach(availableMediaControllers) { controller in
-                        Text(controller.localizedName).tag(controller)
-                    }
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Music Source")
+                        .font(.system(size: 13, weight: .semibold))
+
+                    MusicSourceSelector(
+                        selection: $mediaController,
+                        controllers: availableMediaControllers
+                    )
                 }
                 .onChange(of: mediaController) { _, _ in
                     NotificationCenter.default.post(
@@ -2911,7 +3078,9 @@ struct Media: View {
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(String(localized: "'Now Playing' was the only option on previous versions and works with all media apps."))
-                        Text(String(localized: "Uses macOS Now Playing when the Amazon Music app is the active media source. Playback controls follow the system Now Playing target. Scrubbing the timeline may not work if the Amazon Music app does not support remote seek."))
+                        if mediaController == .amazonMusic || mediaController == .tidal || mediaController == .cider {
+                            Text(mediaController.description)
+                        }
                     }
                     .foregroundStyle(.secondary)
                     .font(.caption)
