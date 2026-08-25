@@ -4665,6 +4665,7 @@ struct Appearance: View {
     @Default(.selectedAppIconID) private var selectedAppIconID
     @Default(.openNotchWidth) var openNotchWidth
     @Default(.closedNotchWidth) var closedNotchWidth
+    @Default(.notchHorizontalOffset) var notchHorizontalOffset
     @Default(.customizePhysicalNotchWidth) var customizePhysicalNotchWidth
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @Default(.lockScreenGlassCustomizationMode) private var lockScreenGlassCustomizationMode
@@ -4784,6 +4785,7 @@ struct Appearance: View {
             }
 
             notchWidthControls()
+            notchPositionControls()
 
             Section {
                 if #available(macOS 26.0, *) {
@@ -5401,6 +5403,46 @@ struct Appearance: View {
         } header: {
             HStack {
                 Text("Notch Width")
+                customBadge(text: "Beta")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func notchPositionControls() -> some View {
+        Section {
+            let offsetRange = -500.0...500.0
+            let offsetBinding = Binding<Double>(
+                get: { Double(notchHorizontalOffset) },
+                set: { newValue in
+                    notchHorizontalOffset = CGFloat(min(max(newValue, offsetRange.lowerBound), offsetRange.upperBound))
+                }
+            )
+
+            Slider(value: offsetBinding, in: offsetRange, step: 1) {
+                HStack {
+                    Text("Horizontal offset")
+                    Spacer()
+                    Text("\(Int(notchHorizontalOffset)) px")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .settingsHighlight(id: highlightID("Horizontal offset"))
+
+            HStack {
+                Text("Negative moves left; positive moves right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Reset Position") {
+                    notchHorizontalOffset = 0
+                }
+                .disabled(notchHorizontalOffset == 0)
+                .buttonStyle(.bordered)
+            }
+        } header: {
+            HStack {
+                Text("Notch Position")
                 customBadge(text: "Beta")
             }
         }

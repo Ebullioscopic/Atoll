@@ -447,7 +447,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let centerX = screenFrame.origin.x + (screenFrame.width / 2)
         let roundedWidth = window.frame.width.rounded()
         let roundedHeight = window.frame.height.rounded()
-        let newX = (centerX - (roundedWidth / 2)).rounded()
+        let newX = (centerX - (roundedWidth / 2) + Defaults[.notchHorizontalOffset]).rounded()
         let newY = (screenFrame.maxY + topBleed - roundedHeight).rounded()
 
         window.setFrame(NSRect(
@@ -658,7 +658,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let maxHeight = screenFrame.height + topBleed
         let clampedHeight = min(size.height, maxHeight).rounded()
         let centerX = screenFrame.midX
-        let newX = (centerX - (clampedWidth / 2)).rounded()
+        let newX = (centerX - (clampedWidth / 2) + Defaults[.notchHorizontalOffset]).rounded()
         let newY = (screenFrame.maxY + topBleed - clampedHeight).rounded()
         let targetFrame = NSRect(x: newX, y: newY, width: clampedWidth, height: clampedHeight)
 
@@ -814,6 +814,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         Defaults.publisher(.openNotchWidth, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
+        }.store(in: &cancellables)
+
+        Defaults.publisher(.notchHorizontalOffset, options: []).sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.adjustWindowPosition()
+            }
         }.store(in: &cancellables)
 
         // Observe terminal settings changes
