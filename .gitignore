@@ -168,3 +168,4 @@ TemporaryAssets/
 # Python bytecode from the privacy-configuration tests
 __pycache__/
 *.pyc
+*.profraw
