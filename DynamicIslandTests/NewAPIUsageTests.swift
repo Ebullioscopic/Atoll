@@ -29,6 +29,10 @@ final class NewAPIUsageTests: XCTestCase {
 
     func testNormalizesBaseURLAndPreservesSubpath() {
         XCTAssertEqual(
+            NewAPIClient.normalizedBaseURL(" http://example.com/new-api/ ")?.absoluteString,
+            "http://example.com/new-api"
+        )
+        XCTAssertEqual(
             NewAPIClient.normalizedBaseURL(" https://example.com/new-api/ ")?.absoluteString,
             "https://example.com/new-api"
         )
@@ -42,13 +46,32 @@ final class NewAPIUsageTests: XCTestCase {
 
     func testFetchAccountUsesBearerAuthAndConsumeLogType() async throws {
         let recorder = RequestRecorder()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let end = Int64(now.timeIntervalSince1970)
+        let todayStart = Int64(calendar.startOfDay(for: now).timeIntervalSince1970)
+        let weekStart = Int64(calendar.dateInterval(of: .weekOfYear, for: now)!.start.timeIntervalSince1970)
+        let throughputStart = end - 60
         let client = NewAPIClient { request in
             recorder.append(request)
             let body: String
             if request.url?.path.hasSuffix("/api/user/self") == true {
                 body = #"{"success":true,"data":{"quota":1500000,"used_quota":500000,"request_count":12}}"#
             } else {
-                body = #"{"success":true,"data":{"quota":1234,"rpm":7,"tpm":9876}}"#
+                let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+                let start = items.first(where: { $0.name == "start_timestamp" })?.value
+                switch start {
+                case String(todayStart):
+                    body = #"{"success":true,"data":{"quota":1234,"rpm":7,"tpm":9876}}"#
+                case String(weekStart):
+                    body = #"{"success":true,"data":{"quota":5678,"rpm":70,"tpm":98760}}"#
+                case String(throughputStart):
+                    body = #"{"success":true,"data":{"quota":9,"rpm":3,"tpm":321}}"#
+                default:
+                    XCTFail("Unexpected statistic start timestamp: \(start ?? "nil")")
+                    body = #"{"success":false,"data":null}"#
+                }
             }
             return (
                 Data(body.utf8),
@@ -65,14 +88,15 @@ final class NewAPIUsageTests: XCTestCase {
         let snapshot = try await client.fetchAccount(
             account,
             apiKey: "secret-key",
-            now: Date(timeIntervalSince1970: 1_700_000_000),
-            calendar: Calendar(identifier: .gregorian)
+            now: now,
+            calendar: calendar
         )
 
         XCTAssertEqual(snapshot.balanceQuota, 1_500_000)
         XCTAssertEqual(snapshot.todayQuota, 1_234)
-        XCTAssertEqual(snapshot.currentRPM, 7)
-        XCTAssertEqual(snapshot.currentTPM, 9_876)
+        XCTAssertEqual(snapshot.weekQuota, 5_678)
+        XCTAssertEqual(snapshot.currentRPM, 3)
+        XCTAssertEqual(snapshot.currentTPM, 321)
         XCTAssertEqual(recorder.requests.count, 4)
 
         for request in recorder.requests {
@@ -85,9 +109,12 @@ final class NewAPIUsageTests: XCTestCase {
         for request in statRequests {
             let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
             XCTAssertEqual(items.first(where: { $0.name == "type" })?.value, "2")
-            XCTAssertNotNil(items.first(where: { $0.name == "start_timestamp" })?.value)
-            XCTAssertNotNil(items.first(where: { $0.name == "end_timestamp" })?.value)
+            XCTAssertEqual(items.first(where: { $0.name == "end_timestamp" })?.value, String(end))
         }
+        let starts = Set(statRequests.compactMap { request in
+            URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "start_timestamp" })?.value
+        })
+        XCTAssertEqual(starts, Set([String(todayStart), String(weekStart), String(throughputStart)]))
     }
 
     func testProviderAggregatesMultipleAccountsAndKeepsFailuresIsolated() async throws {

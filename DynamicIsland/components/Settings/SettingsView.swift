@@ -7324,6 +7324,7 @@ struct StatsSettings: View {
     @State private var isNewAPIEditorPresented = false
     @State private var editingNewAPIAccount: NewAPIAccount?
     @State private var accountPendingDeletion: NewAPIAccount?
+    @State private var newAPIAccountErrorMessage: String?
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.stats.highlightID(for: title)
@@ -7695,16 +7696,24 @@ struct StatsSettings: View {
                     try NewAPIAccountStore.delete(account)
                     newAPIAccounts = Defaults[.newAPIAccounts]
                     LLMUsageManager.shared.refreshAll(force: true)
+                    accountPendingDeletion = nil
                 } catch {
-                    // Keychain deletion failures should not remove the visible account silently.
+                    newAPIAccountErrorMessage = "Failed to delete \(account.name): \(error.localizedDescription)"
                 }
-                accountPendingDeletion = nil
             }
             Button("Cancel", role: .cancel) {
                 accountPendingDeletion = nil
             }
         } message: { account in
             Text("This removes \(account.name) and its stored API key from Atoll.")
+        }
+        .alert("New API Account Error", isPresented: Binding(
+            get: { newAPIAccountErrorMessage != nil },
+            set: { if !$0 { newAPIAccountErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { newAPIAccountErrorMessage = nil }
+        } message: {
+            Text(newAPIAccountErrorMessage ?? "An unknown error occurred.")
         }
     }
 }
