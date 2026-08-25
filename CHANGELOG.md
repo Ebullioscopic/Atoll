@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Fingerprint lock screen activity**: choose the lock, an animated fingerprint scan, or both from Lock Screen settings. The fingerprint uses an attributed Lottie animation and completes its green scan while the Mac unlocks. (#774)
 
+- TIDAL can now be selected as the music source. Atoll follows the TIDAL desktop app's macOS Now Playing session, so unrelated videos no longer replace its metadata or controls, and the real-time waveform captures TIDAL's separate player process. (#764)
 - **Choose how the sung line is marked**: a Highlight setting beside Show lyrics picks between Sweep, where the highlight travels across the line in time with the singing, and Solid, where the whole line lights at once as it did before.
 
 - **Lyrics follow the music**: the current line in the side lyrics panel and the lock screen music player is now lit by a highlight that sweeps across it in time with playback, instead of the whole line changing colour at once. Stretches of a track with no words are shown as music notes rather than as a gap — LRC marks where singing stops with a bare timestamp, so the break is read from the lyrics themselves rather than guessed, and only breaks of five seconds or more are marked so breaths between lines do not flicker.
