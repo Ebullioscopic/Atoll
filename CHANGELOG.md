@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Lyrics on the side**: Added ability to show lyrics of the current song when calendar is disabled (#741)
 
+- **Convert files on the shelf**: Right-clicking a file on the shelf now offers a "Convert To" menu built from that file's own type — images between PNG, JPEG, HEIC, TIFF and PDF, videos between MP4 and MOV or down to just their audio, audio between M4A, WAV and AIFF, and rich text between RTF, HTML, plain text and PDF. The original file is never modified or deleted.
 ### Changed
 - Lock screen live activity timings now follow the selected icons: the fingerprint remains visible through its scan, while the open lock gets its own brief confirmation beat before the island contracts. (#774)
 

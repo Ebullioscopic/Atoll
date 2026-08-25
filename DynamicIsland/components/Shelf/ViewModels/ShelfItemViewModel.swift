@@ -20,6 +20,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import Defaults
 import Foundation
 import AppKit
 import SwiftUI
@@ -237,9 +238,46 @@ final class ShelfItemViewModel: ObservableObject {
         if event.clickCount == 2 { handleDoubleClick() }
     }
 
+    /// Best-effort content type for the conversion matrix, falling back to the
+    /// path extension when the file has no recorded type.
+    static func contentType(of url: URL) -> UTType {
+        if let type = (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType {
+            return type
+        }
+        return UTType(filenameExtension: url.pathExtension) ?? .data
+    }
+
     func handleRightClick(event: NSEvent, view: NSView) {
         if !selection.isSelected(item.id) { selection.selectSingle(item) }
         presentContextMenu(event: event, in: view)
+    }
+
+    /// Converts the selected file and puts the result on the Shelf. The source
+    /// file is never touched: on success the converted copy is added and the
+    /// original item is dropped from the Shelf only when the user asked for a
+    /// replacement.
+    func performConversion(_ request: ShelfConversionRequest) {
+        Task {
+            do {
+                let converted = try await request.sourceURL.accessSecurityScopedResource { url in
+                    try await ShelfConversionService.convert(url, to: request.target)
+                }
+                guard let bookmark = try? Bookmark(url: converted) else {
+                    throw ShelfConversionError.writeFailed
+                }
+                let newItem = ShelfItem(kind: .file(bookmark: bookmark.data), isTemporary: true)
+                ShelfStateViewModel.shared.add([newItem])
+                if Defaults[.shelfConversionReplacesOriginalItem] {
+                    ShelfActionService.remove(item)
+                }
+            } catch {
+                Logger.log(
+                    "Shelf conversion to \(request.target.title) failed: \(error.localizedDescription)",
+                    category: .error
+                )
+                NSAlert.popError(error)
+            }
+        }
     }
 
     func handleDoubleClick() {
@@ -475,6 +513,30 @@ final class ShelfItemViewModel: ObservableObject {
             menu.addItem(NSMenuItem.separator())
         }
 
+        // Add a "Convert To" submenu whose contents come from the source file's
+        // own type, so a conversion that would fail is never offered. Single file
+        // only; link and text items have nothing to convert.
+        if Defaults[.enableShelfConversion],
+           selectedItems.count == 1,
+           case .file = item.kind,
+           let sourceURL = selectedFileURLs.first {
+            let targets = ShelfConversionMatrix.targets(for: Self.contentType(of: sourceURL))
+            if !targets.isEmpty {
+                let convertTo = NSMenuItem(title: "Convert To", action: nil, keyEquivalent: "")
+                let convertSubmenu = NSMenu()
+                for target in targets {
+                    let entry = NSMenuItem(title: target.title, action: nil, keyEquivalent: "")
+                    // Carried on the item rather than matched by title, because these
+                    // titles are data and the handler's title switch is not.
+                    entry.representedObject = ShelfConversionRequest(sourceURL: sourceURL, target: target)
+                    convertSubmenu.addItem(entry)
+                }
+                convertTo.submenu = convertSubmenu
+                menu.addItem(convertTo)
+                menu.addItem(NSMenuItem.separator())
+            }
+        }
+
         // Add compression option for files/folders (single or multiple)
         if !selectedFileURLs.isEmpty {
             let compressItem = NSMenuItem(title: "Compress", action: nil, keyEquivalent: "")
@@ -543,6 +605,11 @@ final class ShelfItemViewModel: ObservableObject {
 
             if let marker = sender.representedObject as? String, marker == "__OTHER__" {
                 openWithPanel()
+                return
+            }
+
+            if let request = sender.representedObject as? ShelfConversionRequest {
+                viewModel.performConversion(request)
                 return
             }
 
