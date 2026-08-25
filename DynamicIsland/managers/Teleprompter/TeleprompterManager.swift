@@ -67,6 +67,10 @@ final class TeleprompterManager: ObservableObject {
     private var speechTimestamps: [TimeInterval] = []
     private var followState = FollowState()
     private var followIndex: ScriptFollowIndex?
+    /// `confirmedTokenIndex` at the moment the current take began. Automatic and
+    /// manual modes never touch `followState.matchedWordCount`, so this is what
+    /// tells `recordTakeIfWorthwhile` those modes made progress.
+    private var takeStartTokenIndex: Int?
     private var cancellables = Set<AnyCancellable>()
     private var advanceTask: Task<Void, Never>?
     private var hasStarted = false
@@ -264,11 +268,23 @@ final class TeleprompterManager: ObservableObject {
         // Whatever the reader had just changed belongs to the script they are
         // leaving, and the debounced capture may not have fired yet.
         captureCurrentPreferences()
+        // The follow index and follow state are built for the script being
+        // left; carrying them across would match voice against the wrong
+        // script's tokens. startListening() rebuilds both from scratch.
+        let wasListening = isListening
+        if wasListening {
+            stopListening()
+        }
         currentScriptID = id
         // Resume where this script was left, which is what makes reopening one
-        // feel like returning to it.
-        confirmedTokenIndex = currentScript?.preferences.lastTokenIndex ?? 0
+        // feel like returning to it. Clamped in case the script's tokens have
+        // since changed and the saved position no longer exists.
+        let savedIndex = currentScript?.preferences.lastTokenIndex ?? 0
+        confirmedTokenIndex = min(max(savedIndex, 0), currentScript?.tokens.count ?? 0)
         applyPreferencesOfCurrentScript()
+        if wasListening {
+            startListening()
+        }
     }
 
     // MARK: - Per-script memory
@@ -590,6 +606,7 @@ final class TeleprompterManager: ObservableObject {
         guard currentScript != nil else { return }
         isRunning = true
         takeStartedAt = Date()
+        takeStartTokenIndex = confirmedTokenIndex
         speechTimestamps = []
         lastTake = nil
         // A second take must not inherit the first one's matched words and
@@ -617,7 +634,10 @@ final class TeleprompterManager: ObservableObject {
     func resumeTake() {
         guard currentScript != nil else { return }
         isRunning = true
-        if takeStartedAt == nil { takeStartedAt = Date() }
+        if takeStartedAt == nil {
+            takeStartedAt = Date()
+            takeStartTokenIndex = confirmedTokenIndex
+        }
         startAdvanceIfNeeded()
     }
 
@@ -625,6 +645,7 @@ final class TeleprompterManager: ObservableObject {
         recordTakeIfWorthwhile()
         isRunning = false
         takeStartedAt = nil
+        takeStartTokenIndex = nil
         advanceTask?.cancel()
         advanceTask = nil
         stopListening()
@@ -650,6 +671,7 @@ final class TeleprompterManager: ObservableObject {
         setTokenIndex(0)
         speechTimestamps = []
         takeStartedAt = Date()
+        takeStartTokenIndex = confirmedTokenIndex
         resetFollowState()
         startAdvanceIfNeeded()
     }
@@ -659,9 +681,14 @@ final class TeleprompterManager: ObservableObject {
     /// A take with nothing matched is someone opening the prompter and closing
     /// it again; filing statistics for that would only clutter the history.
     private func recordTakeIfWorthwhile(surfacingDebrief: Bool = true) {
+        // Voice mode registers progress as matched words; automatic and manual
+        // modes never touch that counter and instead move the token cursor
+        // directly, so either counts as a take worth filing.
+        let madeProgress = followState.matchedWordCount > 0
+            || (takeStartTokenIndex.map { confirmedTokenIndex > $0 } ?? false)
         guard let script = currentScript,
               let startedAt = takeStartedAt,
-              followState.matchedWordCount > 0
+              madeProgress
         else { return }
 
         let take = TakeStatsBuilder.build(

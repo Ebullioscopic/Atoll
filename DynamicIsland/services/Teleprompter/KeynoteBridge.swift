@@ -221,7 +221,14 @@ enum KeynoteScriptBuilder {
     static func escaped(_ notes: String) -> String {
         notes.components(separatedBy: .newlines).map { line -> String in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
+            // A code fence swallows every slide after it into one inert block,
+            // and a bare rule line is dropped outright — both as silently as
+            // the heading/blockquote cases below.
+            let isFence = trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~")
+            let isRule = trimmed.count >= 3
+                && trimmed.allSatisfy { $0 == "-" || $0 == "*" || $0 == "_" }
             guard trimmed.hasPrefix("#") || trimmed.hasPrefix(">") || trimmed.hasPrefix("\\")
+                    || isFence || isRule
             else { return line }
             return "\\" + trimmed
         }

@@ -51,7 +51,7 @@ enum SpeechTranscriptDiffer {
     static func delta(
         previous: [String],
         current: [String],
-        provisionalTail: Int = provisionalTail
+        provisionalTail: Int = Self.provisionalTail
     ) -> TranscriptDelta {
         let shared = commonPrefixLength(previous, current)
 

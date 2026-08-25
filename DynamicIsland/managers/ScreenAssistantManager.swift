@@ -326,6 +326,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
             print("Started recording: \(fileName)")
         } catch {
             print("Failed to start recording: \(error)")
+            MicrophoneLease.shared.release(.screenAssistant)
         }
     }
     
@@ -1290,10 +1291,11 @@ class ScreenAssistantManager: NSObject, ObservableObject {
 
 extension ScreenAssistantManager: AVAudioRecorderDelegate {
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+        MicrophoneLease.shared.release(.screenAssistant)
         isRecording = false
         recordingTimer?.invalidate()
         recordingTimer = nil
-        
+
         if flag {
             let fileName = recorder.url.lastPathComponent
             let displayName = "Recording \(DateFormatter.shortTime.string(from: Date()))"

@@ -80,7 +80,18 @@ final class TeleprompterLibraryStore {
 
     func load() -> [TeleprompterScript] {
         guard let data = try? Data(contentsOf: fileURL) else { return [] }
-        return (try? decoder.decode([TeleprompterScript].self, from: data)) ?? []
+        do {
+            return try decoder.decode([TeleprompterScript].self, from: data)
+        } catch {
+            // Move the unreadable file aside rather than let the next save()
+            // silently overwrite it — an empty in-memory library plus a normal
+            // save would otherwise delete scripts that just failed to decode.
+            Logger.log("Teleprompter: could not decode the script library: \(error)", category: .ui)
+            let backup = fileURL.appendingPathExtension("corrupt")
+            try? FileManager.default.removeItem(at: backup)
+            try? FileManager.default.moveItem(at: fileURL, to: backup)
+            return []
+        }
     }
 
     func save(_ scripts: [TeleprompterScript]) {

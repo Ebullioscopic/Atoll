@@ -188,8 +188,10 @@ final class TeleprompterSpeechFollower: ObservableObject {
         endTask()
         if engine.isRunning {
             engine.stop()
-            engine.inputNode.removeTap(onBus: 0)
         }
+        // Unconditional: a tap can be installed by startAudio() even when
+        // engine.start() then fails, and engine is reused across starts.
+        engine.inputNode.removeTap(onBus: 0)
         recognizer = nil
         MicrophoneLease.shared.release(.teleprompter)
         isListening = false
@@ -213,7 +215,15 @@ final class TeleprompterSpeechFollower: ObservableObject {
             self?.request?.append(buffer)
         }
         engine.prepare()
-        try engine.start()
+        do {
+            try engine.start()
+        } catch {
+            // engine is a stored property reused by every start(locale:) call.
+            // Leaving the tap on bus 0 makes the next installTap(onBus:) raise
+            // an Objective-C exception and terminate the app.
+            input.removeTap(onBus: 0)
+            throw error
+        }
     }
 
     /// The default input can change mid-take — a headset connects, a dock is
