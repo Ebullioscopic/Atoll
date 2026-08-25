@@ -506,6 +506,51 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         }
 
     }
+}
+
+struct NowPlayingUpdate: Codable {
+    let payload: NowPlayingPayload
+    let diff: Bool?
+}
+
+struct NowPlayingPayload: Codable {
+    let title: String?
+    let artist: String?
+    let album: String?
+    let duration: Double?
+    let elapsedTime: Double?
+    /// Microsecond variants, emitted in place of the keys above when the adapter
+    /// runs with --micros. Preferred because the plain "timestamp" is truncated
+    /// to whole seconds.
+    let durationMicros: Double?
+    let elapsedTimeMicros: Double?
+    let timestampEpochMicros: Double?
+    let shuffleMode: Int?
+    let repeatMode: Int?
+    let artworkData: String?
+    let timestamp: String?
+    let playbackRate: Double?
+    let playing: Bool?
+    let parentApplicationBundleIdentifier: String?
+    let bundleIdentifier: String?
+
+    /// Whether the update names a position field and sets it to null.
+    ///
+    /// A diff omits what has not changed, so an absent position means "carry the
+    /// last one forward". A position that is present but null is the sender
+    /// saying it no longer has one. Optional decoding renders both as nil, so
+    /// the distinction has to be captured while the container is still in hand
+    /// -- otherwise a cleared position is mistaken for an unchanged one and the
+    /// old position keeps being extrapolated from.
+    let clearsElapsedTime: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case title, artist, album, duration, elapsedTime
+        case durationMicros, elapsedTimeMicros, timestampEpochMicros
+        case shuffleMode, repeatMode, artworkData, timestamp
+        case playbackRate, playing
+        case parentApplicationBundleIdentifier, bundleIdentifier
+    }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
