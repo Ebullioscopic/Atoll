@@ -441,8 +441,10 @@ struct CalendarView: View {
                 hideAllDayEvents: hideAllDayEvents
             )
             if filteredEvents.isEmpty {
+                // Centre it in the space left under the header rather than
+                // hanging it off the header with all the slack below.
                 EmptyEventsView(selectedDate: selectedDate)
-                Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 EventListView(events: calendarManager.events, selectedDate: selectedDate)
             }
@@ -773,17 +775,23 @@ struct EmptyEventsView: View {
     let selectedDate: Date
 
     var body: some View {
-        VStack {
+        // Explicit spacing: the default VStack gap (8pt) applied equally between
+        // the icon and both lines, which left the two labels floating apart
+        // instead of reading as one caption block under the glyph.
+        VStack(spacing: 0) {
             Image(systemName: "calendar.badge.checkmark")
-                .font(.title)
+                .font(.system(size: 20, weight: .regular))
                 .foregroundColor(Color(white: 0.65))
+                .padding(.bottom, 7)
             Text(Calendar.current.isDateInToday(selectedDate) ? "No events today" : "No events")
                 .font(.subheadline)
                 .foregroundColor(.white)
             Text("Enjoy your free time!")
                 .font(.caption)
                 .foregroundColor(Color(white: 0.65))
+                .padding(.top, 1)
         }
+        .multilineTextAlignment(.center)
     }
 }
 
@@ -818,11 +826,11 @@ private struct StandaloneEventCardList: View {
         let refTime = scrollReferenceTime(for: selectedDate)
         guard let target = scrollTargetForTimedEvents(timed: timedEvents, referenceTime: refTime) else { return }
 
-        // The List reserves `listTopInset` at its top when an all-day strip is
-        // present, so scrolling to `.top` lands the target event just below the
-        // overlay — fully visible. Mirrors `EventListView`. (#566)
-        let anchor: UnitPoint = .top
-        Task { @MainActor in
+        // Use .center anchor for more reliable positioning with List's internal padding.
+        // DispatchQueue.main.async ensures the scroll fires after List completes its initial layout,
+        // avoiding the race condition where proxy.scrollTo fires before items are measured.
+        let anchor: UnitPoint = .center
+        DispatchQueue.main.async {
             withTransaction(Transaction(animation: nil)) {
                 proxy.scrollTo(target.id, anchor: anchor)
             }
@@ -875,6 +883,14 @@ private struct StandaloneEventCardList: View {
                     guard wasEmpty, !isEmpty, !initialAutoScrollDone else { return }
                     scrollToRelevantEvent(proxy: proxy)
                     initialAutoScrollDone = true
+                }
+                .onChange(of: events) { _, _ in
+                    // Fallback: re-trigger auto-scroll when events are refreshed (e.g., calendar
+                    // permission granted, calendars re-selected, or external calendar change).
+                    // The initialAutoScrollDone guard prevents unwanted re-scrolling on minor updates.
+                    if !initialAutoScrollDone {
+                        scrollToRelevantEvent(proxy: proxy)
+                    }
                 }
             }
 
@@ -1074,12 +1090,11 @@ struct EventListView: View {
         let refTime = scrollReferenceTime(for: selectedDate)
         guard let target = scrollTargetForTimedEvents(timed: timedEvents, referenceTime: refTime) else { return }
 
-        // The List has .padding(.top: 30) when all-day events are present,
-        // which lives inside the ScrollView's coordinate space.  Scrolling to
-        // .top therefore places the target event just below that inset — i.e.
-        // fully visible beneath the floating all-day overlay.
-        let anchor: UnitPoint = .top
-        Task { @MainActor in
+        // Use .center anchor for more reliable positioning with List's internal padding.
+        // DispatchQueue.main.async ensures the scroll fires after List completes its initial layout,
+        // avoiding the race condition where proxy.scrollTo fires before items are measured.
+        let anchor: UnitPoint = .center
+        DispatchQueue.main.async {
             withTransaction(Transaction(animation: nil)) {
                 proxy.scrollTo(target.id, anchor: anchor)
             }
@@ -1140,6 +1155,14 @@ struct EventListView: View {
                     guard wasEmpty, !isEmpty, !initialAutoScrollDone else { return }
                     scrollToRelevantEvent(proxy: proxy)
                     initialAutoScrollDone = true
+                }
+                .onChange(of: calendarManager.events) { _, _ in
+                    // Fallback: re-trigger auto-scroll when events are refreshed (e.g., calendar
+                    // permission granted, calendars re-selected, or external calendar change).
+                    // The initialAutoScrollDone guard prevents unwanted re-scrolling on minor updates.
+                    if !initialAutoScrollDone {
+                        scrollToRelevantEvent(proxy: proxy)
+                    }
                 }
             }
 

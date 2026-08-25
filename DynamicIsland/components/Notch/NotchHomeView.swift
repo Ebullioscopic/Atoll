@@ -80,7 +80,13 @@ private final class DynamicIslandArtworkVideoContainerView: NSView {
 
     override func layout() {
         super.layout()
+        // SwiftUI owns the enclosing transition timing. Prevent the video
+        // layer from adding a second implicit frame animation during that
+        // transition, which makes Canvas artwork lag behind static artwork.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         playerLayer.frame = bounds
+        CATransaction.commit()
     }
 }
 
@@ -160,6 +166,58 @@ struct MusicPlayerView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct LyricsSidePanelView: View {
+    @ObservedObject private var musicManager = MusicManager.shared
+    @EnvironmentObject private var vm: DynamicIslandViewModel
+    @State private var suppressionToken = UUID()
+    @State private var isSuppressing = false
+    private var artistLineColor: Color {
+        Defaults[.playerColorTinting]
+            ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6)
+            : .gray
+    }
+
+    /// The colour a line has yet to be sung in. Tinted rather than plain grey so
+    /// the unsung remainder still reads as part of the current line.
+    private var lyricsStyle: SyncedLyricsStyle {
+        SyncedLyricsStyle(
+            sung: .white,
+            unsung: artistLineColor.opacity(0.55),
+            idle: .white.opacity(0.5),
+            tint: artistLineColor
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Lyrics")
+                .font(.headline)
+                .foregroundStyle(artistLineColor)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+
+            SyncedLyricsList(musicManager: musicManager, style: lyricsStyle)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.black.opacity(0.3))
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .onHover { hovering in
+            updateSuppression(for: hovering)
+        }
+        .onDisappear {
+            updateSuppression(for: false)
+        }
+    }
+
+    // Prevent lyrics scrolling to close the expanded notch
+    private func updateSuppression(for hovering: Bool) {
+        guard hovering != isSuppressing else { return }
+        isSuppressing = hovering
+        vm.setScrollGestureSuppression(hovering, token: suppressionToken)
     }
 }
 
@@ -289,8 +347,8 @@ struct MusicControlsView: View {
     @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.enableLyrics) private var enableLyrics
+    @Default(.showCalendar) private var showCalendar
     private let seekInterval: TimeInterval = 10
-    private let skipMagnitude: CGFloat = 6
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -339,16 +397,28 @@ struct MusicControlsView: View {
                 frameWidth: width
             )
             .fontWeight(.medium)
-            // Lyrics shown under the author name (same font size as author) when enabled in settings
-            if enableLyrics {
+            if enableLyrics && showCalendar {
                 let transition = AnyTransition.asymmetric(
                     insertion: .move(edge: .bottom).combined(with: .opacity),
                     removal: .move(edge: .top).combined(with: .opacity)
                 )
 
                 let line = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
+                let isInstrumentalBreak = musicManager.isInInstrumentalBreak
 
-                if !line.isEmpty {
+                if isInstrumentalBreak {
+                    // The track is between verses, so mark it the way the side
+                    // panel does instead of leaving a hole in the layout. Driven
+                    // by the break itself rather than by the line being blank:
+                    // during an intro there is no current line to blank out, so
+                    // testing the text would miss it.
+                    InstrumentalBreakNotes(fontSize: 10, weight: .regular)
+                        .foregroundStyle(.white.opacity(0.7))
+                    .padding(.top, 2)
+                    .transition(transition)
+                }
+
+                if !isInstrumentalBreak, !line.isEmpty {
                     let lyricsBinding = Binding<String>(
                         get: { musicManager.currentLyrics },
                         set: { _ in }
@@ -480,7 +550,24 @@ struct MusicControlsView: View {
     private func syncHUDValueIfNeeded(force: Bool) {
         guard shouldShowControlHUDRow else { return }
         guard force || !hudDragging else { return }
-        hudValue = Double(coordinator.sneakPeek.value)
+
+        let target = Double(coordinator.sneakPeek.value)
+        guard target != hudValue else { return }
+
+        guard !force else {
+            // First sync when the row appears: adopt the current level outright
+            // rather than sliding up to it from wherever the slider last sat.
+            hudValue = target
+            return
+        }
+
+        // The keys deliver discrete steps (1/16 of the range each), and nothing
+        // animated the fill between them, so the track jumped. Glide instead —
+        // short enough to keep up with key auto-repeat, and interruptible, so a
+        // held key reads as one continuous sweep rather than a queue of hops.
+        withAnimation(.easeOut(duration: 0.18)) {
+            hudValue = target
+        }
     }
 
     private func updateControlHUDValue(_ newValue: Double) {
@@ -576,16 +663,18 @@ struct MusicControlsView: View {
         case .trackBackward:
             playbackButton(
                 icon: "backward.fill",
-                press: .nudge(-skipMagnitude),
-                trigger: skipGestureTrigger(for: .trackBackward)
+                press: nil,
+                trigger: skipGestureTrigger(for: .trackBackward),
+                skipDirection: .backward
             ) {
                 musicManager.previousTrack()
             }
         case .trackForward:
             playbackButton(
                 icon: "forward.fill",
-                press: .nudge(skipMagnitude),
-                trigger: skipGestureTrigger(for: .trackForward)
+                press: nil,
+                trigger: skipGestureTrigger(for: .trackForward),
+                skipDirection: .forward
             ) {
                 musicManager.nextTrack()
             }
@@ -648,13 +737,16 @@ struct MusicControlsView: View {
 
     private struct SkipTrigger {
         let token: Int
-        let pressEffect: HoverButton.PressEffect
+        /// nil for the track buttons: the pulse advances the skip glyph rather
+        /// than moving the button.
+        let pressEffect: HoverButton.PressEffect?
     }
 
     private func playbackButton(
         icon: String,
         press: HoverButton.PressEffect?,
         trigger: SkipTrigger?,
+        skipDirection: SkipTrackGlyph.Direction? = nil,
         action: @escaping () -> Void
     ) -> some View {
         HoverButton(
@@ -662,7 +754,8 @@ struct MusicControlsView: View {
             scale: .medium,
             pressEffect: press,
             externalTriggerToken: trigger?.token,
-            externalTriggerEffect: trigger?.pressEffect
+            externalTriggerEffect: trigger?.pressEffect,
+            skipDirection: skipDirection
         ) {
             action()
         }
@@ -673,9 +766,9 @@ struct MusicControlsView: View {
 
         switch control {
         case .trackBackward where pulse.behavior == .track && pulse.direction == .backward:
-            return SkipTrigger(token: pulse.token, pressEffect: .nudge(-skipMagnitude))
+            return SkipTrigger(token: pulse.token, pressEffect: nil)
         case .trackForward where pulse.behavior == .track && pulse.direction == .forward:
-            return SkipTrigger(token: pulse.token, pressEffect: .nudge(skipMagnitude))
+            return SkipTrigger(token: pulse.token, pressEffect: nil)
         case .seekBackward where pulse.behavior == .tenSecond && pulse.direction == .backward:
             return SkipTrigger(token: pulse.token, pressEffect: .wiggle(.counterClockwise))
         case .seekForward where pulse.behavior == .tenSecond && pulse.direction == .forward:
@@ -697,11 +790,19 @@ struct NotchHomeView: View {
     @ObservedObject private var musicManager = MusicManager.shared
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
+    @Default(.showCalendar) private var showCalendar
+    @Default(.enableLyrics) private var enableLyrics
+    @Default(.lyricsPanelWidth) private var lyricsPanelWidth
+    @Default(.lyricsPanelOffset) private var lyricsPanelOffset
     let albumArtNamespace: Namespace.ID
 
     /// Whether the music player should actively display (enabled AND has real content).
     private var shouldShowMusicPlayer: Bool {
         showStandardMediaControls && (!autoHideInactiveNotchMediaPlayer || musicManager.hasActiveSession)
+    }
+
+    private var shouldShowSideLyrics: Bool {
+        shouldShowMusicPlayer && enableLyrics && !showCalendar
     }
     
     var body: some View {
@@ -714,7 +815,7 @@ struct NotchHomeView: View {
     }
 
     private var mainContent: some View {
-        HStack(alignment: .top, spacing: 20) {
+        Group {
             if Defaults[.enableMinimalisticUI] {
                 if let overridePayload = minimalisticOverridePayload {
                     ExtensionMinimalisticExperienceView(
@@ -724,35 +825,34 @@ struct NotchHomeView: View {
                 } else {
                     MinimalisticMusicPlayerView(albumArtNamespace: albumArtNamespace)
                 }
+            } else if shouldShowSideLyrics {
+                sideLyricsContent
             } else {
-                // Normal mode: Show full music player with optional calendar and webcam
-                if shouldShowMusicPlayer {
-                    MusicPlayerView(albumArtNamespace: albumArtNamespace)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                
-                if Defaults[.showCalendar] {
-                    Group {
-                        if shouldShowMusicPlayer {
-                            CalendarView()
-                        } else {
-                            StandaloneCalendarView()
+                HStack(alignment: .top, spacing: SideLyricsLayout.hStackSpacing) {
+                    // Normal mode: Show full music player with optional calendar and webcam
+                    if shouldShowMusicPlayer {
+                        MusicPlayerView(albumArtNamespace: albumArtNamespace)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    if showCalendar {
+                        Group {
+                            if shouldShowMusicPlayer {
+                                CalendarView()
+                            } else {
+                                StandaloneCalendarView()
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .onHover { isHovering in
+                            vm.isHoveringCalendar = isHovering
+                        }
+                        .environmentObject(vm)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .onHover { isHovering in
-                        vm.isHoveringCalendar = isHovering
+
+                    if mirrorIsVisible {
+                        cameraPreview
                     }
-                    .environmentObject(vm)
-                }
-                
-                if Defaults[.showMirror],
-                   webcamManager.cameraAvailable,
-                   vm.notchState == .open {
-                    CameraPreviewView(webcamManager: webcamManager)
-                        .scaledToFit()
-                        .opacity(vm.notchState == .closed ? 0 : 1)
-                        .blur(radius: vm.notchState == .closed ? 20 : 0)
                 }
             }
         }
@@ -761,6 +861,35 @@ struct NotchHomeView: View {
             .combined(with: .move(edge: .top)))
         .blur(radius: vm.notchState == .closed ? 30 : 0)
         .padding(Defaults[.enableMinimalisticUI] ? 0 : 8) //Putting the main padding for home view here for consistency
+    }
+
+    private var sideLyricsContent: some View {
+        HStack(alignment: .top, spacing: SideLyricsLayout.hStackSpacing) {
+            MusicPlayerView(albumArtNamespace: albumArtNamespace)
+                .frame(minWidth: SideLyricsLayout.minimumPlayerWidth, maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
+
+            LyricsSidePanelView()
+                .frame(width: max(0, lyricsPanelWidth), alignment: .topLeading)
+                .padding(.leading, max(0, -lyricsPanelOffset))
+                .offset(x: lyricsPanelOffset)
+
+            if mirrorIsVisible {
+                cameraPreview
+                    .frame(minWidth: SideLyricsLayout.minimumMirrorWidth, maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var mirrorIsVisible: Bool {
+        Defaults[.showMirror] && webcamManager.cameraAvailable && vm.notchState == .open
+    }
+
+    private var cameraPreview: some View {
+        CameraPreviewView(webcamManager: webcamManager)
+            .scaledToFit()
+            .opacity(vm.notchState == .closed ? 0 : 1)
+            .blur(radius: vm.notchState == .closed ? 20 : 0)
     }
 
     private var minimalisticOverridePayload: ExtensionNotchExperiencePayload? {
@@ -787,6 +916,10 @@ struct MusicSliderView: View {
     var draggingTrackHeight: CGFloat = 14
     /// When set, bypasses Defaults[.sliderColor] (used by lock screen appearance).
     var tintOverride: Color? = nil
+    /// Greys the track out until it is reached for, the way Apple's transport
+    /// sliders do. Opt-in: the notch's own slider is meant to carry the album
+    /// colour at rest.
+    var desaturatesWhenIdle: Bool = false
 
     enum TimeLabelLayout {
         case stacked
@@ -899,17 +1032,30 @@ struct MusicSliderView: View {
         }
     }
 
+    @ViewBuilder
     private var sliderCore: some View {
-        CustomSlider(
-            value: $sliderValue,
-            range: 0 ... duration,
-            color: sliderTint,
-            dragging: $dragging,
-            lastDragged: $lastDragged,
-            onValueChange: onValueChange,
-            restingTrackHeight: restingTrackHeight,
-            draggingTrackHeight: draggingTrackHeight
-        )
+        if hasUsableDuration {
+            CustomSlider(
+                value: $sliderValue,
+                range: 0 ... duration,
+                color: sliderTint,
+                dragging: $dragging,
+                lastDragged: $lastDragged,
+                onValueChange: onValueChange,
+                restingTrackHeight: restingTrackHeight,
+                draggingTrackHeight: draggingTrackHeight,
+                desaturatesWhenIdle: desaturatesWhenIdle
+            )
+        } else {
+            // `0 ... duration` traps when the upper bound is below the lower
+            // one, so a negative duration crashes here before any of the
+            // formatting guards get a look at it. A length nobody has reported
+            // also has nothing to scrub within, so the track is inert.
+            Capsule(style: .continuous)
+                .fill(sliderTint.opacity(0.18))
+                .frame(height: restingTrackHeight)
+                .frame(maxWidth: .infinity)
+        }
     }
 
     private var sliderTint: Color {
@@ -935,13 +1081,37 @@ struct MusicSliderView: View {
             : .gray
     }
 
+    /// Whether the reported duration is one a track could actually have.
+    ///
+    /// Senders do not always report a usable one — a live stream has none to
+    /// give, and some hand back a sentinel or an epoch timestamp instead. The
+    /// remaining-time label subtracts the position from it and formats the
+    /// result as hours, so an epoch came out on screen as `-1732919508:00:54`.
+    /// A day is well past any track and well short of any of those.
+    private var hasUsableDuration: Bool {
+        duration.isFinite && duration > 0 && duration <= 24 * 60 * 60
+    }
+
+    /// Shown in place of a time there is no sensible value for, rather than a
+    /// formatted impossibility.
+    private static let unknownTime = "--:--"
+
     private var trailingTimeText: String {
+        guard hasUsableDuration else { return Self.unknownTime }
+
         switch trailingLabel {
         case .duration:
             return timeString(from: duration)
         case .remaining:
-            let remaining = max(duration - sliderValue, 0)
-            return "-" + timeString(from: remaining)
+            // A position that is not a position cannot be subtracted from
+            // anything, and a negative one would inflate what is left rather
+            // than reduce it.
+            guard sliderValue.isFinite, sliderValue >= 0 else { return Self.unknownTime }
+
+            let remaining = timeString(from: max(duration - sliderValue, 0))
+            // The minus belongs to a time, not to the absence of one: prefixing
+            // it unconditionally turned --:-- into ---:--.
+            return remaining == Self.unknownTime ? remaining : "-" + remaining
         }
     }
 
@@ -954,6 +1124,12 @@ struct MusicSliderView: View {
     }
 
     func timeString(from seconds: Double) -> String {
+        // Int(_:) traps on a value too large to represent, and NaN has no
+        // meaning here either; neither belongs on screen as a time.
+        guard seconds.isFinite, seconds >= 0, seconds < Double(Int.max) else {
+            return Self.unknownTime
+        }
+
         let totalMinutes = Int(seconds) / 60
         let remainingSeconds = Int(seconds) % 60
         let hours = totalMinutes / 60
@@ -979,10 +1155,23 @@ struct CustomSlider: View {
     var thumbSize: CGFloat = 12
     var restingTrackHeight: CGFloat = 8
     var draggingTrackHeight: CGFloat = 14
+    /// See `MusicSliderView.desaturatesWhenIdle`.
+    var desaturatesWhenIdle: Bool = false
     
     @State private var isHovering: Bool = false
     @Default(.enableRealTimeWaveform) var enableRealTimeWaveform
     @Default(.enableWaveformScrubber) var enableWaveformScrubber
+
+    private var isEngaged: Bool { dragging || isHovering }
+
+    private var trackSaturation: Double {
+        desaturatesWhenIdle && !isEngaged ? 0 : 1
+    }
+
+    private var trackOpacity: Double {
+        guard desaturatesWhenIdle else { return 1 }
+        return isEngaged ? 1 : 0.82
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -1021,7 +1210,15 @@ struct CustomSlider: View {
                         .cornerRadius(trackHeight / 2)
                 }
             }
-            .frame(height: max(restingTrackHeight, draggingTrackHeight), alignment: .bottom)
+            // The track swells from its middle, so it grows into the space
+            // above and below equally instead of climbing off the baseline --
+            // which is also what leaves it level with the times beside it.
+            // The waveform scrubber is the exception: it is 3.5x the track and
+            // is drawn to rise out of the bar, so it stays bottom-anchored.
+            .frame(
+                height: max(restingTrackHeight, draggingTrackHeight),
+                alignment: showScrubber ? .bottom : .center
+            )
             .contentShape(Rectangle())
             .highPriorityGesture(
                 DragGesture(minimumDistance: 0)
@@ -1038,6 +1235,12 @@ struct CustomSlider: View {
                         lastDragged = Date()
                     }
             )
+            .saturation(trackSaturation)
+            // Kept well above the volume bar's resting brightness: a seek bar
+            // that fades as far as that one reads as disabled rather than idle.
+            .opacity(trackOpacity)
+            .animation(.easeOut(duration: 0.2), value: trackSaturation)
+            .animation(.easeOut(duration: 0.2), value: trackOpacity)
             .animation(.bouncy.speed(1.4), value: dragging)
             .onHover { hovering in
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -1052,7 +1255,7 @@ private struct MediaOutputPickerButton: View {
     @ObservedObject private var routeManager = AudioRouteManager.shared
     @StateObject private var volumeModel = MediaOutputVolumeViewModel()
     @State private var isPopoverPresented = false
-    @State private var isHoveringPopover = false
+    @State private var popoverToken = UUID()
     @EnvironmentObject private var vm: DynamicIslandViewModel
 
     var body: some View {
@@ -1067,27 +1270,20 @@ private struct MediaOutputPickerButton: View {
             MediaOutputSelectorPopover(
                 routeManager: routeManager,
                 volumeModel: volumeModel,
-                onHoverChanged: { hovering in
-                    isHoveringPopover = hovering
-                    updatePopoverActivity()
-                }
+                onHoverChanged: { _ in }
             ) {
                 isPopoverPresented = false
-                isHoveringPopover = false
                 updatePopoverActivity()
             }
         }
         .onAppear {
             routeManager.refreshDevices()
         }
-        .onChange(of: isPopoverPresented) { _, presented in
-            if !presented {
-                isHoveringPopover = false
-            }
+        .onChange(of: isPopoverPresented) { _, _ in
             updatePopoverActivity()
         }
         .onDisappear {
-            vm.isMediaOutputPopoverActive = false
+            vm.setMediaOutputPopoverActive(false, token: popoverToken)
         }
     }
 
@@ -1095,8 +1291,21 @@ private struct MediaOutputPickerButton: View {
         routeManager.activeDevice?.iconName ?? "speaker.wave.2"
     }
 
+    /// Reports whether this picker's popover is open, so the notch knows not to
+    /// auto-close while it is.
+    ///
+    /// Keyed by a token unique to this presenter: several pickers can exist at
+    /// once and the notch has to stay open while *any* of them is showing, so
+    /// the view model tracks a set of open popovers rather than one flag that
+    /// the second picker to close would clear on behalf of the first.
     private func updatePopoverActivity() {
-        vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+        // Presentation alone, deliberately. Also requiring the pointer to be over
+        // the popover raced the notch's own hover tracking: the popover is a
+        // separate window, so moving into it reads as leaving the notch, and any
+        // moment before the popover reported the pointer let the auto-close timer
+        // shut the notch and take the popover with it. This is what the stats,
+        // timer and clipboard popovers already do.
+        vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
     }
 }
 
@@ -1104,7 +1313,7 @@ private struct AirPlayPickerButton: View {
     @ObservedObject private var musicManager = MusicManager.shared
     @ObservedObject private var airPlayManager = AppleMusicAirPlayManager.shared
     @State private var isPopoverPresented = false
-    @State private var isHoveringPopover = false
+    @State private var popoverToken = UUID()
     @EnvironmentObject private var vm: DynamicIslandViewModel
 
     private var isAppleMusicActive: Bool {
@@ -1122,13 +1331,9 @@ private struct AirPlayPickerButton: View {
         .popover(isPresented: $isPopoverPresented, arrowEdge: .bottom) {
             AirPlaySelectorPopover(
                 airPlayManager: airPlayManager,
-                onHoverChanged: { hovering in
-                    isHoveringPopover = hovering
-                    updatePopoverActivity()
-                }
+                onHoverChanged: { _ in }
             ) {
                 isPopoverPresented = false
-                isHoveringPopover = false
                 updatePopoverActivity()
             }
         }
@@ -1137,8 +1342,7 @@ private struct AirPlayPickerButton: View {
                 Task { await airPlayManager.refreshDevices() }
             }
         }
-        .onChange(of: isPopoverPresented) { _, presented in
-            if !presented { isHoveringPopover = false }
+        .onChange(of: isPopoverPresented) { _, _ in
             updatePopoverActivity()
         }
         .onChange(of: musicManager.bundleIdentifier) { _, newBundle in
@@ -1147,12 +1351,25 @@ private struct AirPlayPickerButton: View {
             }
         }
         .onDisappear {
-            vm.isMediaOutputPopoverActive = false
+            vm.setMediaOutputPopoverActive(false, token: popoverToken)
         }
     }
 
+    /// Reports whether this picker's popover is open, so the notch knows not to
+    /// auto-close while it is.
+    ///
+    /// Keyed by a token unique to this presenter: several pickers can exist at
+    /// once and the notch has to stay open while *any* of them is showing, so
+    /// the view model tracks a set of open popovers rather than one flag that
+    /// the second picker to close would clear on behalf of the first.
     private func updatePopoverActivity() {
-        vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+        // Presentation alone, deliberately. Also requiring the pointer to be over
+        // the popover raced the notch's own hover tracking: the popover is a
+        // separate window, so moving into it reads as leaving the notch, and any
+        // moment before the popover reported the pointer let the auto-close timer
+        // shut the notch and take the popover with it. This is what the stats,
+        // timer and clipboard popovers already do.
+        vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
     }
 }
 
@@ -1184,8 +1401,11 @@ struct MediaOutputSelectorPopover: View {
                 Button {
                     volumeModel.toggleMute()
                 } label: {
+                    // Half the chip, which is about where Apple puts a glyph
+                    // inside a circular one. At 18pt the speaker's waves ran
+                    // right up against the edge of the circle.
                     Image(systemName: volumeIconName)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.primary)
                         .frame(width: 28, height: 28)
                         .background(
@@ -1416,7 +1636,17 @@ final class MediaOutputVolumeViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// How long the volume HUD stays suppressed after a change made from one of
+    /// our own controls. Refreshed on every change, so a drag holds it off until
+    /// shortly after the last movement.
+    private static let ownControlHUDSuppression: TimeInterval = 1.5
+
     func setVolume(_ value: Float) {
+        // The user is already looking at a volume control. Letting the change
+        // raise the notch's volume HUD puts a second slider on screen and swaps
+        // out the content this one is anchored to, tearing the popover down
+        // mid-drag -- which is why the slider could not be dragged at all.
+        HUDSuppressionCoordinator.shared.suppressVolumeHUD(for: Self.ownControlHUDSuppression)
         level = value
         if value > 0 {
             isMuted = false
@@ -1425,6 +1655,7 @@ final class MediaOutputVolumeViewModel: ObservableObject {
     }
 
     func toggleMute() {
+        HUDSuppressionCoordinator.shared.suppressVolumeHUD(for: Self.ownControlHUDSuppression)
         isMuted.toggle()
         controller.toggleMute()
     }
