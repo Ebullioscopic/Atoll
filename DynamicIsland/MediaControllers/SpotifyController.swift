@@ -100,7 +100,8 @@ class SpotifyController: MediaControllerProtocol {
                 self?.artistMetadataFetchTask?.cancel()
                 self?.artistMetadataFetchTask = nil
                 self?.currentArtistTrackURI = nil
-                if let self {
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
                     var updatedState = self.playbackState
                     updatedState.liveArtworkURL = nil
                     self.playbackState = updatedState
@@ -208,7 +209,10 @@ class SpotifyController: MediaControllerProtocol {
             artistMetadataFetchTask = nil
         }
 
-        playbackState = state
+        let resolvedState = state
+        await MainActor.run { [weak self] in
+            self?.playbackState = resolvedState
+        }
 
         if !trackURI.isEmpty {
             if cachedArtistResult == nil {

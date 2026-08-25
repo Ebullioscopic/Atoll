@@ -108,17 +108,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     var whatsNewWindow: NSWindow?
     var timer: Timer?
-    let calendarManager = CalendarManager.shared
-    let webcamManager = WebcamManager.shared
-    let dndManager = DoNotDisturbManager.shared  // NEW: DND detection
-    let bluetoothAudioManager = BluetoothAudioManager.shared  // NEW: Bluetooth audio detection
-    let idleAnimationManager = IdleAnimationManager.shared  // NEW: Custom idle animations
-    let downloadManager = DownloadManager.shared  // NEW: Chromium downloads detection
-    let lockScreenPanelManager = LockScreenPanelManager.shared  // NEW: Lock screen music panel
-    let mediaControlsStateCoordinator = MediaControlsStateCoordinator.shared
-    let systemTimerBridge = SystemTimerBridge.shared
-    let extensionXPCServiceHost = ExtensionXPCServiceHost.shared
-    let extensionRPCServer = ExtensionRPCServer.shared
+    // Feature-dependent managers are lazily initialized so their (sometimes
+    // observer/poller-heavy) `.shared` init does not run synchronously when the
+    // AppDelegate object is allocated (before applicationDidFinishLaunching).
+    // Each is either kept alive by an external owner that is touched during
+    // launch (ContentView / vm / ReminderLiveActivityManager), gated behind its
+    // feature flag, or explicitly touched from the deferred launch block below.
+    lazy var calendarManager = CalendarManager.shared  // owned by ReminderLiveActivityManager (touched at launch)
+    let webcamManager = WebcamManager.shared  // eager: consumed by createDynamicIslandWindow during launch; also owned by vm
+    lazy var dndManager = DoNotDisturbManager.shared  // NEW: DND detection (gated by enableDoNotDisturbDetection; owned by ContentView)
+    lazy var bluetoothAudioManager = BluetoothAudioManager.shared  // NEW: Bluetooth audio detection (deferred touch)
+    lazy var idleAnimationManager = IdleAnimationManager.shared  // NEW: Custom idle animations (touched via deferred initializeDefaultAnimations)
+    lazy var downloadManager = DownloadManager.shared  // NEW: Chromium downloads detection (owned by ContentView)
+    lazy var lockScreenPanelManager = LockScreenPanelManager.shared  // NEW: Lock screen music panel (deferred touch)
+    let mediaControlsStateCoordinator = MediaControlsStateCoordinator.shared  // eager: settings-consistency glue with no other owner; cheap init
+    lazy var systemTimerBridge = SystemTimerBridge.shared  // deferred touch (no external owner; init hosts mirrorSystemTimer observer)
+    let extensionXPCServiceHost = ExtensionXPCServiceHost.shared  // eager: start()/stop() lifecycle driven from launch/terminate
+    let extensionRPCServer = ExtensionRPCServer.shared  // eager: start()/stop() lifecycle driven from launch/terminate
     var closeNotchWorkItem: DispatchWorkItem?
     private var previousScreens: [NSScreen]?
     private var onboardingWindowController: NSWindowController?
@@ -712,10 +718,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
         
-        // Initialize idle animations (load bundled + built-in face)
-        idleAnimationManager.initializeDefaultAnimations()
-
-        applySelectedAppIcon()
+        // Idle-animation loading (disk I/O) and app-icon application (disk I/O)
+        // are deferred to the post-first-frame block at the end of this method.
         installTopMenuItemsIfNeeded()
 
         Defaults.publisher(.focusMonitoringMode, options: [])
@@ -1039,8 +1043,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if coordinator.firstLaunch && !AppRuntimeEnvironment.isUITesting {
             DispatchQueue.main.async {
                 self.showOnboardingWindow()
+                self.playWelcomeSound()
             }
-            playWelcomeSound()
         }
         
         previousScreens = NSScreen.screens
@@ -1058,6 +1062,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let timerWidgetManager = LockScreenTimerWidgetManager.shared
         timerWidgetManager.handleLockStateChange(isLocked: LockScreenManager.shared.currentLockStatus)
 
+        // Defer non-critical launch work until after the first window/notch is on
+        // screen. This runs on the next main-runloop turn, once the synchronous
+        // launch path (window creation above) has completed.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+
+            // Idle animations: resolves bundled resource URLs and reconciles the
+            // Defaults keys that back the animation picker. Kept on the main actor
+            // because those Defaults writes have UI observers — and it only resolves
+            // bundle URLs (no file-content reads), so it stays cheap here.
+            self.idleAnimationManager.initializeDefaultAnimations()
+
+            // App icon: the image file read is the one real disk hit on this path,
+            // so load it off-main (mirrors ModelPricingManager.loadInitialPricing)
+            // and publish applicationIconImage back on the main actor.
+            Task.detached(priority: .utility) {
+                let image = loadSelectedAppIconImage()
+                await MainActor.run {
+                    if let image { NSApp.applicationIconImage = image }
+                }
+            }
+
+            // Instantiate always-on managers whose init only registers
+            // observers/pollers. They have no other owner touched during launch,
+            // so they must be materialized here to preserve behavior — just one
+            // runloop later than before, off the synchronous launch path.
+            _ = self.bluetoothAudioManager
+            _ = self.systemTimerBridge
+            _ = self.lockScreenPanelManager
+        }
     }
 
     private func installTopMenuItemsIfNeeded() {

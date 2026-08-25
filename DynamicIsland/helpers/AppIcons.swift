@@ -20,21 +20,51 @@ import SwiftUI
 import AppKit
 import Defaults
 
+/// Process-wide cache of resolved app icons keyed by file path.
+/// `NSCache` is thread-safe, so it can be shared across the synchronous
+/// call sites below (which run on the main thread during SwiftUI renders)
+/// without extra locking. App icons rarely change during a session, so
+/// caching removes redundant, main-thread `NSWorkspace` lookups on every
+/// view refresh.
+private let appIconPathCache = NSCache<NSString, NSImage>()
+
+private func cachedIcon(forFile path: String) -> NSImage {
+    // Fold the file's modification date into the cache key. Keying on the path
+    // alone would return a stale icon forever if the app at that path is updated
+    // or replaced while this process keeps running (the key never changes, so the
+    // cache never re-resolves). When the bundle changes, its mtime changes, the
+    // key changes, and we resolve a fresh icon. stat() is far cheaper than
+    // icon(forFile:), so the cache still saves the expensive NSWorkspace lookup.
+    let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+    let modStamp = (attrs?[.modificationDate] as? Date)?.timeIntervalSinceReferenceDate ?? 0
+    let key = "\(path)@\(modStamp)" as NSString
+
+    if let cached = appIconPathCache.object(forKey: key) {
+        return cached
+    }
+    let icon = NSWorkspace.shared.icon(forFile: path)
+    appIconPathCache.setObject(icon, forKey: key)
+    return icon
+}
+
 struct AppIcons {
-    
+
     func getIcon(file path: String) -> NSImage? {
         guard FileManager.default.fileExists(atPath: path)
         else { return nil }
-        
-        return NSWorkspace.shared.icon(forFile: path)
+
+        return cachedIcon(forFile: path)
     }
-    
+
     func getIcon(bundleID: String) -> NSImage? {
+        // Use the POSIX path, not absoluteString ("file://…"): getIcon(file:)
+        // guards on fileExists(atPath:), which only accepts POSIX paths, so
+        // absoluteString made this lookup always return nil.
         guard let path = NSWorkspace.shared.urlForApplication(
             withBundleIdentifier: bundleID
-        )?.absoluteString
+        )?.path
         else { return nil }
-        
+
         return getIcon(file: path)
     }
     
@@ -50,37 +80,42 @@ struct AppIcons {
 
 func AppIcon(for bundleID: String) -> Image {
     let workspace = NSWorkspace.shared
-    
+
     if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID) {
-        let appIcon = workspace.icon(forFile: appURL.path)
-        return Image(nsImage: appIcon)
+        return Image(nsImage: cachedIcon(forFile: appURL.path))
     }
-    
+
     return Image(nsImage: workspace.icon(for: .applicationBundle))
 }
 
 
 func AppIconAsNSImage(for bundleID: String) -> NSImage? {
     let workspace = NSWorkspace.shared
-    
+
     if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID) {
-        let appIcon = workspace.icon(forFile: appURL.path)
-        return appIcon
+        return cachedIcon(forFile: appURL.path)
     }
     return nil
 }
 
-func applySelectedAppIcon() {
+/// Loads the selected app-icon image (Defaults lookup + on-disk image read).
+/// Safe to call off the main thread — it performs no UI mutation. The
+/// `NSImage(contentsOf:)` read is real disk I/O, so the launch path resolves
+/// this off-main and only assigns `applicationIconImage` back on the main actor.
+func loadSelectedAppIconImage() -> NSImage? {
     let customIcons = Defaults[.customAppIcons]
     if let selectedID = Defaults[.selectedAppIconID],
        let icon = customIcons.first(where: { $0.id.uuidString == selectedID }),
        let image = NSImage(contentsOf: icon.fileURL) {
-        NSApp.applicationIconImage = image
-        return
+        return image
     }
 
     let fallbackName = Bundle.main.iconFileName ?? "AppIcon"
-    if let image = NSImage(named: fallbackName) {
+    return NSImage(named: fallbackName)
+}
+
+func applySelectedAppIcon() {
+    if let image = loadSelectedAppIconImage() {
         NSApp.applicationIconImage = image
     }
 }

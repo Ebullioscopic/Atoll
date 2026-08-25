@@ -47,6 +47,9 @@ struct ShelfItemView: View {
     @EnvironmentObject private var quickLookService: QuickLookService
     @State private var showStack = false
     @State private var cachedPreviewImage: NSImage?
+    /// Whether `cachedPreviewImage` was composed from a real thumbnail rather than the
+    /// generic icon fallback. Gates the single re-render once the thumbnail resolves.
+    @State private var renderedWithRealThumbnail = false
     @State private var debouncedDropTarget = false
     @State private var isHovering = false
 
@@ -127,10 +130,13 @@ struct ShelfItemView: View {
             }
         }
         .onAppear {
-            // Metadata loading is now done in ViewModel.init via loadMetadata()
-            // Pre-render drag preview once on appear
-            Task {
+            // Metadata loading is now done in ViewModel.init via loadMetadata().
+            // Render the composed drag preview lazily and cache it. The
+            // ImageRenderer pass is @MainActor, so it is kept off the shelf-open
+            // critical path (deferred, low priority, and only produced once).
+            Task(priority: .utility) {
                 if cachedPreviewImage == nil {
+                    renderedWithRealThumbnail = viewModel.thumbnail != nil
                     cachedPreviewImage = await renderDragPreview()
                 }
             }
@@ -138,9 +144,13 @@ struct ShelfItemView: View {
                 quickLookService.show(urls: urls, selectFirst: true)
             }
         }
-        .onChange(of: viewModel.thumbnail) { _, _ in
-            // Invalidate cached preview when thumbnail changes
-            Task {
+        .onChange(of: viewModel.thumbnail) { _, newThumbnail in
+            // `loadMetadata()` is async, so a slow QuickLook generation can land after the
+            // onAppear render — which would leave the composed preview stuck on the generic
+            // icon. Re-compose exactly once, when the real thumbnail arrives.
+            guard newThumbnail != nil, !renderedWithRealThumbnail else { return }
+            renderedWithRealThumbnail = true
+            Task(priority: .utility) {
                 cachedPreviewImage = await renderDragPreview()
             }
         }
@@ -269,7 +279,11 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
         view.viewModel = viewModel
         view.isHovering = isHovering
         view.onHoverChange = onHoverChange
-        view.dragPreviewImage = cachedPreviewImage ?? renderDragPreview()
+        // Avoid a synchronous ImageRenderer pass during view creation (it would
+        // hitch when many shelf items appear at once). Use the cached composed
+        // preview if it's ready, otherwise fall back to the plain thumbnail/icon;
+        // the composed preview is filled in asynchronously via the binding.
+        view.dragPreviewImage = cachedPreviewImage ?? viewModel.thumbnail ?? viewModel.icon
         view.onRightClick = onRightClick
         view.onClick = onClick
         view.onDragEnded = onDragEnded
@@ -289,20 +303,7 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
         nsView.onClick = onClick
         nsView.onDragEnded = onDragEnded
     }
-    
-    private func renderDragPreview() -> NSImage {
-        let content = dragPreviewContent()
-        let renderer = ImageRenderer(content: content)
-        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2.0
-        
-        if let nsImage = renderer.nsImage {
-            return nsImage
-        }
-        
-        // Fallback to icon if rendering fails
-        return viewModel.thumbnail ?? viewModel.icon ?? NSImage()
-    }
-    
+
     final class DraggableClickView: NSView, NSDraggingSource {
         // Registered with `ShelfItemHitRegistry` so marquee selection can read
         // this cell's frame without walking the view hierarchy.
