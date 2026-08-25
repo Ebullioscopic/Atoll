@@ -100,7 +100,8 @@ class SpotifyController: MediaControllerProtocol {
                 self?.artistMetadataFetchTask?.cancel()
                 self?.artistMetadataFetchTask = nil
                 self?.currentArtistTrackURI = nil
-                if let self {
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
                     var updatedState = self.playbackState
                     updatedState.liveArtworkURL = nil
                     self.playbackState = updatedState
@@ -185,16 +186,9 @@ class SpotifyController: MediaControllerProtocol {
             ? nil
             : spotifyURLString.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if artworkURL == lastArtworkURL, let existingArtwork = self.playbackState.artwork {
-            state.artwork = existingArtwork
-        }
-
         let isSameCanvasTrack = trackURI == currentCanvasTrackURI
 
-        if isSameCanvasTrack {
-            state.liveArtworkURL = playbackState.liveArtworkURL
-        } else {
-            state.liveArtworkURL = nil
+        if !isSameCanvasTrack {
             currentCanvasTrackURI = trackURI.isEmpty ? nil : trackURI
             canvasFetchTask?.cancel()
             canvasFetchTask = nil
@@ -208,7 +202,22 @@ class SpotifyController: MediaControllerProtocol {
             artistMetadataFetchTask = nil
         }
 
-        playbackState = state
+        // Merge the artwork and live-artwork-URL carryover against the freshest
+        // baseline on the main actor, immediately before publishing — reading
+        // self.playbackState earlier and publishing later left a window where a
+        // concurrent update (e.g. the artwork fetch task below) could be
+        // overwritten by this older snapshot.
+        let baseState = state
+        let resolvedState: PlaybackState = await MainActor.run { [weak self, baseState] in
+            guard let self else { return baseState }
+            var merged = baseState
+            if artworkURL == self.lastArtworkURL, let existingArtwork = self.playbackState.artwork {
+                merged.artwork = existingArtwork
+            }
+            merged.liveArtworkURL = isSameCanvasTrack ? self.playbackState.liveArtworkURL : nil
+            self.playbackState = merged
+            return merged
+        }
 
         if !trackURI.isEmpty {
             if cachedArtistResult == nil {
@@ -218,10 +227,10 @@ class SpotifyController: MediaControllerProtocol {
         }
 
         if !artworkURL.isEmpty, let url = URL(string: artworkURL) {
-            guard artworkURL != lastArtworkURL || state.artwork == nil else { return }
+            guard artworkURL != lastArtworkURL || resolvedState.artwork == nil else { return }
             artworkFetchTask?.cancel()
 
-            let currentState = state
+            let currentState = resolvedState
             let expectedTrackURI = trackURI
 
             artworkFetchTask = Task {
