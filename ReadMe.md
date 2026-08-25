@@ -176,7 +176,7 @@ codex://threads/<sessionID>
 
 [![点击打开完整录屏：从刘海进行中摘要进入活动托盘，再展示完成提示](https://raw.githubusercontent.com/liusong881002-bit/Atoll-CodexAtoll/main/docs/assets/codex-notch-activity-tray.jpg)](https://github.com/liusong881002-bit/Atoll-CodexAtoll/blob/main/docs/assets/codex-notch-demo.mp4)
 
-上图可点击打开完整录屏：[`codex-notch-demo.mp4`](https://github.com/liusong881002-bit/Atoll-CodexAtoll/blob/main/docs/assets/codex-notch-demo.mp4)（约 64 秒，720p，约 57 MB）。录屏串联展示了关闭态“进行中”提示、展开后的活动托盘，以及任务完成后的绿色提示；README 中的三张截图分别对应这三个关键状态。
+上图可点击打开完整录屏：[`codex-notch-demo.mp4`](https://github.com/liusong881002-bit/Atoll-CodexAtoll/blob/main/docs/assets/codex-notch-demo.mp4)（约 64 秒，1668×1080，约 24 MB）。这是压缩后的版本，适合在 GitHub 上下载和查看；录屏串联展示了关闭态“进行中”提示、展开后的活动托盘，以及任务完成后的绿色提示。
 
 ## 上游 Atoll 基础能力
 
