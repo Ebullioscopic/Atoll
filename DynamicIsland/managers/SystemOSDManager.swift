@@ -18,6 +18,7 @@
 
 import Foundation
 import AppKit
+import Darwin
 import os
 
 class SystemOSDManager {
@@ -252,11 +253,10 @@ class SystemOSDManager {
             guard isCurrentTransition(generation, active: true) else { return }
             suspendOSDUIHelper()
 
-            // If the user disabled Atoll's HUD replacement while SIGSTOP was in
-            // flight, undo that stale suppression immediately. The current
-            // restoration transition will still perform its clean restart.
+            // If this transition went stale while the SIGSTOP was in flight,
+            // hand the helper over rather than assuming it should be resumed.
             guard isCurrentTransition(generation, active: true) else {
-                resumeOSDUIHelperProcess()
+                relinquishStaleSuspension()
                 return
             }
 
@@ -270,12 +270,35 @@ class SystemOSDManager {
         guard isCurrentTransition(generation, active: true) else { return }
 
         do {
+            // Freeze whatever is already running, first and synchronously.
+            //
+            // The kickstart below carries `-k`, which kills the current helper
+            // and starts a live replacement — and every millisecond between the
+            // two is a window where the native HUD draws. That was tolerable
+            // when suppression ran once at startup, but lock-state changes now
+            // re-run it, so the window reopened on every unlock and the native
+            // HUD reappeared on the home screen. A helper that is already
+            // SIGSTOPped needs no replacing; freezing it in place closes the
+            // window entirely, and the watcher still catches any process macOS
+            // swaps in later.
+            if let existing = osduiHelperPID() {
+                suspendOSDUIHelper()
+                guard isCurrentTransition(generation, active: true) else {
+                    relinquishStaleSuspension()
+                    return
+                }
+                suppressionState.withLock { $0.lastSuspendedPID = existing }
+                await MainActor.run {
+                    print("✅ System HUD disabled (suspended running helper \(existing))")
+                }
+                return
+            }
+
             let kickstart = Process()
             kickstart.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            // Force a clean helper instance. A plain kickstart is a no-op when
-            // OSDUIHelper is already running, and macOS may replace that lingering
-            // process on the first media key, briefly exposing the native HUD.
-            kickstart.arguments = ["kickstart", "-k", "gui/\(getuid())/com.apple.OSDUIHelper"]
+            // No helper running — ask launchd for one so there is something to
+            // freeze before the next media key arrives.
+            kickstart.arguments = ["kickstart", "gui/\(getuid())/com.apple.OSDUIHelper"]
             try kickstart.run()
             kickstart.waitUntilExit()
 
@@ -418,27 +441,52 @@ class SystemOSDManager {
     }
 
     /// Returns the newest OSDUIHelper PID, or nil if none.
+    ///
+    /// Asked once a second for as long as the app runs, so it is deliberately
+    /// not `pgrep`. Shelling out costs a fork, an exec, a pipe and a process
+    /// reap -- measured at 67ms of wall time and ~5ms of CPU per call, which is
+    /// roughly half a percent of a core burned continuously, forever, to answer
+    /// a question the kernel will answer directly in 0.6ms.
     private static func osduiHelperPID() -> Int32? {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["-n", "OSDUIHelper"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = Pipe() // silence "No matching processes..." stderr
-        do {
-            try task.run()
-            task.waitUntilExit()
-            // pgrep exits 1 when no process found — check status to avoid
-            // parsing an empty string as a valid PID.
-            guard task.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let trimmed = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return Int32(trimmed)
-        } catch {
-            return nil
+        var byteCount = proc_listpids(UInt32(PROC_ALL_PIDS), 0, nil, 0)
+        guard byteCount > 0 else { return nil }
+
+        var pids = [pid_t](repeating: 0, count: Int(byteCount) / MemoryLayout<pid_t>.size)
+        byteCount = proc_listpids(
+            UInt32(PROC_ALL_PIDS),
+            0,
+            &pids,
+            Int32(pids.count * MemoryLayout<pid_t>.size)
+        )
+        guard byteCount > 0 else { return nil }
+
+        // `pgrep -n` means newest by start time, not highest PID. The two
+        // usually agree and stop agreeing once PIDs wrap, so ask for the start
+        // time rather than assume the ordering.
+        var newestPID: pid_t?
+        var newestStart: (sec: UInt64, usec: UInt64) = (0, 0)
+        var name = [CChar](repeating: 0, count: Int(2 * MAXCOMLEN) + 1)
+
+        for pid in pids.prefix(Int(byteCount) / MemoryLayout<pid_t>.size) where pid > 0 {
+            guard proc_name(pid, &name, UInt32(name.count)) > 0,
+                  String(cString: name) == helperProcessName
+            else { continue }
+
+            var info = proc_bsdinfo()
+            let size = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout<proc_bsdinfo>.size))
+            guard size == Int32(MemoryLayout<proc_bsdinfo>.size) else { continue }
+
+            let start = (sec: UInt64(info.pbi_start_tvsec), usec: UInt64(info.pbi_start_tvusec))
+            if newestPID == nil || start > newestStart {
+                newestPID = pid
+                newestStart = start
+            }
         }
+
+        return newestPID
     }
+
+    private static let helperProcessName = "OSDUIHelper"
 
     /// Sends SIGSTOP to all OSDUIHelper processes. Idempotent.
     private static func suspendOSDUIHelper() {
@@ -452,6 +500,26 @@ class SystemOSDManager {
         } catch {
             NSLog("Suppression watcher: failed to SIGSTOP OSDUIHelper: \(error)")
         }
+    }
+
+    /// Undoes a SIGSTOP this transition just issued, having discovered it is
+    /// stale.
+    ///
+    /// A failed `isCurrentTransition(_, active: true)` means one of two very
+    /// different things: suppression was cancelled, or a *newer* suppression
+    /// transition took ownership. Only the first calls for SIGCONT. Resuming in
+    /// the second case hands the native HUD back while suppression is still
+    /// active, and the watcher will not undo it — the helper's PID already
+    /// matches `lastSuspendedPID`, so it is skipped as already handled. Clear
+    /// that PID instead, so the watcher re-examines the helper on its next poll.
+    private static func relinquishStaleSuspension() {
+        let supersededBySuppression = suppressionState.withLock { state -> Bool in
+            guard state.active else { return false }
+            state.lastSuspendedPID = -1
+            return true
+        }
+        guard !supersededBySuppression else { return }
+        resumeOSDUIHelperProcess()
     }
 
     private static func resumeOSDUIHelperProcess() {
@@ -469,27 +537,9 @@ class SystemOSDManager {
 
     /// Check if OSDUIHelper is currently running
     public static func isOSDUIHelperRunning() -> Bool {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        task.arguments = ["OSDUIHelper"]
-        
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = Pipe() // silence "No matching processes..." stderr
-        
-        do {
-            try task.run()
-            task.waitUntilExit()
-            
-            guard task.terminationStatus == 0 else { return false }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return !output.isEmpty
-        } catch {
-            return false
-        }
+        osduiHelperPID() != nil
     }
-    
+
     /// Async version of status checking to avoid main thread blocking
     public static func isOSDUIHelperRunningAsync() async -> Bool {
         return await withCheckedContinuation { continuation in

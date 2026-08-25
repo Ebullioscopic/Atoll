@@ -28,6 +28,14 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     // Stub for now to conform with ControllerProtocol
     func updatePlaybackInfo() async {}
 
+    /// How recent a sender's timestamp has to be for the position beside it to
+    /// count as a reading of now rather than a record of something earlier.
+    ///
+    /// Generous on purpose: it only has to separate a sample taken this moment
+    /// from one a sender has been repeating since it paused, and those are
+    /// minutes apart, not seconds.
+    private static let currentSampleWindow: TimeInterval = 2
+
     // MARK: - Properties
     @Published private(set) var playbackState: PlaybackState = .init(
         bundleIdentifier: "com.apple.Music"
@@ -42,10 +50,6 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     }
     private var lastMusicItem:
         (title: String, artist: String, album: String, duration: TimeInterval, artworkData: Data?)?
-
-    /// Reused across every stream update to avoid re-allocating a formatter
-    /// on each (1+/second) now playing payload.
-    private static let iso8601Formatter = ISO8601DateFormatter()
 
     // MARK: - Media Remote Functions
     private let mediaRemoteBundle: CFBundle
@@ -293,7 +297,11 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         }
 
         process.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
-        process.arguments = [scriptURL.path, frameworkPath, "stream"]
+        // --micros swaps the time keys for microsecond equivalents. The default
+        // "timestamp" is an ISO-8601 string truncated to whole seconds, which
+        // throws away up to a second of the playback anchor and makes every
+        // position estimate drift by that much.
+        process.arguments = [scriptURL.path, frameworkPath, "stream", "--micros"]
 
         let pipeHandler = JSONLinesPipeHandler()
         process.standardOutput = await pipeHandler.getPipe()
@@ -360,83 +368,202 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         let payload = update.payload
         let diff = update.diff ?? false
 
-        var newPlaybackState = PlaybackState(bundleIdentifier: playbackState.bundleIdentifier)
-        
-        newPlaybackState.title = payload.title ?? (diff ? self.playbackState.title : "")
-        newPlaybackState.artist = payload.artist ?? (diff ? self.playbackState.artist : "")
-        newPlaybackState.album = payload.album ?? (diff ? self.playbackState.album : "")
-        newPlaybackState.duration = payload.duration ?? (diff ? self.playbackState.duration : 0)
-        
-        // Match boring.notch behavior: if elapsedTime is provided use it,
-        // if this update is a diff keep the previous currentTime, otherwise default to 0.
-        newPlaybackState.currentTime = payload.elapsedTime ?? (diff ? self.playbackState.currentTime : 0)
-
-        
-        if let shuffleMode = payload.shuffleMode {
-            newPlaybackState.isShuffled = shuffleMode != 1
-        } else if !diff {
-            newPlaybackState.isShuffled = false
-        } else {
-            newPlaybackState.isShuffled = self.playbackState.isShuffled
-        }
-        if let repeatModeValue = payload.repeatMode {
-            newPlaybackState.repeatMode = RepeatMode(rawValue: repeatModeValue) ?? .off
-        } else if !diff {
-            newPlaybackState.repeatMode = .off
-        } else {
-            newPlaybackState.repeatMode = self.playbackState.repeatMode
-        }
-
-        if let artworkDataString = payload.artworkData {
-            newPlaybackState.artwork = Data(
-                base64Encoded: artworkDataString.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-        } else if !diff {
-            newPlaybackState.artwork = nil
-        }
-
-        if let dateString = payload.timestamp,
-           let date = Self.iso8601Formatter.date(from: dateString) {
-            newPlaybackState.lastUpdated = date
-        } else if !diff {
-            newPlaybackState.lastUpdated = Date()
-        } else {
-            newPlaybackState.lastUpdated = self.playbackState.lastUpdated
-        }
-
-        newPlaybackState.playbackRate = payload.playbackRate ?? (diff ? self.playbackState.playbackRate : 1.0)
-        newPlaybackState.isPlaying = payload.playing ?? (diff ? self.playbackState.isPlaying : false)
-        newPlaybackState.bundleIdentifier = (
-            payload.parentApplicationBundleIdentifier ??
-            payload.bundleIdentifier ??
-            (diff ? self.playbackState.bundleIdentifier : "")
-        )
-
+        // Merge and publish inside one main-actor transaction. Reading the
+        // baseline out here and publishing a whole snapshot later left a window
+        // where a command or a later stream update could land on the main
+        // actor and then be overwritten by this older, fuller snapshot.
         await MainActor.run { [weak self] in
-            self?.playbackState = newPlaybackState
+            guard let self else { return }
+
+            var newPlaybackState = PlaybackState(bundleIdentifier: self.playbackState.bundleIdentifier)
+
+            newPlaybackState.title = payload.title ?? (diff ? self.playbackState.title : "")
+            newPlaybackState.artist = payload.artist ?? (diff ? self.playbackState.artist : "")
+            newPlaybackState.album = payload.album ?? (diff ? self.playbackState.album : "")
+            newPlaybackState.duration = payload.resolvedDuration ?? (diff ? self.playbackState.duration : 0)
+
+            // The reported position and the instant it was sampled are a matched pair:
+            // elapsedTime is the position *at* timestamp. They have to be adopted or
+            // carried forward together -- pairing a fresh position with the previous
+            // update's anchor makes every estimate run ahead by the age of that anchor.
+            if let elapsed = payload.resolvedElapsedTime {
+                newPlaybackState.currentTime = elapsed
+                newPlaybackState.lastUpdated = payload.resolvedTimestamp ?? Date()
+            } else if payload.clearsElapsedTime {
+                // The sender named the position and set it to null, so there is
+                // nothing left to extrapolate from. Carrying the old pair forward
+                // here would keep advancing a position the sender has disowned.
+                newPlaybackState.currentTime = 0
+                newPlaybackState.lastUpdated = payload.resolvedTimestamp ?? Date()
+            } else if diff {
+                newPlaybackState.currentTime = self.playbackState.currentTime
+                newPlaybackState.lastUpdated = self.playbackState.lastUpdated
+            } else {
+                newPlaybackState.currentTime = 0
+                newPlaybackState.lastUpdated = payload.resolvedTimestamp ?? Date()
+            }
+
+            // Senders are not obliged to keep publishing. Spotify anchors once when
+            // a track starts and then says nothing for the rest of it -- measured
+            // here as an elapsed of 0 paired with a timestamp 141 seconds old, on a
+            // track that had been playing for exactly that long. Extrapolating from
+            // a stale anchor is fine while the music is running, because wall-clock
+            // time and playback time advance together.
+            //
+            // They stop agreeing the moment playback stops. A pause that the sender
+            // does not follow with a fresh position leaves the anchor where it was,
+            // so when playback resumes the extrapolation silently counts the paused
+            // time as played, and every pause pushes the estimate further ahead --
+            // which is why the position could only be brought back by pausing and
+            // playing until the sender happened to republish.
+            //
+            // So the position is re-anchored on the transition itself: frozen where
+            // it had got to when playback stops, and restarted from there when it
+            // resumes.
+            let wasPlaying = self.playbackState.isPlaying
+            let isPlayingNow = payload.playing ?? (diff ? wasPlaying : false)
+
+            // Whether the sender sent a position is not the question -- whether it
+            // sent a *current* one is. Spotify keeps republishing the exact instant
+            // it paused: four reads six seconds apart returned the same 40.342 with
+            // its timestamp 235, 241, 247 and 254 seconds old, still climbing. That
+            // pair is true, and harmless while paused because nothing extrapolates
+            // a stopped track. It becomes wrong the moment playback resumes, when
+            // the anchor still points to before the pause and the whole stopped
+            // interval gets counted as played.
+            let now = Date()
+            let hasCurrentSample: Bool = {
+                guard payload.resolvedElapsedTime != nil else { return false }
+                // No timestamp means it was stamped on arrival, so it is current
+                // by construction.
+                guard let stamp = payload.resolvedTimestamp else { return true }
+                return abs(now.timeIntervalSince(stamp)) <= Self.currentSampleWindow
+            }()
+
+            if wasPlaying != isPlayingNow, !hasCurrentSample {
+                // The transition is being observed now, so now is when it happened.
+                // The payload's own timestamp is only better than that if it is
+                // about now as well -- and the stale one is what caused this.
+                let transitionInstant: Date = {
+                    guard let stamp = payload.resolvedTimestamp,
+                          abs(now.timeIntervalSince(stamp)) <= Self.currentSampleWindow
+                    else { return now }
+                    return stamp
+                }()
+
+                if wasPlaying {
+                    let elapsedWhilePlaying = transitionInstant.timeIntervalSince(self.playbackState.lastUpdated)
+                    newPlaybackState.currentTime = max(
+                        0,
+                        self.playbackState.currentTime + (elapsedWhilePlaying * self.playbackState.playbackRate)
+                    )
+                } else {
+                    // Resuming. The position is wherever it was left, and the
+                    // frozen one is what this controller worked out when the pause
+                    // was observed -- the payload's is the sample already known to
+                    // be stale, which for some senders is a repeated zero that
+                    // would restart the track. A seek while paused publishes a
+                    // fresh sample, so it never reaches this branch.
+                    newPlaybackState.currentTime = max(0, self.playbackState.currentTime)
+                }
+
+                newPlaybackState.lastUpdated = transitionInstant
+            }
+
+
+            if let shuffleMode = payload.shuffleMode {
+                newPlaybackState.isShuffled = shuffleMode != 1
+            } else if !diff {
+                newPlaybackState.isShuffled = false
+            } else {
+                newPlaybackState.isShuffled = self.playbackState.isShuffled
+            }
+            if let repeatModeValue = payload.repeatMode {
+                newPlaybackState.repeatMode = RepeatMode(rawValue: repeatModeValue) ?? .off
+            } else if !diff {
+                newPlaybackState.repeatMode = .off
+            } else {
+                newPlaybackState.repeatMode = self.playbackState.repeatMode
+            }
+
+            if let artworkDataString = payload.artworkData {
+                newPlaybackState.artwork = Data(
+                    base64Encoded: artworkDataString.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            } else if !diff {
+                newPlaybackState.artwork = nil
+            }
+
+            newPlaybackState.playbackRate = payload.playbackRate ?? (diff ? self.playbackState.playbackRate : 1.0)
+            newPlaybackState.isPlaying = payload.playing ?? (diff ? self.playbackState.isPlaying : false)
+            newPlaybackState.bundleIdentifier = (
+                payload.parentApplicationBundleIdentifier ??
+                payload.bundleIdentifier ??
+                (diff ? self.playbackState.bundleIdentifier : "")
+            )
+
+            self.playbackState = newPlaybackState
         }
+
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        artist = try container.decodeIfPresent(String.self, forKey: .artist)
+        album = try container.decodeIfPresent(String.self, forKey: .album)
+        duration = try container.decodeIfPresent(Double.self, forKey: .duration)
+        elapsedTime = try container.decodeIfPresent(Double.self, forKey: .elapsedTime)
+        durationMicros = try container.decodeIfPresent(Double.self, forKey: .durationMicros)
+        elapsedTimeMicros = try container.decodeIfPresent(Double.self, forKey: .elapsedTimeMicros)
+        timestampEpochMicros = try container.decodeIfPresent(Double.self, forKey: .timestampEpochMicros)
+        shuffleMode = try container.decodeIfPresent(Int.self, forKey: .shuffleMode)
+        repeatMode = try container.decodeIfPresent(Int.self, forKey: .repeatMode)
+        artworkData = try container.decodeIfPresent(String.self, forKey: .artworkData)
+        timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
+        playbackRate = try container.decodeIfPresent(Double.self, forKey: .playbackRate)
+        playing = try container.decodeIfPresent(Bool.self, forKey: .playing)
+        parentApplicationBundleIdentifier = try container.decodeIfPresent(
+            String.self, forKey: .parentApplicationBundleIdentifier
+        )
+        bundleIdentifier = try container.decodeIfPresent(String.self, forKey: .bundleIdentifier)
+
+        func isExplicitlyNull(_ key: CodingKeys) throws -> Bool {
+            try container.contains(key) && container.decodeNil(forKey: key)
+        }
+
+        clearsElapsedTime = try isExplicitlyNull(.elapsedTime)
+            || isExplicitlyNull(.elapsedTimeMicros)
     }
 }
 
-struct NowPlayingUpdate: Codable {
-    let payload: NowPlayingPayload
-    let diff: Bool?
-}
+extension NowPlayingPayload {
+    private static let isoFormatter = ISO8601DateFormatter()
 
-struct NowPlayingPayload: Codable {
-    let title: String?
-    let artist: String?
-    let album: String?
-    let duration: Double?
-    let elapsedTime: Double?
-    let shuffleMode: Int?
-    let repeatMode: Int?
-    let artworkData: String?
-    let timestamp: String?
-    let playbackRate: Double?
-    let playing: Bool?
-    let parentApplicationBundleIdentifier: String?
-    let bundleIdentifier: String?
+    var resolvedDuration: Double? {
+        if let durationMicros { return durationMicros / 1_000_000 }
+        return duration
+    }
+
+    var resolvedElapsedTime: Double? {
+        if let elapsedTimeMicros { return elapsedTimeMicros / 1_000_000 }
+        return elapsedTime
+    }
+
+    /// The instant ``resolvedElapsedTime`` was sampled.
+    ///
+    /// Prefers the microsecond epoch value. The ISO-8601 string is only a
+    /// fallback for adapters that do not honour --micros: it is formatted as
+    /// `yyyy-MM-dd'T'HH:mm:ss'Z'`, so it silently drops the sub-second part of
+    /// the anchor and biases the position estimate forward by up to a second.
+    var resolvedTimestamp: Date? {
+        if let timestampEpochMicros {
+            return Date(timeIntervalSince1970: timestampEpochMicros / 1_000_000)
+        }
+        guard let timestamp else { return nil }
+        return Self.isoFormatter.date(from: timestamp)
+    }
 }
 
 actor JSONLinesPipeHandler {
