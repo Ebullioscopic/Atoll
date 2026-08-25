@@ -757,7 +757,14 @@ struct ContentView: View {
                 startHiddenEdgeHoverPolling()
                 // Deterministic teardown for borderless panels (`.onDisappear` is
                 // unreliable); the window-cleanup path calls this before closing.
-                vm.onViewTeardown = { performViewTeardown() }
+                let screenID = vm.screen
+                vm.onNotchWillClose = {
+                    CodexFeatureController.shared.finishActivityTrayPresentation(screenID: screenID)
+                }
+                vm.onViewTeardown = {
+                    CodexFeatureController.shared.finishActivityTrayPresentation(screenID: screenID)
+                    performViewTeardown()
+                }
             }
             .onChange(of: terminalStickyMode) { _, _ in
                 syncStickyTerminalOutsideClickMonitor()

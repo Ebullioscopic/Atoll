@@ -1,0 +1,119 @@
+#!/bin/zsh
+
+set -euo pipefail
+setopt null_glob
+
+repo_root="${0:A:h:h}"
+dry_run=false
+clear_dev=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run) dry_run=true ;;
+        --all) clear_dev=true ;;
+        -h|--help)
+            cat <<'USAGE'
+Usage: ./scripts/clean-build-artifacts [--dry-run] [--all]
+
+Moves historical Atoll build caches and release artifacts into a recoverable
+Trash quarantine. By default DerivedData/Dev is kept as the canonical
+incremental Debug cache. Pass --all to clear it too.
+USAGE
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg" >&2
+            exit 2
+            ;;
+    esac
+done
+
+timestamp="$(date '+%Y%m%d-%H%M%S')"
+quarantine="$HOME/.Trash/AtollBuildCleanup-$timestamp"
+
+move_to_quarantine() {
+    local source="$1"
+    local name destination
+
+    [[ -e "$source" || -L "$source" ]] || return 0
+    name="${source##*/}"
+    destination="$quarantine/$name"
+
+    if $dry_run; then
+        printf 'would move: %s\n' "$source"
+        return 0
+    fi
+
+    if [[ ! -d "$quarantine" ]]; then
+        mkdir -p "$quarantine"
+    fi
+    if [[ -e "$destination" || -L "$destination" ]]; then
+        destination="$quarantine/${name}-$RANDOM"
+    fi
+    /bin/mv "$source" "$destination"
+}
+
+if ! $dry_run; then
+    mkdir -p "$quarantine"
+fi
+
+# DerivedData/Dev is the only retained local Debug cache unless --all is used.
+for path in "$repo_root/DerivedData"/*; do
+    [[ -e "$path" || -L "$path" ]] || continue
+    if [[ "$path" == "$repo_root/DerivedData/Dev" && "$clear_dev" == false ]]; then
+        continue
+    fi
+    move_to_quarantine "$path"
+done
+
+# Keep only the newest release directory. A future release should use the
+# same build/releases directory; old commit-stamped directories are history.
+release_root="$repo_root/build/releases"
+if [[ -d "$release_root" ]]; then
+    newest_release=''
+    for path in "$release_root"/*; do
+        [[ -d "$path" ]] || continue
+        if [[ "${path##*/}" == "current" ]]; then
+            newest_release="$path"
+            break
+        fi
+        if [[ -z "$newest_release" || "$path" -nt "$newest_release" ]]; then
+            newest_release="$path"
+        fi
+    done
+
+    for path in "$release_root"/*; do
+        [[ -e "$path" || -L "$path" ]] || continue
+        [[ "$path" == "$newest_release" ]] && continue
+        move_to_quarantine "$path"
+    done
+fi
+
+# Remove generated build intermediates and logs outside the retained release.
+for path in "$repo_root/build"/*; do
+    [[ -e "$path" || -L "$path" ]] || continue
+    [[ "$path" == "$release_root" ]] && continue
+    move_to_quarantine "$path"
+done
+
+# Temporary test output belongs in a transaction-scoped directory and must not
+# accumulate in /private/tmp. Clean only project-named entries.
+while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    move_to_quarantine "$path"
+done < <(/usr/bin/find /private/tmp -maxdepth 1 -mindepth 1 \( \
+    -iname 'atoll-*' -o \
+    -iname 'atoll_*' -o \
+    -iname 'codexatoll-*' -o \
+    -iname 'codex-atoll-*' -o \
+    -iname 'AtollCodex*' -o \
+    -iname 'CodexAtoll*' -o \
+    -iname 'Atoll_*' \
+\) -print)
+
+if $dry_run; then
+    printf 'Dry run complete. No files were moved.\n'
+else
+    printf 'Moved historical Atoll build artifacts to: %s\n' "$quarantine"
+    /usr/bin/du -sh "$quarantine"
+fi

@@ -77,6 +77,26 @@ struct CodexActivityTrayCompletionDeduplicationTests {
             "only completion cards that are materially visible in the drawer count as read"
         )
 
+        let presentationID = UUID()
+        var presentationVisibility = CodexActivityTrayPresentationVisibility()
+        presentationVisibility.updateLayout(
+            itemFrames: [
+                "visible": CGRect(x: 0, y: 20, width: 240, height: 80),
+                "offscreen": CGRect(x: 0, y: 220, width: 240, height: 80),
+            ],
+            viewportSize: CGSize(width: 240, height: 200)
+        )
+        try expect(
+            presentationVisibility.activeExposure == nil,
+            "visible layout arriving before the tray presentation waits for an active session"
+        )
+        presentationVisibility.beginPresentation(id: presentationID)
+        try expect(
+            presentationVisibility.activeExposure?.presentationID == presentationID
+                && presentationVisibility.activeExposure?.visibleItemIDs == ["visible"],
+            "the first visible layout is replayed when the tray presentation starts"
+        )
+
         let visibleCompletionItems = unreadTray.buckets.first?.items ?? []
         let firstPresentation = CodexActivityTrayExposurePolicy.decision(
             for: visibleCompletionItems,
@@ -113,6 +133,18 @@ struct CodexActivityTrayCompletionDeduplicationTests {
                 for: visibleCompletionItems
             ) == [latestTurn.sessionID],
             "dismissing the drawer acknowledges the completion that was browsed during the presentation"
+        )
+
+        var explicitCloseSession = CodexActivityTrayReadSession()
+        let explicitCloseDecision = explicitCloseSession.recordExposure(
+            for: visibleCompletionItems,
+            previouslyPresentedIDs: []
+        )
+        try expect(
+            explicitCloseDecision.handledCompletionIDs == [latestTurn.id]
+                && explicitCloseSession.finish() == [latestTurn.sessionID]
+                && explicitCloseSession.finish().isEmpty,
+            "an explicit tray close acknowledges exposed sessions without relying on onDisappear and is idempotent"
         )
         print("CodexActivityTrayCompletionDeduplicationTests: PASS")
     }

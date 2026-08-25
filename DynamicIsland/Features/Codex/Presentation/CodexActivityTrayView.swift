@@ -10,6 +10,7 @@ private struct CodexActivityItemFramePreferenceKey: PreferenceKey {
 }
 
 struct CodexActivityTrayView: View {
+    @EnvironmentObject private var vm: DynamicIslandViewModel
     @ObservedObject private var controller = CodexFeatureController.shared
     @Default(.codexPinnedProjectNames) private var pinnedProjectNames
     @Default(.codexIgnoredSessionIDs) private var ignoredSessionIDs
@@ -18,8 +19,7 @@ struct CodexActivityTrayView: View {
     @State private var collapsedBuckets: Set<CodexActivityBucket> =
         CodexActivityTrayExpansionPolicy.defaultCollapsedBuckets()
     @State private var collapsedProjects: Set<String> = []
-    @State private var handledCompletionIDsThisPresentation: Set<UUID> = []
-    @State private var exposedCompletionSessionIDsThisPresentation: Set<String> = []
+    @State private var presentationVisibility = CodexActivityTrayPresentationVisibility()
 
     private let defaultHistoryLimit = 10
     private static let scrollCoordinateSpace = "codex-activity-tray-scroll"
@@ -60,17 +60,22 @@ struct CodexActivityTrayView: View {
             }
             .coordinateSpace(name: Self.scrollCoordinateSpace)
             .onPreferenceChange(CodexActivityItemFramePreferenceKey.self) { itemFrames in
-                acknowledgeVisibleCompletions(
+                presentationVisibility.updateLayout(
                     itemFrames: itemFrames,
                     viewportSize: viewportProxy.size
                 )
+                recordVisibleCompletions()
             }
         }
         .onAppear {
+            presentationVisibility.beginPresentation(
+                id: controller.beginActivityTrayPresentation(screenID: vm.screen)
+            )
             resetPresentationState()
+            recordVisibleCompletions()
         }
         .onDisappear {
-            acknowledgeCompletionsViewedDuringPresentation()
+            finishActivityTrayPresentation()
         }
         .accessibilityIdentifier("codex-activity-tray")
     }
@@ -331,50 +336,24 @@ struct CodexActivityTrayView: View {
         }
     }
 
-    private func acknowledgeVisibleCompletions(
-        itemFrames: [String: CGRect],
-        viewportSize: CGSize
-    ) {
-        let visibleItemIDs = CodexActivityTrayVisibilityPolicy.visibleItemIDs(
-            itemFrames: itemFrames,
-            viewportBounds: CGRect(origin: .zero, size: viewportSize)
-        )
+    private func recordVisibleCompletions() {
+        guard let exposure = presentationVisibility.activeExposure else { return }
         let unreadItems = model.buckets
             .first { $0.bucket == .unreadCompleted }?
             .items ?? []
-        let visibleItems = unreadItems.filter { visibleItemIDs.contains($0.id) }
-        let previouslyPresentedIDs = Set(controller.snapshot.presentedCompletionIDs ?? [])
-        let decision = CodexActivityTrayExposurePolicy.decision(
-            for: visibleItems,
-            previouslyPresentedIDs: previouslyPresentedIDs,
-            handledCompletionIDs: handledCompletionIDsThisPresentation
+        let visibleItems = unreadItems.filter { exposure.visibleItemIDs.contains($0.id) }
+        controller.recordVisibleActivityTrayCompletions(
+            visibleItems,
+            screenID: vm.screen,
+            presentationID: exposure.presentationID
         )
-        guard !decision.handledCompletionIDs.isEmpty else { return }
-
-        handledCompletionIDsThisPresentation.formUnion(decision.handledCompletionIDs)
-        exposedCompletionSessionIDsThisPresentation.formUnion(
-            CodexActivityTrayExposurePolicy.sessionIDsToAcknowledgeOnDismiss(
-                for: visibleItems
-            )
-        )
-        Task { @MainActor in
-            if !decision.completionIDsToRecord.isEmpty {
-                controller.recordCompletionPresentations(
-                    completionIDs: decision.completionIDsToRecord
-                )
-            }
-        }
     }
 
-    private func acknowledgeCompletionsViewedDuringPresentation() {
-        let sessionIDs = exposedCompletionSessionIDsThisPresentation
-        handledCompletionIDsThisPresentation.removeAll()
-        exposedCompletionSessionIDsThisPresentation.removeAll()
-        guard !sessionIDs.isEmpty else { return }
-
-        Task { @MainActor in
-            controller.acknowledgeCompletions(sessionIDs: sessionIDs)
-        }
+    private func finishActivityTrayPresentation() {
+        controller.finishActivityTrayPresentation(
+            screenID: vm.screen,
+            presentationID: presentationVisibility.finishPresentation()
+        )
     }
 
     private var ignoredItemsView: some View {

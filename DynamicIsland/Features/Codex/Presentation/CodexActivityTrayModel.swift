@@ -200,6 +200,46 @@ struct CodexActivityTrayVisibilityPolicy {
     }
 }
 
+struct CodexActivityTrayPresentationExposure: Equatable, Sendable {
+    let presentationID: UUID
+    let visibleItemIDs: Set<String>
+}
+
+struct CodexActivityTrayPresentationVisibility: Equatable, Sendable {
+    private var presentationID: UUID?
+    private var itemFrames: [String: CGRect] = [:]
+    private var viewportSize: CGSize = .zero
+
+    mutating func updateLayout(
+        itemFrames: [String: CGRect],
+        viewportSize: CGSize
+    ) {
+        self.itemFrames = itemFrames
+        self.viewportSize = viewportSize
+    }
+
+    mutating func beginPresentation(id: UUID) {
+        presentationID = id
+    }
+
+    mutating func finishPresentation() -> UUID? {
+        let finishedPresentationID = presentationID
+        self = CodexActivityTrayPresentationVisibility()
+        return finishedPresentationID
+    }
+
+    var activeExposure: CodexActivityTrayPresentationExposure? {
+        guard let presentationID else { return nil }
+        return CodexActivityTrayPresentationExposure(
+            presentationID: presentationID,
+            visibleItemIDs: CodexActivityTrayVisibilityPolicy.visibleItemIDs(
+                itemFrames: itemFrames,
+                viewportBounds: CGRect(origin: .zero, size: viewportSize)
+            )
+        )
+    }
+}
+
 struct CodexActivityTrayExposureDecision: Equatable {
     let completionIDsToRecord: Set<UUID>
     // Kept in the decision shape for callers that already consume it. Read
@@ -238,6 +278,38 @@ struct CodexActivityTrayExposurePolicy {
                 return item.sessionID
             }
         )
+    }
+}
+
+struct CodexActivityTrayReadSession: Equatable, Sendable {
+    private(set) var handledCompletionIDs: Set<UUID> = []
+    private(set) var exposedSessionIDs: Set<String> = []
+
+    mutating func recordExposure(
+        for visibleItems: [CodexActivityTrayItem],
+        previouslyPresentedIDs: Set<UUID>
+    ) -> CodexActivityTrayExposureDecision {
+        let decision = CodexActivityTrayExposurePolicy.decision(
+            for: visibleItems,
+            previouslyPresentedIDs: previouslyPresentedIDs,
+            handledCompletionIDs: handledCompletionIDs
+        )
+        guard !decision.handledCompletionIDs.isEmpty else { return decision }
+
+        handledCompletionIDs.formUnion(decision.handledCompletionIDs)
+        exposedSessionIDs.formUnion(
+            CodexActivityTrayExposurePolicy.sessionIDsToAcknowledgeOnDismiss(
+                for: visibleItems
+            )
+        )
+        return decision
+    }
+
+    mutating func finish() -> Set<String> {
+        let sessionIDs = exposedSessionIDs
+        handledCompletionIDs.removeAll()
+        exposedSessionIDs.removeAll()
+        return sessionIDs
     }
 }
 

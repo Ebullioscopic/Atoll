@@ -93,6 +93,24 @@ Running the `DynamicIsland` scheme with Xcode's Run command provides the same in
 
 Do not create or retain extra `.app` copies for individual changes. `/Applications/Atoll.app` may remain installed as the Release copy, but it must not run at the same time as **Atoll Dev**. Before accepting a runtime result, verify that the active executable comes from `DerivedData/Dev/Build/Products/Debug/Atoll.app` and that its bundle identifier is `com.Ebullioscopic.Atoll.dev`.
 
+### Build cache and release retention
+
+Use one canonical cache per build configuration:
+
+- Debug: `DerivedData/Dev` via `./scripts/dev-run`
+- Release: `DerivedData/Release` only when a formal package is explicitly requested
+- Release output: one latest artifact under `build/releases`
+
+Do not pass a new `-derivedDataPath`, create commit- or timestamp-named build directories, or leave Atoll test files in `/private/tmp`. Xcode's DerivedData contains all dependency and module caches, so changing the path repeatedly multiplies disk usage without changing the source product.
+
+To remove historical caches, logs, test binaries, and old release artifacts while keeping the current Debug cache:
+
+```bash
+./scripts/clean-build-artifacts
+```
+
+Use `--dry-run` to inspect the candidates first. Use `--all` only when a complete rebuild is intentional; it also removes `DerivedData/Dev`. The script moves candidates to a recoverable Trash quarantine instead of permanently deleting them.
+
 ## Installation
 1) Download the latest DMG [here](https://github.com/Ebullioscopic/Atoll/releases/latest).
 2) Open the DMG and drag Atoll into Applications.

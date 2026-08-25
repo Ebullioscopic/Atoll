@@ -41,6 +41,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     /// invokes it before closing the panel since `.onDisappear` is unreliable for
     /// borderless panels, preventing leaked hover-polling Tasks from accumulating.
     var onViewTeardown: (() -> Void)?
+    /// Deterministic notification emitted before the notch closes. Feature
+    /// modules can use it for state that must not depend on SwiftUI teardown.
+    var onNotchWillClose: (() -> Void)?
     
     @Published var hideOnClosed: Bool = true
     @Published var isHoveringCalendar: Bool = false
@@ -119,6 +122,8 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
 
     func destroy() {
+        onNotchWillClose?()
+        onNotchWillClose = nil
         onViewTeardown?()
         onViewTeardown = nil
         cancellables.forEach { $0.cancel() }
@@ -385,6 +390,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
 
     func close() {
+        if notchState != .closed {
+            onNotchWillClose?()
+        }
         let targetSize = getClosedNotchSize(screen: screen)
         notchSize = targetSize
         closedNotchSize = targetSize
@@ -402,6 +410,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
 
     func closeForLockScreen() {
+        if notchState != .closed {
+            onNotchWillClose?()
+        }
         let targetSize = getClosedNotchSize(screen: screen)
         withAnimation(.none) {
             notchSize = targetSize
