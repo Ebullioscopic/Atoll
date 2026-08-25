@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		63A78415C5726BE9C806EFAF /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 47C39E67B09152F6665ED683 /* Cocoa.framework */; };
+		6B8DE5BE065E4BFE9E531A74 /* MarqueeTextMeasurementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC2ACF06B40405DB1A8F99E /* MarqueeTextMeasurementTests.swift */; };
 		7E1ADF1D2EA209B1001DA867 /* SkyLightWindow in Frameworks */ = {isa = PBXBuildFile; productRef = 7E61181E2E24071E0050006C /* SkyLightWindow */; };
 		7E288D122F1659EF0020C117 /* AtollExtensionKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7E288D112F1659EF0020C117 /* AtollExtensionKit */; };
 		7E6118142E24071E0050006C /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = 14D032192C68F32E0096E6A1 /* LaunchAtLogin */; };
@@ -29,11 +30,21 @@
 		7EE1D73F2E6B1E1200997219 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EE1D73E2E6B1E1200997219 /* IOKit.framework */; };
 		7EF10C122F817ECF004229A0 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7EF10C112F817ECF004229A0 /* Accelerate.framework */; };
 		7EF19C172F577040005B9929 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 7EF19C162F577040005B9929 /* SwiftTerm */; };
+		8C9E422544384A70B829EDE7 /* NowPlayingPayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2137D0F9431A495AA62ACE96 /* NowPlayingPayloadTests.swift */; };
+		9A7D1A012F90000200A71001 /* AudioTapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7D1A022F90000200A71002 /* AudioTapTests.swift */; };
+		A1B2C3D40000000000000001 /* LyricsMetadataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000002 /* LyricsMetadataTests.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* ExtensionRPCServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */; };
 		A3C83CAF84544DCE386C3BB8 /* DynamicIslandUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54078F29304A9DBBEFBDF932 /* DynamicIslandUITests.swift */; };
 		A1F0C2D34E5B6789ABCD0123 /* AIKeyStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E1D3C45F6A7890BCDE1234 /* AIKeyStoreTests.swift */; };
+		A4B5C6D7E8F90123456789AB /* AppleMusicControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */; };
+		A70F1A012F90000100F1A001 /* FingerprintScan.json in Resources */ = {isa = PBXBuildFile; fileRef = A70F1A022F90000100F1A001 /* FingerprintScan.json */; };
+		B1C2D3E4F5A60718293A4B01 /* MediaKeyTapRetryPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5A60718293A4B02 /* MediaKeyTapRetryPolicyTests.swift */; };
 		B4777BB9FE29243B253B8306 /* SpotifyLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */; };
+		B5E314BBF3AF4E6D8E90B25B /* LRCParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D82568218362418EA59B2CDC /* LRCParserTests.swift */; };
+		C0DECAFE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */; };
+		D1A2B3C4D5E6F70819AB2C4D /* SystemHUDPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A2B3C4D5E6F70819AB2C4E /* SystemHUDPlacementTests.swift */; };
 		F1E2D3C4B5A6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */; };
-		F3E4D5C6B7A8E9F0A1B2C3D4 /* NowPlayingTestClient in CopyFiles */ = {isa = PBXBuildFile; fileRef = F2E3D4C5B6A7E8F9A0B1C2D3 /* NowPlayingTestClient */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		F3E4D5C6B7A8E9F0A1B2C3D4 /* Contents/Helpers/NowPlayingTestClient in CopyFiles */ = {isa = PBXBuildFile; fileRef = F2E3D4C5B6A7E8F9A0B1C2D3 /* Contents/Helpers/NowPlayingTestClient */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		F910B9C812C7AEFE2293F7D2 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 47C39E67B09152F6665ED683 /* Cocoa.framework */; };
 /* End PBXBuildFile section */
 
@@ -54,7 +65,7 @@
 			dstPath = Contents/Helpers;
 			dstSubfolderSpec = 1;
 			files = (
-				F3E4D5C6B7A8E9F0A1B2C3D4 /* NowPlayingTestClient in CopyFiles */,
+				F3E4D5C6B7A8E9F0A1B2C3D4 /* Contents/Helpers/NowPlayingTestClient in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -62,6 +73,7 @@
 
 /* Begin PBXFileReference section */
 		0796C681D7B557C0110EC381 /* DynamicIslandTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicIslandTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2137D0F9431A495AA62ACE96 /* NowPlayingPayloadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingPayloadTests.swift; sourceTree = "<group>"; };
 		47C39E67B09152F6665ED683 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		54078F29304A9DBBEFBDF932 /* DynamicIslandUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DynamicIslandUITests.swift; sourceTree = "<group>"; };
 		7E25ECA02E6C6C3800700E72 /* CoreBrightness.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBrightness.framework; path = /System/Library/PrivateFrameworks/CoreBrightness.framework; sourceTree = "<absolute>"; };
@@ -76,13 +88,23 @@
 		7EE1D73C2E6B1E0B00997219 /* ApplicationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ApplicationServices.framework; path = System/Library/Frameworks/ApplicationServices.framework; sourceTree = SDKROOT; };
 		7EE1D73E2E6B1E1200997219 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		7EF10C112F817ECF004229A0 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		8DC2ACF06B40405DB1A8F99E /* MarqueeTextMeasurementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarqueeTextMeasurementTests.swift; sourceTree = "<group>"; };
 		957599910322B546D91E6F96 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		9A7D1A022F90000200A71002 /* AudioTapTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioTapTests.swift; sourceTree = "<group>"; };
 		A058D80A7EF44593B0F24EB7 /* DynamicIslandUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicIslandUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D40000000000000002 /* LyricsMetadataTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricsMetadataTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExtensionRPCServerTests.swift; sourceTree = "<group>"; };
+		A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleMusicControllerTests.swift; sourceTree = "<group>"; };
+		A70F1A022F90000100F1A001 /* FingerprintScan.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = FingerprintScan.json; sourceTree = "<group>"; };
+		B1C2D3E4F5A60718293A4B02 /* MediaKeyTapRetryPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MediaKeyTapRetryPolicyTests.swift; sourceTree = "<group>"; };
+		C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlyoutFrameCalculatorTests.swift; sourceTree = "<group>"; };
+		D1A2B3C4D5E6F70819AB2C4E /* SystemHUDPlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemHUDPlacementTests.swift; sourceTree = "<group>"; };
+		D82568218362418EA59B2CDC /* LRCParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRCParserTests.swift; sourceTree = "<group>"; };
 		DAA671E7B1B26733F02166C5 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B2E1D3C45F6A7890BCDE1234 /* AIKeyStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AIKeyStoreTests.swift; sourceTree = "<group>"; };
 		DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpotifyLibraryTests.swift; sourceTree = "<group>"; };
 		E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JSONLUsageParserTests.swift; sourceTree = "<group>"; };
-		F2E3D4C5B6A7E8F9A0B1C2D3 /* NowPlayingTestClient */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.executable"; path = "Contents/Helpers/NowPlayingTestClient"; sourceTree = "<group>"; };
+		F2E3D4C5B6A7E8F9A0B1C2D3 /* Contents/Helpers/NowPlayingTestClient */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.executable"; path = Contents/Helpers/NowPlayingTestClient; sourceTree = "<group>"; };
 		F4C1DD09EC134302938E84F6 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = Frameworks/MediaRemoteAdapter.framework; sourceTree = SOURCE_ROOT; };
 		F54406E72CD4987A00C7AFD9 /* Atoll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atoll.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -176,7 +198,17 @@
 			isa = PBXGroup;
 			children = (
 				B2E1D3C45F6A7890BCDE1234 /* AIKeyStoreTests.swift */,
+				9A7D1A022F90000200A71002 /* AudioTapTests.swift */,
+				A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */,
+				C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */,
+				B1C2D3E4F5A60718293A4B02 /* MediaKeyTapRetryPolicyTests.swift */,
+				D82568218362418EA59B2CDC /* LRCParserTests.swift */,
+				2137D0F9431A495AA62ACE96 /* NowPlayingPayloadTests.swift */,
+				8DC2ACF06B40405DB1A8F99E /* MarqueeTextMeasurementTests.swift */,
 				DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */,
+				A1B2C3D40000000000000002 /* LyricsMetadataTests.swift */,
+				A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */,
+				D1A2B3C4D5E6F70819AB2C4E /* SystemHUDPlacementTests.swift */,
 				E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */,
 				957599910322B546D91E6F96 /* Info.plist */,
 			);
@@ -210,12 +242,21 @@
 			isa = PBXGroup;
 			children = (
 				7E6856472EA963FD00D261F5 /* Lock.json */,
+				A70F1A022F90000100F1A001 /* FingerprintScan.json */,
 				7E8840D62E9A346700C5CB8C /* Dog waiting.json */,
 				7E9911AF2EFD7D1B002EDFD5 /* Reindeer.json */,
 				7E8840D82E9A347000C5CB8C /* Moody Dog.json */,
 				7E8840DA2E9A347800C5CB8C /* Orange Cat Peeping.json */,
 			);
 			path = LottieAnimations;
+			sourceTree = "<group>";
+		};
+		8A5BBA1D30357EBF00E3B99D /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				F2E3D4C5B6A7E8F9A0B1C2D3 /* Contents/Helpers/NowPlayingTestClient */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 		BF9102C8771E45168EF97D18 /* DynamicIslandUITests */ = {
@@ -238,6 +279,7 @@
 				F54406E82CD4987A00C7AFD9 /* Products */,
 				BF9102C8771E45168EF97D18 /* DynamicIslandUITests */,
 				50983E4A1FCC1F5E2220FF8A /* DynamicIslandTests */,
+				8A5BBA1D30357EBF00E3B99D /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -403,6 +445,7 @@
 				7E9918722EFDAE5B002EDFD5 /* MediaRemoteAdapter.framework in Resources */,
 				7E8130402E3FB40500E08F3F /* mediaremote-adapter.pl in Resources */,
 				7E6856482EA963FD00D261F5 /* Lock.json in Resources */,
+				A70F1A012F90000100F1A001 /* FingerprintScan.json in Resources */,
 				7E8840D92E9A347000C5CB8C /* Moody Dog.json in Resources */,
 				7E9911B02EFD7D1B002EDFD5 /* Reindeer.json in Resources */,
 				7E8840D72E9A346700C5CB8C /* Dog waiting.json in Resources */,
@@ -439,8 +482,18 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1F0C2D34E5B6789ABCD0123 /* AIKeyStoreTests.swift in Sources */,
+				9A7D1A012F90000200A71001 /* AudioTapTests.swift in Sources */,
+				A4B5C6D7E8F90123456789AB /* AppleMusicControllerTests.swift in Sources */,
 				B4777BB9FE29243B253B8306 /* SpotifyLibraryTests.swift in Sources */,
+				A1B2C3D40000000000000001 /* LyricsMetadataTests.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* ExtensionRPCServerTests.swift in Sources */,
+				D1A2B3C4D5E6F70819AB2C4D /* SystemHUDPlacementTests.swift in Sources */,
 				F1E2D3C4B5A6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift in Sources */,
+				C0DECAFE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift in Sources */,
+				B1C2D3E4F5A60718293A4B01 /* MediaKeyTapRetryPolicyTests.swift in Sources */,
+				B5E314BBF3AF4E6D8E90B25B /* LRCParserTests.swift in Sources */,
+				8C9E422544384A70B829EDE7 /* NowPlayingPayloadTests.swift in Sources */,
+				6B8DE5BE065E4BFE9E531A74 /* MarqueeTextMeasurementTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -696,7 +749,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1196;
+				CURRENT_PROJECT_VERSION = 1257;
 				DEVELOPMENT_ASSET_PATHS = "\"DynamicIsland/Preview Content\"";
 				DEVELOPMENT_TEAM = 9Y64TRM77N;
 				ENABLE_APP_SANDBOX = NO;
@@ -731,6 +784,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Atoll needs microphone access to record voice questions for the AI assistant feature.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Atoll needs Reminders access to show your reminders";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -769,7 +823,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1196;
+				CURRENT_PROJECT_VERSION = 1257;
 				DEVELOPMENT_ASSET_PATHS = "\"DynamicIsland/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = 9Y64TRM77N;
@@ -805,6 +859,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Atoll needs microphone access to record voice questions for the AI assistant feature.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Atoll needs Reminders access to show your reminders";
 				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -28,7 +28,12 @@ struct LockScreenMusicPanel: View {
     }
 
     static let collapsedHeight: CGFloat = 180
-    static let defaultCollapsedWidth: CGFloat = 420
+    /// The width the panel starts at, and what "reset to default" restores.
+    ///
+    /// Also the value `Defaults.Key.lockScreenMusicPanelWidth` defaults to, so the
+    /// two cannot drift apart: the stored default used to be 350 while reset put
+    /// it at 420, so the app disagreed with itself about its own default.
+    static let defaultCollapsedWidth: CGFloat = 390
     static var collapsedSize: CGSize {
         CGSize(width: CGFloat(Defaults[.lockScreenMusicPanelWidth]), height: collapsedHeight)
     }
@@ -45,13 +50,18 @@ struct LockScreenMusicPanel: View {
     @State private var lastDragged: Date = .distantPast
     @State private var isActive = true
     @State private var isExpanded = false
-    @State private var isVolumeSliderVisible = false
+    /// The output picker (device list) — the volume slider is no longer tied
+    /// to it and stays on screen whenever the panel does.
+    @State private var isOutputPickerVisible = false
     @State private var isAirPlayPopoverPresented = false
     @State private var isArtworkFullscreen = false
     
     @State private var collapseWorkItem: DispatchWorkItem?
     @State private var parallaxResumeWorkItem: DispatchWorkItem?
     @State private var isParallaxSuspended = false
+    /// Whether the pointer is resting on the panel, which holds the collapse
+    /// timer off entirely rather than merely restarting it.
+    @State private var isPointerInsidePanel = false
     @State private var lastLoggedGlassSnapshot: GlassLogSnapshot?
     @Default(.lockScreenGlassStyle) var lockScreenGlassStyle
     @Default(.lockScreenGlassCustomizationMode) private var glassCustomizationMode
@@ -81,11 +91,122 @@ struct LockScreenMusicPanel: View {
     private let expandedPanelCornerRadius: CGFloat = 52
     private let collapsedAlbumArtCornerRadius: CGFloat = 16
     private let expandedAlbumArtCornerRadius: CGFloat = 60
-    private let expandedContentSpacing: CGFloat = 40
-    private let collapseTimeout: TimeInterval = 5
-    private let collapsedSliderExtraHeight: CGFloat = 72
-    private let expandedSliderExtraHeight: CGFloat = 88
-    private let collapsedLyricsExtraHeight: CGFloat = 64
+    private let expandedContentSpacing: CGFloat = 28
+
+    /// One gap between the metadata, the progress row and the transport. Even
+    /// spacing beats pinning the ends: pushing title and transport apart left
+    /// the whole column's slack sitting in the two gaps between them.
+    private let expandedColumnSpacing: CGFloat = 18
+
+    /// Expanded artwork fills the panel's content height rather than staying a
+    /// fixed square in the middle of it. The panel grows as the volume and
+    /// output rows appear, and a fixed square left a band of dead space above
+    /// and below the art every time it did.
+    /// The artwork is the flexible column: it takes whatever the transport row
+    /// and the lyrics column do not need. Sizing it off the panel's height
+    /// alone is what pushed the lyrics past the right edge -- the transport row
+    /// has a hard minimum width and simply refuses to be squeezed, so the
+    /// overflow came out of whatever sat beside it.
+    private var expandedArtworkSize: CGFloat {
+        let heightBudget = expandedBaseContentHeight + totalExtraHeight
+
+        var widthBudget = Self.expandedSize.width + totalExtraWidth
+        widthBudget -= expandedHorizontalInsets
+        widthBudget -= expandedContentSpacing + minimumTransportColumnWidth
+        if usesExpandedLyricsColumn {
+            widthBudget -= expandedContentSpacing + expandedLyricsColumnWidth
+        }
+
+        return min(max(min(heightBudget, widthBudget), 180), 340)
+    }
+
+    /// What the transport row cannot go below: every control at its expanded
+    /// size, the gaps between them, and a little either side. Measured from the
+    /// slots actually on screen, since the row is user-configurable.
+    private var minimumTransportColumnWidth: CGFloat {
+        let count = displayedSlots.count
+        guard count > 0 else { return 0 }
+        let hasPlayPause = displayedSlots.contains(.playPause)
+        let secondaries = CGFloat(hasPlayPause ? count - 1 : count)
+        let gaps = CGFloat(count - 1) * 14
+        return secondaries * controlFrameSize
+            + (hasPlayPause ? playPauseFrameSize : 0)
+            + gaps
+            + 24
+    }
+
+    /// The leading and trailing insets `panelForeground` applies when expanded,
+    /// which are 20pt a side in both presentations.
+    private let expandedHorizontalInsets: CGFloat = 40
+
+    private var expandedBaseContentHeight: CGFloat {
+        Self.expandedSize.height - expandedVerticalInsets
+    }
+
+    /// What the expanded player's middle column actually needs. The panel then
+    /// grows by the shortfall, if any, rather than by a fixed reserve per row:
+    /// reserving for the volume and output rows on top of a height the column
+    /// already had room for is what opened the gaps between everything.
+    private var expandedColumnContentHeight: CGFloat {
+        var height: CGFloat = 52
+        height += expandedColumnSpacing + 20
+        height += expandedColumnSpacing + playPauseFrameSize
+        if shouldShowVolumeSlider {
+            height += 14 + 13
+            height += accessorySectionRawHeight
+        }
+        return height
+    }
+
+    /// The top and bottom insets `panelForeground` applies when expanded.
+    private var expandedVerticalInsets: CGFloat {
+        usesSpotifyCanvasFallbackContentPresentation ? 32 : 38
+    }
+
+    /// Expanded is the mode you open to read along, so the lyrics get a column
+    /// of their own beside the player rather than a single line squeezed under
+    /// the controls. The panel widens by exactly this much when it is shown.
+    private let expandedLyricsColumnWidth: CGFloat = 300
+    // Expanded used to be a glance at bigger artwork, and five seconds was
+    // enough for that. It now holds the lyrics column, which is something you
+    // sit and read, so the panel waits far longer -- and does not start
+    // counting at all while the pointer is on it.
+    private let collapseTimeout: TimeInterval = 30
+    // Transport control sizing. Apple sizes the circular highlight at roughly
+    // 2.2x the glyph so the tint reads as a comfortable ring around the symbol
+    // instead of hugging it; these pairs keep that ratio in both states.
+    private var controlFrameSize: CGFloat { isExpanded ? 62 : 40 }
+    private var controlIconSize: CGFloat { isExpanded ? 26 : 18 }
+
+    // Play/pause leads the row. When the secondary controls were sized up to
+    // match Apple, this pair was left where it was, and the gap between them
+    // closed from 1.7x to 1.35x -- enough that the row read as five buttons of
+    // one size. Its glyph also sits proportionally larger in its highlight than
+    // the others, which is what Apple does: the primary control is the one you
+    // aim at without looking.
+    private var playPauseFrameSize: CGFloat { isExpanded ? 84 : 58 }
+    private var playPauseIconSize: CGFloat { isExpanded ? 39 : 28 }
+
+    // What the volume and lyrics rows add to the panel's height. Content is
+    // top-aligned, so whatever is reserved past what a row draws reads as dead
+    // space along the bottom edge, and whatever falls short pins the row
+    // against it.
+    //
+    // Collapsed, the fixed part of the panel already fills its 180pt: a 60pt
+    // header, a 13pt progress row and a 58pt transport row, with the stack's
+    // 12pt gaps and 4pt insets between them, comes to 188 against 152pt of
+    // content height. So the volume row needs its own 13pt capsule and the
+    // 14pt gap above it *plus* the 12pt that fixed part is already over by --
+    // 40, not the 27 the row itself measures. The old 72/88 was sized for a
+    // boxed slider with an icon and a percentage label, which is where the
+    // dead space came from; 32 was this arithmetic done without the overflow,
+    // and pinned the capsule against the bottom edge.
+    //
+    // The lyrics row is 8pt of inset and up to two 15pt lines, plus the same
+    // 14pt gap: 52, with a little over.
+    private let collapsedSliderExtraHeight: CGFloat = 40
+    private let expandedSliderExtraHeight: CGFloat = 44
+    private let collapsedLyricsExtraHeight: CGFloat = 56
     private let expandedLyricsExtraHeight: CGFloat = 96
 
     private var shouldUseFrostedBlur: Bool {
@@ -94,7 +215,20 @@ struct LockScreenMusicPanel: View {
 
     private var currentSize: CGSize {
         let base = isExpanded ? Self.expandedSize : collapsedPanelSize
-        return CGSize(width: base.width, height: base.height + totalExtraHeight)
+        return CGSize(width: base.width + totalExtraWidth, height: base.height + totalExtraHeight)
+    }
+
+    /// Whether the expanded player reads its lyrics in a side column. The
+    /// Spotify-canvas fallback already hands its lyrics to a separate window,
+    /// and drops the inline artwork, so it keeps the stacked layout.
+    /// Expanded, in the two-or-three column arrangement -- as opposed to the
+    /// Spotify-canvas fallback, which stays stacked.
+    private var usesExpandedColumnLayout: Bool {
+        isExpanded && !hidesInlineArtworkForSpotifyCanvasFallback
+    }
+
+    private var usesExpandedLyricsColumn: Bool {
+        isExpanded && shouldShowInlineLyrics && !hidesInlineArtworkForSpotifyCanvasFallback
     }
 
     private var collapsedPanelSize: CGSize {
@@ -175,6 +309,14 @@ struct LockScreenMusicPanel: View {
             y: usesSpotifyCanvasFallbackContentPresentation ? 14 : 10
         )
         .contentShape(Rectangle())
+        .onHover { hovering in
+            isPointerInsidePanel = hovering
+            if hovering {
+                cancelCollapseTimer()
+            } else {
+                registerInteraction()
+            }
+        }
         .animation(.easeInOut(duration: 0.28), value: isExpanded)
         .animation(.easeInOut(duration: 0.24), value: shouldShowVolumeSlider)
         .onAppear {
@@ -191,7 +333,7 @@ struct LockScreenMusicPanel: View {
         .onDisappear {
             isActive = false
             cancelCollapseTimer()
-            isVolumeSliderVisible = false
+            isOutputPickerVisible = false
             parallaxResumeWorkItem?.cancel()
             parallaxResumeWorkItem = nil
             isParallaxSuspended = false
@@ -207,12 +349,12 @@ struct LockScreenMusicPanel: View {
         .onChange(of: showMediaOutputControl) { _, enabled in
             if !enabled {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                    isVolumeSliderVisible = false
+                    isOutputPickerVisible = false
                 }
             }
             updatePanelSize()
         }
-        .onChange(of: isVolumeSliderVisible) { _, visible in
+        .onChange(of: isOutputPickerVisible) { _, visible in
             if useMergedAirPlayOutput {
                 if visible && musicManager.isAppleMusicActive {
                     Task { await airPlayManager.refreshDevices() }
@@ -231,6 +373,15 @@ struct LockScreenMusicPanel: View {
             }
         }
         .onChange(of: enableLyrics) { _, _ in
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                updatePanelSize()
+            }
+        }
+        // The Spotify-canvas fallback hands its lyrics to a window of their own
+        // and drops the inline artwork, so entering or leaving it moves the
+        // panel between the column layout and the stacked one -- a change of
+        // width, which nothing was asking the window for.
+        .onChange(of: fullscreenArtworkManager.isShowingSpotifyCanvasFallback) { _, _ in
             withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                 updatePanelSize()
             }
@@ -260,8 +411,9 @@ struct LockScreenMusicPanel: View {
                 collapsedLayout
             }
         }
-        .padding(.horizontal, usesSpotifyCanvasFallbackContentPresentation ? (isExpanded ? 24 : 22) : (isExpanded ? 24 : 20))
-        .padding(.vertical, usesSpotifyCanvasFallbackContentPresentation ? (isExpanded ? 18 : 14) : (isExpanded ? 22 : 16))
+        .padding(.horizontal, usesSpotifyCanvasFallbackContentPresentation ? (isExpanded ? 20 : 18) : (isExpanded ? 20 : 16))
+        .padding(.top, usesSpotifyCanvasFallbackContentPresentation ? (isExpanded ? 18 : 14) : (isExpanded ? 22 : 16))
+        .padding(.bottom, usesSpotifyCanvasFallbackContentPresentation ? (isExpanded ? 14 : 10) : (isExpanded ? 16 : 12))
         .frame(
             maxWidth: .infinity,
             maxHeight: .infinity,
@@ -293,18 +445,24 @@ struct LockScreenMusicPanel: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 HStack(alignment: .center, spacing: expandedContentSpacing) {
-                    albumArtButton(size: 230, cornerRadius: expandedAlbumArtCornerRadius)
-                        .frame(width: 230, height: 230)
+                    albumArtButton(size: expandedArtworkSize, cornerRadius: expandedAlbumArtCornerRadius)
+                        .frame(width: expandedArtworkSize, height: expandedArtworkSize)
 
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: expandedColumnSpacing) {
                         expandedHeader
                         progressBar
-                            .padding(.top, 10)
                             .frame(maxWidth: .infinity)
                         playbackControls(alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+                    if usesExpandedLyricsColumn {
+                        expandedLyricsColumn
+                            .frame(width: expandedLyricsColumnWidth)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
                 }
+                .frame(maxHeight: .infinity)
             }
         }
         .frame(maxHeight: .infinity, alignment: .center)
@@ -321,31 +479,31 @@ struct LockScreenMusicPanel: View {
                     MusicTitleMarqueeView(
                         text: musicManager.songTitle.isEmpty ? "No Music Playing" : musicManager.songTitle,
                         isExplicit: !musicManager.songTitle.isEmpty && musicManager.isCurrentTrackExplicit,
-                        font: .system(size: 12, weight: .semibold),
-                        nsFont: .subheadline,
+                        font: .system(size: 14, weight: .semibold),
+                        nsFont: .headline,
                         textColor: widgetAppearance.primary(),
                         minDuration: 0.45,
                         frameWidth: geo.size.width,
                         badgeSpacing: 5,
                         badgeLabel: "E",
-                        badgeHeight: 13,
+                        badgeHeight: 15,
                         badgeForegroundColor: widgetAppearance.usesLightGlyphs
                             ? Color.black.opacity(0.72)
                             : Color.white.opacity(0.85),
                         badgeBackgroundColor: widgetAppearance.primary(opacity: 0.46),
                         badgeHorizontalPadding: 4,
-                        badgeMinWidth: 14,
+                        badgeMinWidth: 16,
                         badgeCornerRadius: 4
                     )
 
                     Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
-                        .font(.system(size: 10, weight: .regular))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(artistLabelColor(factor: 0.6))
                         .lineLimit(1)
                 }
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, minHeight: 30, maxHeight: 30, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36, alignment: .leading)
 
             visualizer(height: 16)
         }
@@ -359,33 +517,38 @@ struct LockScreenMusicPanel: View {
                     MusicTitleMarqueeView(
                         text: musicManager.songTitle.isEmpty ? "No Music Playing" : musicManager.songTitle,
                         isExplicit: !musicManager.songTitle.isEmpty && musicManager.isCurrentTrackExplicit,
-                        font: .system(size: 18, weight: .semibold),
-                        nsFont: .title3,
+                        font: .system(size: 21, weight: .semibold),
+                        nsFont: .title2,
                         textColor: widgetAppearance.primary(),
                         minDuration: 0.55,
                         frameWidth: geo.size.width,
                         badgeSpacing: 6,
                         badgeLabel: "E",
-                        badgeHeight: 16,
+                        badgeHeight: 18,
                         badgeForegroundColor: widgetAppearance.usesLightGlyphs
                             ? Color.black.opacity(0.74)
                             : Color.white.opacity(0.88),
                         badgeBackgroundColor: widgetAppearance.primary(opacity: 0.5),
                         badgeHorizontalPadding: 5,
-                        badgeMinWidth: 17,
+                        badgeMinWidth: 19,
                         badgeCornerRadius: 5
                     )
 
                     Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundColor(artistLabelColor(factor: 0.7))
                         .lineLimit(2)
                 }
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 52, maxHeight: 52, alignment: .leading)
 
-            visualizer(height: 20)
+            // Sits with the title block rather than floating off at the column's
+            // far edge, and drops out entirely when the lyrics column is there --
+            // two things competing for the same corner read as clutter.
+            if !usesExpandedLyricsColumn {
+                visualizer(height: 20)
+            }
         }
     }
 
@@ -404,12 +567,13 @@ struct LockScreenMusicPanel: View {
             } else {
                 albumArtImage(size: size, cornerRadius: cornerRadius)
                 if showAppIcon, let icon = lockScreenAppIcon {
+                    let badge = appIconSize(forArtwork: size)
                     icon
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: appIconSize, height: appIconSize)
-                        .shadow(color: Color.black.opacity(0.35), radius: 6, x: 0, y: 4)
-                        .offset(x: appIconOffset, y: appIconOffset)
+                        .frame(width: badge, height: badge)
+                        .shadow(color: Color.black.opacity(0.28), radius: badge * 0.14, x: 0, y: badge * 0.06)
+                        .offset(x: badge * 0.26, y: badge * 0.26)
                         .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -421,7 +585,10 @@ struct LockScreenMusicPanel: View {
         )
         .frame(width: size)
         .background(albumArtBackground(cornerRadius: artworkCornerRadius))
-        .clipShape(RoundedRectangle(cornerRadius: artworkCornerRadius, style: .continuous))
+        // Deliberately no clip here. The artwork clips itself to this radius
+        // and the background is already a rounded rect of it, so the only
+        // thing a clip at this level did was cut the corner off the source
+        // badge, which is meant to overhang.
         .opacity(musicManager.isPlaying ? 1 : 0.4)
         .scaleEffect(musicManager.isPlaying ? 1 : 0.85)
         .animation(.easeInOut(duration: 0.2), value: musicManager.isPlaying)
@@ -502,6 +669,7 @@ struct LockScreenMusicPanel: View {
     private func registerInteraction() {
         cancelCollapseTimer()
         guard isExpanded else { return }
+        guard !isPointerInsidePanel else { return }
 
         let workItem = DispatchWorkItem {
             suspendParallaxInteraction()
@@ -566,7 +734,8 @@ struct LockScreenMusicPanel: View {
                 trailingLabel: .remaining,
                 restingTrackHeight: 7,
                 draggingTrackHeight: 11,
-                tintOverride: progressSliderTint
+                tintOverride: progressSliderTint,
+                desaturatesWhenIdle: true
             )
         }
         .onAppear {
@@ -605,7 +774,9 @@ struct LockScreenMusicPanel: View {
     // MARK: - Playback Controls
     
     private func playbackControls(alignment: Alignment) -> some View {
-        let spacing: CGFloat = isExpanded ? 24 : 20
+        // Tighter than before: the highlight circles are now wide enough that
+        // Apple-sized gaps between them keep the row visually grouped.
+        let spacing: CGFloat = isExpanded ? 14 : 10
         let verticalSpacing: CGFloat = (shouldShowVolumeSlider || shouldShowInlineLyrics) ? 14 : 10
 
         return VStack(spacing: verticalSpacing) {
@@ -627,7 +798,7 @@ struct LockScreenMusicPanel: View {
                 }
             }
 
-            if shouldShowInlineLyrics {
+            if shouldShowInlineLyrics && !usesExpandedLyricsColumn {
                 lyricsSection(alignment: alignment)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -641,11 +812,9 @@ struct LockScreenMusicPanel: View {
     }
 
     private func controlsRow(alignment: Alignment, spacing: CGFloat) -> some View {
-        let skipNudge: CGFloat = isExpanded ? 14 : 9
-
-        return HStack(spacing: spacing) {
+        HStack(spacing: spacing) {
             ForEach(Array(displayedSlots.enumerated()), id: \.offset) { _, slot in
-                slotView(for: slot, skipNudge: skipNudge)
+                slotView(for: slot)
             }
         }
         .frame(maxWidth: .infinity, alignment: alignment)
@@ -670,7 +839,7 @@ struct LockScreenMusicPanel: View {
     }
 
     @ViewBuilder
-    private func slotView(for control: MusicControlButton, skipNudge: CGFloat) -> some View {
+    private func slotView(for control: MusicControlButton) -> some View {
         let seekInterval: TimeInterval = 10
 
         switch control {
@@ -682,8 +851,9 @@ struct LockScreenMusicPanel: View {
             controlButton(
                 icon: "backward.fill",
                 size: 18,
-                interaction: .nudge(-skipNudge),
-                symbolEffect: .replace
+                interaction: .none,
+                symbolEffect: .replace,
+                skipDirection: .backward
             ) {
                 musicManager.previousTrack()
             }
@@ -691,8 +861,9 @@ struct LockScreenMusicPanel: View {
             controlButton(
                 icon: "forward.fill",
                 size: 18,
-                interaction: .nudge(skipNudge),
-                symbolEffect: .replace
+                interaction: .none,
+                symbolEffect: .replace,
+                skipDirection: .forward
             ) {
                 musicManager.nextTrack()
             }
@@ -769,19 +940,23 @@ struct LockScreenMusicPanel: View {
     }
 
     private var playPauseButton: some View {
-        let frameSize: CGFloat = isExpanded ? 80 : 54
         let iconName = musicManager.isPlaying ? "pause.fill" : "play.fill"
 
-        return HoverButton(
-            icon: iconName,
+        // Shares PanelControlButton with the rest of the row so the highlight is
+        // a full-size circle rather than HoverButton's undersized capsule.
+        return PanelControlButton(
+            glyph: .symbol(iconName),
+            frameSize: playPauseFrameSize,
+            iconSize: playPauseIconSize,
             iconColor: widgetAppearance.primary(),
-            scale: .large,
-            pressEffect: nil
+            backgroundOpacity: 0,
+            interaction: .none,
+            symbolEffect: .replace
         ) {
             registerInteraction()
             musicManager.togglePlay()
         }
-        .frame(width: frameSize, height: frameSize)
+        .accessibilityLabel(musicManager.isPlaying ? "Pause" : "Play")
     }
     
     private func controlButton(
@@ -791,16 +966,18 @@ struct LockScreenMusicPanel: View {
         activeColor: Color? = nil,
         interaction: PanelControlButton.Interaction = .none,
         symbolEffect: PanelControlButton.SymbolEffectStyle = .replace,
+        skipDirection: SkipTrackGlyph.Direction? = nil,
         action: @escaping () -> Void
     ) -> some View {
+        let glyph: PanelControlButton.Glyph = skipDirection.map { .skipArrows($0) } ?? .symbol(icon)
         let resolvedActiveColor = activeColor ?? brandAccentColor
-        let frameSize: CGFloat = isExpanded ? 56 : 32
-        let iconSize: CGFloat = isExpanded ? max(size, 24) : size
+        let frameSize: CGFloat = controlFrameSize
+        let iconSize: CGFloat = isExpanded ? max(size, controlIconSize) : size
         let iconColor = isActive ? resolvedActiveColor : widgetAppearance.primary(opacity: 0.8)
         let backgroundOpacity: Double = isActive ? 0.22 : 0.0
 
         return PanelControlButton(
-            icon: icon,
+            glyph: glyph,
             frameSize: frameSize,
             iconSize: iconSize,
             iconColor: iconColor,
@@ -814,28 +991,28 @@ struct LockScreenMusicPanel: View {
     }
     
     private var mediaOutputControlButton: some View {
-        let frameSize: CGFloat = isExpanded ? 56 : 32
-        let iconSize: CGFloat = isExpanded ? 26 : 18
+        let frameSize: CGFloat = controlFrameSize
+        let iconSize: CGFloat = controlIconSize
 
         return PanelControlButton(
-            icon: mediaOutputIcon,
+            glyph: .symbol(mediaOutputIcon),
             frameSize: frameSize,
             iconSize: iconSize,
-            iconColor: shouldShowVolumeSlider ? .accentColor : widgetAppearance.primary(opacity: 0.8),
-            backgroundOpacity: shouldShowVolumeSlider ? 0.22 : 0.0,
+            iconColor: isOutputPickerOpen ? .accentColor : widgetAppearance.primary(opacity: 0.8),
+            backgroundOpacity: isOutputPickerOpen ? 0.22 : 0.0,
             interaction: .none,
             symbolEffect: .replace,
-            action: toggleVolumeSlider
+            action: toggleOutputPicker
         )
         .accessibilityLabel("Media output")
     }
 
     private var standaloneAirPlayButton: some View {
-        let frameSize: CGFloat = isExpanded ? 56 : 32
-        let iconSize: CGFloat = isExpanded ? 26 : 18
+        let frameSize: CGFloat = controlFrameSize
+        let iconSize: CGFloat = controlIconSize
 
         return PanelControlButton(
-            icon: "airplayaudio",
+            glyph: .symbol("airplayaudio"),
             frameSize: frameSize,
             iconSize: iconSize,
             iconColor: isAirPlayPopoverPresented ? .accentColor : widgetAppearance.primary(opacity: 0.8),
@@ -859,35 +1036,117 @@ struct LockScreenMusicPanel: View {
         }
     }
 
+    /// The read-along column: the whole song, scrolling itself to the line
+    /// being sung, with that line swept in time the same way the notch does it.
+    private var expandedLyricsColumn: some View {
+        HStack(spacing: 0) {
+            // A hairline spine, so the column reads as its own half of the
+            // panel instead of text that drifted away from the controls.
+            Rectangle()
+                .fill(widgetAppearance.primary(opacity: 0.12))
+                .frame(width: 1)
+                .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "quote.bubble")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Lyrics")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundColor(widgetAppearance.primary(opacity: 0.55))
+            .padding(.horizontal, 18)
+            .padding(.top, 2)
+
+            SyncedLyricsList(
+                musicManager: musicManager,
+                style: SyncedLyricsStyle(
+                    fontSize: 15,
+                    lineSpacing: 12,
+                    horizontalPadding: 18,
+                    sung: widgetAppearance.primary(),
+                    unsung: widgetAppearance.primary(opacity: 0.35),
+                    idle: widgetAppearance.primary(opacity: 0.35),
+                    tint: widgetAppearance.primary(opacity: 0.6),
+                    placeholder: "No lyrics for this track"
+                )
+            )
+            // Fades the ends rather than cutting them, so the column reads as a
+            // window onto the song instead of a box with clipped text.
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black, location: 0.1),
+                        .init(color: .black, location: 0.9),
+                        .init(color: .clear, location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
+        .padding(.trailing, 4)
+    }
+
     private func lyricsSection(alignment: Alignment) -> some View {
         let line = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isInstrumentalBreak = musicManager.isInInstrumentalBreak
+        let fontSize: CGFloat = isExpanded ? 14 : 12
         let transition: AnyTransition = .asymmetric(
             insertion: .move(edge: .bottom).combined(with: .opacity),
             removal: .move(edge: .top).combined(with: .opacity)
         )
 
-        return HStack(spacing: 8) {
-            if !line.isEmpty {
-                Image(systemName: "music.note")
-                    .font(.system(size: isExpanded ? 14 : 12, weight: .semibold))
-                    .foregroundColor(widgetAppearance.primary(opacity: 0.7))
-                    .symbolRenderingMode(.monochrome)
+        // Redraws each frame while playing so the highlight tracks the music
+        // rather than stepping a whole line at a time.
+        return TimelineView(.animation(paused: !musicManager.isPlaying)) { timeline in
+            let progress = musicManager.currentLyricSweepProgress(at: timeline.date)
 
-                Text(line)
-                    .font(.system(size: isExpanded ? 14 : 12, weight: .semibold))
-                    .foregroundColor(widgetAppearance.primary(opacity: 0.88))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.trailing, 6)
-                    .id(line)
-                    .transition(transition)
+            HStack(spacing: 8) {
+                if isInstrumentalBreak {
+                    // Carrying on without words, rather than nothing to show.
+                    InstrumentalBreakNotes(fontSize: fontSize)
+                        .lyricSweep(
+                            progress: progress,
+                            isCurrent: true,
+                            sung: widgetAppearance.primary(opacity: 1),
+                            unsung: widgetAppearance.primary(opacity: 0.45),
+                            idle: widgetAppearance.primary(opacity: 0.45)
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(transition)
+                } else if !line.isEmpty {
+                    Image(systemName: "music.note")
+                        .font(.system(size: fontSize, weight: .semibold))
+                        .foregroundColor(widgetAppearance.primary(opacity: 0.7))
+                        .symbolRenderingMode(.monochrome)
+
+                    Text(line)
+                        .font(.system(size: fontSize, weight: .semibold))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .lyricSweep(
+                            progress: progress,
+                            isCurrent: true,
+                            sung: widgetAppearance.primary(opacity: 1),
+                            unsung: widgetAppearance.primary(opacity: 0.45),
+                            idle: widgetAppearance.primary(opacity: 0.88)
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.trailing, 6)
+                        .id(line)
+                        .transition(transition)
+                }
             }
+            .padding(.horizontal, isExpanded ? 10 : 8)
+            .padding(.top, isExpanded ? 12 : 8)
+            .frame(maxWidth: .infinity, alignment: alignment)
+            .animation(.smooth(duration: 0.32), value: line)
+            .animation(.smooth(duration: 0.32), value: isInstrumentalBreak)
         }
-        .padding(.horizontal, isExpanded ? 10 : 8)
-        .padding(.top, isExpanded ? 12 : 8)
-        .frame(maxWidth: .infinity, alignment: alignment)
-        .animation(.smooth(duration: 0.32), value: line)
     }
 
     private var repeatIcon: String {
@@ -903,34 +1162,23 @@ struct LockScreenMusicPanel: View {
     }
 
     private var volumeSlider: some View {
-        HStack(spacing: 14) {
-            Image(systemName: volumeIconName)
-                .font(.system(size: isExpanded ? 16 : 14, weight: .semibold))
-                .foregroundColor(widgetAppearance.primary(opacity: 0.8))
-
-            Slider(
-                value: Binding(
-                    get: { Double(volumeModel.level) },
-                    set: { newValue in
-                        registerInteraction()
-                        volumeModel.setVolume(Float(newValue))
-                    }
-                ),
-                in: 0 ... 1
-            )
-            .tint(sliderColor)
-
-            Text(volumePercentage)
-                .font(.system(size: isExpanded ? 12 : 11, weight: .medium, design: .monospaced))
-                .foregroundColor(widgetAppearance.primary(opacity: 0.7))
-                .frame(width: 48, alignment: .trailing)
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: isExpanded ? 16 : 12, style: .continuous)
-                .fill(sliderBackgroundFill)
+        // iOS draws this as a bare capsule between two speaker glyphs, with no
+        // surrounding card — the panel is the card.
+        VolumeCapsuleSlider(
+            value: Binding(
+                // Muting leaves `level` where it was, so reading it alone left
+                // the capsule full and the glyph un-slashed while muted.
+                get: { volumeModel.isMuted ? 0 : Double(volumeModel.level) },
+                set: { newValue in
+                    registerInteraction()
+                    volumeModel.setVolume(Float(newValue))
+                }
+            ),
+            tint: widgetAppearance.primary(),
+            compact: !isExpanded,
+            onEditingChanged: { _ in registerInteraction() }
         )
+        .padding(.horizontal, isExpanded ? 6 : 4)
     }
 
     private var airPlaySection: some View {
@@ -1064,19 +1312,35 @@ struct LockScreenMusicPanel: View {
     }
 
     private var shouldShowAirPlay: Bool {
-        useMergedAirPlayOutput && shouldShowVolumeSlider && !airPlayManager.devices.isEmpty
+        // Deliberately not gated on the device list being non-empty. The merged
+        // output mode owns this slot outright -- shouldShowRouteSelector stands
+        // down whenever it is on -- so requiring devices left the open picker
+        // rendering nothing at all, and made airPlaySection's own "No AirPlay
+        // outputs available" state unreachable.
+        useMergedAirPlayOutput && isOutputPickerOpen
     }
 
     private var shouldShowRouteSelector: Bool {
-        !useMergedAirPlayOutput && shouldShowVolumeSlider
+        !useMergedAirPlayOutput && isOutputPickerOpen
     }
 
     private var shouldShowAccessorySection: Bool {
         shouldShowAirPlay || shouldShowRouteSelector
     }
 
+    /// Volume sits under the transport row for as long as the panel is up, the
+    /// way iOS shows it on the Lock Screen. It used to be hidden behind the
+    /// output button, which put the most-reached-for control two taps away —
+    /// and left nothing on screen at all when the volume keys were pressed,
+    /// since the notch HUD has nowhere to draw over the lock screen.
     private var shouldShowVolumeSlider: Bool {
-        showMediaOutputControl && isVolumeSliderVisible
+        showMediaOutputControl
+    }
+
+    /// The device list stays behind the output button, which is what that
+    /// button is for.
+    private var isOutputPickerOpen: Bool {
+        showMediaOutputControl && isOutputPickerVisible
     }
 
     private var sliderExtraHeight: CGFloat {
@@ -1092,39 +1356,73 @@ struct LockScreenMusicPanel: View {
     }
 
     private var accessorySectionExtraHeight: CGFloat {
+        // The expanded column has the room already; see expandedColumnContentHeight.
+        guard !usesExpandedColumnLayout else { return 0 }
+        return accessorySectionRawHeight
+    }
+
+    private var accessorySectionRawHeight: CGFloat {
         guard shouldShowAccessorySection else { return 0 }
         if shouldShowAirPlay {
             let selectedCount = airPlayManager.devices.filter(\.isSelected).count
             let totalCount = airPlayManager.devices.count
             let deviceRows: CGFloat = CGFloat(totalCount) * 30 + CGFloat(max(totalCount - 1, 0)) * 6
             let sliders: CGFloat = CGFloat(selectedCount) * 34
-            return min(deviceRows + sliders + 24, accessorySectionScrollMaxHeight + 16)
+            return min(deviceRows + sliders + accessorySectionChrome, accessorySectionScrollMaxHeight + 16)
         }
 
         let totalCount = max(routeManager.devices.count, 1)
         let deviceRows: CGFloat = CGFloat(totalCount) * 30 + CGFloat(max(totalCount - 1, 0)) * 6
-        return min(deviceRows + 24, accessorySectionScrollMaxHeight + 16)
+        return min(deviceRows + accessorySectionChrome, accessorySectionScrollMaxHeight + 16)
     }
 
+    /// The section's own vertical padding plus the 14pt the controls stack puts
+    /// above it. Leaving the stack's spacing out is what left the last device
+    /// row cut in half by the panel's bottom edge.
+    private var accessorySectionChrome: CGFloat { 38 }
+
     private var totalExtraHeight: CGFloat {
-        sliderExtraHeight + accessorySectionExtraHeight + lyricsExtraHeight
+        panelAdditionalHeight(forExpanded: isExpanded)
+    }
+
+    private var totalExtraWidth: CGFloat {
+        panelAdditionalWidth(forExpanded: isExpanded)
+    }
+
+    private func panelAdditionalWidth(forExpanded expanded: Bool) -> CGFloat {
+        guard expanded,
+              shouldShowInlineLyrics,
+              !hidesInlineArtworkForSpotifyCanvasFallback
+        else { return 0 }
+        // The column plus room for the transport row to keep its width. Adding
+        // only the column's own width took that room out of the player side,
+        // which the transport row will not give up -- so the lyrics were the
+        // ones pushed off the edge.
+        return expandedLyricsColumnWidth + 72
     }
 
     private func lyricsHeight(forExpanded expanded: Bool, enabled: Bool) -> CGFloat {
         guard enabled else { return 0 }
+        // The side column lives inside the panel's existing height, so it must
+        // not also reserve a stacked row's worth of it.
+        if expanded && !hidesInlineArtworkForSpotifyCanvasFallback { return 0 }
         return expanded ? expandedLyricsExtraHeight : collapsedLyricsExtraHeight
     }
 
     private func panelAdditionalHeight(forExpanded expanded: Bool) -> CGFloat {
-        sliderHeight(forExpanded: expanded, visible: shouldShowVolumeSlider) +
-        accessorySectionExtraHeight +
-        lyricsHeight(forExpanded: expanded, enabled: shouldShowInlineLyrics)
+        if expanded && !hidesInlineArtworkForSpotifyCanvasFallback {
+            return max(0, expandedColumnContentHeight - expandedBaseContentHeight)
+        }
+        return sliderHeight(forExpanded: expanded, visible: shouldShowVolumeSlider) +
+            accessorySectionExtraHeight +
+            lyricsHeight(forExpanded: expanded, enabled: shouldShowInlineLyrics)
     }
 
     private func updatePanelSize(animated: Bool = true) {
         LockScreenPanelManager.shared.updatePanelSize(
             expanded: isExpanded,
             additionalHeight: panelAdditionalHeight(forExpanded: isExpanded),
+            additionalWidth: panelAdditionalWidth(forExpanded: isExpanded),
             animated: animated
         )
     }
@@ -1144,14 +1442,19 @@ struct LockScreenMusicPanel: View {
         "\(Int(round(volumeModel.level * 100)))%"
     }
 
-    private func toggleVolumeSlider() {
+    /// Opens or closes the output picker, refreshing the device list on the way
+    /// open so the panel never shows a stale set of outputs.
+    ///
+    /// Closes without opening when the output control is switched off, since the
+    /// picker would otherwise be left visible with no way to dismiss it.
+    private func toggleOutputPicker() {
         guard showMediaOutputControl else {
-            isVolumeSliderVisible = false
+            isOutputPickerVisible = false
             return
         }
 
         registerInteraction()
-        let newState = !isVolumeSliderVisible
+        let newState = !isOutputPickerVisible
         if newState {
             routeManager.refreshDevices()
             if useMergedAirPlayOutput {
@@ -1160,7 +1463,7 @@ struct LockScreenMusicPanel: View {
         }
 
         withAnimation(.easeInOut(duration: 0.24)) {
-            isVolumeSliderVisible = newState
+            isOutputPickerVisible = newState
         }
 
         updatePanelSize()
@@ -1330,16 +1633,17 @@ struct LockScreenMusicPanel: View {
         return AppIcon(for: bundleIdentifier)
     }
 
-    private var appIconSize: CGFloat {
-        isExpanded ? 58 : 34
-    }
-
-    private var appIconCornerRadius: CGFloat {
-        isExpanded ? 18 : 12
-    }
-
-    private var appIconOffset: CGFloat {
-        isExpanded ? 18 : 12
+    /// The source badge, sized against the artwork it sits on rather than
+    /// against the panel's state.
+    ///
+    /// It was a flat 34pt on 60pt of collapsed artwork — over half its width —
+    /// pushed a further 12pt clear of the corner, so it read as a second icon
+    /// parked beside the album rather than as a mark on it. A third of the
+    /// artwork, straddling the corner, is the proportion Apple uses; the clamp
+    /// keeps it from growing with the expanded artwork, which is five times the
+    /// size and does not want a five-times badge.
+    private func appIconSize(forArtwork artworkSize: CGFloat) -> CGFloat {
+        min(max(artworkSize * 0.34, 20), 54)
     }
 
     private func resolvedArtworkCornerRadius(from baseCornerRadius: CGFloat) -> CGFloat {
@@ -1422,8 +1726,56 @@ struct LockScreenMusicPanel: View {
     }
 }
 
+/// Apple's transport-control feedback: the tint fills the whole circular
+/// target (never a ring hugging the glyph), deepens on press, and the button
+/// dips slightly while it is held.
+private struct PanelControlButtonStyle: ButtonStyle {
+    let restingOpacity: Double
+    let isHovering: Bool
+    let appearance: LockScreenWidgetAppearance
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                Circle()
+                    .fill(appearance.primary(opacity: opacity(isPressed: configuration.isPressed)))
+            )
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .animation(
+                .easeOut(duration: configuration.isPressed ? 0.06 : 0.15),
+                value: configuration.isPressed
+            )
+    }
+
+    private func opacity(isPressed: Bool) -> Double {
+        if isPressed {
+            return min(max(restingOpacity + 0.16, 0.26), 0.4)
+        }
+        if isHovering {
+            return min(max(restingOpacity + 0.08, 0.15), 0.32)
+        }
+        return restingOpacity
+    }
+}
+
 private struct PanelControlButton: View {
-    let icon: String
+    /// What the button draws. Modelling this as one value rather than an icon
+    /// name plus an optional direction keeps the two from disagreeing, and
+    /// keeps the parameter list shorter than it was before skip arrows existed.
+    enum Glyph {
+        case symbol(String)
+        /// Chevrons that march in this direction on press, the way Apple's do.
+        case skipArrows(SkipTrackGlyph.Direction)
+
+        var symbolName: String {
+            switch self {
+            case .symbol(let name): return name
+            case .skipArrows(let direction): return direction == .forward ? "forward.fill" : "backward.fill"
+            }
+        }
+    }
+
+    let glyph: Glyph
     let frameSize: CGFloat
     let iconSize: CGFloat
     let iconColor: Color
@@ -1437,20 +1789,24 @@ private struct PanelControlButton: View {
     @State private var pressOffset: CGFloat = 0
     @State private var rotationAngle: Double = 0
     @State private var wiggleToken: Int = 0
+    @State private var skipToken: Int = 0
 
     var body: some View {
         Button(action: {
             triggerPressEffect()
             action()
         }) {
-            RoundedRectangle(cornerRadius: frameSize / 2, style: .continuous)
-                .fill(backgroundColor)
-                .overlay(
-                    iconView
-                )
+            iconView
+                .frame(width: frameSize, height: frameSize)
+                .contentShape(Circle())
         }
-        .frame(width: frameSize, height: frameSize)
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(
+            PanelControlButtonStyle(
+                restingOpacity: backgroundOpacity,
+                isHovering: isHovering,
+                appearance: appearance
+            )
+        )
         .offset(x: pressOffset)
         .rotationEffect(.degrees(rotationAngle))
         .onHover { hovering in
@@ -1460,13 +1816,11 @@ private struct PanelControlButton: View {
         }
     }
 
-    private var backgroundColor: Color {
-        let hoveredOpacity = max(backgroundOpacity + 0.08, 0.18)
-        let appliedOpacity = isHovering ? hoveredOpacity : backgroundOpacity
-        return appearance.primary(opacity: min(appliedOpacity, 0.32))
-    }
-
     private func triggerPressEffect() {
+        if case .skipArrows = glyph {
+            skipToken += 1
+        }
+
         switch interaction {
         case .none:
             return
@@ -1499,9 +1853,24 @@ private struct PanelControlButton: View {
 
     @ViewBuilder
     private var iconView: some View {
-        let base = Image(systemName: icon)
+        switch glyph {
+        case .skipArrows(let direction):
+            SkipTrackGlyph(direction: direction, size: iconSize, trigger: skipToken)
+                .foregroundStyle(iconColor)
+        case .symbol:
+            symbolIconView
+        }
+    }
+
+    @ViewBuilder
+    private var symbolIconView: some View {
+        // The glyph swap rides whatever animation is ambient when `isPlaying`
+        // changes, and the default is slow enough that pause reads as lagging
+        // the click. Naming a fast one here pins it.
+        let base = Image(systemName: glyph.symbolName)
             .font(.system(size: iconSize, weight: .medium))
             .foregroundStyle(iconColor)
+            .animation(.snappy(duration: 0.16), value: glyph.symbolName)
 
         switch symbolEffect {
         case .replace:
@@ -1510,7 +1879,7 @@ private struct PanelControlButton: View {
             if #available(macOS 14.0, *) {
                 base
                     .contentTransition(.symbolEffect(.replace))
-                    .symbolEffect(.bounce, value: icon)
+                    .symbolEffect(.bounce, value: glyph.symbolName)
             } else {
                 base.contentTransition(.symbolEffect(.replace))
             }

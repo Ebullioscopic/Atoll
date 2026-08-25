@@ -22,6 +22,7 @@
 
 import SwiftUI
 import Defaults
+import KeyboardShortcuts
 import Lottie
 import Foundation
 
@@ -403,12 +404,41 @@ extension Notification.Name {
 }
 
 // Media controller types for selection in settings
+/// How the line being sung is picked out from the rest.
+enum LyricHighlightStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case sweep = "Sweep"
+    case gradient = "Gradient"
+    case solid = "Solid"
+
+    var id: String { rawValue }
+
+    var localizedName: String {
+        switch self {
+        case .sweep: return String(localized: "Sweep")
+        case .gradient: return String(localized: "Gradient")
+        case .solid: return String(localized: "Solid")
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .sweep:
+            return String(localized: "The highlight travels across the line word by word, in reading order.")
+        case .gradient:
+            return String(localized: "The current line is lit by one fixed gradient that does not move, the way lyrics were marked before the sweep.")
+        case .solid:
+            return String(localized: "The current line is lit in one flat colour, with nothing crossing it.")
+        }
+    }
+}
+
 enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializable {
     case nowPlaying = "Now Playing"
     case appleMusic = "Apple Music"
     case spotify = "Spotify"
     case youtubeMusic = "Youtube Music"
     case amazonMusic = "Amazon Music"
+    case tidal = "TIDAL"
     case cider = "Cider"
     
     var id: String { self.rawValue }
@@ -420,6 +450,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
         case .spotify: return String(localized: "Spotify")
         case .youtubeMusic: return String(localized: "Youtube Music")
         case .amazonMusic: return String(localized: "Amazon Music")
+        case .tidal: return String(localized: "TIDAL")
         case .cider: return String(localized: "Cider")
         }
     }
@@ -510,6 +541,38 @@ enum BatteryNotificationStyle: String, CaseIterable, Identifiable, Defaults.Seri
             return String(localized: "Standard")
         case .compact:
             return String(localized: "Compact")
+        }
+    }
+}
+
+enum RecordingHoverStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case `default`
+    case inline
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .default:
+            return String(localized: "Default")
+        case .inline:
+            return String(localized: "Inline")
+        }
+    }
+}
+
+enum RecordingControlMode: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case indicatorOnly
+    case withStopButton
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .indicatorOnly:
+            return String(localized: "Indicator only")
+        case .withStopButton:
+            return String(localized: "With stop button")
         }
     }
 }
@@ -860,6 +923,15 @@ enum ColorExtractionMode: String, CaseIterable, Identifiable, Defaults.Serializa
     var id: Self { self }
 }
 
+enum LockScreenLiveActivityIconStyle: String, Defaults.Serializable {
+    case lock
+    case fingerprint
+    case both
+
+    var showsLock: Bool { self == .lock || self == .both }
+    var showsFingerprint: Bool { self == .fingerprint || self == .both }
+}
+
 extension Defaults.Keys {
         // MARK: General
     static let updateChannel = Key<UpdateChannel>("updateChannel", default: .stable)
@@ -972,14 +1044,17 @@ extension Defaults.Keys {
     static let lockScreenWeatherShowsLocation = Key<Bool>("lockScreenWeatherShowsLocation", default: true)
     static let lockScreenWeatherShowsSunrise = Key<Bool>("lockScreenWeatherShowsSunrise", default: true)
     static let lockScreenWeatherWidgetStyle = Key<LockScreenWeatherWidgetStyle>("lockScreenWeatherWidgetStyle", default: .inline)
-    static let lockScreenWeatherTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("lockScreenWeatherTemperatureUnit", default: .celsius)
+    static let lockScreenWeatherTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("lockScreenWeatherTemperatureUnit", default: .matchingSystemPreference)
     static let lockScreenWeatherShowsAQI = Key<Bool>("lockScreenWeatherShowsAQI", default: true)
     static let lockScreenWeatherAQIScale = Key<LockScreenWeatherAirQualityScale>("lockScreenWeatherAQIScale", default: .us)
     static let lockScreenWeatherUsesGaugeTint = Key<Bool>("lockScreenWeatherUsesGaugeTint", default: false)
     static let lockScreenWeatherProviderSource = Key<LockScreenWeatherProviderSource>("lockScreenWeatherProviderSource", default: .openMeteo)
     static let lockScreenWeatherVerticalOffset = Key<Double>("lockScreenWeatherVerticalOffset", default: 0)
     static let lockScreenMusicVerticalOffset = Key<Double>("lockScreenMusicVerticalOffset", default: 0)
-    static let lockScreenMusicPanelWidth = Key<Double>("lockScreenMusicPanelWidth", default: 350)
+    static let lockScreenMusicPanelWidth = Key<Double>(
+        "lockScreenMusicPanelWidth",
+        default: Double(LockScreenMusicPanel.defaultCollapsedWidth)
+    )
     static let lockScreenMusicAlbumParallaxEnabled = Key<Bool>("lockScreenMusicAlbumParallaxEnabled", default: false)
     static let lockScreenTimerVerticalOffset = Key<Double>("lockScreenTimerVerticalOffset", default: 0)
     static let lockScreenTimerWidgetWidth = Key<Double>("lockScreenTimerWidgetWidth", default: 350)
@@ -1145,7 +1220,7 @@ extension Defaults.Keys {
     static let showGpuGraph = Key<Bool>("showGpuGraph", default: true)
     static let showNetworkGraph = Key<Bool>("showNetworkGraph", default: false)
     static let showDiskGraph = Key<Bool>("showDiskGraph", default: false)
-    static let cpuTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("cpuTemperatureUnit", default: .celsius)
+    static let cpuTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("cpuTemperatureUnit", default: .matchingSystemPreference)
     
     // MARK: Terminal Feature
     static let enableTerminalFeature = Key<Bool>("enableTerminalFeature", default: false)
@@ -1184,6 +1259,7 @@ extension Defaults.Keys {
     static let reminderPresentationStyle = Key<ReminderPresentationStyle>("reminderPresentationStyle", default: .ringCountdown)
     static let reminderLeadTime = Key<Int>("reminderLeadTime", default: 5)
     static let reminderSneakPeekDuration = Key<Double>("reminderSneakPeekDuration", default: 5)
+    // Legacy key name: the separate control window is gone, this now shows inline notch controls.
     static let timerControlWindowEnabled = Key<Bool>("timerControlWindowEnabled", default: true)
     
     // MARK: ColorPicker Feature
@@ -1303,6 +1379,8 @@ extension Defaults.Keys {
     // MARK: Screen Recording Detection Feature
     static let enableScreenRecordingDetection = Key<Bool>("enableScreenRecordingDetection", default: true)
     static let showRecordingIndicator = Key<Bool>("showRecordingIndicator", default: true)
+    static let recordingHoverStyle = Key<RecordingHoverStyle>("recordingHoverStyle", default: .default)
+    static let recordingControlMode = Key<RecordingControlMode>("recordingControlMode", default: .withStopButton)
     // Polling removed - now uses event-driven private API detection (CGSIsScreenWatcherPresent)
     // static let enableScreenRecordingPolling = Key<Bool>("enableScreenRecordingPolling", default: false)
 
@@ -1319,6 +1397,7 @@ extension Defaults.Keys {
     
     // MARK: Lock Screen Features
     static let enableLockScreenLiveActivity = Key<Bool>("enableLockScreenLiveActivity", default: true)
+    static let lockScreenLiveActivityIconStyle = Key<LockScreenLiveActivityIconStyle>("lockScreenLiveActivityIconStyle", default: .lock)
     static let enableLockSounds = Key<Bool>("enableLockSounds", default: true)
     
     // MARK: Caps Lock Indicator
@@ -1326,6 +1405,7 @@ extension Defaults.Keys {
     static let capsLockIndicatorUseGreenColor = Key<Bool>("capsLockIndicatorUseGreenColor", default: false) // Legacy toggle
     static let capsLockIndicatorTintMode = Key<CapsLockIndicatorTintMode>("capsLockIndicatorTintMode", default: .white)
     static let didMigrateCapsLockTintMode = Key<Bool>("didMigrateCapsLockTintMode", default: false)
+    static let didMigrateClipboardShortcutToV = Key<Bool>("didMigrateClipboardShortcutToV", default: false)
     static let showCapsLockLabel = Key<Bool>("showCapsLockLabel", default: false)
     
     // MARK: ImageService
@@ -1336,6 +1416,11 @@ extension Defaults.Keys {
     
     // MARK: Lyrics Feature
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
+
+    /// Whether the sung line is swept or simply lit.
+    static let lyricHighlightStyle = Key<LyricHighlightStyle>("lyricHighlightStyle", default: .sweep)
+    static let lyricsPanelWidth = Key<CGFloat>("lyricsPanelWidth", default: 280)
+    static let lyricsPanelOffset = Key<CGFloat>("lyricsPanelOffset", default: 0)
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)
     
     // MARK: Notes Feature
@@ -1379,6 +1464,31 @@ extension Defaults.Keys {
         }
 
         normalizeMusicAuxControls()
+    }
+
+    /// Move the clipboard shortcut off the old Cmd+Shift+C default.
+    ///
+    /// Settings has always documented Cmd+Shift+V ("similar to Windows+V on PC") while the
+    /// shortcut was registered as Cmd+Shift+C. Changing the default alone fixes nothing for
+    /// anyone who has already launched Atoll: `KeyboardShortcuts.Name` writes its default into
+    /// UserDefaults on first run and never overwrites it, so the old value would win forever.
+    ///
+    /// Only a shortcut still sitting on the old default is moved. Anyone who picked their own
+    /// keeps it — including, unavoidably, anyone who deliberately chose Cmd+Shift+C.
+    ///
+    /// The marker is written last: if this crashed between marking and moving, the migration
+    /// would be considered done while the shortcut still sat on the old key, with no second
+    /// chance to correct it. Running twice is harmless by comparison, since the second run
+    /// finds Cmd+Shift+V rather than the legacy default and changes nothing.
+    static func migrateClipboardShortcutToV() {
+        guard Defaults[.didMigrateClipboardShortcutToV] == false else { return }
+
+        let legacyDefault = KeyboardShortcuts.Shortcut(.c, modifiers: [.shift, .command])
+        if KeyboardShortcuts.getShortcut(for: .clipboardHistoryPanel) == legacyDefault {
+            KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.shift, .command]), for: .clipboardHistoryPanel)
+        }
+
+        Defaults[.didMigrateClipboardShortcutToV] = true
     }
 
     static func migrateCapsLockTintMode() {
