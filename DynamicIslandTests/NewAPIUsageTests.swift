@@ -117,11 +117,16 @@ final class NewAPIUsageTests: XCTestCase {
 
         for request in statRequests {
             let items = URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)?.queryItems ?? []
-            let values = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value) })
+            let values = Dictionary(
+                uniqueKeysWithValues: items.compactMap { item in
+                    item.value.map { (item.name, $0) }
+                }
+            )
             XCTAssertEqual(values["type"], "2")
             XCTAssertEqual(values["end_timestamp"], String(end))
 
-            let start = try XCTUnwrap(Int64(try XCTUnwrap(values["start_timestamp"])))
+            let startValue = try XCTUnwrap(values["start_timestamp"])
+            let start = try XCTUnwrap(Int64(startValue))
             let expected = try XCTUnwrap(expectedStats[start])
             switch start {
             case todayStart:
