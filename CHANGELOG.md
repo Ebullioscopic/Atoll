@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
-- **The lock screen positioning preview can move a widget as far as the setting allows**: it clamped each widget's whole stand-in box inside the mock screen, and the music box is drawn at roughly twice the panel's real proportions -- so the music widget ran out of travel about 10pt down, nowhere near the 160pt the setting itself permits. The widget's centre is what stays on screen now.
+- **The lock screen positioning preview can move a widget as far as the setting allows**: it clamped each widget's whole stand-in box inside the mock screen, and the music box is drawn at roughly twice the panel's real proportions -- so the music widget could move only about 10pt down, nowhere near the 160pt the setting itself permits. The widget's centre is what stays on screen now.
 - A stray divider above the lock screen width sliders drew as a short vertical tick with an empty row around it, just above the separator the form already draws.
 - **The Controls tab no longer overflows the settings window**: its HUD variant cards are a fixed 110pt each, which inside a grouped form became a hard minimum width for the whole pane and pushed everything sideways. They fit to the available width now, and scroll horizontally when there is not enough.
 - The control palette's swipe indicator no longer overlaps the settings beneath it.
