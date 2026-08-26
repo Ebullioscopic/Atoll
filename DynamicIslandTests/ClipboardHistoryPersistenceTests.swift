@@ -30,16 +30,51 @@ import XCTest
 @MainActor
 final class ClipboardHistoryPersistenceTests: XCTestCase {
     private let historyKey = "ClipboardHistory"
+    private let pinnedKey = "ClipboardPinnedItems"
     private var originalSetting = true
+    private var originalHistory: Data?
+    private var originalPinned: Data?
+    private var temporaryDirectory: URL!
 
+    /// These tests turn persistence off, and turning it off deletes every
+    /// unpinned image file in the clipboard data directory. Pointed at the
+    /// real one, running the suite deletes the clipboard images of whoever ran
+    /// it, and leaves the stored history and pinned lists as the last test
+    /// wrote them. So the directory is a temporary one for the duration, and
+    /// both stored lists are put back afterwards.
     override func setUp() {
         super.setUp()
         originalSetting = Defaults[.persistClipboardHistory]
+        originalHistory = UserDefaults.standard.data(forKey: historyKey)
+        originalPinned = UserDefaults.standard.data(forKey: pinnedKey)
+
+        temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AtollClipboardTests-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(
+            at: temporaryDirectory, withIntermediateDirectories: true
+        )
+        ClipboardManager.directoryOverride = temporaryDirectory
     }
 
     override func tearDown() {
+        ClipboardManager.directoryOverride = nil
+        if let temporaryDirectory {
+            try? FileManager.default.removeItem(at: temporaryDirectory)
+        }
+        temporaryDirectory = nil
+
         Defaults[.persistClipboardHistory] = originalSetting
+        restore(originalHistory, forKey: historyKey)
+        restore(originalPinned, forKey: pinnedKey)
         super.tearDown()
+    }
+
+    private func restore(_ data: Data?, forKey key: String) {
+        if let data {
+            UserDefaults.standard.set(data, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
     }
 
     private func makeImageData() -> Data {
@@ -167,6 +202,87 @@ final class ClipboardHistoryPersistenceTests: XCTestCase {
         let url = ClipboardManager.clipboardDataDirectory.appendingPathComponent(name)
         defer { try? FileManager.default.removeItem(at: url) }
         XCTAssertEqual(try? Data(contentsOf: url), png)
+    }
+
+    /// Pinning is a request to keep one thing. While history is not being
+    /// saved an image has no file behind it, so the pinned record named a file
+    /// that was never written and a restart restored a pinned entry with no
+    /// picture in it.
+    func testPinningAnImageWhileHistoryIsNotSavedGivesItAFile() {
+        let manager = ClipboardManager.shared
+        let existingHistory = manager.clipboardHistory
+        let existingPinned = manager.pinnedItems
+        defer {
+            manager.clipboardHistory = existingHistory
+            manager.pinnedItems = existingPinned
+        }
+
+        Defaults[.persistClipboardHistory] = false
+        let png = makeImageData()
+        let item = ClipboardItem(imageData: png)
+        XCTAssertNil(item.imageFileName, "expected a session-only image to start from")
+
+        manager.pinnedItems = []
+        manager.pinItem(item)
+
+        guard let name = manager.pinnedItems.first?.imageFileName else {
+            return XCTFail("a pinned image should have been given a file")
+        }
+        let url = ClipboardManager.clipboardDataDirectory.appendingPathComponent(name)
+        XCTAssertEqual(try? Data(contentsOf: url), png, "the pinned image should survive a restart")
+    }
+
+    /// The rest of the session-only history is not persisted by pinning one
+    /// item — only the thing that was pinned.
+    func testPinningDoesNotPersistTheRestOfTheSessionOnlyHistory() {
+        let manager = ClipboardManager.shared
+        let existingHistory = manager.clipboardHistory
+        let existingPinned = manager.pinnedItems
+        defer {
+            manager.clipboardHistory = existingHistory
+            manager.pinnedItems = existingPinned
+        }
+
+        Defaults[.persistClipboardHistory] = false
+        let pinned = ClipboardItem(imageData: makeImageData())
+        let other = ClipboardItem(imageData: makeImageData())
+        manager.clipboardHistory = [pinned, other]
+        manager.pinnedItems = []
+
+        manager.pinItem(pinned)
+
+        XCTAssertEqual(imageFilesOnDisk().count, 1, "only the pinned image should have a file")
+        XCTAssertNil(
+            manager.clipboardHistory.first(where: { $0.id == other.id })?.imageFileName,
+            "the unpinned image should still be memory-only"
+        )
+    }
+
+    /// The launch purge took the stored list but left the pictures it referred
+    /// to sitting in the data directory — and because the manager is lazy,
+    /// nothing else deleted them either if the panel was never opened.
+    func testLaunchPurgeDeletesUnpinnedImageFilesButKeepsPinnedOnes() {
+        let manager = ClipboardManager.shared
+        let existingPinned = manager.pinnedItems
+        defer { manager.pinnedItems = existingPinned }
+
+        Defaults[.persistClipboardHistory] = true
+        let pinnedItem = ClipboardItem(imageData: makeImageData())
+        let looseItem = ClipboardItem(imageData: makeImageData())
+        guard let pinnedName = pinnedItem.imageFileName,
+              let looseName = looseItem.imageFileName else {
+            return XCTFail("expected both images to be file-backed")
+        }
+        manager.pinnedItems = [pinnedItem]
+        manager.savePinnedItemsToDefaults()
+
+        Defaults[.persistClipboardHistory] = false
+        ClipboardManager.purgeStoredHistoryIfPersistenceDisabled()
+
+        let remaining = imageFilesOnDisk()
+        XCTAssertTrue(remaining.contains(pinnedName), "a pinned image was asked to be kept")
+        XCTAssertFalse(remaining.contains(looseName), "an unpinned image should not survive the purge")
+        XCTAssertNil(UserDefaults.standard.data(forKey: historyKey))
     }
 
     // MARK: - Stored history
