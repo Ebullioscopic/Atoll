@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Lyrics on the side**: Added ability to show lyrics of the current song when calendar is disabled (#741)
 
 ### Changed
+- **The lock screen temperature gauge shows the day's range**: with coloured gauges on, the arc is now a gradient running from the day's low to its high with a dot marking the current reading along it, rather than a single-colour fill. The colour scale it draws from was also being read in Celsius whatever the display unit, so every Fahrenheit reading above freezing came out the hottest colour -- readings are converted before they are coloured now, and the scale is continuous rather than five steps, so a range inside one step is still visibly a gradient.
 - Lock screen live activity timings now follow the selected icons: the fingerprint remains visible through its scan, while the open lock gets its own brief confirmation beat before the island contracts. (#774)
 
 - The LIVE indicator shown in place of a progress bar on streams now follows Apple's treatment: two thin rules meeting the word in the middle, softening as they run away from it. It was a 10pt capsule with a fill, a centre shade, a stroke and three blend modes. Shadowed text was dropped over the top of all that. The result read as a progress bar someone had written on, and a stream has no progress to draw. The notch, the lock screen player and the floating window all draw the same component, so all three change together.
