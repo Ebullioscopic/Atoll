@@ -6533,9 +6533,10 @@ private struct LockScreenPositioningControls: View {
                 Spacer()
             }
 
-            Divider()
-                .padding(.vertical, 8)
-
+            // No Divider here: a Section lays each child out as its own row,
+            // and a Divider in a row draws across the row's axis -- a short
+            // vertical tick with an empty row's worth of space around it,
+            // sitting just above the separator the Form already draws.
             VStack(alignment: .leading, spacing: 16) {
                 widthSlider(
                     title: String(localized: "Media Panel Width"),
