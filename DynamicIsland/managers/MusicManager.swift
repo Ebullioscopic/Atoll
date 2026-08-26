@@ -982,7 +982,11 @@ class MusicManager: ObservableObject {
             self.playbackRate = state.playbackRate
         }
         
-        if shuffleChanged {
+        // TIDAL reports neither on the media stream, so what arrives here is
+        // the default rather than the truth. Its own menu is the authority.
+        let sourceOwnsPlaybackModes = state.bundleIdentifier == TidalAccessibility.bundleIdentifier
+
+        if shuffleChanged && !sourceOwnsPlaybackModes {
             self.isShuffled = state.isShuffled
         }
 
@@ -990,7 +994,7 @@ class MusicManager: ObservableObject {
             self.bundleIdentifier = state.bundleIdentifier
         }
 
-        if repeatModeChanged {
+        if repeatModeChanged && !sourceOwnsPlaybackModes {
             self.repeatMode = state.repeatMode
         }
         

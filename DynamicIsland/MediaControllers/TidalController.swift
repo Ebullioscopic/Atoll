@@ -139,9 +139,11 @@ enum TidalAccessibility {
             guard current != favorited else { return true }
             guard press(button) else { return false }
 
-            // The label follows the network round trip rather than the press,
-            // so a press that never took effect would report success.
-            return settles { favoriteState(of: button) == favorited }
+            // Looked up again on each attempt rather than re-read from the
+            // element we pressed: TIDAL rebuilds the heart when its state
+            // changes, so the one we were holding stops answering exactly when
+            // the answer arrives.
+            return settles { favoriteButton().flatMap(favoriteState(of:)) == favorited }
         }
     }
 
@@ -209,7 +211,9 @@ enum TidalAccessibility {
             guard let item = playbackMenuItem(titled: shuffleTitle) else { return false }
             guard isChecked(item) != shuffled else { return true }
             guard press(item) else { return false }
-            return settles { isChecked(item) == shuffled }
+            return settles {
+                playbackMenuItem(titled: shuffleTitle).map(isChecked) == shuffled
+            }
         }
     }
 
@@ -235,7 +239,10 @@ enum TidalAccessibility {
             // Each item sets its own mode, so unlike the player bar button
             // there is nothing to cycle through and nothing to overshoot.
             guard press(items[wanted]) else { return false }
-            return settles { isChecked(items[wanted]) }
+            return settles {
+                guard let fresh = repeatItems() else { return false }
+                return isChecked(fresh[wanted])
+            }
         }
     }
 
@@ -284,8 +291,10 @@ enum TidalAccessibility {
 
     private static let messagingTimeout: Float = 1
     private static let searchBudget = 12_000
-    private static let settleAttempts = 8
-    private static let settleInterval: UInt32 = 60_000
+    // Wide enough for a network round trip: TIDAL does not move these
+    // controls until its own server agrees, which is far slower than the press.
+    private static let settleAttempts = 20
+    private static let settleInterval: UInt32 = 150_000
 
     /// Accessibility calls block on the other application answering, so they
     /// are kept off the main thread and off each other.
@@ -311,7 +320,8 @@ enum TidalAccessibility {
 
     /// TIDAL updates these controls when its own state catches up rather than
     /// when the press lands, so success is whatever the app is showing shortly
-    /// afterwards.
+    /// afterwards. The condition re-resolves its element each time, because a
+    /// control that changes state may not be the same element afterwards.
     private static func settles(_ condition: () -> Bool) -> Bool {
         for _ in 0..<settleAttempts {
             usleep(settleInterval)
