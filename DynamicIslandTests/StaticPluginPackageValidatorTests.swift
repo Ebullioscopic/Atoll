@@ -33,12 +33,16 @@ final class StaticPluginPackageValidatorTests: XCTestCase {
         XCTAssertEqual(plugin.id, "com.example.tools")
         XCTAssertEqual(plugin.entrypointURL.lastPathComponent, "index.html")
         XCTAssertEqual(plugin.allowedExternalURLs, [URL(string: "https://geojson.io/")!])
+        XCTAssertEqual(plugin.allowedExternalURLPrefixes, ["https://uri.amap.com/marker?"])
     }
 
-    func testMissingExternalURLListDefaultsToEmpty() throws {
-        let plugin = try validator.validate(packageURL: makePackage(allowedURLs: nil))
+    func testMissingExternalURLListsDefaultToEmpty() throws {
+        let plugin = try validator.validate(
+            packageURL: makePackage(allowedURLs: nil, allowedURLPrefixes: nil)
+        )
 
         XCTAssertTrue(plugin.allowedExternalURLs.isEmpty)
+        XCTAssertTrue(plugin.allowedExternalURLPrefixes.isEmpty)
     }
 
     func testUnsupportedSchemaIsRejected() throws {
@@ -85,6 +89,16 @@ final class StaticPluginPackageValidatorTests: XCTestCase {
         }
     }
 
+    func testExternalURLPrefixWithoutQueryDelimiterIsRejected() throws {
+        assertThrows(.invalidExternalURLPrefix("https://uri.amap.com/marker")) {
+            _ = try validator.validate(
+                packageURL: makePackage(
+                    allowedURLPrefixes: ["https://uri.amap.com/marker"]
+                )
+            )
+        }
+    }
+
     func testEmptyDisplayValueIsRejected() throws {
         assertThrows(.emptyDisplayValue("name")) {
             _ = try validator.validate(packageURL: makePackage(name: "  "))
@@ -114,7 +128,8 @@ final class StaticPluginPackageValidatorTests: XCTestCase {
         version: String = "1.0.0",
         schemaVersion: Int = 1,
         entrypoint: String = "index.html",
-        allowedURLs: [String]? = ["https://geojson.io/"]
+        allowedURLs: [String]? = ["https://geojson.io/"],
+        allowedURLPrefixes: [String]? = ["https://uri.amap.com/marker?"]
     ) throws -> URL {
         let packageURL = rootURL.appendingPathComponent("Tools.atollplugin", isDirectory: true)
         try FileManager.default.createDirectory(at: packageURL, withIntermediateDirectories: true)
@@ -133,6 +148,9 @@ final class StaticPluginPackageValidatorTests: XCTestCase {
         ]
         if let allowedURLs {
             manifest["allowedExternalURLs"] = allowedURLs
+        }
+        if let allowedURLPrefixes {
+            manifest["allowedExternalURLPrefixes"] = allowedURLPrefixes
         }
 
         let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted])
@@ -236,7 +254,8 @@ final class StaticPluginLayoutTests: XCTestCase {
                 "icon": "wrench.and.screwdriver",
                 "preferredHeight": \(preferredHeight)
               },
-              "allowedExternalURLs": []
+              "allowedExternalURLs": [],
+              "allowedExternalURLPrefixes": []
             }
             """.utf8
         )
@@ -246,7 +265,8 @@ final class StaticPluginLayoutTests: XCTestCase {
             manifest: manifest,
             rootURL: rootURL,
             entrypointURL: rootURL.appendingPathComponent("index.html"),
-            allowedExternalURLs: []
+            allowedExternalURLs: [],
+            allowedExternalURLPrefixes: []
         )
     }
 }

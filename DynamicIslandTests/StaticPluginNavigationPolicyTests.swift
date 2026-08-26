@@ -21,6 +21,7 @@ final class StaticPluginNavigationPolicyTests: XCTestCase {
 
     private let rootURL = URL(fileURLWithPath: "/tmp/Tools.atollplugin", isDirectory: true)
     private let allowedURL = URL(string: "https://geojson.io/")!
+    private let allowedPrefix = "https://uri.amap.com/marker?"
 
     func testLocalFileInsidePluginRootIsAllowed() {
         let policy = makePolicy()
@@ -60,11 +61,56 @@ final class StaticPluginNavigationPolicyTests: XCTestCase {
         )
     }
 
+    func testAllowlistedQueryPrefixUserClickOpensExternally() {
+        let target = URL(
+            string: "https://uri.amap.com/marker?position=116.403372,39.924912&coordinate=gaode"
+        )!
+
+        XCTAssertEqual(
+            makePolicy(allowedExternalURLPrefixes: [allowedPrefix]).decision(
+                for: target,
+                userActivated: true,
+                mainFrame: true
+            ),
+            .openExternally(target)
+        )
+    }
+
+    func testQueryPrefixDoesNotPermitAnotherHostOrPath() {
+        let policy = makePolicy(allowedExternalURLPrefixes: [allowedPrefix])
+
+        for value in [
+            "https://uri.amap.com.evil/marker?position=116,39",
+            "https://uri.amap.com/marker-extra?position=116,39",
+            "https://uri.amap.com/other?position=116,39"
+        ] {
+            XCTAssertEqual(
+                policy.decision(
+                    for: URL(string: value)!,
+                    userActivated: true,
+                    mainFrame: true
+                ),
+                .cancel
+            )
+        }
+    }
+
     func testScriptedAndPopupNavigationAreCancelled() {
         let policy = makePolicy()
 
         XCTAssertEqual(policy.decision(for: allowedURL, userActivated: false, mainFrame: true), .cancel)
         XCTAssertEqual(policy.decision(for: allowedURL, userActivated: true, mainFrame: false), .cancel)
+
+        let prefixedURL = URL(string: "https://uri.amap.com/marker?position=116,39")!
+        let prefixPolicy = makePolicy(allowedExternalURLPrefixes: [allowedPrefix])
+        XCTAssertEqual(
+            prefixPolicy.decision(for: prefixedURL, userActivated: false, mainFrame: true),
+            .cancel
+        )
+        XCTAssertEqual(
+            prefixPolicy.decision(for: prefixedURL, userActivated: true, mainFrame: false),
+            .cancel
+        )
     }
 
     func testUndeclaredAndNonHTTPURLsAreCancelled() {
@@ -115,10 +161,13 @@ final class StaticPluginNavigationPolicyTests: XCTestCase {
         XCTAssertNil(loadingError)
     }
 
-    private func makePolicy() -> StaticPluginNavigationPolicy {
+    private func makePolicy(
+        allowedExternalURLPrefixes: Set<String> = []
+    ) -> StaticPluginNavigationPolicy {
         StaticPluginNavigationPolicy(
             pluginRoot: rootURL,
-            allowedExternalURLs: [allowedURL]
+            allowedExternalURLs: [allowedURL],
+            allowedExternalURLPrefixes: allowedExternalURLPrefixes
         )
     }
 
@@ -137,7 +186,8 @@ final class StaticPluginNavigationPolicyTests: XCTestCase {
                     "title": "Tools",
                     "icon": "wrench.and.screwdriver"
                   },
-                  "allowedExternalURLs": []
+                  "allowedExternalURLs": [],
+                  "allowedExternalURLPrefixes": []
                 }
                 """.utf8
             )
@@ -146,7 +196,8 @@ final class StaticPluginNavigationPolicyTests: XCTestCase {
             manifest: manifest,
             rootURL: rootURL,
             entrypointURL: rootURL.appendingPathComponent("index.html"),
-            allowedExternalURLs: []
+            allowedExternalURLs: [],
+            allowedExternalURLPrefixes: []
         )
     }
 }

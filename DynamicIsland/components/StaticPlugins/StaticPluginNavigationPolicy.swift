@@ -22,6 +22,8 @@ struct StaticPluginNavigationPolicy {
     let pluginRoot: URL
     /// 用户点击后可交给系统浏览器打开的精确 URL。
     let allowedExternalURLs: Set<URL>
+    /// 用户点击后可交给系统浏览器打开的动态查询 URL 前缀。
+    let allowedExternalURLPrefixes: Set<String>
 
     /// 只根据已验证的插件边界决定导航去向；`mainFrame == nil` 表示新窗口目标，仍需用户点击才允许外部打开。
     func decision(
@@ -37,11 +39,13 @@ struct StaticPluginNavigationPolicy {
                 : .cancel
         }
 
+        let allowedExternalURL = allowedExternalURLs.contains(url)
+            || allowedExternalURLPrefixes.contains { url.absoluteString.hasPrefix($0) }
         guard userActivated,
               mainFrame != false,
               let scheme = url.scheme?.lowercased(),
               ["http", "https"].contains(scheme),
-              allowedExternalURLs.contains(url) else {
+              allowedExternalURL else {
             return .cancel
         }
         return .openExternally(url)

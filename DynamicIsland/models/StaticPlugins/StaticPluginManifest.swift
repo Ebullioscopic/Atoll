@@ -25,6 +25,8 @@ struct StaticPluginManifest: Codable, Equatable {
     let tab: StaticPluginTabManifest
     /// 允许用户点击后交给系统浏览器打开的精确 URL。
     let allowedExternalURLs: [String]
+    /// 允许携带动态查询参数的外部 URL 前缀；校验器要求以 `?` 结尾。
+    let allowedExternalURLPrefixes: [String]
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -35,6 +37,10 @@ struct StaticPluginManifest: Codable, Equatable {
         entrypoint = try values.decode(String.self, forKey: .entrypoint)
         tab = try values.decode(StaticPluginTabManifest.self, forKey: .tab)
         allowedExternalURLs = try values.decodeIfPresent([String].self, forKey: .allowedExternalURLs) ?? []
+        allowedExternalURLPrefixes = try values.decodeIfPresent(
+            [String].self,
+            forKey: .allowedExternalURLPrefixes
+        ) ?? []
     }
 }
 
@@ -56,6 +62,8 @@ struct InstalledStaticPlugin: Identifiable, Equatable {
     let entrypointURL: URL
     /// 允许交给系统浏览器处理的精确 URL 集合。
     let allowedExternalURLs: Set<URL>
+    /// 允许交给系统浏览器处理并携带动态查询参数的已校验前缀。
+    let allowedExternalURLPrefixes: Set<String>
 
     var id: String { manifest.id }
 }

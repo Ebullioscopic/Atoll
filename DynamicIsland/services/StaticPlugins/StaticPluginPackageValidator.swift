@@ -20,6 +20,7 @@ enum StaticPluginValidationError: LocalizedError, Equatable {
     case emptyDisplayValue(String)
     case unsafeEntrypoint
     case invalidExternalURL(String)
+    case invalidExternalURLPrefix(String)
 
     var errorDescription: String? {
         switch self {
@@ -41,6 +42,8 @@ enum StaticPluginValidationError: LocalizedError, Equatable {
             return "The plugin entry point must be a regular HTML file inside the package."
         case .invalidExternalURL(let value):
             return "External URL is not an absolute HTTP or HTTPS URL: \(value)"
+        case .invalidExternalURLPrefix(let value):
+            return "External URL prefix must be an absolute HTTP or HTTPS URL ending in ?: \(value)"
         }
     }
 }
@@ -101,11 +104,15 @@ struct StaticPluginPackageValidator {
         }
 
         let externalURLs = try Set(manifest.allowedExternalURLs.map(validateExternalURL))
+        let externalURLPrefixes = try Set(
+            manifest.allowedExternalURLPrefixes.map(validateExternalURLPrefix)
+        )
         return InstalledStaticPlugin(
             manifest: manifest,
             rootURL: rootURL,
             entrypointURL: entrypointURL,
-            allowedExternalURLs: externalURLs
+            allowedExternalURLs: externalURLs,
+            allowedExternalURLPrefixes: externalURLPrefixes
         )
     }
 
@@ -153,6 +160,22 @@ struct StaticPluginPackageValidator {
             throw StaticPluginValidationError.invalidExternalURL(value)
         }
         return url
+    }
+
+    /// 动态 URL 前缀必须在查询分隔符处结束，避免主机名或路径的文本前缀误匹配。
+    private func validateExternalURLPrefix(_ value: String) throws -> String {
+        guard value.hasSuffix("?"),
+              value == value.trimmingCharacters(in: .whitespacesAndNewlines),
+              let url = URL(string: value),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host != nil,
+              url.user == nil,
+              url.password == nil,
+              url.fragment == nil else {
+            throw StaticPluginValidationError.invalidExternalURLPrefix(value)
+        }
+        return value
     }
 
     private func isContained(_ candidateURL: URL, by rootURL: URL) -> Bool {

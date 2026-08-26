@@ -140,7 +140,8 @@ struct StaticPluginWebRepresentable: NSViewRepresentable {
             }
             let policy = StaticPluginNavigationPolicy(
                 pluginRoot: plugin.rootURL,
-                allowedExternalURLs: plugin.allowedExternalURLs
+                allowedExternalURLs: plugin.allowedExternalURLs,
+                allowedExternalURLPrefixes: plugin.allowedExternalURLPrefixes
             )
             switch policy.decision(
                 for: url,
