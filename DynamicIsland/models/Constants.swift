@@ -404,12 +404,41 @@ extension Notification.Name {
 }
 
 // Media controller types for selection in settings
+/// How the line being sung is picked out from the rest.
+enum LyricHighlightStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case sweep = "Sweep"
+    case gradient = "Gradient"
+    case solid = "Solid"
+
+    var id: String { rawValue }
+
+    var localizedName: String {
+        switch self {
+        case .sweep: return String(localized: "Sweep")
+        case .gradient: return String(localized: "Gradient")
+        case .solid: return String(localized: "Solid")
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .sweep:
+            return String(localized: "The highlight travels across the line word by word, in reading order.")
+        case .gradient:
+            return String(localized: "The current line is lit by one fixed gradient that does not move, the way lyrics were marked before the sweep.")
+        case .solid:
+            return String(localized: "The current line is lit in one flat colour, with nothing crossing it.")
+        }
+    }
+}
+
 enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializable {
     case nowPlaying = "Now Playing"
     case appleMusic = "Apple Music"
     case spotify = "Spotify"
     case youtubeMusic = "Youtube Music"
     case amazonMusic = "Amazon Music"
+    case tidal = "TIDAL"
     case cider = "Cider"
     
     var id: String { self.rawValue }
@@ -421,6 +450,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
         case .spotify: return String(localized: "Spotify")
         case .youtubeMusic: return String(localized: "Youtube Music")
         case .amazonMusic: return String(localized: "Amazon Music")
+        case .tidal: return String(localized: "TIDAL")
         case .cider: return String(localized: "Cider")
         }
     }
@@ -893,6 +923,15 @@ enum ColorExtractionMode: String, CaseIterable, Identifiable, Defaults.Serializa
     var id: Self { self }
 }
 
+enum LockScreenLiveActivityIconStyle: String, Defaults.Serializable {
+    case lock
+    case fingerprint
+    case both
+
+    var showsLock: Bool { self == .lock || self == .both }
+    var showsFingerprint: Bool { self == .fingerprint || self == .both }
+}
+
 extension Defaults.Keys {
         // MARK: General
     static let updateChannel = Key<UpdateChannel>("updateChannel", default: .stable)
@@ -1356,6 +1395,7 @@ extension Defaults.Keys {
     
     // MARK: Lock Screen Features
     static let enableLockScreenLiveActivity = Key<Bool>("enableLockScreenLiveActivity", default: true)
+    static let lockScreenLiveActivityIconStyle = Key<LockScreenLiveActivityIconStyle>("lockScreenLiveActivityIconStyle", default: .lock)
     static let enableLockSounds = Key<Bool>("enableLockSounds", default: true)
     
     // MARK: Caps Lock Indicator
@@ -1374,6 +1414,9 @@ extension Defaults.Keys {
     
     // MARK: Lyrics Feature
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
+
+    /// Whether the sung line is swept or simply lit.
+    static let lyricHighlightStyle = Key<LyricHighlightStyle>("lyricHighlightStyle", default: .sweep)
     static let lyricsPanelWidth = Key<CGFloat>("lyricsPanelWidth", default: 280)
     static let lyricsPanelOffset = Key<CGFloat>("lyricsPanelOffset", default: 0)
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)

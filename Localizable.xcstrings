@@ -107125,6 +107125,12 @@
             "value": "Полужирный текст вместо ярких цветов"
           }
         },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "粗体文本显示为亮色"
+          }
+        },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
