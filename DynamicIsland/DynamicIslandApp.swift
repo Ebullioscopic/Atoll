@@ -546,7 +546,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
         // Use a consistent height for different view types
-        if coordinator.currentView == .timer {
+        if let pluginSize = StaticPluginLayout.resolvedSize(
+            baseSize: baseSize,
+            isStaticPluginView: coordinator.currentView == .staticPlugin,
+            selectedPluginID: coordinator.selectedStaticPluginID,
+            enabledPlugins: StaticPluginManager.shared.enabledPlugins,
+            visibleScreenHeight: NSScreen.main?.visibleFrame.height,
+            fallbackMaximumHeight: baseSize.height + statsSecondRowContentHeight + statsGridSpacingHeight
+        ) {
+            baseSize = pluginSize
+        } else if coordinator.currentView == .timer {
             baseSize.height = 250 // Extra space for timer presets
         } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight

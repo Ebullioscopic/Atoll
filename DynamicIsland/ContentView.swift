@@ -193,10 +193,18 @@ struct ContentView: View {
             return CGSize(width: baseSize.width, height: terminalHeight)
         }
 
+        if let pluginSize = StaticPluginLayout.resolvedSize(
+            baseSize: baseSize,
+            isStaticPluginView: coordinator.currentView == .staticPlugin,
+            selectedPluginID: coordinator.selectedStaticPluginID,
+            enabledPlugins: staticPluginManager.enabledPlugins,
+            visibleScreenHeight: NSScreen.main?.visibleFrame.height,
+            fallbackMaximumHeight: baseSize.height + statsAdditionalRowHeight
+        ) {
+            return pluginSize
+        }
+
         if coordinator.currentView == .staticPlugin {
-            if let preferredHeight = staticPluginPreferredHeight(baseSize: baseSize) {
-                return CGSize(width: baseSize.width, height: preferredHeight)
-            }
             return baseSize
         }
 
@@ -2377,25 +2385,6 @@ struct ContentView: View {
         let count = enabledStatsGraphCount()
         if count == 0 { return 0 }
         return count <= 3 ? 1 : 2
-    }
-
-    /// 返回当前选中且仍启用的静态插件。
-    private func currentStaticPlugin() -> InstalledStaticPlugin? {
-        guard let selectedID = coordinator.selectedStaticPluginID else { return nil }
-        return staticPluginManager.enabledPlugins.first { $0.id == selectedID }
-    }
-
-    /// 尊重插件请求高度，同时避免刘海内容超出当前屏幕可用范围。
-    private func staticPluginPreferredHeight(baseSize: CGSize) -> CGFloat? {
-        guard let preferredHeight = currentStaticPlugin()?.manifest.tab.preferredHeight else {
-            return nil
-        }
-        return StaticPluginLayout.resolvedHeight(
-            preferredHeight: CGFloat(preferredHeight),
-            baseHeight: baseSize.height,
-            visibleScreenHeight: NSScreen.main?.visibleFrame.height,
-            fallbackMaximumHeight: baseSize.height + statsAdditionalRowHeight
-        )
     }
 
     private func currentExtensionTabPayload() -> ExtensionNotchExperiencePayload? {

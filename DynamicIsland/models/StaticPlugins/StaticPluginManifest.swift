@@ -63,6 +63,32 @@ struct InstalledStaticPlugin: Identifiable, Equatable {
 enum StaticPluginLayout {
     static let maximumVisibleScreenFraction: CGFloat = 0.7
 
+    /// 仅在静态插件标签选中时返回对应插件的窗口内容尺寸。
+    static func resolvedSize(
+        baseSize: CGSize,
+        isStaticPluginView: Bool,
+        selectedPluginID: String?,
+        enabledPlugins: [InstalledStaticPlugin],
+        visibleScreenHeight: CGFloat?,
+        fallbackMaximumHeight: CGFloat
+    ) -> CGSize? {
+        guard isStaticPluginView,
+              let selectedPluginID,
+              let preferredHeight = enabledPlugins.first(where: { $0.id == selectedPluginID })?
+                .manifest.tab.preferredHeight else {
+            return nil
+        }
+        return CGSize(
+            width: baseSize.width,
+            height: resolvedHeight(
+                preferredHeight: CGFloat(preferredHeight),
+                baseHeight: baseSize.height,
+                visibleScreenHeight: visibleScreenHeight,
+                fallbackMaximumHeight: fallbackMaximumHeight
+            )
+        )
+    }
+
     /// 将插件请求高度限制在默认刘海高度和当前屏幕安全高度之间。
     static func resolvedHeight(
         preferredHeight: CGFloat,

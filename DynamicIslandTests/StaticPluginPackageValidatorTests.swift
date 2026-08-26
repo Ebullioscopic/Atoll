@@ -114,6 +114,37 @@ final class StaticPluginPackageValidatorTests: XCTestCase {
 }
 
 final class StaticPluginLayoutTests: XCTestCase {
+    func testResolvesSelectedStaticPluginSizeForWindowSizing() throws {
+        let plugin = try makePlugin(id: "com.example.tools", preferredHeight: 460)
+
+        XCTAssertEqual(
+            StaticPluginLayout.resolvedSize(
+                baseSize: CGSize(width: 640, height: 200),
+                isStaticPluginView: true,
+                selectedPluginID: plugin.id,
+                enabledPlugins: [plugin],
+                visibleScreenHeight: 900,
+                fallbackMaximumHeight: 332
+            ),
+            CGSize(width: 640, height: 460)
+        )
+    }
+
+    func testDoesNotResolveSizeOutsideStaticPluginView() throws {
+        let plugin = try makePlugin(id: "com.example.tools", preferredHeight: 460)
+
+        XCTAssertNil(
+            StaticPluginLayout.resolvedSize(
+                baseSize: CGSize(width: 640, height: 200),
+                isStaticPluginView: false,
+                selectedPluginID: plugin.id,
+                enabledPlugins: [plugin],
+                visibleScreenHeight: 900,
+                fallbackMaximumHeight: 332
+            )
+        )
+    }
+
     func testUsesRequestedHeightWhenItFitsScreen() {
         XCTAssertEqual(
             StaticPluginLayout.resolvedHeight(
@@ -159,6 +190,34 @@ final class StaticPluginLayoutTests: XCTestCase {
                 fallbackMaximumHeight: 332
             ),
             332
+        )
+    }
+
+    private func makePlugin(id: String, preferredHeight: Double) throws -> InstalledStaticPlugin {
+        let manifestData = Data(
+            """
+            {
+              "schemaVersion": 1,
+              "id": "\(id)",
+              "name": "Tools",
+              "version": "1.0.0",
+              "entrypoint": "index.html",
+              "tab": {
+                "title": "Tools",
+                "icon": "wrench.and.screwdriver",
+                "preferredHeight": \(preferredHeight)
+              },
+              "allowedExternalURLs": []
+            }
+            """.utf8
+        )
+        let manifest = try JSONDecoder().decode(StaticPluginManifest.self, from: manifestData)
+        let rootURL = URL(fileURLWithPath: "/tmp/\(id).atollplugin", isDirectory: true)
+        return InstalledStaticPlugin(
+            manifest: manifest,
+            rootURL: rootURL,
+            entrypointURL: rootURL.appendingPathComponent("index.html"),
+            allowedExternalURLs: []
         )
     }
 }
