@@ -291,6 +291,31 @@ class DownloadManager {
         }
     }
     
+#if DEBUG
+    /// A manager that watches nothing, for tests.
+    ///
+    /// The scan-to-scan bookkeeping is the part worth testing and the part
+    /// hardest to reach: it is driven by a directory watcher on the real
+    /// Downloads folder, so exercising it any other way means creating files
+    /// on the machine running the tests and racing the file system for them.
+    /// This builds the same object with no watcher attached, so scans can be
+    /// handed to it directly.
+    init(monitoringDisabledForTesting: Bool) {
+        precondition(monitoringDisabledForTesting)
+    }
+
+    /// One scan, in the shape the directory watcher delivers them.
+    ///
+    /// - Parameters:
+    ///   - inProgressFiles: the partial-download files in the folder now.
+    ///   - stamps: modification dates of the **non-empty** files in the folder
+    ///     now. An empty file has no entry, which is how Firefox's placeholder
+    ///     destination is told apart from one that has been written.
+    func processScanForTesting(_ inProgressFiles: Set<String>, stamps: [String: Date] = [:]) {
+        processDownloadFiles(inProgressFiles, stamps: stamps)
+    }
+#endif
+
     private func requestDownloadsPermissionIfNeeded() {
         guard let downloadsDirectory else { return }
         _ = try? FileManager.default.contentsOfDirectory(at: downloadsDirectory, includingPropertiesForKeys: nil)

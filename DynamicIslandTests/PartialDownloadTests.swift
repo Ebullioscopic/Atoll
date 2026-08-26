@@ -188,3 +188,110 @@ final class PartialDownloadTests: XCTestCase {
         )
     }
 }
+
+/// The scan-to-scan path, driven through `DownloadManager` itself rather than
+/// through `PartialDownload` alone.
+///
+/// The rules `PartialDownload` states are only half the feature: the other
+/// half is which files each scan hands it, and that is where the awkward
+/// cases live -- a download already running when Atoll starts, one that lands
+/// while another is still writing, and a destination that was on disk before
+/// anything was downloaded onto it.
+@MainActor
+final class DownloadScanSequenceTests: XCTestCase {
+    private let started = Date(timeIntervalSince1970: 1_000_000)
+    private var written: Date { started.addingTimeInterval(30) }
+
+    private func makeManager() -> DownloadManager {
+        DownloadManager(monitoringDisabledForTesting: true)
+    }
+
+    /// Firefox: an empty destination appears first and the bytes go to the
+    /// `.part` file beside it, so the destination existing proves nothing and
+    /// only its being written does. An empty file has no stamp entry.
+    func testFirefoxPlaceholderThenCompletionReportsCompleted() {
+        let manager = makeManager()
+        manager.processScanForTesting([])                       // first scan: nothing running
+        manager.processScanForTesting(["a.zip.part"])           // placeholder + part file
+        XCTAssertTrue(manager.isDownloading)
+        XCTAssertFalse(manager.isDownloadCompleted)
+
+        // The part file is renamed onto a destination that now holds data.
+        manager.processScanForTesting([], stamps: ["a.zip": written])
+        XCTAssertTrue(manager.isDownloadCompleted)
+    }
+
+    /// A download told to replace a file that is already there starts with a
+    /// destination holding data. Cancelling it must not read as a completion.
+    func testCancellationOverPreExistingDestinationIsNotCompletion() {
+        let manager = makeManager()
+        manager.processScanForTesting([], stamps: ["a.zip": started])
+        manager.processScanForTesting(["a.zip.crdownload"], stamps: ["a.zip": started])
+        XCTAssertTrue(manager.isDownloading)
+
+        // Cancelled: the temporary file is gone and the destination is exactly
+        // as old as it was when the download started.
+        manager.processScanForTesting([], stamps: ["a.zip": started])
+        XCTAssertFalse(manager.isDownloadCompleted)
+        XCTAssertFalse(manager.isDownloading)
+    }
+
+    /// A download already running when Atoll starts belongs to whoever started
+    /// it, and does not get an activity of its own.
+    func testDownloadRunningAtLaunchIsIgnored() {
+        let manager = makeManager()
+        manager.processScanForTesting(["old.zip.crdownload"])   // first scan
+        XCTAssertFalse(manager.isDownloading)
+
+        manager.processScanForTesting(["old.zip.crdownload"])   // still writing
+        XCTAssertFalse(manager.isDownloading)
+    }
+
+    /// ...but once that file is gone the name is free again, so a later
+    /// download reusing it is a new download rather than one ignored forever.
+    func testNameIsFreeAgainAfterTheIgnoredFileGoes() {
+        let manager = makeManager()
+        manager.processScanForTesting(["old.zip.crdownload"])
+        manager.processScanForTesting([])                       // the old one ends
+        XCTAssertFalse(manager.isDownloading)
+
+        manager.processScanForTesting(["old.zip.crdownload"])   // a new download, same name
+        XCTAssertTrue(manager.isDownloading)
+    }
+
+    /// One download landing while another is still writing cannot be judged at
+    /// the scan that sees it go, because there is still active work. It has to
+    /// be remembered until the writing stops, or a run whose last download was
+    /// cancelled closes the activity with nothing shown for the ones that
+    /// finished.
+    func testCompletionIsRememberedWhileAnotherDownloadIsStillWriting() {
+        let manager = makeManager()
+        manager.processScanForTesting([])
+        manager.processScanForTesting(["a.zip.crdownload", "b.zip.crdownload"])
+        XCTAssertTrue(manager.isDownloading)
+
+        // a finishes; b is still going, so nothing is decided yet.
+        manager.processScanForTesting(["b.zip.crdownload"], stamps: ["a.zip": written])
+        XCTAssertFalse(manager.isDownloadCompleted)
+
+        // b is cancelled. a still counts.
+        manager.processScanForTesting([], stamps: ["a.zip": written])
+        XCTAssertTrue(manager.isDownloadCompleted)
+    }
+
+    /// The completion animation owns the next couple of seconds, and the
+    /// rename that finishes a download is itself a directory event -- so a
+    /// scan arrives mid-animation, finds nothing left to have completed, and
+    /// must not close the view out from under it.
+    func testFollowUpScanDoesNotInterruptTheCompletionAnimation() {
+        let manager = makeManager()
+        manager.processScanForTesting([])
+        manager.processScanForTesting(["a.zip.crdownload"])
+        manager.processScanForTesting([], stamps: ["a.zip": written])
+        XCTAssertTrue(manager.isDownloadCompleted)
+
+        manager.processScanForTesting([], stamps: ["a.zip": written])
+        XCTAssertTrue(manager.isDownloadCompleted, "the animation was cut short")
+        XCTAssertTrue(manager.isDownloading, "the activity was closed mid-animation")
+    }
+}
