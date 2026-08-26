@@ -23,11 +23,11 @@ struct StaticPluginNavigationPolicy {
     /// 用户点击后可交给系统浏览器打开的精确 URL。
     let allowedExternalURLs: Set<URL>
 
-    /// 只根据已验证的插件边界决定导航去向，不在这里产生系统副作用。
+    /// 只根据已验证的插件边界决定导航去向；`mainFrame == nil` 表示新窗口目标，仍需用户点击才允许外部打开。
     func decision(
         for url: URL,
         userActivated: Bool,
-        mainFrame: Bool
+        mainFrame: Bool?
     ) -> StaticPluginNavigationDecision {
         if url.isFileURL {
             let rootPath = pluginRoot.standardizedFileURL.resolvingSymlinksInPath().path
@@ -38,7 +38,7 @@ struct StaticPluginNavigationPolicy {
         }
 
         guard userActivated,
-              mainFrame,
+              mainFrame != false,
               let scheme = url.scheme?.lowercased(),
               ["http", "https"].contains(scheme),
               allowedExternalURLs.contains(url) else {

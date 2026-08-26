@@ -42,18 +42,25 @@ final class StaticPluginPackageValidatorTests: XCTestCase {
     }
 
     func testUnsupportedSchemaIsRejected() throws {
-        XCTAssertThrowsError(try validator.validate(packageURL: makePackage(schemaVersion: 2)))
+        assertThrows(.unsupportedSchema(2)) {
+            _ = try validator.validate(packageURL: makePackage(schemaVersion: 2))
+        }
     }
 
     func testUnsafeIdentifierIsRejected() throws {
-        XCTAssertThrowsError(try validator.validate(packageURL: makePackage(id: "../escape")))
-        XCTAssertThrowsError(try validator.validate(packageURL: makePackage(id: "工具.example")))
+        for id in ["../escape", "工具.example"] {
+            assertThrows(.invalidIdentifier) {
+                _ = try validator.validate(packageURL: makePackage(id: id))
+            }
+        }
     }
 
     func testTraversalEntrypointIsRejected() throws {
         try Data("outside".utf8).write(to: rootURL.appendingPathComponent("outside.html"))
 
-        XCTAssertThrowsError(try validator.validate(packageURL: makePackage(entrypoint: "../outside.html")))
+        assertThrows(.unsafeEntrypoint) {
+            _ = try validator.validate(packageURL: makePackage(entrypoint: "../outside.html"))
+        }
     }
 
     func testPackageContainingSymlinkIsRejected() throws {
@@ -65,17 +72,39 @@ final class StaticPluginPackageValidatorTests: XCTestCase {
             withDestinationURL: outsideURL
         )
 
-        XCTAssertThrowsError(try validator.validate(packageURL: packageURL))
+        assertThrows(.symbolicLink("escaped.html")) {
+            _ = try validator.validate(packageURL: packageURL)
+        }
     }
 
     func testNonHTTPExternalURLIsRejected() throws {
-        XCTAssertThrowsError(
-            try validator.validate(packageURL: makePackage(allowedURLs: ["file:///tmp/private"]))
-        )
+        assertThrows(.invalidExternalURL("file:///tmp/private")) {
+            _ = try validator.validate(
+                packageURL: makePackage(allowedURLs: ["file:///tmp/private"])
+            )
+        }
     }
 
     func testEmptyDisplayValueIsRejected() throws {
-        XCTAssertThrowsError(try validator.validate(packageURL: makePackage(name: "  ")))
+        assertThrows(.emptyDisplayValue("name")) {
+            _ = try validator.validate(packageURL: makePackage(name: "  "))
+        }
+    }
+
+    private func assertThrows(
+        _ expectedError: StaticPluginValidationError,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        operation: () throws -> Void
+    ) {
+        XCTAssertThrowsError(try operation(), file: file, line: line) { error in
+            XCTAssertEqual(
+                error as? StaticPluginValidationError,
+                expectedError,
+                file: file,
+                line: line
+            )
+        }
     }
 
     @discardableResult

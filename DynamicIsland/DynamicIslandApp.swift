@@ -809,6 +809,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }.store(in: &cancellables)
 
+        // Replace 可保持插件 ID 不变；扫描修订号保证已打开窗口仍会刷新内容和高度。
+        StaticPluginManager.shared.$reloadRevision
+            .dropFirst()
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeIfNeeded()
+                }
+            }
+            .store(in: &cancellables)
+
         coordinator.$notesLayoutState
             .removeDuplicates()
             .sink { [weak self] _ in

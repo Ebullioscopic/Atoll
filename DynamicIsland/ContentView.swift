@@ -1208,6 +1208,7 @@ struct ContentView: View {
                             case .staticPlugin:
                                 if let plugin = currentStaticPlugin() {
                                     StaticPluginWebView(plugin: plugin)
+                                        .id("\(plugin.id):\(staticPluginManager.reloadRevision)")
                                 } else {
                                     NotchHomeView(albumArtNamespace: albumArtNamespace)
                                 }

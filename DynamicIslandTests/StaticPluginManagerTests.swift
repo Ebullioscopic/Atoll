@@ -18,6 +18,15 @@ final class StaticPluginManagerTests: XCTestCase {
         case failed
     }
 
+    private final class MutatingCopyFileManager: FileManager {
+        var mutateCopiedPackage: ((URL) throws -> Void)?
+
+        override func copyItem(at srcURL: URL, to dstURL: URL) throws {
+            try super.copyItem(at: srcURL, to: dstURL)
+            try mutateCopiedPackage?(dstURL)
+        }
+    }
+
     private var rootURL: URL!
     private var installationRootURL: URL!
     private var defaults: UserDefaults!
@@ -78,17 +87,55 @@ final class StaticPluginManagerTests: XCTestCase {
         XCTAssertTrue(reloadedManager.enabledPlugins.isEmpty)
     }
 
-    func testInvalidReplacementKeepsOldVersion() throws {
-        let manager = makeManager()
+    func testInvalidStagedReplacementKeepsOldVersion() throws {
+        let fileManager = MutatingCopyFileManager()
+        let manager = makeManager(fileManager: fileManager)
         try manager.install(from: makePackage(version: "1.0.0"), replacingExisting: false)
 
-        XCTAssertThrowsError(
-            try manager.install(
-                from: makePackage(version: "2.0.0", entrypoint: "missing.html", writesEntrypoint: false),
-                replacingExisting: true
+        fileManager.mutateCopiedPackage = { stagedPackageURL in
+            try FileManager.default.removeItem(
+                at: stagedPackageURL.appendingPathComponent("index.html")
             )
-        )
+        }
 
+        XCTAssertThrowsError(
+            try manager.install(from: makePackage(version: "2.0.0"), replacingExisting: true)
+        ) { error in
+            XCTAssertEqual(error as? StaticPluginValidationError, .unsafeEntrypoint)
+        }
+
+        fileManager.mutateCopiedPackage = nil
+        manager.reload()
+        XCTAssertEqual(manager.plugins.first?.manifest.version, "1.0.0")
+    }
+
+    func testStagedPluginIDChangeKeepsOldVersion() throws {
+        let fileManager = MutatingCopyFileManager()
+        let manager = makeManager(fileManager: fileManager)
+        try manager.install(from: makePackage(version: "1.0.0"), replacingExisting: false)
+
+        fileManager.mutateCopiedPackage = { stagedPackageURL in
+            let manifestURL = stagedPackageURL.appendingPathComponent("manifest.json")
+            var manifest = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any]
+            )
+            manifest["id"] = "com.example.changed"
+            try JSONSerialization.data(withJSONObject: manifest).write(to: manifestURL)
+        }
+
+        XCTAssertThrowsError(
+            try manager.install(from: makePackage(version: "2.0.0"), replacingExisting: true)
+        ) { error in
+            XCTAssertEqual(
+                error as? StaticPluginManagerError,
+                .pluginChangedDuringInstall(
+                    expectedID: "com.example.tools",
+                    actualID: "com.example.changed"
+                )
+            )
+        }
+
+        fileManager.mutateCopiedPackage = nil
         manager.reload()
         XCTAssertEqual(manager.plugins.first?.manifest.version, "1.0.0")
     }
@@ -130,12 +177,36 @@ final class StaticPluginManagerTests: XCTestCase {
         XCTAssertEqual(manager.discoveryErrors.count, 1)
     }
 
+    func testReloadRejectsPackageWhoseDirectoryDoesNotMatchPluginID() throws {
+        let manager = makeManager()
+        let mismatchedURL = installationRootURL
+            .appendingPathComponent("wrong-name.atollplugin", isDirectory: true)
+        try FileManager.default.copyItem(at: makePackage(), to: mismatchedURL)
+
+        manager.reload()
+
+        XCTAssertTrue(manager.plugins.isEmpty)
+        XCTAssertEqual(manager.discoveryErrors.count, 1)
+    }
+
+    func testReloadRevisionChangesForSameIDReplacement() throws {
+        let manager = makeManager()
+        try manager.install(from: makePackage(), replacingExisting: false)
+        let installedRevision = manager.reloadRevision
+
+        try manager.install(from: makePackage(), replacingExisting: true)
+
+        XCTAssertGreaterThan(manager.reloadRevision, installedRevision)
+    }
+
     private func makeManager(
+        fileManager: FileManager = .default,
         replaceItem: StaticPluginManager.ReplaceItem? = nil
     ) -> StaticPluginManager {
         StaticPluginManager(
             installationRoot: installationRootURL,
             userDefaults: defaults,
+            fileManager: fileManager,
             replaceItem: replaceItem
         )
     }

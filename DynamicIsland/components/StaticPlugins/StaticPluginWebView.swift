@@ -145,7 +145,7 @@ private struct StaticPluginWebRepresentable: NSViewRepresentable {
             switch policy.decision(
                 for: url,
                 userActivated: navigationAction.navigationType == .linkActivated,
-                mainFrame: navigationAction.targetFrame?.isMainFrame == true
+                mainFrame: navigationAction.targetFrame?.isMainFrame
             ) {
             case .allow:
                 decisionHandler(.allow)

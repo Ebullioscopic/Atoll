@@ -14,6 +14,8 @@ import Foundation
 enum StaticPluginManagerError: LocalizedError, Equatable {
     case replacementConfirmationRequired(String)
     case pluginNotFound(String)
+    case installedPackageNameMismatch(expected: String, actual: String)
+    case pluginChangedDuringInstall(expectedID: String, actualID: String)
 
     var errorDescription: String? {
         switch self {
@@ -21,6 +23,10 @@ enum StaticPluginManagerError: LocalizedError, Equatable {
             return "A plugin with ID \(pluginID) is already installed. Confirm Replace to continue."
         case .pluginNotFound(let pluginID):
             return "The static plugin \(pluginID) is not installed."
+        case .installedPackageNameMismatch(let expected, let actual):
+            return "Installed plugin package \(actual) must be named \(expected)."
+        case .pluginChangedDuringInstall(let expectedID, let actualID):
+            return "Plugin ID changed from \(expectedID) to \(actualID) while it was being installed."
         }
     }
 }
@@ -37,6 +43,8 @@ final class StaticPluginManager: ObservableObject {
     @Published private(set) var disabledPluginIDs: Set<String>
     /// 扫描时发现但无法加载的插件错误。
     @Published private(set) var discoveryErrors: [String] = []
+    /// 每次重新扫描后递增，使同 ID Replace 也能触发界面和窗口刷新。
+    @Published private(set) var reloadRevision: UInt = 0
 
     private let installationRoot: URL
     private let userDefaults: UserDefaults
@@ -77,6 +85,7 @@ final class StaticPluginManager: ObservableObject {
 
     /// 重新扫描安装目录；单个坏包不会阻止其他插件加载。
     func reload() {
+        defer { reloadRevision &+= 1 }
         do {
             try fileManager.createDirectory(at: installationRoot, withIntermediateDirectories: true)
             let packageURLs = try fileManager.contentsOfDirectory(
@@ -90,7 +99,15 @@ final class StaticPluginManager: ObservableObject {
                 .filter({ $0.pathExtension.lowercased() == "atollplugin" })
                 .sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }) {
                 do {
-                    loadedPlugins.append(try validator.validate(packageURL: packageURL))
+                    let plugin = try validator.validate(packageURL: packageURL)
+                    let expectedName = installedPackageName(for: plugin.id)
+                    guard packageURL.lastPathComponent == expectedName else {
+                        throw StaticPluginManagerError.installedPackageNameMismatch(
+                            expected: expectedName,
+                            actual: packageURL.lastPathComponent
+                        )
+                    }
+                    loadedPlugins.append(plugin)
                 } catch {
                     errors.append("\(packageURL.lastPathComponent): \(error.localizedDescription)")
                 }
@@ -124,7 +141,13 @@ final class StaticPluginManager: ObservableObject {
         defer { try? fileManager.removeItem(at: stagingParentURL) }
 
         try fileManager.copyItem(at: sourceURL, to: stagedPackageURL)
-        _ = try validator.validate(packageURL: stagedPackageURL)
+        let stagedPlugin = try validator.validate(packageURL: stagedPackageURL)
+        guard stagedPlugin.id == sourcePlugin.id else {
+            throw StaticPluginManagerError.pluginChangedDuringInstall(
+                expectedID: sourcePlugin.id,
+                actualID: stagedPlugin.id
+            )
+        }
 
         if destinationExists {
             try replaceItem(destinationURL, stagedPackageURL)
@@ -166,7 +189,11 @@ final class StaticPluginManager: ObservableObject {
     }
 
     private func installedURL(for pluginID: String) -> URL {
-        installationRoot.appendingPathComponent("\(pluginID).atollplugin", isDirectory: true)
+        installationRoot.appendingPathComponent(installedPackageName(for: pluginID), isDirectory: true)
+    }
+
+    private func installedPackageName(for pluginID: String) -> String {
+        "\(pluginID).atollplugin"
     }
 
     private func persistDisabledPluginIDs() {

@@ -26,6 +26,19 @@ class StaticPluginWindowSizingTests(unittest.TestCase):
             "ContentView lost the selected-plugin lookup used by its render switch",
         )
 
+    def test_plugin_reload_recreates_web_view_and_resizes_window(self):
+        content_source = (REPOSITORY_ROOT / "DynamicIsland/ContentView.swift").read_text()
+        self.assertTrue(
+            "staticPluginManager.reloadRevision" in content_source,
+            "ContentView does not key plugin rendering by the reload revision",
+        )
+
+        app_source = (REPOSITORY_ROOT / "DynamicIsland/DynamicIslandApp.swift").read_text()
+        self.assertTrue(
+            "StaticPluginManager.shared.$reloadRevision" in app_source,
+            "AppDelegate does not observe plugin reloads for window resizing",
+        )
+
     def test_runtime_sizing_uses_each_window_screen(self):
         for relative_path in (
             "DynamicIsland/ContentView.swift",

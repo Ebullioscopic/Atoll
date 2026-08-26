@@ -47,6 +47,13 @@ final class StaticPluginNavigationPolicyTests: XCTestCase {
         )
     }
 
+    func testAllowlistedUserClickWithoutTargetFrameOpensExternally() {
+        XCTAssertEqual(
+            makePolicy().decision(for: allowedURL, userActivated: true, mainFrame: nil),
+            .openExternally(allowedURL)
+        )
+    }
+
     func testScriptedAndPopupNavigationAreCancelled() {
         let policy = makePolicy()
 
