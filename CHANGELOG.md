@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Favorite the playing song from the notch**: the heart control now works with Apple Music, YouTube Music and TIDAL as well as Spotify, and under the Now Playing source it follows whichever of them is actually playing. Apple Music goes through Music.app's own scripting interface, YouTube Music through the desktop app's API server, and TIDAL through its accessibility tree, so none of them needs a subscription or developer credentials. Sources that cannot favourite show the control disabled rather than hiding it. (#599)
+- **Favorite the playing song from the notch**: the heart control now works with Apple Music and YouTube Music as well as Spotify, and under the Now Playing source it follows whichever of them is actually playing. Apple Music goes through Music.app's own scripting interface and YouTube Music through the desktop app's API server, so neither needs a subscription or developer credentials. Sources that cannot favourite show the control disabled rather than hiding it. (#599)
 - **TIDAL shuffle and repeat actually work**: TIDAL registers no Media Remote command for either, so both buttons moved in the notch while the app carried on playing as before. They now go through TIDAL's Playback menu, which both reports the current state and accepts a change -- and because each repeat item sets its own mode, repeat no longer has to cycle toward the one you asked for.
 - **Fingerprint lock screen activity**: choose the lock, an animated fingerprint scan, or both from Lock Screen settings. The fingerprint uses an attributed Lottie animation and completes its green scan while the Mac unlocks. (#774)
 

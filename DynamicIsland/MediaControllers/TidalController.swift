@@ -34,22 +34,10 @@ final class TidalController: FilteredNowPlayingController {
         )
     }
 
-    // MARK: - Favouriting
-
-    @MainActor
-    override var canEverFavorite: Bool { true }
-
-    @MainActor
-    override var supportsFavoriting: Bool { TidalAccessibility.isAvailable }
-
-    override func isCurrentTrackFavorited() async -> Bool? {
-        await TidalAccessibility.isCurrentTrackFavorited()
-    }
-
-    @discardableResult
-    override func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
-        await TidalAccessibility.setCurrentTrackFavorited(favorited)
-    }
+    // Favouriting is deliberately not claimed. TIDAL's heart can be *read*
+    // through accessibility but not written: see TidalAccessibility for what
+    // was tried. The control therefore stays disabled rather than accepting a
+    // click it cannot honour.
 
     // MARK: - Shuffle and repeat
 
@@ -120,79 +108,26 @@ enum TidalAccessibility {
         AXIsProcessTrusted() && runningApp != nil
     }
 
-    // MARK: - Favouriting
+    // MARK: - Favouriting, and why it is not here
 
-    static func isCurrentTrackFavorited() async -> Bool? {
-        guard isAvailable else { return nil }
-        return await onAccessibilityQueue { favoriteButton().flatMap(favoriteState(of:)) }
-    }
-
-    @discardableResult
-    static func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
-        guard isAvailable else { return false }
-
-        return await onAccessibilityQueue {
-            // The heart is a toggle, and a press made without knowing where it
-            // stands is as likely to undo the request as to carry it out.
-            guard let button = favoriteButton(),
-                  let current = favoriteState(of: button) else { return false }
-            guard current != favorited else { return true }
-            guard press(button) else { return false }
-
-            // Looked up again on each attempt rather than re-read from the
-            // element we pressed: TIDAL rebuilds the heart when its state
-            // changes, so the one we were holding stops answering exactly when
-            // the answer arrives.
-            return settles { favoriteButton().flatMap(favoriteState(of:)) == favorited }
-        }
-    }
-
-    /// The two labels TIDAL puts on the heart. They are localised, so a TIDAL
-    /// running in another language reports its state as unknown rather than
-    /// guessed: the control stays dimmed instead of lying.
-    private static let notFavoritedLabel = "Add to My Collection"
-    private static let favoritedLabel = "Remove from My Collection"
-
-    private static func favoriteState(of button: AXUIElement) -> Bool? {
-        switch attribute(button, kAXDescriptionAttribute) as? String {
-        case notFavoritedLabel: return false
-        case favoritedLabel: return true
-        default: return nil
-        }
-    }
-
-    /// Kept between calls: the tree runs to a few thousand nodes, and the
-    /// element only needs finding again once it stops answering.
-    private static var cachedFavoriteButton: AXUIElement?
-
-    private static func favoriteButton() -> AXUIElement? {
-        if let cached = cachedFavoriteButton,
-           attribute(cached, kAXDescriptionAttribute) != nil {
-            return cached
-        }
-        cachedFavoriteButton = nil
-
-        guard let root = applicationElement() else { return nil }
-        var budget = searchBudget
-        guard let footer = firstDescendant(of: root, budget: &budget, where: {
-            attribute($0, "AXDOMIdentifier") as? String == "footerPlayer"
-        }) else { return nil }
-
-        budget = searchBudget
-        let button = firstDescendant(of: footer, budget: &budget) { element in
-            guard attribute(element, kAXRoleAttribute) as? String == kAXCheckBoxRole else {
-                return false
-            }
-            let classes = attribute(element, "AXDOMClassList") as? [String] ?? []
-            // Anchored on the class rather than the label so finding it does
-            // not depend on the app's language. The hash on the end changes
-            // between builds; the name in front of it is TIDAL's own.
-            return classes.contains { $0.hasPrefix("_favoriteButton_") }
-        }
-        if let button { AXUIElementSetMessagingTimeout(button, messagingTimeout) }
-        cachedFavoriteButton = button
-        return button
-    }
+    // The heart in TIDAL's player bar can be read: it is an AXCheckBox under
+    // #footerPlayer whose label reads "Add to My Collection" or "Remove from
+    // My Collection" depending on the track. Writing it is another matter, and
+    // every way in was tried against a running TIDAL 2.43.2:
+    //
+    //   AXPress                      reports success, changes nothing
+    //   setting AXValue              reports settable and succeeds, changes nothing
+    //   AXShowMenu                   opens an unrelated menu
+    //   the menu bar                 has no favourite item to press
+    //   a real click via postToPid   changes nothing
+    //
+    // Shuffle and repeat below work because they are native menu items. The
+    // heart is a web component that answers only a genuine user event in a
+    // focused window, which is not something a control in the notch can be.
+    //
+    // Reading alone is no use -- a heart that shows the truth and refuses to
+    // change it is worse than one that is plainly disabled -- so TidalController
+    // does not claim the capability at all.
 
     // MARK: - Shuffle
 
@@ -290,7 +225,6 @@ enum TidalAccessibility {
     // MARK: - Plumbing
 
     private static let messagingTimeout: Float = 1
-    private static let searchBudget = 12_000
     // Wide enough for a network round trip: TIDAL does not move these
     // controls until its own server agrees, which is far slower than the press.
     private static let settleAttempts = 20
@@ -336,26 +270,6 @@ enum TidalAccessibility {
             return nil
         }
         return value
-    }
-
-    private static func firstDescendant(
-        of element: AXUIElement,
-        budget: inout Int,
-        where matches: (AXUIElement) -> Bool
-    ) -> AXUIElement? {
-        guard budget > 0 else { return nil }
-        budget -= 1
-
-        if matches(element) { return element }
-        guard let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] else {
-            return nil
-        }
-        for child in children {
-            if let found = firstDescendant(of: child, budget: &budget, where: matches) {
-                return found
-            }
-        }
-        return nil
     }
 
     private static func onAccessibilityQueue<T>(_ work: @escaping () -> T) async -> T {
