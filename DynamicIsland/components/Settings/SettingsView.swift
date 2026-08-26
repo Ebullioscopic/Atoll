@@ -5634,7 +5634,10 @@ struct LockScreenSettings: View {
                         value: musicVariantBinding,
                         currentValue: lockScreenMusicLiquidGlassVariant.rawValue,
                         isEnabled: enableLockScreenMediaWidget,
-                        highlight: highlightID("Music panel variant")
+                        highlight: highlightID("Music panel variant"),
+                        preview: AnyView(
+                            LockScreenGlassVariantPreviewCell(variant: $lockScreenMusicLiquidGlassVariant)
+                        )
                     )
                 } else if lockScreenGlassStyle == .frosted {
                     Defaults.Toggle(key: .lockScreenPanelUsesBlur) {

@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Lyrics on the side**: Added ability to show lyrics of the current song when calendar is disabled (#741)
 
 ### Changed
-- **Lock screen glass has one home**: the Lock Screen Glass section is now only on the Lock Screen tab. Appearance carried a second copy of the same material and glass-mode pickers, with its own variant sliders whose caption admitted they mirrored the other tab — two places to change one setting, and neither obviously the real one.
+- **Lock screen glass has one home**: the Lock Screen Glass section is now only on the Lock Screen tab. Appearance carried a second copy of the same material and glass-mode pickers, with its own variant sliders whose caption admitted they mirrored the other tab — two places to change one setting, and neither obviously the real one. The live glass preview that only existed on the Appearance copy moved over with it, so nothing is lost in the move.
 
 - Lock screen live activity timings now follow the selected icons: the fingerprint remains visible through its scan, while the open lock gets its own brief confirmation beat before the island contracts. (#774)
 
