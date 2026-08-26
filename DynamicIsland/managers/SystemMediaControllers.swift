@@ -109,7 +109,14 @@ final class SystemVolumeController {
     /// than "silent" when the truth is "unknown".
     private struct VolumeMemory {
         var byDevice: [AudioDeviceID: Float] = [:]
-        var mostRecent: Float = 0
+        /// Absent until some device has answered once.
+        ///
+        /// Starting this at zero gave the same protection everywhere except
+        /// the one place it was needed most: before the first successful
+        /// read there was nothing to hold, so an unreadable device at launch
+        /// published 0% -- silence the user never asked for, and
+        /// indistinguishable from having turned it down themselves.
+        var mostRecent: Float?
     }
 
     private let volumeMemory = OSAllocatedUnfairLock(initialState: VolumeMemory())
@@ -373,7 +380,10 @@ final class SystemVolumeController {
     }
 
     private func notifyCurrentState() {
-        let volume = getVolume()
+        // Nothing has ever been read: say nothing rather than announce a
+        // level. There is no volume to report yet, and every value that could
+        // stand in for "unknown" is a real volume to whoever receives it.
+        guard let volume = knownVolume() else { return }
         let muted = getMuteState()
         DispatchQueue.main.async {
             self.onVolumeChange?(volume, muted)
@@ -382,6 +392,14 @@ final class SystemVolumeController {
     }
 
     private func getVolume() -> Float {
+        knownVolume() ?? 0
+    }
+
+    /// The current level, or nil when no device has ever answered.
+    ///
+    /// Callers that must produce a number fall back to zero; callers that are
+    /// telling somebody else what the volume is should say nothing instead.
+    private func knownVolume() -> Float? {
         // One snapshot for the whole read. Re-reading `currentDeviceID` in each
         // helper meant a route change part-way through could read device B and
         // file the answer under device A -- the precise mix-up the per-device
