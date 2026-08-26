@@ -782,6 +782,11 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .media, title: "Skip buttons", keywords: ["skip", "controls", "±10"], highlightID: SettingsTab.media.highlightID(for: "Skip buttons")),
             SettingsSearchEntry(tab: .media, title: "Sneak Peek Style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak Peek Style")),
             SettingsSearchEntry(tab: .media, title: "Show lyrics", keywords: ["lyrics", "song text", "side panel", "calendar", "inline"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
+            // Targets the lyrics toggle rather than the Highlight picker: the picker
+            // only exists while lyrics are on, so a search result pointing at it
+            // scrolls to nothing for anyone who has not turned them on yet -- which
+            // is everyone, by default.
+            SettingsSearchEntry(tab: .media, title: "Lyric highlight", keywords: ["lyrics", "highlight", "sweep", "gradient", "solid", "karaoke", "animation"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
             SettingsSearchEntry(tab: .media, title: "Side lyrics width", keywords: ["lyrics", "width", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics width")),
             SettingsSearchEntry(tab: .media, title: "Side lyrics horizontal offset", keywords: ["lyrics", "offset", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics horizontal offset")),
             SettingsSearchEntry(tab: .media, title: "Show live canvas in Dynamic Island", keywords: ["canvas", "live canvas", "album art", "dynamic island", "spotify canvas"], highlightID: SettingsTab.media.highlightID(for: "Show live canvas in Dynamic Island")),
@@ -837,6 +842,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .lockScreen, title: "Preview lock screen widgets", keywords: ["preview", "lock screen", "widgets"], highlightID: SettingsTab.lockScreen.highlightID(for: "Preview lock screen widgets")),
             SettingsSearchEntry(tab: .lockScreen, title: "Widget appearance", keywords: ["appearance", "theme", "dark", "light", "contrast", "wallpaper"], highlightID: SettingsTab.lockScreen.highlightID(for: "Widget appearance")),
             SettingsSearchEntry(tab: .lockScreen, title: "Enable lock screen live activity", keywords: ["lock screen", "live activity"], highlightID: SettingsTab.lockScreen.highlightID(for: "Enable lock screen live activity")),
+            SettingsSearchEntry(tab: .lockScreen, title: "Live activity icon", keywords: ["lock", "fingerprint", "touch id", "unlock", "biometric", "icon style"], highlightID: SettingsTab.lockScreen.highlightID(for: "Live activity icon")),
             SettingsSearchEntry(tab: .lockScreen, title: "Play lock/unlock sounds", keywords: ["chime", "sound"], highlightID: SettingsTab.lockScreen.highlightID(for: "Play lock/unlock sounds")),
             SettingsSearchEntry(tab: .lockScreen, title: "Material", keywords: ["glass", "frosted", "liquid"], highlightID: SettingsTab.lockScreen.highlightID(for: "Material")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen media panel", keywords: ["media panel", "lock screen media"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen media panel")),
@@ -1099,7 +1105,11 @@ struct GeneralSettings: View {
                 Defaults.Toggle(key: .showBatteryPercentInside) {
                     Text("Show battery percentage inside icon")
                 }
-                .disabled(!enableMinimalisticUI || !Defaults[.showMinimalisticBatteryIndicator])
+                // Draws inside whichever battery the notch is showing, so it is
+                // gated on there being one -- not on Minimalistic UI, which only
+                // decides which of the two gets drawn.
+                .disabled(!Defaults[.showBatteryIndicator]
+                    || (enableMinimalisticUI && !Defaults[.showMinimalisticBatteryIndicator]))
                 .settingsHighlight(id: highlightID("Show battery percentage inside icon"))
             } header: {
                 Text("UI Mode")
@@ -2829,6 +2839,169 @@ struct HUD: View {
     }
 }
 
+private struct MusicSourceSelector: View {
+    @Binding var selection: MediaControllerType
+    let controllers: [MediaControllerType]
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(controllers) { controller in
+                        MusicSourceCard(
+                            controller: controller,
+                            isSelected: selection == controller
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selection = controller
+                            }
+                        }
+                        .id(controller)
+                    }
+                }
+                .padding(.horizontal, 2)
+                .padding(.vertical, 3)
+            }
+            .onAppear {
+                proxy.scrollTo(selection, anchor: .center)
+            }
+            .onChange(of: selection) { _, controller in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(controller, anchor: .center)
+                }
+            }
+        }
+        .frame(height: 112)
+    }
+}
+
+private struct MusicSourceCard: View {
+    let controller: MediaControllerType
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 9) {
+                Group {
+                    if let logoAssetName = controller.officialLogoAssetName {
+                        Image(logoAssetName)
+                            .resizable()
+                            .scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    } else {
+                        AppIconImage(
+                            bundleIdentifiers: controller.applicationBundleIdentifiers,
+                            symbolFallback: controller.fallbackSymbol,
+                            symbolColor: controller.fallbackColor,
+                            size: 42
+                        )
+                        .font(.system(size: 24, weight: .semibold))
+                    }
+                }
+                .frame(width: 42, height: 42)
+
+                Text(controller.localizedName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .frame(width: 112, height: 92)
+            .background {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(backgroundColor)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(borderColor, lineWidth: isSelected ? 2.5 : 1)
+            }
+            .scaleEffect(isHovering && !isSelected ? 1.015 : 1)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = hovering
+            }
+        }
+        .accessibilityLabel(controller.localizedName)
+    }
+
+    private var backgroundColor: Color {
+        if isSelected {
+            return Color.accentColor.opacity(0.16)
+        }
+        if isHovering {
+            return Color(nsColor: .controlBackgroundColor).opacity(0.92)
+        }
+        return Color(nsColor: .controlBackgroundColor).opacity(0.7)
+    }
+
+    private var borderColor: Color {
+        if isSelected {
+            return .accentColor
+        }
+        return Color(nsColor: .separatorColor).opacity(isHovering ? 0.8 : 0.45)
+    }
+}
+
+private extension MediaControllerType {
+    var officialLogoAssetName: String? {
+        switch self {
+        case .youtubeMusic: return "YouTubeMusicLogo"
+        case .amazonMusic: return "AmazonMusicLogo"
+        case .cider: return "CiderLogo"
+        default: return nil
+        }
+    }
+
+    var applicationBundleIdentifiers: [String] {
+        switch self {
+        case .nowPlaying:
+            return []
+        case .appleMusic:
+            return ["com.apple.Music"]
+        case .spotify:
+            return ["com.spotify.client"]
+        case .youtubeMusic:
+            return ["com.github.th-ch.youtube-music"]
+        case .amazonMusic:
+            return ["com.amazon.music"]
+        case .tidal:
+            return [TidalController.bundleIdentifier]
+        case .cider:
+            return ["sh.cider.genten.mac"]
+        }
+    }
+
+    var fallbackSymbol: String {
+        switch self {
+        case .nowPlaying: return "waveform"
+        case .appleMusic: return "music.note"
+        case .spotify: return "dot.radiowaves.left.and.right"
+        case .youtubeMusic: return "play.rectangle.fill"
+        case .amazonMusic: return "music.note.list"
+        case .tidal: return "waveform.path"
+        case .cider: return "cup.and.saucer.fill"
+        }
+    }
+
+    var fallbackColor: Color {
+        switch self {
+        case .nowPlaying: return .accentColor
+        case .appleMusic: return .pink
+        case .spotify: return .green
+        case .youtubeMusic: return .red
+        case .amazonMusic: return .cyan
+        case .tidal: return .primary
+        case .cider: return .orange
+        }
+    }
+}
+
 struct Media: View {
     @Default(.waitInterval) var waitInterval
     @Default(.mediaController) var mediaController
@@ -2850,6 +3023,7 @@ struct Media: View {
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
     @Default(.showCalendar) private var showCalendar
     @Default(.enableLyrics) private var enableLyrics
+    @Default(.lyricHighlightStyle) private var lyricHighlightStyle
     @Default(.lyricsPanelWidth) private var lyricsPanelWidth
     @Default(.lyricsPanelOffset) private var lyricsPanelOffset
     @Default(.visualizerBarCount) private var visualizerBarCount
@@ -2875,10 +3049,14 @@ struct Media: View {
     var body: some View {
         Form {
             Section {
-                Picker("Music Source", selection: $mediaController) {
-                    ForEach(availableMediaControllers) { controller in
-                        Text(controller.localizedName).tag(controller)
-                    }
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Music Source")
+                        .font(.system(size: 13, weight: .semibold))
+
+                    MusicSourceSelector(
+                        selection: $mediaController,
+                        controllers: availableMediaControllers
+                    )
                 }
                 .onChange(of: mediaController) { _, _ in
                     NotificationCenter.default.post(
@@ -2902,7 +3080,9 @@ struct Media: View {
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(String(localized: "'Now Playing' was the only option on previous versions and works with all media apps."))
-                        Text(String(localized: "Uses macOS Now Playing when the Amazon Music app is the active media source. Playback controls follow the system Now Playing target. Scrubbing the timeline may not work if the Amazon Music app does not support remote seek."))
+                        if mediaController == .amazonMusic || mediaController == .tidal || mediaController == .cider {
+                            Text(mediaController.description)
+                        }
                     }
                     .foregroundStyle(.secondary)
                     .font(.caption)
@@ -3023,6 +3203,29 @@ struct Media: View {
                             : ""
                 )
                 .settingsHighlight(id: highlightID("Show lyrics"))
+
+                if enableLyrics && !enableMinimalisticUI && showStandardMediaControls {
+                    // Caption inside the row rather than after it: a Form gives
+                    // every top-level view its own row and a divider, so the
+                    // explanation was being ruled off from the control it
+                    // explains and read as belonging to nothing.
+                    VStack(alignment: .leading, spacing: 6) {
+                        Picker("Highlight", selection: $lyricHighlightStyle) {
+                            ForEach(LyricHighlightStyle.allCases) { style in
+                                Text(style.localizedName).tag(style)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        Text(lyricHighlightStyle.explanation)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .settingsHighlight(id: highlightID("Lyric highlight"))
+                }
+
                 Text(
                     showCalendar
                         ? "Lyrics sit on one line under the artist name, since the calendar is using the rest of the notch. Turn the calendar off to give them a full panel beside the player."
@@ -5216,6 +5419,7 @@ struct Appearance: View {
 
 struct LockScreenSettings: View {
     @Default(.enableReminderLiveActivity) private var enableReminderLiveActivity
+    @Default(.lockScreenLiveActivityIconStyle) private var lockScreenLiveActivityIconStyle
     @ObservedObject private var calendarManager = CalendarManager.shared
     @ObservedObject private var previewManager = LockScreenWidgetPreviewManager.shared
     @Default(.lockScreenGlassStyle) private var lockScreenGlassStyle
@@ -5346,6 +5550,45 @@ struct LockScreenSettings: View {
                     Text("Enable lock screen live activity")
                 }
                 .settingsHighlight(id: highlightID("Enable lock screen live activity"))
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Live activity icon")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+
+                    HStack(spacing: 16) {
+                        Spacer(minLength: 0)
+                        LockScreenIconStyleCard(
+                            title: "Lock",
+                            systemImage: "lock.fill",
+                            isSelected: lockScreenLiveActivityIconStyle.showsLock
+                        ) {
+                            if lockScreenLiveActivityIconStyle.showsLock {
+                                if lockScreenLiveActivityIconStyle.showsFingerprint {
+                                    lockScreenLiveActivityIconStyle = .fingerprint
+                                }
+                            } else {
+                                lockScreenLiveActivityIconStyle = .both
+                            }
+                        }
+                        LockScreenIconStyleCard(
+                            title: "Fingerprint",
+                            systemImage: "touchid",
+                            isSelected: lockScreenLiveActivityIconStyle.showsFingerprint
+                        ) {
+                            if lockScreenLiveActivityIconStyle.showsFingerprint {
+                                if lockScreenLiveActivityIconStyle.showsLock {
+                                    lockScreenLiveActivityIconStyle = .lock
+                                }
+                            } else {
+                                lockScreenLiveActivityIconStyle = .both
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+                .settingsHighlight(id: highlightID("Live activity icon"))
+
                 Defaults.Toggle(key: .enableLockSounds) {
                     Text("Play lock/unlock sounds")
                 }
@@ -5353,7 +5596,7 @@ struct LockScreenSettings: View {
             } header: {
                 Text("Live Activity & Feedback")
             } footer: {
-                Text("Controls whether Dynamic Island mirrors lock/unlock events with its own live activity and audible chimes.")
+                Text("Select the lock, the fingerprint, or both icons. When the fingerprint is selected, the live activity stays open long enough to complete its unlock animation.")
             }
 
             Section {
@@ -5981,6 +6224,60 @@ extension LockScreenSettings {
         .settingsHighlight(id: highlight)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.4)
+    }
+}
+
+private struct LockScreenIconStyleCard: View {
+    let title: String
+    let systemImage: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(backgroundColor)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(borderColor, lineWidth: isSelected ? 2 : 1)
+                        }
+
+                    Image(systemName: systemImage)
+                        .font(.system(size: 13, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .frame(width: 72, height: 50)
+
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.medium)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isHovering = hovering
+            }
+        }
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var backgroundColor: Color {
+        if isSelected { return Color.accentColor.opacity(0.12) }
+        if isHovering { return Color.primary.opacity(0.05) }
+        return Color(nsColor: .controlBackgroundColor)
+    }
+
+    private var borderColor: Color {
+        if isSelected { return Color.accentColor }
+        if isHovering { return Color.primary.opacity(0.1) }
+        return Color.clear
     }
 }
 

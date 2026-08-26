@@ -244,6 +244,47 @@ func notchTerminalBottomCornerRadii(
     return (outerBottom, max(0, outerBottom - p))
 }
 
+/// Height of the inline lyrics line shown under the artist name on the home tab.
+///
+/// The player column is laid out inside a greedy `GeometryReader`, so the lyrics
+/// line takes its space out of the gap above the transport controls instead of
+/// growing the notch. Handing that height back keeps the controls from being
+/// crowded when lyrics are on.
+let inlineLyricsLineHeight: CGFloat = 18
+
+/// Grows the open notch by one lyrics line when the home tab renders inline lyrics.
+///
+/// The extra height is applied whenever inline lyrics are enabled rather than only
+/// while a line is on screen, so the notch keeps a stable height between lyric lines.
+///
+/// Minimalistic UI is excluded: its player draws lyrics whenever they are enabled,
+/// regardless of the calendar, and sizes itself for them through its own resize
+/// publisher. Adding this line there would reserve room for a line the standard
+/// player is not drawing.
+func inlineLyricsAdjustedNotchSize(
+    from baseSize: CGSize,
+    isHomeTabActive: Bool
+) -> CGSize {
+    // The same conditions `sideLyricsRequiredNotchWidth` tests, for the same
+    // reason: the extra line belongs to the standard player, so it is only
+    // owed when that player is on screen to draw it. Without the last two the
+    // notch grew for a line nobody could see whenever the player was switched
+    // off, or hidden by auto-hide with nothing playing.
+    guard isHomeTabActive,
+          !Defaults[.enableMinimalisticUI],
+          Defaults[.enableLyrics],
+          Defaults[.showCalendar],
+          Defaults[.showStandardMediaControls],
+          (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+    else {
+        return baseSize
+    }
+
+    var adjustedSize = baseSize
+    adjustedSize.height += inlineLyricsLineHeight
+    return adjustedSize
+}
+
 func statsAdjustedNotchSize(
     from baseSize: CGSize,
     isStatsTabActive: Bool,
