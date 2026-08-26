@@ -2385,14 +2385,17 @@ struct ContentView: View {
         return staticPluginManager.enabledPlugins.first { $0.id == selectedID }
     }
 
-    /// 将插件期望高度限制在 Atoll 现有刘海展开范围内。
+    /// 尊重插件请求高度，同时避免刘海内容超出当前屏幕可用范围。
     private func staticPluginPreferredHeight(baseSize: CGSize) -> CGFloat? {
         guard let preferredHeight = currentStaticPlugin()?.manifest.tab.preferredHeight else {
             return nil
         }
-        let minHeight = baseSize.height
-        let maxHeight = baseSize.height + statsAdditionalRowHeight
-        return min(max(CGFloat(preferredHeight), minHeight), maxHeight)
+        return StaticPluginLayout.resolvedHeight(
+            preferredHeight: CGFloat(preferredHeight),
+            baseHeight: baseSize.height,
+            visibleScreenHeight: NSScreen.main?.visibleFrame.height,
+            fallbackMaximumHeight: baseSize.height + statsAdditionalRowHeight
+        )
     }
 
     private func currentExtensionTabPayload() -> ExtensionNotchExperiencePayload? {

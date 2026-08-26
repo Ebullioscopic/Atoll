@@ -59,3 +59,20 @@ struct InstalledStaticPlugin: Identifiable, Equatable {
 
     var id: String { manifest.id }
 }
+
+enum StaticPluginLayout {
+    static let maximumVisibleScreenFraction: CGFloat = 0.7
+
+    /// 将插件请求高度限制在默认刘海高度和当前屏幕安全高度之间。
+    static func resolvedHeight(
+        preferredHeight: CGFloat,
+        baseHeight: CGFloat,
+        visibleScreenHeight: CGFloat?,
+        fallbackMaximumHeight: CGFloat
+    ) -> CGFloat {
+        let maximumHeight = visibleScreenHeight.map {
+            max(baseHeight, $0 * maximumVisibleScreenFraction)
+        } ?? max(baseHeight, fallbackMaximumHeight)
+        return min(max(preferredHeight, baseHeight), maximumHeight)
+    }
+}

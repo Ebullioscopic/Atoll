@@ -112,3 +112,53 @@ final class StaticPluginPackageValidatorTests: XCTestCase {
         return packageURL
     }
 }
+
+final class StaticPluginLayoutTests: XCTestCase {
+    func testUsesRequestedHeightWhenItFitsScreen() {
+        XCTAssertEqual(
+            StaticPluginLayout.resolvedHeight(
+                preferredHeight: 460,
+                baseHeight: 200,
+                visibleScreenHeight: 900,
+                fallbackMaximumHeight: 332
+            ),
+            460
+        )
+    }
+
+    func testNeverShrinksBelowBaseHeight() {
+        XCTAssertEqual(
+            StaticPluginLayout.resolvedHeight(
+                preferredHeight: 100,
+                baseHeight: 200,
+                visibleScreenHeight: 900,
+                fallbackMaximumHeight: 332
+            ),
+            200
+        )
+    }
+
+    func testClampsToSeventyPercentOfVisibleScreen() {
+        XCTAssertEqual(
+            StaticPluginLayout.resolvedHeight(
+                preferredHeight: 800,
+                baseHeight: 200,
+                visibleScreenHeight: 600,
+                fallbackMaximumHeight: 332
+            ),
+            420
+        )
+    }
+
+    func testUsesExistingFallbackWithoutScreenHeight() {
+        XCTAssertEqual(
+            StaticPluginLayout.resolvedHeight(
+                preferredHeight: 460,
+                baseHeight: 200,
+                visibleScreenHeight: nil,
+                fallbackMaximumHeight: 332
+            ),
+            332
+        )
+    }
+}
