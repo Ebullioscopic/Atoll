@@ -6745,15 +6745,15 @@ private struct LockScreenPositioningPreview: View {
 
                 weatherPanel(size: weatherSize)
                     .position(x: centerX, y: weatherBaseY - CGFloat(weatherOffset))
-                    .gesture(weatherDragGesture(in: screenRect, baseY: weatherBaseY, panelSize: weatherSize))
+                    .gesture(weatherDragGesture(in: screenRect, baseY: weatherBaseY))
 
                 timerPanel(size: timerSize)
                     .position(x: centerX, y: timerBaseY - CGFloat(timerOffset))
-                    .gesture(timerDragGesture(in: screenRect, baseY: timerBaseY, panelSize: timerSize))
+                    .gesture(timerDragGesture(in: screenRect, baseY: timerBaseY))
 
                 musicPanel(size: musicSize)
                     .position(x: centerX, y: musicBaseY - CGFloat(musicOffset))
-                    .gesture(musicDragGesture(in: screenRect, baseY: musicBaseY, panelSize: musicSize))
+                    .gesture(musicDragGesture(in: screenRect, baseY: musicBaseY))
             }
         }
         .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.82), value: weatherOffset)
@@ -6834,7 +6834,7 @@ private struct LockScreenPositioningPreview: View {
             .shadow(color: Color.orange.opacity(0.3), radius: 12, x: 0, y: 8)
     }
 
-    private func weatherDragGesture(in screenRect: CGRect, baseY: CGFloat, panelSize: CGSize) -> some Gesture {
+    private func weatherDragGesture(in screenRect: CGRect, baseY: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
                 if !isWeatherDragging {
@@ -6846,7 +6846,6 @@ private struct LockScreenPositioningPreview: View {
                 weatherOffset = clampedOffset(
                     proposed,
                     baseCenterY: baseY,
-                    panelHeight: panelSize.height,
                     screenRect: screenRect
                 )
             }
@@ -6855,7 +6854,7 @@ private struct LockScreenPositioningPreview: View {
             }
     }
 
-    private func musicDragGesture(in screenRect: CGRect, baseY: CGFloat, panelSize: CGSize) -> some Gesture {
+    private func musicDragGesture(in screenRect: CGRect, baseY: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
                 if !isMusicDragging {
@@ -6867,7 +6866,6 @@ private struct LockScreenPositioningPreview: View {
                 musicOffset = clampedOffset(
                     proposed,
                     baseCenterY: baseY,
-                    panelHeight: panelSize.height,
                     screenRect: screenRect
                 )
             }
@@ -6876,7 +6874,7 @@ private struct LockScreenPositioningPreview: View {
             }
     }
 
-    private func timerDragGesture(in screenRect: CGRect, baseY: CGFloat, panelSize: CGSize) -> some Gesture {
+    private func timerDragGesture(in screenRect: CGRect, baseY: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
                 if !isTimerDragging {
@@ -6888,7 +6886,6 @@ private struct LockScreenPositioningPreview: View {
                 timerOffset = clampedOffset(
                     proposed,
                     baseCenterY: baseY,
-                    panelHeight: panelSize.height,
                     screenRect: screenRect
                 )
             }
@@ -6900,12 +6897,21 @@ private struct LockScreenPositioningPreview: View {
     private func clampedOffset(
         _ proposed: Double,
         baseCenterY: CGFloat,
-        panelHeight: CGFloat,
         screenRect: CGRect
     ) -> Double {
-        let halfHeight = panelHeight / 2
-        let minCenterY = screenRect.minY + halfHeight
-        let maxCenterY = screenRect.maxY - halfHeight
+        // Keep the widget's centre on screen rather than the whole of it.
+        //
+        // These boxes are rough stand-ins, and the music one is drawn at 34% of
+        // the screen height where the real panel is nearer 18% (180pt). Holding
+        // the whole box inside the screen therefore clamped against a size the
+        // panel does not have: the music widget sits at 78% of the height, so
+        // it ran out of travel about 10pt down, well short of the +/-160pt the
+        // setting itself allows. Letting a widget overhang the edge it is being
+        // pushed towards costs nothing -- the outer clamp below is still the
+        // real limit -- and it is honest, since the panel can be positioned
+        // past the visible area at runtime too.
+        let minCenterY = screenRect.minY
+        let maxCenterY = screenRect.maxY
         let proposedCenter = baseCenterY - CGFloat(proposed)
         let clampedCenter = min(max(proposedCenter, minCenterY), maxCenterY)
         let derivedOffset = Double(baseCenterY - clampedCenter)
