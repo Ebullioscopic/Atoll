@@ -562,6 +562,16 @@ class MusicManager: ObservableObject {
 
     var isAppleMusicActive: Bool { bundleIdentifier == "com.apple.Music" }
     var isSpotifyActive: Bool { bundleIdentifier == SpotifyController.bundleIdentifier }
+    /// Whether favouriting applies to the playing source at all. Decides
+    /// whether the control is offered in settings and kept in the layout, so
+    /// it must not change with playback or connection state.
+    @MainActor
+    var activeSourceCanEverFavorite: Bool { activeController?.canEverFavorite ?? false }
+
+    /// Whether favouriting would work right now -- the app is playing, the
+    /// account is connected. Decides only whether the control is enabled.
+    @MainActor
+    var activeSourceSupportsFavoriting: Bool { activeController?.supportsFavoriting ?? false }
     @Published var songDuration: TimeInterval = 0
     @Published var elapsedTime: TimeInterval = 0
     @Published var timestampDate: Date = .init()
@@ -595,9 +605,15 @@ class MusicManager: ObservableObject {
     private var explicitLookupTask: Task<Void, Never>?
     private var explicitLookupKey: String?
 
-    // MARK: - Spotify Liked Songs
-    /// nil = unknown (not Spotify, not connected, or lookup pending) — the like button renders disabled.
+    // MARK: - Favourite current track
+    /// nil = unknown (the source cannot favourite, is not connected, or the
+    /// lookup is still running) — the control renders disabled.
     @Published private(set) var isCurrentTrackLiked: Bool? = nil
+    /// Whether the playing source can favourite at all, so a view can hide the
+    /// control outright rather than show one that will never do anything.
+    @Published private(set) var canFavoriteCurrentTrack: Bool = false
+    /// Identifies the track a lookup belongs to, so a result arriving after the
+    /// track changed is discarded.
     private var likedLookupTrackID: String?
     private var likedLookupTask: Task<Void, Never>?
     private var likeToggleTask: Task<Void, Never>?
@@ -1003,54 +1019,80 @@ class MusicManager: ObservableObject {
 
     @MainActor
     private func refreshLikedFlag(for state: PlaybackState) {
-        guard state.bundleIdentifier == SpotifyController.bundleIdentifier,
-              SpotifyLibraryManager.shared.isAuthenticated,
-              let lookupKey = SpotifyExplicitnessResolver.LookupKey(
-                  contentIdentifier: state.contentIdentifier,
-                  contentURL: state.contentURL
-              )
-        else {
-            likedLookupTask?.cancel()
-            likedLookupTask = nil
-            likedLookupTrackID = nil
-            if isCurrentTrackLiked != nil {
-                isCurrentTrackLiked = nil
-            }
+        // Favouriting is the playing source's own business: Music.app has a
+        // scriptable property, Spotify has the account the user connected.
+        // Ask whichever is playing rather than naming one of them here.
+        guard let controller = activeController, controller.supportsFavoriting else {
+            clearLikedState()
             return
         }
 
-        guard likedLookupTrackID != lookupKey.trackID else { return }
+        // Any change of track invalidates the answer. There is no id that means
+        // the same thing across every source, so the track's own identity is
+        // what a lookup is keyed on.
+        let trackKey = Self.favoriteTrackKey(for: state)
+        guard !trackKey.isEmpty else {
+            clearLikedState()
+            return
+        }
+
+        canFavoriteCurrentTrack = true
+        guard likedLookupTrackID != trackKey else { return }
 
         likedLookupTask?.cancel()
         likeToggleTask?.cancel()
-        likedLookupTrackID = lookupKey.trackID
+        likedLookupTrackID = trackKey
         isCurrentTrackLiked = nil
 
-        let trackID = lookupKey.trackID
         likedLookupTask = Task { [weak self] in
-            let saved = await SpotifyLibraryManager.shared.isTrackSaved(trackID: trackID)
+            let favorited = await controller.isCurrentTrackFavorited()
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                guard let self, self.likedLookupTrackID == trackID else { return }
-                self.isCurrentTrackLiked = saved
+                guard let self, self.likedLookupTrackID == trackKey else { return }
+                self.isCurrentTrackLiked = favorited
             }
         }
     }
 
     @MainActor
+    private func clearLikedState() {
+        likedLookupTask?.cancel()
+        likedLookupTask = nil
+        likedLookupTrackID = nil
+        if canFavoriteCurrentTrack { canFavoriteCurrentTrack = false }
+        if isCurrentTrackLiked != nil { isCurrentTrackLiked = nil }
+    }
+
+    /// Identity of the playing track, for deciding when a lookup is stale.
+    ///
+    /// Prefers whatever stable identifier the source gives; falls back to the
+    /// metadata, which is all a scripted app like Music.app offers.
+    private static func favoriteTrackKey(for state: PlaybackState) -> String {
+        if let identifier = state.contentIdentifier, !identifier.isEmpty { return identifier }
+        if let url = state.contentURL, !url.isEmpty { return url }
+        let parts = [state.title, state.artist, state.album].filter { !$0.isEmpty }
+        return parts.isEmpty ? "" : parts.joined(separator: "\u{1F}")
+    }
+
+    @MainActor
     func toggleLike() {
-        guard let trackID = likedLookupTrackID,
+        guard let controller = activeController,
+              controller.supportsFavoriting,
+              let trackKey = likedLookupTrackID,
               let currentValue = isCurrentTrackLiked else { return }
 
+        // Shown as done straight away, then put back if the source refuses:
+        // scripting a running app and a network round trip are both slow
+        // enough that waiting would feel like the click missed.
         let targetValue = !currentValue
         isCurrentTrackLiked = targetValue
 
         likeToggleTask?.cancel()
         likeToggleTask = Task { [weak self] in
-            let success = await SpotifyLibraryManager.shared.setTrackSaved(targetValue, trackID: trackID)
+            let success = await controller.setCurrentTrackFavorited(targetValue)
             guard !Task.isCancelled, !success else { return }
             await MainActor.run {
-                guard let self, self.likedLookupTrackID == trackID else { return }
+                guard let self, self.likedLookupTrackID == trackKey else { return }
                 self.isCurrentTrackLiked = currentValue
             }
         }

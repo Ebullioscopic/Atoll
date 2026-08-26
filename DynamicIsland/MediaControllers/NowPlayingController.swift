@@ -139,6 +139,63 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     func isActive() -> Bool {
         return true
     }
+
+    // MARK: - Favouriting
+
+    /// This source fronts whatever app is playing, so favouriting has to be
+    /// answered by that app rather than by the source. Under Now Playing the
+    /// user has not told us which player they are using -- MediaRemote has.
+    @MainActor
+    var canEverFavorite: Bool {
+        switch playbackState.bundleIdentifier {
+        case AppleMusicFavoriting.bundleIdentifier, SpotifyController.bundleIdentifier:
+            return true
+        default:
+            return false
+        }
+    }
+
+    @MainActor
+    var supportsFavoriting: Bool {
+        switch playbackState.bundleIdentifier {
+        case AppleMusicFavoriting.bundleIdentifier:
+            return AppleMusicFavoriting.isAvailable
+        case SpotifyController.bundleIdentifier:
+            return SpotifyFavoriting.isAvailable
+        default:
+            return false
+        }
+    }
+
+    func isCurrentTrackFavorited() async -> Bool? {
+        switch playbackState.bundleIdentifier {
+        case AppleMusicFavoriting.bundleIdentifier:
+            return await AppleMusicFavoriting.isCurrentTrackFavorited()
+        case SpotifyController.bundleIdentifier:
+            return await SpotifyFavoriting.isFavorited(
+                contentIdentifier: playbackState.contentIdentifier,
+                contentURL: playbackState.contentURL
+            )
+        default:
+            return nil
+        }
+    }
+
+    @discardableResult
+    func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
+        switch playbackState.bundleIdentifier {
+        case AppleMusicFavoriting.bundleIdentifier:
+            return await AppleMusicFavoriting.setCurrentTrackFavorited(favorited)
+        case SpotifyController.bundleIdentifier:
+            return await SpotifyFavoriting.setFavorited(
+                favorited,
+                contentIdentifier: playbackState.contentIdentifier,
+                contentURL: playbackState.contentURL
+            )
+        default:
+            return false
+        }
+    }
     
     func toggleShuffle() async {
         // MRMediaRemoteSendCommandFunction(6, nil)
