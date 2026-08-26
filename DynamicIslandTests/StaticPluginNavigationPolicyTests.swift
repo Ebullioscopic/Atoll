@@ -8,11 +8,17 @@
  * (at your option) any later version.
  */
 
+import SwiftUI
+import WebKit
 import XCTest
 
 @testable import Atoll
 
 final class StaticPluginNavigationPolicyTests: XCTestCase {
+    private struct IgnoringExternalOpener: StaticPluginExternalOpening {
+        func open(_ url: URL) {}
+    }
+
     private let rootURL = URL(fileURLWithPath: "/tmp/Tools.atollplugin", isDirectory: true)
     private let allowedURL = URL(string: "https://geojson.io/")!
 
@@ -81,16 +87,66 @@ final class StaticPluginNavigationPolicyTests: XCTestCase {
     func testContentRulesBlockHTTPAndWebSocketLoads() throws {
         let data = try XCTUnwrap(StaticPluginWebView.networkBlockingRules.data(using: .utf8))
         let rules = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        let filters = rules.compactMap {
+            ($0["trigger"] as? [String: Any])?["url-filter"] as? String
+        }
+        let actions = rules.compactMap {
+            ($0["action"] as? [String: Any])?["type"] as? String
+        }
 
         XCTAssertEqual(rules.count, 2)
-        XCTAssertTrue(StaticPluginWebView.networkBlockingRules.contains("^https?://"))
-        XCTAssertTrue(StaticPluginWebView.networkBlockingRules.contains("^wss?://"))
+        XCTAssertEqual(Set(filters), ["^https?://.*", "^wss?://.*"])
+        XCTAssertEqual(actions, ["block", "block"])
+    }
+
+    func testSuccessfulNavigationClearsPreviousLoadingError() throws {
+        var loadingError: String? = "Previous load failed"
+        let coordinator = StaticPluginWebRepresentable.Coordinator(
+            plugin: try makePlugin(),
+            loadingError: Binding(
+                get: { loadingError },
+                set: { loadingError = $0 }
+            ),
+            externalOpener: IgnoringExternalOpener()
+        )
+
+        coordinator.webView(WKWebView(), didFinish: nil)
+
+        XCTAssertNil(loadingError)
     }
 
     private func makePolicy() -> StaticPluginNavigationPolicy {
         StaticPluginNavigationPolicy(
             pluginRoot: rootURL,
             allowedExternalURLs: [allowedURL]
+        )
+    }
+
+    private func makePlugin() throws -> InstalledStaticPlugin {
+        let manifest = try JSONDecoder().decode(
+            StaticPluginManifest.self,
+            from: Data(
+                """
+                {
+                  "schemaVersion": 1,
+                  "id": "com.example.tools",
+                  "name": "Tools",
+                  "version": "1.0.0",
+                  "entrypoint": "index.html",
+                  "tab": {
+                    "title": "Tools",
+                    "icon": "wrench.and.screwdriver"
+                  },
+                  "allowedExternalURLs": []
+                }
+                """.utf8
+            )
+        )
+        return InstalledStaticPlugin(
+            manifest: manifest,
+            rootURL: rootURL,
+            entrypointURL: rootURL.appendingPathComponent("index.html"),
+            allowedExternalURLs: []
         )
     }
 }

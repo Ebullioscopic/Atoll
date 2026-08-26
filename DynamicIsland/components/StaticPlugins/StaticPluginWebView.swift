@@ -37,7 +37,7 @@ struct StaticPluginWebView: View {
     }
 }
 
-private struct StaticPluginWebRepresentable: NSViewRepresentable {
+struct StaticPluginWebRepresentable: NSViewRepresentable {
     /// 当前需要展示的已校验插件。
     let plugin: InstalledStaticPlugin
     /// WebKit 配置或加载失败时显示的错误。
@@ -180,6 +180,11 @@ private struct StaticPluginWebRepresentable: NSViewRepresentable {
             withError error: Error
         ) {
             loadingError.wrappedValue = error.localizedDescription
+        }
+
+        /// 后续导航成功时移除先前失败留下的错误遮罩。
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            loadingError.wrappedValue = nil
         }
     }
 }
