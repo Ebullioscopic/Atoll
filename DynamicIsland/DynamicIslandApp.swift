@@ -91,6 +91,20 @@ final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
     }
+
+    /// The notch hangs from the top of the screen, so a resize has to hold on
+    /// to its top edge.
+    ///
+    /// `setFrame(_:display:animate:)` blocks the main thread for the length of
+    /// its animation, so SwiftUI draws no frames while it runs. AppKit fills
+    /// them with the layer's existing contents, and its default placement
+    /// anchors those to the bottom left -- which for a window hanging from the
+    /// top of the screen is the wrong end. Anchoring to the top left keeps the
+    /// stale frames where the real ones are going to be.
+    override var layerContentsPlacement: NSView.LayerContentsPlacement {
+        get { .topLeft }
+        set { _ = newValue }
+    }
 }
 
 extension AppDelegate {
@@ -716,7 +730,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // considered, but an unchanged frame still needs no AppKit display
         // transaction. Avoiding that no-op matters during hover/click opens.
         guard window.frame != targetFrame else { return }
-        if animated {
+        // A window that is growing is never animated. `setFrame(_:display:
+        // animate:)` runs its animation on the main thread and blocks it, so
+        // SwiftUI draws nothing at all while it runs -- and a window growing
+        // taller under a still picture shows whatever is behind the notch
+        // along its top edge until the animation ends. Growing the window at
+        // once costs nothing to look at, because the window is transparent and
+        // the card inside it does its own animating; only the card is ever
+        // visible. Shrinking still animates, so the card is never cut off
+        // while it is still animating down.
+        if animated, targetFrame.height <= window.frame.height {
             let topAlignedStartFrame = NSRect(
                 x: window.frame.origin.x,
                 y: targetFrame.maxY - window.frame.height,
