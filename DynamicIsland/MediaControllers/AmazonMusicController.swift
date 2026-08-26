@@ -135,6 +135,23 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == targetBundleIdentifier }
     }
 
+    // MARK: - Favouriting
+
+    // Declared here rather than left to the protocol's defaults so subclasses
+    // can override them: the conformance is on this class, so a witness picked
+    // from an extension would be the one used no matter what a subclass says.
+
+    @MainActor
+    var canEverFavorite: Bool { false }
+
+    @MainActor
+    var supportsFavoriting: Bool { false }
+
+    func isCurrentTrackFavorited() async -> Bool? { nil }
+
+    @discardableResult
+    func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool { false }
+
     func toggleShuffle() async {
         MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
         playbackState.isShuffled.toggle()

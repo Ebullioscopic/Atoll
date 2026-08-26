@@ -150,7 +150,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         switch playbackState.bundleIdentifier {
         case AppleMusicFavoriting.bundleIdentifier,
              SpotifyController.bundleIdentifier,
-             YouTubeMusicFavoriting.bundleIdentifier:
+             YouTubeMusicFavoriting.bundleIdentifier,
+             TidalFavoriting.bundleIdentifier:
             return true
         default:
             return false
@@ -166,6 +167,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             return SpotifyFavoriting.isAvailable
         case YouTubeMusicFavoriting.bundleIdentifier:
             return YouTubeMusicFavoriting.isAvailable
+        case TidalFavoriting.bundleIdentifier:
+            return TidalFavoriting.isAvailable
         default:
             return false
         }
@@ -182,6 +185,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             )
         case YouTubeMusicFavoriting.bundleIdentifier:
             return await YouTubeMusicFavoriting.isCurrentTrackFavorited()
+        case TidalFavoriting.bundleIdentifier:
+            return await TidalFavoriting.isCurrentTrackFavorited()
         default:
             return nil
         }
@@ -200,6 +205,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             )
         case YouTubeMusicFavoriting.bundleIdentifier:
             return await YouTubeMusicFavoriting.setCurrentTrackFavorited(favorited)
+        case TidalFavoriting.bundleIdentifier:
+            return await TidalFavoriting.setCurrentTrackFavorited(favorited)
         default:
             return false
         }
