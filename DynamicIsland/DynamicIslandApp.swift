@@ -562,6 +562,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             baseSize.height = max(baseSize.height, llmUsageOpenNotchHeight)
         }
         
+        baseSize = inlineLyricsAdjustedNotchSize(
+            from: baseSize,
+            isHomeTabActive: coordinator.currentView == .home
+        )
+
         let adjustedContentSize = statsAdjustedNotchSize(
             from: baseSize,
             isStatsTabActive: coordinator.currentView == .stats,
