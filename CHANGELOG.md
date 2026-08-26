@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- **The custom OSD no longer sticks on screen**: switching away from Custom OSD while one of its windows was visible left the overlay there for good. Nothing watched the setting, and the only thing that would ever have hidden that window was its own two-second timer, which the switch outran. Turning the OSD off -- or turning off volume, brightness or keyboard backlight individually -- now dismisses what is on screen.
 - The lock screen Dynamic Island now completes one clean unlock contraction instead of disappearing early or showing a second island that closes immediately afterward. (#774)
 
 - The keyboard backlight HUD and OSD toggles come back when the external display app is quit. They were greyed out by the integration setting alone, but the keys are only handed over while that setting is on *and* the provider is actually running — so quitting it returned the keys to Atoll and left the toggles disabled over a setting that had started working again.
