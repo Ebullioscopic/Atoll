@@ -16,15 +16,19 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import AppKit
 import SwiftUI
 import Defaults
 import AtollExtensionKit
+import UniformTypeIdentifiers
 
 struct ExtensionsSettingsView: View {
     @ObservedObject private var authManager = ExtensionAuthorizationManager.shared
+    @ObservedObject private var staticPluginManager = StaticPluginManager.shared
     @State private var searchText = ""
     @State private var selectedEntry: ExtensionAuthorizationEntry?
     @State private var showingRemoveConfirmation = false
+    @State private var staticPluginAlert: StaticPluginAlert?
     
     private func highlightID(_ title: String) -> String {
         "extensions-\(title)"
@@ -42,6 +46,7 @@ struct ExtensionsSettingsView: View {
     var body: some View {
         Form {
             globalTogglesSection
+            staticPluginsSection
             
             if authManager.isExtensionsFeatureEnabled {
                 authorizedAppsSection
@@ -56,6 +61,130 @@ struct ExtensionsSettingsView: View {
             }
         } message: { entry in
             Text("Remove \(entry.appName) from the authorized extensions list? This will dismiss all active live activities, lock screen widgets, and notch experiences from this app.")
+        }
+    }
+
+    private var staticPluginsSection: some View {
+        Section {
+            Button("Import Plugin", systemImage: "plus") {
+                chooseStaticPlugin()
+            }
+
+            if staticPluginManager.plugins.isEmpty {
+                Text("No static plugins installed")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(staticPluginManager.plugins) { plugin in
+                    StaticPluginSettingsRow(
+                        plugin: plugin,
+                        isEnabled: !staticPluginManager.isDisabled(pluginID: plugin.id),
+                        onEnabledChange: {
+                            staticPluginManager.setEnabled($0, pluginID: plugin.id)
+                        },
+                        onRemove: {
+                            staticPluginAlert = .remove(plugin)
+                        }
+                    )
+                }
+            }
+
+            ForEach(staticPluginManager.discoveryErrors, id: \.self) { error in
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        } header: {
+            HStack {
+                Text("Static Plugins")
+                Spacer()
+                if !staticPluginManager.plugins.isEmpty {
+                    Text("\(staticPluginManager.plugins.count) installed")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } footer: {
+            Text("Static plugins run local HTML, CSS, and JavaScript inside Atoll. Declared links open in your default browser.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .alert(item: $staticPluginAlert) { alert in
+            switch alert {
+            case .replace(let sourceURL, let incoming, let installed):
+                return Alert(
+                    title: Text("Replace Static Plugin?"),
+                    message: Text("Replace \(installed.manifest.name) \(installed.manifest.version) with version \(incoming.manifest.version)?"),
+                    primaryButton: .cancel(),
+                    secondaryButton: .destructive(Text("Replace")) {
+                        performStaticPluginOperation {
+                            try staticPluginManager.install(from: sourceURL, replacingExisting: true)
+                        }
+                    }
+                )
+            case .remove(let plugin):
+                return Alert(
+                    title: Text("Remove Static Plugin?"),
+                    message: Text("Remove \(plugin.manifest.name) from Atoll?"),
+                    primaryButton: .cancel(),
+                    secondaryButton: .destructive(Text("Remove")) {
+                        performStaticPluginOperation {
+                            try staticPluginManager.remove(pluginID: plugin.id)
+                        }
+                    }
+                )
+            case .error(let message):
+                return Alert(
+                    title: Text("Static Plugin Error"),
+                    message: Text(message),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
+        }
+    }
+
+    /// 让用户选择一个本地目录包，所有格式和安全检查仍由校验器完成。
+    private func chooseStaticPlugin() {
+        let panel = NSOpenPanel()
+        panel.title = "Import Static Plugin"
+        panel.message = "Choose a directory ending in .atollplugin."
+        panel.prompt = "Import"
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = true
+        panel.treatsFilePackagesAsDirectories = false
+        if let pluginType = UTType(filenameExtension: "atollplugin", conformingTo: .package) {
+            panel.allowedContentTypes = [pluginType]
+        }
+        guard panel.runModal() == .OK, let sourceURL = panel.url else { return }
+        prepareStaticPluginImport(from: sourceURL)
+    }
+
+    /// 校验导入内容，并在相同 ID 时要求用户明确确认 Replace。
+    private func prepareStaticPluginImport(from sourceURL: URL) {
+        do {
+            let incoming = try StaticPluginPackageValidator().validate(packageURL: sourceURL)
+            if let installed = staticPluginManager.plugins.first(where: { $0.id == incoming.id }) {
+                staticPluginAlert = .replace(
+                    sourceURL: sourceURL,
+                    incoming: incoming,
+                    installed: installed
+                )
+            } else {
+                try staticPluginManager.install(from: sourceURL, replacingExisting: false)
+            }
+        } catch {
+            staticPluginAlert = .error(error.localizedDescription)
+        }
+    }
+
+    private func performStaticPluginOperation(_ operation: () throws -> Void) {
+        do {
+            try operation()
+        } catch {
+            let message = error.localizedDescription
+            DispatchQueue.main.async {
+                staticPluginAlert = .error(message)
+            }
         }
     }
     
@@ -166,6 +295,73 @@ struct ExtensionsSettingsView: View {
                 .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+private enum StaticPluginAlert: Identifiable {
+    case replace(
+        sourceURL: URL,
+        incoming: InstalledStaticPlugin,
+        installed: InstalledStaticPlugin
+    )
+    case remove(InstalledStaticPlugin)
+    case error(String)
+
+    var id: String {
+        switch self {
+        case .replace(_, let incoming, _):
+            return "replace-\(incoming.id)"
+        case .remove(let plugin):
+            return "remove-\(plugin.id)"
+        case .error(let message):
+            return "error-\(message)"
+        }
+    }
+}
+
+@MainActor
+private struct StaticPluginSettingsRow: View {
+    /// 当前展示的已安装插件。
+    let plugin: InstalledStaticPlugin
+    /// 插件当前是否启用。
+    let isEnabled: Bool
+    let onEnabledChange: (Bool) -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: plugin.manifest.tab.icon)
+                .frame(width: 24)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(plugin.manifest.name)
+                        .font(.system(size: 13, weight: .medium))
+                    Text(plugin.manifest.version)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Text(plugin.id)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Toggle(
+                "Enabled",
+                isOn: Binding(get: { isEnabled }, set: onEnabledChange)
+            )
+            .labelsHidden()
+
+            Button(role: .destructive, action: onRemove) {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+            .help("Remove Plugin")
+        }
+        .padding(.vertical, 6)
     }
 }
 

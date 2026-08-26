@@ -30,14 +30,30 @@ struct TabModel: Identifiable {
     let label: String
     let icon: String
     let view: NotchViews
+    /// 静态插件标签对应的插件 ID。
+    let staticPluginID: String?
     let experienceID: String?
     let accentColor: Color?
 
-    init(label: String, icon: String, view: NotchViews, experienceID: String? = nil, accentColor: Color? = nil) {
-        self.id = experienceID.map { "extension-\($0)" } ?? "system-\(view)-\(label)"
+    init(
+        label: String,
+        icon: String,
+        view: NotchViews,
+        staticPluginID: String? = nil,
+        experienceID: String? = nil,
+        accentColor: Color? = nil
+    ) {
+        if let staticPluginID {
+            self.id = "static-\(staticPluginID)"
+        } else if let experienceID {
+            self.id = "extension-\(experienceID)"
+        } else {
+            self.id = "system-\(view)-\(label)"
+        }
         self.label = label
         self.icon = icon
         self.view = view
+        self.staticPluginID = staticPluginID
         self.experienceID = experienceID
         self.accentColor = accentColor
     }
@@ -45,6 +61,7 @@ struct TabModel: Identifiable {
 
 struct TabSelectionView: View {
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
+    @ObservedObject private var staticPluginManager = StaticPluginManager.shared
     @ObservedObject private var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @StateObject private var quickShareService = QuickShareService.shared
     @Default(.quickShareProvider) private var quickShareProvider
@@ -95,6 +112,20 @@ struct TabSelectionView: View {
         if Defaults[.enableTerminalFeature] {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
+        for plugin in staticPluginManager.enabledPlugins {
+            let requestedIcon = plugin.manifest.tab.icon
+            let icon = NSImage(systemSymbolName: requestedIcon, accessibilityDescription: nil) == nil
+                ? "puzzlepiece.extension"
+                : requestedIcon
+            tabsArray.append(
+                TabModel(
+                    label: plugin.manifest.tab.title,
+                    icon: icon,
+                    view: .staticPlugin,
+                    staticPluginID: plugin.id
+                )
+            )
+        }
         if extensionTabsEnabled {
             for payload in extensionTabPayloads {
                 guard let tab = payload.descriptor.tab else { continue }
@@ -121,7 +152,9 @@ struct TabSelectionView: View {
 
                 // Render the tab button
                 TabButton(label: tab.label, icon: tab.icon, selected: isSelected) {
-                    if tab.view == .extensionExperience {
+                    if tab.view == .staticPlugin {
+                        coordinator.selectedStaticPluginID = tab.staticPluginID
+                    } else if tab.view == .extensionExperience {
                         coordinator.selectedExtensionExperienceID = tab.experienceID
                     }
                     coordinator.currentView = tab.view
@@ -149,6 +182,9 @@ struct TabSelectionView: View {
         .onAppear {
             ensureValidSelection(with: tabs)
         }
+        .onChange(of: tabs.map(\.id)) { _, _ in
+            ensureValidSelection(with: tabs)
+        }
     }
 
     private var extensionTabsEnabled: Bool {
@@ -167,6 +203,10 @@ struct TabSelectionView: View {
     }
 
     private func isSelected(_ tab: TabModel) -> Bool {
+        if tab.view == .staticPlugin {
+            return coordinator.currentView == .staticPlugin
+                && coordinator.selectedStaticPluginID == tab.staticPluginID
+        }
         if tab.view == .extensionExperience {
             return coordinator.currentView == .extensionExperience
                 && coordinator.selectedExtensionExperienceID == tab.experienceID
@@ -180,9 +220,14 @@ struct TabSelectionView: View {
             return
         }
         guard let first = tabs.first else { return }
-        if first.view == .extensionExperience {
+        if first.view == .staticPlugin {
+            coordinator.selectedStaticPluginID = first.staticPluginID
+            coordinator.selectedExtensionExperienceID = nil
+        } else if first.view == .extensionExperience {
+            coordinator.selectedStaticPluginID = nil
             coordinator.selectedExtensionExperienceID = first.experienceID
         } else {
+            coordinator.selectedStaticPluginID = nil
             coordinator.selectedExtensionExperienceID = nil
         }
         coordinator.currentView = first.view

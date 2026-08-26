@@ -50,6 +50,7 @@ struct ContentView: View {
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
     @ObservedObject var lockScreenManager = LockScreenManager.shared
     @ObservedObject var capsLockManager = CapsLockManager.shared
+    @ObservedObject var staticPluginManager = StaticPluginManager.shared
     @ObservedObject var extensionLiveActivityManager = ExtensionLiveActivityManager.shared
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @ObservedObject var localSendService = LocalSendService.shared
@@ -190,6 +191,13 @@ struct ContentView: View {
             let maxFraction = Defaults[.terminalMaxHeightFraction]
             let terminalHeight = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
             return CGSize(width: baseSize.width, height: terminalHeight)
+        }
+
+        if coordinator.currentView == .staticPlugin {
+            if let preferredHeight = staticPluginPreferredHeight(baseSize: baseSize) {
+                return CGSize(width: baseSize.width, height: preferredHeight)
+            }
+            return baseSize
         }
 
         if coordinator.currentView == .extensionExperience {
@@ -1189,6 +1197,12 @@ struct ContentView: View {
                                 NotchClipboardView()
                             case .terminal:
                                 NotchTerminalView()
+                            case .staticPlugin:
+                                if let plugin = currentStaticPlugin() {
+                                    StaticPluginWebView(plugin: plugin)
+                                } else {
+                                    NotchHomeView(albumArtNamespace: albumArtNamespace)
+                                }
                             case .extensionExperience:
                                 if let payload = currentExtensionTabPayload() {
                                     ExtensionNotchExperienceTabView(payload: payload)
@@ -2363,6 +2377,22 @@ struct ContentView: View {
         let count = enabledStatsGraphCount()
         if count == 0 { return 0 }
         return count <= 3 ? 1 : 2
+    }
+
+    /// 返回当前选中且仍启用的静态插件。
+    private func currentStaticPlugin() -> InstalledStaticPlugin? {
+        guard let selectedID = coordinator.selectedStaticPluginID else { return nil }
+        return staticPluginManager.enabledPlugins.first { $0.id == selectedID }
+    }
+
+    /// 将插件期望高度限制在 Atoll 现有刘海展开范围内。
+    private func staticPluginPreferredHeight(baseSize: CGSize) -> CGFloat? {
+        guard let preferredHeight = currentStaticPlugin()?.manifest.tab.preferredHeight else {
+            return nil
+        }
+        let minHeight = baseSize.height
+        let maxHeight = baseSize.height + statsAdditionalRowHeight
+        return min(max(CGFloat(preferredHeight), minHeight), maxHeight)
     }
 
     private func currentExtensionTabPayload() -> ExtensionNotchExperiencePayload? {
