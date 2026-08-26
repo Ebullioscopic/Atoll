@@ -151,7 +151,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         case AppleMusicFavoriting.bundleIdentifier,
              SpotifyController.bundleIdentifier,
              YouTubeMusicFavoriting.bundleIdentifier,
-             TidalFavoriting.bundleIdentifier:
+             TidalAccessibility.bundleIdentifier:
             return true
         default:
             return false
@@ -167,8 +167,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             return SpotifyFavoriting.isAvailable
         case YouTubeMusicFavoriting.bundleIdentifier:
             return YouTubeMusicFavoriting.isAvailable
-        case TidalFavoriting.bundleIdentifier:
-            return TidalFavoriting.isAvailable
+        case TidalAccessibility.bundleIdentifier:
+            return TidalAccessibility.isAvailable
         default:
             return false
         }
@@ -185,8 +185,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             )
         case YouTubeMusicFavoriting.bundleIdentifier:
             return await YouTubeMusicFavoriting.isCurrentTrackFavorited()
-        case TidalFavoriting.bundleIdentifier:
-            return await TidalFavoriting.isCurrentTrackFavorited()
+        case TidalAccessibility.bundleIdentifier:
+            return await TidalAccessibility.isCurrentTrackFavorited()
         default:
             return nil
         }
@@ -205,20 +205,45 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             )
         case YouTubeMusicFavoriting.bundleIdentifier:
             return await YouTubeMusicFavoriting.setCurrentTrackFavorited(favorited)
-        case TidalFavoriting.bundleIdentifier:
-            return await TidalFavoriting.setCurrentTrackFavorited(favorited)
+        case TidalAccessibility.bundleIdentifier:
+            return await TidalAccessibility.setCurrentTrackFavorited(favorited)
         default:
             return false
         }
     }
     
     func toggleShuffle() async {
+        // TIDAL never registered a shuffle command, so the Media Remote call
+        // below reaches nothing: the button moved and the app carried on. Its
+        // Playback menu is the one place that both reports and accepts it.
+        if playbackState.bundleIdentifier == TidalAccessibility.bundleIdentifier {
+            let current = await TidalAccessibility.isShuffled() ?? playbackState.isShuffled
+            guard await TidalAccessibility.setShuffled(!current) else { return }
+            await MainActor.run { playbackState.isShuffled = !current }
+            return
+        }
+
         // MRMediaRemoteSendCommandFunction(6, nil)
         MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
         playbackState.isShuffled.toggle()
     }
     
     func toggleRepeat() async {
+        // Same as shuffle, and the menu is better than a cycling button: each
+        // repeat item sets its own mode, so there is nothing to overshoot.
+        if playbackState.bundleIdentifier == TidalAccessibility.bundleIdentifier {
+            let current = await TidalAccessibility.repeatMode() ?? playbackState.repeatMode
+            let next: RepeatMode
+            switch current {
+            case .off: next = .all
+            case .all: next = .one
+            case .one: next = .off
+            }
+            guard await TidalAccessibility.setRepeatMode(next) else { return }
+            await MainActor.run { playbackState.repeatMode = next }
+            return
+        }
+
         // MRMediaRemoteSendCommandFunction(7, nil)
         let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
         playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off

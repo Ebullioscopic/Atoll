@@ -40,47 +40,91 @@ final class TidalController: FilteredNowPlayingController {
     override var canEverFavorite: Bool { true }
 
     @MainActor
-    override var supportsFavoriting: Bool { TidalFavoriting.isAvailable }
+    override var supportsFavoriting: Bool { TidalAccessibility.isAvailable }
 
     override func isCurrentTrackFavorited() async -> Bool? {
-        await TidalFavoriting.isCurrentTrackFavorited()
+        await TidalAccessibility.isCurrentTrackFavorited()
     }
 
     @discardableResult
     override func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
-        await TidalFavoriting.setCurrentTrackFavorited(favorited)
+        await TidalAccessibility.setCurrentTrackFavorited(favorited)
+    }
+
+    // MARK: - Shuffle and repeat
+
+    // TIDAL registers seven Media Remote commands and neither shuffle nor
+    // repeat is among them, so the inherited implementations set a local flag
+    // and send a command the app never listens for -- the button moved and
+    // nothing happened. Both go through the Playback menu instead, which is
+    // the one place TIDAL both reports the state and accepts a change.
+
+    override func toggleShuffle() async {
+        let current = await TidalAccessibility.isShuffled() ?? playbackState.isShuffled
+        guard await TidalAccessibility.setShuffled(!current) else { return }
+        await MainActor.run { applyShuffleState(!current) }
+    }
+
+    override func toggleRepeat() async {
+        let current = await TidalAccessibility.repeatMode() ?? playbackState.repeatMode
+        let next: RepeatMode
+        switch current {
+        case .off: next = .all
+        case .all: next = .one
+        case .one: next = .off
+        }
+        guard await TidalAccessibility.setRepeatMode(next) else { return }
+        await MainActor.run { applyRepeatMode(next) }
+    }
+
+    /// The Media Remote stream never mentions shuffle or repeat for TIDAL, so
+    /// the state has to be asked for rather than waited on. Cheap enough to do
+    /// on the same beat as everything else: two menu reads, no tree walk.
+    func refreshPlaybackModes() async {
+        guard TidalAccessibility.isAvailable else { return }
+
+        if let shuffled = await TidalAccessibility.isShuffled() {
+            await MainActor.run { applyShuffleState(shuffled) }
+        }
+        if let mode = await TidalAccessibility.repeatMode() {
+            await MainActor.run { applyRepeatMode(mode) }
+        }
     }
 }
 
-// MARK: - Favouriting
 
-/// Favouriting for TIDAL, at file scope so the Now Playing source can reach it
-/// without owning a controller -- the same shape as the other sources.
+
+// MARK: - Accessibility
+
+/// Everything Atoll can drive in TIDAL that TIDAL does not otherwise expose,
+/// at file scope so the Now Playing source can reach it without owning a
+/// controller.
 ///
-/// TIDAL gives us nothing the others do. It registers seven MediaRemote
-/// commands and none of them is a like or a rating; it is an Electron app with
-/// no scripting dictionary; and it opens no local port. What it does have is an
-/// accessibility tree, and the now playing heart sits in it as a real control:
-/// an `AXCheckBox` under `#footerPlayer` that answers `AXPress`.
+/// TIDAL offers none of the doors the other sources do. It registers seven
+/// Media Remote commands -- play, pause, toggle, stop, next, previous, seek --
+/// and nothing else: no like, no rating, no shuffle, no repeat. It is an
+/// Electron app with no scripting dictionary, and it opens no local port. What
+/// it does have is an accessibility tree, and the controls are in it.
 ///
-/// Reading its state is the awkward half. `AXValue` is empty and `AXSelected`
-/// stays `0` whether or not the track is in the collection, and the icon keeps
-/// its class in both states -- TIDAL swaps the shape inside the SVG, which
-/// accessibility does not describe. The only thing that moves is the label, so
-/// that is what we read, and outside the languages we recognise the answer is
-/// honestly unknown rather than guessed.
-enum TidalFavoriting {
+/// The heart lives in the player bar. Shuffle and repeat are read and written
+/// through the Playback menu instead, which unlike the player bar buttons
+/// reports its state: a menu item carries a check mark, and pressing a
+/// particular repeat item sets that mode outright rather than cycling toward
+/// it. Reading a menu this way does not open it on screen.
+enum TidalAccessibility {
     static let bundleIdentifier = TidalController.bundleIdentifier
 
-    /// Favouriting needs the accessibility permission Atoll already asks for
+    /// All of this needs the accessibility permission Atoll already asks for
     /// elsewhere; without it the tree is empty rather than wrong.
     static var isAvailable: Bool {
         AXIsProcessTrusted() && runningApp != nil
     }
 
+    // MARK: - Favouriting
+
     static func isCurrentTrackFavorited() async -> Bool? {
         guard isAvailable else { return nil }
-        return await onAccessibilityQueue { currentState() }
+        return await onAccessibilityQueue { favoriteButton().flatMap(favoriteState(of:)) }
     }
 
     @discardableResult
@@ -88,39 +132,26 @@ enum TidalFavoriting {
         guard isAvailable else { return false }
 
         return await onAccessibilityQueue {
-            // The control is a toggle, and a press made without knowing where
-            // it stands is as likely to undo the request as to carry it out.
+            // The heart is a toggle, and a press made without knowing where it
+            // stands is as likely to undo the request as to carry it out.
             guard let button = favoriteButton(),
-                  let current = state(of: button) else { return false }
+                  let current = favoriteState(of: button) else { return false }
             guard current != favorited else { return true }
-            guard AXUIElementPerformAction(button, kAXPressAction as CFString) == .success else {
-                return false
-            }
+            guard press(button) else { return false }
 
             // The label follows the network round trip rather than the press,
-            // so a press that never took effect would otherwise report success.
-            for _ in 0..<Self.confirmationAttempts {
-                usleep(Self.confirmationInterval)
-                if state(of: button) == favorited { return true }
-            }
-            return false
+            // so a press that never took effect would report success.
+            return settles { favoriteState(of: button) == favorited }
         }
     }
 
-    // MARK: - Reading the label
-
-    /// The two labels TIDAL puts on the control. They are localised, so a
-    /// TIDAL running in another language falls through to `nil`: the heart
-    /// stays dimmed instead of claiming a state we cannot see.
+    /// The two labels TIDAL puts on the heart. They are localised, so a TIDAL
+    /// running in another language reports its state as unknown rather than
+    /// guessed: the control stays dimmed instead of lying.
     private static let notFavoritedLabel = "Add to My Collection"
     private static let favoritedLabel = "Remove from My Collection"
 
-    private static func currentState() -> Bool? {
-        guard let button = favoriteButton() else { return nil }
-        return state(of: button)
-    }
-
-    private static func state(of button: AXUIElement) -> Bool? {
+    private static func favoriteState(of button: AXUIElement) -> Bool? {
         switch attribute(button, kAXDescriptionAttribute) as? String {
         case notFavoritedLabel: return false
         case favoritedLabel: return true
@@ -128,43 +159,173 @@ enum TidalFavoriting {
         }
     }
 
-    // MARK: - Finding the control
-
-    /// The tree runs to a few thousand nodes, so the element is kept between
-    /// calls and only searched for again once it stops answering.
-    private static var cachedButton: AXUIElement?
+    /// Kept between calls: the tree runs to a few thousand nodes, and the
+    /// element only needs finding again once it stops answering.
+    private static var cachedFavoriteButton: AXUIElement?
 
     private static func favoriteButton() -> AXUIElement? {
-        if let cached = cachedButton, attribute(cached, kAXDescriptionAttribute) != nil {
+        if let cached = cachedFavoriteButton,
+           attribute(cached, kAXDescriptionAttribute) != nil {
             return cached
         }
-        cachedButton = nil
+        cachedFavoriteButton = nil
 
-        guard let app = runningApp else { return nil }
-        let root = AXUIElementCreateApplication(app.processIdentifier)
-        AXUIElementSetMessagingTimeout(root, Self.messagingTimeout)
-
-        var budget = Self.searchBudget
+        guard let root = applicationElement() else { return nil }
+        var budget = searchBudget
         guard let footer = firstDescendant(of: root, budget: &budget, where: {
             attribute($0, "AXDOMIdentifier") as? String == "footerPlayer"
         }) else { return nil }
 
-        budget = Self.searchBudget
-        let button = firstDescendant(of: footer, budget: &budget, where: isFavoriteButton)
-        if let button {
-            AXUIElementSetMessagingTimeout(button, Self.messagingTimeout)
+        budget = searchBudget
+        let button = firstDescendant(of: footer, budget: &budget) { element in
+            guard attribute(element, kAXRoleAttribute) as? String == kAXCheckBoxRole else {
+                return false
+            }
+            let classes = attribute(element, "AXDOMClassList") as? [String] ?? []
+            // Anchored on the class rather than the label so finding it does
+            // not depend on the app's language. The hash on the end changes
+            // between builds; the name in front of it is TIDAL's own.
+            return classes.contains { $0.hasPrefix("_favoriteButton_") }
         }
-        cachedButton = button
+        if let button { AXUIElementSetMessagingTimeout(button, messagingTimeout) }
+        cachedFavoriteButton = button
         return button
     }
 
-    /// Anchored on the class rather than the label so the search itself does
-    /// not depend on the app's language. The hash on the end changes between
-    /// builds; the name in front of it is TIDAL's own.
-    private static func isFavoriteButton(_ element: AXUIElement) -> Bool {
-        guard attribute(element, kAXRoleAttribute) as? String == kAXCheckBoxRole else { return false }
-        let classes = attribute(element, "AXDOMClassList") as? [String] ?? []
-        return classes.contains { $0.hasPrefix("_favoriteButton_") }
+    // MARK: - Shuffle
+
+    static func isShuffled() async -> Bool? {
+        guard isAvailable else { return nil }
+        return await onAccessibilityQueue {
+            playbackMenuItem(titled: shuffleTitle).map(isChecked)
+        }
+    }
+
+    @discardableResult
+    static func setShuffled(_ shuffled: Bool) async -> Bool {
+        guard isAvailable else { return false }
+
+        return await onAccessibilityQueue {
+            guard let item = playbackMenuItem(titled: shuffleTitle) else { return false }
+            guard isChecked(item) != shuffled else { return true }
+            guard press(item) else { return false }
+            return settles { isChecked(item) == shuffled }
+        }
+    }
+
+    // MARK: - Repeat
+
+    static func repeatMode() async -> RepeatMode? {
+        guard isAvailable else { return nil }
+        return await onAccessibilityQueue {
+            guard let items = repeatItems() else { return nil }
+            guard let index = items.firstIndex(where: isChecked) else { return nil }
+            return repeatModeOrder[index]
+        }
+    }
+
+    @discardableResult
+    static func setRepeatMode(_ mode: RepeatMode) async -> Bool {
+        guard isAvailable else { return false }
+
+        return await onAccessibilityQueue {
+            guard let items = repeatItems(),
+                  let wanted = repeatModeOrder.firstIndex(of: mode) else { return false }
+            guard !isChecked(items[wanted]) else { return true }
+            // Each item sets its own mode, so unlike the player bar button
+            // there is nothing to cycle through and nothing to overshoot.
+            guard press(items[wanted]) else { return false }
+            return settles { isChecked(items[wanted]) }
+        }
+    }
+
+    /// The submenu lists the three modes in this order. Read by position
+    /// rather than by title, so only finding the submenu depends on language.
+    private static let repeatModeOrder: [RepeatMode] = [.off, .all, .one]
+
+    private static func repeatItems() -> [AXUIElement]? {
+        guard let parent = playbackMenuItem(titled: repeatTitle),
+              let submenu = (attribute(parent, kAXChildrenAttribute) as? [AXUIElement])?.first,
+              let items = attribute(submenu, kAXChildrenAttribute) as? [AXUIElement],
+              items.count == repeatModeOrder.count else { return nil }
+        return items
+    }
+
+    // MARK: - The Playback menu
+
+    // Localised like the heart's labels, and unrecognised titles fall through
+    // to an unknown state for the same reason.
+    private static let playbackMenuTitle = "Playback"
+    private static let shuffleTitle = "Shuffle"
+    private static let repeatTitle = "Repeat"
+
+    private static func playbackMenuItem(titled title: String) -> AXUIElement? {
+        guard let root = applicationElement(),
+              let menuBar = attribute(root, kAXMenuBarAttribute) else { return nil }
+
+        let bar = menuBar as! AXUIElement
+        guard let menus = attribute(bar, kAXChildrenAttribute) as? [AXUIElement],
+              let playback = menus.first(where: {
+                  attribute($0, kAXTitleAttribute) as? String == playbackMenuTitle
+              }),
+              let menu = (attribute(playback, kAXChildrenAttribute) as? [AXUIElement])?.first,
+              let items = attribute(menu, kAXChildrenAttribute) as? [AXUIElement] else { return nil }
+
+        return items.first { attribute($0, kAXTitleAttribute) as? String == title }
+    }
+
+    /// A menu item carries a mark character only while it is the chosen one.
+    private static func isChecked(_ item: AXUIElement) -> Bool {
+        let mark = attribute(item, kAXMenuItemMarkCharAttribute) as? String
+        return !(mark ?? "").isEmpty
+    }
+
+    // MARK: - Plumbing
+
+    private static let messagingTimeout: Float = 1
+    private static let searchBudget = 12_000
+    private static let settleAttempts = 8
+    private static let settleInterval: UInt32 = 60_000
+
+    /// Accessibility calls block on the other application answering, so they
+    /// are kept off the main thread and off each other.
+    private static let accessibilityQueue = DispatchQueue(
+        label: "com.atoll.tidal.accessibility",
+        qos: .userInitiated
+    )
+
+    private static var runningApp: NSRunningApplication? {
+        NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == bundleIdentifier }
+    }
+
+    private static func applicationElement() -> AXUIElement? {
+        guard let app = runningApp else { return nil }
+        let element = AXUIElementCreateApplication(app.processIdentifier)
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
+        return element
+    }
+
+    private static func press(_ element: AXUIElement) -> Bool {
+        AXUIElementPerformAction(element, kAXPressAction as CFString) == .success
+    }
+
+    /// TIDAL updates these controls when its own state catches up rather than
+    /// when the press lands, so success is whatever the app is showing shortly
+    /// afterwards.
+    private static func settles(_ condition: () -> Bool) -> Bool {
+        for _ in 0..<settleAttempts {
+            usleep(settleInterval)
+            if condition() { return true }
+        }
+        return false
+    }
+
+    private static func attribute(_ element: AXUIElement, _ name: String) -> Any? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else {
+            return nil
+        }
+        return value
     }
 
     private static func firstDescendant(
@@ -185,32 +346,6 @@ enum TidalFavoriting {
             }
         }
         return nil
-    }
-
-    // MARK: - Plumbing
-
-    private static let messagingTimeout: Float = 1
-    private static let searchBudget = 12_000
-    private static let confirmationAttempts = 8
-    private static let confirmationInterval: UInt32 = 60_000
-
-    /// Accessibility calls block on the other application answering, so they
-    /// are kept off the main thread and off each other.
-    private static let accessibilityQueue = DispatchQueue(
-        label: "com.atoll.tidal.favoriting",
-        qos: .userInitiated
-    )
-
-    private static var runningApp: NSRunningApplication? {
-        NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == bundleIdentifier }
-    }
-
-    private static func attribute(_ element: AXUIElement, _ name: String) -> Any? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else {
-            return nil
-        }
-        return value
     }
 
     private static func onAccessibilityQueue<T>(_ work: @escaping () -> T) async -> T {

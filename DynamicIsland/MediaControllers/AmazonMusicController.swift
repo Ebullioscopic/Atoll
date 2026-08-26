@@ -157,6 +157,20 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         playbackState.isShuffled.toggle()
     }
 
+    /// Openings for a subclass whose app reports shuffle and repeat somewhere
+    /// other than the Media Remote stream. `playbackState` is settable only in
+    /// this file, so a subclass cannot reach it directly.
+
+    func applyShuffleState(_ isShuffled: Bool) {
+        guard playbackState.isShuffled != isShuffled else { return }
+        playbackState.isShuffled = isShuffled
+    }
+
+    func applyRepeatMode(_ mode: RepeatMode) {
+        guard playbackState.repeatMode != mode else { return }
+        playbackState.repeatMode = mode
+    }
+
     func toggleRepeat() async {
         let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
         playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off

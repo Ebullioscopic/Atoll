@@ -612,6 +612,10 @@ class MusicManager: ObservableObject {
     /// Whether the playing source can favourite at all, so a view can hide the
     /// control outright rather than show one that will never do anything.
     @Published private(set) var canFavoriteCurrentTrack: Bool = false
+
+    private static let tidalModeRefreshInterval: TimeInterval = 2
+    private var lastTidalModeRefresh = Date.distantPast
+    private var tidalModeTask: Task<Void, Never>?
     /// Identifies the track a lookup belongs to, so a result arriving after the
     /// track changed is discarded.
     private var likedLookupTrackID: String?
@@ -992,6 +996,7 @@ class MusicManager: ObservableObject {
         
         updateLiveStreamState(with: state)
         self.refreshLikedFlag(for: state)
+        self.refreshTidalPlaybackModes(for: state)
 
         // Guarded like every other assignment in this method, and for the same
         // reason. This is a published property that several views read, so an
@@ -1014,6 +1019,36 @@ class MusicManager: ObservableObject {
             startLyricSync()
         } else {
             stopLyricSync()
+        }
+    }
+
+    /// TIDAL is the one source whose shuffle and repeat never arrive on the
+    /// media stream -- it registers no command for either, so Media Remote has
+    /// nothing to report. The state has to be asked for instead, and asking
+    /// means reading TIDAL's menu, so it is paced rather than done on every
+    /// delivery.
+    @MainActor
+    private func refreshTidalPlaybackModes(for state: PlaybackState) {
+        guard state.bundleIdentifier == TidalAccessibility.bundleIdentifier,
+              TidalAccessibility.isAvailable else { return }
+
+        let now = Date()
+        guard now.timeIntervalSince(lastTidalModeRefresh) >= Self.tidalModeRefreshInterval else {
+            return
+        }
+        lastTidalModeRefresh = now
+
+        tidalModeTask?.cancel()
+        tidalModeTask = Task { [weak self] in
+            let shuffled = await TidalAccessibility.isShuffled()
+            let mode = await TidalAccessibility.repeatMode()
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                guard let self else { return }
+                if let shuffled, self.isShuffled != shuffled { self.isShuffled = shuffled }
+                if let mode, self.repeatMode != mode { self.repeatMode = mode }
+            }
         }
     }
 
