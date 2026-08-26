@@ -40,13 +40,6 @@ protocol MediaControllerProtocol: ObservableObject {
 
     // MARK: - Favouriting
 
-    /// Whether this source can favourite the track it is playing.
-    ///
-    /// Most cannot. A source qualifies only if it exposes favouriting to us
-    /// without asking the user for anything they would not already have: a
-    /// scripting interface on an app they are running, or an account they have
-    /// already connected. Everything else answers `false`, and the control is
-    /// hidden rather than shown broken.
     /// Whether favouriting applies to this source at all.
     ///
     /// Deliberately not the same question as ``supportsFavoriting``. This one

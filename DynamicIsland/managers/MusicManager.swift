@@ -1036,7 +1036,7 @@ class MusicManager: ObservableObject {
             return
         }
 
-        canFavoriteCurrentTrack = true
+        if !canFavoriteCurrentTrack { canFavoriteCurrentTrack = true }
         guard likedLookupTrackID != trackKey else { return }
 
         likedLookupTask?.cancel()

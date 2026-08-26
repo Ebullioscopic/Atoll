@@ -198,7 +198,7 @@ private struct ScrollHintIndicator: View {
     private func isControlDisabled(_ control: MusicControlButton) -> Bool {
         if control == .mediaOutput && !showMediaOutputControl { return true }
         if control.isAppleMusicExclusive && !musicManager.isAppleMusicActive { return true }
-        if control.requiresFavoriting && !musicManager.activeSourceSupportsFavoriting { return true }
+        if control.requiresFavoriting && !musicManager.activeSourceCanEverFavorite { return true }
         return false
     }
 
