@@ -425,7 +425,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             isStaticPluginView: coordinator.currentView == .staticPlugin,
             selectedPluginID: coordinator.selectedStaticPluginID,
             enabledPlugins: StaticPluginManager.shared.enabledPlugins,
-            visibleScreenHeight: NSScreen.main?.visibleFrame.height,
+            visibleScreenHeight: currentScreenVisibleHeight,
             fallbackMaximumHeight: baseSize.height + statsSecondRowContentHeight + statsGridSpacingHeight
         ) {
             return pluginSize
@@ -452,6 +452,11 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             isStatsTabActive: coordinator.currentView == .stats,
             secondRowProgress: coordinator.statsSecondRowExpansion
         )
+    }
+
+    private var currentScreenVisibleHeight: CGFloat? {
+        NSScreen.screens.first { $0.localizedName == screen }?.visibleFrame.height
+            ?? NSScreen.main?.visibleFrame.height
     }
 
     func close() {
