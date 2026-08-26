@@ -118,25 +118,14 @@ struct MusicSlotConfigurationView: View {
                         paletteItem(for: control)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.top, 4)
+                // The horizontal scroll bar is drawn over the bottom of the
+                // scroll view's content, not under it, so without a gap of its
+                // own it sat across the row beneath.
+                .padding(.bottom, 14)
             }
         }
     }
-
-private struct ScrollHintIndicator: View {
-    var body: some View {
-        HStack(spacing: 2) {
-            Image(systemName: "chevron.left")
-            Text("Scroll")
-            Image(systemName: "chevron.right")
-        }
-        .font(.caption2.weight(.medium))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.primary.opacity(0.08), in: Capsule())
-    }
-}
 
     private var resetButton: some View {
         HStack {
@@ -377,5 +366,26 @@ private struct ScrollHintIndicator: View {
                 }
             }
         )
+    }
+}
+
+/// The "‹ Scroll ›" pill.
+///
+/// A horizontal row inside a settings form gives no sign that it scrolls --
+/// the trackpad has no visible edge to bump against and the scroll bar only
+/// appears once somebody has already tried. This says so up front, next to
+/// the heading of whatever scrolls.
+struct ScrollHintIndicator: View {
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: "chevron.left")
+            Text("Scroll")
+            Image(systemName: "chevron.right")
+        }
+        .font(.caption2.weight(.medium))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.primary.opacity(0.08), in: Capsule())
     }
 }

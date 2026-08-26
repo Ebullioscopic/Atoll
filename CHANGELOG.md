@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Lyrics on the side**: Added ability to show lyrics of the current song when calendar is disabled (#741)
 
 ### Changed
+- **Lock Screen settings are split into General and Widgets**: the tab held fourteen sections, ten of them configuring one widget each, so the settings you came for when you are not adjusting a particular widget were buried among the per-widget ones. Settings search still opens any of them directly -- it switches to the right segment first.
+- **Segmented pickers throughout settings match the clipboard panel**: one rounded selection that slides between options on a spring, instead of the stock flat rectangle that snaps. It keeps the system accent colour, so it still follows System Settings > Appearance.
 - **Lock screen glass has one home**: the Lock Screen Glass section is now only on the Lock Screen tab. Appearance carried a second copy of the same material and glass-mode pickers, with its own variant sliders whose caption admitted they mirrored the other tab — two places to change one setting, and neither obviously the real one. The live glass preview that only existed on the Appearance copy moved over with it, so nothing is lost in the move.
 
 - Lock screen live activity timings now follow the selected icons: the fingerprint remains visible through its scan, while the open lock gets its own brief confirmation beat before the island contracts. (#774)
@@ -40,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- **The Controls tab no longer overflows the settings window**: its HUD variant cards are a fixed 110pt each, which inside a grouped form became a hard minimum width for the whole pane and pushed everything sideways. They fit to the available width now, and scroll horizontally when there is not enough.
+- The control palette's swipe indicator no longer overlaps the settings beneath it.
+- The lock screen positioning footer and reminder tooltip described the wrong controls, and the battery indicator toggle did not update the rows that depend on it until the tab was reopened.
 - The lock screen Dynamic Island now completes one clean unlock contraction instead of disappearing early or showing a second island that closes immediately afterward. (#774)
 
 - The keyboard backlight HUD and OSD toggles come back when the external display app is quit. They were greyed out by the integration setting alone, but the keys are only handed over while that setting is on *and* the provider is actually running — so quitting it returned the keys to Atoll and left the toggles disabled over a setting that had started working again.
