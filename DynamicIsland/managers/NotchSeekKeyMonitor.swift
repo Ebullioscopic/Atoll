@@ -32,6 +32,13 @@ final class NotchSeekKeyMonitor {
     private var localMonitor: Any?
     private var globalMonitor: Any?
 
+    /// The open notches currently asking for the arrow keys.
+    ///
+    /// One pair of process-wide event taps is shared by every screen, so they
+    /// cannot come down until nothing wants them: with notches open on two
+    /// displays, closing one used to take seeking away from the other.
+    private var owners: Set<UUID> = []
+
     private enum ArrowKey: UInt16 {
         case left = 123
         case right = 124
@@ -39,7 +46,12 @@ final class NotchSeekKeyMonitor {
 
     private init() {}
 
-    func start() {
+    /// Asks for the arrow keys on behalf of one notch.
+    ///
+    /// - Parameter owner: identifies the notch, so it can give them back
+    ///   without speaking for any other notch that is still open.
+    func start(owner: UUID) {
+        owners.insert(owner)
         guard localMonitor == nil, globalMonitor == nil else { return }
 
         // Fires when Atoll itself is frontmost, and can swallow the event so the
@@ -63,7 +75,16 @@ final class NotchSeekKeyMonitor {
         }
     }
 
-    func stop() {
+    /// Gives the arrow keys back on behalf of one notch.
+    ///
+    /// The taps come down only once the last notch has let go. Releasing a
+    /// notch that never asked, or has already let go, does nothing -- which is
+    /// what makes it safe to call from every teardown path without first
+    /// working out whether this notch was the one that started it.
+    func stop(owner: UUID) {
+        owners.remove(owner)
+        guard owners.isEmpty else { return }
+
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
         if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
         localMonitor = nil

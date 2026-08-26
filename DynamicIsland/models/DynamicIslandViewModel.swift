@@ -138,6 +138,10 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     @Published var notchSize: CGSize = getClosedNotchSize()
     @Published var closedNotchSize: CGSize = getClosedNotchSize()
     
+    /// This notch's claim on the shared arrow-key monitor. A value rather than
+    /// a reference to `self`, so teardown can release it from `deinit`.
+    private let seekMonitorOwner = UUID()
+
     @MainActor
     deinit {
         destroy()
@@ -147,14 +151,10 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         // A view model can be thrown away while its notch is still open --
         // window cleanup removes one without going through close() -- and the
         // seek monitor is a pair of process-wide event taps that would then
-        // stay registered with nothing left to drive them.
-        //
-        // Only when this notch was the open one: the monitor is shared, so a
-        // screen being torn down must not take the arrow keys away from
-        // another screen whose notch is still open.
-        if notchState == .open {
-            NotchSeekKeyMonitor.shared.stop()
-        }
+        // stay registered with nothing left to drive them. Releasing a claim
+        // that was never made does nothing, so this needs no test for whether
+        // this notch was open.
+        NotchSeekKeyMonitor.shared.stop(owner: seekMonitorOwner)
         onViewTeardown?()
         onViewTeardown = nil
         cancellables.forEach { $0.cancel() }
@@ -422,7 +422,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         notchSize = targetSize
         notchState = .open
 
-        NotchSeekKeyMonitor.shared.start()
+        NotchSeekKeyMonitor.shared.start(owner: seekMonitorOwner)
 
         // Force music information update when notch is opened
         MusicManager.shared.forceUpdate()
@@ -461,7 +461,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         notchSize = targetSize
         closedNotchSize = targetSize
         notchState = .closed
-        NotchSeekKeyMonitor.shared.stop()
+        NotchSeekKeyMonitor.shared.stop(owner: seekMonitorOwner)
         resetScrollGestureSuppression()
         resetAutoCloseSuppression()
 
@@ -480,7 +480,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             notchSize = targetSize
             closedNotchSize = targetSize
             notchState = .closed
-            NotchSeekKeyMonitor.shared.stop()
+            NotchSeekKeyMonitor.shared.stop(owner: seekMonitorOwner)
             resetScrollGestureSuppression()
             resetAutoCloseSuppression()
         }
