@@ -148,7 +148,9 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     @MainActor
     var canEverFavorite: Bool {
         switch playbackState.bundleIdentifier {
-        case AppleMusicFavoriting.bundleIdentifier, SpotifyController.bundleIdentifier:
+        case AppleMusicFavoriting.bundleIdentifier,
+             SpotifyController.bundleIdentifier,
+             YouTubeMusicFavoriting.bundleIdentifier:
             return true
         default:
             return false
@@ -162,6 +164,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             return AppleMusicFavoriting.isAvailable
         case SpotifyController.bundleIdentifier:
             return SpotifyFavoriting.isAvailable
+        case YouTubeMusicFavoriting.bundleIdentifier:
+            return YouTubeMusicFavoriting.isAvailable
         default:
             return false
         }
@@ -176,6 +180,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
                 contentIdentifier: playbackState.contentIdentifier,
                 contentURL: playbackState.contentURL
             )
+        case YouTubeMusicFavoriting.bundleIdentifier:
+            return await YouTubeMusicFavoriting.isCurrentTrackFavorited()
         default:
             return nil
         }
@@ -192,6 +198,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
                 contentIdentifier: playbackState.contentIdentifier,
                 contentURL: playbackState.contentURL
             )
+        case YouTubeMusicFavoriting.bundleIdentifier:
+            return await YouTubeMusicFavoriting.setCurrentTrackFavorited(favorited)
         default:
             return false
         }

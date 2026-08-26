@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Favorite the playing song from the notch**: the heart control now works with Apple Music as well as Spotify, and under the Now Playing source it follows whichever of the two is actually playing. Apple Music goes through Music.app's own scripting interface, so it needs no Apple Music subscription and no developer credentials. Sources that cannot favourite do not offer the control. (#599)
+- **Favorite the playing song from the notch**: the heart control now works with Apple Music and YouTube Music as well as Spotify, and under the Now Playing source it follows whichever of the three is actually playing. Apple Music goes through Music.app's own scripting interface and YouTube Music through the desktop app's API server, so neither needs a subscription or developer credentials. Sources that cannot favourite do not offer the control. (#599)
 - **Fingerprint lock screen activity**: choose the lock, an animated fingerprint scan, or both from Lock Screen settings. The fingerprint uses an attributed Lottie animation and completes its green scan while the Mac unlocks. (#774)
 
 - TIDAL can now be selected as the music source. Atoll follows the TIDAL desktop app's macOS Now Playing session, so unrelated videos no longer replace its metadata or controls, and the real-time waveform captures TIDAL's separate player process. (#764)

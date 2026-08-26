@@ -93,6 +93,23 @@ final class YouTubeMusicController: MediaControllerProtocol {
         }
     }
     
+    // MARK: - Favouriting
+
+    @MainActor
+    var canEverFavorite: Bool { true }
+
+    @MainActor
+    var supportsFavoriting: Bool { YouTubeMusicFavoriting.isAvailable }
+
+    func isCurrentTrackFavorited() async -> Bool? {
+        await YouTubeMusicFavoriting.isCurrentTrackFavorited()
+    }
+
+    @discardableResult
+    func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
+        await YouTubeMusicFavoriting.setCurrentTrackFavorited(favorited)
+    }
+
     func updatePlaybackInfo() async {
         guard isActive() else {
             resetPlaybackState()
@@ -373,6 +390,10 @@ final class YouTubeMusicController: MediaControllerProtocol {
         
         newState.isPlaying = !response.isPaused
 
+        if let videoId = response.videoId, !videoId.isEmpty {
+            newState.contentIdentifier = videoId
+        }
+
         if let title = response.title {
             newState.title = title
         }
@@ -452,4 +473,94 @@ final class YouTubeMusicController: MediaControllerProtocol {
         if let target, target != playbackState.repeatMode { playbackState.repeatMode = target }
     }
     
+}
+
+// MARK: - Favouriting
+
+/// Favouriting for YouTube Music, at file scope so the Now Playing source can
+/// reach it without owning a controller -- the same shape as the Apple Music
+/// and Spotify implementations.
+///
+/// The desktop app's API server plugin exposes the like button directly, so
+/// there is no account to connect and no track id to resolve: the endpoints act
+/// on whatever is playing. `like` presses the button rather than setting a
+/// value, so writing a state means reading the current one first and only
+/// pressing when the two differ.
+enum YouTubeMusicFavoriting {
+    static let bundleIdentifier = YouTubeMusicConfiguration.default.bundleIdentifier
+
+    private static let httpClient = YouTubeMusicHTTPClient(
+        baseURL: YouTubeMusicConfiguration.default.baseURL
+    )
+    private static let authManager = YouTubeMusicAuthManager(httpClient: httpClient)
+
+    /// Only true while the app is already running. Nothing here launches it.
+    static var isAvailable: Bool {
+        NSWorkspace.shared.runningApplications.contains {
+            $0.bundleIdentifier == bundleIdentifier
+        }
+    }
+
+    static func isCurrentTrackFavorited() async -> Bool? {
+        guard let state = await likeState() else { return nil }
+        return state == .like
+    }
+
+    @discardableResult
+    static func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
+        // Without knowing where the button stands, a press is as likely to
+        // undo the request as to carry it out. Failing is the honest answer.
+        guard let state = await likeState() else { return false }
+        guard (state == .like) != favorited else { return true }
+        return await press("/like")
+    }
+
+    /// The three states the app's like button reports.
+    private enum LikeState: String {
+        case like = "LIKE"
+        case dislike = "DISLIKE"
+        case indifferent = "INDIFFERENT"
+    }
+
+    /// `nil` covers every way the answer can be unavailable: the app is closed,
+    /// it is too old to have the endpoint, or nothing is playing.
+    private static func likeState() async -> LikeState? {
+        guard isAvailable else { return nil }
+
+        do {
+            let token = try await authManager.authenticate()
+            let data = try await httpClient.sendCommand(
+                endpoint: "/like-state",
+                method: "GET",
+                token: token
+            )
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let raw = json["state"] as? String else { return nil }
+            return LikeState(rawValue: raw)
+        } catch YouTubeMusicError.authenticationRequired {
+            await authManager.invalidateToken()
+            return nil
+        } catch {
+            return nil
+        }
+    }
+
+    private static func press(_ endpoint: String) async -> Bool {
+        guard isAvailable else { return false }
+
+        do {
+            let token = try await authManager.authenticate()
+            _ = try await httpClient.sendCommand(
+                endpoint: endpoint,
+                method: "POST",
+                token: token
+            )
+            return true
+        } catch YouTubeMusicError.authenticationRequired {
+            await authManager.invalidateToken()
+            return false
+        } catch {
+            return false
+        }
+    }
 }
