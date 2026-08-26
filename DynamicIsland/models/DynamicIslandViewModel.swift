@@ -144,6 +144,17 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
 
     func destroy() {
+        // A view model can be thrown away while its notch is still open --
+        // window cleanup removes one without going through close() -- and the
+        // seek monitor is a pair of process-wide event taps that would then
+        // stay registered with nothing left to drive them.
+        //
+        // Only when this notch was the open one: the monitor is shared, so a
+        // screen being torn down must not take the arrow keys away from
+        // another screen whose notch is still open.
+        if notchState == .open {
+            NotchSeekKeyMonitor.shared.stop()
+        }
         onViewTeardown?()
         onViewTeardown = nil
         cancellables.forEach { $0.cancel() }
