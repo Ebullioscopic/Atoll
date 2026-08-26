@@ -3010,6 +3010,7 @@ struct Media: View {
     @Default(.sneakPeekStyles) var sneakPeekStyles
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @Default(.showShuffleAndRepeat) private var showShuffleAndRepeat
+    @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.musicControlWindowEnabled) private var musicControlWindowEnabled
     @Default(.enableLockScreenMediaWidget) private var enableLockScreenMediaWidget
@@ -3154,6 +3155,19 @@ struct Media: View {
                 Text("Applies the notch-style parallax effect to the lock screen media widget album art.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Defaults.Toggle(key: .alwaysShowLockScreenVolume) {
+                        Text("Always show volume control")
+                    }
+                    .disabled(!showMediaOutputControl)
+                    Text(showMediaOutputControl
+                         ? "Keeps a volume slider under the playback controls on the lock screen, instead of leaving it behind the output button. The volume keys move it while the Mac is locked, where the notch cannot draw."
+                         : "Needs the \"Change Media Output\" control above, which the lock screen panel takes its volume slider from.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .settingsHighlight(id: highlightID("Always show volume control"))
             }
             Section {
                 Picker("Skip buttons", selection: $musicSkipBehavior) {

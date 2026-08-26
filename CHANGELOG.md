@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Always show volume control**: the lock screen panel can keep a volume slider under the playback controls, instead of leaving volume behind the output button. Off by default and named after the iOS setting it copies — a permanent bar across a panel that is mostly artwork is a preference, so it is asked for rather than assumed. The volume keys move it while the Mac is locked, where the notch has nowhere to draw.
+
 - **Fingerprint lock screen activity**: choose the lock, an animated fingerprint scan, or both from Lock Screen settings. The fingerprint uses an attributed Lottie animation and completes its green scan while the Mac unlocks. (#774)
 
 - TIDAL can now be selected as the music source. Atoll follows the TIDAL desktop app's macOS Now Playing session, so unrelated videos no longer replace its metadata or controls, and the real-time waveform captures TIDAL's separate player process. (#764)

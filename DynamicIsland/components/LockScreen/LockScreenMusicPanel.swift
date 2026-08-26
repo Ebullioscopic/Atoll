@@ -72,6 +72,7 @@ struct LockScreenMusicPanel: View {
     @Default(.lockScreenMusicUsesEnhancedLiquidBorder) private var useEnhancedLiquidBorder
     @Default(.lockScreenPanelUsesBlur) var enableBlur
     @Default(.showMediaOutputControl) private var showMediaOutputControl
+    @Default(.alwaysShowLockScreenVolume) private var alwaysShowVolume
     @Default(.showShuffleAndRepeat) private var showShuffleAndRepeat
     @Default(.musicControlSlots) private var slotConfig
     @Default(.musicSkipBehavior) private var musicSkipBehavior
@@ -1335,13 +1336,17 @@ struct LockScreenMusicPanel: View {
         shouldShowAirPlay || shouldShowRouteSelector
     }
 
-    /// Volume sits under the transport row for as long as the panel is up, the
-    /// way iOS shows it on the Lock Screen. It used to be hidden behind the
-    /// output button, which put the most-reached-for control two taps away —
-    /// and left nothing on screen at all when the volume keys were pressed,
-    /// since the notch HUD has nowhere to draw over the lock screen.
+    /// Volume can sit under the transport row for as long as the panel is up,
+    /// the way iOS shows it on the Lock Screen — but only when asked for.
+    ///
+    /// Otherwise it stays behind the output button, which is where it was.
+    /// Having it always there puts the most-reached-for control one tap
+    /// instead of two away, and gives the volume keys something to move while
+    /// the Mac is locked, since the notch HUD has nowhere to draw there. It is
+    /// also a permanent bar across a panel that is mostly artwork, which is
+    /// why iOS asks first rather than assuming, and why this does too.
     private var shouldShowVolumeSlider: Bool {
-        showMediaOutputControl
+        showMediaOutputControl && alwaysShowVolume
     }
 
     /// The device list stays behind the output button, which is what that
