@@ -420,6 +420,17 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
         var adjustedSize = baseSize
 
+        if let pluginSize = StaticPluginLayout.resolvedSize(
+            baseSize: baseSize,
+            isStaticPluginView: coordinator.currentView == .staticPlugin,
+            selectedPluginID: coordinator.selectedStaticPluginID,
+            enabledPlugins: StaticPluginManager.shared.enabledPlugins,
+            visibleScreenHeight: currentScreenVisibleHeight,
+            fallbackMaximumHeight: baseSize.height + statsSecondRowContentHeight + statsGridSpacingHeight
+        ) {
+            return pluginSize
+        }
+
         if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
             let preferred = coordinator.notesLayoutState.preferredHeight
             adjustedSize.height = max(adjustedSize.height, preferred)
@@ -441,6 +452,11 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             isStatsTabActive: coordinator.currentView == .stats,
             secondRowProgress: coordinator.statsSecondRowExpansion
         )
+    }
+
+    private var currentScreenVisibleHeight: CGFloat? {
+        NSScreen.screens.first { $0.localizedName == screen }?.visibleFrame.height
+            ?? NSScreen.main?.visibleFrame.height
     }
 
     func close() {

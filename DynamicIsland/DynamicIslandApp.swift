@@ -408,7 +408,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     {
         // Use the current required size instead of always using openNotchSize
         let baseSize = calculateRequiredNotchSize()
-        let requiredSize = adjustedSizeForScreen(baseSize, screen: screen)
+        let pluginAdjustedSize = staticPluginAdjustedSize(baseSize, for: screen)
+        let requiredSize = adjustedSizeForScreen(pluginAdjustedSize, screen: screen)
         let roundedWidth = requiredSize.width.rounded()
         let roundedHeight = requiredSize.height.rounded()
         
@@ -626,6 +627,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return adjusted
     }
 
+    /// 按每个窗口所在屏幕重新限制静态插件高度，避免副屏超出可用范围。
+    private func staticPluginAdjustedSize(_ size: CGSize, for screen: NSScreen) -> CGSize {
+        let baseContentSize = Defaults[.enableMinimalisticUI]
+            ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen.localizedName))
+            : openNotchSize
+        guard let pluginContentSize = StaticPluginLayout.resolvedSize(
+            baseSize: baseContentSize,
+            isStaticPluginView: coordinator.currentView == .staticPlugin,
+            selectedPluginID: coordinator.selectedStaticPluginID,
+            enabledPlugins: StaticPluginManager.shared.enabledPlugins,
+            visibleScreenHeight: screen.visibleFrame.height,
+            fallbackMaximumHeight: baseContentSize.height + statsSecondRowContentHeight + statsGridSpacingHeight
+        ) else {
+            return size
+        }
+        var adjusted = size
+        adjusted.height = pluginContentSize.height + notchShadowPaddingValue(
+            isMinimalistic: Defaults[.enableMinimalisticUI]
+        )
+        return adjusted
+    }
+
     func ensureWindowSize(_ size: CGSize, animated: Bool, force: Bool = false) {
         resizeWindows(to: size, animated: animated, force: force)
     }
@@ -635,7 +658,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         if Defaults[.showOnAllDisplays] {
             for (screen, window) in windows {
-                let screenSize = adjustedSizeForScreen(size, screen: screen)
+                let screenSize = adjustedSizeForScreen(
+                    staticPluginAdjustedSize(size, for: screen),
+                    screen: screen
+                )
                 if force || window.frame.size != screenSize {
                     resizeWindow(window, on: screen, to: screenSize, animated: animated)
                 }
@@ -643,7 +669,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else if let window {
             let screen = window.screen ?? NSScreen.screens.first { $0.frame.intersects(window.frame) } ?? NSScreen.main ?? NSScreen.screens.first
             guard let screen else { return }
-            let screenSize = adjustedSizeForScreen(size, screen: screen)
+            let screenSize = adjustedSizeForScreen(
+                staticPluginAdjustedSize(size, for: screen),
+                screen: screen
+            )
             if force || window.frame.size != screenSize {
                 resizeWindow(window, on: screen, to: screenSize, animated: animated)
             }
@@ -779,6 +808,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateWindowSizeForTabSwitch()
             }
         }.store(in: &cancellables)
+
+        // Replace 可保持插件 ID 不变；扫描修订号保证已打开窗口仍会刷新内容和高度。
+        StaticPluginManager.shared.$reloadRevision
+            .dropFirst()
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeIfNeeded()
+                }
+            }
+            .store(in: &cancellables)
 
         coordinator.$notesLayoutState
             .removeDuplicates()

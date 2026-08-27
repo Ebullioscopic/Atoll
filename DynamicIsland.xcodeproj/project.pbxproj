@@ -32,6 +32,9 @@
 		7EF19C172F577040005B9929 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 7EF19C162F577040005B9929 /* SwiftTerm */; };
 		8C9E422544384A70B829EDE7 /* NowPlayingPayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2137D0F9431A495AA62ACE96 /* NowPlayingPayloadTests.swift */; };
 		9A7D1A012F90000200A71001 /* AudioTapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7D1A022F90000200A71002 /* AudioTapTests.swift */; };
+		A70000000000000000000002 /* StaticPluginPackageValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70000000000000000000001 /* StaticPluginPackageValidatorTests.swift */; };
+		A70000000000000000000004 /* StaticPluginManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70000000000000000000003 /* StaticPluginManagerTests.swift */; };
+		A70000000000000000000006 /* StaticPluginNavigationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70000000000000000000005 /* StaticPluginNavigationPolicyTests.swift */; };
 		A1B2C3D40000000000000001 /* LyricsMetadataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000002 /* LyricsMetadataTests.swift */; };
 		A1B2C3D4E5F60718293A4B5C /* ExtensionRPCServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */; };
 		A3C83CAF84544DCE386C3BB8 /* DynamicIslandUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54078F29304A9DBBEFBDF932 /* DynamicIslandUITests.swift */; };
@@ -90,6 +93,9 @@
 		8DC2ACF06B40405DB1A8F99E /* MarqueeTextMeasurementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarqueeTextMeasurementTests.swift; sourceTree = "<group>"; };
 		957599910322B546D91E6F96 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9A7D1A022F90000200A71002 /* AudioTapTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioTapTests.swift; sourceTree = "<group>"; };
+		A70000000000000000000001 /* StaticPluginPackageValidatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StaticPluginPackageValidatorTests.swift; sourceTree = "<group>"; };
+		A70000000000000000000003 /* StaticPluginManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StaticPluginManagerTests.swift; sourceTree = "<group>"; };
+		A70000000000000000000005 /* StaticPluginNavigationPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StaticPluginNavigationPolicyTests.swift; sourceTree = "<group>"; };
 		A058D80A7EF44593B0F24EB7 /* DynamicIslandUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicIslandUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1B2C3D40000000000000002 /* LyricsMetadataTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LyricsMetadataTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* ExtensionRPCServerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExtensionRPCServerTests.swift; sourceTree = "<group>"; };
@@ -195,6 +201,9 @@
 		50983E4A1FCC1F5E2220FF8A /* DynamicIslandTests */ = {
 			isa = PBXGroup;
 			children = (
+				A70000000000000000000001 /* StaticPluginPackageValidatorTests.swift */,
+				A70000000000000000000003 /* StaticPluginManagerTests.swift */,
+				A70000000000000000000005 /* StaticPluginNavigationPolicyTests.swift */,
 				9A7D1A022F90000200A71002 /* AudioTapTests.swift */,
 				A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */,
 				C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */,
@@ -478,6 +487,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A70000000000000000000002 /* StaticPluginPackageValidatorTests.swift in Sources */,
+				A70000000000000000000004 /* StaticPluginManagerTests.swift in Sources */,
+				A70000000000000000000006 /* StaticPluginNavigationPolicyTests.swift in Sources */,
 				9A7D1A012F90000200A71001 /* AudioTapTests.swift in Sources */,
 				A4B5C6D7E8F90123456789AB /* AppleMusicControllerTests.swift in Sources */,
 				B4777BB9FE29243B253B8306 /* SpotifyLibraryTests.swift in Sources */,

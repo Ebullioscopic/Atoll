@@ -50,6 +50,7 @@ struct ContentView: View {
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
     @ObservedObject var lockScreenManager = LockScreenManager.shared
     @ObservedObject var capsLockManager = CapsLockManager.shared
+    @ObservedObject var staticPluginManager = StaticPluginManager.shared
     @ObservedObject var extensionLiveActivityManager = ExtensionLiveActivityManager.shared
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @ObservedObject var localSendService = LocalSendService.shared
@@ -190,6 +191,21 @@ struct ContentView: View {
             let maxFraction = Defaults[.terminalMaxHeightFraction]
             let terminalHeight = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
             return CGSize(width: baseSize.width, height: terminalHeight)
+        }
+
+        if let pluginSize = StaticPluginLayout.resolvedSize(
+            baseSize: baseSize,
+            isStaticPluginView: coordinator.currentView == .staticPlugin,
+            selectedPluginID: coordinator.selectedStaticPluginID,
+            enabledPlugins: staticPluginManager.enabledPlugins,
+            visibleScreenHeight: currentScreenVisibleHeight,
+            fallbackMaximumHeight: baseSize.height + statsAdditionalRowHeight
+        ) {
+            return pluginSize
+        }
+
+        if coordinator.currentView == .staticPlugin {
+            return baseSize
         }
 
         if coordinator.currentView == .extensionExperience {
@@ -1199,6 +1215,13 @@ struct ContentView: View {
                                 NotchClipboardView()
                             case .terminal:
                                 NotchTerminalView()
+                            case .staticPlugin:
+                                if let plugin = currentStaticPlugin() {
+                                    StaticPluginWebView(plugin: plugin)
+                                        .id("\(plugin.id):\(staticPluginManager.reloadRevision)")
+                                } else {
+                                    NotchHomeView(albumArtNamespace: albumArtNamespace)
+                                }
                             case .extensionExperience:
                                 if let payload = currentExtensionTabPayload() {
                                     ExtensionNotchExperienceTabView(payload: payload)
@@ -2373,6 +2396,17 @@ struct ContentView: View {
         let count = enabledStatsGraphCount()
         if count == 0 { return 0 }
         return count <= 3 ? 1 : 2
+    }
+
+    private var currentScreenVisibleHeight: CGFloat? {
+        NSScreen.screens.first { $0.localizedName == vm.screen }?.visibleFrame.height
+            ?? NSScreen.main?.visibleFrame.height
+    }
+
+    /// 返回当前选中且仍启用的静态插件。
+    private func currentStaticPlugin() -> InstalledStaticPlugin? {
+        guard let selectedID = coordinator.selectedStaticPluginID else { return nil }
+        return staticPluginManager.enabledPlugins.first { $0.id == selectedID }
     }
 
     private func currentExtensionTabPayload() -> ExtensionNotchExperiencePayload? {

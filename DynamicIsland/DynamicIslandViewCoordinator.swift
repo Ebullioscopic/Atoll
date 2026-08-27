@@ -105,7 +105,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var hoverOpenSuppressedUntil: Date = .distantPast
     
-    private static let tabOrder: [NotchViews] = [.home, .shelf, .timer, .stats, .llmUsage, .colorPicker, .notes, .clipboard, .terminal, .extensionExperience]
+    private static let tabOrder: [NotchViews] = [.home, .shelf, .timer, .stats, .llmUsage, .colorPicker, .notes, .clipboard, .terminal, .staticPlugin, .extensionExperience]
     
     /// Direction of the most recent tab switch (true = forward/right, false = backward/left)
     @Published var tabSwitchForward: Bool = true
@@ -126,6 +126,8 @@ class DynamicIslandViewCoordinator: ObservableObject {
     
     @Published var statsSecondRowExpansion: CGFloat = 1
     @Published var notesLayoutState: NotesLayoutState = .list
+    /// 当前刘海标签选中的静态插件 ID。
+    @Published var selectedStaticPluginID: String?
     @Published var selectedExtensionExperienceID: String?
     
     
@@ -168,6 +170,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
     @Published var selectedScreen: String = NSScreen.main?.localizedName ?? "Unknown"
 
     @Published var optionKeyPressed: Bool = true
+    private let staticPluginManager = StaticPluginManager.shared
     private let extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     
     private init() {
@@ -200,6 +203,16 @@ class DynamicIslandViewCoordinator: ObservableObject {
             }
             .store(in: &cancellables)
 
+        Publishers.CombineLatest(
+            staticPluginManager.$plugins,
+            staticPluginManager.$disabledPluginIDs
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] _, _ in
+            self?.handleStaticPluginSnapshot()
+        }
+        .store(in: &cancellables)
+
         Defaults.publisher(.enableThirdPartyExtensions)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -222,6 +235,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
             .store(in: &cancellables)
 
         handleExtensionExperienceSnapshot(extensionNotchExperienceManager.activeExperiences)
+        handleStaticPluginSnapshot()
 
         // Observe all tab-affecting settings to enforce minimum notch width
         Publishers.MergeMany(
@@ -310,6 +324,19 @@ class DynamicIslandViewCoordinator: ObservableObject {
 
     private func handleExtensionFeatureToggle() {
         handleExtensionExperienceSnapshot(extensionNotchExperienceManager.activeExperiences)
+    }
+
+    /// 插件被禁用、删除或校验失效时退出已经不存在的标签页。
+    private func handleStaticPluginSnapshot() {
+        guard let selectedStaticPluginID,
+              staticPluginManager.enabledPlugins.contains(where: { $0.id == selectedStaticPluginID }) else {
+            self.selectedStaticPluginID = nil
+            guard currentView == .staticPlugin else { return }
+            withAnimation(.smooth) {
+                currentView = .home
+            }
+            return
+        }
     }
 
     private func resetExtensionViewIfNeeded() {
