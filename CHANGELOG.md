@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Lyrics on the side**: Added ability to show lyrics of the current song when calendar is disabled (#741)
 
 ### Changed
+- Completed the Korean (ko) localization: every remaining string is translated and no entry is left needing review. Terminology now follows Apple's official macOS Korean glossary — 음량 for Volume, 재생 중 for Now Playing, 손쉬운 사용 for Accessibility, 메뉴 막대 for the menu bar, 사용자 설정 for Custom and 사용자화 for Customize, 실시간 활동 for Live Activity, 훑어보기 for Quick Look, 노이즈 캔슬링 and 주변음 허용 for the AirPods listening modes. Variants that had drifted apart across separate contributions were unified, so Material, Minimalistic, Sneak Peek, Shelf, album art, window, hover and Gradient each read the same way throughout. (#789)
+- User-facing strings that bypassed the localization path are now localizable. `Text(verbatim:)` call sites, `String`-returning display properties, `NSAlert` message and informative text, and AppKit menu item titles across 20 files went through `String(localized:)`, so 168 strings that always rendered in English can now be translated in every language. Brand and product names, model identifiers, appcast URLs, SF Symbol names and internal log labels were deliberately left alone. (#789)
+
 - Lock screen live activity timings now follow the selected icons: the fingerprint remains visible through its scan, while the open lock gets its own brief confirmation beat before the island contracts. (#774)
 
 - The LIVE indicator shown in place of a progress bar on streams now follows Apple's treatment: two thin rules meeting the word in the middle, softening as they run away from it. It was a 10pt capsule with a fill, a centre shade, a stroke and three blend modes. Shadowed text was dropped over the top of all that. The result read as a progress bar someone had written on, and a stream has no progress to draw. The notch, the lock screen player and the floating window all draw the same component, so all three change together.
@@ -38,6 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- A tab count in the notch settings could not be formatted. `%lld tab%@ enabled · min %lld px` was translated using `%1lld` — missing the `$` — so it was never parsed as a positional specifier, and the separator was U+22C5 (dot operator) rather than the U+00B7 the source uses. (#789)
+- The microphone privacy indicator description showed an unrelated sentence about a meeting start time, which also introduced a `%@` that the source string does not have — reading an argument that was never passed. (#789)
+- A shipped string began with `추천 번역 ⭐️: `, an AI suggestion prefix that had been committed along with the translation it labelled. (#789)
+- The clipboard shortcut description ended mid-clause; its final sentence, stating that the shortcut only works while the clipboard feature is enabled, was missing entirely. (#789)
+- Leading and trailing spaces that the source strings carry on purpose had been dropped from four entries used to lay out the lock screen calendar and the stats rows, closing up gaps that are meant to be there. (#789)
+- Corrected a typo in the screen recording label (화면 녹과 → 화면 녹화), and restored the product names Cursor and Antigravity in the LLM Usage view, which had been translated as though they were common nouns. (#789)
+
 - The lock screen Dynamic Island now completes one clean unlock contraction instead of disappearing early or showing a second island that closes immediately afterward. (#774)
 
 - The keyboard backlight HUD and OSD toggles come back when the external display app is quit. They were greyed out by the integration setting alone, but the keys are only handed over while that setting is on *and* the provider is actually running — so quitting it returned the keys to Atoll and left the toggles disabled over a setting that had started working again.
