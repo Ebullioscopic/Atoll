@@ -617,9 +617,19 @@ struct ContentView: View {
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-            .padding(.top, isIslandMode ? 0 : notchTopScreenBleedAmount)
             .background(.black)
             .clipShape(resolvedClipShape)
+            // Keep the anti-gap fill outside the clipped notch. The window sits
+            // this far above screen.maxY, so placing the spacer after clipShape
+            // leaves the notch's top corners anchored to the visible screen edge.
+            .padding(.top, isIslandMode ? 0 : notchTopScreenBleedAmount)
+            .overlay(alignment: .top) {
+                if !isIslandMode {
+                    Rectangle()
+                        .fill(.black)
+                        .frame(height: notchTopScreenBleedAmount)
+                }
+            }
             .compositingGroup()
             .shadow(
                 color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])

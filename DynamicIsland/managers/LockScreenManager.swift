@@ -24,6 +24,10 @@ import SwiftUI
 import AVFoundation
 import os
 
+private extension NSEvent.EventSubtype {
+    static let powerKey = NSEvent.EventSubtype(rawValue: 1)!
+}
+
 enum LockScreenAnimationTimings {
     static let lockExpand: TimeInterval = 0.45
     static let unlockCollapse: TimeInterval = 0.82
@@ -93,13 +97,15 @@ class LockScreenManager: ObservableObject {
     @Published var isLockIdle: Bool = true
     @Published var shouldDelayPostUnlockMusicHUD: Bool = false
     @Published var lastUpdated: Date = .distantPast
-    @Published private(set) var fingerprintScanToken: Int = 0
+    @Published private(set) var isFingerprintAnimating: Bool = false
+    @Published private(set) var fingerprintAnimationGeneration: Int = 0
     
     // MARK: - Private Properties
     private var debounceIdleTask: Task<Void, Never>?
     private var collapseTask: Task<Void, Never>?
     private var postUnlockMusicHUDTask: Task<Void, Never>?
     private var lockStatePollTask: Task<Void, Never>?
+    private var fingerprintAnimationResetTask: Task<Void, Never>?
     private var powerKeyMonitors: [Any] = []
     private var lastPowerKeyEventDate: Date = .distantPast
     
@@ -124,6 +130,7 @@ class LockScreenManager: ObservableObject {
         collapseTask?.cancel()
         postUnlockMusicHUDTask?.cancel()
         lockStatePollTask?.cancel()
+        fingerprintAnimationResetTask?.cancel()
         powerKeyMonitors.forEach(NSEvent.removeMonitor)
     }
     
@@ -162,7 +169,7 @@ class LockScreenManager: ObservableObject {
         // globally: global monitors do not receive events delivered to Atoll,
         // while local monitors only receive those events.
         if let localMonitor = NSEvent.addLocalMonitorForEvents(matching: .systemDefined) { [weak self] event in
-            if event.subtype.rawValue == 1 {
+            if event.subtype == .powerKey {
                 Task { @MainActor in
                     self?.handlePowerKeyEvent()
                 }
@@ -173,7 +180,7 @@ class LockScreenManager: ObservableObject {
         }
 
         if let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .systemDefined) { [weak self] event in
-            guard event.subtype.rawValue == 1 else { return }
+            guard event.subtype == .powerKey else { return }
             Task { @MainActor in
                 self?.handlePowerKeyEvent()
             }
@@ -192,7 +199,27 @@ class LockScreenManager: ObservableObject {
         let now = Date()
         guard now.timeIntervalSince(lastPowerKeyEventDate) > 0.2 else { return }
         lastPowerKeyEventDate = now
-        fingerprintScanToken &+= 1
+        startFingerprintAnimation(resetIfStillLocked: true)
+    }
+
+    private func startFingerprintAnimation(resetIfStillLocked: Bool) {
+        fingerprintAnimationResetTask?.cancel()
+        fingerprintAnimationResetTask = nil
+        isFingerprintAnimating = true
+        fingerprintAnimationGeneration &+= 1
+
+        guard resetIfStillLocked else { return }
+        fingerprintAnimationResetTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(LockScreenAnimationTimings.fingerprintScanReset))
+            guard let self, !Task.isCancelled, self.isLocked else { return }
+            self.isFingerprintAnimating = false
+        }
+    }
+
+    private func resetFingerprintAnimation() {
+        fingerprintAnimationResetTask?.cancel()
+        fingerprintAnimationResetTask = nil
+        isFingerprintAnimating = false
     }
     
     // MARK: - Event Handlers
@@ -210,6 +237,7 @@ class LockScreenManager: ObservableObject {
         // Update state SYNCHRONOUSLY without Task/await to avoid any delay
         lastUpdated = Date()
         updateIdleState(locked: true)
+        resetFingerprintAnimation()
         postUnlockMusicHUDTask?.cancel()
         shouldDelayPostUnlockMusicHUD = false
         
@@ -260,6 +288,10 @@ class LockScreenManager: ObservableObject {
         LockScreenDisplayContextProvider.shared.refresh(reason: "screen-unlocked")
         lastUpdated = Date()
         updateIdleState(locked: false)
+        if Defaults[.enableLockScreenLiveActivity],
+           Defaults[.lockScreenLiveActivityIconStyle].showsFingerprint {
+            startFingerprintAnimation(resetIfStillLocked: false)
+        }
         isLocked = false
         updateNativeHUDSuppression()
         stopLockStatePolling()
