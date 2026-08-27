@@ -572,6 +572,10 @@ class MusicManager: ObservableObject {
     /// account is connected. Decides only whether the control is enabled.
     @MainActor
     var activeSourceSupportsFavoriting: Bool { activeController?.supportsFavoriting ?? false }
+
+    /// True when the playing source will show the favourited state but not
+    /// change it. The heart stays lit and stops taking clicks.
+    var activeSourceFavoritingIsReadOnly: Bool { activeController?.favoritingIsReadOnly ?? false }
     @Published var songDuration: TimeInterval = 0
     @Published var elapsedTime: TimeInterval = 0
     @Published var timestampDate: Date = .init()
@@ -1117,6 +1121,7 @@ class MusicManager: ObservableObject {
     func toggleLike() {
         guard let controller = activeController,
               controller.supportsFavoriting,
+              !controller.favoritingIsReadOnly,
               let trackKey = likedLookupTrackID,
               let currentValue = isCurrentTrackLiked else { return }
 

@@ -54,6 +54,11 @@ protocol MediaControllerProtocol: ObservableObject {
     /// whether the control exists.
     @MainActor var supportsFavoriting: Bool { get }
 
+    /// Whether this source will report the favourited state but refuse to
+    /// change it. The control still shows the truth -- worth having on its own
+    /// -- and simply does not take a click.
+    @MainActor var favoritingIsReadOnly: Bool { get }
+
     /// Whether the playing track is favourited, or `nil` while that is not yet
     /// known -- nothing is playing, the answer is still being fetched, or the
     /// source cannot say.
@@ -68,6 +73,8 @@ protocol MediaControllerProtocol: ObservableObject {
 extension MediaControllerProtocol {
     @MainActor var canEverFavorite: Bool { false }
     @MainActor var supportsFavoriting: Bool { false }
+
+    @MainActor var favoritingIsReadOnly: Bool { false }
     func isCurrentTrackFavorited() async -> Bool? { nil }
     @discardableResult
     func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool { false }

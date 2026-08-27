@@ -150,7 +150,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         switch playbackState.bundleIdentifier {
         case AppleMusicFavoriting.bundleIdentifier,
              SpotifyController.bundleIdentifier,
-             YouTubeMusicFavoriting.bundleIdentifier:
+             YouTubeMusicFavoriting.bundleIdentifier,
+             TidalAccessibility.bundleIdentifier:
             return true
         default:
             return false
@@ -166,9 +167,17 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             return SpotifyFavoriting.isAvailable
         case YouTubeMusicFavoriting.bundleIdentifier:
             return YouTubeMusicFavoriting.isAvailable
+        case TidalAccessibility.bundleIdentifier:
+            return TidalAccessibility.isAvailable
         default:
             return false
         }
+    }
+
+    /// TIDAL reports the favourited state but will not accept a change.
+    @MainActor
+    var favoritingIsReadOnly: Bool {
+        playbackState.bundleIdentifier == TidalAccessibility.bundleIdentifier
     }
 
     func isCurrentTrackFavorited() async -> Bool? {
@@ -182,6 +191,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             )
         case YouTubeMusicFavoriting.bundleIdentifier:
             return await YouTubeMusicFavoriting.isCurrentTrackFavorited()
+        case TidalAccessibility.bundleIdentifier:
+            return await TidalAccessibility.isCurrentTrackFavorited()
         default:
             return nil
         }

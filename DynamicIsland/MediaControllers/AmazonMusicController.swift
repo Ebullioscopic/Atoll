@@ -147,6 +147,9 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
     @MainActor
     var supportsFavoriting: Bool { false }
 
+    @MainActor
+    var favoritingIsReadOnly: Bool { false }
+
     func isCurrentTrackFavorited() async -> Bool? { nil }
 
     @discardableResult
