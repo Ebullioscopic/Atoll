@@ -98,6 +98,7 @@ class LockScreenManager: ObservableObject {
     @Published var shouldDelayPostUnlockMusicHUD: Bool = false
     @Published var lastUpdated: Date = .distantPast
     @Published private(set) var isFingerprintAnimating: Bool = false
+    @Published private(set) var fingerprintAnimationGeneration: Int = 0
     
     // MARK: - Private Properties
     private var debounceIdleTask: Task<Void, Never>?
@@ -205,6 +206,7 @@ class LockScreenManager: ObservableObject {
         fingerprintAnimationResetTask?.cancel()
         fingerprintAnimationResetTask = nil
         isFingerprintAnimating = true
+        fingerprintAnimationGeneration &+= 1
 
         guard resetIfStillLocked else { return }
         fingerprintAnimationResetTask = Task { [weak self] in

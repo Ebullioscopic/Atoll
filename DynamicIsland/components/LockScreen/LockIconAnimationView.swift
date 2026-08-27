@@ -126,7 +126,6 @@ struct LockScreenFingerprintProgressView: View {
 
     @ObservedObject private var lockScreenManager = LockScreenManager.shared
     @Default(.lockScreenLiveActivityIconStyle) private var iconStyle
-    @State private var playbackToken = 0
 
     var body: some View {
         Group {
@@ -155,15 +154,10 @@ struct LockScreenFingerprintProgressView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .scaleEffect(Self.fingerprintCanvasCropScale)
-                            .id(playbackToken)
+                            .id(lockScreenManager.fingerprintAnimationGeneration)
                     }
                 }
                     .accessibilityLabel(lockScreenManager.isFingerprintAnimating ? "Unlocking" : "Fingerprint unlock")
-                    .onChange(of: lockScreenManager.isFingerprintAnimating) { _, isAnimating in
-                        if isAnimating {
-                            playbackToken &+= 1
-                        }
-                    }
             }
         }
     }
