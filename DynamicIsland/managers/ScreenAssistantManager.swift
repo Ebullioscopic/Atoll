@@ -66,11 +66,11 @@ struct ScreenAssistantFile: Identifiable, Codable {
         
         var displayName: String {
             switch self {
-            case .document: return "Document"
-            case .image: return "Image"
-            case .audio: return "Audio"
-            case .video: return "Video"
-            case .other: return "File"
+            case .document: return String(localized: "Document")
+            case .image: return String(localized: "Image")
+            case .audio: return String(localized: "Audio")
+            case .video: return String(localized: "Video")
+            case .other: return String(localized: "File")
             }
         }
     }

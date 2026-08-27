@@ -3501,14 +3501,14 @@ struct CalendarSettings: View {
 
         var title: String {
             switch self {
-            case .mins15: return "15 mins"
-            case .mins30: return "30 mins"
-            case .hour1: return "1 hour"
-            case .hours3: return "3 hours"
-            case .hours6: return "6 hours"
-            case .hours12: return "12 hours"
-            case .restOfDay: return "Rest of the day"
-            case .allTime: return "All time"
+            case .mins15: return String(localized: "15 mins")
+            case .mins30: return String(localized: "30 mins")
+            case .hour1: return String(localized: "1 hour")
+            case .hours3: return String(localized: "3 hours")
+            case .hours6: return String(localized: "6 hours")
+            case .hours12: return String(localized: "12 hours")
+            case .restOfDay: return String(localized: "Rest of the day")
+            case .allTime: return String(localized: "All time")
             }
         }
     }
@@ -4067,9 +4067,9 @@ private extension DevicesSettingsView {
         var title: String {
             switch self {
             case .symbol:
-                return "Symbol"
+                return String(localized: "Symbol")
             case .threeD:
-                return "3D"
+                return String(localized: "3D")
             }
         }
     }
@@ -5487,14 +5487,14 @@ struct LockScreenSettings: View {
 
         var title: String {
             switch self {
-            case .mins15: return "15 mins"
-            case .mins30: return "30 mins"
-            case .hour1: return "1 hour"
-            case .hours3: return "3 hours"
-            case .hours6: return "6 hours"
-            case .hours12: return "12 hours"
-            case .restOfDay: return "Rest of the day"
-            case .allTime: return "All time"
+            case .mins15: return String(localized: "15 mins")
+            case .mins30: return String(localized: "30 mins")
+            case .hour1: return String(localized: "1 hour")
+            case .hours3: return String(localized: "3 hours")
+            case .hours6: return String(localized: "6 hours")
+            case .hours12: return String(localized: "12 hours")
+            case .restOfDay: return String(localized: "Rest of the day")
+            case .allTime: return String(localized: "All time")
             }
         }
     }
@@ -5508,9 +5508,9 @@ struct LockScreenSettings: View {
 
         var title: String {
             switch self {
-            case .leading: return "Left"
-            case .center: return "Center"
-            case .trailing: return "Right"
+            case .leading: return String(localized: "Left")
+            case .center: return String(localized: "Center")
+            case .trailing: return String(localized: "Right")
             }
         }
     }
@@ -6828,8 +6828,8 @@ private func copyLatestCrashReport() {
 
         guard let latestCrash = crashFiles.sorted(by: >).first else {
             let alert = NSAlert()
-            alert.messageText = "No Crash Reports Found"
-            alert.informativeText = "No crash reports found for DynamicIsland"
+            alert.messageText = String(localized: "No Crash Reports Found")
+            alert.informativeText = String(localized: "No crash reports found for DynamicIsland")
             alert.alertStyle = .informational
             alert.runModal()
             return
@@ -6842,14 +6842,14 @@ private func copyLatestCrashReport() {
         NSPasteboard.general.setString(crashContent, forType: .string)
 
         let alert = NSAlert()
-        alert.messageText = "Crash Report Copied"
-        alert.informativeText = "Crash report '\(latestCrash)' has been copied to clipboard"
+        alert.messageText = String(localized: "Crash Report Copied")
+        alert.informativeText = String(localized: "Crash report '\(latestCrash)' has been copied to clipboard")
         alert.alertStyle = .informational
         alert.runModal()
     } catch {
         let alert = NSAlert()
-        alert.messageText = "Error"
-        alert.informativeText = "Failed to read crash reports: \(error.localizedDescription)"
+        alert.messageText = String(localized: "Error")
+        alert.informativeText = String(localized: "Failed to read crash reports: \(error.localizedDescription)")
         alert.alertStyle = .warning
         alert.runModal()
     }

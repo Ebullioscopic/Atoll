@@ -1069,7 +1069,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let insertionIndex = preferredMenuInsertionIndex(in: mainMenu)
 
-        let focusMenuItem = NSMenuItem(title: "Focus", action: nil, keyEquivalent: "")
+        let focusMenuItem = NSMenuItem(title: String(localized: "Focus"), action: nil, keyEquivalent: String(localized: ""))
         focusMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Focus.Menu")
         let focusSubmenu = NSMenu(title: "Focus")
 
@@ -1095,7 +1095,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         focusWithoutDevToolsMenuItem = withoutDevTools
         focusUseDevToolsMenuItem = useDevTools
 
-        let accessibilityMenuItem = NSMenuItem(title: "Accessibility", action: nil, keyEquivalent: "")
+        let accessibilityMenuItem = NSMenuItem(title: String(localized: "Accessibility"), action: nil, keyEquivalent: String(localized: ""))
         accessibilityMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Accessibility.Menu")
         let accessibilitySubmenu = NSMenu(title: "Accessibility")
 
@@ -1118,7 +1118,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         accessibilityMenuItem.submenu = accessibilitySubmenu
         mainMenu.insertItem(accessibilityMenuItem, at: insertionIndex + 1)
 
-        let permissionsMenuItem = NSMenuItem(title: "Permissions", action: nil, keyEquivalent: "")
+        let permissionsMenuItem = NSMenuItem(title: String(localized: "Permissions"), action: nil, keyEquivalent: String(localized: ""))
         permissionsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Permissions.Menu")
         let permissionsSubmenu = NSMenu(title: "Permissions")
 
@@ -1150,11 +1150,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         permissionsMenuItem.submenu = permissionsSubmenu
         mainMenu.insertItem(permissionsMenuItem, at: insertionIndex + 2)
 
-        let toolsMenuItem = NSMenuItem(title: "Tools", action: nil, keyEquivalent: "")
+        let toolsMenuItem = NSMenuItem(title: String(localized: "Tools"), action: nil, keyEquivalent: String(localized: ""))
         toolsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Tools.Menu")
         let toolsSubmenu = NSMenu(title: "Tools")
 
-        let loggingLevelItem = NSMenuItem(title: "Logging Level", action: nil, keyEquivalent: "")
+        let loggingLevelItem = NSMenuItem(title: String(localized: "Logging Level"), action: nil, keyEquivalent: String(localized: ""))
         let loggingLevelSubmenu = NSMenu(title: "Logging Level")
         
         let levels: [(String, LogLevel)] = [
@@ -1177,7 +1177,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         toolsSubmenu.addItem(NSMenuItem.separator())
         
-        let exportLogsItem = NSMenuItem(title: "Export Logs", action: #selector(exportLogs), keyEquivalent: "")
+        let exportLogsItem = NSMenuItem(title: String(localized: "Export Logs"), action: #selector(exportLogs), keyEquivalent: String(localized: ""))
         exportLogsItem.target = self
         toolsSubmenu.addItem(exportLogsItem)
 
@@ -1309,16 +1309,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     
                     DispatchQueue.main.async {
                         let alert = NSAlert()
-                        alert.messageText = "Logs Exported"
-                        alert.informativeText = "Logs and crash reports have been successfully exported to \(url.lastPathComponent)."
+                        alert.messageText = String(localized: "Logs Exported")
+                        alert.informativeText = String(localized: "Logs and crash reports have been successfully exported to \(url.lastPathComponent).")
                         alert.alertStyle = .informational
                         alert.runModal()
                     }
                 } catch {
                     DispatchQueue.main.async {
                         let alert = NSAlert()
-                        alert.messageText = "Export Failed"
-                        alert.informativeText = "Failed to export logs: \(error.localizedDescription)"
+                        alert.messageText = String(localized: "Export Failed")
+                        alert.informativeText = String(localized: "Failed to export logs: \(error.localizedDescription)")
                         alert.alertStyle = .critical
                         alert.runModal()
                     }

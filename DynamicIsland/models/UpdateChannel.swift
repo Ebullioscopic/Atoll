@@ -31,21 +31,21 @@ enum UpdateChannel: String, CaseIterable, Identifiable, Codable, Defaults.Serial
 
     var displayName: String {
         switch self {
-        case .stable:  return "Stable"
-        case .beta:    return "Beta"
-        case .alpha:   return "Alpha"
-        case .nightly: return "Nightly"
-        case .dev:     return "Dev"
+        case .stable:  return String(localized: "Stable")
+        case .beta:    return String(localized: "Beta")
+        case .alpha:   return String(localized: "Alpha")
+        case .nightly: return String(localized: "Nightly")
+        case .dev:     return String(localized: "Dev")
         }
     }
 
     var description: String {
         switch self {
-        case .stable:  return "Production releases, thoroughly tested"
-        case .beta:    return "Pre-release builds, mostly stable"
-        case .alpha:   return "Early testing builds, may have issues"
-        case .nightly: return "Bleeding edge, built daily from dev"
-        case .dev:     return "Local development build from Xcode"
+        case .stable:  return String(localized: "Production releases, thoroughly tested")
+        case .beta:    return String(localized: "Pre-release builds, mostly stable")
+        case .alpha:   return String(localized: "Early testing builds, may have issues")
+        case .nightly: return String(localized: "Bleeding edge, built daily from dev")
+        case .dev:     return String(localized: "Local development build from Xcode")
         }
     }
 
