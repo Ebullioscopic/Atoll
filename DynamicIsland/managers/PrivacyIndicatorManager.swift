@@ -63,14 +63,14 @@ enum IndicatorLayout {
     // Description for debugging
     var description: String {
         switch self {
-        case .none: return String(localized: "None")
-        case .cameraOnly: return String(localized: "Camera Only")
-        case .microphoneOnly: return String(localized: "Microphone Only")
-        case .cameraAndMicrophone: return String(localized: "Camera + Microphone")
-        case .recordingOnly: return String(localized: "Recording Only")
-        case .recordingWithCamera: return String(localized: "Recording + Camera")
-        case .recordingWithMicrophone: return String(localized: "Recording + Microphone")
-        case .recordingWithBoth: return String(localized: "Recording + Camera + Microphone")
+        case .none: return "None"
+        case .cameraOnly: return "Camera Only"
+        case .microphoneOnly: return "Microphone Only"
+        case .cameraAndMicrophone: return "Camera + Microphone"
+        case .recordingOnly: return "Recording Only"
+        case .recordingWithCamera: return "Recording + Camera"
+        case .recordingWithMicrophone: return "Recording + Microphone"
+        case .recordingWithBoth: return "Recording + Camera + Microphone"
         }
     }
 }

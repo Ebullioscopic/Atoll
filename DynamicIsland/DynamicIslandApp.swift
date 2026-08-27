@@ -1069,7 +1069,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let insertionIndex = preferredMenuInsertionIndex(in: mainMenu)
 
-        let focusMenuItem = NSMenuItem(title: String(localized: "Focus"), action: nil, keyEquivalent: String(localized: ""))
+        let focusMenuItem = NSMenuItem(title: String(localized: "Focus"), action: nil, keyEquivalent: "")
         focusMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Focus.Menu")
         let focusSubmenu = NSMenu(title: "Focus")
 
@@ -1095,7 +1095,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         focusWithoutDevToolsMenuItem = withoutDevTools
         focusUseDevToolsMenuItem = useDevTools
 
-        let accessibilityMenuItem = NSMenuItem(title: String(localized: "Accessibility"), action: nil, keyEquivalent: String(localized: ""))
+        let accessibilityMenuItem = NSMenuItem(title: String(localized: "Accessibility"), action: nil, keyEquivalent: "")
         accessibilityMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Accessibility.Menu")
         let accessibilitySubmenu = NSMenu(title: "Accessibility")
 
@@ -1118,7 +1118,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         accessibilityMenuItem.submenu = accessibilitySubmenu
         mainMenu.insertItem(accessibilityMenuItem, at: insertionIndex + 1)
 
-        let permissionsMenuItem = NSMenuItem(title: String(localized: "Permissions"), action: nil, keyEquivalent: String(localized: ""))
+        let permissionsMenuItem = NSMenuItem(title: String(localized: "Permissions"), action: nil, keyEquivalent: "")
         permissionsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Permissions.Menu")
         let permissionsSubmenu = NSMenu(title: "Permissions")
 
@@ -1150,19 +1150,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         permissionsMenuItem.submenu = permissionsSubmenu
         mainMenu.insertItem(permissionsMenuItem, at: insertionIndex + 2)
 
-        let toolsMenuItem = NSMenuItem(title: String(localized: "Tools"), action: nil, keyEquivalent: String(localized: ""))
+        let toolsMenuItem = NSMenuItem(title: String(localized: "Tools"), action: nil, keyEquivalent: "")
         toolsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Tools.Menu")
         let toolsSubmenu = NSMenu(title: "Tools")
 
-        let loggingLevelItem = NSMenuItem(title: String(localized: "Logging Level"), action: nil, keyEquivalent: String(localized: ""))
+        let loggingLevelItem = NSMenuItem(title: String(localized: "Logging Level"), action: nil, keyEquivalent: "")
+        loggingLevelItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Tools.LoggingLevel")
         let loggingLevelSubmenu = NSMenu(title: "Logging Level")
         
+        // Dispatched by tag, so the titles are safe to localize.
         let levels: [(String, LogLevel)] = [
-            ("No Logging", .none),
-            ("Error", .error),
-            ("Warning", .warning),
-            ("Info", .info),
-            ("Debug", .debug)
+            (String(localized: "No Logging"), .none),
+            (String(localized: "Error"), .error),
+            (String(localized: "Warning"), .warning),
+            (String(localized: "Info"), .info),
+            (String(localized: "Debug"), .debug)
         ]
         
         for (title, level) in levels {
@@ -1177,7 +1179,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         toolsSubmenu.addItem(NSMenuItem.separator())
         
-        let exportLogsItem = NSMenuItem(title: String(localized: "Export Logs"), action: #selector(exportLogs), keyEquivalent: String(localized: ""))
+        let exportLogsItem = NSMenuItem(title: String(localized: "Export Logs"), action: #selector(exportLogs), keyEquivalent: "")
         exportLogsItem.target = self
         toolsSubmenu.addItem(exportLogsItem)
 
@@ -1247,10 +1249,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let level = LogLevel(rawValue: sender.tag) else { return }
         Defaults[.logLevel] = level
         
+        // Look these up by identifier: the titles are localized.
         guard let mainMenu = NSApp.mainMenu,
-              let toolsItem = mainMenu.item(withTitle: "Tools"),
+              let toolsItem = mainMenu.items.first(where: { $0.identifier?.rawValue == "Atoll.Tools.Menu" }),
               let toolsMenu = toolsItem.submenu,
-              let loggingItem = toolsMenu.items.first(where: { $0.title == "Logging Level" }),
+              let loggingItem = toolsMenu.items.first(where: { $0.identifier?.rawValue == "Atoll.Tools.LoggingLevel" }),
               let loggingSubmenu = loggingItem.submenu else { return }
               
         for item in loggingSubmenu.items {

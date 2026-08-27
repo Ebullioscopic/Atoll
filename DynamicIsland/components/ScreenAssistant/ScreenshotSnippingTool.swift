@@ -46,9 +46,9 @@ class ScreenshotSnippingTool: NSObject, ObservableObject {
         
         var displayName: String {
             switch self {
-            case .full: return String(localized: "Full Screen")
-            case .window: return String(localized: "Window")
-            case .area: return String(localized: "Area")
+            case .full: return "Full Screen"
+            case .window: return "Window"
+            case .area: return "Area"
             }
         }
         
