@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Lyrics on the side**: Added ability to show lyrics of the current song when calendar is disabled (#741)
 
+- **New API provider**: monitor multiple New API accounts with balance, usage (today/week), RPM, TPM, and request counts in the LLM Usage tab (#752)
+- Secure API key storage in macOS Keychain; account metadata in UserDefaults
+- Per-account error isolation — one account's failure doesn't block others
+- Settings: add/edit/delete accounts, toggle provider, validation with inline errors
+
 ### Changed
 - **Lock Screen settings are split into General and Widgets**: the tab held fourteen sections, ten of them configuring one widget each, so the settings you came for when you are not adjusting a particular widget were buried among the per-widget ones. Settings search still opens any of them directly -- it switches to the right segment first.
 - **Segmented pickers throughout settings match the clipboard panel**: one rounded selection that slides between options on a spring, instead of the stock flat rectangle that snaps. It keeps the system accent colour, so it still follows System Settings > Appearance.
