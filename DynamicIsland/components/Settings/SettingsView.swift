@@ -847,6 +847,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .lockScreen, title: "Material", keywords: ["glass", "frosted", "liquid"], highlightID: SettingsTab.lockScreen.highlightID(for: "Material")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen media panel", keywords: ["media panel", "lock screen media"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen media panel")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show media app icon", keywords: ["app icon", "media"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show media app icon")),
+            SettingsSearchEntry(tab: .lockScreen, title: "Always show volume control", keywords: ["volume", "slider", "lock screen", "media output", "accessibility"], highlightID: SettingsTab.lockScreen.highlightID(for: "Always show volume control")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show panel border", keywords: ["panel border"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show panel border")),
             SettingsSearchEntry(tab: .lockScreen, title: "Enable media panel blur", keywords: ["blur", "media panel"], highlightID: SettingsTab.lockScreen.highlightID(for: "Enable media panel blur")),
             SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen timer", keywords: ["timer widget", "lock screen timer"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen timer")),
@@ -902,6 +903,8 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .stats, title: "Codex Provider", keywords: ["llm", "codex", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Codex Provider")),
             SettingsSearchEntry(tab: .stats, title: "Cursor Provider", keywords: ["llm", "cursor", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Cursor Provider")),
             SettingsSearchEntry(tab: .stats, title: "Antigravity Provider", keywords: ["llm", "antigravity", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Antigravity Provider")),
+            SettingsSearchEntry(tab: .stats, title: "New API Provider", keywords: ["llm", "new api", "newapi", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "New API Provider")),
+            SettingsSearchEntry(tab: .stats, title: "New API Accounts", keywords: ["llm", "new api", "newapi", "accounts", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "New API Accounts")),
             SettingsSearchEntry(tab: .stats, title: "Stop monitoring after closing the notch", keywords: ["stats", "auto stop"], highlightID: SettingsTab.stats.highlightID(for: "Stop monitoring after closing the notch")),
             SettingsSearchEntry(tab: .stats, title: "CPU Usage", keywords: ["cpu", "graph"], highlightID: SettingsTab.stats.highlightID(for: "CPU Usage")),
             SettingsSearchEntry(tab: .stats, title: "Temperature unit", keywords: ["cpu", "temperature", "celsius", "fahrenheit"], highlightID: SettingsTab.stats.highlightID(for: "Temperature unit")),
@@ -2971,6 +2974,7 @@ private extension MediaControllerType {
         switch self {
         case .youtubeMusic: return "YouTubeMusicLogo"
         case .amazonMusic: return "AmazonMusicLogo"
+        case .tidal: return "TidalLogo"
         case .cider: return "CiderLogo"
         default: return nil
         }
@@ -3029,6 +3033,7 @@ struct Media: View {
     @Default(.sneakPeekStyles) var sneakPeekStyles
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @Default(.showShuffleAndRepeat) private var showShuffleAndRepeat
+    @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.musicControlWindowEnabled) private var musicControlWindowEnabled
     @Default(.enableLockScreenMediaWidget) private var enableLockScreenMediaWidget
@@ -3173,6 +3178,19 @@ struct Media: View {
                 Text("Applies the notch-style parallax effect to the lock screen media widget album art.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Defaults.Toggle(key: .alwaysShowLockScreenVolume) {
+                        Text("Always show volume control")
+                    }
+                    .disabled(!showMediaOutputControl)
+                    Text(showMediaOutputControl
+                         ? "Keeps a volume slider under the playback controls on the lock screen, instead of leaving it behind the output button. The volume keys move it while the Mac is locked, where the notch cannot draw. Also on the Lock Screen tab."
+                         : "Needs the \"Change Media Output\" control above, which the lock screen panel takes its volume slider from.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .settingsHighlight(id: highlightID("Always show volume control"))
             }
             Section {
                 Picker("Skip buttons", selection: $musicSkipBehavior) {
@@ -5436,6 +5454,7 @@ struct Appearance: View {
 }
 
 struct LockScreenSettings: View {
+    @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.enableReminderLiveActivity) private var enableReminderLiveActivity
     @Default(.lockScreenLiveActivityIconStyle) private var lockScreenLiveActivityIconStyle
     @ObservedObject private var calendarManager = CalendarManager.shared
@@ -5743,6 +5762,23 @@ struct LockScreenSettings: View {
                 }
                 .disabled(!enableLockScreenMediaWidget)
                 .settingsHighlight(id: highlightID("Show panel border"))
+
+                // Deliberately the same setting as the one on the Media tab.
+                // It is one key, so the two cannot drift; it is on both because
+                // this is a lock screen setting, while the control it depends
+                // on lives over on Media.
+                VStack(alignment: .leading, spacing: 6) {
+                    Defaults.Toggle(key: .alwaysShowLockScreenVolume) {
+                        Text("Always show volume control")
+                    }
+                    .disabled(!enableLockScreenMediaWidget || !showMediaOutputControl)
+                    Text(showMediaOutputControl
+                         ? "Keeps a volume slider under the playback controls on the lock screen, instead of leaving it behind the output button. The volume keys move it while the Mac is locked, where the notch cannot draw."
+                         : "Needs the \"Show Change Media Output control\" setting on the Media tab, which the lock screen panel takes its volume slider from.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .settingsHighlight(id: highlightID("Always show volume control"))
                 if lockScreenGlassCustomizationMode == .customLiquid {
                     Defaults.Toggle(key: .lockScreenMusicUsesEnhancedLiquidBorder) {
                         Text("Use enhanced liquid border")
@@ -7724,6 +7760,7 @@ struct StatsSettings: View {
     @ObservedObject var statsManager = StatsManager.shared
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.enableLLMUsageFeature) var enableLLMUsageFeature
+    @Default(.enableNewAPIProvider) var enableNewAPIProvider
     @Default(.statsStopWhenNotchCloses) var statsStopWhenNotchCloses
     @Default(.statsUpdateInterval) var statsUpdateInterval
     @Default(.showCpuGraph) var showCpuGraph
@@ -7732,6 +7769,11 @@ struct StatsSettings: View {
     @Default(.showNetworkGraph) var showNetworkGraph
     @Default(.showDiskGraph) var showDiskGraph
     @Default(.cpuTemperatureUnit) var cpuTemperatureUnit
+    @State private var newAPIAccounts = Defaults[.newAPIAccounts]
+    @State private var isNewAPIEditorPresented = false
+    @State private var editingNewAPIAccount: NewAPIAccount?
+    @State private var accountPendingDeletion: NewAPIAccount?
+    @State private var newAPIAccountErrorMessage: String?
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.stats.highlightID(for: title)
@@ -7805,10 +7847,74 @@ struct StatsSettings: View {
                         Text("Antigravity")
                     }
                     .settingsHighlight(id: highlightID("Antigravity Provider"))
+
+                    Defaults.Toggle(key: .enableNewAPIProvider) {
+                        Text("New API")
+                    }
+                    .settingsHighlight(id: highlightID("New API Provider"))
+                    .onChange(of: enableNewAPIProvider) { _, _ in
+                        LLMUsageManager.shared.refreshAll(force: true)
+                    }
                 } header: {
                     Text("LLM Providers")
                 } footer: {
                     Text("Choose which AI providers appear in the Usage tab.")
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    .font(.caption)
+                }
+
+                Section {
+                    if newAPIAccounts.isEmpty {
+                        Text("Add one or more New API accounts to monitor their balance and usage.")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    } else {
+                        ForEach(newAPIAccounts) { account in
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(account.name)
+                                    Text(account.baseURL)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                }
+
+                                Spacer()
+
+                                Button {
+                                    editingNewAPIAccount = account
+                                    isNewAPIEditorPresented = true
+                                } label: {
+                                    Image(systemName: "pencil")
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Edit New API account")
+
+                                Button(role: .destructive) {
+                                    accountPendingDeletion = account
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Delete New API account")
+                            }
+                        }
+                    }
+
+                    Button {
+                        editingNewAPIAccount = nil
+                        isNewAPIEditorPresented = true
+                    } label: {
+                        Label("Add New API Account", systemImage: "plus")
+                    }
+                    .buttonStyle(.bordered)
+                    .settingsHighlight(id: highlightID("New API Accounts"))
+                } header: {
+                    Text("New API Accounts")
+                } footer: {
+                    Text("API keys are stored in the macOS Keychain. Balance and usage are shown in the quota units reported by your New API server.")
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                         .font(.caption)
@@ -8015,6 +8121,121 @@ struct StatsSettings: View {
             }
         }
         .navigationTitle("Stats")
+        .onAppear {
+            newAPIAccounts = Defaults[.newAPIAccounts]
+        }
+        .sheet(isPresented: $isNewAPIEditorPresented) {
+            NewAPIAccountEditor(account: editingNewAPIAccount) { account, apiKey in
+                try NewAPIAccountStore.upsert(account, apiKey: apiKey)
+                newAPIAccounts = Defaults[.newAPIAccounts]
+                LLMUsageManager.shared.refreshAll(force: true)
+                isNewAPIEditorPresented = false
+            }
+        }
+        .confirmationDialog(
+            "Delete New API account?",
+            isPresented: Binding(
+                get: { accountPendingDeletion != nil },
+                set: { if !$0 { accountPendingDeletion = nil } }
+            ),
+            presenting: accountPendingDeletion
+        ) { account in
+            Button("Delete \(account.name)", role: .destructive) {
+                do {
+                    try NewAPIAccountStore.delete(account)
+                    newAPIAccounts = Defaults[.newAPIAccounts]
+                    LLMUsageManager.shared.refreshAll(force: true)
+                    accountPendingDeletion = nil
+                } catch {
+                    newAPIAccountErrorMessage = "Failed to delete \(account.name): \(error.localizedDescription)"
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                accountPendingDeletion = nil
+            }
+        } message: { account in
+            Text("This removes \(account.name) and its stored API key from Atoll.")
+        }
+        .alert("New API Account Error", isPresented: Binding(
+            get: { newAPIAccountErrorMessage != nil },
+            set: { if !$0 { newAPIAccountErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { newAPIAccountErrorMessage = nil }
+        } message: {
+            Text(newAPIAccountErrorMessage ?? "An unknown error occurred.")
+        }
+    }
+}
+
+private struct NewAPIAccountEditor: View {
+    let account: NewAPIAccount?
+    let onSave: (NewAPIAccount, String) throws -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var baseURL: String
+    @State private var apiKey: String
+    @State private var errorMessage: String?
+
+    init(account: NewAPIAccount?, onSave: @escaping (NewAPIAccount, String) throws -> Void) {
+        self.account = account
+        self.onSave = onSave
+        _name = State(initialValue: account?.name ?? "")
+        _baseURL = State(initialValue: account?.baseURL ?? "https://")
+        _apiKey = State(initialValue: account.map { NewAPIKeychain.read(accountID: $0.id) ?? "" } ?? "")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(account == nil ? "Add New API Account" : "Edit New API Account")
+                .font(.title3.weight(.semibold))
+
+            Form {
+                TextField("Account name", text: $name)
+                TextField("Base URL", text: $baseURL)
+                    .textContentType(.URL)
+                SecureField("API key", text: $apiKey)
+                    .textContentType(.password)
+            }
+            .formStyle(.grouped)
+            .frame(width: 420)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Save") {
+                    save()
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 470)
+    }
+
+    private func save() {
+        let updated = NewAPIAccount(
+            id: account?.id ?? UUID(),
+            name: name,
+            baseURL: baseURL
+        )
+        do {
+            try onSave(updated, apiKey)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
