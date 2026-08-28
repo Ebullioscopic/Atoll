@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Lyrics on the side**: Added ability to show lyrics of the current song when calendar is disabled (#741)
 
+- **New API provider**: monitor multiple New API accounts with balance, usage (today/week), RPM, TPM, and request counts in the LLM Usage tab (#752)
+- Secure API key storage in macOS Keychain; account metadata in UserDefaults
+- Per-account error isolation — one account's failure doesn't block others
+- Settings: add/edit/delete accounts, toggle provider, validation with inline errors
+
 ### Changed
 - The TIDAL source picker now uses the official TIDAL diamond logo instead of a generic waveform symbol. (#782)
 
