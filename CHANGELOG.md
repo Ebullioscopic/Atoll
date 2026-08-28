@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Always show volume control**: the lock screen panel can keep a volume slider under the playback controls, instead of leaving volume behind the output button. Off by default and named after the iOS setting it copies — a permanent bar across a panel that is mostly artwork is a preference, so it is asked for rather than assumed. The volume keys move it while the Mac is locked, where the notch has nowhere to draw.
+
 - **Fingerprint lock screen activity**: choose the lock, an animated fingerprint scan, or both from Lock Screen settings. The fingerprint uses an attributed Lottie animation and completes its green scan while the Mac unlocks. (#774)
 
 - TIDAL can now be selected as the music source. Atoll follows the TIDAL desktop app's macOS Now Playing session, so unrelated videos no longer replace its metadata or controls, and the real-time waveform captures TIDAL's separate player process. (#764)
@@ -29,7 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Lyrics on the side**: Added ability to show lyrics of the current song when calendar is disabled (#741)
 
+- **New API provider**: monitor multiple New API accounts with balance, usage (today/week), RPM, TPM, and request counts in the LLM Usage tab (#752)
+- Secure API key storage in macOS Keychain; account metadata in UserDefaults
+- Per-account error isolation — one account's failure doesn't block others
+- Settings: add/edit/delete accounts, toggle provider, validation with inline errors
+
 ### Changed
+- The TIDAL source picker now uses the official TIDAL diamond logo instead of a generic waveform symbol. (#782)
+
 - Lock screen live activity timings now follow the selected icons: the fingerprint remains visible through its scan, while the open lock gets its own brief confirmation beat before the island contracts. (#774)
 
 - The LIVE indicator shown in place of a progress bar on streams now follows Apple's treatment: two thin rules meeting the word in the middle, softening as they run away from it. It was a 10pt capsule with a fill, a centre shade, a stroke and three blend modes. Shadowed text was dropped over the top of all that. The result read as a progress bar someone had written on, and a stream has no progress to draw. The notch, the lock screen player and the floating window all draw the same component, so all three change together.
@@ -40,7 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- Restored the notch's curved top corners in both standard and Minimalistic music UI while retaining the top-edge anti-gap fill, and synchronized the lock and fingerprint indicators through one shared scan state. (#782)
+
 - The lock screen Dynamic Island now completes one clean unlock contraction instead of disappearing early or showing a second island that closes immediately afterward. (#774)
+- **Lock screen volume slider sat on the panel's edge**: the collapsed panel reserved half a point less height than its content needed, so the volume capsule was clipped by the bottom border while the transport row above it kept about 33pt of air. The reserved height is now measured rather than derived, and the capsule has around 20pt of room beneath it.
+
+- **Volume slider stuck at the bottom**: a volume the system would not report was being shown as a volume of zero, so on outputs that publish no readable per-channel level the lock screen and notch sliders sat empty and the speaker glyph showed muted. The level is now also read through the virtual main volume that macOS's own volume UI uses, and a read that fails holds the last known level instead of reporting silence. Setting the volume takes the same fallback.
 
 - The keyboard backlight HUD and OSD toggles come back when the external display app is quit. They were greyed out by the integration setting alone, but the keys are only handed over while that setting is on *and* the provider is actually running — so quitting it returned the keys to Atoll and left the toggles disabled over a setting that had started working again.
 - **Lyrics for untagged tracks**: An untagged file playing as "Track 7" by "Unknown artist" no longer shows a stranger's lyrics. lrclib holds many different songs filed under exactly that placeholder title and artist, so the search returned a perfect-scoring match that was somebody else's song. Metadata that names no particular track is now recognised as such and skipped, and a result that agrees with neither the title nor the artist is no longer accepted as the best of a bad set. Search results are also matched with the same diacritic folding used to build the query, so lrclib's "Beyoncé" no longer fails to match the "Beyonce" that was searched for. A karaoke, instrumental, remix or sped-up version is also no longer accepted in place of the track playing, since its words are right but its timings are not.
