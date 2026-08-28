@@ -3049,8 +3049,12 @@ struct Media: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Music Source")
-                        .font(.system(size: 13, weight: .semibold))
+                    HStack(spacing: 6) {
+                        Text("Music Source")
+                            .font(.system(size: 13, weight: .semibold))
+                        MediaSourceCapabilitiesButton()
+                        Spacer()
+                    }
 
                     MusicSourceSelector(
                         selection: $mediaController,
