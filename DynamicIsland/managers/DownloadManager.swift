@@ -269,7 +269,7 @@ class DownloadManager {
     /// whole file up front reports its final size from the first moment, which
     /// would read as a download that finished instantly and then never moved.
     /// Blocks on disk grow as the bytes actually arrive.
-    private static func bytesInProgress(in directory: URL) -> Int64 {
+    nonisolated static func bytesInProgress(in directory: URL) -> Int64 {
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.fileAllocatedSizeKey, .fileSizeKey]
@@ -277,9 +277,40 @@ class DownloadManager {
 
         return contents.reduce(into: Int64(0)) { total, url in
             guard PartialDownload.isInProgress(url.lastPathComponent) else { return }
-            let values = try? url.resourceValues(forKeys: [.fileAllocatedSizeKey, .fileSizeKey])
-            guard let bytes = values?.fileAllocatedSize ?? values?.fileSize else { return }
-            total += Int64(bytes)
+            total += allocatedBytes(of: url)
+        }
+    }
+
+    /// The bytes one in-progress download is holding.
+    ///
+    /// Safari's `.download` is a bundle rather than a file: the bytes land in a
+    /// child file and the directory entry itself never grows, so measuring only
+    /// the top level reports every Safari download as permanently stalled.
+    /// Chromium, Firefox and Opera all write a plain partial file, which the
+    /// first branch handles.
+    nonisolated private static func allocatedBytes(of url: URL) -> Int64 {
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .fileAllocatedSizeKey, .fileSizeKey]
+
+        func size(of item: URL) -> Int64 {
+            let values = try? item.resourceValues(forKeys: keys)
+            guard values?.isDirectory != true,
+                  let bytes = values?.fileAllocatedSize ?? values?.fileSize
+            else { return 0 }
+            return Int64(bytes)
+        }
+
+        guard (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else {
+            return size(of: url)
+        }
+
+        guard let children = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: Array(keys)
+        ) else { return 0 }
+
+        return children.reduce(into: Int64(0)) { total, child in
+            guard let child = child as? URL else { return }
+            total += size(of: child)
         }
     }
 
@@ -486,6 +517,11 @@ class DownloadManager {
     private func closeDownloadViewImmediately() {
         completionTimer?.invalidate()
         completionTimer = nil
+        // Without this a cancelled download leaves the sampler scanning the
+        // Downloads folder every second, and the next download inherits its
+        // stale samples because `startSpeedSampling` sees a live timer and
+        // skips the reset.
+        stopSpeedSampling()
         
         withAnimation(.smooth) {
             isDownloading = false

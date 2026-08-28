@@ -295,3 +295,66 @@ final class DownloadScanSequenceTests: XCTestCase {
         XCTAssertTrue(manager.isDownloading, "the activity was closed mid-animation")
     }
 }
+
+/// Speed is read from how much the in-progress files are holding, and the
+/// browsers do not agree on what an in-progress download even is on disk.
+final class DownloadBytesInProgressTests: XCTestCase {
+    private var directory: URL!
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+        directory = nil
+        try super.tearDownWithError()
+    }
+
+    private func write(_ byteCount: Int, to url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(repeating: 0xAB, count: byteCount).write(to: url)
+    }
+
+    /// The plain-file case every browser but Safari uses.
+    func testAPartialFileIsMeasured() throws {
+        try write(4_096, to: directory.appendingPathComponent("archive.zip.crdownload"))
+
+        XCTAssertGreaterThanOrEqual(DownloadManager.bytesInProgress(in: directory), 4_096)
+    }
+
+    /// Safari's `.download` is a bundle. Measuring only the directory entry
+    /// reports nothing, which reads as a download that never moves.
+    func testASafariBundleIsMeasuredThroughItsContents() throws {
+        let bundle = directory.appendingPathComponent("archive.zip.download", isDirectory: true)
+        try write(8_192, to: bundle.appendingPathComponent("Data"))
+
+        XCTAssertGreaterThanOrEqual(DownloadManager.bytesInProgress(in: directory), 8_192)
+    }
+
+    /// Safari nests the data file under a subdirectory in some versions.
+    func testASafariBundleIsMeasuredThroughNestedContents() throws {
+        let bundle = directory.appendingPathComponent("archive.zip.download", isDirectory: true)
+        try write(8_192, to: bundle.appendingPathComponent("Contents/Data"))
+
+        XCTAssertGreaterThanOrEqual(DownloadManager.bytesInProgress(in: directory), 8_192)
+    }
+
+    /// Only in-progress names count -- a finished file sitting in Downloads is
+    /// not part of the rate.
+    func testFinishedFilesAreNotMeasured() throws {
+        try write(16_384, to: directory.appendingPathComponent("archive.zip"))
+
+        XCTAssertEqual(DownloadManager.bytesInProgress(in: directory), 0)
+    }
+
+    func testAnEmptyFolderMeasuresNothing() {
+        XCTAssertEqual(DownloadManager.bytesInProgress(in: directory), 0)
+    }
+}
