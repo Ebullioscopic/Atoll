@@ -337,13 +337,5 @@ final class AmazonMusicController: FilteredNowPlayingController {
     }
 }
 
-final class CiderController: FilteredNowPlayingController {
-    static let bundleIdentifier = "sh.cider.genten.mac"
-
-    init?() {
-        super.init(
-            bundleIdentifier: Self.bundleIdentifier,
-            controllerName: "CiderController"
-        )
-    }
-}
+// CiderController now lives in CiderController.swift, where its
+// favouriting support sits alongside it.

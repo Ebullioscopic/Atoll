@@ -3096,6 +3096,10 @@ struct Media: View {
                 SpotifyLikeButtonSettingsSection()
             }
 
+            if mediaController == .cider {
+                CiderFavoritingSettingsSection()
+            }
+
             Section {
                 Defaults.Toggle(key: .showStandardMediaControls) {
                     Text("Show media controls in Dynamic Island")

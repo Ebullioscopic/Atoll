@@ -1196,6 +1196,12 @@ extension Defaults.Keys {
     static let spotifyAuthAccessTokenExpiration = Key<Double>("spotifyAuthAccessTokenExpiration", default: 0)
     static let spotifyAuthLastValidatedAt = Key<Double>("spotifyAuthLastValidatedAt", default: 0)
     static let spotifyLibraryClientID = Key<String>("spotifyLibraryClientID", default: "")
+
+    /// Token for Cider's external-application API, from
+    /// Settings > Connectivity > Manage External Application Access in Cider.
+    /// Empty is a valid setting: Cider can also run that API with
+    /// authentication switched off, and then no header is wanted at all.
+    static let ciderAPIToken = Key<String>("ciderAPIToken", default: "")
     // The OAuth token pair lives in the Keychain (see KeychainSpotifyTokenStore);
     // these two keys remain only for the one-time migration of early builds.
     static let spotifyLibraryAccessToken = Key<String>("spotifyLibraryAccessToken", default: "")
