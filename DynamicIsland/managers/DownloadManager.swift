@@ -195,9 +195,18 @@ class DownloadManager {
         }
         
         source = src
+        // Queued before the source is resumed, and onto the same serial queue
+        // the event handler runs on, so the baseline is always the first scan
+        // to be delivered. Resuming first let a download that appeared during
+        // the baseline's own directory read be processed as a watcher event
+        // while `hasPerformedInitialScan` was still false -- which files it as
+        // pre-existing and ignored, after which the late baseline could drop
+        // it with nothing to notice it again until the next directory event.
+        // It also keeps the directory read off the main actor.
+        queue.async { [weak self] in
+            self?.scanDownloadsDirectory(session: session)
+        }
         src.resume()
-        
-        scanDownloadsDirectory(session: session)
     }
     
     private func stopMonitoring() {
@@ -534,11 +543,18 @@ class DownloadManager {
         if isActive {
             isDownloadCompleted = false
             
+            // Outside the `!isDownloading` branch below: completion stops the
+            // speed timer but holds `isDownloading` true for the two-second
+            // completion animation, so a download starting inside that window
+            // would never begin sampling and would show no speed for its whole
+            // life. `startSpeedSampling` no-ops while a timer is already live,
+            // so asking every time is safe.
+            startSpeedSampling()
+
             if !isDownloading {
                 withAnimation(.smooth) {
                     isDownloading = true
                 }
-                startSpeedSampling()
                 coordinator.toggleExpandingView(
                     status: true,
                     type: .download,
