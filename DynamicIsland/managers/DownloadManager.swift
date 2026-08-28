@@ -108,6 +108,15 @@ class DownloadManager {
     
     private let coordinator = DynamicIslandViewCoordinator.shared
     private var source: DispatchSourceFileSystemObject?
+    /// Which run of monitoring a scan belongs to. A scan reads the folder on
+    /// `queue` and delivers on the main actor, so one that was already reading
+    /// when monitoring stopped lands *after* the state it describes has been
+    /// cleared. If monitoring has restarted by then, that stale listing
+    /// overwrites the fresh initial scan and the live activity comes up for a
+    /// download that is no longer running -- with nothing to close it until
+    /// the next directory event. Each scan carries the session it was started
+    /// for and is dropped if that is no longer the current one.
+    private var monitorSession = 0
     private let queue = DispatchQueue(label: "com.dynamicisland.downloads.monitor", qos: .utility)
     private var completionTimer: Timer?
     private var hasPerformedInitialScan: Bool = false
@@ -158,6 +167,8 @@ class DownloadManager {
     private func startMonitoring() {
         guard source == nil, let downloadsDirectory else { return }
         
+        monitorSession &+= 1
+        let session = monitorSession
         hasPerformedInitialScan = false
         previousInProgressFiles.removeAll()
         ignoredFiles.removeAll()
@@ -176,7 +187,7 @@ class DownloadManager {
         )
         
         src.setEventHandler { [weak self] in
-            self?.scanDownloadsDirectory()
+            self?.scanDownloadsDirectory(session: session)
         }
         
         src.setCancelHandler {
@@ -186,13 +197,14 @@ class DownloadManager {
         source = src
         src.resume()
         
-        scanDownloadsDirectory()
+        scanDownloadsDirectory(session: session)
     }
     
     private func stopMonitoring() {
         source?.cancel()
         source = nil
         
+        monitorSession &+= 1
         hasPerformedInitialScan = false
         previousInProgressFiles.removeAll()
         ignoredFiles.removeAll()
@@ -372,7 +384,7 @@ class DownloadManager {
     /// unstructured `Task`, and one created from that queue never ran -- the
     /// listing was read and then silently dropped, so a download that appeared
     /// after launch was never noticed at all.
-    nonisolated private func scanDownloadsDirectory() {
+    nonisolated private func scanDownloadsDirectory(session: Int) {
         guard let downloadsDirectory = FileManager.default
             .urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
         
@@ -403,6 +415,7 @@ class DownloadManager {
         let resolvedStamps = stamps
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
+                guard session == self.monitorSession else { return }
                 self.processDownloadFiles(inProgressFiles, stamps: resolvedStamps)
             }
         }
