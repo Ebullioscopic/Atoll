@@ -1021,6 +1021,14 @@ extension Defaults.Keys {
     static let waitInterval = Key<Double>("waitInterval", default: 3)
     static let showShuffleAndRepeat = Key<Bool>("showShuffleAndRepeat", default: true)
     static let showMediaOutputControl = Key<Bool>("showMediaOutputControl", default: true)
+    /// Whether the lock screen panel keeps a volume slider under the transport
+    /// row, rather than leaving volume behind the output button.
+    ///
+    /// Off by default and named after the setting it copies: iOS puts "Always
+    /// Show Volume Control" in Accessibility rather than showing the slider to
+    /// everybody, because a Lock Screen that is mostly artwork is the point for
+    /// most people and a permanent slider is a preference, not an improvement.
+    static let alwaysShowLockScreenVolume = Key<Bool>("alwaysShowLockScreenVolume", default: false)
     static let musicAuxLeftControl = Key<MusicAuxiliaryControl>("musicAuxLeftControl", default: .shuffle)
     static let musicAuxRightControl = Key<MusicAuxiliaryControl>("musicAuxRightControl", default: .repeatMode)
     static let didMigrateMusicAuxControls = Key<Bool>("didMigrateMusicAuxControls", default: false)
