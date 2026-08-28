@@ -374,6 +374,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen media panel", keywords: ["media panel", "lock screen media"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen media panel"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Show media app icon", keywords: ["app icon", "media"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show media app icon"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Show panel border", keywords: ["panel border"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show panel border"), lockScreenSection: .widgets),
+        SettingsSearchEntry(tab: .lockScreen, title: "Always show volume control", keywords: ["volume", "slider", "lock screen", "media output", "accessibility"], highlightID: SettingsTab.lockScreen.highlightID(for: "Always show volume control"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Enable media panel blur", keywords: ["blur", "media panel"], highlightID: SettingsTab.lockScreen.highlightID(for: "Enable media panel blur"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen timer", keywords: ["timer widget", "lock screen timer"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen timer"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Timer surface", keywords: ["timer glass", "classic", "blur"], highlightID: SettingsTab.lockScreen.highlightID(for: "Timer surface"), lockScreenSection: .widgets),
@@ -3075,6 +3076,7 @@ struct Media: View {
     @Default(.sneakPeekStyles) var sneakPeekStyles
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @Default(.showShuffleAndRepeat) private var showShuffleAndRepeat
+    @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.musicControlWindowEnabled) private var musicControlWindowEnabled
     @Default(.enableLockScreenMediaWidget) private var enableLockScreenMediaWidget
@@ -3223,6 +3225,19 @@ struct Media: View {
                 Text("Applies the notch-style parallax effect to the lock screen media widget album art.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Defaults.Toggle(key: .alwaysShowLockScreenVolume) {
+                        Text("Always show volume control")
+                    }
+                    .disabled(!showMediaOutputControl)
+                    Text(showMediaOutputControl
+                         ? "Keeps a volume slider under the playback controls on the lock screen, instead of leaving it behind the output button. The volume keys move it while the Mac is locked, where the notch cannot draw. Also on the Lock Screen tab."
+                         : "Needs the \"Change Media Output\" control above, which the lock screen panel takes its volume slider from.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .settingsHighlight(id: highlightID("Always show volume control"))
             }
             Section {
                 SettingsSegmentedPicker(
@@ -3425,6 +3440,23 @@ struct Media: View {
                     Text("Show panel border")
                 }
                 .disabled(!enableLockScreenMediaWidget)
+
+                // Deliberately the same setting as the one on the Media tab.
+                // It is one key, so the two cannot drift; it is on both because
+                // this is a lock screen setting, while the control it depends
+                // on lives over on Media.
+                VStack(alignment: .leading, spacing: 6) {
+                    Defaults.Toggle(key: .alwaysShowLockScreenVolume) {
+                        Text("Always show volume control")
+                    }
+                    .disabled(!enableLockScreenMediaWidget || !showMediaOutputControl)
+                    Text(showMediaOutputControl
+                         ? "Keeps a volume slider under the playback controls on the lock screen, instead of leaving it behind the output button. The volume keys move it while the Mac is locked, where the notch cannot draw."
+                         : "Needs the \"Show Change Media Output control\" setting on the Media tab, which the lock screen panel takes its volume slider from.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .settingsHighlight(id: highlightID("Always show volume control"))
                 if lockScreenGlassCustomizationMode == .customLiquid {
                     Defaults.Toggle(key: .lockScreenMusicUsesEnhancedLiquidBorder) {
                         Text("Use enhanced liquid border")
@@ -5490,6 +5522,7 @@ struct SettingsSegmentedPicker<Item: Hashable>: View {
 }
 
 struct LockScreenSettings: View {
+    @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.enableReminderLiveActivity) private var enableReminderLiveActivity
     @Default(.lockScreenLiveActivityIconStyle) private var lockScreenLiveActivityIconStyle
     @ObservedObject private var calendarManager = CalendarManager.shared
