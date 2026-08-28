@@ -166,7 +166,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         case SpotifyController.bundleIdentifier:
             return SpotifyFavoriting.isAvailable
         case YouTubeMusicFavoriting.bundleIdentifier:
-            return YouTubeMusicFavoriting.isAvailable
+            return YouTubeMusicFavoriting.default.isAvailable
         case TidalAccessibility.bundleIdentifier:
             return TidalAccessibility.isAvailable
         default:
@@ -190,7 +190,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
                 contentURL: playbackState.contentURL
             )
         case YouTubeMusicFavoriting.bundleIdentifier:
-            return await YouTubeMusicFavoriting.isCurrentTrackFavorited()
+            return await YouTubeMusicFavoriting.default.isCurrentTrackFavorited()
         case TidalAccessibility.bundleIdentifier:
             return await TidalAccessibility.isCurrentTrackFavorited()
         default:
@@ -210,7 +210,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
                 contentURL: playbackState.contentURL
             )
         case YouTubeMusicFavoriting.bundleIdentifier:
-            return await YouTubeMusicFavoriting.setCurrentTrackFavorited(favorited)
+            return await YouTubeMusicFavoriting.default.setCurrentTrackFavorited(favorited)
         default:
             return false
         }

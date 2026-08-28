@@ -42,6 +42,10 @@ final class YouTubeMusicController: MediaControllerProtocol {
     
     // MARK: - Private Properties
     private let configuration: YouTubeMusicConfiguration
+    /// Built from this controller's configuration rather than the shared
+    /// default, so a controller pointed at a different server favourites
+    /// against that server instead of quietly reaching for localhost.
+    private let favoriting: YouTubeMusicFavoriting
     private let httpClient: YouTubeMusicHTTPClient
     private let authManager: YouTubeMusicAuthManager
     private var webSocketClient: YouTubeMusicWebSocketClient?
@@ -53,6 +57,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
     // MARK: - Initialization
     init(configuration: YouTubeMusicConfiguration = .default) {
         self.configuration = configuration
+        self.favoriting = YouTubeMusicFavoriting(configuration: configuration)
         self.httpClient = YouTubeMusicHTTPClient(baseURL: configuration.baseURL)
         self.authManager = YouTubeMusicAuthManager(httpClient: httpClient)
         
@@ -99,15 +104,15 @@ final class YouTubeMusicController: MediaControllerProtocol {
     var canEverFavorite: Bool { true }
 
     @MainActor
-    var supportsFavoriting: Bool { YouTubeMusicFavoriting.isAvailable }
+    var supportsFavoriting: Bool { favoriting.isAvailable }
 
     func isCurrentTrackFavorited() async -> Bool? {
-        await YouTubeMusicFavoriting.isCurrentTrackFavorited()
+        await favoriting.isCurrentTrackFavorited()
     }
 
     @discardableResult
     func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
-        await YouTubeMusicFavoriting.setCurrentTrackFavorited(favorited)
+        await favoriting.setCurrentTrackFavorited(favorited)
     }
 
     func updatePlaybackInfo() async {
@@ -385,6 +390,19 @@ final class YouTubeMusicController: MediaControllerProtocol {
         }
     }
     
+    /// Whether `response` names a track other than the one already in `state`.
+    ///
+    /// Only the fields the response actually carries are compared: a poll that
+    /// omits the artist says nothing about whether the artist changed, and
+    /// treating an absent field as a change would drop the identifier on every
+    /// partial update.
+    private static func namesADifferentTrack(_ response: PlaybackResponse, than state: PlaybackState) -> Bool {
+        if let title = response.title, title != state.title { return true }
+        if let artist = response.artist, artist != state.artist { return true }
+        if let album = response.album, album != state.album { return true }
+        return false
+    }
+
     private func updatePlaybackState(with response: PlaybackResponse) async {
         var newState = playbackState
         
@@ -392,7 +410,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
 
         if let videoId = response.videoId, !videoId.isEmpty {
             newState.contentIdentifier = videoId
-        } else if let title = response.title, title != playbackState.title {
+        } else if Self.namesADifferentTrack(response, than: playbackState) {
             // A different song arriving without an id of its own: carrying the
             // last one's over would attribute this track's favourite state, and
             // the heart's feedback, to the track that just finished. No
@@ -493,28 +511,37 @@ final class YouTubeMusicController: MediaControllerProtocol {
 /// on whatever is playing. `like` presses the button rather than setting a
 /// value, so writing a state means reading the current one first and only
 /// pressing when the two differ.
-enum YouTubeMusicFavoriting {
-    static let bundleIdentifier = YouTubeMusicConfiguration.default.bundleIdentifier
+struct YouTubeMusicFavoriting {
+    /// The Now Playing path has no controller to borrow a configuration from --
+    /// it dispatches on whichever app is playing -- so it uses this one.
+    static let `default` = YouTubeMusicFavoriting(configuration: .default)
+    static var bundleIdentifier: String { YouTubeMusicConfiguration.default.bundleIdentifier }
 
-    private static let httpClient = YouTubeMusicHTTPClient(
-        baseURL: YouTubeMusicConfiguration.default.baseURL
-    )
-    private static let authManager = YouTubeMusicAuthManager(httpClient: httpClient)
+    private let configuration: YouTubeMusicConfiguration
+    private let httpClient: YouTubeMusicHTTPClient
+    private let authManager: YouTubeMusicAuthManager
+
+    init(configuration: YouTubeMusicConfiguration) {
+        self.configuration = configuration
+        let client = YouTubeMusicHTTPClient(baseURL: configuration.baseURL)
+        self.httpClient = client
+        self.authManager = YouTubeMusicAuthManager(httpClient: client)
+    }
 
     /// Only true while the app is already running. Nothing here launches it.
-    static var isAvailable: Bool {
+    var isAvailable: Bool {
         NSWorkspace.shared.runningApplications.contains {
-            $0.bundleIdentifier == bundleIdentifier
+            $0.bundleIdentifier == configuration.bundleIdentifier
         }
     }
 
-    static func isCurrentTrackFavorited() async -> Bool? {
+    func isCurrentTrackFavorited() async -> Bool? {
         guard let state = await likeState() else { return nil }
         return state == .like
     }
 
     @discardableResult
-    static func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
+    func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
         // Without knowing where the button stands, a press is as likely to
         // undo the request as to carry it out. Failing is the honest answer.
         guard let state = await likeState() else { return false }
@@ -531,7 +558,7 @@ enum YouTubeMusicFavoriting {
 
     /// `nil` covers every way the answer can be unavailable: the app is closed,
     /// it is too old to have the endpoint, or nothing is playing.
-    private static func likeState() async -> LikeState? {
+    private func likeState() async -> LikeState? {
         guard isAvailable else { return nil }
 
         do {
@@ -552,7 +579,7 @@ enum YouTubeMusicFavoriting {
         }
     }
 
-    private static func press(_ endpoint: String) async -> Bool {
+    private func press(_ endpoint: String) async -> Bool {
         guard isAvailable else { return false }
 
         do {

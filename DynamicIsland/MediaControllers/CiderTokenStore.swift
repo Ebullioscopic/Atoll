@@ -38,7 +38,11 @@ final class CiderTokenStore: @unchecked Sendable {
         if !legacy.isEmpty {
             if cached == nil {
                 cached = legacy
-                Self.writeToKeychain(legacy)
+                // Only forget the plaintext copy once the Keychain has actually
+                // taken it. Clearing it after a failed write would leave the
+                // token nowhere at all, and Cider unauthenticated after the
+                // next launch.
+                guard Self.writeToKeychain(legacy) == errSecSuccess else { return }
             }
             Defaults[.ciderAPIToken] = ""
         }
