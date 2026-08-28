@@ -335,8 +335,7 @@ class DownloadManager {
                 coordinator.toggleExpandingView(
                     status: true,
                     type: .download,
-                    value: 0,
-                    browser: .chromium
+                    value: 0
                 )
             }
             
@@ -364,8 +363,7 @@ class DownloadManager {
         coordinator.toggleExpandingView(
             status: false,
             type: .download,
-            value: 0,
-            browser: .chromium
+            value: 0
         )
     }
     
@@ -381,8 +379,7 @@ class DownloadManager {
         coordinator.toggleExpandingView(
             status: false,
             type: .download,
-            value: 0,
-            browser: .chromium
+            value: 0
         )
     }
 }
