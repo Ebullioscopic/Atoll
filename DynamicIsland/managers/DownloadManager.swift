@@ -93,7 +93,15 @@ class DownloadManager {
     private(set) var downloadSpeed: Double?
 
     private var speedTimer: Timer?
-    private var lastSpeedSample: (bytes: Int64, at: Date)?
+    private var lastSpeedSample: DownloadsSample?
+    /// Changes whenever sampling starts or stops.
+    ///
+    /// Invalidating the timer does not reach work already queued on `queue`,
+    /// nor the main-actor hop it ends with. Without this, a reading in flight
+    /// when sampling stopped could land after the next download had started
+    /// one, and seed that session's baseline with bytes measured before it --
+    /// making the first rate it showed a fiction.
+    private var speedSession = 0
     /// Smoothed, because a raw sample swings with whatever the browser
     /// happened to flush in the last second.
     private var smoothedSpeed: Double?
@@ -204,6 +212,7 @@ class DownloadManager {
     private func startSpeedSampling() {
         guard speedTimer == nil else { return }
 
+        speedSession &+= 1
         lastSpeedSample = nil
         smoothedSpeed = nil
         downloadSpeed = nil
@@ -217,6 +226,7 @@ class DownloadManager {
     }
 
     private func stopSpeedSampling() {
+        speedSession &+= 1
         speedTimer?.invalidate()
         speedTimer = nil
         lastSpeedSample = nil
@@ -227,40 +237,69 @@ class DownloadManager {
     private func sampleSpeed() {
         guard let downloadsDirectory else { return }
 
+        let session = speedSession
         queue.async { [weak self] in
             guard let self else { return }
-            let total = Self.bytesInProgress(in: downloadsDirectory)
-            let now = Date()
+            let reading = Self.sample(in: downloadsDirectory, at: Date())
             Task { @MainActor in
-                self.recordSpeedSample(bytes: total, at: now)
+                self.recordSpeedSample(reading, session: session)
             }
         }
     }
 
     @MainActor
-    private func recordSpeedSample(bytes: Int64, at now: Date) {
-        defer { lastSpeedSample = (bytes, now) }
+    private func recordSpeedSample(_ reading: DownloadsSample, session: Int) {
+        // A reading measured before the current sampling session began says
+        // nothing about it.
+        guard session == speedSession else { return }
+
+        defer { lastSpeedSample = reading }
 
         guard let previous = lastSpeedSample else { return }
-        let elapsed = now.timeIntervalSince(previous.at)
-        guard elapsed > 0 else { return }
-
-        // A finished download takes its temporary file with it, so the total
-        // drops. That is not a negative rate -- there is simply nothing to
-        // measure across that pair of samples.
-        let delta = bytes - previous.bytes
-        guard delta >= 0 else {
+        guard let sample = reading.rate(since: previous) else {
+            // Nothing measurable across this pair. Drop the displayed rate
+            // rather than carrying a stale one over the gap.
             smoothedSpeed = nil
             downloadSpeed = nil
             return
         }
-
-        let sample = Double(delta) / elapsed
         let smoothed = smoothedSpeed.map { $0 + (sample - $0) * Self.speedSmoothing } ?? sample
         smoothedSpeed = smoothed
         // Below a byte a second there is nothing worth showing, and a paused or
         // stalled download should not read as a very slow one.
         downloadSpeed = smoothed >= 1 ? smoothed : nil
+    }
+
+    /// One reading of what the Downloads folder is holding.
+    struct DownloadsSample: Equatable, Sendable {
+        let bytes: Int64
+        /// The in-progress names the total was taken across.
+        let files: Set<String>
+        let takenAt: Date
+
+        /// The rate since an earlier reading, or nil when the pair cannot carry
+        /// one.
+        ///
+        /// A download that ended between two readings took its bytes out of the
+        /// total with it, so the difference across that pair is not a rate. A
+        /// vanished file dragging the total down is the obvious case, but a
+        /// completion alongside a faster download still nets positive: a 2 MB
+        /// file finishing while another gains 5 MB reads as +3 MB, and would
+        /// quietly understate the rate rather than being caught. So the test is
+        /// whether any file left, not whether the total fell.
+        func rate(since earlier: DownloadsSample) -> Double? {
+            guard earlier.files.isSubset(of: files) else { return nil }
+
+            let elapsed = takenAt.timeIntervalSince(earlier.takenAt)
+            guard elapsed > 0 else { return nil }
+
+            // Nothing removes bytes from a file that is still being written, so
+            // a fall here is a truncation rather than a rate.
+            let delta = bytes - earlier.bytes
+            guard delta >= 0 else { return nil }
+
+            return Double(delta) / elapsed
+        }
     }
 
     /// What the in-progress files hold right now.
@@ -270,15 +309,26 @@ class DownloadManager {
     /// would read as a download that finished instantly and then never moved.
     /// Blocks on disk grow as the bytes actually arrive.
     nonisolated static func bytesInProgress(in directory: URL) -> Int64 {
+        sample(in: directory, at: Date()).bytes
+    }
+
+    nonisolated static func sample(in directory: URL, at now: Date) -> DownloadsSample {
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.fileAllocatedSizeKey, .fileSizeKey]
-        ) else { return 0 }
-
-        return contents.reduce(into: Int64(0)) { total, url in
-            guard PartialDownload.isInProgress(url.lastPathComponent) else { return }
-            total += allocatedBytes(of: url)
+        ) else {
+            return DownloadsSample(bytes: 0, files: [], takenAt: now)
         }
+
+        var bytes: Int64 = 0
+        var files: Set<String> = []
+        for url in contents {
+            let name = url.lastPathComponent
+            guard PartialDownload.isInProgress(name) else { continue }
+            files.insert(name)
+            bytes += allocatedBytes(of: url)
+        }
+        return DownloadsSample(bytes: bytes, files: files, takenAt: now)
     }
 
     /// The bytes one in-progress download is holding.

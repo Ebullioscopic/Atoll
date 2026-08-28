@@ -358,3 +358,62 @@ final class DownloadBytesInProgressTests: XCTestCase {
         XCTAssertEqual(DownloadManager.bytesInProgress(in: directory), 0)
     }
 }
+
+/// The rate is read from how much the in-progress files grew between two
+/// readings, which only means anything while the same files are still there.
+final class DownloadSampleRateTests: XCTestCase {
+    private let start = Date(timeIntervalSince1970: 1_000_000)
+
+    private func sample(_ bytes: Int64, _ files: Set<String>, after seconds: TimeInterval) -> DownloadManager.DownloadsSample {
+        DownloadManager.DownloadsSample(bytes: bytes, files: files, takenAt: start.addingTimeInterval(seconds))
+    }
+
+    func testASteadyDownloadReportsItsRate() {
+        let first = sample(1_000_000, ["a.crdownload"], after: 0)
+        let second = sample(6_000_000, ["a.crdownload"], after: 1)
+
+        XCTAssertEqual(second.rate(since: first), 5_000_000)
+    }
+
+    /// The case that motivated this: a small download finishing beside a faster
+    /// one still nets positive, so a "did the total fall" test lets it through
+    /// and understates the rate.
+    func testACompletionBesideAFasterDownloadCarriesNoRate() {
+        let first = sample(2_000_000, ["done.crdownload", "b.crdownload"], after: 0)
+        // `done` finished and left; `b` gained 5 MB. The total rose by 3 MB.
+        let second = sample(5_000_000, ["b.crdownload"], after: 1)
+
+        XCTAssertGreaterThan(second.bytes, first.bytes, "precondition: the total rose")
+        XCTAssertNil(second.rate(since: first))
+    }
+
+    func testAFileDisappearingCarriesNoRate() {
+        let first = sample(9_000_000, ["a.crdownload"], after: 0)
+        let second = sample(0, [], after: 1)
+
+        XCTAssertNil(second.rate(since: first))
+    }
+
+    /// A new download appearing is fine -- nothing left, so the bytes that
+    /// arrived in the window are still bytes that arrived.
+    func testANewDownloadJoiningStillCarriesARate() {
+        let first = sample(1_000_000, ["a.crdownload"], after: 0)
+        let second = sample(3_000_000, ["a.crdownload", "new.part"], after: 1)
+
+        XCTAssertEqual(second.rate(since: first), 2_000_000)
+    }
+
+    func testATruncationCarriesNoRate() {
+        let first = sample(5_000_000, ["a.crdownload"], after: 0)
+        let second = sample(1_000_000, ["a.crdownload"], after: 1)
+
+        XCTAssertNil(second.rate(since: first))
+    }
+
+    func testTwoReadingsAtTheSameInstantCarryNoRate() {
+        let first = sample(1_000_000, ["a.crdownload"], after: 0)
+        let second = sample(2_000_000, ["a.crdownload"], after: 0)
+
+        XCTAssertNil(second.rate(since: first))
+    }
+}
