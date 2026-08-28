@@ -47,8 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- **The custom OSD no longer sticks on screen**: switching away from Custom OSD while one of its windows was visible left the overlay there for good. Nothing watched the setting, and the only thing that would ever have hidden that window was its own two-second timer, which the switch outran. Turning the OSD off -- or turning off volume, brightness or keyboard backlight individually -- now dismisses what is on screen.
 - Restored the notch's curved top corners in both standard and Minimalistic music UI while retaining the top-edge anti-gap fill, and synchronized the lock and fingerprint indicators through one shared scan state. (#782)
-
 - The lock screen Dynamic Island now completes one clean unlock contraction instead of disappearing early or showing a second island that closes immediately afterward. (#774)
 - **Lock screen volume slider sat on the panel's edge**: the collapsed panel reserved half a point less height than its content needed, so the volume capsule was clipped by the bottom border while the transport row above it kept about 33pt of air. The reserved height is now measured rather than derived, and the capsule has around 20pt of room beneath it.
 
