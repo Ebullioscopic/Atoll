@@ -705,6 +705,7 @@ struct SettingsView: View {
 
     private var settingsSearchIndex: [SettingsSearchEntry] {
         [
+            SettingsSearchEntry(tab: .whatsapp, title: "Suggest replies", keywords: ["smart replies", "apple intelligence", "ai", "suggestions", "reply", "social"], highlightID: SettingsTab.whatsapp.highlightID(for: "Suggest replies")),
             // General
             SettingsSearchEntry(tab: .general, title: "Enable Minimalistic UI", keywords: ["minimalistic", "ui mode", "general"], highlightID: SettingsTab.general.highlightID(for: "Enable Minimalistic UI")),
             SettingsSearchEntry(tab: .general, title: "Menubar icon", keywords: ["menu bar", "status bar", "icon"], highlightID: SettingsTab.general.highlightID(for: "Menubar icon")),
@@ -8843,6 +8844,7 @@ struct SocialSettingsView: View {
     @Default(.whatsAppEnabled) var whatsAppEnabled
     @Default(.isWhatsAppAnimEnabled) var isWhatsAppAnimEnabled
     @Default(.telegramEnabled) var telegramEnabled
+    @ObservedObject private var smartReplies = SmartReplyManager.shared
     @State private var disconnecting = false
     @State private var telegramDisconnecting = false
 
@@ -8850,8 +8852,66 @@ struct SocialSettingsView: View {
         SettingsTab.whatsapp.highlightID(for: title)
     }
 
+    private var smartReplyStatusText: String {
+        switch smartReplies.availability {
+        case .ready:
+            return ""
+        case .unsupportedOS:
+            return String(localized: "Smart Replies needs macOS 26 or later on a Mac with Apple Intelligence.")
+        case .notEnabled:
+            return String(localized: "Turn on Apple Intelligence in System Settings to use Smart Replies.")
+        case .modelNotReady:
+            return String(localized: "Apple Intelligence is still downloading its model. Smart Replies will turn on by itself once it finishes.")
+        case .unavailable(let reason):
+            return String(localized: "Apple Intelligence is unavailable on this Mac (\(reason)).")
+        }
+    }
+
     var body: some View {
             Form {
+                Section {
+                    HStack(spacing: 10) {
+                        Image(systemName: "apple.intelligence")
+                            .font(.system(size: 22))
+                            .foregroundStyle(.tint)
+                            .frame(width: 28, height: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Smart Replies")
+                                .font(.headline)
+                            Text("Reply to messages from the notch, with suggestions written on device by Apple Intelligence")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    Defaults.Toggle(key: .smartRepliesEnabled) {
+                        Text("Suggest replies")
+                    }
+                    .disabled(!smartReplies.availability.isReady)
+                    .settingsHighlight(id: highlightID("Suggest replies"))
+
+                    if !smartReplies.availability.isReady {
+                        HStack(spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.orange)
+                            Text(smartReplyStatusText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer()
+                        }
+                    }
+                } header: {
+                    Text("Apple Intelligence")
+                } footer: {
+                    Text("Message text is processed on your Mac and is never sent to Atoll or to Apple.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .onAppear { smartReplies.refreshAvailability() }
+
                 Section {
                     HStack(spacing: 10) {
                         Image("WhatsApp")

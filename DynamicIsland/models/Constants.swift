@@ -1395,6 +1395,11 @@ extension Defaults.Keys {
 
     // MARK: - Telegram Settings
     static let telegramEnabled = Key<Bool>("telegramEnabled", default: false)
+
+    /// Suggested replies generated on device by Apple Intelligence. Off by
+    /// default: it reads message text to do its job, which nobody should
+    /// discover after the fact.
+    static let smartRepliesEnabled = Key<Bool>("smartRepliesEnabled", default: false)
     
     
     // Helper to determine the default media controller based on macOS version
