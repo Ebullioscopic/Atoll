@@ -26,6 +26,26 @@ struct DownloadLiveActivity: View {
     @State private var isHovering: Bool = false
     @State private var gestureProgress: CGFloat = 0
     @State private var isExpanded: Bool = false
+
+    @Default(.showDownloadSpeed) private var showDownloadSpeed
+    @Default(.selectedDownloadIndicatorStyle) private var indicatorStyle
+
+    /// Shown only while there is a rate to show: the figure needs two samples
+    /// a second apart, and a finished download has no rate at all.
+    private var speedText: String? {
+        guard showDownloadSpeed,
+              !downloadManager.isDownloadCompleted,
+              let speed = downloadManager.downloadSpeed else { return nil }
+        return Self.speedFormatter.string(fromByteCount: Int64(speed)) + "/s"
+    }
+
+    private static let speedFormatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        formatter.isAdaptive = true
+        return formatter
+    }()
     
     private var tint: Color {
         .accentColor
@@ -78,23 +98,40 @@ struct DownloadLiveActivity: View {
                                     .foregroundStyle(.green)
                                     .font(.system(size: 16, weight: .semibold))
                                     .padding(.trailing, 6)
-                            } else if Defaults[.selectedDownloadIndicatorStyle] == .circle {
-                                SpinningCircleDownloadView()
-                                    .padding(.trailing, 6)
                             } else {
-                                ProgressView()
-                                    .progressViewStyle(.linear)
-                                    .tint(.accentColor)
-                                    .frame(width: 40)
+                                HStack(spacing: 6) {
+                                    if let speedText {
+                                        Text(speedText)
+                                            // Monospaced digits so the figure
+                                            // does not jitter as it changes.
+                                            .font(.system(size: 10, weight: .medium).monospacedDigit())
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                            .fixedSize()
+                                            .transition(.opacity)
+                                    }
+
+                                    if indicatorStyle == .circle {
+                                        SpinningCircleDownloadView()
+                                    } else {
+                                        ProgressView()
+                                            .progressViewStyle(.linear)
+                                            .tint(.accentColor)
+                                            .frame(width: 40)
+                                    }
+                                }
+                                .padding(.trailing, 6)
+                                .animation(.smooth(duration: 0.2), value: speedText)
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                     }
                 }
                 .frame(
-                    width: isExpanded ? max(60, vm.effectiveClosedNotchHeight) : 0,
+                    width: isExpanded ? max(60, vm.effectiveClosedNotchHeight) + (speedText == nil ? 0 : 58) : 0,
                     height: vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)
                 )
+                .animation(.smooth(duration: 0.25), value: speedText == nil)
         }
         .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0))
         .onAppear {

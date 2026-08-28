@@ -79,6 +79,7 @@ enum PartialDownload {
     }
 }
 
+
 @Observable
 @MainActor
 class DownloadManager {
@@ -86,6 +87,16 @@ class DownloadManager {
     
     private(set) var isDownloading: Bool = false
     private(set) var isDownloadCompleted: Bool = false
+
+    /// Bytes per second across everything currently downloading, or `nil`
+    /// before there are two samples to measure between.
+    private(set) var downloadSpeed: Double?
+
+    private var speedTimer: Timer?
+    private var lastSpeedSample: (bytes: Int64, at: Date)?
+    /// Smoothed, because a raw sample swings with whatever the browser
+    /// happened to flush in the last second.
+    private var smoothedSpeed: Double?
     
     private let coordinator = DynamicIslandViewCoordinator.shared
     private var source: DispatchSourceFileSystemObject?
@@ -180,10 +191,109 @@ class DownloadManager {
         vanishedSinceActive.removeAll()
         destinationStampsWhenStarted.removeAll()
         isDownloading = false
+        stopSpeedSampling()
     }
-    
-    private func scanDownloadsDirectory() {
+
+    // MARK: - Download speed
+
+    /// Sampled on a timer rather than off the directory's change events: those
+    /// fire when the folder's listing changes, and a file merely growing does
+    /// not always produce one. Two evenly spaced samples are also what makes
+    /// the figure a rate rather than whatever arrived between two arbitrary
+    /// moments.
+    private func startSpeedSampling() {
+        guard speedTimer == nil else { return }
+
+        lastSpeedSample = nil
+        smoothedSpeed = nil
+        downloadSpeed = nil
+
+        let timer = Timer(timeInterval: Self.speedSampleInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.sampleSpeed() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        speedTimer = timer
+        sampleSpeed()
+    }
+
+    private func stopSpeedSampling() {
+        speedTimer?.invalidate()
+        speedTimer = nil
+        lastSpeedSample = nil
+        smoothedSpeed = nil
+        downloadSpeed = nil
+    }
+
+    private func sampleSpeed() {
         guard let downloadsDirectory else { return }
+
+        queue.async { [weak self] in
+            guard let self else { return }
+            let total = Self.bytesInProgress(in: downloadsDirectory)
+            let now = Date()
+            Task { @MainActor in
+                self.recordSpeedSample(bytes: total, at: now)
+            }
+        }
+    }
+
+    @MainActor
+    private func recordSpeedSample(bytes: Int64, at now: Date) {
+        defer { lastSpeedSample = (bytes, now) }
+
+        guard let previous = lastSpeedSample else { return }
+        let elapsed = now.timeIntervalSince(previous.at)
+        guard elapsed > 0 else { return }
+
+        // A finished download takes its temporary file with it, so the total
+        // drops. That is not a negative rate -- there is simply nothing to
+        // measure across that pair of samples.
+        let delta = bytes - previous.bytes
+        guard delta >= 0 else {
+            smoothedSpeed = nil
+            downloadSpeed = nil
+            return
+        }
+
+        let sample = Double(delta) / elapsed
+        let smoothed = smoothedSpeed.map { $0 + (sample - $0) * Self.speedSmoothing } ?? sample
+        smoothedSpeed = smoothed
+        // Below a byte a second there is nothing worth showing, and a paused or
+        // stalled download should not read as a very slow one.
+        downloadSpeed = smoothed >= 1 ? smoothed : nil
+    }
+
+    /// What the in-progress files hold right now.
+    ///
+    /// Allocated size rather than logical size: a browser that reserves the
+    /// whole file up front reports its final size from the first moment, which
+    /// would read as a download that finished instantly and then never moved.
+    /// Blocks on disk grow as the bytes actually arrive.
+    private static func bytesInProgress(in directory: URL) -> Int64 {
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.fileAllocatedSizeKey, .fileSizeKey]
+        ) else { return 0 }
+
+        return contents.reduce(into: Int64(0)) { total, url in
+            guard PartialDownload.isInProgress(url.lastPathComponent) else { return }
+            let values = try? url.resourceValues(forKeys: [.fileAllocatedSizeKey, .fileSizeKey])
+            guard let bytes = values?.fileAllocatedSize ?? values?.fileSize else { return }
+            total += Int64(bytes)
+        }
+    }
+
+    private static let speedSampleInterval: TimeInterval = 1
+    private static let speedSmoothing: Double = 0.4
+    
+    /// Explicitly outside the main actor, because the directory source calls
+    /// this from its own queue. Left isolated, the hop back was written as an
+    /// unstructured `Task`, and one created from that queue never ran -- the
+    /// listing was read and then silently dropped, so a download that appeared
+    /// after launch was never noticed at all.
+    nonisolated private func scanDownloadsDirectory() {
+        guard let downloadsDirectory = FileManager.default
+            .urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
         
         let inProgressFiles: Set<String>
         var stamps: [String: Date] = [:]
@@ -210,8 +320,10 @@ class DownloadManager {
         }
 
         let resolvedStamps = stamps
-        Task { @MainActor in
-            self.processDownloadFiles(inProgressFiles, stamps: resolvedStamps)
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                self.processDownloadFiles(inProgressFiles, stamps: resolvedStamps)
+            }
         }
     }
     
@@ -332,6 +444,7 @@ class DownloadManager {
                 withAnimation(.smooth) {
                     isDownloading = true
                 }
+                startSpeedSampling()
                 coordinator.toggleExpandingView(
                     status: true,
                     type: .download,
@@ -342,6 +455,7 @@ class DownloadManager {
             
         } else {
             if isDownloading {
+                stopSpeedSampling()
                 withAnimation(.smooth) {
                     isDownloadCompleted = true
                 }

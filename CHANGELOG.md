@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Show download speed**: an option in Downloads settings puts the current rate beside the download indicator, measured from how fast the files in your Downloads folder are growing. Read from blocks on disk rather than the file's stated length, since a browser that reserves the whole file up front reports its final size from the first moment. Off by default.
 - **Fingerprint lock screen activity**: choose the lock, an animated fingerprint scan, or both from Lock Screen settings. The fingerprint uses an attributed Lottie animation and completes its green scan while the Mac unlocks. (#774)
 
 - TIDAL can now be selected as the music source. Atoll follows the TIDAL desktop app's macOS Now Playing session, so unrelated videos no longer replace its metadata or controls, and the real-time waveform captures TIDAL's separate player process. (#764)
