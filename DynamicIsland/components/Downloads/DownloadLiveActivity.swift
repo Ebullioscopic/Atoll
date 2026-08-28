@@ -39,6 +39,17 @@ struct DownloadLiveActivity: View {
         return Self.speedFormatter.string(fromByteCount: Int64(speed)) + "/s"
     }
 
+    /// How much room the rate needs beside the indicator.
+    ///
+    /// It is added to the black centre as well as to the right-hand side. The
+    /// centre only covers the physical notch while the two sides stay balanced
+    /// -- that is what the `isDownloading` widening already compensates for --
+    /// so growing one side alone drags the centre's right edge in under the
+    /// notch and hides whatever sits next to it.
+    private static let speedAllowance: CGFloat = 58
+
+    private var speedAllowance: CGFloat { speedText == nil ? 0 : Self.speedAllowance }
+
     private static let speedFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .file
@@ -86,7 +97,9 @@ struct DownloadLiveActivity: View {
                     width: vm.closedNotchSize.width
                         + (isHovering ? 8 : 0)
                         + (downloadManager.isDownloading ? 40 : 0)
+                        + speedAllowance
                 )
+                .animation(.smooth(duration: 0.25), value: speedAllowance)
             
             // Right side: indeterminate-style progress bar
             Color.clear
@@ -128,10 +141,10 @@ struct DownloadLiveActivity: View {
                     }
                 }
                 .frame(
-                    width: isExpanded ? max(60, vm.effectiveClosedNotchHeight) + (speedText == nil ? 0 : 58) : 0,
+                    width: isExpanded ? max(60, vm.effectiveClosedNotchHeight) + speedAllowance : 0,
                     height: vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)
                 )
-                .animation(.smooth(duration: 0.25), value: speedText == nil)
+                .animation(.smooth(duration: 0.25), value: speedAllowance)
         }
         .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0))
         .onAppear {
