@@ -51,8 +51,14 @@ private struct LyricsLookupKey: Hashable {
     let artist: String
     let album: String
 
+    /// Whether this is worth searching for.
+    ///
+    /// Empty fields are the obvious case. The subtler one is metadata that is
+    /// filled in but identifies nothing -- an untagged rip playing as "Track 7"
+    /// by "Unknown Artist" matches lrclib's twenty *other* untagged rips
+    /// exactly, and one of them wins. Not searching is the right answer there.
     var isValid: Bool {
-        !title.isEmpty && !artist.isEmpty
+        !LyricsMetadata.namesNoParticularTrack(title: title, artist: artist)
     }
 }
 
@@ -764,6 +770,8 @@ class MusicManager: ObservableObject {
             newController = YouTubeMusicController()
         case .amazonMusic:
             newController = AmazonMusicController()
+        case .tidal:
+            newController = TidalController()
         case .cider:
             newController = CiderController()
         }
@@ -968,7 +976,21 @@ class MusicManager: ObservableObject {
         
         updateLiveStreamState(with: state)
         self.refreshLikedFlag(for: state)
-        self.timestampDate = state.lastUpdated
+
+        // Guarded like every other assignment in this method, and for the same
+        // reason. This is a published property that several views read, so an
+        // unconditional assign republishes MusicManager on every delivery from
+        // the media stream and invalidates all of them.
+        //
+        // It is not a clock, it is the playback anchor: it moves when the
+        // player re-anchors, which Spotify does roughly once a track. While
+        // paused it re-sends the same instant indefinitely -- four samples six
+        // seconds apart during this work carried a byte-identical timestamp.
+        // Nearly every one of those assignments was writing a value that had
+        // not changed.
+        if state.lastUpdated != self.timestampDate {
+            self.timestampDate = state.lastUpdated
+        }
 
         // Manage lyric sync task based on playback/lyrics availability
         if Defaults[.enableLyrics] && !self.syncedLyrics.isEmpty {
@@ -1759,39 +1781,7 @@ class MusicManager: ObservableObject {
     }
 
     private func bestLyricsMatch(in results: [[String: Any]], artist: String, title: String, album: String) -> [String: Any]? {
-        let normalizedArtist = artist.lowercased()
-        let normalizedTitle = title.lowercased()
-        let normalizedAlbum = album.lowercased()
-
-        return results.max { lhs, rhs in
-            lyricsMatchScore(for: lhs, artist: normalizedArtist, title: normalizedTitle, album: normalizedAlbum)
-                < lyricsMatchScore(for: rhs, artist: normalizedArtist, title: normalizedTitle, album: normalizedAlbum)
-        }
-    }
-
-    private func lyricsMatchScore(for result: [String: Any], artist: String, title: String, album: String) -> Int {
-        let resultArtist = ((result["artistName"] as? String) ?? "").lowercased()
-        let resultTitle = ((result["trackName"] as? String) ?? "").lowercased()
-        let resultAlbum = ((result["albumName"] as? String) ?? "").lowercased()
-
-        var score = 0
-
-        if resultTitle == title { score += 8 }
-        else if resultTitle.contains(title) || title.contains(resultTitle) { score += 4 }
-
-        if resultArtist == artist { score += 8 }
-        else if resultArtist.contains(artist) || artist.contains(resultArtist) { score += 4 }
-
-        if !album.isEmpty {
-            if resultAlbum == album { score += 4 }
-            else if resultAlbum.contains(album) || album.contains(resultAlbum) { score += 2 }
-        }
-
-        if !(result["syncedLyrics"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            score += 3
-        }
-
-        return score
+        LyricsSearchResults.bestMatch(in: results, artist: artist, title: title, album: album)
     }
 
     private func applyLyricsToDisplay(_ lyrics: [LyricLine]) {
@@ -1804,12 +1794,7 @@ class MusicManager: ObservableObject {
             return
         }
 
-        let playbackPosition = max(estimatedPlaybackPosition(), elapsedTime)
-        updateCurrentLyric(for: playbackPosition)
-
-        if currentLyricIndex == -1, let firstLine = lyrics.first?.text {
-            currentLyrics = firstLine
-        }
+        updateCurrentLyric(for: lyricPlaybackPosition())
 
         if Defaults[.enableLyrics] {
             startLyricSync()
@@ -1819,41 +1804,7 @@ class MusicManager: ObservableObject {
     }
 
     private func parseLRC(_ lrc: String) -> [LyricLine] {
-        let lines = lrc.components(separatedBy: .newlines)
-        var lyrics: [LyricLine] = []
-
-        // Accept patterns like [m:ss], [mm:ss], [mm:ss.xx] where centiseconds are optional
-        let pattern = "\\[(\\d{1,2}):(\\d{2})(?:\\.(\\d{1,2}))?\\]"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
-
-        for line in lines {
-            let nsLine = line as NSString
-            let fullRange = NSRange(location: 0, length: nsLine.length)
-            if let match = regex.firstMatch(in: line, options: [], range: fullRange) {
-                let minRange = match.range(at: 1)
-                let secRange = match.range(at: 2)
-                let centiRange = match.range(at: 3)
-
-                let minStr = minRange.location != NSNotFound ? nsLine.substring(with: minRange) : "0"
-                let secStr = secRange.location != NSNotFound ? nsLine.substring(with: secRange) : "0"
-                let centiStr = (centiRange.location != NSNotFound) ? nsLine.substring(with: centiRange) : "0"
-
-                let minutes = Double(minStr) ?? 0
-                let seconds = Double(secStr) ?? 0
-                let centis = Double(centiStr) ?? 0
-                let timestamp = minutes * 60 + seconds + centis / 100.0
-
-                let textStart = match.range.location + match.range.length
-                if textStart <= nsLine.length {
-                    let text = nsLine.substring(from: textStart).trimmingCharacters(in: .whitespaces)
-                    if !text.isEmpty {
-                        lyrics.append(LyricLine(timestamp: timestamp, text: text))
-                    }
-                }
-            }
-        }
-
-        return lyrics.sorted(by: { $0.timestamp < $1.timestamp })
+        LRCParser.parse(lrc)
     }
 
     func updateCurrentLyric(for elapsedTime: TimeInterval) {
@@ -1869,11 +1820,21 @@ class MusicManager: ObservableObject {
             }
         }
 
+        // The text is settled independently of whether the index moved. Lyrics
+        // arrive with the index already at -1, so keying the text off a change in
+        // the index leaves whatever was there before standing.
+        let newText = newIndex >= 0 && newIndex < syncedLyrics.count
+            ? syncedLyrics[newIndex].text
+            : ""
+
         if newIndex != currentLyricIndex {
             currentLyricIndex = newIndex
-            if newIndex >= 0 && newIndex < syncedLyrics.count {
-                currentLyrics = syncedLyrics[newIndex].text
-            }
+        }
+
+        // Compared before assigning: this runs on every sync tick, and writing an
+        // unchanged value would republish and redraw for nothing.
+        if currentLyrics != newText {
+            currentLyrics = newText
         }
     }
 
@@ -1886,15 +1847,137 @@ class MusicManager: ObservableObject {
             guard let self = self else { return }
             while !Task.isCancelled {
                 // Compute estimated playback position and update lyric
-                let position = self.estimatedPlaybackPosition()
-                await MainActor.run {
+                let position = self.lyricPlaybackPosition()
+                let delay = await MainActor.run { () -> TimeInterval in
                     self.updateCurrentLyric(for: position)
+                    return self.delayUntilNextLyric(after: position)
                 }
 
-                // Sleep ~300ms between updates
-                try? await Task.sleep(nanoseconds: 300_000_000)
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
+    }
+
+    /// Playback position for lyric purposes, tolerant of a missing duration.
+    ///
+    /// `estimatedPlaybackPosition` clamps to `songDuration`, which is zero until
+    /// the duration arrives and for streams that never report one -- so it answers
+    /// zero however far playback has actually got, which pegs every lyric at the
+    /// start of the track. Elapsed time is the better answer there.
+    private func lyricPlaybackPosition(at date: Date = Date()) -> TimeInterval {
+        // `estimatedPlaybackPosition` clamps to the duration, so a sender that
+        // reports none -- a live stream, or a player that simply does not --
+        // pins every estimate to zero and the lyrics stop moving between
+        // deliveries. Extrapolate from the anchor directly in that case; a
+        // paused track has nothing to extrapolate and stays where it is.
+        let position: TimeInterval
+        if songDuration > 0 {
+            position = max(estimatedPlaybackPosition(at: date), elapsedTime)
+        } else if isPlaying {
+            position = max(0, elapsedTime + date.timeIntervalSince(timestampDate) * playbackRate)
+        } else {
+            position = max(0, elapsedTime)
+        }
+        return position + Self.lyricLeadTime
+    }
+
+    /// How far ahead of the voice the lyrics run.
+    ///
+    /// A line that arrives exactly on its timestamp arrives too late to read:
+    /// the word is already being sung by the time the eye finds it. Every
+    /// karaoke display leads the voice slightly, and so did this one before the
+    /// playback anchor was fixed -- a stale anchor made the estimate run ahead,
+    /// which is why the lyrics used to feel better timed while the clock beside
+    /// them was wrong.
+    ///
+    /// So the lead is kept, and made deliberate: a quarter second, applied to
+    /// the position every lyric decision is made from, rather than left to
+    /// depend on how badly the position was drifting.
+    static let lyricLeadTime: TimeInterval = 0.25
+
+    /// Gaps shorter than this are breaths between lines rather than instrumental
+    /// breaks; marking them would flicker.
+    static let instrumentalBreakThreshold: TimeInterval = 5
+
+    /// Whether playback is in a stretch with no words long enough to be worth
+    /// marking, rather than simply between two sung lines.
+    ///
+    /// LRC marks where singing stops with a bare timestamp, so a break is a
+    /// blank line that runs for a while. The run-up to the first line counts too,
+    /// which is what covers a song's intro.
+    var isInInstrumentalBreak: Bool {
+        guard !syncedLyrics.isEmpty else { return false }
+
+        let index = currentLyricIndex
+        if index < 0 {
+            // Before the first line: the intro is a break if it is long enough.
+            return (syncedLyrics.first?.timestamp ?? 0) >= Self.instrumentalBreakThreshold
+        }
+
+        guard index < syncedLyrics.count,
+              syncedLyrics[index].text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let window = lyricWindow(at: index)
+        else { return false }
+
+        return window.end - window.start >= Self.instrumentalBreakThreshold
+    }
+
+    /// The stretch of the track the lyric line at `index` is on screen for.
+    ///
+    /// The window ends where the next line begins, whatever that line is -- an
+    /// empty one marks where singing stops, so it closes the window just as a
+    /// sung line would.
+    func lyricWindow(at index: Int) -> (start: TimeInterval, end: TimeInterval)? {
+        // -1 is the run-up to the first line, which is the index the current line
+        // holds before any line has started and which the intro marker keys off.
+        if index < 0 {
+            guard let first = syncedLyrics.first, first.timestamp > 0 else { return nil }
+            return (0, first.timestamp)
+        }
+
+        guard index < syncedLyrics.count else { return nil }
+
+        let start = syncedLyrics[index].timestamp
+        let end: TimeInterval
+        if index + 1 < syncedLyrics.count {
+            end = syncedLyrics[index + 1].timestamp
+        } else if songDuration > start {
+            end = songDuration
+        } else {
+            return nil
+        }
+
+        guard end > start else { return nil }
+        return (start, end)
+    }
+
+    /// How far playback has moved through the line currently on screen, 0...1.
+    ///
+    /// Drives the highlight that sweeps across the line as it is sung. Returns 0
+    /// when there is no line to sweep, so the caller draws an unstarted line
+    /// rather than a fully swept one.
+    func currentLyricSweepProgress(at date: Date = Date()) -> Double {
+        guard let window = lyricWindow(at: currentLyricIndex) else { return 0 }
+        let elapsed = lyricPlaybackPosition(at: date) - window.start
+        return min(max(elapsed / (window.end - window.start), 0), 1)
+    }
+
+    /// How long to wait before the displayed lyric could next change.
+    ///
+    /// A fixed polling interval shows every line up to that interval late. Sleeping
+    /// until the next line's own timestamp lands on the boundary instead. The upper
+    /// bound keeps seeks and pauses responsive, and the lower bound stops the loop
+    /// from spinning through lines that share a timestamp.
+    private func delayUntilNextLyric(after position: TimeInterval) -> TimeInterval {
+        let minimumDelay: TimeInterval = 0.05
+        let maximumDelay: TimeInterval = 0.25
+
+        guard isPlaying, playbackRate > 0,
+              let next = syncedLyrics.first(where: { $0.timestamp > position })
+        else { return maximumDelay }
+
+        let untilNext = (next.timestamp - position) / playbackRate
+        return min(max(untilNext, minimumDelay), maximumDelay)
     }
 
     private func stopLyricSync() {
@@ -1967,7 +2050,7 @@ extension MusicManager {
             return spotifyGreen
         case .amazonMusic:
             return amazonOrange
-        case .cider:
+        case .tidal, .cider:
             return .accentColor
         case .nowPlaying:
             if let bundleIdentifier,
@@ -1988,6 +2071,8 @@ extension MusicManager {
             return spotifyGreen
         case AmazonMusicController.bundleIdentifier:
             return amazonOrange
+        case TidalController.bundleIdentifier:
+            return .accentColor
         case CiderController.bundleIdentifier:
             return .accentColor
         default:

@@ -562,6 +562,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             baseSize.height = max(baseSize.height, llmUsageOpenNotchHeight)
         }
         
+        baseSize = inlineLyricsAdjustedNotchSize(
+            from: baseSize,
+            isHomeTabActive: coordinator.currentView == .home
+        )
+
         let adjustedContentSize = statsAdjustedNotchSize(
             from: baseSize,
             isStatsTabActive: coordinator.currentView == .stats,
@@ -693,6 +698,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.Keys.migrateMusicControlSlots()
         Defaults.Keys.migrateCapsLockTintMode()
         Defaults.Keys.migrateThirdPartyDDCIntegration()
+        Defaults.Keys.migrateClipboardShortcutToV()
 
         Defaults.publisher(.enableThirdPartyDDCIntegration, options: [])
             .sink { _ in
