@@ -193,7 +193,7 @@ final class CiderFavoritingTests: XCTestCase {
     func testTheDefaultBaseURLIsCidersDocumentedLoopbackPort() {
         XCTAssertEqual(
             CiderFavoriting.defaultBaseURL.absoluteString,
-            "http://127.0.0.1:10767/api/v1/playback"
+            "http://localhost:10767/api/v1/playback"
         )
     }
 }

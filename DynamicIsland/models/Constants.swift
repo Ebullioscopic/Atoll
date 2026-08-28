@@ -1201,6 +1201,9 @@ extension Defaults.Keys {
     /// Settings > Connectivity > Manage External Application Access in Cider.
     /// Empty is a valid setting: Cider can also run that API with
     /// authentication switched off, and then no header is wanted at all.
+    /// Superseded by `CiderTokenStore`, which keeps the token in the Keychain.
+    /// Kept only so an existing value can be migrated out of the preferences
+    /// plist on first launch; nothing reads it to make a request.
     static let ciderAPIToken = Key<String>("ciderAPIToken", default: "")
     // The OAuth token pair lives in the Keychain (see KeychainSpotifyTokenStore);
     // these two keys remain only for the one-time migration of early builds.

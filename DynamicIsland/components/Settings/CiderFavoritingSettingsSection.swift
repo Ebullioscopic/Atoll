@@ -25,7 +25,7 @@ import SwiftUI
 /// favouriting has to ask Cider directly, so the section says so rather than
 /// looking like a requirement for the source as a whole.
 struct CiderFavoritingSettingsSection: View {
-    @Default(.ciderAPIToken) private var token
+    @State private var token: String = CiderTokenStore.shared.token
 
     var body: some View {
         Section {
@@ -33,6 +33,9 @@ struct CiderFavoritingSettingsSection: View {
             // SettingsView, and the sibling Spotify sections do without it too.
             SecureField(String(localized: "API token"), text: $token)
                 .textFieldStyle(.roundedBorder)
+                .onChange(of: token) { _, value in
+                    CiderTokenStore.shared.setToken(value)
+                }
         } header: {
             Text("Favorite Song in Cider")
         } footer: {

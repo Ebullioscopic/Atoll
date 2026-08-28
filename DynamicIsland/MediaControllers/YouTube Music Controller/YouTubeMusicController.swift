@@ -392,6 +392,13 @@ final class YouTubeMusicController: MediaControllerProtocol {
 
         if let videoId = response.videoId, !videoId.isEmpty {
             newState.contentIdentifier = videoId
+        } else if let title = response.title, title != playbackState.title {
+            // A different song arriving without an id of its own: carrying the
+            // last one's over would attribute this track's favourite state, and
+            // the heart's feedback, to the track that just finished. No
+            // identifier is worse than a right one and far better than a wrong
+            // one -- the lookup falls back to title/artist/album.
+            newState.contentIdentifier = nil
         }
 
         if let title = response.title {

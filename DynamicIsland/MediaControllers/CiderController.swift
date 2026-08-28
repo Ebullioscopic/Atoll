@@ -90,7 +90,11 @@ struct CiderFavoriting: Sendable {
     static let defaultPort = 10767
 
     static var defaultBaseURL: URL {
-        URL(string: "http://127.0.0.1:\(defaultPort)/api/v1/playback")!
+        // `localhost` rather than a literal 127.0.0.1: it resolves to
+        // whichever loopback the machine actually has, and URLSession tries
+        // both families, so this still reaches Cider on a host with IPv4
+        // switched off.
+        URL(string: "http://localhost:\(defaultPort)/api/v1/playback")!
     }
 
     private let httpClient: CiderHTTPClient
@@ -102,7 +106,7 @@ struct CiderFavoriting: Sendable {
     init(
         httpClient: CiderHTTPClient = URLSessionCiderHTTPClient(),
         baseURL: URL = CiderFavoriting.defaultBaseURL,
-        tokenProvider: @escaping @Sendable () -> String = { Defaults[.ciderAPIToken] }
+        tokenProvider: @escaping @Sendable () -> String = { CiderTokenStore.shared.token }
     ) {
         self.httpClient = httpClient
         self.baseURL = baseURL

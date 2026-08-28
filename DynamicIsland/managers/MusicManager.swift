@@ -575,6 +575,7 @@ class MusicManager: ObservableObject {
 
     /// True when the playing source will show the favourited state but not
     /// change it. The heart stays lit and stops taking clicks.
+    @MainActor
     var activeSourceFavoritingIsReadOnly: Bool { activeController?.favoritingIsReadOnly ?? false }
     @Published var songDuration: TimeInterval = 0
     @Published var elapsedTime: TimeInterval = 0
