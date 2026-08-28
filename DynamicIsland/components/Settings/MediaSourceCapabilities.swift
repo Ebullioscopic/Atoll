@@ -90,13 +90,19 @@ enum MediaSourceCapabilities {
         }
     }
 
-    static var all: [MediaSourceCapability] {
-        MediaControllerType.allCases.map(entry(for:))
+    static func entries(for types: [MediaControllerType]) -> [MediaSourceCapability] {
+        types.map(entry(for:))
     }
 }
 
 /// The ⓘ beside the source picker.
 struct MediaSourceCapabilitiesButton: View {
+    /// The sources the picker beside this button is actually offering. Passed
+    /// in rather than taken from `allCases`, so the panel cannot describe a
+    /// source the user has no way to select -- `.nowPlaying` is dropped from
+    /// the picker on systems where it is deprecated.
+    let controllers: [MediaControllerType]
+
     @State private var isPresented = false
 
     var body: some View {
@@ -110,13 +116,18 @@ struct MediaSourceCapabilitiesButton: View {
         .buttonStyle(.plain)
         .help("What each source supports")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
-            MediaSourceCapabilitiesTable()
+            MediaSourceCapabilitiesTable(controllers: controllers)
         }
     }
 }
 
 struct MediaSourceCapabilitiesTable: View {
+    let controllers: [MediaControllerType]
+
     private let columnWidth: CGFloat = 74
+    private var rows: [MediaSourceCapability] {
+        MediaSourceCapabilities.entries(for: controllers)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -137,7 +148,7 @@ struct MediaSourceCapabilitiesTable: View {
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 6)
 
-                ForEach(MediaSourceCapabilities.all) { row in
+                ForEach(rows) { row in
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 0) {
                             Text(row.name)
@@ -155,7 +166,7 @@ struct MediaSourceCapabilitiesTable: View {
                     }
                     .padding(.vertical, 6)
 
-                    if row.id != MediaSourceCapabilities.all.last?.id {
+                    if row.id != rows.last?.id {
                         Divider().opacity(0.4)
                     }
                 }

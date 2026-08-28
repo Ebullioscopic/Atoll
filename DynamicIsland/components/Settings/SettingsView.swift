@@ -3052,7 +3052,7 @@ struct Media: View {
                     HStack(spacing: 6) {
                         Text("Music Source")
                             .font(.system(size: 13, weight: .semibold))
-                        MediaSourceCapabilitiesButton()
+                        MediaSourceCapabilitiesButton(controllers: availableMediaControllers)
                         Spacer()
                     }
 
