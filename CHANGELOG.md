@@ -37,8 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings: add/edit/delete accounts, toggle provider, validation with inline errors
 
 ### Changed
+- **The lock screen temperature gauge shows the day's range**: with coloured gauges on, the arc is now a gradient running from the day's low to its high with a dot marking the current reading along it, rather than a single-colour fill. The colour scale it draws from was also being read in Celsius whatever the display unit, so every Fahrenheit reading above freezing came out the hottest colour -- readings are converted before they are coloured now, and the scale is continuous rather than five steps, so a range inside one step is still visibly a gradient.
 - The TIDAL source picker now uses the official TIDAL diamond logo instead of a generic waveform symbol. (#782)
-
 - Lock screen live activity timings now follow the selected icons: the fingerprint remains visible through its scan, while the open lock gets its own brief confirmation beat before the island contracts. (#774)
 
 - The LIVE indicator shown in place of a progress bar on streams now follows Apple's treatment: two thin rules meeting the word in the middle, softening as they run away from it. It was a 10pt capsule with a fill, a centre shade, a stroke and three blend modes. Shadowed text was dropped over the top of all that. The result read as a progress bar someone had written on, and a stream has no progress to draw. The notch, the lock screen player and the floating window all draw the same component, so all three change together.
@@ -49,8 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- **The custom OSD no longer sticks on screen**: switching away from Custom OSD while one of its windows was visible left the overlay there for good. Nothing watched the setting, and the only thing that would ever have hidden that window was its own two-second timer, which the switch outran. Turning the OSD off -- or turning off volume, brightness or keyboard backlight individually -- now dismisses what is on screen.
 - Restored the notch's curved top corners in both standard and Minimalistic music UI while retaining the top-edge anti-gap fill, and synchronized the lock and fingerprint indicators through one shared scan state. (#782)
-
 - The lock screen Dynamic Island now completes one clean unlock contraction instead of disappearing early or showing a second island that closes immediately afterward. (#774)
 - **Lock screen volume slider sat on the panel's edge**: the collapsed panel reserved half a point less height than its content needed, so the volume capsule was clipped by the bottom border while the transport row above it kept about 33pt of air. The reserved height is now measured rather than derived, and the capsule has around 20pt of room beneath it.
 
