@@ -77,7 +77,11 @@ struct NotchLLMUsageView: View {
             case .failure(let reason):
                 Text(reason).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             case .success(let snap):
-                success(snap, provider: provider)
+                if provider == .newAPI {
+                    newAPISuccess(snap)
+                } else {
+                    success(snap, provider: provider)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -147,6 +151,86 @@ struct NotchLLMUsageView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func newAPISuccess(_ snap: UsageSnapshot) -> some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(snap.newAPIAccounts) { account in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text(account.name)
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                            Spacer()
+                            if account.errorMessage != nil {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                                    .help(account.errorMessage ?? "New API account has an error")
+                            }
+                        }
+
+                        if let errorMessage = account.errorMessage,
+                           account.balanceQuota == nil {
+                            Text(errorMessage)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        } else {
+                            quotaRow("Balance", account.balanceQuota, prominent: true)
+                            quotaRow("Used", account.usedQuota)
+                            quotaRow("Today", account.todayQuota)
+                            quotaRow("Week", account.weekQuota)
+                            HStack(spacing: 12) {
+                                metric("RPM", account.currentRPM)
+                                metric("TPM", account.currentTPM)
+                                metric("Requests", account.requestCount)
+                            }
+                            if let errorMessage = account.errorMessage {
+                                Text(errorMessage)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 2)
+                    .overlay(alignment: .bottom) {
+                        if account.id != snap.newAPIAccounts.last?.id {
+                            Rectangle()
+                                .fill(.white.opacity(0.1))
+                                .frame(height: 1)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(height: 135)
+    }
+
+    private func quotaRow(_ label: String, _ value: Int?, prominent: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 44, alignment: .leading)
+            Text(value.map(quota) ?? "-")
+                .font(.system(size: prominent ? 15 : 11, weight: prominent ? .bold : .semibold, design: .rounded))
+                .monospacedDigit()
+            Spacer()
+        }
+    }
+
+    private func metric(_ label: String, _ value: Int?) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value.map(quota) ?? "-")
+                .font(.caption2.weight(.semibold))
+                .monospacedDigit()
         }
     }
 
@@ -238,6 +322,14 @@ struct NotchLLMUsageView: View {
     }
 
     private func tokens(_ n: Int) -> String {
+        switch n {
+        case 1_000_000...: return String(format: "%.1fM", Double(n) / 1_000_000)
+        case 1_000...: return String(format: "%.1fk", Double(n) / 1_000)
+        default: return "\(n)"
+        }
+    }
+
+    private func quota(_ n: Int) -> String {
         switch n {
         case 1_000_000...: return String(format: "%.1fM", Double(n) / 1_000_000)
         case 1_000...: return String(format: "%.1fk", Double(n) / 1_000)
