@@ -267,6 +267,7 @@ class AudioTap: NSObject {
         }
 
         var targetProcessObjects = Set<AudioObjectID>()
+        var bundleIdentifierByProcessObject: [AudioObjectID: String] = [:]
 
         // AirPods/Bluetooth output + Spotify don't mix: process-tapping Spotify into our
         // private aggregate device disturbs the system Now Playing / AVRCP session, so the
@@ -290,13 +291,16 @@ class AudioTap: NSObject {
                 continue
             }
 
-            if targetBundleIdentifier.caseInsensitiveCompare(SpotifyController.bundleIdentifier) == .orderedSame,
-               bluetoothOutputActive {
+            if shouldSkipSpotifyTap(
+                bundleIdentifier: targetBundleIdentifier,
+                bluetoothOutputActive: bluetoothOutputActive
+            ) {
                 print("⏭️ [AudioTap] Bluetooth output active — skipping Spotify tap to preserve AirPods media control")
                 continue
             }
 
             targetProcessObjects.insert(processObject)
+            bundleIdentifierByProcessObject[processObject] = processBundleIdentifier
             let pidDescription = getPID(for: processObject).map(String.init) ?? "unknown"
             print("🎯 [AudioTap] Found audio process \(processBundleIdentifier) with PID: \(pidDescription), AudioObjectID: \(processObject)")
         }
@@ -306,11 +310,15 @@ class AudioTap: NSObject {
         for app in NSWorkspace.shared.runningApplications {
             guard let bundleIdentifier = app.bundleIdentifier,
                   targetBundleIDs.contains(bundleIdentifier) else { continue }
-            if bundleIdentifier == SpotifyController.bundleIdentifier, bluetoothOutputActive {
+            if shouldSkipSpotifyTap(
+                bundleIdentifier: bundleIdentifier,
+                bluetoothOutputActive: bluetoothOutputActive
+            ) {
                 continue
             }
             if let processObject = getAudioObjectID(for: app.processIdentifier),
                targetProcessObjects.insert(processObject).inserted {
+                bundleIdentifierByProcessObject[processObject] = bundleIdentifier
                 print("🎯 [AudioTap] Found \(app.localizedName ?? "App") with PID: \(app.processIdentifier), AudioObjectID: \(processObject)")
             }
         }
@@ -320,7 +328,13 @@ class AudioTap: NSObject {
             return
         }
 
-        let sortedTargetProcessObjects = targetProcessObjects.sorted()
+        let sortedTargetProcessObjects = targetProcessObjects.sorted { lhs, rhs in
+            let lhsBundleIdentifier = bundleIdentifierByProcessObject[lhs]?.lowercased() ?? ""
+            let rhsBundleIdentifier = bundleIdentifierByProcessObject[rhs]?.lowercased() ?? ""
+            return lhsBundleIdentifier == rhsBundleIdentifier
+                ? lhs < rhs
+                : lhsBundleIdentifier < rhsBundleIdentifier
+        }
 
         let description = CATapDescription()
         description.processes = sortedTargetProcessObjects
@@ -405,6 +419,14 @@ class AudioTap: NSObject {
         }
         
         print("🟢 [AudioTap] CoreAudio CATap flowing through Aggregate Device!")
+    }
+
+    private func shouldSkipSpotifyTap(
+        bundleIdentifier: String,
+        bluetoothOutputActive: Bool
+    ) -> Bool {
+        bluetoothOutputActive
+            && bundleIdentifier.caseInsensitiveCompare(SpotifyController.bundleIdentifier) == .orderedSame
     }
     
     private func cleanupPartialSetup() {
