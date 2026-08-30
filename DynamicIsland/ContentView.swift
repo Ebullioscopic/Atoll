@@ -49,6 +49,11 @@ struct ContentView: View {
     @ObservedObject var privacyManager = PrivacyIndicatorManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
     @ObservedObject var lockScreenManager = LockScreenManager.shared
+    @ObservedObject private var menuBarLayout = MenuBarLayout.shared
+    /// Width of the closed-notch content, measured so its left edge can be
+    /// compared against the frontmost app's menus. Only the *size* is read --
+    /// the offset that follows does not change it, so there is no feedback.
+    @State private var closedContentWidth: CGFloat = 0
     @ObservedObject var capsLockManager = CapsLockManager.shared
     @ObservedObject var extensionLiveActivityManager = ExtensionLiveActivityManager.shared
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
@@ -962,9 +967,49 @@ struct ContentView: View {
                     enqueueMusicControlWindowSync(forceRefresh: true)
                 }
             }
+            .onAppear {
+                if vm.notchState == .closed { menuBarLayout.startTracking() }
+            }
+            .onChange(of: vm.notchState) { _, state in
+                // An open notch covers the menu bar wholesale and is the user's
+                // own doing, so there is nothing to step around while it is up.
+                if state == .closed {
+                    menuBarLayout.startTracking()
+                } else {
+                    menuBarLayout.stopTracking()
+                }
+            }
             .onDisappear {
                 performViewTeardown()
             }
+    }
+
+    /// How far right the closed-notch content has to move so it stops covering
+    /// the frontmost app's menus.
+    ///
+    /// A live activity's left wing draws into the strip of menu bar beside the
+    /// notch, which is where the app's own menus live. macOS lays those out
+    /// against `NSScreen.auxiliaryTopLeftArea` and there is no way to tell it
+    /// some of that strip is spoken for -- both auxiliary areas are read-only.
+    /// So the content moves instead of the menus.
+    ///
+    /// Zero unless something is actually being covered: no live activity, an
+    /// open notch, no accessibility permission, or menus that end before the
+    /// content begins all leave the notch centred where it belongs.
+    private var menuBarClearanceOffset: CGFloat {
+        guard vm.notchState == .closed,
+              !vm.hideOnClosed,
+              closedContentWidth > 0,
+              let menusRightEdge = menuBarLayout.appMenusRightEdge,
+              let screenFrame = getScreenFrame(currentScreenName)
+        else { return 0 }
+
+        return MenuBarLayout.clearanceOffset(
+            contentWidth: closedContentWidth,
+            screenFrame: screenFrame,
+            menusRightEdge: menusRightEdge,
+            gap: MenuBarLayout.clearanceGap
+        )
     }
 
     @ViewBuilder
@@ -1175,6 +1220,15 @@ struct ContentView: View {
                   view
                       .fixedSize()
               }
+              .background {
+                  GeometryReader { geo in
+                      Color.clear
+                          .onAppear { closedContentWidth = geo.size.width }
+                          .onChange(of: geo.size.width) { _, width in closedContentWidth = width }
+                  }
+              }
+              .offset(x: menuBarClearanceOffset)
+              .animation(.smooth(duration: 0.25), value: menuBarClearanceOffset)
               .zIndex(2)
               
               ZStack {
@@ -2043,6 +2097,7 @@ struct ContentView: View {
     /// Cancels every long-lived task / event monitor this view owns. Called from
     /// `.onDisappear` and from `vm.onViewTeardown` on window close. Idempotent.
     private func performViewTeardown() {
+        menuBarLayout.stopTracking()
         hoverTask?.cancel()
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
