@@ -2,7 +2,7 @@ import Foundation
 import Defaults
 
 enum ProviderID: String, CaseIterable, Identifiable {
-    case claude, codex, cursor, antigravity
+    case claude, codex, cursor, antigravity, newAPI
     var id: String { rawValue }
     var displayName: String {
         switch self {
@@ -10,6 +10,7 @@ enum ProviderID: String, CaseIterable, Identifiable {
         case .codex: return "Codex"
         case .cursor: return "Cursor"
         case .antigravity: return "Antigravity"
+        case .newAPI: return "New API"
         }
     }
     var enabledKey: Defaults.Key<Bool> {
@@ -18,6 +19,7 @@ enum ProviderID: String, CaseIterable, Identifiable {
         case .codex: return .enableCodexProvider
         case .cursor: return .enableCursorProvider
         case .antigravity: return .enableAntigravityProvider
+        case .newAPI: return .enableNewAPIProvider
         }
     }
 }
@@ -53,6 +55,7 @@ struct UsageSnapshot: Equatable {
     var weekLimit: UsageLimit? = nil // 7d window quota
     var models: [ModelUsage] = []
     var plan: String? = nil // Subscription plan label (e.g. "Max 5x"); provided by Claude only, nil otherwise.
+    var newAPIAccounts: [NewAPIAccountSnapshot] = []
     var lastUpdated: Date = .distantPast
 }
 

@@ -1119,14 +1119,40 @@ struct LockScreenWeatherWidget: View {
 		let range = temperatureRange(for: info)
 
 		return VStack(spacing: 6) {
-			Gauge(value: info.current, in: range) {
-				EmptyView()
-			} currentValueLabel: {
-				temperatureCenterLabel(for: info)
+			// Coloured gauges get the whole day rather than a level. A plain
+			// Gauge fills from the bottom of the range to the current reading
+			// in one colour, which says how far through today it is and
+			// nothing about the day itself -- 12° to 14° and 2° to 24° draw
+			// identically. The gradient spans low to high on the same colour
+			// scale a single reading would have used, and the dot marks where
+			// it is now, the way Apple's Weather does it.
+			//
+			// Only when the tint is on: with colour switched off there is no
+			// gradient to show, and the level gauge is the honest drawing.
+			if snapshot.usesGaugeTint {
+				ZStack {
+					TemperatureRangeArc(
+						fraction: Self.gaugeFraction(of: info.current, in: range),
+						gradientColors: Self.temperatureGradientColors(
+							for: range,
+							unitSymbol: info.unitSymbol
+						),
+						trackColor: monochromeGaugeTint.opacity(0.22),
+						markerColor: appearance.primary(opacity: 1)
+					)
+					temperatureCenterLabel(for: info)
+				}
+				.frame(width: gaugeDiameter, height: gaugeDiameter)
+			} else {
+				Gauge(value: info.current, in: range) {
+					EmptyView()
+				} currentValueLabel: {
+					temperatureCenterLabel(for: info)
+				}
+				.gaugeStyle(.accessoryCircular)
+				.tint(temperatureTint(for: info))
+				.frame(width: gaugeDiameter, height: gaugeDiameter)
 			}
-			.gaugeStyle(.accessoryCircular)
-			.tint(temperatureTint(for: info))
-			.frame(width: gaugeDiameter, height: gaugeDiameter)
 
 			HStack {
 				Text(minimumTemperatureLabel(for: info))
@@ -1391,18 +1417,75 @@ struct LockScreenWeatherWidget: View {
 
 	private func temperatureTint(for info: LockScreenWeatherSnapshot.TemperatureInfo) -> Color {
 		guard snapshot.usesGaugeTint else { return monochromeGaugeTint }
-		let value = info.current
-		switch value {
-		case ..<0:
-			return Color(red: 0.29, green: 0.63, blue: 1.00)
-		case 0..<15:
-			return Color(red: 0.20, green: 0.79, blue: 0.93)
-		case 15..<25:
-			return Color(red: 0.20, green: 0.79, blue: 0.39)
-		case 25..<32:
-			return Color(red: 0.97, green: 0.58, blue: 0.29)
-		default:
-			return Color(red: 0.91, green: 0.29, blue: 0.25)
+		return Self.temperatureColor(for: info.current, unitSymbol: info.unitSymbol)
+	}
+
+	/// The colour a temperature is drawn in, on the same scale the gauge tint
+	/// has always used -- so the gradient's ends agree with what a single
+	/// reading would have been coloured.
+	/// Anchor colours for the temperature ramp, in Celsius.
+	///
+	/// Interpolated rather than stepped: a day that runs 19C to 26C sits inside
+	/// a single step, so a stepped scale paints both ends of the arc the same
+	/// colour and the gradient disappears.
+	private static let temperatureRamp: [(celsius: Double, rgb: (Double, Double, Double))] = [
+		(-15, (0.36, 0.44, 0.95)),
+		(0, (0.29, 0.63, 1.00)),
+		(10, (0.20, 0.79, 0.93)),
+		(18, (0.20, 0.79, 0.39)),
+		(24, (0.95, 0.77, 0.25)),
+		(30, (0.97, 0.58, 0.29)),
+		(38, (0.91, 0.29, 0.25))
+	]
+
+	/// Colour for a temperature given in the units the widget is displaying.
+	///
+	/// The ramp is in Celsius, so a Fahrenheit reading has to be converted
+	/// first -- without it every US temperature above freezing lands past the
+	/// top of the scale and reads as the hottest colour.
+	static func temperatureColor(for value: Double, unitSymbol: String) -> Color {
+		let celsius = Self.celsius(from: value, unitSymbol: unitSymbol)
+		let ramp = Self.temperatureRamp
+
+		guard let first = ramp.first, let last = ramp.last else { return .white }
+		if celsius <= first.celsius { return Color(red: first.rgb.0, green: first.rgb.1, blue: first.rgb.2) }
+		if celsius >= last.celsius { return Color(red: last.rgb.0, green: last.rgb.1, blue: last.rgb.2) }
+
+		for (lower, upper) in zip(ramp, ramp.dropFirst()) where celsius <= upper.celsius {
+			let span = upper.celsius - lower.celsius
+			let t = span > 0 ? (celsius - lower.celsius) / span : 0
+			return Color(
+				red: lower.rgb.0 + (upper.rgb.0 - lower.rgb.0) * t,
+				green: lower.rgb.1 + (upper.rgb.1 - lower.rgb.1) * t,
+				blue: lower.rgb.2 + (upper.rgb.2 - lower.rgb.2) * t
+			)
+		}
+
+		return Color(red: last.rgb.0, green: last.rgb.1, blue: last.rgb.2)
+	}
+
+	static func celsius(from value: Double, unitSymbol: String) -> Double {
+		unitSymbol.uppercased().contains("F") ? (value - 32) * 5 / 9 : value
+	}
+
+	/// The arc's gradient, sampled across the day's range.
+	///
+	/// Two stops would only ever be a straight blend between the low and the
+	/// high; sampling the ramp keeps the colours in between honest to the
+	/// temperatures they sit above.
+	static func temperatureGradientColors(
+		for range: ClosedRange<Double>,
+		unitSymbol: String,
+		samples: Int = 12
+	) -> [Color] {
+		let span = range.upperBound - range.lowerBound
+		guard span > 0, samples > 1 else {
+			return [temperatureColor(for: range.lowerBound, unitSymbol: unitSymbol)]
+		}
+
+		return (0..<samples).map { step in
+			let value = range.lowerBound + span * (Double(step) / Double(samples - 1))
+			return temperatureColor(for: value, unitSymbol: unitSymbol)
 		}
 	}
 
@@ -1534,6 +1617,89 @@ struct LockScreenWeatherWidget: View {
 	}
 }
 
+extension LockScreenWeatherWidget {
+	/// Where a reading sits across a range, 0 at the low end and 1 at the high.
+	static func gaugeFraction(of value: Double, in range: ClosedRange<Double>) -> Double {
+		let span = range.upperBound - range.lowerBound
+		guard span > 0 else { return 0.5 }
+		return min(max((value - range.lowerBound) / span, 0), 1)
+	}
+}
 
+/// Today's temperature range drawn as an arc, with the current reading marked
+/// along it.
+///
+/// Built by hand rather than with `Gauge`, which offers one tint and fills
+/// from the bottom of its range: there is no way to ask it for a gradient
+/// across the span or for a marker that is not the fill's leading edge.
+private struct TemperatureRangeArc: View {
+	/// The current reading's position along the arc, 0 to 1.
+	let fraction: Double
+	let gradientColors: [Color]
+	let trackColor: Color
+	let markerColor: Color
 
+	/// Open at the bottom, where the low and high labels sit.
+	private let startAngle: Double = 145
+	private let sweep: Double = 250
+	private let lineWidth: CGFloat = 6
 
+	var body: some View {
+		GeometryReader { proxy in
+			let radius = (min(proxy.size.width, proxy.size.height) - lineWidth) / 2
+			let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+			let radians = (startAngle + sweep * fraction) * .pi / 180
+			let marker = CGPoint(
+				x: center.x + radius * cos(radians),
+				y: center.y + radius * sin(radians)
+			)
+
+			ZStack {
+				ArcShape(startAngle: startAngle, sweep: sweep, lineWidth: lineWidth)
+					.stroke(trackColor, style: strokeStyle)
+
+				ArcShape(startAngle: startAngle, sweep: sweep, lineWidth: lineWidth)
+					.stroke(
+						AngularGradient(
+							colors: gradientColors,
+							center: .center,
+							startAngle: .degrees(startAngle),
+							endAngle: .degrees(startAngle + sweep)
+						),
+						style: strokeStyle
+					)
+
+				// Reads against both ends of the gradient, and against the
+				// track where the two happen to be a similar colour.
+				Circle()
+					.fill(markerColor)
+					.overlay(Circle().strokeBorder(Color.black.opacity(0.22), lineWidth: 0.5))
+					.frame(width: lineWidth + 2.5, height: lineWidth + 2.5)
+					.position(marker)
+			}
+		}
+		.animation(.easeInOut(duration: 0.35), value: fraction)
+	}
+
+	private var strokeStyle: StrokeStyle {
+		StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+	}
+}
+
+private struct ArcShape: Shape {
+	let startAngle: Double
+	let sweep: Double
+	let lineWidth: CGFloat
+
+	func path(in rect: CGRect) -> Path {
+		var path = Path()
+		path.addArc(
+			center: CGPoint(x: rect.midX, y: rect.midY),
+			radius: (min(rect.width, rect.height) - lineWidth) / 2,
+			startAngle: .degrees(startAngle),
+			endAngle: .degrees(startAngle + sweep),
+			clockwise: false
+		)
+		return path
+	}
+}
