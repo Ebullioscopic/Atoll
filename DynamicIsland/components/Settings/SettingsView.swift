@@ -405,6 +405,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .extensions, title: "Allow extension lock screen widgets", keywords: ["extensions", "lock screen", "widgets"], highlightID: SettingsTab.extensions.highlightID(for: "Allow extension lock screen widgets")),
         SettingsSearchEntry(tab: .extensions, title: "Enable extension diagnostics logging", keywords: ["extensions", "diagnostics", "logging"], highlightID: SettingsTab.extensions.highlightID(for: "Enable extension diagnostics logging")),
         SettingsSearchEntry(tab: .extensions, title: "Manage app permissions", keywords: ["extensions", "permissions", "apps"], highlightID: SettingsTab.extensions.highlightID(for: "App permissions list")),
+        SettingsSearchEntry(tab: .extensions, title: "Browse the Marketplace", keywords: ["marketplace", "extensions", "install", "download", "store", "getatoll"], highlightID: SettingsTab.extensions.highlightID(for: "Browse the Marketplace")),
 
         // Shortcuts
         SettingsSearchEntry(tab: .shortcuts, title: "Enable global keyboard shortcuts", keywords: ["keyboard", "shortcut"], highlightID: SettingsTab.shortcuts.highlightID(for: "Enable global keyboard shortcuts")),
@@ -1668,6 +1669,7 @@ struct Charge: View {
 struct Downloads: View {
     @Default(.selectedDownloadIndicatorStyle) var selectedDownloadIndicatorStyle
     @Default(.selectedDownloadIconStyle) var selectedDownloadIconStyle
+    @Default(.enableDownloadListener) var enableDownloadListener
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.downloads.highlightID(for: title)
@@ -1683,13 +1685,15 @@ struct Downloads: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Download indicator style")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
+                        // .white is invisible against a light Settings window;
+                        // the label follows the appearance like every other one.
+                        .foregroundStyle(enableDownloadListener ? Color.primary : Color.secondary)
 
                     HStack(spacing: 16) {
                         DownloadStyleButton(
                             style: .progress,
                             isSelected: selectedDownloadIndicatorStyle == .progress,
-                            disabled: !Defaults[.enableDownloadListener]
+                            disabled: !enableDownloadListener
                         ) {
                             selectedDownloadIndicatorStyle = .progress
                         }
@@ -1697,17 +1701,21 @@ struct Downloads: View {
                         DownloadStyleButton(
                             style: .circle,
                             isSelected: selectedDownloadIndicatorStyle == .circle,
-                            disabled: !Defaults[.enableDownloadListener]
+                            disabled: !enableDownloadListener
                         ) {
                             selectedDownloadIndicatorStyle = .circle
                         }
                     }
+
+                    Text("A bar that fills as the download runs, or a ring around the notch's corner.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
                 .settingsHighlight(id: highlightID("Download indicator style"))
             } header: {
                 Text("Download Detection")
             } footer: {
-                Text("Monitor your Downloads folder for Chromium-style downloads (.crdownload files) and show a live activity in the Dynamic Island while downloads are in progress.")
+                Text("Shows a live activity in the Dynamic Island while a file is downloading. Works with Safari, Firefox, and Chrome and the browsers built on it — Edge, Brave, Arc, Vivaldi and Opera. Only your Downloads folder is watched, so a file saved anywhere else will not appear.")
             }
         }
         .navigationTitle("Downloads")
