@@ -2084,8 +2084,11 @@ struct ContentView: View {
         let activationWidth = vm.closedNotchSize.width + horizontalPadding * 2
         let activationHeight = max(vm.closedNotchSize.height + zeroHeightHoverPadding, 14)
 
+        // Follows the rendered content: when a live activity has stepped aside
+         // from the menus, activating at the old centre would arm the notch where
+         // nothing is drawn and refuse the pointer where it is.
         let activationRect = CGRect(
-            x: screen.frame.midX - activationWidth / 2,
+            x: screen.frame.midX - activationWidth / 2 + menuBarClearanceOffset,
             y: screen.frame.maxY - activationHeight,
             width: activationWidth,
             height: activationHeight
@@ -2359,7 +2362,8 @@ struct ContentView: View {
         )
         let height = max(closedHeight, recordingSize?.height ?? 0) + 6
         let width = max(closedWidth, recordingSize?.width ?? 0) + 24
-        let minX = screen.frame.midX - width / 2
+        // Same shift the content is drawn with, so the hit area stays under it.
+        let minX = screen.frame.midX - width / 2 + menuBarClearanceOffset
         let minY = screen.frame.maxY - height
 
         return location.x >= minX && location.x <= minX + width

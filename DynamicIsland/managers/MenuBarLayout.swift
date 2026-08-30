@@ -130,18 +130,31 @@ final class MenuBarLayout: ObservableObject {
         }
     }
 
+    /// Longest the whole scan may take. A menu bar with many items could
+    /// otherwise reach minutes at the per-element timeout, and until it returns
+    /// no further measurement is taken.
+    nonisolated private static let scanDeadline: TimeInterval = 1
+
+    /// Per-element messaging timeout. `AXUIElementSetMessagingTimeout` applies
+    /// only to the element it is called on -- it does not carry to the children
+    /// that element hands back -- so every element messaged here is given its
+    /// own, or a hung app would still block on the ones that inherited nothing.
+    nonisolated private static let elementTimeout: Float = 0.25
+
     /// The right edge of the last menu, or `nil` if the menu bar cannot be read.
     nonisolated private static func menusRightEdge(pid: pid_t) -> CGFloat? {
+        let startedAt = Date()
         let app = AXUIElementCreateApplication(pid)
         // A hung app must not hold this up; the measurement is an optimisation,
         // never something worth waiting on.
-        AXUIElementSetMessagingTimeout(app, 0.25)
+        AXUIElementSetMessagingTimeout(app, elementTimeout)
 
         var menuBarValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXMenuBarAttribute as CFString, &menuBarValue) == .success,
               CFGetTypeID(menuBarValue) == AXUIElementGetTypeID()
         else { return nil }
         let menuBar = unsafeBitCast(menuBarValue, to: AXUIElement.self)
+        AXUIElementSetMessagingTimeout(menuBar, elementTimeout)
 
         var childrenValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(menuBar, kAXChildrenAttribute as CFString, &childrenValue) == .success,
@@ -150,6 +163,12 @@ final class MenuBarLayout: ObservableObject {
 
         var rightEdge: CGFloat?
         for item in items {
+            // Whatever has been measured so far is still usable; a scan that has
+            // run long is one where the app is not answering, and waiting out
+            // every remaining item only delays the next attempt.
+            guard Date().timeIntervalSince(startedAt) < scanDeadline else { break }
+            AXUIElementSetMessagingTimeout(item, elementTimeout)
+
             var positionValue: CFTypeRef?
             var sizeValue: CFTypeRef?
             guard AXUIElementCopyAttributeValue(item, kAXPositionAttribute as CFString, &positionValue) == .success,
