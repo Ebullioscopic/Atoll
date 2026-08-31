@@ -169,6 +169,11 @@ let statsSecondRowContentHeight: CGFloat = 120
 let statsGridSpacingHeight: CGFloat = 12
 let llmUsageOpenNotchHeight: CGFloat = 220
 let llmUsageProviderCardHeight: CGFloat = 188
+/// Height needed for the standalone calendar to render a whole month without
+/// scrolling. The view chain spends 146pt before the grid gets any space (68pt
+/// to maxTabContentHeight, 56pt to pickerViewportHeight, 22pt to the weekday
+/// header row), and six week rows at 28pt plus 4pt spacing need 192pt.
+let calendarFullMonthNotchHeight: CGFloat = 340
 let notchShadowPaddingStandard: CGFloat = 18
 let notchShadowPaddingMinimalistic: CGFloat = 12
 
@@ -261,6 +266,54 @@ let inlineLyricsLineHeight: CGFloat = 18
 /// regardless of the calendar, and sizes itself for them through its own resize
 /// publisher. Adding this line there would reserve room for a line the standard
 /// player is not drawing.
+/// Whether the standard media player is on screen in the home view.
+///
+/// Mirrors ``NotchHomeView.shouldShowMusicPlayer``, which stays the layout's own
+/// source of truth because SwiftUI tracks its `@Default` reads for
+/// invalidation. This copy exists for the sizing functions, which run outside
+/// the view and cannot borrow that observation.
+func notchMediaPlayerVisible() -> Bool {
+    Defaults[.showStandardMediaControls]
+        && (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+}
+
+/// Whether the home tab's calendar renders as ``StandaloneCalendarView`` — the
+/// full-width variant that owns a month grid — rather than the narrow
+/// ``CalendarView`` shown beside the music player.
+///
+/// Only the standalone variant is owed the extra height, and only it can spend
+/// it: the narrow variant shares its row with the player.
+///
+/// Minimalistic UI is excluded because it replaces the home layout entirely and
+/// sizes itself through its own resize publisher.
+func standaloneCalendarActive() -> Bool {
+    guard Defaults[.showCalendar],
+          !Defaults[.enableMinimalisticUI]
+    else {
+        return false
+    }
+
+    return !notchMediaPlayerVisible()
+}
+
+/// Height the notch needs on the home tab, taken from the calendar's view mode.
+///
+/// Only the month mode asks for more than the default, so selecting three days
+/// or a week returns the notch to its normal height -- the mode the user picked
+/// is the whole story, which is what makes the taller notch reversible.
+func calendarAdjustedNotchSize(
+    from baseSize: CGSize,
+    isHomeTabActive: Bool
+) -> CGSize {
+    guard isHomeTabActive, standaloneCalendarActive() else {
+        return baseSize
+    }
+
+    var adjustedSize = baseSize
+    adjustedSize.height = max(adjustedSize.height, Defaults[.calendarViewMode].notchHeight)
+    return adjustedSize
+}
+
 func inlineLyricsAdjustedNotchSize(
     from baseSize: CGSize,
     isHomeTabActive: Bool
@@ -274,8 +327,7 @@ func inlineLyricsAdjustedNotchSize(
           !Defaults[.enableMinimalisticUI],
           Defaults[.enableLyrics],
           Defaults[.showCalendar],
-          Defaults[.showStandardMediaControls],
-          (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+          notchMediaPlayerVisible()
     else {
         return baseSize
     }

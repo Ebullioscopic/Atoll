@@ -562,6 +562,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             baseSize.height = max(baseSize.height, llmUsageOpenNotchHeight)
         }
         
+        baseSize = calendarAdjustedNotchSize(
+            from: baseSize,
+            isHomeTabActive: coordinator.currentView == .home
+        )
+
         baseSize = inlineLyricsAdjustedNotchSize(
             from: baseSize,
             isHomeTabActive: coordinator.currentView == .home
@@ -810,6 +815,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         Defaults.publisher(.showDiskGraph, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
+        }.store(in: &cancellables)
+
+        // The calendar's view mode decides the notch height, so the window has
+        // to follow it. Resized immediately rather than debounced: this is a
+        // direct response to a click, and a lagging notch reads as a bug.
+        Defaults.publisher(.calendarViewMode, options: []).sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.updateWindowSizeIfNeeded()
+            }
         }.store(in: &cancellables)
 
         Defaults.publisher(.openNotchWidth, options: []).sink { [weak self] _ in

@@ -3484,6 +3484,7 @@ struct Media: View {
 struct CalendarSettings: View {
     @ObservedObject private var calendarManager = CalendarManager.shared
     @Default(.showCalendar) var showCalendar: Bool
+    @Default(.calendarViewMode) var calendarViewMode: CalendarViewMode
     @Default(.enableLyrics) private var enableLyrics
     @Default(.enableReminderLiveActivity) var enableReminderLiveActivity
     @Default(.reminderPresentationStyle) var reminderPresentationStyle
@@ -3589,6 +3590,23 @@ struct CalendarSettings: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Picker("Calendar view", selection: $calendarViewMode) {
+                        ForEach(CalendarViewMode.allCases) { viewMode in
+                            Text(viewMode.displayName).tag(viewMode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(!showCalendar)
+
+                    Text(calendarViewMode.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .settingsHighlight(id: highlightID("Calendar view"))
 
                 Section(header: Text("Event List")) {
                     Toggle("Hide completed reminders", isOn: $hideCompletedReminders)
