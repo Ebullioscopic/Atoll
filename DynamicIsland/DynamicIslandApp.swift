@@ -1410,6 +1410,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ColorPickerPanelManager.shared.toggleColorPickerPanel()
         }
 
+        KeyboardShortcuts.onKeyDown(for: .toggleCaffeinate) {
+            guard Defaults[.enableShortcuts], Defaults[.enableCaffeinate] else { return }
+            CaffeinateManager.shared.toggle()
+        }
+
         KeyboardShortcuts.onKeyDown(for: .toggleTerminalTab) { [weak self] in
             guard let self else { return }
             guard Defaults[.enableShortcuts], Defaults[.enableTerminalFeature] else { return }

@@ -676,6 +676,40 @@ enum TimerProgressStyle: String, CaseIterable, Identifiable, Defaults.Serializab
     }
 }
 
+enum CaffeinateDuration: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case indefinite = "indefinite"
+    case fifteenMinutes = "fifteenMinutes"
+    case thirtyMinutes = "thirtyMinutes"
+    case oneHour = "oneHour"
+    case twoHours = "twoHours"
+    case fourHours = "fourHours"
+
+    var id: String { rawValue }
+
+    /// How long the session lasts, or `nil` when it runs until turned off.
+    var seconds: TimeInterval? {
+        switch self {
+        case .indefinite: return nil
+        case .fifteenMinutes: return 15 * 60
+        case .thirtyMinutes: return 30 * 60
+        case .oneHour: return 60 * 60
+        case .twoHours: return 2 * 60 * 60
+        case .fourHours: return 4 * 60 * 60
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .indefinite: return String(localized: "Until turned off")
+        case .fifteenMinutes: return String(localized: "15 minutes")
+        case .thirtyMinutes: return String(localized: "30 minutes")
+        case .oneHour: return String(localized: "1 hour")
+        case .twoHours: return String(localized: "2 hours")
+        case .fourHours: return String(localized: "4 hours")
+        }
+    }
+}
+
 enum FocusMonitoringMode: String, CaseIterable, Identifiable, Defaults.Serializable {
     case withoutDevTools = "withoutDevTools"
     case useDevTools = "useDevTools"
@@ -1273,6 +1307,12 @@ extension Defaults.Keys {
     // Legacy key name: the separate control window is gone, this now shows inline notch controls.
     static let timerControlWindowEnabled = Key<Bool>("timerControlWindowEnabled", default: true)
     
+    // MARK: Caffeinate Feature
+    static let enableCaffeinate = Key<Bool>("enableCaffeinate", default: true)
+    static let showCaffeinateIcon = Key<Bool>("showCaffeinateIcon", default: true)
+    static let caffeinateDefaultDuration = Key<CaffeinateDuration>("caffeinateDefaultDuration", default: .indefinite)
+    static let caffeinateKeepsDisplayAwake = Key<Bool>("caffeinateKeepsDisplayAwake", default: true)
+
     // MARK: ColorPicker Feature
     static let enableColorPickerFeature = Key<Bool>("enableColorPickerFeature", default: true)
     static let showColorFormats = Key<Bool>("showColorFormats", default: true)
