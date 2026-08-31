@@ -51,30 +51,40 @@ struct PinnedLyricsView: View {
             : .gray
     }
 
+    /// How wide the strip is allowed to get.
+    ///
+    /// The closed notch sizes itself to its content, so an unconstrained line
+    /// stretched the whole panel across the screen. Capping it keeps the strip
+    /// reading as a caption under the notch instead of a slab, and a line too
+    /// long for the cap truncates rather than wrapping -- a second row would
+    /// grow the panel downwards from lyric to lyric.
+    private static let maximumWidth: CGFloat = 360
+
     var body: some View {
         if let line = currentLine {
             // Redrawn per frame while playing so the sweep tracks the music,
             // and frozen when paused so a paused notch is not animating.
             TimelineView(.animation(paused: !musicManager.isPlaying)) { timeline in
-                SweptLyricText(
-                    text: line,
-                    fontSize: 11,
-                    weight: .medium,
-                    progress: musicManager.currentLyricSweepProgress(at: timeline.date),
-                    isCurrent: true,
-                    sung: .white,
-                    unsung: tint.opacity(0.55),
-                    idle: .white.opacity(0.5),
-                    tint: tint
-                )
-                .multilineTextAlignment(.center)
-                // One line only: a wrapping lyric would grow the strip under
-                // the notch from frame to frame as the words change.
-                .lineLimit(1)
-                .frame(maxWidth: .infinity)
+                // A plain Text rather than the panel's word-by-word layout:
+                // that exists to sweep a wrapped line in reading order, and
+                // this is deliberately one line, where sweeping the whole line
+                // as one is both correct and cheaper.
+                Text(line)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lyricSweep(
+                        progress: musicManager.currentLyricSweepProgress(at: timeline.date),
+                        isCurrent: true,
+                        sung: .white,
+                        unsung: tint.opacity(0.55),
+                        idle: .white.opacity(0.5)
+                    )
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
+            .frame(maxWidth: Self.maximumWidth)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 4)
             .transition(.opacity.animation(.smooth(duration: 0.25)))
         }
     }
