@@ -26,32 +26,31 @@ import SwiftUI
 /// way to keep reading along without holding the pointer over the notch. Only
 /// the current line is shown -- there is no room under a closed notch for a
 /// list, and the line that matters is the one playing.
-struct PinnedLyricsView: View {
+///
+/// Applied as a modifier rather than added to the notch's stack, because the
+/// notch panel sizes itself to its widest child and paints black behind the
+/// result. Anything placed in that stack that reports a width -- a sized
+/// `Text`, or a `GeometryReader`, which returns whatever width it is offered
+/// and so claims the whole screen -- stretches the panel into a full-width
+/// slab, and re-centres the music row inside it so the spectrum slides under
+/// the physical notch cutout. Padding adds the height, and an overlay draws
+/// the words into it: an overlay is proposed its parent's size and never
+/// changes it.
+struct PinnedLyricsModifier: ViewModifier {
     @ObservedObject private var musicManager = MusicManager.shared
 
-    /// Whether the strip should be showing at all.
-    ///
-    /// Passed in rather than branched on by the caller so the view is always
-    /// mounted: an `if` in the caller inserts and removes it outright, and the
-    /// strip pops in and out with nothing to animate.
     let isVisible: Bool
 
-    /// Whether there is a line to draw at all.
-    ///
-    /// Checked here rather than only by the caller so the view is safe to
-    /// mount on its own: an out-of-range index would otherwise trap.
-    static func hasCurrentLine(index: Int, lineCount: Int) -> Bool {
-        index >= 0 && index < lineCount
-    }
-
-    /// One 10pt line and no taller. The GeometryReader below has no intrinsic
-    /// height, so without this the strip collapses.
+    /// One 10pt line, plus the gap between it and the notch body above.
     private static let stripHeight: CGFloat = 13
+    private static let stripGap: CGFloat = 4
 
     private var currentLine: String? {
-        guard Self.hasCurrentLine(index: musicManager.currentLyricIndex, lineCount: musicManager.syncedLyrics.count) else {
-            return nil
-        }
+        guard PinnedLyricsView.hasCurrentLine(
+            index: musicManager.currentLyricIndex,
+            lineCount: musicManager.syncedLyrics.count
+        ) else { return nil }
+
         let text = musicManager.syncedLyrics[musicManager.currentLyricIndex].text
         return text.isEmpty ? nil : text
     }
@@ -66,50 +65,67 @@ struct PinnedLyricsView: View {
             : .gray
     }
 
-    var body: some View {
-        // A GeometryReader, like the music sneak peek under the notch uses.
-        //
-        // It reports no width of its own and simply fills what it is offered,
-        // so the strip cannot widen the closed notch panel. A plain sized Text
-        // here did: the panel sizes to its widest child, so a long lyric
-        // stretched it, and the music row -- being narrower -- was then centred
-        // inside that wider panel, which slid the spectrum under the physical
-        // notch cutout.
-        GeometryReader { geometry in
-            // Redrawn per frame while playing so the sweep tracks the music,
-            // and frozen when paused so a paused notch is not animating.
-            TimelineView(.animation(paused: !musicManager.isPlaying)) { timeline in
-                // A plain Text swept as one rather than the panel's
-                // word-by-word layout: that exists to sweep a wrapped line in
-                // reading order, and this is deliberately one line.
-                Text(currentLine ?? "")
-                    .font(.system(size: 10, weight: .medium))
-                    .lineLimit(1)
-                    // Truncated rather than wrapped: a second row would grow
-                    // the panel downwards from lyric to lyric.
-                    .truncationMode(.tail)
-                    .contentTransition(.opacity)
-                    .lyricSweep(
-                        progress: musicManager.currentLyricSweepProgress(at: timeline.date),
-                        isCurrent: true,
-                        sung: .white,
-                        unsung: tint.opacity(0.55),
-                        idle: .white.opacity(0.5)
-                    )
-                    .frame(width: max(0, geometry.size.width - 16), alignment: .center)
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-            }
+    func body(content: Content) -> some View {
+        content
+            // Height only. Padding cannot widen the panel, so the music row
+            // keeps the width -- and therefore the position -- it had before
+            // lyrics were pinned.
+            .padding(.bottom, isShowing ? Self.stripHeight + Self.stripGap : 0)
+            .overlay(alignment: .bottom) { lyricLine }
+            // Height as well as opacity, so the panel grows into the strip
+            // rather than jumping taller a frame before the words arrive.
+            .animation(.smooth(duration: 0.28), value: isShowing)
+            // Separate and quicker: one line replacing another is a smaller
+            // event than the strip arriving, and sharing the timing made every
+            // line change feel like the panel resizing.
+            .animation(.smooth(duration: 0.18), value: currentLine)
+    }
+
+    private var lyricLine: some View {
+        // Redrawn per frame while playing so the sweep tracks the music, and
+        // frozen when paused so a paused notch is not animating.
+        TimelineView(.animation(paused: !musicManager.isPlaying)) { timeline in
+            // A plain Text swept as one rather than the panel's word-by-word
+            // layout: that exists to sweep a wrapped line in reading order,
+            // and this is deliberately one line.
+            Text(currentLine ?? "")
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+                // Truncated rather than wrapped: the overlay is only one line
+                // tall, and a second row would be clipped.
+                .truncationMode(.tail)
+                .contentTransition(.opacity)
+                .lyricSweep(
+                    progress: musicManager.currentLyricSweepProgress(at: timeline.date),
+                    isCurrent: true,
+                    sung: .white,
+                    unsung: tint.opacity(0.55),
+                    idle: .white.opacity(0.5)
+                )
         }
-        // Height as well as opacity, so the notch panel grows into the strip
-        // instead of jumping taller a frame before the words arrive.
-        .frame(height: isShowing ? Self.stripHeight : 0)
+        .padding(.horizontal, 10)
+        .frame(height: Self.stripHeight)
+        .padding(.bottom, Self.stripGap)
         .opacity(isShowing ? 1 : 0)
-        .padding(.bottom, isShowing ? 4 : 0)
-        .clipped()
-        .animation(.smooth(duration: 0.28), value: isShowing)
-        // Separate and quicker: one line replacing another is a smaller event
-        // than the strip arriving, and sharing the timing made every line
-        // change feel like the panel resizing.
-        .animation(.smooth(duration: 0.18), value: currentLine)
+    }
+}
+
+extension View {
+    /// Draws the line currently being sung under this view, without changing
+    /// its width. See `PinnedLyricsModifier`.
+    func pinnedLyrics(isVisible: Bool) -> some View {
+        modifier(PinnedLyricsModifier(isVisible: isVisible))
+    }
+}
+
+/// Namespace for the bounds check the modifier and its tests share.
+enum PinnedLyricsView {
+    /// Whether there is a line to draw at all.
+    ///
+    /// `-1` is where a track sits before its first timestamp, and the index can
+    /// briefly outlive a shorter set of lyrics when a new track's arrive first;
+    /// both would trap on the subscript.
+    static func hasCurrentLine(index: Int, lineCount: Int) -> Bool {
+        index >= 0 && index < lineCount
     }
 }
