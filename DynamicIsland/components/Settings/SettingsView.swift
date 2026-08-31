@@ -748,6 +748,9 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .battery, title: "Full charge threshold", keywords: ["battery", "threshold", "full"], highlightID: SettingsTab.battery.highlightID(for: "Full charge threshold")),
 
             // HUDs
+            SettingsSearchEntry(tab: .devices, title: "Enable per-app volume", keywords: ["per app volume", "app volume", "mixer", "audio", "mute app"], highlightID: SettingsTab.devices.highlightID(for: "Enable per-app volume")),
+            SettingsSearchEntry(tab: .devices, title: "Show app volume icon in the notch", keywords: ["per app volume", "icon", "notch", "mixer"], highlightID: SettingsTab.devices.highlightID(for: "Show app volume icon in the notch")),
+            SettingsSearchEntry(tab: .devices, title: "Reset all app volumes", keywords: ["per app volume", "reset", "mixer"], highlightID: SettingsTab.devices.highlightID(for: "Reset all app volumes")),
             SettingsSearchEntry(tab: .devices, title: "Show Bluetooth device connections", keywords: ["bluetooth", "hud"], highlightID: SettingsTab.devices.highlightID(for: "Show Bluetooth device connections")),
             SettingsSearchEntry(tab: .devices, title: "Use circular battery indicator", keywords: ["battery", "circular"], highlightID: SettingsTab.devices.highlightID(for: "Use circular battery indicator")),
             SettingsSearchEntry(tab: .devices, title: "Show battery percentage text in HUD", keywords: ["battery text"], highlightID: SettingsTab.devices.highlightID(for: "Show battery percentage text in HUD")),
@@ -2613,6 +2616,7 @@ private struct HUDSelectionCard<Preview: View>: View {
 private struct DevicesSettingsView: View {
     @Default(.progressBarStyle) var progressBarStyle
     @Default(.useBluetoothHUD3DIcon) private var useBluetoothHUD3DIcon
+    @Default(.enablePerAppVolume) private var enablePerAppVolume
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.devices.highlightID(for: title)
@@ -2624,6 +2628,29 @@ private struct DevicesSettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Defaults.Toggle(key: .enablePerAppVolume) {
+                    Text("Enable per-app volume")
+                }
+                .settingsHighlight(id: highlightID("Enable per-app volume"))
+
+                Defaults.Toggle(key: .showPerAppVolumeIcon) {
+                    Text("Show app volume icon in the notch")
+                }
+                .disabled(!enablePerAppVolume)
+                .settingsHighlight(id: highlightID("Show app volume icon in the notch"))
+
+                Button("Reset all app volumes") {
+                    PerAppVolumeManager.shared.resetAll()
+                }
+                .disabled(!enablePerAppVolume)
+                .settingsHighlight(id: highlightID("Reset all app volumes"))
+            } header: {
+                Text("App Volume")
+            } footer: {
+                Text("Gives each app its own volume and mute, independent of the system volume. macOS will ask for audio recording permission the first time an app's level is changed: routing an app's audio through Atoll is the only way it can be adjusted, and nothing is ever recorded or written to disk. Apps left at 100% and unmuted keep their normal, untouched path to the speakers.")
+            }
+
             Section {
                 Defaults.Toggle(key: .showBluetoothDeviceConnections) {
                     Text("Show Bluetooth device connections")

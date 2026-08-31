@@ -69,114 +69,23 @@ let audioIOProc: AudioDeviceIOProc = {
     return noErr
 }
 
+// These four lookups moved to `AudioProcessQuery` when the per-app volume
+// taps started needing the same reads. They stay here as thin wrappers so the
+// call sites below read the way they always have.
 private func getAudioObjectID(for pid: pid_t) -> AudioObjectID? {
-    var audioObjectID: AudioObjectID = kAudioObjectUnknown
-    var pidValue = pid
-
-    var address = AudioObjectPropertyAddress(
-        mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
-    )
-
-    var size = UInt32(MemoryLayout<AudioObjectID>.size)
-    let qualifierSize = UInt32(MemoryLayout<pid_t>.size)
-
-    // We query the global system object (kAudioObjectSystemObject)
-    // We pass the PID as the "qualifier", and it returns the AudioObjectID
-    let status = AudioObjectGetPropertyData(
-        AudioObjectID(kAudioObjectSystemObject),
-        &address,
-        qualifierSize,
-        &pidValue,
-        &size,
-        &audioObjectID
-    )
-
-    if status == noErr && audioObjectID != kAudioObjectUnknown {
-        return audioObjectID
-    }
-
-    return nil
+    AudioProcessQuery.processObject(for: pid)
 }
 
 private func getAudioProcessObjectIDs() -> [AudioObjectID] {
-    var address = AudioObjectPropertyAddress(
-        mSelector: kAudioHardwarePropertyProcessObjectList,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
-    )
-    let systemObject = AudioObjectID(kAudioObjectSystemObject)
-    var size: UInt32 = 0
-
-    guard AudioObjectGetPropertyDataSize(systemObject, &address, 0, nil, &size) == noErr,
-          size >= UInt32(MemoryLayout<AudioObjectID>.size) else {
-        return []
-    }
-
-    var processObjects = [AudioObjectID](
-        repeating: kAudioObjectUnknown,
-        count: Int(size) / MemoryLayout<AudioObjectID>.size
-    )
-    guard AudioObjectGetPropertyData(
-        systemObject,
-        &address,
-        0,
-        nil,
-        &size,
-        &processObjects
-    ) == noErr else {
-        return []
-    }
-
-    return processObjects.filter { $0 != kAudioObjectUnknown }
+    AudioProcessQuery.processObjectIDs()
 }
 
 private func getBundleIdentifier(for audioProcessObject: AudioObjectID) -> String? {
-    var address = AudioObjectPropertyAddress(
-        mSelector: kAudioProcessPropertyBundleID,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
-    )
-    var unmanagedBundleIdentifier: Unmanaged<CFString>?
-    var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
-
-    guard AudioObjectGetPropertyData(
-        audioProcessObject,
-        &address,
-        0,
-        nil,
-        &size,
-        &unmanagedBundleIdentifier
-    ) == noErr,
-          let unmanagedBundleIdentifier else {
-        return nil
-    }
-
-    return unmanagedBundleIdentifier.takeRetainedValue() as String
+    AudioProcessQuery.bundleIdentifier(for: audioProcessObject)
 }
 
 private func getPID(for audioProcessObject: AudioObjectID) -> pid_t? {
-    var address = AudioObjectPropertyAddress(
-        mSelector: kAudioProcessPropertyPID,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
-    )
-    var pid: pid_t = 0
-    var size = UInt32(MemoryLayout<pid_t>.size)
-
-    guard AudioObjectGetPropertyData(
-        audioProcessObject,
-        &address,
-        0,
-        nil,
-        &size,
-        &pid
-    ) == noErr else {
-        return nil
-    }
-
-    return pid
+    AudioProcessQuery.pid(for: audioProcessObject)
 }
 
 enum AudioTapTargetMatcher {
