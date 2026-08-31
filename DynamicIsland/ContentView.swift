@@ -1085,6 +1085,10 @@ struct ContentView: View {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
                       
+                      if pinnedLyricsVisible {
+                          PinnedLyricsView()
+                      }
+
                       if isSneakPeekVisibleOnCurrentScreen {
                           if (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && (coordinator.sneakPeek.type != .capsLock) && !coordinator.sneakPeek.type.isExtensionPayload && !Defaults[.inlineHUD] && !isAirPodsListeningModeSneak && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
                               SystemEventIndicatorModifier(eventType: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, sendEventBack: { _ in
@@ -2330,6 +2334,25 @@ struct ContentView: View {
             && point.y >= frame.minY && point.y <= frame.maxY
     }
     
+    /// Whether the pinned current lyric belongs under the closed notch.
+    ///
+    /// Deliberately excludes the moment a sneak peek is up: both draw in the
+    /// same strip below the notch, and stacking them would push the notch's
+    /// own content around every time the volume changed.
+    private var pinnedLyricsVisible: Bool {
+        Defaults[.enableLyrics]
+            && Defaults[.pinLyricsWhenClosed]
+            && vm.notchState == .closed
+            && !vm.hideOnClosed
+            && !lockScreenManager.isLocked
+            && !isSneakPeekVisibleOnCurrentScreen
+            && musicManager.isPlaying
+            && PinnedLyricsView.hasCurrentLine(
+                index: musicManager.currentLyricIndex,
+                lineCount: musicManager.syncedLyrics.count
+            )
+    }
+
     // Helper function to check if any popovers are active
     private func hasAnyActivePopovers() -> Bool {
      return vm.isBatteryPopoverActive || 

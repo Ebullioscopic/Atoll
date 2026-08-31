@@ -172,6 +172,7 @@ struct MusicPlayerView: View {
 struct LyricsSidePanelView: View {
     @ObservedObject private var musicManager = MusicManager.shared
     @EnvironmentObject private var vm: DynamicIslandViewModel
+    @Default(.pinLyricsWhenClosed) private var pinLyricsWhenClosed
     @State private var suppressionToken = UUID()
     @State private var isSuppressing = false
     private var artistLineColor: Color {
@@ -193,12 +194,16 @@ struct LyricsSidePanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Lyrics")
-                .font(.headline)
-                .foregroundStyle(artistLineColor)
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+            HStack(spacing: 6) {
+                Text("Lyrics")
+                    .font(.headline)
+                    .foregroundStyle(artistLineColor)
+                Spacer()
+                pinButton
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
 
             SyncedLyricsList(musicManager: musicManager, style: lyricsStyle)
         }
@@ -211,6 +216,30 @@ struct LyricsSidePanelView: View {
         .onDisappear {
             updateSuppression(for: false)
         }
+    }
+
+    /// Keeps the current line under the notch once it closes again.
+    ///
+    /// Filled while pinned so the state reads at a glance from the panel that
+    /// set it -- the strip it controls is only visible once the notch closes,
+    /// which is exactly when this button is off screen.
+    private var pinButton: some View {
+        Button {
+            withAnimation(.smooth) {
+                pinLyricsWhenClosed.toggle()
+            }
+        } label: {
+            Image(systemName: pinLyricsWhenClosed ? "pin.fill" : "pin")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(pinLyricsWhenClosed ? artistLineColor : Color.white.opacity(0.5))
+                .rotationEffect(.degrees(pinLyricsWhenClosed ? 0 : 45))
+                .frame(width: 20, height: 20)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(pinLyricsWhenClosed
+            ? "Stop showing lyrics under the closed notch"
+            : "Keep showing lyrics under the closed notch")
     }
 
     // Prevent lyrics scrolling to close the expanded notch
