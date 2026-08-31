@@ -82,25 +82,26 @@ struct PinnedLyricsModifier: ViewModifier {
     }
 
     private var lyricLine: some View {
-        // A GeometryReader is safe here in a way it was not in the notch's
-        // stack: overlay content is proposed its parent's size and cannot
-        // change it, so reading that width costs nothing.
-        GeometryReader { geometry in
-            // A marquee rather than a swept Text. The strip is only as wide as
-            // the notch's own content, so most lines do not fit, and a scroll
-            // reads the whole line where truncation just hid the end of it.
-            // The sweep goes with it: a gradient fixed to the view's bounds
-            // does not travel with text moving underneath it, so the two
-            // cannot both be right.
-            MarqueeText(
-                .constant(currentLine ?? ""),
-                font: .system(size: 10, weight: .medium),
-                nsFont: .caption1,
-                textColor: tint.opacity(0.9),
-                minDuration: 6,
-                frameWidth: geometry.size.width
-            )
-            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .leading)
+        // Redrawn per frame while playing so the sweep tracks the music, and
+        // frozen when paused so a paused notch is not animating.
+        TimelineView(.animation(paused: !musicManager.isPlaying)) { timeline in
+            // A plain Text swept as one rather than the panel's word-by-word
+            // layout: that exists to sweep a wrapped line in reading order,
+            // and this is deliberately one line.
+            Text(currentLine ?? "")
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+                // Truncated rather than wrapped: the overlay is only one line
+                // tall, and a second row would be clipped.
+                .truncationMode(.tail)
+                .contentTransition(.opacity)
+                .lyricSweep(
+                    progress: musicManager.currentLyricSweepProgress(at: timeline.date),
+                    isCurrent: true,
+                    sung: .white,
+                    unsung: tint.opacity(0.55),
+                    idle: .white.opacity(0.5)
+                )
         }
         .padding(.horizontal, 10)
         .frame(height: Self.stripHeight)
