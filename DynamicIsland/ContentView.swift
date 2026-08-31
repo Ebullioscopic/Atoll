@@ -1085,9 +1085,10 @@ struct ContentView: View {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
                       
-                      if pinnedLyricsVisible {
-                          PinnedLyricsView()
-                      }
+                      // Always mounted, with visibility passed in: an `if`
+                      // here inserts and removes it outright, which pops
+                      // rather than animates.
+                      PinnedLyricsView(isVisible: pinnedLyricsVisible)
 
                       if isSneakPeekVisibleOnCurrentScreen {
                           if (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && (coordinator.sneakPeek.type != .capsLock) && !coordinator.sneakPeek.type.isExtensionPayload && !Defaults[.inlineHUD] && !isAirPodsListeningModeSneak && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
