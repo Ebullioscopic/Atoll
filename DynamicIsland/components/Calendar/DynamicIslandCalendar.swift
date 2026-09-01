@@ -708,7 +708,7 @@ struct StandaloneCalendarView: View {
                     LazyVGrid(columns: columns, spacing: 6) {
                         ForEach(Array(columnHeaderSymbols.enumerated()), id: \.offset) { _, symbol in
                             Text(symbol.prefix(1))
-                                .font(.caption2)
+                                .font(mode == .month ? .caption2 : .caption)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(Color(white: 0.55))
                                 .frame(maxWidth: .infinity)
@@ -722,15 +722,13 @@ struct StandaloneCalendarView: View {
                     // month and a single-row week all fill the pane.
                     let gridHeight = max(0, pickerViewportHeight - 22)
                     let rowSpacing: CGFloat = 6
-                    // Capped as well as floored: a single-row week would
-                    // otherwise stretch its one row over the whole pane and
-                    // leave the date floating in the middle of it.
-                    let rowHeight = min(
-                        36,
-                        max(
-                            10,
-                            (gridHeight - rowSpacing * CGFloat(weekRowCount - 1)) / CGFloat(weekRowCount)
-                        )
+                    // Uncapped: the single-row views spend the whole pane on
+                    // their one row and size their dates to match, and the
+                    // month's rows come out under any cap worth setting anyway
+                    // -- 27pt across six rows, 34pt across five.
+                    let rowHeight = max(
+                        10,
+                        (gridHeight - rowSpacing * CGFloat(weekRowCount - 1)) / CGFloat(weekRowCount)
                     )
 
                     LazyVGrid(columns: columns, spacing: rowSpacing) {
@@ -738,9 +736,16 @@ struct StandaloneCalendarView: View {
                             dayCell(for: day, rowHeight: rowHeight)
                         }
                     }
+                    // Identified by mode so a change replaces the grid outright
+                    // rather than diffing 42 date cells down to 3, which animated
+                    // the removals and let them outlive the layout they belonged
+                    // to. Clipped so nothing mid-change can paint outside.
+                    .id(mode)
                     .frame(height: gridHeight, alignment: .top)
+                    .clipped()
                 }
                 .frame(height: pickerViewportHeight, alignment: .top)
+                .clipped()
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
@@ -798,7 +803,7 @@ struct StandaloneCalendarView: View {
             }
         } label: {
             Text(day.formatted(.dateTime.day()))
-                .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
+                .font(.system(size: mode.dayFontSize, weight: isSelected ? .semibold : .medium))
                 .foregroundStyle(dayTextColor(isInVisibleRange: isInVisibleRange, isSelected: isSelected, isToday: isToday))
                 .padding(.horizontal, 4)
                 .frame(minWidth: markerHeight, minHeight: markerHeight)
@@ -828,9 +833,11 @@ struct StandaloneCalendarView: View {
             ForEach(CalendarViewMode.allCases) { option in
                 Button {
                     guard option != mode else { return }
-                    withAnimation(.smooth(duration: 0.2)) {
-                        mode = option
-                    }
+                    // Not animated: switching mode swaps the grid's shape, the
+                    // pane's height and the notch's height at once, and tweening
+                    // the content while the other two land immediately is what
+                    // left the previous mode's grid on screen under the new one.
+                    mode = option
                 } label: {
                     Text(option.shortName)
                         .font(.system(size: 10, weight: .semibold))

@@ -259,9 +259,12 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         // `@Published` fires on willSet, so `currentView` still holds the old
         // value at emission time; `receive(on:)` hops a run loop tick so the
         // new one is read.
-        // Same reasoning as the tab-switch sink below: the mode changes the
-        // height, so notchSize has to follow it. The window is left to
-        // AppDelegate's own observer.
+        // Same reasoning as the tab-switch sink below, including the lack of an
+        // animation: the mode changes the height, so notchSize has to follow it,
+        // and it has to land on the same frame the window does. Tweening this
+        // while the window moved separately left the container sized for one
+        // mode around content laid out for the other, and the old grid painted
+        // on over the new one. The window is left to AppDelegate's observer.
         Defaults.publisher(.calendarViewMode, options: [])
             .map { $0.newValue }
             .removeDuplicates()
@@ -271,9 +274,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 guard self.notchState == .open else { return }
                 let updatedTarget = self.calculateDynamicNotchSize()
                 guard self.notchSize != updatedTarget else { return }
-                withAnimation(.smooth) {
-                    self.notchSize = updatedTarget
-                }
+                self.notchSize = updatedTarget
             }
             .store(in: &cancellables)
 

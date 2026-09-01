@@ -78,6 +78,18 @@ public enum CalendarViewMode: String, CaseIterable, Defaults.Serializable, Ident
         }
     }
 
+    /// Point size for the day numbers.
+    ///
+    /// The single-row views get a little more than the month, which divides its
+    /// height between five or six rows, but not much: their row is floored at
+    /// 74pt by the pane's own minimum rather than by anything the dates need, so
+    /// sizing the text to fill it makes the dates the loudest thing in the notch
+    /// for no reason. The leftover height reads better as padding around a
+    /// normal-sized date than as a reason to enlarge one.
+    var dayFontSize: CGFloat {
+        self == .month ? 14 : 16
+    }
+
     /// Notch height this mode needs. Only the month grid asks for more than the
     /// default, so picking either of the others returns the notch to its normal
     /// size -- the mode the user chose is the whole story, which is what makes

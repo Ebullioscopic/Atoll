@@ -792,12 +792,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
-        // The calendar's view mode decides the notch height. Resized immediately
-        // rather than debounced: this is the direct response to a click, and a
-        // lagging notch reads as a bug.
+        // The calendar's view mode decides the notch height. Applied through the
+        // tab-switch path, which resizes at once and without animating: this is
+        // the direct response to a click, and the content and vm.notchSize both
+        // change on one frame, so a tweened window would be the only thing
+        // out of step.
         Defaults.publisher(.calendarViewMode, options: []).sink { [weak self] _ in
             DispatchQueue.main.async {
-                self?.updateWindowSizeIfNeeded()
+                self?.updateWindowSizeForTabSwitch()
             }
         }.store(in: &cancellables)
 
