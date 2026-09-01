@@ -295,3 +295,125 @@ final class DownloadScanSequenceTests: XCTestCase {
         XCTAssertTrue(manager.isDownloading, "the activity was closed mid-animation")
     }
 }
+
+/// Speed is read from how much the in-progress files are holding, and the
+/// browsers do not agree on what an in-progress download even is on disk.
+final class DownloadBytesInProgressTests: XCTestCase {
+    private var directory: URL!
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+        directory = nil
+        try super.tearDownWithError()
+    }
+
+    private func write(_ byteCount: Int, to url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(repeating: 0xAB, count: byteCount).write(to: url)
+    }
+
+    /// The plain-file case every browser but Safari uses.
+    func testAPartialFileIsMeasured() throws {
+        try write(4_096, to: directory.appendingPathComponent("archive.zip.crdownload"))
+
+        XCTAssertGreaterThanOrEqual(DownloadManager.bytesInProgress(in: directory), 4_096)
+    }
+
+    /// Safari's `.download` is a bundle. Measuring only the directory entry
+    /// reports nothing, which reads as a download that never moves.
+    func testASafariBundleIsMeasuredThroughItsContents() throws {
+        let bundle = directory.appendingPathComponent("archive.zip.download", isDirectory: true)
+        try write(8_192, to: bundle.appendingPathComponent("Data"))
+
+        XCTAssertGreaterThanOrEqual(DownloadManager.bytesInProgress(in: directory), 8_192)
+    }
+
+    /// Safari nests the data file under a subdirectory in some versions.
+    func testASafariBundleIsMeasuredThroughNestedContents() throws {
+        let bundle = directory.appendingPathComponent("archive.zip.download", isDirectory: true)
+        try write(8_192, to: bundle.appendingPathComponent("Contents/Data"))
+
+        XCTAssertGreaterThanOrEqual(DownloadManager.bytesInProgress(in: directory), 8_192)
+    }
+
+    /// Only in-progress names count -- a finished file sitting in Downloads is
+    /// not part of the rate.
+    func testFinishedFilesAreNotMeasured() throws {
+        try write(16_384, to: directory.appendingPathComponent("archive.zip"))
+
+        XCTAssertEqual(DownloadManager.bytesInProgress(in: directory), 0)
+    }
+
+    func testAnEmptyFolderMeasuresNothing() {
+        XCTAssertEqual(DownloadManager.bytesInProgress(in: directory), 0)
+    }
+}
+
+/// The rate is read from how much the in-progress files grew between two
+/// readings, which only means anything while the same files are still there.
+final class DownloadSampleRateTests: XCTestCase {
+    private let start = Date(timeIntervalSince1970: 1_000_000)
+
+    private func sample(_ bytes: Int64, _ files: Set<String>, after seconds: TimeInterval) -> DownloadManager.DownloadsSample {
+        DownloadManager.DownloadsSample(bytes: bytes, files: files, takenAt: start.addingTimeInterval(seconds))
+    }
+
+    func testASteadyDownloadReportsItsRate() {
+        let first = sample(1_000_000, ["a.crdownload"], after: 0)
+        let second = sample(6_000_000, ["a.crdownload"], after: 1)
+
+        XCTAssertEqual(second.rate(since: first), 5_000_000)
+    }
+
+    /// The case that motivated this: a small download finishing beside a faster
+    /// one still nets positive, so a "did the total fall" test lets it through
+    /// and understates the rate.
+    func testACompletionBesideAFasterDownloadCarriesNoRate() {
+        let first = sample(2_000_000, ["done.crdownload", "b.crdownload"], after: 0)
+        // `done` finished and left; `b` gained 5 MB. The total rose by 3 MB.
+        let second = sample(5_000_000, ["b.crdownload"], after: 1)
+
+        XCTAssertGreaterThan(second.bytes, first.bytes, "precondition: the total rose")
+        XCTAssertNil(second.rate(since: first))
+    }
+
+    func testAFileDisappearingCarriesNoRate() {
+        let first = sample(9_000_000, ["a.crdownload"], after: 0)
+        let second = sample(0, [], after: 1)
+
+        XCTAssertNil(second.rate(since: first))
+    }
+
+    /// A new download appearing is fine -- nothing left, so the bytes that
+    /// arrived in the window are still bytes that arrived.
+    func testANewDownloadJoiningStillCarriesARate() {
+        let first = sample(1_000_000, ["a.crdownload"], after: 0)
+        let second = sample(3_000_000, ["a.crdownload", "new.part"], after: 1)
+
+        XCTAssertEqual(second.rate(since: first), 2_000_000)
+    }
+
+    func testATruncationCarriesNoRate() {
+        let first = sample(5_000_000, ["a.crdownload"], after: 0)
+        let second = sample(1_000_000, ["a.crdownload"], after: 1)
+
+        XCTAssertNil(second.rate(since: first))
+    }
+
+    func testTwoReadingsAtTheSameInstantCarryNoRate() {
+        let first = sample(1_000_000, ["a.crdownload"], after: 0)
+        let second = sample(2_000_000, ["a.crdownload"], after: 0)
+
+        XCTAssertNil(second.rate(since: first))
+    }
+}
