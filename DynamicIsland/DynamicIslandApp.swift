@@ -874,6 +874,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }.store(in: &cancellables)
 
+        Defaults.publisher(.enableCaffeinate, options: []).sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.updateFeatureShortcutAvailability()
+            }
+        }.store(in: &cancellables)
+
         // The hide option changes fullscreen visibility, not Spaces pinning.
         // Re-sync in case the user changes it while macOS is moving Spaces.
         Defaults.publisher(.hideNotchOption, options: []).sink { [weak self] _ in
@@ -1470,6 +1476,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateShortcut(.colorPickerPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableColorPickerFeature])
         updateShortcut(.screenAssistantPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableScreenAssistant])
         updateShortcut(.toggleTerminalTab, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableTerminalFeature])
+        updateShortcut(.toggleCaffeinate, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableCaffeinate])
     }
 
     @MainActor

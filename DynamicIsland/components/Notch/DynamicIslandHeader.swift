@@ -70,9 +70,9 @@ struct DynamicIslandHeader: View {
     /// The 20pt box clears the largest frame any of these symbols asks for
     /// (19pt, `list.clipboard`), so none of them is clipped — a smaller box
     /// silently cuts the tall ones.
-    private func headerGlyph(_ name: String) -> some View {
+    private func headerGlyph(_ name: String, color: Color = .white) -> some View {
         Image(systemName: name)
-            .foregroundColor(.white)
+            .foregroundColor(color)
             .font(.system(size: Self.headerGlyphSizes[name] ?? 14.4, weight: .medium))
             .frame(width: 20, height: 20)
     }
@@ -246,8 +246,10 @@ struct DynamicIslandHeader: View {
                                     // signal the closed row can give that the
                                     // Mac is being held awake, so it is not
                                     // just a filled-vs-hollow glyph swap.
-                                    headerGlyph(caffeinateManager.isActive ? "cup.and.saucer.fill" : "cup.and.saucer")
-                                        .foregroundColor(caffeinateManager.isActive ? .yellow : .white)
+                                    headerGlyph(
+                                        caffeinateManager.isActive ? "cup.and.saucer.fill" : "cup.and.saucer",
+                                        color: caffeinateManager.isActive ? .yellow : .white
+                                    )
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
