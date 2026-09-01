@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Pin lyrics under the closed notch**: a pin button in the Lyrics panel keeps the line being sung visible after the notch closes, so a song can be followed without holding the pointer over the notch. The strip is drawn as an overlay on padding rather than as a row in the notch stack, so it never widens the panel or shifts the music row. Off by default, and inert unless lyrics are enabled.
 - **A way to find extensions**: Extensions settings now opens with a link to the Marketplace at [getatoll.app/marketplace](https://getatoll.app/marketplace). The rest of that page manages extensions that are already installed, which is no help to anyone who has none — nothing said they existed as a thing to go and get, or where.
 - **Always show volume control**: the lock screen panel can keep a volume slider under the playback controls, instead of leaving volume behind the output button. Off by default and named after the iOS setting it copies — a permanent bar across a panel that is mostly artwork is a preference, so it is asked for rather than assumed. The volume keys move it while the Mac is locked, where the notch has nowhere to draw.
 - **Show download speed**: an option in Downloads settings puts the current rate beside the download indicator, measured from how fast the files in your Downloads folder are growing. Read from blocks on disk rather than the file's stated length, since a browser that reserves the whole file up front reports its final size from the first moment. Off by default.
@@ -51,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed CPU temperature reporting on M5-series Macs by using the M5 SMC sensor keys instead of the M4 key set (#585).
+- **Live activities step around the menu bar**: a live activity draws into the strip of menu bar beside the notch, which is where the frontmost app's own menus live, so a timer or download could sit on top of them — the Help menu especially, being the one nearest the notch. macOS offers no way to tell it that part of that strip is spoken for, so Atoll measures where the menus actually end and slides the activity clear, moving back once there is room again (#793).
 - **The custom OSD no longer sticks on screen**: switching away from Custom OSD while one of its windows was visible left the overlay there for good. Nothing watched the setting, and the only thing that would ever have hidden that window was its own two-second timer, which the switch outran. Turning the OSD off -- or turning off volume, brightness or keyboard backlight individually -- now dismisses what is on screen.
 - Restored the notch's curved top corners in both standard and Minimalistic music UI while retaining the top-edge anti-gap fill, and synchronized the lock and fingerprint indicators through one shared scan state. (#782)
 - The lock screen Dynamic Island now completes one clean unlock contraction instead of disappearing early or showing a second island that closes immediately afterward. (#774)
