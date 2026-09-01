@@ -378,7 +378,16 @@ struct NotchTimerView: View {
     }
 
     private var maxTabContentHeight: CGFloat {
-        let available = resolvedNotchHeight - headerHeight - 36
+        // Measured against the standard open notch rather than the timer tab's
+        // own 250pt. That extra 50pt exists for the preset list, which caps
+        // itself at its content height anyway, while the composer on the left is
+        // top-aligned above a Spacer -- so handing either column the taller
+        // value only grows the gap under the card. This is the height both
+        // columns were laid out against; before the notch's tab height was
+        // resolved in one place, they received it by accident, because the value
+        // this reads was never updated for the timer tab.
+        let tunedHeight = min(resolvedNotchHeight, openNotchSize.height)
+        let available = tunedHeight - headerHeight - 36
         return max(130, available)
     }
 
