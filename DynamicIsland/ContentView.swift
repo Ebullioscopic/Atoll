@@ -210,10 +210,9 @@ struct ContentView: View {
         }
         
         guard coordinator.currentView == .stats else {
-            let isHomeTabActive = coordinator.currentView == .home && vm.notchState == .open
             return inlineLyricsAdjustedNotchSize(
-                from: calendarAdjustedNotchSize(from: baseSize, isHomeTabActive: isHomeTabActive),
-                isHomeTabActive: isHomeTabActive
+                from: baseSize,
+                isHomeTabActive: coordinator.currentView == .home && vm.notchState == .open
             )
         }
         

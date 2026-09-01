@@ -244,30 +244,6 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             }
             .store(in: &cancellables)
 
-        // The tab decides the height -- `calculateDynamicNotchSize` branches on
-        // `currentView` -- so the size has to be recomputed when the tab changes.
-        // Without this `notchSize` keeps whatever the previous tab resolved to,
-        // and every view that derives its content height from it (NotchTimerView,
-        // StandaloneCalendarView) lays out against the wrong number. This was
-        // invisible while every tab happened to resolve to `openNotchSize`.
-        //
-        // `@Published` fires on willSet, so `currentView` still holds the old
-        // value at emission time; hop a run loop tick to read the new one, the
-        // same way AppDelegate's tab-switch resize does.
-        coordinator.$currentView
-            .removeDuplicates()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                guard let self else { return }
-                guard self.notchState == .open else { return }
-                let updatedTarget = self.calculateDynamicNotchSize()
-                guard self.notchSize != updatedTarget else { return }
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    self.notchSize = updatedTarget
-                }
-            }
-            .store(in: &cancellables)
-
         coordinator.$notesLayoutState
             .removeDuplicates()
             .receive(on: RunLoop.main)
@@ -277,31 +253,6 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 let updatedTarget = self.calculateDynamicNotchSize()
                 guard self.notchSize != updatedTarget else { return }
                 withAnimation(.easeInOut(duration: 0.25)) {
-                    self.notchSize = updatedTarget
-                }
-                if let delegate = AppDelegate.shared {
-                    delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
-                        animated: true,
-                        force: false
-                    )
-                }
-            }
-            .store(in: &cancellables)
-
-        // The calendar's view mode owns the notch height, so switching mode has
-        // to resize it -- otherwise picking Month leaves the notch short and
-        // clips the grid, and leaving Month leaves it tall and empty.
-        Defaults.publisher(.calendarViewMode, options: [])
-            .map { $0.newValue }
-            .removeDuplicates()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                guard let self else { return }
-                guard self.notchState == .open else { return }
-                let updatedTarget = self.calculateDynamicNotchSize()
-                guard self.notchSize != updatedTarget else { return }
-                withAnimation(.smooth) {
                     self.notchSize = updatedTarget
                 }
                 if let delegate = AppDelegate.shared {
@@ -479,11 +430,6 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             adjustedSize.height = max(adjustedSize.height, llmUsageOpenNotchHeight)
             return adjustedSize
         }
-
-        adjustedSize = calendarAdjustedNotchSize(
-            from: adjustedSize,
-            isHomeTabActive: coordinator.currentView == .home
-        )
 
         adjustedSize = inlineLyricsAdjustedNotchSize(
             from: adjustedSize,
