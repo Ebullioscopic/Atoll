@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Keep the Mac awake from the notch**: a cup-and-saucer button in the notch header holds an IOKit power assertion — indefinitely, or for 15 minutes, 30 minutes, 1, 2 or 4 hours — with `⌘⇧K` to toggle it and a setting for whether the display is kept on too. The assertion is owned by the Atoll process, so it is released automatically if Atoll exits.
 - **A way to find extensions**: Extensions settings now opens with a link to the Marketplace at [getatoll.app/marketplace](https://getatoll.app/marketplace). The rest of that page manages extensions that are already installed, which is no help to anyone who has none — nothing said they existed as a thing to go and get, or where.
 - **Always show volume control**: the lock screen panel can keep a volume slider under the playback controls, instead of leaving volume behind the output button. Off by default and named after the iOS setting it copies — a permanent bar across a panel that is mostly artwork is a preference, so it is asked for rather than assumed. The volume keys move it while the Mac is locked, where the notch has nowhere to draw.
 - **Show download speed**: an option in Downloads settings puts the current rate beside the download indicator, measured from how fast the files in your Downloads folder are growing. Read from blocks on disk rather than the file's stated length, since a browser that reserves the whole file up front reports its final size from the first moment. Off by default.
