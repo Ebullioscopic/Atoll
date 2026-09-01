@@ -146,6 +146,12 @@ struct NotchTimerView: View {
                         .frame(maxHeight: .infinity, alignment: .bottom)
                 }
                 .frame(height: listHeight)
+                .onHover { hovering in
+                    updatePresetScrollSuppression(for: hovering)
+                }
+                .onDisappear {
+                    updatePresetScrollSuppression(for: false)
+                }
             }
         }
         .frame(width: 210, alignment: .leading)
@@ -375,6 +381,21 @@ struct NotchTimerView: View {
 
     private var headerHeight: CGFloat {
         max(24, vm.effectiveClosedNotchHeight)
+    }
+
+    @State private var presetScrollSuppressionToken = UUID()
+    @State private var isSuppressingPresetScroll = false
+
+    /// Scrolling the preset list used to reach the notch's close gesture, which
+    /// reads an upward scroll as "close". The list is scrollable whenever the
+    /// presets are taller than the column, so three presets were enough to make
+    /// scrolling them dismiss the notch. Every other scrollable surface in the
+    /// notch already registers this -- the clipboard, notes, the terminal, the
+    /// home view and the ruler picker -- and this list was the one that did not.
+    private func updatePresetScrollSuppression(for hovering: Bool) {
+        guard hovering != isSuppressingPresetScroll else { return }
+        isSuppressingPresetScroll = hovering
+        vm.setScrollGestureSuppression(hovering, token: presetScrollSuppressionToken)
     }
 
     private var maxTabContentHeight: CGFloat {
