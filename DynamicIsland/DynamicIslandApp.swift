@@ -562,9 +562,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             baseSize.height = max(baseSize.height, llmUsageOpenNotchHeight)
         }
         
+        // Gated on the open state, unlike the lyrics adjustment below: a closed
+        // notch draws nothing that needs the month's height, and sizing the
+        // window for it would leave a tall transparent slab over the top of the
+        // screen while the notch is a sliver. `ContentView.dynamicNotchSize`
+        // gates the same way, and the two have to agree. Opening does not
+        // depend on this path -- `DynamicIslandViewModel.open()` computes the
+        // expanded target and applies it with `force: true` before it sets
+        // `notchState`.
         baseSize = calendarAdjustedNotchSize(
             from: baseSize,
-            isHomeTabActive: coordinator.currentView == .home
+            isHomeTabActive: coordinator.currentView == .home && vm.notchState == .open
         )
 
         baseSize = inlineLyricsAdjustedNotchSize(

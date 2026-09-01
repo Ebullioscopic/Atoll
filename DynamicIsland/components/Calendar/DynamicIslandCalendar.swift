@@ -767,7 +767,13 @@ struct StandaloneCalendarView: View {
     }
 
     private func dayCell(for day: Date, rowHeight: CGFloat) -> some View {
-        let isCurrentMonth = calendar.isDate(day, equalTo: displayedMonth, toGranularity: .month)
+        // Only the month grid pads its range out to whole weeks, so only it has
+        // days that are on screen without being part of what was asked for. A
+        // week or three-day range that straddles a month boundary is showing
+        // every day deliberately, and dimming half of them would read as those
+        // days falling outside the range.
+        let isInVisibleRange = mode != .month
+            || calendar.isDate(day, equalTo: displayedMonth, toGranularity: .month)
         let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
         let isToday = calendar.isDateInToday(day)
         // Keep the selection circle inside its row instead of pinning it to
@@ -788,7 +794,7 @@ struct StandaloneCalendarView: View {
 
                 Text(day.formatted(.dateTime.day()))
                     .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
-                    .foregroundStyle(dayTextColor(isCurrentMonth: isCurrentMonth, isSelected: isSelected, isToday: isToday))
+                    .foregroundStyle(dayTextColor(isInVisibleRange: isInVisibleRange, isSelected: isSelected, isToday: isToday))
             }
             .frame(maxWidth: .infinity, minHeight: rowHeight)
             .contentShape(Rectangle())
@@ -796,9 +802,9 @@ struct StandaloneCalendarView: View {
         .buttonStyle(.plain)
     }
 
-    private func dayTextColor(isCurrentMonth: Bool, isSelected: Bool, isToday: Bool) -> Color {
+    private func dayTextColor(isInVisibleRange: Bool, isSelected: Bool, isToday: Bool) -> Color {
         if isSelected { return .white }
-        if !isCurrentMonth { return Color(white: 0.35) }
+        if !isInVisibleRange { return Color(white: 0.35) }
         if isToday { return Color.effectiveAccent }
         return .white
     }
