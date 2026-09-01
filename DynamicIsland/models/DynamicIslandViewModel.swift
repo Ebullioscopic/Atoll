@@ -259,6 +259,24 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         // `@Published` fires on willSet, so `currentView` still holds the old
         // value at emission time; `receive(on:)` hops a run loop tick so the
         // new one is read.
+        // Same reasoning as the tab-switch sink below: the mode changes the
+        // height, so notchSize has to follow it. The window is left to
+        // AppDelegate's own observer.
+        Defaults.publisher(.calendarViewMode, options: [])
+            .map { $0.newValue }
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                guard self.notchState == .open else { return }
+                let updatedTarget = self.calculateDynamicNotchSize()
+                guard self.notchSize != updatedTarget else { return }
+                withAnimation(.smooth) {
+                    self.notchSize = updatedTarget
+                }
+            }
+            .store(in: &cancellables)
+
         coordinator.$currentView
             .removeDuplicates()
             .receive(on: RunLoop.main)
@@ -446,10 +464,16 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     private func calculateDynamicNotchSize() -> CGSize {
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
 
+        // Always resolved as if open, because that is what every caller is
+        // asking for. `open()` calls this to find the size to expand *to*, and
+        // it runs before `notchState` flips -- reading the live state there
+        // answered for the closed notch and opened the calendar at the short
+        // height, leaving the month grid clipped until some later event
+        // recomputed it. Every other caller guards on `.open` already.
         return notchTabContentSize(
             from: baseSize,
             view: coordinator.currentView,
-            isNotchOpen: notchState == .open,
+            isNotchOpen: true,
             statsSecondRowProgress: coordinator.statsSecondRowExpansion
         )
     }

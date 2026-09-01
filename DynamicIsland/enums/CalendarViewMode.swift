@@ -21,11 +21,11 @@ import Foundation
 
 /// How much of the calendar the standalone calendar shows at once.
 ///
-/// Every mode draws inside the notch's normal height. The month grid trades
-/// row height for the extra weeks rather than growing the notch: three separate
-/// functions compute the notch size and only agree while every tab wants the
-/// same height, so a mode that changed it made that disagreement visible --
-/// content measured against one height inside a window built for another.
+/// The mode owns the notch height as well as the date range, because the two
+/// cannot disagree: a month needs six week rows and the room to draw them, and
+/// three days must not hold the notch open at a month's height. Both are
+/// resolved through ``notchTabContentSize``, so the content frame, the window
+/// and `vm.notchSize` cannot drift apart over it.
 public enum CalendarViewMode: String, CaseIterable, Defaults.Serializable, Identifiable {
     case threeDay
     case week
@@ -64,24 +64,8 @@ public enum CalendarViewMode: String, CaseIterable, Defaults.Serializable, Ident
         case .week:
             return "Shows the week around the selected day."
         case .month:
-            return "Shows the whole month at once. Rows are shorter to fit, so the dates are smaller than in the other views."
+            return "Shows the whole month. The notch grows taller to fit every week row without scrolling."
         }
-    }
-
-    /// Point size for the day numbers.
-    ///
-    /// Sized against the digits' own height rather than a full line box: dates
-    /// have no descenders, so a 13pt date stands about 9pt tall and clears a
-    /// 16.8pt month row easily. Budgeting for leading the text never uses is
-    /// what kept these smaller than they needed to be.
-    var dayFontSize: CGFloat {
-        self == .month ? 13 : 14
-    }
-
-    /// Spacing between grid rows, tightened for the month so the rows
-    /// themselves keep as much of the pane as possible.
-    var rowSpacing: CGFloat {
-        self == .month ? 1 : 6
     }
 
     /// Columns in the day grid, and the number of days a non-month mode spans.
@@ -92,6 +76,14 @@ public enum CalendarViewMode: String, CaseIterable, Defaults.Serializable, Ident
         case .week, .month:
             return 7
         }
+    }
+
+    /// Notch height this mode needs. Only the month grid asks for more than the
+    /// default, so picking either of the others returns the notch to its normal
+    /// size -- the mode the user chose is the whole story, which is what makes
+    /// the taller notch reversible.
+    var notchHeight: CGFloat {
+        self == .month ? calendarFullMonthNotchHeight : openNotchSize.height
     }
 
     /// Calendar unit the previous/next buttons step by, so paging moves the

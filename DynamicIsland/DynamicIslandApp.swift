@@ -792,6 +792,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
+        // The calendar's view mode decides the notch height. Resized immediately
+        // rather than debounced: this is the direct response to a click, and a
+        // lagging notch reads as a bug.
+        Defaults.publisher(.calendarViewMode, options: []).sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.updateWindowSizeIfNeeded()
+            }
+        }.store(in: &cancellables)
+
         Defaults.publisher(.openNotchWidth, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)

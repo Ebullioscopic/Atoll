@@ -577,11 +577,6 @@ struct StandaloneCalendarView: View {
         return days
     }
 
-    /// Space the weekday header row and its spacing take out of the pane.
-    private var weekdayRowAllowance: CGFloat {
-        mode == .month ? 12 : 22
-    }
-
     /// Rows the grid divides its height by: one for the shorter modes, and 5 or
     /// 6 for a month depending on where the 1st falls.
     private var weekRowCount: Int {
@@ -607,10 +602,7 @@ struct StandaloneCalendarView: View {
     }
 
     private var maxTabContentHeight: CGFloat {
-        // The month grid divides this between five or six rows instead of one,
-        // so it claims back the slack the other modes can afford to leave.
-        let chromeAllowance: CGFloat = mode == .month ? 16 : 36
-        let available = resolvedNotchHeight - headerHeight - chromeAllowance
+        let available = resolvedNotchHeight - headerHeight - 36
         return max(130, available)
     }
 
@@ -663,9 +655,7 @@ struct StandaloneCalendarView: View {
 
     private var leftPickerPane: some View {
         GeometryReader { geometry in
-            // Room the title row and its spacing take before the grid begins.
-            let titleRowAllowance: CGFloat = mode == .month ? 34 : 56
-            let pickerViewportHeight = max(96, geometry.size.height - titleRowAllowance)
+            let pickerViewportHeight = max(96, geometry.size.height - 56)
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .center, spacing: 8) {
@@ -715,10 +705,10 @@ struct StandaloneCalendarView: View {
                         count: max(1, mode.dayCount)
                     )
 
-                    LazyVGrid(columns: columns, spacing: mode.rowSpacing) {
+                    LazyVGrid(columns: columns, spacing: 6) {
                         ForEach(Array(columnHeaderSymbols.enumerated()), id: \.offset) { _, symbol in
                             Text(symbol.prefix(1))
-                                .font(mode == .month ? .system(size: 9, weight: .semibold) : .caption2)
+                                .font(.caption2)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(Color(white: 0.55))
                                 .frame(maxWidth: .infinity)
@@ -730,8 +720,8 @@ struct StandaloneCalendarView: View {
                     // scrolling a keyhole. Rows are sized here rather than left
                     // to the cells' old 30pt minimum so a 6-row month, a 5-row
                     // month and a single-row week all fill the pane.
-                    let gridHeight = max(0, pickerViewportHeight - weekdayRowAllowance)
-                    let rowSpacing = mode.rowSpacing
+                    let gridHeight = max(0, pickerViewportHeight - 22)
+                    let rowSpacing: CGFloat = 6
                     // Capped as well as floored: a single-row week would
                     // otherwise stretch its one row over the whole pane and
                     // leave the date floating in the middle of it.
@@ -808,7 +798,7 @@ struct StandaloneCalendarView: View {
             }
         } label: {
             Text(day.formatted(.dateTime.day()))
-                .font(.system(size: mode.dayFontSize, weight: isSelected ? .semibold : .medium))
+                .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
                 .foregroundStyle(dayTextColor(isInVisibleRange: isInVisibleRange, isSelected: isSelected, isToday: isToday))
                 .padding(.horizontal, 4)
                 .frame(minWidth: markerHeight, minHeight: markerHeight)
