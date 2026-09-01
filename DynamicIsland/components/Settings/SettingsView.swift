@@ -1661,6 +1661,18 @@ struct Downloads: View {
                         .foregroundStyle(.secondary)
                 }
                 .settingsHighlight(id: highlightID("Download indicator style"))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Defaults.Toggle(key: .showDownloadSpeed) {
+                        Text("Show download speed")
+                    }
+                    .disabled(!enableDownloadListener)
+
+                    Text("Adds the current rate beside the indicator, measured from how fast the files in your Downloads folder are growing.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .settingsHighlight(id: highlightID("Show download speed"))
             } header: {
                 Text("Download Detection")
             } footer: {
