@@ -54,10 +54,17 @@ final class PerAppVolumeManager: ObservableObject {
     /// which in practice means audio-recording permission has not been granted.
     @Published private(set) var isPermissionBlocked = false
 
+    /// Bumped whenever every stored level is cleared at once. Rows seed their
+    /// slider on appear rather than on every rebuild, so that they do not fight
+    /// a drag in progress -- which means a reset needs its own signal to tell
+    /// them the value underneath them has changed.
+    @Published private(set) var resetRevision = 0
+
     private var taps: [String: AppVolumeTap] = [:]
     private var processListListener: AudioObjectPropertyListenerBlock?
     private var defaultDeviceListener: AudioObjectPropertyListenerBlock?
     private var pollTimer: Timer?
+    private var pollInterval: TimeInterval?
     private var trackers = 0
     private var featureCancellable: AnyCancellable?
 
@@ -131,6 +138,8 @@ final class PerAppVolumeManager: ObservableObject {
         Defaults[.perAppVolumeLevels] = [:]
         Defaults[.perAppVolumeMuted] = []
         tearDownAllTaps()
+        resetRevision += 1
+        rescheduleReconciliation()
     }
 
     /// Whether the app has been moved off the system default at all.
@@ -149,21 +158,42 @@ final class PerAppVolumeManager: ObservableObject {
         installListeners()
         refreshApps()
         syncTaps()
-
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refreshApps() }
-        }
+        rescheduleReconciliation()
     }
 
     func stopTracking() {
         trackers = max(0, trackers - 1)
         guard trackers == 0 else { return }
 
-        pollTimer?.invalidate()
-        pollTimer = nil
         removeListeners()
         // Taps outlive tracking on purpose: a level the user set should keep
-        // applying after the popover closes.
+        // applying after the popover closes. Reconciliation therefore has to
+        // outlive it too. A tap is bound to the process object IDs it was
+        // built with, and only a refresh notices that an app has been replaced
+        // by a new process -- so without this, an adjusted app that quits and
+        // comes back while the popover is shut returns at full volume, with a
+        // tap still holding the setting for a process that no longer exists.
+        rescheduleReconciliation()
+    }
+
+    /// Runs the refresh timer at the cadence the current situation needs, and
+    /// not at all when nothing is watching and no tap is attached.
+    private func rescheduleReconciliation() {
+        // A visible list should feel live; keeping existing taps bound to
+        // their apps does not need anything like that rate.
+        let interval: TimeInterval? = trackers > 0 ? 1.5 : (taps.isEmpty ? nil : 5)
+        // Called from `syncTaps`, so on every refresh -- leave a timer that is
+        // already running at the right rate alone rather than restarting it.
+        guard interval != pollInterval else { return }
+
+        pollTimer?.invalidate()
+        pollTimer = nil
+        pollInterval = interval
+        guard let interval else { return }
+
+        pollTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshApps() }
+        }
     }
 
     // MARK: - App list
@@ -284,6 +314,10 @@ final class PerAppVolumeManager: ObservableObject {
                 isPermissionBlocked = true
             }
         }
+
+        // The set of taps just changed, and it is what decides whether
+        // reconciliation still needs to run once nothing is watching.
+        rescheduleReconciliation()
     }
 
     private func tearDownAllTaps() {

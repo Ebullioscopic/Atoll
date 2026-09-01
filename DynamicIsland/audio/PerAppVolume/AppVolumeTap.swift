@@ -54,6 +54,8 @@ final class AppVolumeTap {
     private var aggregateDeviceID: AudioObjectID = kAudioObjectUnknown
     private var ioProcID: AudioDeviceIOProcID?
     private var isInvalidated = false
+    private var isRunning = false
+    private var aliveListener: AudioObjectPropertyListenerBlock?
 
     init(bundleIdentifier: String, processObjectIDs: [AudioObjectID], outputDeviceUID: String) throws {
         self.bundleIdentifier = bundleIdentifier
@@ -101,10 +103,22 @@ final class AppVolumeTap {
         invalidate()
     }
 
+    /// Creates the IO callback and starts it once the aggregate is usable.
+    ///
+    /// The aggregate is not necessarily ready the instant it is created -- it
+    /// has to bring its sub-devices up first, and starting the IOProc before
+    /// then yields silent buffers. Because the tap has *already* muted the app
+    /// at source by this point, that silence is not harmless: it is the app
+    /// dropping out entirely until something restarts it.
+    ///
+    /// So the start hangs off a `kAudioDevicePropertyDeviceIsAlive` listener
+    /// and happens on the transition, rather than blocking to wait for it. In
+    /// the common case the device is alive already and this costs one extra
+    /// property read.
     func activate() throws {
         let queue = DispatchQueue(label: "com.atoll.pervolume.\(bundleIdentifier)", qos: .userInteractive)
 
-        var status = AudioDeviceCreateIOProcIDWithBlock(&ioProcID, aggregateDeviceID, queue) {
+        let status = AudioDeviceCreateIOProcIDWithBlock(&ioProcID, aggregateDeviceID, queue) {
             [weak self] _, inputData, _, outputData, _ in
             self?.render(inputData, outputData)
         }
@@ -113,11 +127,66 @@ final class AppVolumeTap {
             throw AppVolumeTapError.ioProcCreationFailed(status)
         }
 
-        status = AudioDeviceStart(aggregateDeviceID, ioProcID)
+        if Self.isAlive(aggregateDeviceID) {
+            try start(ioProcID)
+        } else {
+            observeAliveTransition()
+        }
+    }
+
+    private func start(_ ioProcID: AudioDeviceIOProcID) throws {
+        let status = AudioDeviceStart(aggregateDeviceID, ioProcID)
         guard status == noErr else {
             invalidate()
             throw AppVolumeTapError.deviceStartFailed(status)
         }
+        isRunning = true
+    }
+
+    private static var isAliveAddress: AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsAlive,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+    }
+
+    private static func isAlive(_ deviceID: AudioObjectID) -> Bool {
+        guard deviceID != kAudioObjectUnknown else { return false }
+        var address = isAliveAddress
+        var isAlive: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &isAlive)
+        return status == noErr && isAlive == 1
+    }
+
+    /// Listens on the main queue so the callback shares a serial context with
+    /// the manager that owns this tap -- no lock is needed around `ioProcID`
+    /// and `isRunning`, which are only ever touched from there.
+    private func observeAliveTransition() {
+        var address = Self.isAliveAddress
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self, !self.isInvalidated, !self.isRunning,
+                  let ioProcID = self.ioProcID,
+                  Self.isAlive(self.aggregateDeviceID) else { return }
+            do {
+                try self.start(ioProcID)
+            } catch {
+                os_log(.error, log: volumeTapLog, "Could not start %{public}@ once alive: %{public}@",
+                       self.bundleIdentifier, String(describing: error))
+            }
+        }
+        let status = AudioObjectAddPropertyListenerBlock(aggregateDeviceID, &address, DispatchQueue.main, listener)
+        guard status == noErr else {
+            // Without the listener nothing else will start the IOProc, so fall
+            // back to starting now: silent buffers are recoverable on the next
+            // reconciliation, a permanently stopped tap is not.
+            os_log(.error, log: volumeTapLog, "Could not observe readiness for %{public}@ (%d)",
+                   bundleIdentifier, status)
+            if let ioProcID { try? start(ioProcID) }
+            return
+        }
+        aliveListener = listener
     }
 
     /// Stops rendering and destroys the tap, unmuting the app's own path.
@@ -128,10 +197,16 @@ final class AppVolumeTap {
         guard !isInvalidated else { return }
         isInvalidated = true
 
+        if let aliveListener {
+            var address = Self.isAliveAddress
+            AudioObjectRemovePropertyListenerBlock(aggregateDeviceID, &address, DispatchQueue.main, aliveListener)
+            self.aliveListener = nil
+        }
         if let ioProcID {
             AudioDeviceStop(aggregateDeviceID, ioProcID)
             AudioDeviceDestroyIOProcID(aggregateDeviceID, ioProcID)
             self.ioProcID = nil
+            isRunning = false
         }
         if aggregateDeviceID != kAudioObjectUnknown {
             AudioHardwareDestroyAggregateDevice(aggregateDeviceID)

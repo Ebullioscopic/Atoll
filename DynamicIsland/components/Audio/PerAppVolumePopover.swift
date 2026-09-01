@@ -162,6 +162,12 @@ private struct AppVolumeRow: View {
             // would fight a drag that is still in progress.
             volume = manager.volume(for: app.bundleIdentifier)
         }
+        .onChange(of: manager.resetRevision) { _, _ in
+            // Reset All clears the stored level out from under the row, and
+            // seeding on appear alone would leave the slider and the percentage
+            // showing a value that no longer applies to anything.
+            volume = manager.volume(for: app.bundleIdentifier)
+        }
     }
 
     private var isMuted: Bool {
