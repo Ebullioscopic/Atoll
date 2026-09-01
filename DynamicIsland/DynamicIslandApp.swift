@@ -545,10 +545,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Use minimalistic or normal size based on settings
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
+        // `resizeWindows` applies one size to every window, so this has to ask
+        // whether *any* notch is open rather than only the primary one. With
+        // showOnAllDisplays and the primary closed, reading `vm` alone resolved
+        // the short height and shrank the window belonging to an open month
+        // calendar on another display, clipping it.
+        //
+        // Sizing each display from its own view model is the fuller answer, but
+        // every closed-notch branch above reads the primary `vm` the same way --
+        // the sneak peek, the recording HUD, the battery HUD -- so that is a
+        // property of this function rather than of the calendar, and changing it
+        // would change those surfaces too.
+        let isAnyNotchOpen = vm.notchState == .open
+            || viewModels.values.contains { $0.notchState == .open }
+
         let adjustedContentSize = notchTabContentSize(
             from: baseSize,
             view: coordinator.currentView,
-            isNotchOpen: vm.notchState == .open,
+            isNotchOpen: isAnyNotchOpen,
             statsSecondRowProgress: coordinator.statsSecondRowExpansion
         )
 
