@@ -244,6 +244,33 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             }
             .store(in: &cancellables)
 
+        // The tab decides the height, so the size has to be recomputed when the
+        // tab changes. Without this `notchSize` keeps whatever the previous tab
+        // resolved to, and the views that measure their content against it --
+        // NotchTimerView, the calendar -- lay out for the tab you left.
+        //
+        // Applied without animation and without touching the window, matching
+        // AppDelegate's tab-switch resize, which is immediate and already owns
+        // the window. Animating this while the window jumped left the two
+        // disagreeing for the length of the animation, and a pointer inside the
+        // notch but outside the shrunken content shape reads as a hover exit,
+        // which closes the notch.
+        //
+        // `@Published` fires on willSet, so `currentView` still holds the old
+        // value at emission time; `receive(on:)` hops a run loop tick so the
+        // new one is read.
+        coordinator.$currentView
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                guard self.notchState == .open else { return }
+                let updatedTarget = self.calculateDynamicNotchSize()
+                guard self.notchSize != updatedTarget else { return }
+                self.notchSize = updatedTarget
+            }
+            .store(in: &cancellables)
+
         coordinator.$notesLayoutState
             .removeDuplicates()
             .receive(on: RunLoop.main)
@@ -418,28 +445,12 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     
     private func calculateDynamicNotchSize() -> CGSize {
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
-        var adjustedSize = baseSize
 
-        if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
-            let preferred = coordinator.notesLayoutState.preferredHeight
-            adjustedSize.height = max(adjustedSize.height, preferred)
-            return adjustedSize
-        }
-
-        if coordinator.currentView == .llmUsage {
-            adjustedSize.height = max(adjustedSize.height, llmUsageOpenNotchHeight)
-            return adjustedSize
-        }
-
-        adjustedSize = inlineLyricsAdjustedNotchSize(
-            from: adjustedSize,
-            isHomeTabActive: coordinator.currentView == .home
-        )
-
-        return statsAdjustedNotchSize(
-            from: adjustedSize,
-            isStatsTabActive: coordinator.currentView == .stats,
-            secondRowProgress: coordinator.statsSecondRowExpansion
+        return notchTabContentSize(
+            from: baseSize,
+            view: coordinator.currentView,
+            isNotchOpen: notchState == .open,
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion
         )
     }
 
