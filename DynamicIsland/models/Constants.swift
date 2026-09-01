@@ -1205,7 +1205,13 @@ extension Defaults.Keys {
     /// Superseded by `CiderTokenStore`, which keeps the token in the Keychain.
     /// Kept only so an existing value can be migrated out of the preferences
     /// plist on first launch; nothing reads it to make a request.
-    static let ciderAPIToken = Key<String>("ciderAPIToken", default: "")
+    /// Named `legacy…` so nothing new reaches for it by the old name; the
+    /// stored key string is unchanged so existing values still migrate.
+    /// A `@available(*, deprecated)` attribute would have been the obvious
+    /// alternative, but it fires on `CiderTokenStore` -- the one place that is
+    /// supposed to read this -- and a warning at the sanctioned use site is
+    /// worse than none.
+    static let legacyCiderAPIToken = Key<String>("ciderAPIToken", default: "")
     // The OAuth token pair lives in the Keychain (see KeychainSpotifyTokenStore);
     // these two keys remain only for the one-time migration of early builds.
     static let spotifyLibraryAccessToken = Key<String>("spotifyLibraryAccessToken", default: "")

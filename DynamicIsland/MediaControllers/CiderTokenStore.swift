@@ -34,7 +34,7 @@ final class CiderTokenStore: @unchecked Sendable {
         // Anyone who entered a token before it moved to the Keychain has it
         // sitting in the preferences plist. Carry it across and clear it there
         // -- leaving the plaintext copy behind would make the move pointless.
-        let legacy = Defaults[.ciderAPIToken].trimmingCharacters(in: .whitespacesAndNewlines)
+        let legacy = Defaults[.legacyCiderAPIToken].trimmingCharacters(in: .whitespacesAndNewlines)
         if !legacy.isEmpty {
             if cached == nil {
                 cached = legacy
@@ -44,7 +44,7 @@ final class CiderTokenStore: @unchecked Sendable {
                 // next launch.
                 guard Self.writeToKeychain(legacy) == errSecSuccess else { return }
             }
-            Defaults[.ciderAPIToken] = ""
+            Defaults[.legacyCiderAPIToken] = ""
         }
     }
 
