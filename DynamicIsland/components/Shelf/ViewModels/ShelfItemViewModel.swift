@@ -339,6 +339,8 @@ final class ShelfItemViewModel: ObservableObject {
 
         func addMenuItem(title: String) {
             let mi = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            // Dispatch keys off the identifier so localized titles cannot break it.
+            mi.identifier = NSUserInterfaceItemIdentifier(title)
             menu.addItem(mi)
         }
 
@@ -361,7 +363,7 @@ final class ShelfItemViewModel: ObservableObject {
         }
 
         if !selectedOpenableURLs.isEmpty {
-            let openWith = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
+            let openWith = NSMenuItem(title: String(localized: "Open With"), action: nil, keyEquivalent: "")
             let submenu = NSMenu()
 
             // Choose a representative URL to compute apps (prefer current item if not a folder)
@@ -386,7 +388,7 @@ final class ShelfItemViewModel: ObservableObject {
             let defaultApp = defaultAppURL()
 
             if openWithApps.isEmpty {
-                let noApps = NSMenuItem(title: "No Compatible Apps Found", action: nil, keyEquivalent: "")
+                let noApps = NSMenuItem(title: String(localized: "No Compatible Apps Found"), action: nil, keyEquivalent: "")
                 noApps.isEnabled = false
                 submenu.addItem(noApps)
             } else {
@@ -421,7 +423,7 @@ final class ShelfItemViewModel: ObservableObject {
             }
 
             submenu.addItem(NSMenuItem.separator())
-            let other = NSMenuItem(title: "Other…", action: nil, keyEquivalent: "")
+            let other = NSMenuItem(title: String(localized: "Other…"), action: nil, keyEquivalent: "")
             other.representedObject = "__OTHER__"
             submenu.addItem(other)
 
@@ -433,11 +435,13 @@ final class ShelfItemViewModel: ObservableObject {
         // Allow Quick Look for files and link URLs
         if !selectedFileURLs.isEmpty || !selectedLinkURLs.isEmpty {
             // Add Quick Look menu item
-            let quickLookItem = NSMenuItem(title: "Quick Look", action: nil, keyEquivalent: "")
+            let quickLookItem = NSMenuItem(title: String(localized: "Quick Look"), action: nil, keyEquivalent: "")
+            quickLookItem.identifier = NSUserInterfaceItemIdentifier("Quick Look")
             menu.addItem(quickLookItem)
             
             // Add Slideshow as alternate menu item (shown when Option key is held)
-            let slideshowItem = NSMenuItem(title: "Quick Look", action: nil, keyEquivalent: "")
+            let slideshowItem = NSMenuItem(title: String(localized: "Quick Look"), action: nil, keyEquivalent: "")
+            slideshowItem.identifier = NSUserInterfaceItemIdentifier("Quick Look")
             slideshowItem.isAlternate = true
             slideshowItem.keyEquivalentModifierMask = [.option]
             menu.addItem(slideshowItem)
@@ -451,23 +455,26 @@ final class ShelfItemViewModel: ObservableObject {
         if !imageURLs.isEmpty {
             menu.addItem(NSMenuItem.separator())
 
-            let imageActions = NSMenuItem(title: "Image Actions", action: nil, keyEquivalent: "")
+            let imageActions = NSMenuItem(title: String(localized: "Image Actions"), action: nil, keyEquivalent: "")
             let imageSubmenu = NSMenu()
 
             // Remove Background - only for single images
             if imageURLs.count == 1 {
-                let removeBg = NSMenuItem(title: "Remove Background", action: nil, keyEquivalent: "")
+                let removeBg = NSMenuItem(title: String(localized: "Remove Background"), action: nil, keyEquivalent: "")
+                removeBg.identifier = NSUserInterfaceItemIdentifier("Remove Background")
                 imageSubmenu.addItem(removeBg)
             }
 
             // Convert Image - only for single images
             if imageURLs.count == 1 {
-                let convertItem = NSMenuItem(title: "Convert Image…", action: nil, keyEquivalent: "")
+                let convertItem = NSMenuItem(title: String(localized: "Convert Image…"), action: nil, keyEquivalent: "")
+                convertItem.identifier = NSUserInterfaceItemIdentifier("Convert Image…")
                 imageSubmenu.addItem(convertItem)
             }
 
             // Create PDF - for one or more images
-            let createPDF = NSMenuItem(title: "Create PDF", action: nil, keyEquivalent: "")
+            let createPDF = NSMenuItem(title: String(localized: "Create PDF"), action: nil, keyEquivalent: "")
+            createPDF.identifier = NSUserInterfaceItemIdentifier("Create PDF")
             imageSubmenu.addItem(createPDF)
 
             imageActions.submenu = imageSubmenu
@@ -477,7 +484,8 @@ final class ShelfItemViewModel: ObservableObject {
 
         // Add compression option for files/folders (single or multiple)
         if !selectedFileURLs.isEmpty {
-            let compressItem = NSMenuItem(title: "Compress", action: nil, keyEquivalent: "")
+            let compressItem = NSMenuItem(title: String(localized: "Compress"), action: nil, keyEquivalent: "")
+            compressItem.identifier = NSUserInterfaceItemIdentifier("Compress")
             menu.addItem(compressItem)
         }
 
@@ -487,7 +495,8 @@ final class ShelfItemViewModel: ObservableObject {
         addMenuItem(title: "Copy")
         // If there are file URLs, add "Copy Path" as an alternate menu item (Option key)
         if !selectedFileURLs.isEmpty {
-            let copyPathItem = NSMenuItem(title: "Copy Path", action: nil, keyEquivalent: "")
+            let copyPathItem = NSMenuItem(title: String(localized: "Copy Path"), action: nil, keyEquivalent: "")
+            copyPathItem.identifier = NSUserInterfaceItemIdentifier("Copy Path")
             copyPathItem.isAlternate = true
             copyPathItem.keyEquivalentModifierMask = [.option]
             menu.addItem(copyPathItem)
@@ -539,7 +548,8 @@ final class ShelfItemViewModel: ObservableObject {
         }
 
         @MainActor @objc func handle(_ sender: NSMenuItem) {
-            let title = sender.title
+            // Menu titles are localized; the identifier carries the stable action key.
+            let title = sender.identifier?.rawValue ?? sender.title
 
             if let marker = sender.representedObject as? String, marker == "__OTHER__" {
                 openWithPanel()
@@ -1000,10 +1010,10 @@ final class ShelfItemViewModel: ObservableObject {
             
             // Create and show conversion options dialog with better layout
             let alert = NSAlert()
-            alert.messageText = "Convert Image"
+            alert.messageText = String(localized: "Convert Image")
             alert.alertStyle = .informational
-            alert.addButton(withTitle: "Convert")
-            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: String(localized: "Convert"))
+            alert.addButton(withTitle: String(localized: "Cancel"))
             
             // Create accessory view with better spacing and organization
             let accessoryView = NSView(frame: NSRect(x: 0, y: 0, width: 380, height: 180))
@@ -1206,7 +1216,7 @@ final class ShelfItemViewModel: ObservableObject {
             alert.messageText = title
             alert.informativeText = message
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: String(localized: "OK"))
             alert.runModal()
         }
     }

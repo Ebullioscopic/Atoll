@@ -66,11 +66,11 @@ struct ScreenAssistantFile: Identifiable, Codable {
         
         var displayName: String {
             switch self {
-            case .document: return "Document"
-            case .image: return "Image"
-            case .audio: return "Audio"
-            case .video: return "Video"
-            case .other: return "File"
+            case .document: return String(localized: "Document")
+            case .image: return String(localized: "Image")
+            case .audio: return String(localized: "Audio")
+            case .video: return String(localized: "Video")
+            case .other: return String(localized: "File")
             }
         }
     }
@@ -372,7 +372,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         
         // Print attached files details
         for (index, file) in attachedFiles.enumerated() {
-            print("📎 ScreenAssistant: File \(index + 1): \(file.name) (\(file.type.displayName))")
+            print("📎 ScreenAssistant: File \(index + 1): \(file.name) (\(file.type.rawValue))")
         }
         
         // Clear input and files after sending
@@ -988,7 +988,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
     
     private func createGeminiFilePart(for file: ScreenAssistantFile) -> [String: Any]? {
-        print("📎 ScreenAssistant: Processing file for Gemini 2.5: \(file.name) (\(file.type.displayName))")
+        print("📎 ScreenAssistant: Processing file for Gemini 2.5: \(file.name) (\(file.type.rawValue))")
         
         guard let fileURL = file.fileURL, let url = URL(string: fileURL) else {
             print("❌ ScreenAssistant: No valid URL for file \(file.name)")

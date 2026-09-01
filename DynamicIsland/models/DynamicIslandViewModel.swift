@@ -506,9 +506,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 NSApp.activate(ignoringOtherApps: true)
 
                 let alert = NSAlert()
-                alert.messageText = "Camera Access Required"
-                alert.informativeText = "Please allow camera access in System Settings."
-                alert.addButton(withTitle: "OK")
+                alert.messageText = String(localized: "Camera Access Required")
+                alert.informativeText = String(localized: "Please allow camera access in System Settings.")
+                alert.addButton(withTitle: String(localized: "OK"))
                 alert.runModal()
 
                 NSApp.setActivationPolicy(.accessory)
