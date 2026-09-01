@@ -240,6 +240,9 @@ struct LyricsSidePanelView: View {
         .help(pinLyricsWhenClosed
             ? "Stop showing lyrics under the closed notch"
             : "Keep showing lyrics under the closed notch")
+        .accessibilityLabel(pinLyricsWhenClosed
+            ? "Unpin lyrics from closed notch"
+            : "Pin lyrics to closed notch")
     }
 
     // Prevent lyrics scrolling to close the expanded notch
