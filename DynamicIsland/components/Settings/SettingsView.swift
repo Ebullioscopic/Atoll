@@ -2912,22 +2912,19 @@ private struct MusicSourceCard: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 9) {
-                Group {
-                    if let logoAssetName = controller.officialLogoAssetName {
-                        Image(logoAssetName)
-                            .resizable()
-                            .scaledToFit()
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    } else {
-                        AppIconImage(
-                            bundleIdentifiers: controller.applicationBundleIdentifiers,
-                            symbolFallback: controller.fallbackSymbol,
-                            symbolColor: controller.fallbackColor,
-                            size: 42
-                        )
-                        .font(.system(size: 24, weight: .semibold))
-                    }
-                }
+                // Every source shows the app's own icon, so the row does not
+                // mix real icons for the apps we happen to ship a logo for
+                // with flat brand marks for the rest. The bundled logo is the
+                // fallback for when the app is not installed, which is better
+                // than the generic symbol that used to stand in there.
+                AppIconImage(
+                    bundleIdentifiers: controller.applicationBundleIdentifiers,
+                    assetFallback: controller.officialLogoAssetName,
+                    symbolFallback: controller.fallbackSymbol,
+                    symbolColor: controller.fallbackColor,
+                    size: 42
+                )
+                .font(.system(size: 24, weight: .semibold))
                 .frame(width: 42, height: 42)
 
                 Text(controller.localizedName)
@@ -3079,8 +3076,12 @@ struct Media: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Music Source")
-                        .font(.system(size: 13, weight: .semibold))
+                    HStack(spacing: 6) {
+                        Text("Music Source")
+                            .font(.system(size: 13, weight: .semibold))
+                        MediaSourceCapabilitiesButton(controllers: availableMediaControllers)
+                        Spacer()
+                    }
 
                     MusicSourceSelector(
                         selection: $mediaController,
@@ -3121,6 +3122,10 @@ struct Media: View {
             if mediaController == .spotify {
                 SpotifyAuthSettingsSection()
                 SpotifyLikeButtonSettingsSection()
+            }
+
+            if mediaController == .cider {
+                CiderFavoritingSettingsSection()
             }
 
             Section {
@@ -9422,10 +9427,14 @@ struct AppIconImage: View {
             if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
                 let icon = NSWorkspace.shared.icon(forFile: appURL.path)
                 // NSWorkspace returns a valid icon even for generic apps;
-                // resize to keep memory low.
-                let thumb = NSImage(size: NSSize(width: 32, height: 32))
+                // redraw it small to keep memory low. At twice the size it is
+                // asked for, so it stays sharp on a Retina display -- the old
+                // flat 32 was being scaled *up* wherever this is drawn larger
+                // than that, which is why the bigger icons looked soft.
+                let side = max(32, size * 2)
+                let thumb = NSImage(size: NSSize(width: side, height: side))
                 thumb.lockFocus()
-                icon.draw(in: NSRect(origin: .zero, size: NSSize(width: 32, height: 32)),
+                icon.draw(in: NSRect(origin: .zero, size: NSSize(width: side, height: side)),
                           from: NSRect(origin: .zero, size: icon.size),
                           operation: .copy, fraction: 1.0)
                 thumb.unlockFocus()

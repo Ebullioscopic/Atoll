@@ -164,6 +164,7 @@ private struct ScrollHintIndicator: View {
                 )
 
             slotContent(for: slot)
+                .opacity(isControlDisabled(slot) ? 0.4 : 1)
         }
         .frame(width: 48, height: 48)
         .contentShape(RoundedRectangle(cornerRadius: 10))
@@ -198,7 +199,7 @@ private struct ScrollHintIndicator: View {
     private func isControlDisabled(_ control: MusicControlButton) -> Bool {
         if control == .mediaOutput && !showMediaOutputControl { return true }
         if control.isAppleMusicExclusive && !musicManager.isAppleMusicActive { return true }
-        if control.isSpotifyExclusive && !musicManager.isSpotifyActive { return true }
+        if control.requiresFavoriting && !musicManager.activeSourceCanEverFavorite { return true }
         return false
     }
 
@@ -241,24 +242,26 @@ private struct ScrollHintIndicator: View {
         }
     }
 
+    /// Padded to the slot count but not filtered by capability, so switching to
+    /// a source that cannot drive a placed control leaves the layout alone
+    /// instead of quietly emptying the slot. The notch still refuses to draw a
+    /// control it cannot work; this is only what the user arranged.
     private func slotValue(at index: Int) -> MusicControlButton {
-        let normalized = musicControlSlots.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, isSpotifyActive: musicManager.isSpotifyActive)
-        guard normalized.indices.contains(index) else { return .none }
-        return normalized[index]
+        let padded = musicControlSlots.normalized(allowingMediaOutput: showMediaOutputControl)
+        guard padded.indices.contains(index) else { return .none }
+        return padded[index]
     }
 
+    /// Every control the palette knows about, whatever the playing source can
+    /// do. A control the source cannot drive is shown disabled rather than
+    /// dropped: an option that vanishes reads as a missing feature, and the
+    /// one place someone looks for it is the palette.
+    ///
+    /// Media output is the exception -- it is hidden by a preference of the
+    /// user's own rather than by what the source supports.
     private var pickerOptions: [MusicControlButton] {
-        var base = MusicControlButton.pickerOptions
-        if !showMediaOutputControl {
-            base = base.filter { $0 != .mediaOutput }
-        }
-        if !musicManager.isAppleMusicActive {
-            base = base.filter { !$0.isAppleMusicExclusive }
-        }
-        if !musicManager.isSpotifyActive {
-            base = base.filter { !$0.isSpotifyExclusive }
-        }
-        return base
+        guard !showMediaOutputControl else { return MusicControlButton.pickerOptions }
+        return MusicControlButton.pickerOptions.filter { $0 != .mediaOutput }
     }
 
     private func previewIconColor(for slot: MusicControlButton) -> Color {
