@@ -50,7 +50,11 @@ struct NotchLLMUsageView: View {
     private func card(for provider: ProviderID) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text(provider.displayName).font(.headline)
+                Text(provider.displayName)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
                 // Subscription plan badge (e.g. "Max 5x"). Only set for Claude; nil elsewhere.
                 if case .success(let snap) = manager.results[provider] ?? .loading, let plan = snap.plan {
                     Text(plan)
@@ -86,7 +90,10 @@ struct NotchLLMUsageView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .frame(height: llmUsageProviderCardHeight, alignment: .topLeading)
+        // Stretch every card to the height the panel offers so the row stays uniform
+        // (the intent behind the former fixed card height) without a hard-coded size
+        // that either clips content or leaves blank space.
+        .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
     }
 
