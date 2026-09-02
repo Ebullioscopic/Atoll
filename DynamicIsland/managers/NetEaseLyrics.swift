@@ -84,11 +84,11 @@ enum NetEaseLyrics {
     }
 
     static func lyricURL(songID: Int) -> URL? {
-        // lv, kv and tv name the line-synced, karaoke and translated versions
-        // wanted; -1 is "whatever is current". A positive version number is a
-        // comparison against that version, and for some tracks it comes back
-        // with the body left empty. Only the LRC is shown.
-        URL(string: "https://music.163.com/api/song/lyric?id=\(songID)&lv=-1&kv=-1&tv=-1")
+        // `lv=-1` asks for the current line-synced lyrics; a positive value is
+        // taken as a version the client already holds and can come back with
+        // an empty body. Leaving `kv` and `tv` out keeps the karaoke and
+        // translated variants out of the response, since only the LRC is shown.
+        URL(string: "https://music.163.com/api/song/lyric?id=\(songID)&lv=-1")
     }
 
     // MARK: - Responses

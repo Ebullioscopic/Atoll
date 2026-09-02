@@ -129,6 +129,14 @@ final class NetEaseLyricsTests: XCTestCase {
         XCTAssertEqual(query.first { $0.name == "type" }?.value, "1")
     }
 
+    func testLyricRequestAsksForTheLRCOnly() throws {
+        let url = try XCTUnwrap(NetEaseLyrics.lyricURL(songID: 186016))
+        let query = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        XCTAssertEqual(query.map(\.name), ["id", "lv"])
+        XCTAssertEqual(query.first { $0.name == "id" }?.value, "186016")
+        XCTAssertEqual(query.first { $0.name == "lv" }?.value, "-1")
+    }
+
     func testEmptyQueryBuildsNoRequest() {
         XCTAssertNil(NetEaseLyrics.searchURL(title: "  ", artist: ""))
     }
