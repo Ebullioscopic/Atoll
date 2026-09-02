@@ -38,6 +38,7 @@
 		A4B5C6D7E8F90123456789AB /* AppleMusicControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */; };
 		A70F1A012F90000100F1A001 /* FingerprintScan.json in Resources */ = {isa = PBXBuildFile; fileRef = A70F1A022F90000100F1A001 /* FingerprintScan.json */; };
 		B4777BB9FE29243B253B8306 /* SpotifyLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */; };
+		A1C0FFEE0004000000000001 /* UnsyncedLyricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0004000000000002 /* UnsyncedLyricsTests.swift */; };
 		D1A2B3C4D5E6F70819AB2C4D /* SystemHUDPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A2B3C4D5E6F70819AB2C4E /* SystemHUDPlacementTests.swift */; };
 		C0DECAFE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */; };
 		C1A2B3C4D5E6F70819AB2C3D /* ClipboardHistoryPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A2B3C4D5E6F70819AB2C3E /* ClipboardHistoryPersistenceTests.swift */; };
@@ -106,6 +107,7 @@
 		D82568218362418EA59B2CDC /* LRCParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRCParserTests.swift; sourceTree = "<group>"; };
 		DAA671E7B1B26733F02166C5 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpotifyLibraryTests.swift; sourceTree = "<group>"; };
+		A1C0FFEE0004000000000002 /* UnsyncedLyricsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UnsyncedLyricsTests.swift; sourceTree = "<group>"; };
 		C1A2B3C4D5E6F70819AB2C3E /* ClipboardHistoryPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryPersistenceTests.swift; sourceTree = "<group>"; };
 		C1DE0FAV0001000000000002 /* CiderFavoritingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CiderFavoritingTests.swift; sourceTree = "<group>"; };
 		2EB37667F763422E97DEEB49 /* MenuBarClearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarClearanceTests.swift"; sourceTree = "<group>"; };
@@ -213,6 +215,7 @@
 				2137D0F9431A495AA62ACE96 /* NowPlayingPayloadTests.swift */,
 				8DC2ACF06B40405DB1A8F99E /* MarqueeTextMeasurementTests.swift */,
 				DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */,
+				A1C0FFEE0004000000000002 /* UnsyncedLyricsTests.swift */,
 				C1DE0FAV0001000000000002 /* CiderFavoritingTests.swift */,
 				2EB37667F763422E97DEEB49 /* MenuBarClearanceTests.swift */,
 				A1B2C3D40000000000000002 /* LyricsMetadataTests.swift */,
@@ -496,6 +499,7 @@
 				9A7D1A012F90000200A71001 /* AudioTapTests.swift in Sources */,
 				A4B5C6D7E8F90123456789AB /* AppleMusicControllerTests.swift in Sources */,
 				B4777BB9FE29243B253B8306 /* SpotifyLibraryTests.swift in Sources */,
+				A1C0FFEE0004000000000001 /* UnsyncedLyricsTests.swift in Sources */,
 				C1DE0FAV0001000000000001 /* CiderFavoritingTests.swift in Sources */,
 				738C4EBB63E3449B923997D0 /* MenuBarClearanceTests.swift in Sources */,
 				A1B2C3D40000000000000001 /* LyricsMetadataTests.swift in Sources */,
