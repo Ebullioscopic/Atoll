@@ -315,6 +315,23 @@ class AppleMusicController: MediaControllerProtocol {
         await commandExecutor(command)
     }
 
+    // MARK: - Favouriting
+
+    @MainActor
+    var canEverFavorite: Bool { true }
+
+    @MainActor
+    var supportsFavoriting: Bool { AppleMusicFavoriting.isAvailable }
+
+    func isCurrentTrackFavorited() async -> Bool? {
+        await AppleMusicFavoriting.isCurrentTrackFavorited()
+    }
+
+    @discardableResult
+    func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
+        await AppleMusicFavoriting.setCurrentTrackFavorited(favorited)
+    }
+
     private static func executeAppleMusicCommand(_ command: String) async {
         let script = "tell application \"Music\" to \(command)"
         try? await AppleScriptHelper.executeVoid(script)
@@ -382,4 +399,64 @@ class AppleMusicController: MediaControllerProtocol {
         """
         return try await AppleScriptHelper.execute(script)
     }
+}
+
+
+/// Favouriting the track Music.app is playing.
+///
+/// Music.app is scriptable and favouriting is a plain read/write property on
+/// `current track` -- no MusicKit, no developer token, and no Apple Music
+/// subscription, which is what had this feature stuck. Anything in the library
+/// can be favourited whether or not the user subscribes to anything.
+///
+/// Lives apart from ``AppleMusicController`` because the Now Playing source
+/// needs it too: that controller fronts whatever app is playing, and when that
+/// app is Music.app the same script is the answer.
+enum AppleMusicFavoriting {
+    static let bundleIdentifier = "com.apple.Music"
+
+    /// Only ever true while Music.app is already running.
+    ///
+    /// Scripting an app that is not running launches it, and a heart appearing
+    /// in the notch is not a reason to open Music.
+    @MainActor
+    static var isAvailable: Bool {
+        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == bundleIdentifier }
+    }
+
+    static func isCurrentTrackFavorited() async -> Bool? {
+        guard await isAvailable else { return nil }
+        for property in propertyNames {
+            guard let descriptor = try? await AppleScriptHelper.execute(
+                "tell application \"Music\" to return \(property) of current track"
+            ) else { continue }
+            return descriptor.booleanValue
+        }
+        return nil
+    }
+
+    @discardableResult
+    static func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
+        guard await isAvailable else { return false }
+        for property in propertyNames {
+            do {
+                try await AppleScriptHelper.executeVoid(
+                    "tell application \"Music\" to set \(property) of current track to \(favorited)"
+                )
+                return true
+            } catch {
+                continue
+            }
+        }
+        return false
+    }
+
+    /// `favorited` and `loved` are the same property under the same AppleEvent
+    /// code (`pLov`); Music.app renamed it when Love became Favorite. A script
+    /// is compiled against the name, though, so the one the running version
+    /// does not know fails to compile -- and Atoll still supports macOS 14,
+    /// where it is `loved`. Try the current name first and fall back, rather
+    /// than branching on an OS version that only approximates which Music.app
+    /// is installed.
+    private static let propertyNames = ["favorited", "loved"]
 }
