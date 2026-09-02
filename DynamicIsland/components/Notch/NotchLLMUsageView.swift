@@ -138,7 +138,7 @@ struct NotchLLMUsageView: View {
             guard let model = model else { return nil }
             let fraction = model.totals.costUSD
             let usedPct = (1 - max(0, min(1, fraction))) * 100
-            return UsageLimit(used: usedPct, limit: 100, resetsAt: nil)
+            return UsageLimit(used: usedPct, limit: 100, resetsAt: model.resetsAt)
         }
         
         return VStack(alignment: .leading, spacing: 6) {
@@ -149,14 +149,11 @@ struct NotchLLMUsageView: View {
                 quotaGauge("Weekly", limit)
             }
             
-            // Show model breakdown for the selected pool
-            let poolModels = snap.models.filter { $0.pool == targetPool }
-            if !poolModels.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(poolModels) { model in
-                        window(model.model, model.totals, compact: true)
-                    }
-                }
+            // Token counts and estimated cost read from the language server's
+            // conversation history (all pools; Antigravity does not split them).
+            VStack(alignment: .leading, spacing: 4) {
+                window("Today", snap.today, compact: true)
+                window("Week", snap.week, compact: true)
             }
         }
     }
@@ -306,9 +303,16 @@ struct NotchLLMUsageView: View {
                 .font(.system(size: compact ? 11 : (prominent ? 17 : 13), weight: prominent ? .bold : .semibold, design: .rounded))
                 .monospacedDigit()
             Spacer(minLength: 4)
-            Text(costLabel(totals))
-                .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
-                .help(costHelp(totals))
+            if totals.isPercentage {
+                // Quota providers store the remaining fraction in costUSD; it is not money.
+                let leftPct = Int((max(0, min(1, totals.costUSD)) * 100).rounded())
+                Text("\(leftPct)% left")
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+            } else {
+                Text(costLabel(totals))
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                    .help(costHelp(totals))
+            }
         }
     }
 

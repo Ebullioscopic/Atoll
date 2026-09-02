@@ -144,9 +144,37 @@ struct AntigravityUsageProvider: UsageProvider {
 
     // MARK: - Language Server
 
+    private struct LSEndpoint {
+        let scheme: String
+        let port: Int
+        let csrf: String
+    }
+
     private func fetchFromLanguageServer(now: Date) async throws -> UsageSnapshot? {
-        return try await withTimeout(seconds: 3) {
+        guard let (quota, endpoint) = try await fetchQuotaFromLanguageServer(now: now) else {
+            Self.log.info("Antigravity LS: no endpoint answered the quota calls")
+            return nil
+        }
+        Self.log.info("Antigravity LS: quota via \(endpoint.scheme, privacy: .public):\(endpoint.port, privacy: .public)")
+        var snapshot = quota
+        // Token usage is a separate, slower walk over conversation history; a failure or
+        // timeout there must not take the quota gauges down with it.
+        do {
+            if let usage = try await withTimeout(seconds: 10, operation: { try await self.fetchTokenUsage(endpoint: endpoint, now: now) }) {
+                snapshot.today = usage.today
+                snapshot.week = usage.week
+                snapshot.session = usage.session
+            }
+        } catch {
+            Self.log.info("Antigravity token usage unavailable: \(String(describing: error), privacy: .public)")
+        }
+        return snapshot
+    }
+
+    private func fetchQuotaFromLanguageServer(now: Date) async throws -> (UsageSnapshot, LSEndpoint)? {
+        return try await withTimeout(seconds: 8) {
             let discoveries = try await discoverLanguageServers()
+            Self.log.info("Antigravity LS: discovered \(discoveries.count, privacy: .public) server(s): \(discoveries.map { "\($0.ports)" }.joined(separator: " "), privacy: .public)")
 
             if discoveries.isEmpty {
                 return nil
@@ -163,21 +191,22 @@ struct AntigravityUsageProvider: UsageProvider {
                 }
 
                 for endpoint in endpoints {
+                    let ep = LSEndpoint(scheme: endpoint.scheme, port: endpoint.port, csrf: discovery.csrf)
                     if let summary = try await callLS(scheme: endpoint.scheme, port: endpoint.port, csrf: discovery.csrf, method: "RetrieveUserQuotaSummary") {
                         if let snapshot = parseQuotaSummary(summary, now: now) {
-                            return snapshot
+                            return (snapshot, ep)
                         }
                     }
 
                     if let status = try await callLS(scheme: endpoint.scheme, port: endpoint.port, csrf: discovery.csrf, method: "GetUserStatus") {
                         if let snapshot = parseUserStatus(status, now: now) {
-                            return snapshot
+                            return (snapshot, ep)
                         }
                     }
 
                     if let fallback = try await callLS(scheme: endpoint.scheme, port: endpoint.port, csrf: discovery.csrf, method: "GetCommandModelConfigs") {
                         if let snapshot = parseCommandModelConfigs(fallback, now: now) {
-                            return snapshot
+                            return (snapshot, ep)
                         }
                     }
                 }
@@ -198,7 +227,8 @@ struct AntigravityUsageProvider: UsageProvider {
             Task.detached {
                 let task = Process()
                 task.executableURL = URL(fileURLWithPath: "/bin/ps")
-                task.arguments = ["aux"]
+                // pid + full command line only: far less output than `ps aux`.
+                task.arguments = ["-axo", "pid=,args="]
 
                 let pipe = Pipe()
                 task.standardOutput = pipe
@@ -215,76 +245,118 @@ struct AntigravityUsageProvider: UsageProvider {
                     task.terminate()
                 }
 
+                // Drain the pipe BEFORE waiting: with hundreds of processes the listing
+                // exceeds the 64 KB pipe buffer, so waiting first deadlocks until the
+                // timeout kills ps and only the head of the list is ever seen.
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 task.waitUntilExit()
                 timeoutTask.cancel()
 
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 guard let output = String(data: data, encoding: .utf8) else {
+                    Self.log.info("Antigravity LS: ps output not decodable (\(data.count, privacy: .public) bytes, status \(task.terminationStatus, privacy: .public))")
                     continuation.resume(returning: [])
                     return
                 }
 
                 var discoveries: [LSDiscovery] = []
+                let lines = output.split(separator: "\n")
+                var candidates = 0
 
-                for line in output.split(separator: "\n") {
-                    let parts = line.split(separator: " ", omittingEmptySubsequences: false)
-                    guard parts.count >= 11 else { continue }
+                for line in lines {
+                    let parts = line.split(separator: " ", omittingEmptySubsequences: true)
+                    guard parts.count >= 2 else { continue }
 
-                    let command = parts[10...].joined(separator: " ")
+                    let pid = Int32(parts[0])
+                    let command = parts[1...].joined(separator: " ")
 
-                    if command.contains("language_server") && (command.contains("antigravity") || command.contains("antigravity-ide")) {
-                        if let discovery = parseLanguageServerCommand(String(command)) {
-                            discoveries.append(discovery)
-                        }
-                    }
+                    let isAntigravity = command.contains("language_server")
+                        && (command.contains("antigravity") || command.contains("antigravity-ide") || command.contains("agy"))
+                    guard isAntigravity else { continue }
+                    candidates += 1
 
-                    if command.contains("agy") && command.contains("language_server") {
-                        if let discovery = parseLanguageServerCommand(String(command)) {
-                            discoveries.append(discovery)
-                        }
+                    // The desktop client starts its language server with "--https_server_port 0"
+                    // (a kernel-assigned port), so the command line alone may not name a port;
+                    // ask lsof which ports that PID is actually listening on.
+                    let listening = pid.map { Self.listeningPorts(pid: $0) } ?? []
+                    Self.log.debug("Antigravity LS: candidate pid \(pid ?? -1, privacy: .public) listening on \(listening, privacy: .public)")
+                    if let discovery = parseLanguageServerCommand(String(command), fallbackPorts: listening) {
+                        discoveries.append(discovery)
                     }
                 }
+                Self.log.debug("Antigravity LS: ps returned \(lines.count, privacy: .public) lines (status \(task.terminationStatus, privacy: .public)), \(candidates, privacy: .public) language_server candidate(s)")
 
                 continuation.resume(returning: discoveries)
             }
         }
     }
 
-    private func parseLanguageServerCommand(_ command: String) -> LSDiscovery? {
+    private func parseLanguageServerCommand(_ command: String, fallbackPorts: [Int] = []) -> LSDiscovery? {
         var ports: [Int] = []
         var csrf: String?
         var extensionPort: Int?
 
-        let args = command.split(separator: " ")
-        for arg in args {
-            if arg.hasPrefix("--extension_server_port=") {
-                let portStr = String(arg.dropFirst("--extension_server_port=".count))
-                if let port = Int(portStr) {
-                    extensionPort = port
-                    ports.append(port)
+        // Flags appear either as "--name=value" (IDE) or "--name value" (desktop client).
+        let args = command.split(separator: " ").map(String.init)
+        var flags: [String: String] = [:]
+        var i = 0
+        while i < args.count {
+            let arg = args[i]
+            if arg.hasPrefix("--") {
+                if let eq = arg.firstIndex(of: "=") {
+                    flags[String(arg[arg.index(arg.startIndex, offsetBy: 2)..<eq])] = String(arg[arg.index(after: eq)...])
+                } else if i + 1 < args.count, !args[i + 1].hasPrefix("--") {
+                    flags[String(arg.dropFirst(2))] = args[i + 1]
+                    i += 1
                 }
-            } else if arg.hasPrefix("--port=") {
-                let portStr = String(arg.dropFirst("--port=".count))
-                if let port = Int(portStr) {
-                    ports.append(port)
-                }
-            } else if arg.hasPrefix("--csrf_token=") {
-                csrf = String(arg.dropFirst("--csrf_token=".count))
             }
+            i += 1
         }
 
-        guard !ports.isEmpty, let csrf else { return nil }
+        if let p = flags["extension_server_port"].flatMap(Int.init), p > 0 {
+            extensionPort = p
+            ports.append(p)
+        }
+        for key in ["port", "https_server_port", "server_port"] {
+            if let p = flags[key].flatMap(Int.init), p > 0, !ports.contains(p) { ports.append(p) }
+        }
+        for p in fallbackPorts where !ports.contains(p) { ports.append(p) }
+        csrf = flags["csrf_token"]
+
+        guard !ports.isEmpty, let csrf, !csrf.isEmpty else { return nil }
 
         return LSDiscovery(ports: ports, csrf: csrf, extensionPort: extensionPort)
     }
 
-    private func callLS(scheme: String, port: Int, csrf: String, method: String) async throws -> Data? {
+    /// TCP ports `pid` is listening on, via `lsof -Fn` (one "n<addr>:<port>" line per socket).
+    private static func listeningPorts(pid: Int32) -> [Int] {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        task.arguments = ["-nP", "-a", "-p", "\(pid)", "-iTCP", "-sTCP:LISTEN", "-Fn"]
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = Pipe()
+        do { try task.run() } catch { return [] }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        task.waitUntilExit()
+        guard let out = String(data: data, encoding: .utf8) else { return [] }
+        var ports: [Int] = []
+        for line in out.split(separator: "\n") where line.hasPrefix("n") {
+            if let colon = line.lastIndex(of: ":"), let p = Int(line[line.index(after: colon)...]), !ports.contains(p) {
+                ports.append(p)
+            }
+        }
+        return ports
+    }
+
+    private func callLS(scheme: String, port: Int, csrf: String, method: String, params: [String: Any] = [:]) async throws -> Data? {
         let baseURL = "\(scheme)://127.0.0.1:\(port)/exa.language_server_pb.LanguageServerService"
         let metadata = ["ideName": "antigravity", "extensionName": "antigravity", "ideVersion": "unknown", "locale": "en"]
 
         guard let url = URL(string: "\(baseURL)/\(method)") else { return nil }
 
-        let body = try? JSONSerialization.data(withJSONObject: ["metadata": metadata])
+        var payload: [String: Any] = ["metadata": metadata]
+        for (k, v) in params { payload[k] = v }
+        let body = try? JSONSerialization.data(withJSONObject: payload)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -294,12 +366,138 @@ struct AntigravityUsageProvider: UsageProvider {
         request.timeoutInterval = 3
 
         // Use session that allows insecure localhost (self-signed cert)
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            Self.log.debug("Antigravity LS: \(scheme, privacy: .public):\(port, privacy: .public)/\(method, privacy: .public) transport error: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            Self.log.debug("Antigravity LS: \(scheme, privacy: .public):\(port, privacy: .public)/\(method, privacy: .public) HTTP \(code, privacy: .public)")
             return nil
         }
 
         return data
+    }
+
+    // MARK: - Token usage from conversation history
+
+    private struct TokenUsageWindows {
+        var today = UsageTotals()
+        var week = UsageTotals()
+        var session = UsageTotals()
+    }
+
+    private static let stepDate: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let stepDatePlain = ISO8601DateFormatter()
+
+    private static func number(_ v: Any?) -> Int {
+        if let i = v as? Int { return i }
+        if let d = v as? Double { return Int(d) }
+        if let s = v as? String { return Int(s) ?? Int(Double(s) ?? 0) }
+        return 0
+    }
+
+    private static func date(_ v: Any?) -> Date? {
+        guard let s = v as? String else { return nil }
+        return stepDate.date(from: s) ?? stepDatePlain.date(from: s)
+    }
+
+    /// Walks every conversation the language server knows about that was touched in the
+    /// last week, reads the per-response `metadata.modelUsage` counters the server records
+    /// on each model reply, and prices them like the Claude/Codex log parsers do.
+    ///
+    /// Model ids in those counters are opaque placeholders ("MODEL_PLACEHOLDER_M298");
+    /// `GetUserStatus` maps them to public ids ("gemini-3.7-flash-high") for pricing.
+    private func fetchTokenUsage(endpoint: LSEndpoint, now: Date) async throws -> TokenUsageWindows? {
+        let weekStart = now.addingTimeInterval(-7 * 86400)
+        let sessionStart = now.addingTimeInterval(-5 * 3600)
+        let cal = Calendar.current
+
+        var modelIds: [String: String] = [:]
+        if let statusData = try await callLS(scheme: endpoint.scheme, port: endpoint.port, csrf: endpoint.csrf, method: "GetUserStatus"),
+           let status = try? JSONSerialization.jsonObject(with: statusData) as? [String: Any],
+           let configs = ((status["userStatus"] as? [String: Any])?["cascadeModelConfigData"] as? [String: Any])?["clientModelConfigs"] as? [[String: Any]] {
+            for c in configs {
+                let alias = c["modelOrAlias"] as? [String: Any]
+                guard let placeholder = (alias?["model"] as? String) ?? (alias?["alias"] as? String) else { continue }
+                if let id = c["modelId"] as? String, !id.isEmpty { modelIds[placeholder] = id }
+            }
+        }
+
+        Self.log.debug("Antigravity LS: \(modelIds.count, privacy: .public) model ids mapped")
+        guard let listData = try await callLS(scheme: endpoint.scheme, port: endpoint.port, csrf: endpoint.csrf, method: "GetAllCascadeTrajectories") else {
+            Self.log.info("Antigravity LS: GetAllCascadeTrajectories failed")
+            return nil
+        }
+        guard let list = try? JSONSerialization.jsonObject(with: listData) as? [String: Any],
+              let summaries = list["trajectorySummaries"] as? [String: [String: Any]] else {
+            Self.log.info("Antigravity LS: unexpected trajectory list shape (\(listData.count, privacy: .public) bytes)")
+            return nil
+        }
+        Self.log.debug("Antigravity LS: \(summaries.count, privacy: .public) trajectories")
+
+        var windows = TokenUsageWindows()
+        var seen = Set<String>()
+        var replies = 0
+
+        for (cascadeId, summary) in summaries {
+            if let modified = Self.date(summary["lastModifiedTime"]), modified < weekStart { continue }
+            let stepCount = Self.number(summary["stepCount"])
+            guard stepCount > 0 else { continue }
+
+            var start = 0
+            while start < stepCount {
+                let end = min(start + 50, stepCount)
+                let params: [String: Any] = ["cascadeId": cascadeId, "startIndex": start, "endIndex": end]
+                guard let data = try await callLS(scheme: endpoint.scheme, port: endpoint.port, csrf: endpoint.csrf, method: "GetCascadeTrajectorySteps", params: params),
+                      let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let steps = obj["steps"] as? [[String: Any]] else {
+                    Self.log.info("Antigravity LS: steps \(start, privacy: .public)-\(end, privacy: .public) of \(cascadeId, privacy: .public) failed")
+                    break
+                }
+
+                for step in steps {
+                    guard let meta = step["metadata"] as? [String: Any],
+                          let usage = meta["modelUsage"] as? [String: Any],
+                          let ts = Self.date(meta["createdAt"]), ts >= weekStart else { continue }
+                    if let messageId = usage["messageId"] as? String {
+                        if seen.contains(messageId) { continue }
+                        seen.insert(messageId)
+                    }
+                    let input = Self.number(usage["inputTokens"])
+                    let output = Self.number(usage["outputTokens"])
+                    let cacheRead = min(input, Self.number(usage["cacheReadTokens"]))
+                    guard input + output > 0 else { continue }
+
+                    let placeholder = usage["model"] as? String ?? "unknown"
+                    let model = modelIds[placeholder] ?? placeholder
+                    let cost = ModelPricing.cost(model: model, inputTokens: input - cacheRead, outputTokens: output, cacheReadTokens: cacheRead)
+
+                    func add(_ t: inout UsageTotals) {
+                        t.inputTokens += input
+                        t.outputTokens += output
+                        if let cost { t.costUSD += cost } else { t.hasUnpricedModel = true }
+                    }
+                    add(&windows.week)
+                    if cal.isDate(ts, inSameDayAs: now) { add(&windows.today) }
+                    if ts >= sessionStart { add(&windows.session) }
+                    replies += 1
+                }
+                if steps.isEmpty { break }
+                start = end
+            }
+        }
+
+        Self.log.info("Antigravity token usage: \(replies, privacy: .public) replies, week \(windows.week.totalTokens, privacy: .public) tokens")
+        return windows
     }
 
     private func parseQuotaSummary(_ data: Data, now: Date) -> UsageSnapshot? {
@@ -335,7 +533,7 @@ struct AntigravityUsageProvider: UsageProvider {
                     outputTokens: 0,
                     costUSD: fraction,
                     isPercentage: true
-                ), pool: spec.pool))
+                ), pool: spec.pool, resetsAt: resetTime))
             }
         }
 
@@ -533,7 +731,7 @@ struct AntigravityUsageProvider: UsageProvider {
                 outputTokens: 0,
                 costUSD: fraction,
                 isPercentage: true
-            ), pool: pool))
+            ), pool: pool, resetsAt: config.resetTime))
         }
 
         snapshot.models = models
