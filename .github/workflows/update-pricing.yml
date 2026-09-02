@@ -31,36 +31,19 @@ jobs:
           # Fetch all models from OpenRouter
           curl -s https://openrouter.ai/api/v1/models > all_models.json
 
-          TARGET_MODELS=("anthropic/claude-3-opus" "anthropic/claude-3-5-sonnet" "anthropic/claude-3-haiku" "openai/gpt-5-preview")
-
-          echo "{" > pricing_new.json
-          echo "  \"models\": [" >> pricing_new.json
-
-          first=true
-          for model_id in "${TARGET_MODELS[@]}"; do
-            if [ "$first" = false ]; then echo "," >> pricing_new.json; fi
-
-            model_data=$(jq -c --arg ID "$model_id" '.data[] | select(.id == $ID)' all_models.json)
-
-            name=$(echo "$model_data" | jq -r '.name')
-            prompt_price=$(echo "$model_data" | jq -r '.pricing.prompt')
-            completion_price=$(echo "$model_data" | jq -r '.pricing.completion')
-
-            echo "    {" >> pricing_new.json
-            echo "      \"id\": \"$model_id\"," >> pricing_new.json
-            echo "      \"name\": \"$name\"," >> pricing_new.json
-            echo "      \"pricing\": {" >> pricing_new.json
-            echo "        \"prompt\": \"$prompt_price\"," >> pricing_new.json
-            echo "        \"completion\": \"$completion_price\"" >> pricing_new.json
-            echo "      }" >> pricing_new.json
-            echo "    }" >> pricing_new.json
-
-            first=false
-          done
-
-          echo "  ]," >> pricing_new.json
-          echo "  \"last_updated\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"" >> pricing_new.json
-          echo "}" >> pricing_new.json
+          # Track every current Anthropic Claude and OpenAI GPT-5 / codex model
+          # (excluding ":batch" variants) instead of a hand-maintained short list,
+          # so newly released models are priced without a workflow change.
+          jq --arg ts "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" '{
+            models: [ .data[]
+              | select(.id | test("^(anthropic/claude-|google/gemini-|openai/(gpt-5|gpt-4\\.1|o3|o4|codex))"))
+              | select(.id | contains(":") | not)
+              | select(.pricing.prompt != null and .pricing.completion != null)
+              | {id: .id, name: .name, pricing: {prompt: .pricing.prompt, completion: .pricing.completion,
+                  cache_read: (.pricing.input_cache_read // ""), cache_write: (.pricing.input_cache_write // "")}} ]
+              | sort_by(.id),
+            last_updated: $ts
+          }' all_models.json > pricing_new.json
 
           mkdir -p DynamicIsland/managers/LLMUsage
           mv pricing_new.json DynamicIsland/managers/LLMUsage/pricing.json
