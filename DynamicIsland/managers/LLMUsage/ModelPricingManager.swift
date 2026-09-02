@@ -67,9 +67,16 @@ struct ModelRates: Codable {
         Double(completion) ?? 0.0
     }
 
-    /// nil when unknown, so callers can fall back to the plain prompt rate.
-    var cacheReadPrice: Double? { cacheRead.flatMap(Double.init).flatMap { $0 > 0 ? $0 : nil } }
-    var cacheWritePrice: Double? { cacheWrite.flatMap(Double.init).flatMap { $0 > 0 ? $0 : nil } }
+    /// nil only when the rate is absent, empty or unparseable, so callers can fall back
+    /// to the plain prompt rate. A published "0" is a real rate: OpenRouter uses it for
+    /// cache operations that are free.
+    var cacheReadPrice: Double? { Self.rate(cacheRead) }
+    var cacheWritePrice: Double? { Self.rate(cacheWrite) }
+
+    private static func rate(_ raw: String?) -> Double? {
+        guard let raw, !raw.isEmpty, let value = Double(raw), value >= 0 else { return nil }
+        return value
+    }
 }
 
 /// Fully resolved per-token rates for one model.
