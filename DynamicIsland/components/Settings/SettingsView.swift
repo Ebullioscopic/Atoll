@@ -443,6 +443,7 @@ private enum SettingsSearchIndex {
         // Clipboard
         SettingsSearchEntry(tab: .clipboard, title: "Enable Clipboard Manager", keywords: ["clipboard", "manager"], highlightID: SettingsTab.clipboard.highlightID(for: "Enable Clipboard Manager")),
         SettingsSearchEntry(tab: .clipboard, title: "Show Clipboard Icon", keywords: ["icon", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Show Clipboard Icon")),
+        SettingsSearchEntry(tab: .clipboard, title: "Save History Across Restarts", keywords: ["clipboard", "history", "save", "persist", "privacy", "disk", "disable"], highlightID: SettingsTab.clipboard.highlightID(for: "Enable Clipboard Manager")),
         SettingsSearchEntry(tab: .clipboard, title: "Display Mode", keywords: ["list", "grid", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Display Mode")),
         SettingsSearchEntry(tab: .clipboard, title: "History Size", keywords: ["history", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "History Size")),
 
@@ -1712,6 +1713,18 @@ struct Downloads: View {
                         .foregroundStyle(.secondary)
                 }
                 .settingsHighlight(id: highlightID("Download indicator style"))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Defaults.Toggle(key: .showDownloadSpeed) {
+                        Text("Show download speed")
+                    }
+                    .disabled(!enableDownloadListener)
+
+                    Text("Adds the current rate beside the indicator, measured from how fast the files in your Downloads folder are growing.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .settingsHighlight(id: highlightID("Show download speed"))
             } header: {
                 Text("Download Detection")
             } footer: {
@@ -2959,22 +2972,19 @@ private struct MusicSourceCard: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 9) {
-                Group {
-                    if let logoAssetName = controller.officialLogoAssetName {
-                        Image(logoAssetName)
-                            .resizable()
-                            .scaledToFit()
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    } else {
-                        AppIconImage(
-                            bundleIdentifiers: controller.applicationBundleIdentifiers,
-                            symbolFallback: controller.fallbackSymbol,
-                            symbolColor: controller.fallbackColor,
-                            size: 42
-                        )
-                        .font(.system(size: 24, weight: .semibold))
-                    }
-                }
+                // Every source shows the app's own icon, so the row does not
+                // mix real icons for the apps we happen to ship a logo for
+                // with flat brand marks for the rest. The bundled logo is the
+                // fallback for when the app is not installed, which is better
+                // than the generic symbol that used to stand in there.
+                AppIconImage(
+                    bundleIdentifiers: controller.applicationBundleIdentifiers,
+                    assetFallback: controller.officialLogoAssetName,
+                    symbolFallback: controller.fallbackSymbol,
+                    symbolColor: controller.fallbackColor,
+                    size: 42
+                )
+                .font(.system(size: 24, weight: .semibold))
                 .frame(width: 42, height: 42)
 
                 Text(controller.localizedName)
@@ -3126,9 +3136,10 @@ struct Media: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Text("Music Source")
                             .font(.system(size: 13, weight: .semibold))
+                        MediaSourceCapabilitiesButton(controllers: availableMediaControllers)
                         Spacer()
                         ScrollHintIndicator()
                     }
@@ -3172,6 +3183,10 @@ struct Media: View {
             if mediaController == .spotify {
                 SpotifyAuthSettingsSection()
                 SpotifyLikeButtonSettingsSection()
+            }
+
+            if mediaController == .cider {
+                CiderFavoritingSettingsSection()
             }
 
             Section {
@@ -7092,10 +7107,16 @@ struct Shortcuts: View {
                 } header: {
                     Text("Clipboard")
                 } footer: {
-                    Text("Opens the clipboard history panel. Default is Cmd+Shift+V (similar to Windows+V on PC). Only works when clipboard feature is enabled.")
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
+                    Group {
+                        if let shortcut = boundShortcutDescription(for: .clipboardHistoryPanel) {
+                            Text("Opens the clipboard history panel, currently \(shortcut). Only works when clipboard feature is enabled.")
+                        } else {
+                            Text("Opens the clipboard history panel. No shortcut is set. Only works when clipboard feature is enabled.")
+                        }
+                    }
+                    .multilineTextAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
                 }
 
                 Section {
@@ -8322,6 +8343,13 @@ private struct NewAPIAccountEditor: View {
     }
 }
 
+/// Renders the shortcut the user actually has bound, rather than a hard-coded
+/// string that silently goes stale the moment anyone rebinds it.
+@MainActor
+private func boundShortcutDescription(for name: KeyboardShortcuts.Name) -> String? {
+    KeyboardShortcuts.getShortcut(for: name)?.description
+}
+
 struct ClipboardSettings: View {
     @ObservedObject var clipboardManager = ClipboardManager.shared
     @Default(.enableClipboardManager) var enableClipboardManager
@@ -8350,10 +8378,25 @@ struct ClipboardSettings: View {
             } header: {
                 Text("Clipboard Manager")
             } footer: {
-                Text("Monitor clipboard changes and keep a history of recent copies. Use Cmd+Shift+V to quickly access clipboard history.")
+                if let shortcut = boundShortcutDescription(for: .clipboardHistoryPanel) {
+                    Text("Monitor clipboard changes and keep a history of recent copies. Press \(shortcut) to open clipboard history.")
+                } else {
+                    Text("Monitor clipboard changes and keep a history of recent copies. Set a shortcut under Shortcuts to open clipboard history.")
+                }
             }
 
             if enableClipboardManager {
+                Section {
+                    Defaults.Toggle(key: .persistClipboardHistory) {
+                        Text("Save History Across Restarts")
+                    }
+                    .settingsHighlight(id: highlightID("Save History Across Restarts"))
+                } header: {
+                    Text("Privacy")
+                } footer: {
+                    Text("When off, clipboard history is kept in memory for this session only and is never written to disk. Turning it off also erases history that was already saved. Pinned items are kept either way.")
+                }
+
                 Section {
                     Defaults.Toggle(key: .showClipboardIcon) {
                         Text("Show Clipboard Icon")
@@ -8430,8 +8473,7 @@ struct ClipboardSettings: View {
                     .disabled(clipboardManager.clipboardHistory.isEmpty)
 
                     Button("Clear Pinned Items") {
-                        clipboardManager.pinnedItems.removeAll()
-                        clipboardManager.savePinnedItemsToDefaults()
+                        clipboardManager.clearPinnedItems()
                     }
                     .foregroundColor(.red)
                     .disabled(clipboardManager.pinnedItems.isEmpty)
@@ -9471,10 +9513,14 @@ struct AppIconImage: View {
             if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
                 let icon = NSWorkspace.shared.icon(forFile: appURL.path)
                 // NSWorkspace returns a valid icon even for generic apps;
-                // resize to keep memory low.
-                let thumb = NSImage(size: NSSize(width: 32, height: 32))
+                // redraw it small to keep memory low. At twice the size it is
+                // asked for, so it stays sharp on a Retina display -- the old
+                // flat 32 was being scaled *up* wherever this is drawn larger
+                // than that, which is why the bigger icons looked soft.
+                let side = max(32, size * 2)
+                let thumb = NSImage(size: NSSize(width: side, height: side))
                 thumb.lockFocus()
-                icon.draw(in: NSRect(origin: .zero, size: NSSize(width: 32, height: 32)),
+                icon.draw(in: NSRect(origin: .zero, size: NSSize(width: side, height: side)),
                           from: NSRect(origin: .zero, size: icon.size),
                           operation: .copy, fraction: 1.0)
                 thumb.unlockFocus()
