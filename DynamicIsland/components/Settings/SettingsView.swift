@@ -26,6 +26,7 @@ private enum SettingsTabGroup: String, CaseIterable, Identifiable {
     case utilities
     case developer
     case integrations
+    case social
     case info
 
     var id: String { rawValue }
@@ -40,6 +41,7 @@ private enum SettingsTabGroup: String, CaseIterable, Identifiable {
         case .utilities:        return String(localized: "Utilities")
         case .developer:        return String(localized: "Developer")
         case .integrations:     return String(localized: "Integrations")
+        case .social:           return String(localized: "Social")
         case .info:             return nil
         }
     }
@@ -66,6 +68,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case shortcuts
     case notes
     case terminal
+    case whatsapp
     case about
 
     var id: String { rawValue }
@@ -81,7 +84,20 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
              .downloads, .shortcuts:                                         return .utilities
         case .stats, .terminal:                                              return .developer
         case .extensions:                                                    return .integrations
+        case .whatsapp:                                                      return .social
         case .about:                                                         return .info
+        }
+    }
+
+    /// Whether the sidebar marks this tab as beta.
+    ///
+    /// The tab's own answer rather than a list inside the row: the row drew one
+    /// badge per tab in a chain of branches, each a copy of the same capsule,
+    /// so marking a tab meant pasting the badge again.
+    var isBeta: Bool {
+        switch self {
+        case .extensions, .whatsapp: return true
+        default: return false
         }
     }
 
@@ -107,6 +123,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return String(localized: "Shortcuts")
         case .notes: return String(localized: "Notes")
         case .terminal: return String(localized: "Terminal")
+        case .whatsapp: return String(localized: "Social")
         case .about: return String(localized: "About")
         }
     }
@@ -133,6 +150,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return "keyboard"
         case .notes: return "note.text"
         case .terminal: return "apple.terminal"
+        case .whatsapp: return "message.fill"
         case .about: return "info.circle"
         }
     }
@@ -159,6 +177,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shortcuts: return .orange
         case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
+        case .whatsapp: return Color(red: 0.15, green: 0.68, blue: 0.38)
         case .about: return .secondary
         }
     }
@@ -451,18 +470,7 @@ struct SettingsView: View {
         HStack(spacing: 10) {
             sidebarIcon(for: tab)
             Text(LocalizedStringKey(tab.title))
-            if tab == .downloads {
-                Spacer()
-                Text("BETA")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(Color.blue)
-                    )
-            } else if tab == .extensions {
+            if tab.isBeta {
                 Spacer()
                 Text("BETA")
                     .font(.system(size: 9, weight: .bold))
@@ -509,6 +517,8 @@ struct SettingsView: View {
             .terminal,
             // Integrations
             .extensions,
+            // Social
+            .whatsapp,
             // Info
             .about
         ]
@@ -695,6 +705,7 @@ struct SettingsView: View {
 
     private var settingsSearchIndex: [SettingsSearchEntry] {
         [
+            SettingsSearchEntry(tab: .whatsapp, title: "Suggest replies", keywords: ["smart replies", "apple intelligence", "ai", "suggestions", "reply", "social"], highlightID: SettingsTab.whatsapp.highlightID(for: "Suggest replies")),
             // General
             SettingsSearchEntry(tab: .general, title: "Enable Minimalistic UI", keywords: ["minimalistic", "ui mode", "general"], highlightID: SettingsTab.general.highlightID(for: "Enable Minimalistic UI")),
             SettingsSearchEntry(tab: .general, title: "Menubar icon", keywords: ["menu bar", "status bar", "icon"], highlightID: SettingsTab.general.highlightID(for: "Menubar icon")),
@@ -1044,6 +1055,10 @@ struct SettingsView: View {
         case .terminal:
             SettingsForm(tab: .terminal) {
                 TerminalSettings()
+            }
+        case .whatsapp:
+            SettingsForm(tab: .whatsapp) {
+                SocialSettingsView()
             }
         case .about:
             if let controller = updaterController {
@@ -9392,6 +9407,412 @@ struct TerminalSettings: View {
             }
         }
         .navigationTitle("Terminal")
+    }
+}
+
+// MARK: - Social (WhatsApp) Settings
+
+struct SocialSettingsView: View {
+    @ObservedObject private var manager = WhatsAppManager.shared
+    @ObservedObject private var telegramManager = TelegramManager.shared
+
+    @Default(.whatsAppEnabled) var whatsAppEnabled
+    @Default(.isWhatsAppAnimEnabled) var isWhatsAppAnimEnabled
+    @Default(.telegramEnabled) var telegramEnabled
+    @ObservedObject private var smartReplies = SmartReplyManager.shared
+    @State private var disconnecting = false
+    @State private var telegramDisconnecting = false
+
+    private func highlightID(_ title: String) -> String {
+        SettingsTab.whatsapp.highlightID(for: title)
+    }
+
+    private var smartReplyStatusText: String {
+        switch smartReplies.availability {
+        case .ready:
+            return ""
+        case .unsupportedOS:
+            return String(localized: "Smart Replies needs macOS 26 or later on a Mac with Apple Intelligence.")
+        case .notEnabled:
+            return String(localized: "Turn on Apple Intelligence in System Settings to use Smart Replies.")
+        case .modelNotReady:
+            return String(localized: "Apple Intelligence is still downloading its model. Smart Replies will turn on by itself once it finishes.")
+        case .unavailable(let reason):
+            return String(localized: "Apple Intelligence is unavailable on this Mac (\(reason)).")
+        }
+    }
+
+    var body: some View {
+            Form {
+                Section {
+                    HStack(spacing: 10) {
+                        Image(systemName: "apple.intelligence")
+                            .font(.system(size: 22))
+                            .foregroundStyle(.tint)
+                            .frame(width: 28, height: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Smart Replies")
+                                .font(.headline)
+                            Text("Reply to messages from the notch, with suggestions written on device by Apple Intelligence")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    Defaults.Toggle(key: .smartRepliesEnabled) {
+                        Text("Suggest replies")
+                    }
+                    .disabled(!smartReplies.availability.isReady)
+                    .settingsHighlight(id: highlightID("Suggest replies"))
+
+                    if !smartReplies.availability.isReady {
+                        HStack(spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.orange)
+                            Text(smartReplyStatusText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer()
+                        }
+                    }
+                } header: {
+                    Text("Apple Intelligence")
+                } footer: {
+                    Text("Message text is processed on your Mac and is never sent to Atoll or to Apple.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .onAppear { smartReplies.refreshAvailability() }
+
+                Section {
+                    HStack(spacing: 10) {
+                        Image("WhatsApp")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 28, height: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("WhatsApp")
+                                .font(.headline)
+                            Text("Native notifications in the Dynamic Island")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Defaults.Toggle(key: .whatsAppEnabled) {
+                        Text("Enable WhatsApp")
+                    }
+                    .settingsHighlight(id: highlightID("Enable WhatsApp"))
+
+                    if whatsAppEnabled {
+                        Defaults.Toggle(key: .isWhatsAppAnimEnabled) {
+                            Text("Checkmark animation")
+                        }
+                        .settingsHighlight(id: highlightID("Checkmark animation"))
+
+                        HStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .fill(statusColor.opacity(0.15))
+                                    .frame(width: 24, height: 24)
+                                Image(systemName: statusIcon)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(statusColor)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(statusTitle)
+                                    .font(.subheadline.weight(.medium))
+                                Text(statusSubtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+
+                        if manager.authState != .authenticated {
+                            Button {
+                                manager.connectWhatsApp()
+                            } label: {
+                                Label("Connect WhatsApp", systemImage: "qrcode")
+                            }
+                            .settingsHighlight(id: highlightID("Connect WhatsApp"))
+                        } else {
+                            Button {
+                                disconnecting = true
+                                manager.disconnect()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { disconnecting = false }
+                            } label: {
+                                if disconnecting {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Label("Disconnect", systemImage: "person.crop.circle.badge.minus")
+                                }
+                            }
+                            .foregroundStyle(.red)
+                            .disabled(disconnecting)
+                        }
+
+                        if manager.authState != .authenticated {
+                            NativeStepRow(
+                                number: 1,
+                                icon: "qrcode.viewfinder",
+                                title: "Click \"Connect WhatsApp\"",
+                                subtitle: "A window with WhatsApp Web will open"
+                            )
+                            NativeStepRow(
+                                number: 2,
+                                icon: "iphone",
+                                title: "Scan the QR code from your phone",
+                                subtitle: "WhatsApp → Linked devices → Link a device"
+                            )
+                            NativeStepRow(
+                                number: 3,
+                                icon: "bell.badge.fill",
+                                title: "Receive notifications in the Dynamic Island",
+                                subtitle: "Reply directly from the notch, without opening any app"
+                            )
+                        }
+
+                        Button {
+                            manager.showPreviewNotification()
+                        } label: {
+                            Label("Preview notification", systemImage: "sparkles.rectangle.stack")
+                        }
+                    }
+                } header: {
+                    Text("WhatsApp")
+                } footer: {
+                    Text(footerText)
+                }
+
+                Section {
+                    HStack(spacing: 10) {
+                        Image("Telegram")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 28, height: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Telegram")
+                                .font(.headline)
+                            Text("Native notifications in the Dynamic Island")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Defaults.Toggle(key: .telegramEnabled) {
+                        Text("Enable Telegram")
+                    }
+                    .settingsHighlight(id: highlightID("Enable Telegram"))
+
+                    if telegramEnabled {
+                        HStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .fill(telegramStatusColor.opacity(0.15))
+                                    .frame(width: 24, height: 24)
+                                Image(systemName: telegramStatusIcon)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(telegramStatusColor)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(telegramStatusTitle)
+                                    .font(.subheadline.weight(.medium))
+                                Text(telegramStatusSubtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+
+                        if telegramManager.authState != .authenticated {
+                            Button {
+                                telegramManager.connect()
+                            } label: {
+                                Label("Connect Telegram", systemImage: "qrcode")
+                            }
+                            .settingsHighlight(id: highlightID("Connect Telegram"))
+
+                            NativeStepRow(
+                                number: 1,
+                                icon: "qrcode.viewfinder",
+                                title: "Click \"Connect Telegram\"",
+                                subtitle: "A window with Telegram Web will open"
+                            )
+                            NativeStepRow(
+                                number: 2,
+                                icon: "iphone",
+                                title: "Scan the code, or sign in with your number",
+                                subtitle: "Telegram → Settings → Devices → Link Desktop Device"
+                            )
+                            NativeStepRow(
+                                number: 3,
+                                icon: "bell.badge.fill",
+                                title: "Receive notifications in the Dynamic Island",
+                                subtitle: "Reply directly from the notch, without opening any app"
+                            )
+                        } else {
+                            Button {
+                                telegramDisconnecting = true
+                                telegramManager.disconnect()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { telegramDisconnecting = false }
+                            } label: {
+                                if telegramDisconnecting {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Label("Disconnect", systemImage: "person.crop.circle.badge.minus")
+                                }
+                            }
+                            .foregroundStyle(.red)
+                            .disabled(telegramDisconnecting)
+                        }
+
+                        Button {
+                            telegramManager.showPreviewNotification()
+                        } label: {
+                            Label("Preview notification", systemImage: "sparkles.rectangle.stack")
+                        }
+                    }
+                } header: {
+                    Text("Telegram")
+                } footer: {
+                    Text("Atoll reads the chat list Telegram Web keeps up to date, so a card carries the same one-line preview Telegram itself shows. Replies are typed straight into that chat.")
+                }
+            }
+            .navigationTitle("Social")
+        }
+
+    // MARK: - Telegram status
+
+    private var telegramStatusTitle: String {
+        switch telegramManager.authState {
+        case .idle: return String(localized: "Not connected")
+        case .loading: return String(localized: "Connecting…")
+        case .signInRequired: return String(localized: "Sign-in required")
+        case .authenticated: return String(localized: "Connected")
+        case .error: return String(localized: "Connection error")
+        }
+    }
+
+    private var telegramStatusSubtitle: String {
+        switch telegramManager.authState {
+        case .idle:
+            return String(localized: "Open the connection window to sign in to Telegram Web.")
+        case .loading:
+            return String(localized: "Loading Telegram Web…")
+        case .signInRequired:
+            return String(localized: "Open the connection window and scan the code, or sign in with your number.")
+        case .authenticated:
+            return String(localized: "Messages will appear in the notch as they arrive.")
+        case .error(let message):
+            return message
+        }
+    }
+
+    private var telegramStatusIcon: String {
+        switch telegramManager.authState {
+        case .authenticated: return "checkmark.circle.fill"
+        case .error: return "exclamationmark.triangle.fill"
+        case .signInRequired: return "qrcode"
+        default: return "circle.dashed"
+        }
+    }
+
+    private var telegramStatusColor: Color {
+        switch telegramManager.authState {
+        case .authenticated: return .green
+        case .error: return .red
+        case .signInRequired: return .orange
+        default: return .secondary
+        }
+    }
+
+
+    // MARK: - Computed
+
+    private var statusTitle: String {
+        switch manager.authState {
+        case .idle:          return String(localized: "Waiting")
+        case .loading:       return String(localized: "Loading…")
+        case .qrRequired:    return String(localized: "QR required")
+        case .authenticated: return String(localized: "Connected")
+        case .error:         return String(localized: "Error")
+        }
+    }
+
+    private var statusSubtitle: String {
+        switch manager.authState {
+        case .idle:          return String(localized: "Enable the integration to get started")
+        case .loading:       return String(localized: "Connecting to WhatsApp Web…")
+        case .qrRequired:    return String(localized: "Click \"Connect WhatsApp\" and scan the QR code")
+        case .authenticated: return String(localized: "Messages will arrive in the Dynamic Island")
+        case .error(let e):  return String(localized: "Error: \(e)")
+        }
+    }
+
+    private var statusIcon: String {
+        switch manager.authState {
+        case .authenticated: return "checkmark"
+        case .error:         return "exclamationmark"
+        case .qrRequired:    return "qrcode"
+        case .loading:       return "arrow.triangle.2.circlepath"
+        case .idle:          return "minus"
+        }
+    }
+
+    private var statusColor: Color {
+        switch manager.authState {
+        case .authenticated: return .green
+        case .error:         return .red
+        case .qrRequired:    return .orange
+        default:             return .secondary
+        }
+    }
+
+    private var footerText: String {
+        switch manager.authState {
+        case .authenticated:
+            return String(localized: "The session is persistent. You won't need to scan the QR code every time Atoll starts.")
+        case .qrRequired:
+            return String(localized: "Open the connection window and scan the QR code with WhatsApp on your phone.")
+        default:
+            return String(localized: "Atoll uses WhatsApp Web natively — no external tools required.")
+        }
+    }
+}
+
+private struct NativeStepRow: View {
+    let number: Int
+    let icon: String
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.15))
+                    .frame(width: 28, height: 28)
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.accentColor)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
 

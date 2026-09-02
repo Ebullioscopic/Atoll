@@ -1462,6 +1462,19 @@ extension Defaults.Keys {
     static let enableAppleNotesSync = Key<Bool>("enableAppleNotesSync", default: false)
     static let appleNotesLastSyncDate = Key<Date?>("appleNotesLastSyncDate", default: nil)
     
+    // MARK: - WhatsApp Settings
+    static let whatsAppEnabled = Key<Bool>("whatsAppEnabled", default: false)
+    static let isWhatsAppAnimEnabled = Key<Bool>("isWhatsAppAnimEnabled", default: false)
+
+    // MARK: - Telegram Settings
+    static let telegramEnabled = Key<Bool>("telegramEnabled", default: false)
+
+    /// Suggested replies generated on device by Apple Intelligence. Off by
+    /// default: it reads message text to do its job, which nobody should
+    /// discover after the fact.
+    static let smartRepliesEnabled = Key<Bool>("smartRepliesEnabled", default: false)
+    
+    
     // Helper to determine the default media controller based on macOS version
     static var defaultMediaController: MediaControllerType {
         if #available(macOS 15.4, *) {

@@ -91,6 +91,20 @@ final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
     }
+
+    /// The notch hangs from the top of the screen, so a resize has to hold on
+    /// to its top edge.
+    ///
+    /// `setFrame(_:display:animate:)` blocks the main thread for the length of
+    /// its animation, so SwiftUI draws no frames while it runs. AppKit fills
+    /// them with the layer's existing contents, and its default placement
+    /// anchors those to the bottom left -- which for a window hanging from the
+    /// top of the screen is the wrong end. Anchoring to the top left keeps the
+    /// stale frames where the real ones are going to be.
+    override var layerContentsPlacement: NSView.LayerContentsPlacement {
+        get { .topLeft }
+        set { _ = newValue }
+    }
 }
 
 extension AppDelegate {
@@ -100,6 +114,12 @@ extension AppDelegate {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    override init() {
+        print("DEBUG: AppDelegate init started")
+        super.init()
+        print("DEBUG: AppDelegate init finished")
+    }
+
     var statusItem: NSStatusItem?
     var windows: [NSScreen: NSWindow] = [:]
     var viewModels: [NSScreen: DynamicIslandViewModel] = [:]
@@ -119,6 +139,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let systemTimerBridge = SystemTimerBridge.shared
     let extensionXPCServiceHost = ExtensionXPCServiceHost.shared
     let extensionRPCServer = ExtensionRPCServer.shared
+    let whatsAppManager = WhatsAppManager.shared
+    let telegramManager = TelegramManager.shared
     var closeNotchWorkItem: DispatchWorkItem?
     private var previousScreens: [NSScreen]?
     private var onboardingWindowController: NSWindowController?
@@ -407,7 +429,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         -> NSWindow
     {
         // Use the current required size instead of always using openNotchSize
-        let baseSize = calculateRequiredNotchSize()
+        let baseSize = calculateRequiredNotchSize(for: screen, viewModel: viewModel)
         let requiredSize = adjustedSizeForScreen(baseSize, screen: screen)
         let roundedWidth = requiredSize.width.rounded()
         let roundedHeight = requiredSize.height.rounded()
@@ -466,15 +488,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Calculate required size based on current state
         let requiredSize = calculateRequiredNotchSize()
         let animateResize = shouldAnimateResize(for: requiredSize)
-        resizeWindows(to: requiredSize, animated: animateResize, force: false)
+        resizeWindowsToCurrentRequiredSize(animated: animateResize, force: false)
     }
 
     private func updateWindowSizeForTabSwitch() {
-        let requiredSize = calculateRequiredNotchSize()
-        resizeWindows(to: requiredSize, animated: false, force: true)
+        resizeWindowsToCurrentRequiredSize(animated: false, force: true)
     }
     
-    private func calculateRequiredNotchSize() -> CGSize {
+    private func calculateRequiredNotchSize(for screen: NSScreen? = nil, viewModel: DynamicIslandViewModel? = nil) -> CGSize {
+        let sizingViewModel = viewModel ?? screen.flatMap { viewModels[$0] } ?? vm
+
+        // Check if a chat expanding HUD is showing
+        if sizingViewModel.notchState == .closed,
+           coordinator.expandingView.show,
+           case .chat(_, _, let messages, _, _) = coordinator.expandingView.type {
+            let screenName = screen?.localizedName ?? sizingViewModel.screen
+            let isIslandMode = shouldUseDynamicIslandMode(for: screenName)
+            let contentSize = ChatNotificationLayout.totalSize(
+                isReplying: coordinator.isChatReplying,
+                hasFilePreview: coordinator.isChatFilePreviewVisible,
+                messages: messages,
+                isDynamicIslandMode: isIslandMode,
+                closedNotchHeight: sizingViewModel.closedNotchSize.height
+            )
+            let targetSize = CGSize(
+                width: contentSize.width + (cornerRadiusInsets.closed.bottom * 2),
+                height: contentSize.height
+            )
+            return addShadowPadding(to: targetSize, isMinimalistic: Defaults[.enableMinimalisticUI])
+        }
+
         // Check if inline sneak peek is showing and notch is closed
         let airPodsListeningModeSneakActive = vm.notchState == .closed &&
                                       coordinator.sneakPeek.show &&
@@ -627,7 +670,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func ensureWindowSize(_ size: CGSize, animated: Bool, force: Bool = false) {
+        if vm.notchState == .closed,
+           coordinator.expandingView.show,
+           case .chat = coordinator.expandingView.type {
+            resizeWindowsToCurrentRequiredSize(animated: animated, force: force)
+            return
+        }
         resizeWindows(to: size, animated: animated, force: force)
+    }
+
+    private func resizeWindowsToCurrentRequiredSize(animated: Bool, force: Bool) {
+        if Defaults[.showOnAllDisplays] {
+            for (screen, window) in windows {
+                let baseSize = calculateRequiredNotchSize(for: screen)
+                let screenSize = adjustedSizeForScreen(baseSize, screen: screen)
+                if force || window.frame.size != screenSize {
+                    resizeWindow(window, on: screen, to: screenSize, animated: animated)
+                }
+            }
+        } else if let window {
+            let screen = window.screen ?? NSScreen.screens.first { $0.frame.intersects(window.frame) } ?? NSScreen.main ?? NSScreen.screens.first
+            guard let screen else { return }
+            let baseSize = calculateRequiredNotchSize(for: screen)
+            let screenSize = adjustedSizeForScreen(baseSize, screen: screen)
+            if force || window.frame.size != screenSize {
+                resizeWindow(window, on: screen, to: screenSize, animated: animated)
+            }
+        }
     }
 
     private func resizeWindows(to size: CGSize, animated: Bool, force: Bool) {
@@ -666,10 +735,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // considered, but an unchanged frame still needs no AppKit display
         // transaction. Avoiding that no-op matters during hover/click opens.
         guard window.frame != targetFrame else { return }
-        window.setFrame(targetFrame, display: true)
+        // A window that is growing is never animated. `setFrame(_:display:
+        // animate:)` runs its animation on the main thread and blocks it, so
+        // SwiftUI draws nothing at all while it runs -- and a window growing
+        // taller under a still picture shows whatever is behind the notch
+        // along its top edge until the animation ends. Growing the window at
+        // once costs nothing to look at, because the window is transparent and
+        // the card inside it does its own animating; only the card is ever
+        // visible. Shrinking still animates, so the card is never cut off
+        // while it is still animating down.
+        if animated, targetFrame.height <= window.frame.height {
+            let topAlignedStartFrame = NSRect(
+                x: window.frame.origin.x,
+                y: targetFrame.maxY - window.frame.height,
+                width: window.frame.width,
+                height: window.frame.height
+            )
+            if window.frame != topAlignedStartFrame {
+                window.setFrame(topAlignedStartFrame, display: true)
+            }
+            window.setFrame(targetFrame, display: true, animate: true)
+        } else {
+            window.setFrame(targetFrame, display: true)
+        }
     }
 
     private func shouldAnimateResize(for newSize: CGSize) -> Bool {
+        if coordinator.expandingView.show,
+           case .chat = coordinator.expandingView.type {
+            return true
+        }
         if Defaults[.enableMinimalisticUI] && !ReminderLiveActivityManager.shared.activeWindowReminders.isEmpty {
             return false
         }
@@ -677,6 +772,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        print("DEBUG: applicationDidFinishLaunching started")
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]
@@ -691,6 +787,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         LockScreenManager.shared.configure(viewModel: vm)
         extensionXPCServiceHost.start()
         extensionRPCServer.start()
+        print("DEBUG: WhatsApp auth state is \(WhatsAppManager.shared.authState)")
+        print("DEBUG: Telegram auth state is \(TelegramManager.shared.authState)")
         
         // Migrate legacy progress bar settings
         Defaults.Keys.migrateProgressBarStyle()
@@ -940,6 +1038,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             forName: Notification.Name.notchHeightChanged, object: nil, queue: nil
         ) { [weak self] _ in
+            self?.updateWindowSizeIfNeeded()
             self?.adjustWindowPosition()
         }
 
