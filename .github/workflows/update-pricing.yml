@@ -38,6 +38,7 @@ jobs:
             models: [ .data[]
               | select(.id | test("^(anthropic/claude-|google/gemini-|openai/(gpt-5|gpt-4\\.1|o3|o4|codex))"))
               | select(.id | contains(":") | not)
+              | select((.pricing | type) == "object")
               | select(.pricing.prompt != null and .pricing.completion != null)
               | {id: .id, name: .name, pricing: {prompt: .pricing.prompt, completion: .pricing.completion,
                   cache_read: (.pricing.input_cache_read // ""), cache_write: (.pricing.input_cache_write // "")}} ]
@@ -64,4 +65,8 @@ jobs:
 
           git commit -m "chore: update llm pricing data [skip ci]"
 
-          git push origin HEAD:main
+          # Push back to the branch this run checked out (the default branch for the
+          # scheduled run). Pushing HEAD:main from a dev checkout is rejected as a
+          # non-fast-forward whenever main is behind dev, which is why the daily run
+          # had been failing.
+          git push origin "HEAD:${GITHUB_REF_NAME}"

@@ -336,9 +336,14 @@ struct AntigravityUsageProvider: UsageProvider {
         task.standardOutput = pipe
         task.standardError = Pipe()
         do { try task.run() } catch { return [] }
+        // lsof normally returns in milliseconds; if it ever hangs (stuck mount, wedged
+        // socket), kill it so the synchronous read below cannot block discovery forever.
+        let watchdog = DispatchWorkItem { if task.isRunning { task.terminate() } }
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 2, execute: watchdog)
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         task.waitUntilExit()
-        guard let out = String(data: data, encoding: .utf8) else { return [] }
+        watchdog.cancel()
+        guard task.terminationStatus == 0, let out = String(data: data, encoding: .utf8) else { return [] }
         var ports: [Int] = []
         for line in out.split(separator: "\n") where line.hasPrefix("n") {
             if let colon = line.lastIndex(of: ":"), let p = Int(line[line.index(after: colon)...]), !ports.contains(p) {

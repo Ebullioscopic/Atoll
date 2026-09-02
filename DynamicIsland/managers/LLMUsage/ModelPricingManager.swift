@@ -86,7 +86,9 @@ class ModelPricingManager: ObservableObject {
     
     @Published private(set) var pricingData: ModelPricingData?
     
-    private let remoteURL = URL(string: "https://raw.githubusercontent.com/Ebullioscopic/Atoll/feat/dynamic-pricing-workflow/DynamicIsland/managers/LLMUsage/pricing.json")!
+    // Read the copy the update-pricing workflow maintains: it runs on, and pushes back
+    // to, the repository's default branch.
+    private let remoteURL = URL(string: "https://raw.githubusercontent.com/Ebullioscopic/Atoll/dev/DynamicIsland/managers/LLMUsage/pricing.json")!
     
     private init() {
         loadInitialPricing()
@@ -161,7 +163,21 @@ class ModelPricingManager: ObservableObject {
         for m in remote.models {
             let k = m.id.lowercased()
             let usable = m.pricing.promptPrice > 0 && m.pricing.completionPrice > 0
-            if byId[k] == nil { order.append(k); byId[k] = m } else if usable { byId[k] = m }
+            guard let existing = byId[k] else {
+                order.append(k)
+                byId[k] = m
+                continue
+            }
+            guard usable else { continue }
+            // A remote row that predates cache rates must not erase the bundled ones:
+            // take the remote prompt/completion prices and fill cache rates field by field.
+            let merged = ModelRates(
+                prompt: m.pricing.prompt,
+                completion: m.pricing.completion,
+                cacheRead: m.pricing.cacheReadPrice != nil ? m.pricing.cacheRead : existing.pricing.cacheRead,
+                cacheWrite: m.pricing.cacheWritePrice != nil ? m.pricing.cacheWrite : existing.pricing.cacheWrite
+            )
+            byId[k] = ModelPriceEntry(id: m.id, name: m.name.isEmpty ? existing.name : m.name, pricing: merged)
         }
         let newest = [bundled.lastUpdated, remote.lastUpdated].compactMap { $0 }.max()
         return ModelPricingData(models: order.compactMap { byId[$0] }, lastUpdated: newest)
