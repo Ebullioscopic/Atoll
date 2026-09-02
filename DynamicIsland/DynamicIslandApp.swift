@@ -543,35 +543,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Use minimalistic or normal size based on settings
-        var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
+        let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
-        // Use a consistent height for different view types
-        if coordinator.currentView == .timer {
-            baseSize.height = 250 // Extra space for timer presets
-        } else if coordinator.currentView == .notes {
-            let preferredHeight = coordinator.notesLayoutState.preferredHeight
-            baseSize.height = max(baseSize.height, preferredHeight)
-        } else if coordinator.currentView == .clipboard {
-            // Clipboard has its own fixed height source; don't inherit the notes layout state.
-            baseSize.height = max(baseSize.height, NotesLayoutState.list.preferredHeight)
-        } else if coordinator.currentView == .terminal {
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-            let maxFraction = Defaults[.terminalMaxHeightFraction]
-            baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
-        } else if coordinator.currentView == .llmUsage {
-            baseSize.height = max(baseSize.height, llmUsageOpenNotchHeight)
-        }
-        
-        baseSize = inlineLyricsAdjustedNotchSize(
+        // `resizeWindows` applies one size to every window, so this has to ask
+        // whether *any* notch is open rather than only the primary one. With
+        // showOnAllDisplays and the primary closed, reading `vm` alone resolved
+        // the short height and shrank the window belonging to an open month
+        // calendar on another display, clipping it.
+        //
+        // Sizing each display from its own view model is the fuller answer, but
+        // every closed-notch branch above reads the primary `vm` the same way --
+        // the sneak peek, the recording HUD, the battery HUD -- so that is a
+        // property of this function rather than of the calendar, and changing it
+        // would change those surfaces too.
+        let isAnyNotchOpen = vm.notchState == .open
+            || viewModels.values.contains { $0.notchState == .open }
+
+        let adjustedContentSize = notchTabContentSize(
             from: baseSize,
-            isHomeTabActive: coordinator.currentView == .home
+            view: coordinator.currentView,
+            isNotchOpen: isAnyNotchOpen,
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion
         )
 
-        let adjustedContentSize = statsAdjustedNotchSize(
-            from: baseSize,
-            isStatsTabActive: coordinator.currentView == .stats,
-            secondRowProgress: coordinator.statsSecondRowExpansion
-        )
         let result = addShadowPadding(
             to: adjustedContentSize,
             isMinimalistic: Defaults[.enableMinimalisticUI]
@@ -814,6 +808,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         Defaults.publisher(.showDiskGraph, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
+        }.store(in: &cancellables)
+
+        // The calendar's view mode decides the notch height. Applied through the
+        // tab-switch path, which resizes at once and without animating: this is
+        // the direct response to a click, and the content and vm.notchSize both
+        // change on one frame, so a tweened window would be the only thing
+        // out of step.
+        Defaults.publisher(.calendarViewMode, options: []).sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.updateWindowSizeForTabSwitch()
+            }
         }.store(in: &cancellables)
 
         Defaults.publisher(.openNotchWidth, options: []).sink { [weak self] _ in

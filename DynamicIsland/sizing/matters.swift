@@ -167,8 +167,12 @@ let minimalisticTimerCountdownContentHeight: CGFloat = 82
 let minimalisticTimerCountdownBlockHeight: CGFloat = minimalisticTimerCountdownTopPadding + minimalisticTimerCountdownContentHeight
 let statsSecondRowContentHeight: CGFloat = 120
 let statsGridSpacingHeight: CGFloat = 12
+let statsAdditionalRowHeight: CGFloat = statsSecondRowContentHeight + statsGridSpacingHeight
 let llmUsageOpenNotchHeight: CGFloat = 220
 let llmUsageProviderCardHeight: CGFloat = 188
+/// Height the month calendar needs to show every week row at a readable size.
+/// 6 rows at ~27pt plus the title row, weekday row and the notch's own chrome.
+let calendarFullMonthNotchHeight: CGFloat = 340
 let notchShadowPaddingStandard: CGFloat = 18
 let notchShadowPaddingMinimalistic: CGFloat = 12
 
@@ -261,6 +265,24 @@ let inlineLyricsLineHeight: CGFloat = 18
 /// regardless of the calendar, and sizes itself for them through its own resize
 /// publisher. Adding this line there would reserve room for a line the standard
 /// player is not drawing.
+/// Whether the home tab's calendar is the full-width ``StandaloneCalendarView``
+/// rather than the narrow ``CalendarView`` shown beside the music player. Only
+/// the standalone variant owns a month grid, and only it can spend extra height.
+///
+/// Mirrors ``NotchHomeView.shouldShowMusicPlayer``, which stays the layout's own
+/// source of truth because SwiftUI tracks its `@Default` reads for invalidation.
+func standaloneCalendarActive() -> Bool {
+    guard Defaults[.showCalendar],
+          !Defaults[.enableMinimalisticUI]
+    else {
+        return false
+    }
+
+    let playerVisible = Defaults[.showStandardMediaControls]
+        && (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+    return !playerVisible
+}
+
 func inlineLyricsAdjustedNotchSize(
     from baseSize: CGSize,
     isHomeTabActive: Bool

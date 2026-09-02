@@ -244,6 +244,52 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             }
             .store(in: &cancellables)
 
+        // The tab decides the height, so the size has to be recomputed when the
+        // tab changes. Without this `notchSize` keeps whatever the previous tab
+        // resolved to, and the views that measure their content against it --
+        // NotchTimerView, the calendar -- lay out for the tab you left.
+        //
+        // Applied without animation and without touching the window, matching
+        // AppDelegate's tab-switch resize, which is immediate and already owns
+        // the window. Animating this while the window jumped left the two
+        // disagreeing for the length of the animation, and a pointer inside the
+        // notch but outside the shrunken content shape reads as a hover exit,
+        // which closes the notch.
+        //
+        // `@Published` fires on willSet, so `currentView` still holds the old
+        // value at emission time; `receive(on:)` hops a run loop tick so the
+        // new one is read.
+        // Same reasoning as the tab-switch sink below, including the lack of an
+        // animation: the mode changes the height, so notchSize has to follow it,
+        // and it has to land on the same frame the window does. Tweening this
+        // while the window moved separately left the container sized for one
+        // mode around content laid out for the other, and the old grid painted
+        // on over the new one. The window is left to AppDelegate's observer.
+        Defaults.publisher(.calendarViewMode, options: [])
+            .map { $0.newValue }
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                guard self.notchState == .open else { return }
+                let updatedTarget = self.calculateDynamicNotchSize()
+                guard self.notchSize != updatedTarget else { return }
+                self.notchSize = updatedTarget
+            }
+            .store(in: &cancellables)
+
+        coordinator.$currentView
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                guard self.notchState == .open else { return }
+                let updatedTarget = self.calculateDynamicNotchSize()
+                guard self.notchSize != updatedTarget else { return }
+                self.notchSize = updatedTarget
+            }
+            .store(in: &cancellables)
+
         coordinator.$notesLayoutState
             .removeDuplicates()
             .receive(on: RunLoop.main)
@@ -418,28 +464,18 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     
     private func calculateDynamicNotchSize() -> CGSize {
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
-        var adjustedSize = baseSize
 
-        if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
-            let preferred = coordinator.notesLayoutState.preferredHeight
-            adjustedSize.height = max(adjustedSize.height, preferred)
-            return adjustedSize
-        }
-
-        if coordinator.currentView == .llmUsage {
-            adjustedSize.height = max(adjustedSize.height, llmUsageOpenNotchHeight)
-            return adjustedSize
-        }
-
-        adjustedSize = inlineLyricsAdjustedNotchSize(
-            from: adjustedSize,
-            isHomeTabActive: coordinator.currentView == .home
-        )
-
-        return statsAdjustedNotchSize(
-            from: adjustedSize,
-            isStatsTabActive: coordinator.currentView == .stats,
-            secondRowProgress: coordinator.statsSecondRowExpansion
+        // Always resolved as if open, because that is what every caller is
+        // asking for. `open()` calls this to find the size to expand *to*, and
+        // it runs before `notchState` flips -- reading the live state there
+        // answered for the closed notch and opened the calendar at the short
+        // height, leaving the month grid clipped until some later event
+        // recomputed it. Every other caller guards on `.open` already.
+        return notchTabContentSize(
+            from: baseSize,
+            view: coordinator.currentView,
+            isNotchOpen: true,
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion
         )
     }
 
