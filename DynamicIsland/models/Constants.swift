@@ -1298,6 +1298,10 @@ extension Defaults.Keys {
     // MARK: Clipboard Feature
     static let enableClipboardManager = Key<Bool>("enableClipboardManager", default: true)
     static let clipboardHistorySize = Key<Int>("clipboardHistorySize", default: 3)
+    /// Whether clipboard history is written to disk and restored on launch.
+    /// Off keeps it in memory for the session only — nothing survives a quit.
+    /// Defaults to true so existing installs keep the behaviour they have.
+    static let persistClipboardHistory = Key<Bool>("persistClipboardHistory", default: true)
     static let showClipboardIcon = Key<Bool>("showClipboardIcon", default: true)
     static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .panel)
     
