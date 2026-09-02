@@ -65,3 +65,52 @@ final class UnsyncedLyricsTests: XCTestCase {
         )
     }
 }
+
+/// Whether the words can be followed at all outranks which pressing they came
+/// from, so a row with timings is chosen over a better-matching row without.
+final class SyncedLyricsPreferenceTests: XCTestCase {
+    private func row(title: String, artist: String, album: String, synced: String?) -> [String: Any] {
+        var result: [String: Any] = ["trackName": title, "artistName": artist, "albumName": album]
+        if let synced { result["syncedLyrics"] = synced }
+        return result
+    }
+
+    /// The case that put plain lyrics on screen: an exact album is worth four
+    /// points and timings were worth three, so the untimed row used to win.
+    func testTimingsBeatAnExactAlbumMatch() {
+        let untimedButExact = row(title: "Passenger", artist: "Alex Warren", album: "You'll Be Alright, Kid", synced: nil)
+        let timedOtherPressing = row(title: "Passenger", artist: "Alex Warren", album: "Singles", synced: "[00:12.00] a line")
+
+        let best = LyricsSearchResults.bestMatch(
+            in: [untimedButExact, timedOtherPressing],
+            artist: "Alex Warren",
+            title: "Passenger",
+            album: "You'll Be Alright, Kid"
+        )
+
+        XCTAssertTrue(LyricsSearchResults.carriesSyncedLyrics(best ?? [:]))
+    }
+
+    func testAmongTimedRowsTheBetterMatchStillWins() {
+        let looseMatch = row(title: "Passenger", artist: "Alex Warren", album: "Compilation", synced: "[00:01.00] a")
+        let exactMatch = row(title: "Passenger", artist: "Alex Warren", album: "You'll Be Alright, Kid", synced: "[00:01.00] b")
+
+        let best = LyricsSearchResults.bestMatch(
+            in: [looseMatch, exactMatch],
+            artist: "Alex Warren",
+            title: "Passenger",
+            album: "You'll Be Alright, Kid"
+        )
+
+        XCTAssertEqual(best?["albumName"] as? String, "You'll Be Alright, Kid")
+    }
+
+    func testAnUntimedRowIsStillUsedWhenNothingIsTimed() {
+        let only = row(title: "Passenger", artist: "Alex Warren", album: "Singles", synced: nil)
+        XCTAssertNotNil(LyricsSearchResults.bestMatch(in: [only], artist: "Alex Warren", title: "Passenger", album: "Singles"))
+    }
+
+    func testWhitespaceOnlySyncedLyricsDoNotCount() {
+        XCTAssertFalse(LyricsSearchResults.carriesSyncedLyrics(["syncedLyrics": "   \n  "]))
+    }
+}
