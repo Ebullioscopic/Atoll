@@ -1757,12 +1757,22 @@ class MusicManager: ObservableObject {
             guard let self else { return }
 
             do {
-                let lyrics = try await self.fetchLyricsFromAPI(
+                var lyrics = try await self.fetchLyricsFromAPI(
                     artist: requestArtist,
                     title: requestTitle,
                     album: requestAlbum
                 )
                 guard !Task.isCancelled else { return }
+
+                // LRCLIB had nothing for this track. NetEase Cloud Music's
+                // own catalogue is the other place lyrics live (#713).
+                if lyrics.isEmpty || Self.isUnmatchedSearchResponse(lyrics) {
+                    let fromNetEase = try await self.fetchLyricsFromNetEase(artist: requestArtist, title: requestTitle)
+                    guard !Task.isCancelled else { return }
+                    if !fromNetEase.isEmpty {
+                        lyrics = fromNetEase
+                    }
+                }
 
                 await MainActor.run {
                     guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
@@ -1786,6 +1796,32 @@ class MusicManager: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Whether what came back is LRCLIB's search response rather than lyrics.
+    ///
+    /// When the search returns rows but none of them agrees with the track,
+    /// `fetchLyricsFromAPI` falls through to its plain-text branch and hands
+    /// back the JSON body as a single line at zero. That is "nothing found"
+    /// for the purpose of asking NetEase; real lyrics never open with `[{`.
+    private static func isUnmatchedSearchResponse(_ lyrics: [LyricLine]) -> Bool {
+        guard lyrics.count == 1, let only = lyrics.first, only.timestamp == 0 else { return false }
+        return only.text.hasPrefix("[{")
+    }
+
+    /// Asked only after LRCLIB has come up empty; see `NetEaseLyrics`.
+    private func fetchLyricsFromNetEase(artist: String, title: String) async throws -> [LyricLine] {
+        guard !artist.isEmpty, !title.isEmpty else { return [] }
+
+        // The duration is read now rather than when the fetch was started:
+        // lyrics are prepared before the duration is assigned in the same
+        // track update, so at that moment it still belongs to the last song.
+        // By the time LRCLIB has answered, the update has long since finished.
+        let duration = await MainActor.run { self.songDuration }
+        guard let lrc = try await NetEaseLyrics.fetchLRC(title: title, artist: artist, duration: duration) else {
+            return []
+        }
+        return parseLRC(lrc)
     }
 
     private func fetchLyricsFromAPI(artist: String, title: String, album: String) async throws -> [LyricLine] {

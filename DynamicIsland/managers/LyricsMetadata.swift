@@ -139,7 +139,7 @@ enum LyricsSearchResults {
     ///
     /// Only markers absent from the request count, so playing the sped-up
     /// version still finds the sped-up lyrics.
-    private static func carriesUnrequestedVersion(_ resultTitle: String, requested: String) -> Bool {
+    static func carriesUnrequestedVersion(_ resultTitle: String, requested: String) -> Bool {
         versionMarkers.contains { marker in
             containsWord(resultTitle, marker) && !containsWord(requested, marker)
         }
