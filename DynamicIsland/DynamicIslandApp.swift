@@ -733,6 +733,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup Lunar integration
         LunarManager.shared.configure(coordinator: coordinator)
         
+        // Honour "Save History Across Restarts" before anything can read the
+        // stored history back.
+        ClipboardManager.purgeStoredHistoryIfPersistenceDisabled()
+
         // Setup ScreenRecording Manager
         if Defaults[.enableScreenRecordingDetection] && !AppRuntimeEnvironment.isUITesting {
             ScreenRecordingManager.shared.startMonitoring()

@@ -84,11 +84,11 @@ class ClipboardPanel: NSPanel {
         }
         
         let hostingView = NSHostingView(rootView: contentView)
-        applyClipboardCornerMask(hostingView, radius: 12)
+        applyClipboardCornerMask(hostingView, radius: ClipboardPanelMetrics.cornerRadius)
         self.contentView = hostingView
         
         // Set initial size
-        let preferredSize = CGSize(width: 320, height: 400)
+        let preferredSize = ClipboardPanelMetrics.panelSize
         hostingView.setFrameSize(preferredSize)
         setContentSize(preferredSize)
     }
@@ -101,10 +101,18 @@ class ClipboardPanel: NSPanel {
         
         // Check if we have a saved position
         if let savedPosition = getSavedPosition() {
-            // Validate saved position is still on screen
             let savedFrame = NSRect(origin: savedPosition, size: panelFrame.size)
-            if screenFrame.intersects(savedFrame) {
+            if screenFrame.contains(savedFrame) {
                 setFrameOrigin(savedPosition)
+                return
+            }
+            // Merely intersecting is not enough: a position saved when the
+            // panel was narrower can now hang off the edge. Nudge it back
+            // inside rather than throwing the user's placement away.
+            if screenFrame.intersects(savedFrame) {
+                setFrameOrigin(
+                    ClipboardPanel.clampedOrigin(savedPosition, size: panelFrame.size, within: screenFrame)
+                )
                 return
             }
         }
@@ -116,6 +124,17 @@ class ClipboardPanel: NSPanel {
         setFrameOrigin(NSPoint(x: xPosition, y: yPosition))
     }
     
+    /// Keeps a frame of `size` fully inside `bounds`, pinning to the origin
+    /// edges if the panel is somehow larger than the visible frame.
+    static func clampedOrigin(_ origin: NSPoint, size: NSSize, within bounds: NSRect) -> NSPoint {
+        let maxX = max(bounds.minX, bounds.maxX - size.width)
+        let maxY = max(bounds.minY, bounds.maxY - size.height)
+        return NSPoint(
+            x: min(max(origin.x, bounds.minX), maxX),
+            y: min(max(origin.y, bounds.minY), maxY)
+        )
+    }
+
     private func getSavedPosition() -> NSPoint? {
         let defaults = UserDefaults.standard
         let x = defaults.double(forKey: "clipboardPanelPositionX")
@@ -161,16 +180,38 @@ class ClipboardPanel: NSPanel {
     
 }
 
+enum ClipboardPanelMetrics {
+    static let panelSize = CGSize(width: 380, height: 480)
+    static let cornerRadius: CGFloat = 18
+    static let rowCornerRadius: CGFloat = 12
+    static let contentInset: CGFloat = 12
+}
+
+/// Muted per-type tints. Saturated primaries on every row read as noise; these
+/// sit far enough apart to scan by colour without shouting.
+private extension ClipboardItemType {
+    var tint: Color {
+        switch self {
+        case .text: return Color(red: 0.55, green: 0.58, blue: 0.64)
+        case .url: return Color(red: 0.35, green: 0.56, blue: 0.92)
+        case .file: return Color(red: 0.92, green: 0.66, blue: 0.30)
+        case .image: return Color(red: 0.66, green: 0.48, blue: 0.90)
+        case .rtf: return Color(red: 0.36, green: 0.72, blue: 0.62)
+        case .unknown: return Color(red: 0.55, green: 0.58, blue: 0.64)
+        }
+    }
+}
+
 struct ClipboardPanelView: View {
     let onClose: () -> Void
     @ObservedObject var clipboardManager = ClipboardManager.shared
     @State private var selectedTab: ClipboardTab = .history
     @State private var searchText = ""
     @State private var hoveredItemId: UUID?
-    
+
     var filteredItems: [ClipboardItem] {
         let allItems = selectedTab == .history ? clipboardManager.regularHistory : clipboardManager.pinnedItems
-        
+
         if searchText.isEmpty {
             return allItems
         } else {
@@ -180,28 +221,23 @@ struct ClipboardPanelView: View {
             }
         }
     }
-    
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Header with tabs
+        VStack(spacing: 10) {
             ClipboardPanelHeader(
                 selectedTab: $selectedTab,
-                searchText: $searchText, 
+                searchText: $searchText,
                 onClose: onClose
             )
-            
-            Divider()
-                .background(Color.gray.opacity(0.3))
-            
-            // Content
+
             if filteredItems.isEmpty {
                 ClipboardPanelEmptyState(
                     hasSearch: !searchText.isEmpty,
                     isHistoryTab: selectedTab == .history
                 )
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 1) {
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 4) {
                         ForEach(filteredItems) { item in
                             ClipboardPanelItemRow(
                                 item: item,
@@ -212,14 +248,33 @@ struct ClipboardPanelView: View {
                             }
                         }
                     }
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, ClipboardPanelMetrics.contentInset)
+                    .padding(.bottom, ClipboardPanelMetrics.contentInset)
                 }
+                .scrollBounceBehavior(.basedOnSize)
             }
         }
-        .frame(width: 320, height: 400)
-        .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)
+        .frame(width: ClipboardPanelMetrics.panelSize.width, height: ClipboardPanelMetrics.panelSize.height)
+        .background {
+            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                .overlay {
+                    // Lifts the material away from flat grey and gives the panel
+                    // a light source, the way macOS window chrome reads.
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.07), Color.clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: ClipboardPanelMetrics.cornerRadius, style: .continuous))
+        .overlay {
+            // Hairline keeps the edge legible against light wallpapers.
+            RoundedRectangle(cornerRadius: ClipboardPanelMetrics.cornerRadius, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.4), radius: 26, x: 0, y: 12)
+        .animation(.easeOut(duration: 0.18), value: filteredItems.count)
     }
 }
 
@@ -229,118 +284,198 @@ struct ClipboardPanelHeader: View {
     let onClose: () -> Void
     @ObservedObject var clipboardManager = ClipboardManager.shared
     @FocusState private var isSearchFieldFocused: Bool
-    
+    @State private var isSearchHovered = false
+    @State private var isClearHovered = false
+
+    private var canClear: Bool {
+        selectedTab == .history ? !clipboardManager.regularHistory.isEmpty : !clipboardManager.pinnedItems.isEmpty
+    }
+
     var body: some View {
-        VStack(spacing: 8) {
-            // Title and close button
-            HStack {
-                // Close button
+        VStack(spacing: 10) {
+            // Search carries the window's identity, so there is no separate
+            // title bar competing for the 480pt of height.
+            HStack(spacing: 8) {
+                HStack(spacing: 7) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+
+                    TextField("Search clipboard", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12.5))
+                        .focused($isSearchFieldFocused)
+
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.opacity.combined(with: .scale(scale: 0.7)))
+                    }
+                }
+                .padding(.horizontal, 9)
+                .frame(height: 28)
+                .background {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(Color.primary.opacity(isSearchFieldFocused ? 0.12 : (isSearchHovered ? 0.09 : 0.07)))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(Color.accentColor.opacity(isSearchFieldFocused ? 0.65 : 0), lineWidth: 1.5)
+                }
+                .onHover { isSearchHovered = $0 }
+                .animation(.easeOut(duration: 0.16), value: isSearchFieldFocused)
+                .animation(.easeOut(duration: 0.16), value: searchText.isEmpty)
+
                 NativeStyleCloseButton(action: onClose)
-                
-                Image(systemName: "doc.on.clipboard")
-                    .foregroundColor(.primary)
-                    .font(.system(size: 16, weight: .medium))
-                
-                Text("Clipboard Manager")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                // Clear button
-                Button(action: {
+            }
+
+            HStack(spacing: 8) {
+                ClipboardSegmentedTabs(selectedTab: $selectedTab)
+
+                Spacer(minLength: 0)
+
+                Button {
                     if selectedTab == .history {
                         clipboardManager.clearHistory()
                     } else {
-                        clipboardManager.pinnedItems.removeAll()
-                        clipboardManager.savePinnedItemsToDefaults()
+                        clipboardManager.clearPinnedItems()
                     }
-                }) {
+                } label: {
                     Image(systemName: "trash")
-                        .foregroundColor(.red)
-                        .font(.system(size: 12))
+                        .font(.system(size: 11.5, weight: .medium))
+                        // Red only once you are actually on it — a permanently
+                        // red destructive glyph pulls the eye off the content.
+                        .foregroundStyle(isClearHovered && canClear ? Color.red : Color.secondary)
+                        .frame(width: 26, height: 24)
+                        .background {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(Color.primary.opacity(isClearHovered && canClear ? 0.1 : 0))
+                        }
                 }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(selectedTab == .history ? clipboardManager.clipboardHistory.isEmpty : clipboardManager.pinnedItems.isEmpty)
+                .buttonStyle(.plain)
+                .disabled(!canClear)
+                .opacity(canClear ? 1 : 0.35)
+                .onHover { isClearHovered = $0 }
+                .animation(.easeOut(duration: 0.16), value: isClearHovered)
+                .help(selectedTab == .history ? "Clear history" : "Clear favorites")
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            
-            // Tab selector
-            HStack(spacing: 0) {
-                ForEach(ClipboardTab.allCases, id: \.self) { tab in
-                    ClipboardTabButton(tab: tab, isSelected: selectedTab == tab) {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedTab = tab
+        }
+        .padding(.horizontal, ClipboardPanelMetrics.contentInset)
+        .padding(.top, ClipboardPanelMetrics.contentInset)
+    }
+}
+
+/// Sliding segmented control — the selection is one shape that moves, rather
+/// than a filled blue rectangle appearing and disappearing under each tab.
+struct ClipboardSegmentedTabs: View {
+    @Binding var selectedTab: ClipboardTab
+    @ObservedObject var clipboardManager = ClipboardManager.shared
+    @Namespace private var selectionNamespace
+
+    private func count(for tab: ClipboardTab) -> Int {
+        switch tab {
+        case .history: return clipboardManager.regularHistory.count
+        case .favorites: return clipboardManager.pinnedItems.count
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(ClipboardTab.allCases, id: \.self) { tab in
+                let isSelected = selectedTab == tab
+
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 10, weight: .semibold))
+
+                        Text(tab.localizedName)
+                            .font(.system(size: 11.5, weight: .medium))
+
+                        if count(for: tab) > 0 {
+                            Text("\(count(for: tab))")
+                                .font(.system(size: 9.5, weight: .semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(isSelected ? Color.primary.opacity(0.55) : Color.secondary.opacity(0.7))
                         }
                     }
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            
-            // Search bar (always visible)
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 12))
-                
-                TextField("Search clipboard...", text: $searchText)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .font(.system(size: 12))
-                    .focused($isSearchFieldFocused)
-                
-                if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                            .font(.system(size: 10))
+                    .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                    .padding(.horizontal, 10)
+                    .frame(height: 24)
+                    .background {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(Color.primary.opacity(0.14))
+                                .matchedGeometryEffect(id: "selectedTab", in: selectionNamespace)
+                        }
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.gray.opacity(0.1))
-            )
-            .padding(.horizontal, 16)
         }
-        .padding(.bottom, 8)
+        .padding(2)
+        .background {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color.primary.opacity(0.06))
+        }
     }
 }
 
 struct ClipboardPanelEmptyState: View {
     let hasSearch: Bool
     let isHistoryTab: Bool
-    
+
+    private var icon: String {
+        hasSearch ? "magnifyingglass" : (isHistoryTab ? "doc.on.clipboard" : "heart")
+    }
+
+    private var title: String {
+        if hasSearch { return String(localized: "No results") }
+        return isHistoryTab ? String(localized: "No clipboard history") : String(localized: "No favorites")
+    }
+
+    private var subtitle: String {
+        if hasSearch { return String(localized: "Try a different search term") }
+        return isHistoryTab
+            ? String(localized: "Copy something to get started")
+            : String(localized: "Pin items to keep them here")
+    }
+
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: hasSearch ? "magnifyingglass" : (isHistoryTab ? "doc.on.clipboard" : "heart.fill"))
-                .font(.system(size: 32))
-                .foregroundColor(.secondary)
-            
-            if hasSearch {
-                Text("No results found")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.primary)
-                
-                Text("Try adjusting your search terms")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-            } else {
-                Text(isHistoryTab ? "No clipboard history" : "No favorites")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.primary)
-                
-                Text(isHistoryTab ? "Copy something to get started" : "Pin items to add them to favorites")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+        VStack(spacing: 0) {
+            ZStack {
+                Circle()
+                    .fill(Color.primary.opacity(0.06))
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .light))
+                    .foregroundStyle(.secondary)
             }
+            .frame(width: 56, height: 56)
+            .padding(.bottom, 14)
+
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            Text(subtitle)
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+                .padding(.top, 3)
         }
+        .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.bottom, 24)
     }
 }
 
@@ -351,110 +486,148 @@ struct ClipboardPanelItemRow: View {
     let onHover: (UUID?) -> Void
     @ObservedObject var clipboardManager = ClipboardManager.shared
     @State private var justCopied = false
-    
+    @State private var copyResetWorkItem: DispatchWorkItem?
+
+    private var thumbnail: NSImage? {
+        guard item.type == .image, let data = item.getImageData() else { return nil }
+        return NSImage(data: data)
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Type icon
-            Image(systemName: item.type.icon)
-                .font(.system(size: 14))
-                .foregroundColor(.blue)
-                .frame(width: 20)
-            
-            // Content
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .center, spacing: 10) {
+            leadingBadge
+
+            VStack(alignment: .leading, spacing: 2) {
                 Text(item.preview)
-                    .font(.system(size: 12))
-                    .foregroundColor(.primary)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(.primary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                
-                HStack {
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 5) {
                     Text(item.type.displayName)
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                    
-                    Spacer()
-                    
+                        .foregroundStyle(item.type.tint.opacity(0.95))
+                    Text("·")
+                        .foregroundStyle(.tertiary)
                     Text(timeAgoString(from: item.timestamp))
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
+                .font(.system(size: 10.5, weight: .medium))
             }
-            
-            Spacer()
-            
-            // Action buttons (shown on hover)
-            if isHovered {
-                HStack(spacing: 6) {
-                    // Pin/Unpin button
-                    Button(action: {
-                        if isPinned {
-                            clipboardManager.unpinItem(item)
-                        } else {
-                            clipboardManager.pinItem(item)
-                        }
-                    }) {
-                        Image(systemName: isPinned ? "heart.fill" : "heart")
-                            .font(.system(size: 11))
-                            .foregroundColor(isPinned ? .red : .gray)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    // Copy button
-                    Button(action: {
-                        clipboardManager.copyToClipboard(item)
-                        
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            justCopied = true
-                        }
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                justCopied = false
-                            }
-                        }
-                    }) {
-                        Image(systemName: justCopied ? "checkmark.circle.fill" : "doc.on.doc")
-                            .font(.system(size: 11))
-                            .foregroundColor(justCopied ? .green : .green)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    // Delete button
-                    Button(action: {
-                        if isPinned {
-                            clipboardManager.unpinItem(item)
-                        } else {
-                            clipboardManager.deleteItem(item)
-                        }
-                    }) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 11))
-                            .foregroundColor(.red)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
+
+            Spacer(minLength: 4)
+
+            actions
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isHovered ? Color.gray.opacity(0.1) : Color.clear)
-        )
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background {
+            RoundedRectangle(cornerRadius: ClipboardPanelMetrics.rowCornerRadius, style: .continuous)
+                .fill(Color.primary.opacity(isHovered ? 0.08 : 0.03))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: ClipboardPanelMetrics.rowCornerRadius, style: .continuous)
+                .strokeBorder(Color.primary.opacity(isHovered ? 0.08 : 0), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: ClipboardPanelMetrics.rowCornerRadius, style: .continuous))
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.easeOut(duration: 0.16)) {
                 onHover(hovering ? item.id : nil)
             }
         }
         .onTapGesture {
-            clipboardManager.copyToClipboard(item)
+            copy()
         }
     }
-    
+
+    @ViewBuilder
+    private var leadingBadge: some View {
+        ZStack {
+            if let thumbnail {
+                // An actual preview beats a generic photo glyph for images.
+                Image(nsImage: thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                item.type.tint.opacity(0.18)
+                Image(systemName: justCopied ? "checkmark" : item.type.icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(justCopied ? Color.green : item.type.tint)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+        }
+        .frame(width: 34, height: 34)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        }
+    }
+
+    private var actions: some View {
+        // Reserved width: the buttons fade in rather than appearing and
+        // shoving the text sideways on every hover.
+        HStack(spacing: 2) {
+            ClipboardRowActionButton(
+                icon: isPinned ? "pin.fill" : "pin",
+                tint: isPinned ? Color.accentColor : nil,
+                help: isPinned ? "Unpin" : "Pin"
+            ) {
+                if isPinned {
+                    clipboardManager.unpinItem(item)
+                } else {
+                    clipboardManager.pinItem(item)
+                }
+            }
+            // A pinned row keeps its marker visible so the state is readable
+            // without hovering every row to find it.
+            .opacity(isHovered || isPinned ? 1 : 0)
+
+            ClipboardRowActionButton(
+                icon: justCopied ? "checkmark" : "doc.on.doc",
+                tint: justCopied ? Color.green : nil,
+                help: "Copy"
+            ) {
+                copy()
+            }
+            .opacity(isHovered ? 1 : 0)
+
+            ClipboardRowActionButton(icon: "trash", tint: nil, hoverTint: .red, help: "Delete") {
+                if isPinned {
+                    clipboardManager.unpinItem(item)
+                } else {
+                    clipboardManager.deleteItem(item)
+                }
+            }
+            .opacity(isHovered ? 1 : 0)
+        }
+        .frame(width: 78, alignment: .trailing)
+    }
+
+    private func copy() {
+        clipboardManager.copyToClipboard(item)
+
+        withAnimation(.easeOut(duration: 0.18)) {
+            justCopied = true
+        }
+
+        // Copying the same row again restarts the confirmation: without
+        // cancelling, the first timer clears the checkmark 1.5s after the
+        // *first* press, cutting the second one short.
+        copyResetWorkItem?.cancel()
+        let reset = DispatchWorkItem {
+            withAnimation(.easeOut(duration: 0.18)) {
+                justCopied = false
+            }
+        }
+        copyResetWorkItem = reset
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: reset)
+    }
+
     private func timeAgoString(from date: Date) -> String {
         let interval = Date().timeIntervalSince(date)
-        
+
         if interval < 60 {
             return String(localized: "Just now")
         } else if interval < 3600 {
@@ -467,6 +640,43 @@ struct ClipboardPanelItemRow: View {
             let days = Int(interval / 86400)
             return String(localized: "\(days)d ago")
         }
+    }
+}
+
+private struct ClipboardRowActionButton: View {
+    let icon: String
+    var tint: Color? = nil
+    var hoverTint: Color? = nil
+    let help: String
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(resolvedTint)
+                .frame(width: 24, height: 24)
+                .background {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.primary.opacity(isHovered ? 0.12 : 0))
+                }
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.14)) {
+                isHovered = hovering
+            }
+        }
+        .help(help)
+    }
+
+    private var resolvedTint: Color {
+        if let tint { return tint }
+        if isHovered, let hoverTint { return hoverTint }
+        return .secondary
     }
 }
 
