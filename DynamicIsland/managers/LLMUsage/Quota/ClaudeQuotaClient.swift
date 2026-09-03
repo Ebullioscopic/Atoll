@@ -50,7 +50,14 @@ struct ClaudeQuotaClient {
         }
         var date: Date? {
             switch self {
-            case .iso(let s): return ISO8601DateFormatter().date(from: s)
+            case .iso(let s):
+                // The usage endpoint returns fractional seconds ("2026-07-03T00:30:00.282668+00:00");
+                // the default formatter rejects those, so try the fractional form first.
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                if let date = formatter.date(from: s) { return date }
+                formatter.formatOptions = [.withInternetDateTime]
+                return formatter.date(from: s)
             case .epochMs(let ms): return Date(timeIntervalSince1970: ms / 1000)
             }
         }

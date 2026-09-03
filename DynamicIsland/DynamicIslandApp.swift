@@ -558,8 +558,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
             let maxFraction = Defaults[.terminalMaxHeightFraction]
             baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
-        } else if coordinator.currentView == .llmUsage {
-            baseSize.height = max(baseSize.height, llmUsageOpenNotchHeight)
         }
         
         baseSize = inlineLyricsAdjustedNotchSize(
