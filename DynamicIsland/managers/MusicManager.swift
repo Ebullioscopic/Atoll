@@ -33,16 +33,36 @@ struct LyricLine: Identifiable, Codable, Equatable {
     let id = UUID()
     let timestamp: TimeInterval
     let text: String
+    /// Whether `timestamp` means anything.
+    ///
+    /// Some tracks only have plain lyrics available, with no timings at all.
+    /// Those still belong on screen -- you can read along yourself -- but
+    /// nothing may pretend to know which line is being sung.
+    let isTimed: Bool
 
-    init(timestamp: TimeInterval, text: String) {
+    init(timestamp: TimeInterval, text: String, isTimed: Bool = true) {
         self.timestamp = timestamp
         self.text = text
+        self.isTimed = isTimed
+    }
+
+    /// Splits an untimed lyrics body into the lines it is written as.
+    ///
+    /// The whole body used to be kept as a single `LyricLine`, which made every
+    /// verse of the song one enormous "current line" -- so the highlight swept
+    /// across the entire text at once, cutting through the middle of words.
+    static func untimedLines(from body: String) -> [LyricLine] {
+        body
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .map { LyricLine(timestamp: 0, text: $0, isTimed: false) }
     }
 
     // Compares content only; `id` is regenerated per instance, so identical
     // lyrics parsed twice would otherwise never compare equal
     static func == (lhs: LyricLine, rhs: LyricLine) -> Bool {
-        lhs.timestamp == rhs.timestamp && lhs.text == rhs.text
+        lhs.timestamp == rhs.timestamp && lhs.text == rhs.text && lhs.isTimed == rhs.isTimed
     }
 }
 
@@ -591,6 +611,12 @@ class MusicManager: ObservableObject {
     // MARK: - Lyrics Properties
     @Published var currentLyrics: String = ""
     @Published var syncedLyrics: [LyricLine] = []
+
+    /// Whether the loaded lyrics carry real timings, as opposed to being a
+    /// plain body split into readable lines.
+    var hasTimedLyrics: Bool {
+        syncedLyrics.contains { $0.isTimed }
+    }
     @Published var showLyrics: Bool = false
     @Published var currentLyricIndex: Int = -1
 
@@ -1826,7 +1852,7 @@ class MusicManager: ObservableObject {
                 if !synced.isEmpty {
                     return parseLRC(synced)
                 } else if !plain.isEmpty {
-                    return [LyricLine(timestamp: 0, text: plain)]
+                    return LyricLine.untimedLines(from: plain)
                 } else {
                     return []
                 }
@@ -1852,7 +1878,7 @@ class MusicManager: ObservableObject {
                     }
 
                     // Otherwise treat as plain lyrics blob
-                    return [LyricLine(timestamp: 0, text: trimmed)]
+                    return LyricLine.untimedLines(from: trimmed)
                 }
                 return []
             }
@@ -1933,6 +1959,16 @@ class MusicManager: ObservableObject {
     func updateCurrentLyric(for elapsedTime: TimeInterval) {
         guard !syncedLyrics.isEmpty else { return }
 
+        // Untimed lyrics have no line to point at. Leaving the index at -1 is
+        // what stops the sweep and the current-line styling from picking a line
+        // arbitrarily -- every one of these carries timestamp 0, so the search
+        // below would otherwise land on the last line of the song and stay there.
+        guard hasTimedLyrics else {
+            if currentLyricIndex != -1 { currentLyricIndex = -1 }
+            if !currentLyrics.isEmpty { currentLyrics = "" }
+            return
+        }
+
         // Find the current lyric based on elapsed time
         var newIndex = -1
         for (index, lyric) in syncedLyrics.enumerated() {
@@ -1963,6 +1999,18 @@ class MusicManager: ObservableObject {
 
     // Start a background task that periodically updates the displayed lyric
     private func startLyricSync() {
+        // Nothing to follow when the lyrics carry no timings; the loop would
+        // wake repeatedly only to conclude there is no line to point at.
+        //
+        // Asked before the "already running" return, not after it: a refetch
+        // on the same track can replace timed lyrics with untimed ones while
+        // the previous loop is still alive, and that loop would otherwise go
+        // on waking at its maximum rate for the rest of the track, finding
+        // nothing to point at each time.
+        guard hasTimedLyrics else {
+            stopLyricSync()
+            return
+        }
         // If already running, keep it
         if lyricSyncTask != nil { return }
 

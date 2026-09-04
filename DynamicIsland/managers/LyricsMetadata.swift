@@ -88,12 +88,30 @@ enum LyricsSearchResults {
         // afterwards throws away a good row whenever a bad one outscores it --
         // a wrong artist with an exactly matching title, album and synced
         // lyrics outscores a right artist matched only by containment.
+        //
+        // Timings come before everything else that is left. They used to be
+        // worth three points against twenty available elsewhere, so a row with
+        // no timings but an exactly matching album beat a row that had them and
+        // agreed slightly less precisely -- and the song then displayed as
+        // plain text with no line ever lit. Whether the words can be followed
+        // at all is a bigger difference than which pressing they came from, so
+        // it is decided first and the score only separates rows that are alike
+        // in it.
         return results
             .filter { agreesOnTitleAndArtist($0, artist: artist, title: title) }
             .max { lhs, rhs in
-                score(for: lhs, artist: artist, title: title, album: album)
-                    < score(for: rhs, artist: artist, title: title, album: album)
+                let lhsRank = (carriesSyncedLyrics(lhs), score(for: lhs, artist: artist, title: title, album: album))
+                let rhsRank = (carriesSyncedLyrics(rhs), score(for: rhs, artist: artist, title: title, album: album))
+                if lhsRank.0 != rhsRank.0 { return rhsRank.0 }
+                return lhsRank.1 < rhsRank.1
             }
+    }
+
+    /// Whether a result actually carries timed lyrics.
+    static func carriesSyncedLyrics(_ result: [String: Any]) -> Bool {
+        !((result["syncedLyrics"] as? String) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
     }
 
     /// Whether a result is plausibly the same recording, rather than merely the
@@ -182,7 +200,9 @@ enum LyricsSearchResults {
             else if resultAlbum.contains(album) || album.contains(resultAlbum) { score += 2 }
         }
 
-        if !(result["syncedLyrics"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        // Kept as a tiebreak for rows that are otherwise equal. `bestMatch`
+        // already decides on timings before it consults the score at all.
+        if carriesSyncedLyrics(result) {
             score += 3
         }
 
