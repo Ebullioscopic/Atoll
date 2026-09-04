@@ -351,6 +351,16 @@
       }
     },
     {
+      "id": "google/gemini-3.8-flash",
+      "name": "Google: Gemini 3.8 Flash",
+      "pricing": {
+        "prompt": "0.00000075",
+        "completion": "0.00000375",
+        "cache_read": "0.000000075",
+        "cache_write": "0.0000000416666666666667"
+      }
+    },
+    {
       "id": "openai/gpt-4.1",
       "name": "OpenAI: GPT-4.1",
       "pricing": {
@@ -721,5 +731,5 @@
       }
     }
   ],
-  "last_updated": "2026-09-02T13:28:29Z"
+  "last_updated": "2026-09-04T00:06:45Z"
 }
