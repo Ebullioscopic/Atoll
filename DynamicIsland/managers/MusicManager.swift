@@ -1999,11 +1999,20 @@ class MusicManager: ObservableObject {
 
     // Start a background task that periodically updates the displayed lyric
     private func startLyricSync() {
-        // If already running, keep it
-        if lyricSyncTask != nil { return }
         // Nothing to follow when the lyrics carry no timings; the loop would
         // wake repeatedly only to conclude there is no line to point at.
-        guard hasTimedLyrics else { return }
+        //
+        // Asked before the "already running" return, not after it: a refetch
+        // on the same track can replace timed lyrics with untimed ones while
+        // the previous loop is still alive, and that loop would otherwise go
+        // on waking at its maximum rate for the rest of the track, finding
+        // nothing to point at each time.
+        guard hasTimedLyrics else {
+            stopLyricSync()
+            return
+        }
+        // If already running, keep it
+        if lyricSyncTask != nil { return }
 
         lyricSyncTask = Task { [weak self] in
             guard let self = self else { return }
