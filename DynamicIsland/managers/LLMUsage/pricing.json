@@ -1,40 +1,735 @@
 {
   "models": [
     {
-      "id": "anthropic/claude-3-opus",
-      "name": "",
-      "pricing": {
-        "prompt": "",
-        "completion": ""
-      }
-    }
-,
-    {
-      "id": "anthropic/claude-3-5-sonnet",
-      "name": "",
-      "pricing": {
-        "prompt": "",
-        "completion": ""
-      }
-    }
-,
-    {
       "id": "anthropic/claude-3-haiku",
       "name": "Anthropic: Claude 3 Haiku",
       "pricing": {
         "prompt": "0.00000025",
-        "completion": "0.00000125"
+        "completion": "0.00000125",
+        "cache_read": "0.00000003",
+        "cache_write": "0.0000003"
       }
-    }
-,
+    },
     {
-      "id": "openai/gpt-5-preview",
-      "name": "",
+      "id": "anthropic/claude-fable-5",
+      "name": "Anthropic: Claude Fable 5",
       "pricing": {
-        "prompt": "",
-        "completion": ""
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "cache_read": "0.000001",
+        "cache_write": "0.0000125"
+      }
+    },
+    {
+      "id": "anthropic/claude-fable-5.1",
+      "name": "Anthropic: Claude Fable 5.1",
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "cache_read": "0.00000025",
+        "cache_write": "0.0000125"
+      }
+    },
+    {
+      "id": "anthropic/claude-haiku-4.5",
+      "name": "Anthropic: Claude Haiku 4.5",
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "cache_read": "0.0000001",
+        "cache_write": "0.00000125"
+      }
+    },
+    {
+      "id": "anthropic/claude-opus-4",
+      "name": "Anthropic: Claude Opus 4",
+      "pricing": {
+        "prompt": "0.000015",
+        "completion": "0.000075",
+        "cache_read": "0.0000015",
+        "cache_write": "0.00001875"
+      }
+    },
+    {
+      "id": "anthropic/claude-opus-4.1",
+      "name": "Anthropic: Claude Opus 4.1",
+      "pricing": {
+        "prompt": "0.000015",
+        "completion": "0.000075",
+        "cache_read": "0.0000015",
+        "cache_write": "0.00001875"
+      }
+    },
+    {
+      "id": "anthropic/claude-opus-4.5",
+      "name": "Anthropic: Claude Opus 4.5",
+      "pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "cache_read": "0.0000005",
+        "cache_write": "0.00000625"
+      }
+    },
+    {
+      "id": "anthropic/claude-opus-4.6",
+      "name": "Anthropic: Claude Opus 4.6",
+      "pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "cache_read": "0.0000005",
+        "cache_write": "0.00000625"
+      }
+    },
+    {
+      "id": "anthropic/claude-opus-4.7",
+      "name": "Anthropic: Claude Opus 4.7",
+      "pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "cache_read": "0.0000005",
+        "cache_write": "0.00000625"
+      }
+    },
+    {
+      "id": "anthropic/claude-opus-4.8",
+      "name": "Anthropic: Claude Opus 4.8",
+      "pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "cache_read": "0.0000005",
+        "cache_write": "0.00000625"
+      }
+    },
+    {
+      "id": "anthropic/claude-opus-5",
+      "name": "Claude Opus 5",
+      "pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "cache_read": "0.0000005",
+        "cache_write": "0.00000625"
+      }
+    },
+    {
+      "id": "anthropic/claude-sonnet-4",
+      "name": "Anthropic: Claude Sonnet 4",
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015",
+        "cache_read": "0.0000003",
+        "cache_write": "0.00000375"
+      }
+    },
+    {
+      "id": "anthropic/claude-sonnet-4.5",
+      "name": "Anthropic: Claude Sonnet 4.5",
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015",
+        "cache_read": "0.0000003",
+        "cache_write": "0.00000375"
+      }
+    },
+    {
+      "id": "anthropic/claude-sonnet-4.6",
+      "name": "Anthropic: Claude Sonnet 4.6",
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015",
+        "cache_read": "0.0000003",
+        "cache_write": "0.00000375"
+      }
+    },
+    {
+      "id": "anthropic/claude-sonnet-5",
+      "name": "Anthropic: Claude Sonnet 5",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000002",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "google/gemini-2.5-flash",
+      "name": "Google: Gemini 2.5 Flash",
+      "pricing": {
+        "prompt": "0.0000003",
+        "completion": "0.0000025",
+        "cache_read": "0.00000003",
+        "cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
+      "id": "google/gemini-2.5-flash-image",
+      "name": "Google: Nano Banana (Gemini 2.5 Flash Image)",
+      "pricing": {
+        "prompt": "0.0000003",
+        "completion": "0.0000025",
+        "cache_read": "0.00000003",
+        "cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
+      "id": "google/gemini-2.5-flash-lite",
+      "name": "Google: Gemini 2.5 Flash Lite",
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000004",
+        "cache_read": "0.00000001",
+        "cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
+      "id": "google/gemini-2.5-pro",
+      "name": "Google: Gemini 2.5 Pro",
+      "pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "cache_read": "0.000000125",
+        "cache_write": "0.000000375"
+      }
+    },
+    {
+      "id": "google/gemini-2.5-pro-preview",
+      "name": "Google: Gemini 2.5 Pro Preview 06-05",
+      "pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "cache_read": "0.000000125",
+        "cache_write": "0.000000375"
+      }
+    },
+    {
+      "id": "google/gemini-2.5-pro-preview-05-06",
+      "name": "Google: Gemini 2.5 Pro Preview 05-06",
+      "pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "cache_read": "0.000000125",
+        "cache_write": "0.000000375"
+      }
+    },
+    {
+      "id": "google/gemini-3-flash-preview",
+      "name": "Google: Gemini 3 Flash Preview",
+      "pricing": {
+        "prompt": "0.0000005",
+        "completion": "0.000003",
+        "cache_read": "0.00000005",
+        "cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
+      "id": "google/gemini-3-pro-image",
+      "name": "Google: Nano Banana Pro (Gemini 3 Pro Image)",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000012",
+        "cache_read": "0.0000002",
+        "cache_write": "0.000000375"
+      }
+    },
+    {
+      "id": "google/gemini-3-pro-image-preview",
+      "name": "Google: Nano Banana Pro (Gemini 3 Pro Image Preview)",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000012",
+        "cache_read": "0.0000002",
+        "cache_write": "0.000000375"
+      }
+    },
+    {
+      "id": "google/gemini-3.1-flash-image",
+      "name": "Google: Nano Banana 2 (Gemini 3.1 Flash Image)",
+      "pricing": {
+        "prompt": "0.0000005",
+        "completion": "0.000003",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "google/gemini-3.1-flash-image-preview",
+      "name": "Google: Nano Banana 2 (Gemini 3.1 Flash Image Preview)",
+      "pricing": {
+        "prompt": "0.0000005",
+        "completion": "0.000003",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "google/gemini-3.1-flash-lite",
+      "name": "Google: Gemini 3.1 Flash Lite",
+      "pricing": {
+        "prompt": "0.00000025",
+        "completion": "0.0000015",
+        "cache_read": "0.000000025",
+        "cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
+      "id": "google/gemini-3.1-flash-lite-image",
+      "name": "Google: Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)",
+      "pricing": {
+        "prompt": "0.00000025",
+        "completion": "0.0000015",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "google/gemini-3.1-flash-lite-preview",
+      "name": "Google: Gemini 3.1 Flash Lite Preview",
+      "pricing": {
+        "prompt": "0.00000025",
+        "completion": "0.0000015",
+        "cache_read": "0.000000025",
+        "cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
+      "id": "google/gemini-3.1-pro-preview",
+      "name": "Google: Gemini 3.1 Pro Preview",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000012",
+        "cache_read": "0.0000002",
+        "cache_write": "0.000000375"
+      }
+    },
+    {
+      "id": "google/gemini-3.1-pro-preview-customtools",
+      "name": "Google: Gemini 3.1 Pro Preview Custom Tools",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000012",
+        "cache_read": "0.0000002",
+        "cache_write": "0.000000375"
+      }
+    },
+    {
+      "id": "google/gemini-3.5-flash",
+      "name": "Google: Gemini 3.5 Flash",
+      "pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.000009",
+        "cache_read": "0.00000015",
+        "cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
+      "id": "google/gemini-3.5-flash-lite",
+      "name": "Google: Gemini 3.5 Flash Lite",
+      "pricing": {
+        "prompt": "0.0000003",
+        "completion": "0.0000025",
+        "cache_read": "0.00000003",
+        "cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
+      "id": "google/gemini-3.6-flash",
+      "name": "Google: Gemini 3.6 Flash",
+      "pricing": {
+        "prompt": "0.00000075",
+        "completion": "0.00000375",
+        "cache_read": "0.000000075",
+        "cache_write": "0.0000000416666666666667"
+      }
+    },
+    {
+      "id": "google/gemini-3.7-flash",
+      "name": "Google: Gemini 3.7 Flash",
+      "pricing": {
+        "prompt": "0.00000075",
+        "completion": "0.00000375",
+        "cache_read": "0.000000075",
+        "cache_write": "0.0000000416666666666667"
+      }
+    },
+    {
+      "id": "google/gemini-3.8-flash",
+      "name": "Google: Gemini 3.8 Flash",
+      "pricing": {
+        "prompt": "0.00000075",
+        "completion": "0.00000375",
+        "cache_read": "0.000000075",
+        "cache_write": "0.0000000416666666666667"
+      }
+    },
+    {
+      "id": "openai/gpt-4.1",
+      "name": "OpenAI: GPT-4.1",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000008",
+        "cache_read": "0.0000005",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-4.1-mini",
+      "name": "OpenAI: GPT-4.1 Mini",
+      "pricing": {
+        "prompt": "0.0000004",
+        "completion": "0.0000016",
+        "cache_read": "0.0000001",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-4.1-nano",
+      "name": "OpenAI: GPT-4.1 Nano",
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000004",
+        "cache_read": "0.000000025",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5",
+      "name": "OpenAI: GPT-5",
+      "pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "cache_read": "0.000000125",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5-image",
+      "name": "OpenAI: GPT-5 Image",
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00001",
+        "cache_read": "0.00000125",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5-image-mini",
+      "name": "OpenAI: GPT-5 Image Mini",
+      "pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.000002",
+        "cache_read": "0.00000025",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5-mini",
+      "name": "OpenAI: GPT-5 Mini",
+      "pricing": {
+        "prompt": "0.00000025",
+        "completion": "0.000002",
+        "cache_read": "0.000000025",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5-nano",
+      "name": "OpenAI: GPT-5 Nano",
+      "pricing": {
+        "prompt": "0.00000005",
+        "completion": "0.0000004",
+        "cache_read": "0.000000005",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5-pro",
+      "name": "OpenAI: GPT-5 Pro",
+      "pricing": {
+        "prompt": "0.000015",
+        "completion": "0.00012",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.1",
+      "name": "OpenAI: GPT-5.1",
+      "pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "cache_read": "0.000000125",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.1-codex",
+      "name": "OpenAI: GPT-5.1-Codex",
+      "pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "cache_read": "0.00000013",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.1-codex-max",
+      "name": "OpenAI: GPT-5.1-Codex-Max",
+      "pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.00001",
+        "cache_read": "0.000000125",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.1-codex-mini",
+      "name": "OpenAI: GPT-5.1-Codex-Mini",
+      "pricing": {
+        "prompt": "0.00000025",
+        "completion": "0.000002",
+        "cache_read": "0.00000003",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.2",
+      "name": "OpenAI: GPT-5.2",
+      "pricing": {
+        "prompt": "0.00000175",
+        "completion": "0.000014",
+        "cache_read": "0.000000175",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.2-chat",
+      "name": "OpenAI: GPT-5.2 Chat",
+      "pricing": {
+        "prompt": "0.00000175",
+        "completion": "0.000014",
+        "cache_read": "0.000000175",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.2-codex",
+      "name": "OpenAI: GPT-5.2-Codex",
+      "pricing": {
+        "prompt": "0.00000175",
+        "completion": "0.000014",
+        "cache_read": "0.000000175",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.2-pro",
+      "name": "OpenAI: GPT-5.2 Pro",
+      "pricing": {
+        "prompt": "0.000021",
+        "completion": "0.000168",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.3-codex",
+      "name": "OpenAI: GPT-5.3-Codex",
+      "pricing": {
+        "prompt": "0.00000175",
+        "completion": "0.000014",
+        "cache_read": "0.000000175",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.4",
+      "name": "OpenAI: GPT-5.4",
+      "pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.000015",
+        "cache_read": "0.00000025",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.4-image-2",
+      "name": "OpenAI: GPT-5.4 Image 2",
+      "pricing": {
+        "prompt": "0.000008",
+        "completion": "0.000015",
+        "cache_read": "0.000002",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.4-mini",
+      "name": "OpenAI: GPT-5.4 Mini",
+      "pricing": {
+        "prompt": "0.00000075",
+        "completion": "0.0000045",
+        "cache_read": "0.000000075",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.4-nano",
+      "name": "OpenAI: GPT-5.4 Nano",
+      "pricing": {
+        "prompt": "0.0000002",
+        "completion": "0.00000125",
+        "cache_read": "0.00000002",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.4-pro",
+      "name": "OpenAI: GPT-5.4 Pro",
+      "pricing": {
+        "prompt": "0.00003",
+        "completion": "0.00018",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.5",
+      "name": "OpenAI: GPT-5.5",
+      "pricing": {
+        "prompt": "0.000005",
+        "completion": "0.00003",
+        "cache_read": "0.0000005",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.5-pro",
+      "name": "OpenAI: GPT-5.5 Pro",
+      "pricing": {
+        "prompt": "0.00003",
+        "completion": "0.00018",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-5.6-luna",
+      "name": "OpenAI: GPT-5.6 Luna",
+      "pricing": {
+        "prompt": "0.0000002",
+        "completion": "0.0000012",
+        "cache_read": "0.00000002",
+        "cache_write": "0.00000025"
+      }
+    },
+    {
+      "id": "openai/gpt-5.6-luna-pro",
+      "name": "OpenAI: GPT-5.6 Luna Pro",
+      "pricing": {
+        "prompt": "0.0000002",
+        "completion": "0.0000012",
+        "cache_read": "0.00000002",
+        "cache_write": "0.00000025"
+      }
+    },
+    {
+      "id": "openai/gpt-5.6-sol",
+      "name": "OpenAI: GPT-5.6 Sol",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000002",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/gpt-5.6-sol-pro",
+      "name": "OpenAI: GPT-5.6 Sol Pro",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000002",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/gpt-5.6-terra",
+      "name": "OpenAI: GPT-5.6 Terra",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000012",
+        "cache_read": "0.0000002",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/gpt-5.6-terra-pro",
+      "name": "OpenAI: GPT-5.6 Terra Pro",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000012",
+        "cache_read": "0.0000002",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/o3",
+      "name": "OpenAI: o3",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000008",
+        "cache_read": "0.0000005",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/o3-mini",
+      "name": "OpenAI: o3 Mini",
+      "pricing": {
+        "prompt": "0.0000011",
+        "completion": "0.0000044",
+        "cache_read": "0.00000055",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/o3-mini-high",
+      "name": "OpenAI: o3 Mini High",
+      "pricing": {
+        "prompt": "0.0000011",
+        "completion": "0.0000044",
+        "cache_read": "0.00000055",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/o3-pro",
+      "name": "OpenAI: o3 Pro",
+      "pricing": {
+        "prompt": "0.00002",
+        "completion": "0.00008",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/o4-mini",
+      "name": "OpenAI: o4 Mini",
+      "pricing": {
+        "prompt": "0.0000011",
+        "completion": "0.0000044",
+        "cache_read": "0.000000275",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/o4-mini-high",
+      "name": "OpenAI: o4 Mini High",
+      "pricing": {
+        "prompt": "0.0000011",
+        "completion": "0.0000044",
+        "cache_read": "0.000000275",
+        "cache_write": ""
       }
     }
   ],
-  "last_updated": "2026-07-22T00:19:02Z"
+  "last_updated": "2026-09-04T00:06:45Z"
 }
