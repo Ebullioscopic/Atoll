@@ -229,6 +229,10 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "Show on a specific display", keywords: ["preferred screen", "display picker"], highlightID: SettingsTab.general.highlightID(for: "Show on a specific display")),
         SettingsSearchEntry(tab: .general, title: "Automatically switch displays", keywords: ["auto switch", "displays"], highlightID: SettingsTab.general.highlightID(for: "Automatically switch displays")),
         SettingsSearchEntry(tab: .general, title: "Hide Dynamic Island during screenshots & recordings", keywords: ["privacy", "screenshot", "recording"], highlightID: SettingsTab.general.highlightID(for: "Hide Dynamic Island during screenshots & recordings")),
+        SettingsSearchEntry(tab: .general, title: "Enable Keep Awake", keywords: ["caffeinate", "keep awake", "prevent sleep", "insomnia", "no sleep"], highlightID: SettingsTab.general.highlightID(for: "Enable Keep Awake")),
+        SettingsSearchEntry(tab: .general, title: "Show Keep Awake icon in the notch", keywords: ["caffeinate", "keep awake", "icon", "notch"], highlightID: SettingsTab.general.highlightID(for: "Show Keep Awake icon in the notch")),
+        SettingsSearchEntry(tab: .general, title: "Default duration", keywords: ["caffeinate", "keep awake", "duration", "timeout"], highlightID: SettingsTab.general.highlightID(for: "Default duration")),
+        SettingsSearchEntry(tab: .general, title: "Also keep the display awake", keywords: ["caffeinate", "keep awake", "display sleep", "screen"], highlightID: SettingsTab.general.highlightID(for: "Also keep the display awake")),
         SettingsSearchEntry(tab: .general, title: "Enable gestures", keywords: ["gestures", "trackpad"], highlightID: SettingsTab.general.highlightID(for: "Enable gestures")),
         SettingsSearchEntry(tab: .general, title: "Close gesture", keywords: ["pinch", "swipe"], highlightID: SettingsTab.general.highlightID(for: "Close gesture")),
         SettingsSearchEntry(tab: .general, title: "Reverse swipe gestures", keywords: ["reverse", "swipe", "media"], highlightID: SettingsTab.general.highlightID(for: "Reverse swipe gestures")),
@@ -1137,6 +1141,8 @@ struct GeneralSettings: View {
     @Default(.reverseScrollGestures) var reverseScrollGestures
     @Default(.externalDisplayStyle) var externalDisplayStyle
     @Default(.hideNonNotchUntilHover) var hideNonNotchUntilHover
+    @Default(.enableCaffeinate) var enableCaffeinate
+    @Default(.caffeinateDefaultDuration) var caffeinateDefaultDuration
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.general.highlightID(for: title)
@@ -1221,6 +1227,37 @@ struct GeneralSettings: View {
                 .settingsHighlight(id: highlightID("Hide Dynamic Island during screenshots & recordings"))
             } header: {
                 Text("System features")
+            }
+
+            Section {
+                Defaults.Toggle(key: .enableCaffeinate) {
+                    Text("Enable Keep Awake")
+                }
+                .settingsHighlight(id: highlightID("Enable Keep Awake"))
+
+                Defaults.Toggle(key: .showCaffeinateIcon) {
+                    Text("Show Keep Awake icon in the notch")
+                }
+                .disabled(!enableCaffeinate)
+                .settingsHighlight(id: highlightID("Show Keep Awake icon in the notch"))
+
+                Picker("Default duration", selection: $caffeinateDefaultDuration) {
+                    ForEach(CaffeinateDuration.allCases) { duration in
+                        Text(duration.displayName).tag(duration)
+                    }
+                }
+                .disabled(!enableCaffeinate)
+                .settingsHighlight(id: highlightID("Default duration"))
+
+                Defaults.Toggle(key: .caffeinateKeepsDisplayAwake) {
+                    Text("Also keep the display awake")
+                }
+                .disabled(!enableCaffeinate)
+                .settingsHighlight(id: highlightID("Also keep the display awake"))
+            } header: {
+                Text("Keep Awake")
+            } footer: {
+                Text("Holds a power assertion so the Mac will not sleep, the way the caffeinate command does. Turning this off also ends a session that is already running. With the display option off, the screen can still sleep while the system stays up.")
             }
 
             Section {
@@ -7048,6 +7085,7 @@ struct Shortcuts: View {
     @Default(.enableShortcuts) var enableShortcuts
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.enableColorPickerFeature) var enableColorPickerFeature
+    @Default(.enableCaffeinate) var enableCaffeinateFeature
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.shortcuts.highlightID(for: title)
@@ -7077,6 +7115,26 @@ struct Shortcuts: View {
                     Text("Media")
                 } footer: {
                     Text("Sneak Peek shows the media title and artist under the notch for a few seconds.")
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+
+                Section {
+                    VStack(alignment: .leading) {
+                        KeyboardShortcuts.Recorder("Toggle Keep Awake:", name: .toggleCaffeinate)
+                            .disabled(!enableShortcuts || !enableCaffeinateFeature)
+                        if !enableCaffeinateFeature {
+                            Text("Keep Awake is disabled")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 2)
+                        }
+                    }
+                } header: {
+                    Text("Keep Awake")
+                } footer: {
+                    Text("Starts the default duration set in General, or ends a running session.")
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                         .font(.caption)

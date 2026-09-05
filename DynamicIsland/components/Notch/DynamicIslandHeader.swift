@@ -28,16 +28,20 @@ struct DynamicIslandHeader: View {
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
+    @ObservedObject var caffeinateManager = CaffeinateManager.shared
     @State private var showClipboardPopover = false
     @State private var showColorPickerPopover = false
     @State private var showTimerPopover = false
     @State private var showPerAppVolumePopover = false
+    @State private var showCaffeinatePopover = false
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.showClipboardIcon) var showClipboardIcon
     @Default(.showColorPickerIcon) var showColorPickerIcon
     @Default(.enablePerAppVolume) var enablePerAppVolume
     @Default(.showPerAppVolumeIcon) var showPerAppVolumeIcon
+    @Default(.enableCaffeinate) var enableCaffeinate
+    @Default(.showCaffeinateIcon) var showCaffeinateIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
     @Default(.showBatteryIndicator) var showBatteryIndicator
     @Default(.showBatteryPercentInside) var showBatteryPercentInside
@@ -59,7 +63,12 @@ struct DynamicIslandHeader: View {
         "gearshape": 14.2,
         // Not solved against measured ink the way the others were: the three
         // sliders stand slightly taller than `timer`, so this trims to match.
-        "slider.vertical.3": 13.8
+        "slider.vertical.3": 13.8,
+        // Unlike the sizes above, these two were not solved against measured
+        // ink height -- they are the row default, nudged down because the cup
+        // glyph carries a saucer and so reads a shade wider than `timer`.
+        "cup.and.saucer": 14.0,
+        "cup.and.saucer.fill": 14.0
     ]
 
     /// One glyph in the header row, on a common centre.
@@ -67,9 +76,9 @@ struct DynamicIslandHeader: View {
     /// The 20pt box clears the largest frame any of these symbols asks for
     /// (19pt, `list.clipboard`), so none of them is clipped — a smaller box
     /// silently cuts the tall ones.
-    private func headerGlyph(_ name: String) -> some View {
+    private func headerGlyph(_ name: String, color: Color = .white) -> some View {
         Image(systemName: name)
-            .foregroundColor(.white)
+            .foregroundColor(color)
             .font(.system(size: Self.headerGlyphSizes[name] ?? 14.4, weight: .medium))
             .frame(width: 20, height: 20)
     }
@@ -257,6 +266,41 @@ struct DynamicIslandHeader: View {
                         }
                     }
 
+                    if enableCaffeinate && showCaffeinateIcon {
+                        Button(action: {
+                            withAnimation(.smooth) {
+                                showCaffeinatePopover.toggle()
+                            }
+                        }) {
+                            Capsule()
+                                .fill(.black)
+                                .frame(width: 30, height: 30)
+                                .overlay {
+                                    // Tinting the active state is the only
+                                    // signal the closed row can give that the
+                                    // Mac is being held awake, so it is not
+                                    // just a filled-vs-hollow glyph swap.
+                                    headerGlyph(
+                                        caffeinateManager.isActive ? "cup.and.saucer.fill" : "cup.and.saucer",
+                                        color: caffeinateManager.isActive ? .yellow : .white
+                                    )
+                                }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .popover(isPresented: $showCaffeinatePopover, arrowEdge: .bottom) {
+                            CaffeinatePopover()
+                        }
+                        .onChange(of: showCaffeinatePopover) { isActive in
+                            vm.isCaffeinatePopoverActive = isActive
+
+                            if !isActive {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    vm.shouldRecheckHover.toggle()
+                                }
+                            }
+                        }
+                    }
+
                     if Defaults[.settingsIconInNotch] {
                         Button(action: {
                             SettingsWindowController.shared.showWindow()
@@ -364,6 +408,12 @@ struct DynamicIslandHeader: View {
             if !newValue {
                 showPerAppVolumePopover = false
                 vm.isPerAppVolumePopoverActive = false
+            }
+        }
+        .onChange(of: enableCaffeinate) { _, newValue in
+            if !newValue {
+                showCaffeinatePopover = false
+                vm.isCaffeinatePopoverActive = false
             }
         }
         .onChange(of: enableTimerFeature) { _, newValue in
