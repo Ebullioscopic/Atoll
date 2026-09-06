@@ -24,10 +24,10 @@ struct ClaudeQuotaClient {
     private static let clientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
     private static let refreshScope = "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
     /// Where a credential was read from, so a refreshed pair can be written back to the
-    /// same place.
+    /// same item and nothing else: service alone can match several Keychain items.
     fileprivate enum CredentialSource: Sendable {
         case file(URL)
-        case keychain(service: String)
+        case keychain(service: String, account: String?)
     }
 
     /// One Claude Code OAuth credential. `raw` is the credential JSON exactly as read:
@@ -177,7 +177,7 @@ struct ClaudeQuotaClient {
             return parsed
         }
         guard let item = KeychainReader.freshestGenericPassword(servicePrefix: "Claude Code-credentials") else { return nil }
-        return Credentials.parse(Data(item.secret.utf8), source: .keychain(service: item.service))
+        return Credentials.parse(Data(item.secret.utf8), source: .keychain(service: item.service, account: item.account))
     }
 
     /// Stores a rotated pair where the credential was read from. The refresh that produced
@@ -193,9 +193,9 @@ struct ClaudeQuotaClient {
             } catch {
                 print("⚠️ ClaudeQuotaClient: could not write refreshed credentials to \(url.lastPathComponent): \(error)")
             }
-        case .keychain(let service):
+        case .keychain(let service, let account):
             guard let secret = String(data: creds.raw, encoding: .utf8) else { return }
-            if let status = KeychainReader.updateGenericPassword(service: service, secret: secret) {
+            if let status = KeychainReader.updateGenericPassword(service: service, account: account, secret: secret) {
                 print("⚠️ ClaudeQuotaClient: could not write refreshed credentials to Keychain item \(service): OSStatus \(status)")
             }
         }

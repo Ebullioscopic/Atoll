@@ -22,7 +22,7 @@ enum KeychainReader {
     // following the freshest item keeps quota working across that migration without hardcoding
     // a hash. The enumeration requests attributes only (no kSecReturnData), so decrypting — and
     // the Keychain access prompt it triggers — happens exactly once, for the chosen item.
-    static func freshestGenericPassword(servicePrefix: String) -> (service: String, secret: String)? {
+    static func freshestGenericPassword(servicePrefix: String) -> (service: String, account: String?, secret: String)? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecReturnAttributes as String: true,
@@ -33,28 +33,31 @@ enum KeychainReader {
               let items = result as? [[String: Any]] else { return nil }
 
         let freshest = items
-            .compactMap { attrs -> (service: String, modified: Date)? in
+            .compactMap { attrs -> (service: String, account: String?, modified: Date)? in
                 guard let service = attrs[kSecAttrService as String] as? String,
                       service.hasPrefix(servicePrefix),
                       let modified = attrs[kSecAttrModificationDate as String] as? Date
                 else { return nil }
-                return (service, modified)
+                return (service, attrs[kSecAttrAccount as String] as? String, modified)
             }
             .max { $0.modified < $1.modified }
 
-        guard let freshest, let secret = genericPassword(service: freshest.service) else { return nil }
-        return (freshest.service, secret)
+        guard let freshest, let secret = genericPassword(service: freshest.service, account: freshest.account) else { return nil }
+        return (freshest.service, freshest.account, secret)
     }
 
     /// Replace the secret of an existing generic password. Returns nil on success, else the
     /// OSStatus — errSecItemNotFound when the item is gone, errSecAuthFailed /
     /// errSecInteractionNotAllowed when its ACL does not admit this app. Never adds an item:
     /// a second item under the same service would not be the one Claude Code reads.
-    static func updateGenericPassword(service: String, secret: String) -> OSStatus? {
-        let query: [String: Any] = [
+    /// `account` must be the one the item was read under: SecItemUpdate writes every item
+    /// the query matches, and service alone can match more than one.
+    static func updateGenericPassword(service: String, account: String?, secret: String) -> OSStatus? {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service
         ]
+        if let account { query[kSecAttrAccount as String] = account }
         let attributes: [String: Any] = [kSecValueData as String: Data(secret.utf8)]
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         return status == errSecSuccess ? nil : status
