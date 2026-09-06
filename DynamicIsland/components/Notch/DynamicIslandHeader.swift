@@ -32,11 +32,14 @@ struct DynamicIslandHeader: View {
     @State private var showClipboardPopover = false
     @State private var showColorPickerPopover = false
     @State private var showTimerPopover = false
+    @State private var showPerAppVolumePopover = false
     @State private var showCaffeinatePopover = false
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.showClipboardIcon) var showClipboardIcon
     @Default(.showColorPickerIcon) var showColorPickerIcon
+    @Default(.enablePerAppVolume) var enablePerAppVolume
+    @Default(.showPerAppVolumeIcon) var showPerAppVolumeIcon
     @Default(.enableCaffeinate) var enableCaffeinate
     @Default(.showCaffeinateIcon) var showCaffeinateIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
@@ -58,6 +61,9 @@ struct DynamicIslandHeader: View {
         "eyedropper": 14.3,
         "timer": 14.4,
         "gearshape": 14.2,
+        // Not solved against measured ink the way the others were: the three
+        // sliders stand slightly taller than `timer`, so this trims to match.
+        "slider.vertical.3": 13.8,
         // Unlike the sizes above, these two were not solved against measured
         // ink height -- they are the row default, nudged down because the cup
         // glyph carries a saucer and so reads a shade wider than `timer`.
@@ -232,6 +238,34 @@ struct DynamicIslandHeader: View {
                         }
                     }
                     
+                    if enablePerAppVolume && showPerAppVolumeIcon {
+                        Button(action: {
+                            withAnimation(.smooth) {
+                                showPerAppVolumePopover.toggle()
+                            }
+                        }) {
+                            Capsule()
+                                .fill(.black)
+                                .frame(width: 30, height: 30)
+                                .overlay {
+                                    headerGlyph("slider.vertical.3")
+                                }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .popover(isPresented: $showPerAppVolumePopover, arrowEdge: .bottom) {
+                            PerAppVolumePopover()
+                        }
+                        .onChange(of: showPerAppVolumePopover) { isActive in
+                            vm.isPerAppVolumePopoverActive = isActive
+
+                            if !isActive {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    vm.shouldRecheckHover.toggle()
+                                }
+                            }
+                        }
+                    }
+
                     if enableCaffeinate && showCaffeinateIcon {
                         Button(action: {
                             withAnimation(.smooth) {
@@ -368,6 +402,12 @@ struct DynamicIslandHeader: View {
             // Handle keyboard shortcut for popover mode
             if Defaults[.enableClipboardManager] && clipboardDisplayMode == .popover {
                 showClipboardPopover.toggle()
+            }
+        }
+        .onChange(of: enablePerAppVolume) { _, newValue in
+            if !newValue {
+                showPerAppVolumePopover = false
+                vm.isPerAppVolumePopoverActive = false
             }
         }
         .onChange(of: enableCaffeinate) { _, newValue in
