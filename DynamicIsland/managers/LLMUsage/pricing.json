@@ -361,6 +361,76 @@
       }
     },
     {
+      "id": "openai/gpt-3.5-turbo",
+      "name": "OpenAI: GPT-3.5 Turbo",
+      "pricing": {
+        "prompt": "0.0000005",
+        "completion": "0.0000015",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-3.5-turbo-0613",
+      "name": "OpenAI: GPT-3.5 Turbo (older v0613)",
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000002",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-3.5-turbo-16k",
+      "name": "OpenAI: GPT-3.5 Turbo 16k",
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000004",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-3.5-turbo-instruct",
+      "name": "OpenAI: GPT-3.5 Turbo Instruct",
+      "pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.000002",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-4",
+      "name": "OpenAI: GPT-4",
+      "pricing": {
+        "prompt": "0.00003",
+        "completion": "0.00006",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-4-turbo",
+      "name": "OpenAI: GPT-4 Turbo",
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00003",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-4-turbo-preview",
+      "name": "OpenAI: GPT-4 Turbo Preview",
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00003",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
       "id": "openai/gpt-4.1",
       "name": "OpenAI: GPT-4.1",
       "pricing": {
@@ -387,6 +457,66 @@
         "prompt": "0.0000001",
         "completion": "0.0000004",
         "cache_read": "0.000000025",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-4o",
+      "name": "OpenAI: GPT-4o",
+      "pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.00001",
+        "cache_read": "0.00000125",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-4o-2024-05-13",
+      "name": "OpenAI: GPT-4o (2024-05-13)",
+      "pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000015",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-4o-2024-08-06",
+      "name": "OpenAI: GPT-4o (2024-08-06)",
+      "pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.00001",
+        "cache_read": "0.00000125",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-4o-2024-11-20",
+      "name": "OpenAI: GPT-4o (2024-11-20)",
+      "pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.00001",
+        "cache_read": "0.00000125",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-4o-mini",
+      "name": "OpenAI: GPT-4o-mini",
+      "pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.0000006",
+        "cache_read": "0.000000075",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-4o-mini-2024-07-18",
+      "name": "OpenAI: GPT-4o-mini (2024-07-18)",
+      "pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.0000006",
+        "cache_read": "0.000000075",
         "cache_write": ""
       }
     },
@@ -671,6 +801,86 @@
       }
     },
     {
+      "id": "openai/gpt-6-astra",
+      "name": "OpenAI: GPT-6 Astra",
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "cache_read": "0.000001",
+        "cache_write": "0.0000125"
+      }
+    },
+    {
+      "id": "openai/gpt-6-astra-pro",
+      "name": "OpenAI: GPT-6 Astra Pro",
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "cache_read": "0.000001",
+        "cache_write": "0.0000125"
+      }
+    },
+    {
+      "id": "openai/gpt-audio",
+      "name": "OpenAI: GPT Audio",
+      "pricing": {
+        "prompt": "0.0000025",
+        "completion": "0.00001",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-audio-mini",
+      "name": "OpenAI: GPT Audio Mini",
+      "pricing": {
+        "prompt": "0.0000006",
+        "completion": "0.0000024",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-chat-latest",
+      "name": "OpenAI: GPT Chat Latest",
+      "pricing": {
+        "prompt": "0.000005",
+        "completion": "0.00003",
+        "cache_read": "0.0000005",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-oss-120b",
+      "name": "OpenAI: gpt-oss-120b",
+      "pricing": {
+        "prompt": "0.000000037",
+        "completion": "0.00000017",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-oss-20b",
+      "name": "OpenAI: gpt-oss-20b",
+      "pricing": {
+        "prompt": "0.00000003",
+        "completion": "0.00000013",
+        "cache_read": "0.00000003",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "openai/gpt-oss-safeguard-20b",
+      "name": "OpenAI: gpt-oss-safeguard-20b",
+      "pricing": {
+        "prompt": "0.000000075",
+        "completion": "0.0000003",
+        "cache_read": "0.0000000375",
+        "cache_write": ""
+      }
+    },
+    {
       "id": "openai/o3",
       "name": "OpenAI: o3",
       "pricing": {
@@ -731,5 +941,5 @@
       }
     }
   ],
-  "last_updated": "2026-09-06T00:07:28Z"
+  "last_updated": "2026-09-06T02:57:36Z"
 }
