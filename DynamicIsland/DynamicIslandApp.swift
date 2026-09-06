@@ -1559,10 +1559,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             let selectedScreen: NSScreen
 
-            if let preferredScreen = NSScreen.screens.first(where: {
-                $0.localizedName == coordinator.preferredScreen
-            }) {
-                coordinator.selectedScreen = coordinator.preferredScreen
+            if let preferredScreen = coordinator.preferredNSScreen() {
+                coordinator.selectedScreen = preferredScreen.localizedName
                 selectedScreen = preferredScreen
             } else if Defaults[.automaticallySwitchDisplay], let mainScreen = NSScreen.main {
                 coordinator.selectedScreen = mainScreen.localizedName
