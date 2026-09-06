@@ -2412,6 +2412,7 @@ struct ContentView: View {
          vm.isColorPickerPopoverActive || 
          vm.isStatsPopoverActive ||
          vm.isTimerPopoverActive ||
+         vm.isPerAppVolumePopoverActive ||
          vm.isCaffeinatePopoverActive ||
          vm.isMediaOutputPopoverActive ||
          vm.isReminderPopoverActive
