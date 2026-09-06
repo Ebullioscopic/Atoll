@@ -2,16 +2,16 @@ import Foundation
 
 actor ClaudeCredentialStore {
     static let shared = ClaudeCredentialStore()
-    private var cached: ClaudeQuotaClient.CredentialFile.OAuth?
+    private var cached: ClaudeQuotaClient.Credentials?
 
-    fileprivate func get() -> ClaudeQuotaClient.CredentialFile.OAuth? { cached }
-    fileprivate func set(_ creds: ClaudeQuotaClient.CredentialFile.OAuth) { cached = creds }
+    fileprivate func get() -> ClaudeQuotaClient.Credentials? { cached }
+    fileprivate func set(_ creds: ClaudeQuotaClient.Credentials) { cached = creds }
     fileprivate func clear() { cached = nil }
 
     // Atomically replace the cache with a fresh load from source. Running the load
     // inside the actor closes the window where a concurrent reader could slot a stale
     // credential in between a separate clear() and set().
-    fileprivate func reload(from load: @Sendable () -> ClaudeQuotaClient.CredentialFile.OAuth?) -> ClaudeQuotaClient.CredentialFile.OAuth? {
+    fileprivate func reload(from load: @Sendable () -> ClaudeQuotaClient.Credentials?) -> ClaudeQuotaClient.Credentials? {
         cached = load()
         return cached
     }
@@ -23,15 +23,48 @@ struct ClaudeQuotaClient {
 
     private static let clientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
     private static let refreshScope = "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
-    private static let refreshSkewMs: Int64 = 5 * 60 * 1000
+    /// Where a credential was read from, so a refreshed pair can be written back to the
+    /// same place.
+    fileprivate enum CredentialSource: Sendable {
+        case file(URL)
+        case keychain(service: String)
+    }
 
-    fileprivate struct CredentialFile: Decodable, Sendable {
-        struct OAuth: Decodable, Sendable {
-            let accessToken: String
-            let refreshToken: String
-            let expiresAt: Int64
+    /// One Claude Code OAuth credential. `raw` is the credential JSON exactly as read:
+    /// Claude Code keeps more under `claudeAiOauth` than the three fields used here
+    /// (scopes, subscriptionType, rateLimitTier, refreshTokenExpiresAt), and a write-back
+    /// must hand all of it back untouched.
+    fileprivate struct Credentials: Sendable {
+        let accessToken: String
+        let refreshToken: String
+        let expiresAt: Int64
+        let raw: Data
+        let source: CredentialSource
+
+        /// nil when the JSON has no usable pair. A logged-out Claude Code leaves the item in
+        /// place with empty tokens and `expiresAt: 0`; that is "no credential", not one to refresh.
+        static func parse(_ data: Data, source: CredentialSource) -> Credentials? {
+            guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let oauth = obj["claudeAiOauth"] as? [String: Any],
+                  let access = oauth["accessToken"] as? String, !access.isEmpty,
+                  let refresh = oauth["refreshToken"] as? String, !refresh.isEmpty,
+                  let expires = (oauth["expiresAt"] as? NSNumber)?.int64Value
+            else { return nil }
+            return Credentials(accessToken: access, refreshToken: refresh, expiresAt: expires, raw: data, source: source)
         }
-        let claudeAiOauth: OAuth
+
+        /// The same credential carrying a new token pair, with `raw` edited to match so the
+        /// fields Atoll does not use survive the write-back.
+        func rotated(accessToken: String, refreshToken: String, expiresAt: Int64) -> Credentials? {
+            guard var obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
+                  var oauth = obj["claudeAiOauth"] as? [String: Any] else { return nil }
+            oauth["accessToken"] = accessToken
+            oauth["refreshToken"] = refreshToken
+            oauth["expiresAt"] = expiresAt
+            obj["claudeAiOauth"] = oauth
+            guard let data = try? JSONSerialization.data(withJSONObject: obj) else { return nil }
+            return Credentials(accessToken: accessToken, refreshToken: refreshToken, expiresAt: expiresAt, raw: data, source: source)
+        }
     }
 
     private struct RefreshResponse: Decodable {
@@ -97,7 +130,7 @@ struct ClaudeQuotaClient {
         }
     }
 
-    private func attemptFetch(_ creds: CredentialFile.OAuth) async -> FetchOutcome {
+    private func attemptFetch(_ creds: Credentials) async -> FetchOutcome {
         guard let token = await validAccessToken(creds) else { return .authFailure }
         var request = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -121,7 +154,7 @@ struct ClaudeQuotaClient {
         }
     }
 
-    private func currentCredentials() async -> CredentialFile.OAuth? {
+    private func currentCredentials() async -> Credentials? {
         if let cached = await ClaudeCredentialStore.shared.get() { return cached }
         guard let loaded = Self.loadCredentialsFromSource() else { return nil }
         await ClaudeCredentialStore.shared.set(loaded)
@@ -131,33 +164,61 @@ struct ClaudeQuotaClient {
     // Force a re-read from source, bypassing the in-memory cache. Called after an auth
     // failure so a token rotated by Claude Code is picked up without an app restart.
     // The invalidate-and-reload is a single atomic actor operation (see reload(from:)).
-    private func reloadCredentials() async -> CredentialFile.OAuth? {
+    private func reloadCredentials() async -> Credentials? {
         await ClaudeCredentialStore.shared.reload(from: { Self.loadCredentialsFromSource() })
     }
 
     // File first never prompts; Keychain only as fallback. On the Keychain path, read the
     // freshest "Claude Code-credentials*" item: newer Claude Code stores its token under a
     // per-install hash suffix and no longer updates the un-suffixed item.
-    private static func loadCredentialsFromSource() -> CredentialFile.OAuth? {
+    private static func loadCredentialsFromSource() -> Credentials? {
         let path = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/.credentials.json")
-        if let data = try? Data(contentsOf: path),
-           let parsed = try? JSONDecoder().decode(CredentialFile.self, from: data) {
-            return parsed.claudeAiOauth
+        if let data = try? Data(contentsOf: path), let parsed = Credentials.parse(data, source: .file(path)) {
+            return parsed
         }
-        guard let json = KeychainReader.freshestGenericPassword(servicePrefix: "Claude Code-credentials"),
-              let parsed = try? JSONDecoder().decode(CredentialFile.self, from: Data(json.utf8)) else { return nil }
-        return parsed.claudeAiOauth
+        guard let item = KeychainReader.freshestGenericPassword(servicePrefix: "Claude Code-credentials") else { return nil }
+        return Credentials.parse(Data(item.secret.utf8), source: .keychain(service: item.service))
     }
 
-    private func validAccessToken(_ creds: CredentialFile.OAuth) async -> String? {
+    /// Stores a rotated pair where the credential was read from. The refresh that produced
+    /// it invalidated the previous pair, so without this the source keeps a dead refresh
+    /// token: the next Atoll launch cannot refresh, and neither can Claude Code, which is
+    /// then logged out. Best-effort — the in-memory copy carries this process either way.
+    private static func writeBack(_ creds: Credentials) {
+        switch creds.source {
+        case .file(let url):
+            do {
+                try creds.raw.write(to: url, options: .atomic)
+                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+            } catch {
+                print("⚠️ ClaudeQuotaClient: could not write refreshed credentials to \(url.lastPathComponent): \(error)")
+            }
+        case .keychain(let service):
+            guard let secret = String(data: creds.raw, encoding: .utf8) else { return }
+            if let status = KeychainReader.updateGenericPassword(service: service, secret: secret) {
+                print("⚠️ ClaudeQuotaClient: could not write refreshed credentials to Keychain item \(service): OSStatus \(status)")
+            }
+        }
+    }
+
+    private func validAccessToken(_ creds: Credentials) async -> String? {
         let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
-        guard creds.expiresAt - nowMs <= Self.refreshSkewMs else { return creds.accessToken }
+        // Refresh only once the token has actually expired. Refreshing early widens the
+        // window in which Claude Code, on the same schedule, refreshes the same pair; one
+        // of the two then loses its refresh token.
+        if creds.expiresAt > nowMs { return creds.accessToken }
+        // Claude Code may already have rotated the pair. Take a fresh read from the source
+        // before spending the refresh token we hold.
+        let reloaded = await reloadCredentials()
+        if let reloaded, reloaded.expiresAt > nowMs { return reloaded.accessToken }
+        let current = reloaded ?? creds
+
         var request = URLRequest(url: URL(string: "https://platform.claude.com/v1/oauth/token")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = [
             "grant_type": "refresh_token",
-            "refresh_token": creds.refreshToken,
+            "refresh_token": current.refreshToken,
             "client_id": Self.clientID,
             "scope": Self.refreshScope
         ]
@@ -173,8 +234,11 @@ struct ClaudeQuotaClient {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         guard let refreshed = try? decoder.decode(RefreshResponse.self, from: data) else { return nil }
         let expiresAt = nowMs + Int64(refreshed.expiresIn) * 1000
-        let updated = CredentialFile.OAuth(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, expiresAt: expiresAt)
-        await ClaudeCredentialStore.shared.set(updated)
+        guard let rotated = current.rotated(accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, expiresAt: expiresAt) else {
+            return refreshed.accessToken
+        }
+        await ClaudeCredentialStore.shared.set(rotated)
+        Self.writeBack(rotated)
         return refreshed.accessToken
     }
 }
