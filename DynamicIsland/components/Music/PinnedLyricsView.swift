@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import AppKit
 import Defaults
 import SwiftUI
 
@@ -41,8 +42,20 @@ struct PinnedLyricsModifier: ViewModifier {
 
     let isVisible: Bool
 
-    /// One 10pt line, plus the gap between it and the notch body above.
-    private static let stripHeight: CGFloat = 13
+    /// The size the strip's one line is set at. The frame below is measured
+    /// from it, so the two cannot drift apart.
+    private static let lyricFontSize: CGFloat = 10
+
+    /// One line of that font, rounded up to a whole point, plus a point so a
+    /// descender is not shaved off by the frame. Comes out at the 13 this was
+    /// written as by hand.
+    private static let stripHeight: CGFloat = {
+        let font = NSFont.systemFont(ofSize: lyricFontSize, weight: .medium)
+        return (font.ascender - font.descender + font.leading).rounded(.up) + 1
+    }()
+
+    /// Space between the strip and the notch body above it. A gap the eye
+    /// judges rather than anything derived from the text.
     private static let stripGap: CGFloat = 4
 
     private var currentLine: String? {
@@ -89,10 +102,17 @@ struct PinnedLyricsModifier: ViewModifier {
             // layout: that exists to sweep a wrapped line in reading order,
             // and this is deliberately one line.
             Text(currentLine ?? "")
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: Self.lyricFontSize, weight: .medium))
                 .lineLimit(1)
                 // Truncated rather than wrapped: the overlay is only one line
                 // tall, and a second row would be clipped.
+                //
+                // Scrolling it instead was tried and reverted -- in testing
+                // it just did not look up to par next to the rest of the UI.
+                // Truncating is the easy way out rather than the considered
+                // answer, so a long line still loses its end. Anyone picking
+                // the marquee back up should start from how it ought to look,
+                // not from this.
                 .truncationMode(.tail)
                 .contentTransition(.opacity)
                 .lyricSweep(
