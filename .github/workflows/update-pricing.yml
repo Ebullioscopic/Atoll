@@ -31,12 +31,14 @@ jobs:
           # Fetch all models from OpenRouter
           curl -s https://openrouter.ai/api/v1/models > all_models.json
 
-          # Track every current Anthropic Claude and OpenAI GPT-5 / codex model
-          # (excluding ":batch" variants) instead of a hand-maintained short list,
-          # so newly released models are priced without a workflow change.
+          # Track every Anthropic Claude, Google Gemini and OpenAI gpt- / o3 / o4 /
+          # codex model (excluding ":batch" variants) instead of a hand-maintained
+          # short list, so newly released models are priced without a workflow change.
+          # Match the whole "gpt-" family rather than a literal "gpt-5": the day
+          # OpenAI shipped GPT-6, gpt-6-astra fell through and went unpriced.
           jq --arg ts "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" '{
             models: [ .data[]
-              | select(.id | test("^(anthropic/claude-|google/gemini-|openai/(gpt-5|gpt-4\\.1|o3|o4|codex))"))
+              | select(.id | test("^(anthropic/claude-|google/gemini-|openai/(gpt-|o3|o4|codex))"))
               | select(.id | contains(":") | not)
               | select((.pricing | type) == "object")
               | select(.pricing.prompt != null and .pricing.completion != null)
