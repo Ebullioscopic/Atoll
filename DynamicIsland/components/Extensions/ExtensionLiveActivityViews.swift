@@ -183,6 +183,9 @@ private func logExtensionDiagnostics(_ message: String) {
 struct ExtensionNotchExperienceTabView: View {
     let payload: ExtensionNotchExperiencePayload
 
+    @EnvironmentObject private var vm: DynamicIslandViewModel
+    @State private var suppressionToken = UUID()
+
     @Default(.enableExtensionNotchInteractiveWebViews) private var interactiveWebViewsEnabled
 
     private var descriptor: AtollNotchExperienceDescriptor { payload.descriptor }
@@ -195,32 +198,18 @@ struct ExtensionNotchExperienceTabView: View {
     var body: some View {
         Group {
             if let tabConfiguration {
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        header(for: tabConfiguration)
-                        ForEach(Array(tabConfiguration.sections.enumerated()), id: \.offset) { index, section in
-                            ExtensionNotchSectionView(
-                                section: section,
-                                accent: accentColor,
-                                allowWebInteraction: allowInteractiveWebViews
-                            )
-                            .accessibilityIdentifier("extension-notch-section-\(payload.descriptor.id)-\(index)")
+                if tabConfiguration.contentLayout == .contentOnly {
+                    contentStack(for: tabConfiguration, spacing: 0, clipsWebContent: false)
+                        .frame(maxHeight: .infinity, alignment: .topLeading)
+                } else {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 18) {
+                            header(for: tabConfiguration)
+                            contentStack(for: tabConfiguration, spacing: 18, clipsWebContent: true)
                         }
-                        if let webDescriptor = tabConfiguration.webContent {
-                            ExtensionWebContentView(descriptor: webDescriptor, allowInteraction: allowInteractiveWebViews)
-                                .frame(height: webDescriptor.preferredHeight)
-                                .frame(maxWidth: webDescriptor.maximumContentWidth ?? .infinity)
-                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        }
-                        if let footnote = tabConfiguration.footnote {
-                            Text(footnote)
-                                .font(.system(size: 11, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.65))
-                                .lineLimit(2)
-                        }
+                        .padding(.vertical, 14)
+                        .padding(.horizontal, 16)
                     }
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 16)
                 }
             } else {
                 Text("Extension tab unavailable")
@@ -232,6 +221,60 @@ struct ExtensionNotchExperienceTabView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(tabBackground)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onHover { hovering in
+            vm.setScrollGestureSuppression(hovering, token: suppressionToken)
+        }
+        .onDisappear {
+            vm.setScrollGestureSuppression(false, token: suppressionToken)
+        }
+        .onChange(of: vm.notchState) { _, state in
+            if state == .closed {
+                vm.setScrollGestureSuppression(false, token: suppressionToken)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func contentStack(
+        for configuration: AtollNotchExperienceDescriptor.TabConfiguration,
+        spacing: CGFloat,
+        clipsWebContent: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            ForEach(Array(configuration.sections.enumerated()), id: \.offset) { index, section in
+                ExtensionNotchSectionView(
+                    section: section,
+                    accent: accentColor,
+                    allowWebInteraction: allowInteractiveWebViews
+                )
+                .accessibilityIdentifier("extension-notch-section-\(payload.descriptor.id)-\(index)")
+            }
+            if let webDescriptor = configuration.webContent {
+                Group {
+                    if clipsWebContent {
+                        ExtensionWebContentView(
+                            descriptor: webDescriptor,
+                            allowInteraction: allowInteractiveWebViews
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    } else {
+                        ExtensionWebContentView(
+                            descriptor: webDescriptor,
+                            allowInteraction: allowInteractiveWebViews
+                        )
+                    }
+                }
+                .frame(height: webDescriptor.preferredHeight)
+                .frame(maxWidth: webDescriptor.maximumContentWidth ?? .infinity)
+            }
+            if let footnote = configuration.footnote {
+                Text(footnote)
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.65))
+                    .lineLimit(2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
