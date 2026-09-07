@@ -33,16 +33,36 @@ struct LyricLine: Identifiable, Codable, Equatable {
     let id = UUID()
     let timestamp: TimeInterval
     let text: String
+    /// Whether `timestamp` means anything.
+    ///
+    /// Some tracks only have plain lyrics available, with no timings at all.
+    /// Those still belong on screen -- you can read along yourself -- but
+    /// nothing may pretend to know which line is being sung.
+    let isTimed: Bool
 
-    init(timestamp: TimeInterval, text: String) {
+    init(timestamp: TimeInterval, text: String, isTimed: Bool = true) {
         self.timestamp = timestamp
         self.text = text
+        self.isTimed = isTimed
+    }
+
+    /// Splits an untimed lyrics body into the lines it is written as.
+    ///
+    /// The whole body used to be kept as a single `LyricLine`, which made every
+    /// verse of the song one enormous "current line" -- so the highlight swept
+    /// across the entire text at once, cutting through the middle of words.
+    static func untimedLines(from body: String) -> [LyricLine] {
+        body
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .map { LyricLine(timestamp: 0, text: $0, isTimed: false) }
     }
 
     // Compares content only; `id` is regenerated per instance, so identical
     // lyrics parsed twice would otherwise never compare equal
     static func == (lhs: LyricLine, rhs: LyricLine) -> Bool {
-        lhs.timestamp == rhs.timestamp && lhs.text == rhs.text
+        lhs.timestamp == rhs.timestamp && lhs.text == rhs.text && lhs.isTimed == rhs.isTimed
     }
 }
 
@@ -562,6 +582,21 @@ class MusicManager: ObservableObject {
 
     var isAppleMusicActive: Bool { bundleIdentifier == "com.apple.Music" }
     var isSpotifyActive: Bool { bundleIdentifier == SpotifyController.bundleIdentifier }
+    /// Whether favouriting applies to the playing source at all. Decides
+    /// whether the control is offered in settings and kept in the layout, so
+    /// it must not change with playback or connection state.
+    @MainActor
+    var activeSourceCanEverFavorite: Bool { activeController?.canEverFavorite ?? false }
+
+    /// Whether favouriting would work right now -- the app is playing, the
+    /// account is connected. Decides only whether the control is enabled.
+    @MainActor
+    var activeSourceSupportsFavoriting: Bool { activeController?.supportsFavoriting ?? false }
+
+    /// True when the playing source will show the favourited state but not
+    /// change it. The heart stays lit and stops taking clicks.
+    @MainActor
+    var activeSourceFavoritingIsReadOnly: Bool { activeController?.favoritingIsReadOnly ?? false }
     @Published var songDuration: TimeInterval = 0
     @Published var elapsedTime: TimeInterval = 0
     @Published var timestampDate: Date = .init()
@@ -576,6 +611,12 @@ class MusicManager: ObservableObject {
     // MARK: - Lyrics Properties
     @Published var currentLyrics: String = ""
     @Published var syncedLyrics: [LyricLine] = []
+
+    /// Whether the loaded lyrics carry real timings, as opposed to being a
+    /// plain body split into readable lines.
+    var hasTimedLyrics: Bool {
+        syncedLyrics.contains { $0.isTimed }
+    }
     @Published var showLyrics: Bool = false
     @Published var currentLyricIndex: Int = -1
 
@@ -595,9 +636,19 @@ class MusicManager: ObservableObject {
     private var explicitLookupTask: Task<Void, Never>?
     private var explicitLookupKey: String?
 
-    // MARK: - Spotify Liked Songs
-    /// nil = unknown (not Spotify, not connected, or lookup pending) — the like button renders disabled.
+    // MARK: - Favourite current track
+    /// nil = unknown (the source cannot favourite, is not connected, or the
+    /// lookup is still running) — the control renders disabled.
     @Published private(set) var isCurrentTrackLiked: Bool? = nil
+    /// Whether the playing source can favourite at all, so a view can hide the
+    /// control outright rather than show one that will never do anything.
+    @Published private(set) var canFavoriteCurrentTrack: Bool = false
+
+    private static let tidalModeRefreshInterval: TimeInterval = 2
+    private var lastTidalModeRefresh = Date.distantPast
+    private var tidalModeTask: Task<Void, Never>?
+    /// Identifies the track a lookup belongs to, so a result arriving after the
+    /// track changed is discarded.
     private var likedLookupTrackID: String?
     private var likedLookupTask: Task<Void, Never>?
     private var likeToggleTask: Task<Void, Never>?
@@ -962,7 +1013,11 @@ class MusicManager: ObservableObject {
             self.playbackRate = state.playbackRate
         }
         
-        if shuffleChanged {
+        // TIDAL reports neither on the media stream, so what arrives here is
+        // the default rather than the truth. Its own menu is the authority.
+        let sourceOwnsPlaybackModes = state.bundleIdentifier == TidalAccessibility.bundleIdentifier
+
+        if shuffleChanged && !sourceOwnsPlaybackModes {
             self.isShuffled = state.isShuffled
         }
 
@@ -970,12 +1025,13 @@ class MusicManager: ObservableObject {
             self.bundleIdentifier = state.bundleIdentifier
         }
 
-        if repeatModeChanged {
+        if repeatModeChanged && !sourceOwnsPlaybackModes {
             self.repeatMode = state.repeatMode
         }
         
         updateLiveStreamState(with: state)
         self.refreshLikedFlag(for: state)
+        self.refreshTidalPlaybackModes(for: state)
 
         // Guarded like every other assignment in this method, and for the same
         // reason. This is a published property that several views read, so an
@@ -1001,56 +1057,113 @@ class MusicManager: ObservableObject {
         }
     }
 
+    /// TIDAL is the one source whose shuffle and repeat never arrive on the
+    /// media stream -- it registers no command for either, so Media Remote has
+    /// nothing to report. The state has to be asked for instead, and asking
+    /// means reading TIDAL's menu, so it is paced rather than done on every
+    /// delivery.
     @MainActor
-    private func refreshLikedFlag(for state: PlaybackState) {
-        guard state.bundleIdentifier == SpotifyController.bundleIdentifier,
-              SpotifyLibraryManager.shared.isAuthenticated,
-              let lookupKey = SpotifyExplicitnessResolver.LookupKey(
-                  contentIdentifier: state.contentIdentifier,
-                  contentURL: state.contentURL
-              )
-        else {
-            likedLookupTask?.cancel()
-            likedLookupTask = nil
-            likedLookupTrackID = nil
-            if isCurrentTrackLiked != nil {
-                isCurrentTrackLiked = nil
-            }
+    private func refreshTidalPlaybackModes(for state: PlaybackState) {
+        guard state.bundleIdentifier == TidalAccessibility.bundleIdentifier,
+              TidalAccessibility.isAvailable else { return }
+
+        let now = Date()
+        guard now.timeIntervalSince(lastTidalModeRefresh) >= Self.tidalModeRefreshInterval else {
             return
         }
+        lastTidalModeRefresh = now
 
-        guard likedLookupTrackID != lookupKey.trackID else { return }
-
-        likedLookupTask?.cancel()
-        likeToggleTask?.cancel()
-        likedLookupTrackID = lookupKey.trackID
-        isCurrentTrackLiked = nil
-
-        let trackID = lookupKey.trackID
-        likedLookupTask = Task { [weak self] in
-            let saved = await SpotifyLibraryManager.shared.isTrackSaved(trackID: trackID)
+        tidalModeTask?.cancel()
+        tidalModeTask = Task { [weak self] in
+            let shuffled = await TidalAccessibility.isShuffled()
+            let mode = await TidalAccessibility.repeatMode()
             guard !Task.isCancelled else { return }
+
             await MainActor.run {
-                guard let self, self.likedLookupTrackID == trackID else { return }
-                self.isCurrentTrackLiked = saved
+                guard let self else { return }
+                if let shuffled, self.isShuffled != shuffled { self.isShuffled = shuffled }
+                if let mode, self.repeatMode != mode { self.repeatMode = mode }
             }
         }
     }
 
     @MainActor
+    private func refreshLikedFlag(for state: PlaybackState) {
+        // Favouriting is the playing source's own business: Music.app has a
+        // scriptable property, Spotify has the account the user connected.
+        // Ask whichever is playing rather than naming one of them here.
+        guard let controller = activeController, controller.supportsFavoriting else {
+            clearLikedState()
+            return
+        }
+
+        // Any change of track invalidates the answer. There is no id that means
+        // the same thing across every source, so the track's own identity is
+        // what a lookup is keyed on.
+        let trackKey = Self.favoriteTrackKey(for: state)
+        guard !trackKey.isEmpty else {
+            clearLikedState()
+            return
+        }
+
+        if !canFavoriteCurrentTrack { canFavoriteCurrentTrack = true }
+        guard likedLookupTrackID != trackKey else { return }
+
+        likedLookupTask?.cancel()
+        likeToggleTask?.cancel()
+        likedLookupTrackID = trackKey
+        isCurrentTrackLiked = nil
+
+        likedLookupTask = Task { [weak self] in
+            let favorited = await controller.isCurrentTrackFavorited()
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self, self.likedLookupTrackID == trackKey else { return }
+                self.isCurrentTrackLiked = favorited
+            }
+        }
+    }
+
+    @MainActor
+    private func clearLikedState() {
+        likedLookupTask?.cancel()
+        likedLookupTask = nil
+        likedLookupTrackID = nil
+        if canFavoriteCurrentTrack { canFavoriteCurrentTrack = false }
+        if isCurrentTrackLiked != nil { isCurrentTrackLiked = nil }
+    }
+
+    /// Identity of the playing track, for deciding when a lookup is stale.
+    ///
+    /// Prefers whatever stable identifier the source gives; falls back to the
+    /// metadata, which is all a scripted app like Music.app offers.
+    private static func favoriteTrackKey(for state: PlaybackState) -> String {
+        if let identifier = state.contentIdentifier, !identifier.isEmpty { return identifier }
+        if let url = state.contentURL, !url.isEmpty { return url }
+        let parts = [state.title, state.artist, state.album].filter { !$0.isEmpty }
+        return parts.isEmpty ? "" : parts.joined(separator: "\u{1F}")
+    }
+
+    @MainActor
     func toggleLike() {
-        guard let trackID = likedLookupTrackID,
+        guard let controller = activeController,
+              controller.supportsFavoriting,
+              !controller.favoritingIsReadOnly,
+              let trackKey = likedLookupTrackID,
               let currentValue = isCurrentTrackLiked else { return }
 
+        // Shown as done straight away, then put back if the source refuses:
+        // scripting a running app and a network round trip are both slow
+        // enough that waiting would feel like the click missed.
         let targetValue = !currentValue
         isCurrentTrackLiked = targetValue
 
         likeToggleTask?.cancel()
         likeToggleTask = Task { [weak self] in
-            let success = await SpotifyLibraryManager.shared.setTrackSaved(targetValue, trackID: trackID)
+            let success = await controller.setCurrentTrackFavorited(targetValue)
             guard !Task.isCancelled, !success else { return }
             await MainActor.run {
-                guard let self, self.likedLookupTrackID == trackID else { return }
+                guard let self, self.likedLookupTrackID == trackKey else { return }
                 self.isCurrentTrackLiked = currentValue
             }
         }
@@ -1644,12 +1757,22 @@ class MusicManager: ObservableObject {
             guard let self else { return }
 
             do {
-                let lyrics = try await self.fetchLyricsFromAPI(
+                var lyrics = try await self.fetchLyricsFromAPI(
                     artist: requestArtist,
                     title: requestTitle,
                     album: requestAlbum
                 )
                 guard !Task.isCancelled else { return }
+
+                // LRCLIB had nothing for this track. NetEase Cloud Music's
+                // own catalogue is the other place lyrics live (#713).
+                if lyrics.isEmpty || Self.isUnmatchedSearchResponse(lyrics) {
+                    let fromNetEase = try await self.fetchLyricsFromNetEase(artist: requestArtist, title: requestTitle)
+                    guard !Task.isCancelled else { return }
+                    if !fromNetEase.isEmpty {
+                        lyrics = fromNetEase
+                    }
+                }
 
                 await MainActor.run {
                     guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
@@ -1673,6 +1796,32 @@ class MusicManager: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Whether what came back is LRCLIB's search response rather than lyrics.
+    ///
+    /// When the search returns rows but none of them agrees with the track,
+    /// `fetchLyricsFromAPI` falls through to its plain-text branch and hands
+    /// back the JSON body as a single line at zero. That is "nothing found"
+    /// for the purpose of asking NetEase; real lyrics never open with `[{`.
+    private static func isUnmatchedSearchResponse(_ lyrics: [LyricLine]) -> Bool {
+        guard lyrics.count == 1, let only = lyrics.first, only.timestamp == 0 else { return false }
+        return only.text.hasPrefix("[{")
+    }
+
+    /// Asked only after LRCLIB has come up empty; see `NetEaseLyrics`.
+    private func fetchLyricsFromNetEase(artist: String, title: String) async throws -> [LyricLine] {
+        guard !artist.isEmpty, !title.isEmpty else { return [] }
+
+        // The duration is read now rather than when the fetch was started:
+        // lyrics are prepared before the duration is assigned in the same
+        // track update, so at that moment it still belongs to the last song.
+        // By the time LRCLIB has answered, the update has long since finished.
+        let duration = await MainActor.run { self.songDuration }
+        guard let lrc = try await NetEaseLyrics.fetchLRC(title: title, artist: artist, duration: duration) else {
+            return []
+        }
+        return parseLRC(lrc)
     }
 
     private func fetchLyricsFromAPI(artist: String, title: String, album: String) async throws -> [LyricLine] {
@@ -1703,7 +1852,7 @@ class MusicManager: ObservableObject {
                 if !synced.isEmpty {
                     return parseLRC(synced)
                 } else if !plain.isEmpty {
-                    return [LyricLine(timestamp: 0, text: plain)]
+                    return LyricLine.untimedLines(from: plain)
                 } else {
                     return []
                 }
@@ -1729,7 +1878,7 @@ class MusicManager: ObservableObject {
                     }
 
                     // Otherwise treat as plain lyrics blob
-                    return [LyricLine(timestamp: 0, text: trimmed)]
+                    return LyricLine.untimedLines(from: trimmed)
                 }
                 return []
             }
@@ -1810,6 +1959,16 @@ class MusicManager: ObservableObject {
     func updateCurrentLyric(for elapsedTime: TimeInterval) {
         guard !syncedLyrics.isEmpty else { return }
 
+        // Untimed lyrics have no line to point at. Leaving the index at -1 is
+        // what stops the sweep and the current-line styling from picking a line
+        // arbitrarily -- every one of these carries timestamp 0, so the search
+        // below would otherwise land on the last line of the song and stay there.
+        guard hasTimedLyrics else {
+            if currentLyricIndex != -1 { currentLyricIndex = -1 }
+            if !currentLyrics.isEmpty { currentLyrics = "" }
+            return
+        }
+
         // Find the current lyric based on elapsed time
         var newIndex = -1
         for (index, lyric) in syncedLyrics.enumerated() {
@@ -1840,6 +1999,18 @@ class MusicManager: ObservableObject {
 
     // Start a background task that periodically updates the displayed lyric
     private func startLyricSync() {
+        // Nothing to follow when the lyrics carry no timings; the loop would
+        // wake repeatedly only to conclude there is no line to point at.
+        //
+        // Asked before the "already running" return, not after it: a refetch
+        // on the same track can replace timed lyrics with untimed ones while
+        // the previous loop is still alive, and that loop would otherwise go
+        // on waking at its maximum rate for the rest of the track, finding
+        // nothing to point at each time.
+        guard hasTimedLyrics else {
+            stopLyricSync()
+            return
+        }
         // If already running, keep it
         if lyricSyncTask != nil { return }
 

@@ -64,8 +64,6 @@ func notchTabContentSize(
         let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
         let maxFraction = Defaults[.terminalMaxHeightFraction]
         size.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
-    case .llmUsage:
-        size.height = max(size.height, llmUsageOpenNotchHeight)
     case .extensionExperience:
         if let preferred = extensionTabPreferredHeight(baseSize: baseSize) {
             size.height = preferred
@@ -83,7 +81,10 @@ func notchTabContentSize(
             // `notchState`.
             size.height = max(size.height, Defaults[.calendarViewMode].notchHeight)
         }
-    case .shelf, .stats, .colorPicker:
+    case .shelf, .stats, .colorPicker, .llmUsage:
+        // The usage tab was given its own height once and had it taken back
+        // again upstream (5d4233f, "keep the usage tab at the normal tab
+        // height"); it takes the standard height like these do.
         break
     }
 

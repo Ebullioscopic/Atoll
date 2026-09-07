@@ -676,6 +676,40 @@ enum TimerProgressStyle: String, CaseIterable, Identifiable, Defaults.Serializab
     }
 }
 
+enum CaffeinateDuration: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case indefinite = "indefinite"
+    case fifteenMinutes = "fifteenMinutes"
+    case thirtyMinutes = "thirtyMinutes"
+    case oneHour = "oneHour"
+    case twoHours = "twoHours"
+    case fourHours = "fourHours"
+
+    var id: String { rawValue }
+
+    /// How long the session lasts, or `nil` when it runs until turned off.
+    var seconds: TimeInterval? {
+        switch self {
+        case .indefinite: return nil
+        case .fifteenMinutes: return 15 * 60
+        case .thirtyMinutes: return 30 * 60
+        case .oneHour: return 60 * 60
+        case .twoHours: return 2 * 60 * 60
+        case .fourHours: return 4 * 60 * 60
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .indefinite: return String(localized: "Until turned off")
+        case .fifteenMinutes: return String(localized: "15 minutes")
+        case .thirtyMinutes: return String(localized: "30 minutes")
+        case .oneHour: return String(localized: "1 hour")
+        case .twoHours: return String(localized: "2 hours")
+        case .fourHours: return String(localized: "4 hours")
+        }
+    }
+}
+
 enum FocusMonitoringMode: String, CaseIterable, Identifiable, Defaults.Serializable {
     case withoutDevTools = "withoutDevTools"
     case useDevTools = "useDevTools"
@@ -1198,6 +1232,21 @@ extension Defaults.Keys {
     static let spotifyAuthAccessTokenExpiration = Key<Double>("spotifyAuthAccessTokenExpiration", default: 0)
     static let spotifyAuthLastValidatedAt = Key<Double>("spotifyAuthLastValidatedAt", default: 0)
     static let spotifyLibraryClientID = Key<String>("spotifyLibraryClientID", default: "")
+
+    /// Token for Cider's external-application API, from
+    /// Settings > Connectivity > Manage External Application Access in Cider.
+    /// Empty is a valid setting: Cider can also run that API with
+    /// authentication switched off, and then no header is wanted at all.
+    /// Superseded by `CiderTokenStore`, which keeps the token in the Keychain.
+    /// Kept only so an existing value can be migrated out of the preferences
+    /// plist on first launch; nothing reads it to make a request.
+    /// Named `legacy…` so nothing new reaches for it by the old name; the
+    /// stored key string is unchanged so existing values still migrate.
+    /// A `@available(*, deprecated)` attribute would have been the obvious
+    /// alternative, but it fires on `CiderTokenStore` -- the one place that is
+    /// supposed to read this -- and a warning at the sanctioned use site is
+    /// worse than none.
+    static let legacyCiderAPIToken = Key<String>("ciderAPIToken", default: "")
     // The OAuth token pair lives in the Keychain (see KeychainSpotifyTokenStore);
     // these two keys remain only for the one-time migration of early builds.
     static let spotifyLibraryAccessToken = Key<String>("spotifyLibraryAccessToken", default: "")
@@ -1274,6 +1323,17 @@ extension Defaults.Keys {
     // Legacy key name: the separate control window is gone, this now shows inline notch controls.
     static let timerControlWindowEnabled = Key<Bool>("timerControlWindowEnabled", default: true)
     
+    // MARK: Per-App Volume
+    static let enablePerAppVolume = Key<Bool>("enablePerAppVolume", default: false)
+    static let showPerAppVolumeIcon = Key<Bool>("showPerAppVolumeIcon", default: true)
+    static let perAppVolumeLevels = Key<[String: Double]>("perAppVolumeLevels", default: [:])
+    static let perAppVolumeMuted = Key<Set<String>>("perAppVolumeMuted", default: [])
+    // MARK: Caffeinate Feature
+    static let enableCaffeinate = Key<Bool>("enableCaffeinate", default: true)
+    static let showCaffeinateIcon = Key<Bool>("showCaffeinateIcon", default: true)
+    static let caffeinateDefaultDuration = Key<CaffeinateDuration>("caffeinateDefaultDuration", default: .indefinite)
+    static let caffeinateKeepsDisplayAwake = Key<Bool>("caffeinateKeepsDisplayAwake", default: true)
+
     // MARK: ColorPicker Feature
     static let enableColorPickerFeature = Key<Bool>("enableColorPickerFeature", default: true)
     static let showColorFormats = Key<Bool>("showColorFormats", default: true)
@@ -1284,6 +1344,10 @@ extension Defaults.Keys {
     // MARK: Clipboard Feature
     static let enableClipboardManager = Key<Bool>("enableClipboardManager", default: true)
     static let clipboardHistorySize = Key<Int>("clipboardHistorySize", default: 3)
+    /// Whether clipboard history is written to disk and restored on launch.
+    /// Off keeps it in memory for the session only — nothing survives a quit.
+    /// Defaults to true so existing installs keep the behaviour they have.
+    static let persistClipboardHistory = Key<Bool>("persistClipboardHistory", default: true)
     static let showClipboardIcon = Key<Bool>("showClipboardIcon", default: true)
     static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .panel)
     
@@ -1429,6 +1493,8 @@ extension Defaults.Keys {
 
     /// Whether the sung line is swept or simply lit.
     static let lyricHighlightStyle = Key<LyricHighlightStyle>("lyricHighlightStyle", default: .sweep)
+    /// Keeps the current line under the closed notch after the panel is gone.
+    static let pinLyricsWhenClosed = Key<Bool>("pinLyricsWhenClosed", default: false)
     static let lyricsPanelWidth = Key<CGFloat>("lyricsPanelWidth", default: 280)
     static let lyricsPanelOffset = Key<CGFloat>("lyricsPanelOffset", default: 0)
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)

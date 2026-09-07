@@ -168,8 +168,6 @@ let minimalisticTimerCountdownBlockHeight: CGFloat = minimalisticTimerCountdownT
 let statsSecondRowContentHeight: CGFloat = 120
 let statsGridSpacingHeight: CGFloat = 12
 let statsAdditionalRowHeight: CGFloat = statsSecondRowContentHeight + statsGridSpacingHeight
-let llmUsageOpenNotchHeight: CGFloat = 220
-let llmUsageProviderCardHeight: CGFloat = 188
 /// Height the month calendar needs to show every week row at a readable size.
 /// 6 rows at ~27pt plus the title row, weekday row and the notch's own chrome.
 let calendarFullMonthNotchHeight: CGFloat = 340

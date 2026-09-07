@@ -25,7 +25,7 @@ struct ModelPricing {
     static func resolveRates(for modelId: String) -> (prompt: Double, completion: Double) {
         // Try to get dynamic rates from the manager (Remote or Local Bundled Fallback)
         if let dynamicRates = ModelPricingManager.shared.getPricing(for: modelId) {
-            return dynamicRates
+            return (dynamicRates.prompt, dynamicRates.completion)
         }
         
         // If the manager has no data (e.g. initialization failed),
@@ -34,10 +34,21 @@ struct ModelPricing {
     }
 
     /// Calculates the total cost for a given model and token counts. Returns nil if the model is unpriced.
-    static func cost(model: String, inputTokens: Int, outputTokens: Int) -> Double? {
+    ///
+    /// `inputTokens` are the prompt tokens billed at the full prompt rate (i.e. excluding
+    /// cache hits and cache writes). Cache reads and writes are priced at the provider's
+    /// cache rates when the table has them, and at the plain prompt rate otherwise — the
+    /// same over-estimate the app produced before cache rates were tracked.
+    static func cost(model: String, inputTokens: Int, outputTokens: Int,
+                     cacheReadTokens: Int = 0, cacheWriteTokens: Int = 0) -> Double? {
         guard let rates = ModelPricingManager.shared.getPricing(for: model) else {
             return nil
         }
-        return (Double(inputTokens) * rates.prompt) + (Double(outputTokens) * rates.completion)
+        let cacheRead = rates.cacheRead ?? rates.prompt
+        let cacheWrite = rates.cacheWrite ?? rates.prompt
+        return (Double(inputTokens) * rates.prompt)
+            + (Double(cacheReadTokens) * cacheRead)
+            + (Double(cacheWriteTokens) * cacheWrite)
+            + (Double(outputTokens) * rates.completion)
     }
 }

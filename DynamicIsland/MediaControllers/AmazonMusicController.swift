@@ -135,9 +135,43 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == targetBundleIdentifier }
     }
 
+    // MARK: - Favouriting
+
+    // Declared here rather than left to the protocol's defaults so subclasses
+    // can override them: the conformance is on this class, so a witness picked
+    // from an extension would be the one used no matter what a subclass says.
+
+    @MainActor
+    var canEverFavorite: Bool { false }
+
+    @MainActor
+    var supportsFavoriting: Bool { false }
+
+    @MainActor
+    var favoritingIsReadOnly: Bool { false }
+
+    func isCurrentTrackFavorited() async -> Bool? { nil }
+
+    @discardableResult
+    func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool { false }
+
     func toggleShuffle() async {
         MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
         playbackState.isShuffled.toggle()
+    }
+
+    /// Openings for a subclass whose app reports shuffle and repeat somewhere
+    /// other than the Media Remote stream. `playbackState` is settable only in
+    /// this file, so a subclass cannot reach it directly.
+
+    func applyShuffleState(_ isShuffled: Bool) {
+        guard playbackState.isShuffled != isShuffled else { return }
+        playbackState.isShuffled = isShuffled
+    }
+
+    func applyRepeatMode(_ mode: RepeatMode) {
+        guard playbackState.repeatMode != mode else { return }
+        playbackState.repeatMode = mode
     }
 
     func toggleRepeat() async {
@@ -303,13 +337,5 @@ final class AmazonMusicController: FilteredNowPlayingController {
     }
 }
 
-final class CiderController: FilteredNowPlayingController {
-    static let bundleIdentifier = "sh.cider.genten.mac"
-
-    init?() {
-        super.init(
-            bundleIdentifier: Self.bundleIdentifier,
-            controllerName: "CiderController"
-        )
-    }
-}
+// CiderController now lives in CiderController.swift, where its
+// favouriting support sits alongside it.

@@ -67,8 +67,7 @@ struct ClipboardWindowHeader: View {
                         clipboardManager.clearHistory()
                     } else {
                         // Clear favorites
-                        clipboardManager.pinnedItems.removeAll()
-                        clipboardManager.savePinnedItemsToDefaults()
+                        clipboardManager.clearPinnedItems()
                     }
                 }) {
                     Image(systemName: "trash")

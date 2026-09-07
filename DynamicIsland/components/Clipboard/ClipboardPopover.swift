@@ -106,8 +106,7 @@ struct ClipboardPopoverHeader: View {
                     if selectedTab == .history {
                         clipboardManager.clearHistory()
                     } else {
-                        clipboardManager.pinnedItems.removeAll()
-                        clipboardManager.savePinnedItemsToDefaults()
+                        clipboardManager.clearPinnedItems()
                     }
                 }) {
                     Image(systemName: "trash")
