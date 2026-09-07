@@ -1223,6 +1223,7 @@ struct ContentView: View {
                           .onChange(of: geo.size.width) { _, width in closedContentWidth = width }
                   }
               }
+              .pinnedLyrics(isVisible: pinnedLyricsVisible)
               .offset(x: menuBarClearanceOffset)
               .animation(.smooth(duration: 0.25), value: menuBarClearanceOffset)
               .zIndex(2)
@@ -2385,6 +2386,25 @@ struct ContentView: View {
             && point.y >= frame.minY && point.y <= frame.maxY
     }
     
+    /// Whether the pinned current lyric belongs under the closed notch.
+    ///
+    /// Deliberately excludes the moment a sneak peek is up: both draw in the
+    /// same strip below the notch, and stacking them would push the notch's
+    /// own content around every time the volume changed.
+    private var pinnedLyricsVisible: Bool {
+        Defaults[.enableLyrics]
+            && Defaults[.pinLyricsWhenClosed]
+            && vm.notchState == .closed
+            && !vm.hideOnClosed
+            && !lockScreenManager.isLocked
+            && !isSneakPeekVisibleOnCurrentScreen
+            && musicManager.isPlaying
+            && PinnedLyricsView.hasCurrentLine(
+                index: musicManager.currentLyricIndex,
+                lineCount: musicManager.syncedLyrics.count
+            )
+    }
+
     // Helper function to check if any popovers are active
     private func hasAnyActivePopovers() -> Bool {
      return vm.isBatteryPopoverActive || 
