@@ -314,6 +314,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .media, title: "Music Source", keywords: ["media source", "controller"], highlightID: SettingsTab.media.highlightID(for: "Music Source")),
         SettingsSearchEntry(tab: .media, title: "Skip buttons", keywords: ["skip", "controls", "±10"], highlightID: SettingsTab.media.highlightID(for: "Skip buttons")),
         SettingsSearchEntry(tab: .media, title: "Sneak Peek Style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak Peek Style")),
+        SettingsSearchEntry(tab: .media, title: "Keep lyrics under the closed notch", keywords: ["lyrics", "pin", "pinned", "closed notch", "always show"], highlightID: SettingsTab.media.highlightID(for: "Keep lyrics under the closed notch")),
         SettingsSearchEntry(tab: .media, title: "Show lyrics", keywords: ["lyrics", "song text", "side panel", "calendar", "inline"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
         // Targets the lyrics toggle rather than the Highlight picker: the picker
         // only exists while lyrics are on, so a search result pointing at it
@@ -3394,6 +3395,18 @@ struct Media: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .settingsHighlight(id: highlightID("Lyric highlight"))
+                }
+
+                if enableLyrics && !enableMinimalisticUI && showStandardMediaControls {
+                    Defaults.Toggle(key: .pinLyricsWhenClosed) {
+                        Text("Keep lyrics under the closed notch")
+                    }
+                    .settingsHighlight(id: highlightID("Keep lyrics under the closed notch"))
+
+                    Text("Shows the line currently being sung below the notch while it is closed, so lyrics stay readable without hovering. Can also be toggled from the pin on the lyrics panel. Hidden while a HUD is on screen.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Text(
