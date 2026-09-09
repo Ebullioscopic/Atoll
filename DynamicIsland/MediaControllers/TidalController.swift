@@ -34,6 +34,25 @@ final class TidalController: FilteredNowPlayingController {
         )
     }
 
+    /// Browsers can become macOS' foreground Now Playing client without
+    /// stopping TIDAL's audio. In that case keep TIDAL's last state instead of
+    /// replacing it with an idle placeholder. Muted videos never become an
+    /// active audio process, matching the distinction reported by users.
+    override func shouldPreservePlaybackState(whenCompetingWith source: String) -> Bool {
+        guard playbackState.isPlaying else { return false }
+
+        return AudioProcessQuery.processObjectIDs().contains { processObject in
+            guard let processBundleIdentifier = AudioProcessQuery.bundleIdentifier(for: processObject),
+                  AudioTapTargetMatcher.targetBundleIdentifier(
+                    for: processBundleIdentifier,
+                    among: [Self.bundleIdentifier]
+                  ) != nil else {
+                return false
+            }
+            return AudioProcessQuery.isRunningOutput(processObject)
+        }
+    }
+
     // MARK: - Favouriting, read only
 
     // TIDAL's heart can be read but not written -- see TidalAccessibility for
