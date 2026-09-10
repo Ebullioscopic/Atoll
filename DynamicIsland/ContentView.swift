@@ -36,6 +36,9 @@ import UIKit
 
 @MainActor
 struct ContentView: View {
+    @Default(.pinnedLyricContext) private var pinnedLyricContext
+    @Default(.pinLyricsWhenClosed) private var pinLyricsWhenClosed
+    @Default(.enableLyrics) private var enableLyrics
     @EnvironmentObject var vm: DynamicIslandViewModel
     @EnvironmentObject var webcamManager: WebcamManager
 
@@ -1223,7 +1226,7 @@ struct ContentView: View {
                           .onChange(of: geo.size.width) { _, width in closedContentWidth = width }
                   }
               }
-              .pinnedLyrics(isVisible: pinnedLyricsVisible)
+              .pinnedLyrics(isVisible: pinnedLyricsVisible, isContentHidden: isSneakPeekVisibleOnCurrentScreen)
               .offset(x: menuBarClearanceOffset)
               .animation(.smooth(duration: 0.25), value: menuBarClearanceOffset)
               .zIndex(2)
@@ -2358,6 +2361,8 @@ struct ContentView: View {
             effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
         )
         let height = max(closedHeight, recordingSize?.height ?? 0) + 6
+            + PinnedLyricsView.reservedHeight(isEligible: pinnedLyricsVisible,
+                availability: musicManager.lyricsAvailability, context: pinnedLyricContext)
         let width = max(closedWidth, recordingSize?.width ?? 0) + 24
         // Same shift the content is drawn with, so the hit area stays under it.
         let minX = screen.frame.midX - width / 2 + menuBarClearanceOffset
@@ -2386,23 +2391,15 @@ struct ContentView: View {
             && point.y >= frame.minY && point.y <= frame.maxY
     }
     
-    /// Whether the pinned current lyric belongs under the closed notch.
-    ///
-    /// Deliberately excludes the moment a sneak peek is up: both draw in the
-    /// same strip below the notch, and stacking them would push the notch's
-    /// own content around every time the volume changed.
+    /// Track-level reservation. A sneak peek hides only the overlaid words.
     private var pinnedLyricsVisible: Bool {
-        Defaults[.enableLyrics]
-            && Defaults[.pinLyricsWhenClosed]
-            && vm.notchState == .closed
-            && !vm.hideOnClosed
-            && !lockScreenManager.isLocked
-            && !isSneakPeekVisibleOnCurrentScreen
-            && musicManager.isPlaying
-            && PinnedLyricsView.hasCurrentLine(
-                index: musicManager.currentLyricIndex,
-                lineCount: musicManager.syncedLyrics.count
-            )
+        PinnedLyricsView.shouldReserve(
+            lyricsEnabled: enableLyrics,
+            pinEnabled: pinLyricsWhenClosed,
+            surfaceEligible: vm.notchState == .closed && !vm.hideOnClosed
+                && !lockScreenManager.isLocked && musicManager.isPlaying,
+            availability: musicManager.lyricsAvailability
+        )
     }
 
     // Helper function to check if any popovers are active

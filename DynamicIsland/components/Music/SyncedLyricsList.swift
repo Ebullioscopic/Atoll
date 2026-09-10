@@ -72,6 +72,40 @@ enum SyncedLyricsRows {
     }
 }
 
+/// Fixed slots around the existing synchronization index. Missing neighbors stay
+/// blank, and gap markers never consume a sung context slot.
+enum PinnedLyricsContextRows {
+    struct Slot: Equatable {
+        let text: String
+        let isCurrent: Bool
+    }
+
+    static func slots(lines: [LyricLine], duration: TimeInterval, currentIndex: Int,
+                      context: PinnedLyricContext) -> [Slot] {
+        let rows = SyncedLyricsRows.rows(for: lines, duration: duration)
+        let sung = rows.compactMap { row -> (index: Int, text: String)? in
+            guard case let .line(index, text) = row,
+                  lines[index].isTimed, LyricTextSemantics.isLyric(text) else { return nil }
+            return (index, text)
+        }
+        let radius = context.rawValue / 2
+        let previous = Array(sung.filter { $0.index < currentIndex }.suffix(radius))
+        let next = Array(sung.filter { $0.index > currentIndex }.prefix(radius))
+        let current = sung.first { $0.index == currentIndex }?.text
+        let inGap = rows.contains {
+            if case let .instrumental(index) = $0 { return index == currentIndex }
+            return false
+        }
+        let blank = Slot(text: "", isCurrent: false)
+        var slots = Array(repeating: blank, count: radius - previous.count)
+        slots += previous.map { Slot(text: $0.text, isCurrent: false) }
+        slots.append(Slot(text: current ?? (inGap ? "♪" : ""), isCurrent: true))
+        slots += next.map { Slot(text: $0.text, isCurrent: false) }
+        slots += Array(repeating: blank, count: radius - next.count)
+        return slots
+    }
+}
+
 /// The colours and metrics a host gives the list, so the notch and the lock
 /// screen can look like themselves while sharing the behaviour.
 struct SyncedLyricsStyle {

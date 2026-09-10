@@ -314,6 +314,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .media, title: "Music Source", keywords: ["media source", "controller"], highlightID: SettingsTab.media.highlightID(for: "Music Source")),
         SettingsSearchEntry(tab: .media, title: "Skip buttons", keywords: ["skip", "controls", "±10"], highlightID: SettingsTab.media.highlightID(for: "Skip buttons")),
         SettingsSearchEntry(tab: .media, title: "Sneak Peek Style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak Peek Style")),
+        SettingsSearchEntry(tab: .media, title: "Pinned lyric context", keywords: ["pinned lyrics", "lyric context", "lyrics lines", "closed notch", "lyrics height"], highlightID: SettingsTab.media.highlightID(for: "Pinned lyric context")),
         SettingsSearchEntry(tab: .media, title: "Keep lyrics under the closed notch", keywords: ["lyrics", "pin", "pinned", "closed notch", "always show"], highlightID: SettingsTab.media.highlightID(for: "Keep lyrics under the closed notch")),
         SettingsSearchEntry(tab: .media, title: "Show lyrics", keywords: ["lyrics", "song text", "side panel", "calendar", "inline"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
         // Targets the lyrics toggle rather than the Highlight picker: the picker
@@ -3174,6 +3175,8 @@ struct Media: View {
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
     @Default(.showCalendar) private var showCalendar
     @Default(.enableLyrics) private var enableLyrics
+    @Default(.pinLyricsWhenClosed) private var pinLyricsWhenClosed
+    @Default(.pinnedLyricContext) private var pinnedLyricContext
     @Default(.lyricHighlightStyle) private var lyricHighlightStyle
     @Default(.lyricsPanelWidth) private var lyricsPanelWidth
     @Default(.lyricsPanelOffset) private var lyricsPanelOffset
@@ -3403,7 +3406,16 @@ struct Media: View {
                     }
                     .settingsHighlight(id: highlightID("Keep lyrics under the closed notch"))
 
-                    Text("Shows the line currently being sung below the notch while it is closed, so lyrics stay readable without hovering. Can also be toggled from the pin on the lyrics panel. Hidden while a HUD is on screen.")
+                    SettingsSegmentedPicker(
+                        "Pinned lyric context",
+                        selection: $pinnedLyricContext,
+                        items: Array(PinnedLyricContext.allCases)
+                    ) { $0.localizedName }
+                    .disabled(!pinLyricsWhenClosed)
+                    .settingsHighlight(id: highlightID("Pinned lyric context"))
+
+
+                    Text("Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen. Can also be toggled from the pin on the lyrics panel.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
