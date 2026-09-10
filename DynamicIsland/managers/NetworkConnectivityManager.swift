@@ -52,6 +52,8 @@ final class NetworkConnectivityManager: NSObject, ObservableObject, CWEventDeleg
     private var lastWiFiName: String?
     private var noConnectionDismissed = false
     private var hideWorkItem: DispatchWorkItem?
+    private let fallbackWiFiCacheLifetime: TimeInterval = 1.5
+    private var fallbackWiFiNameCache: (interfaceName: String, name: String?, updatedAt: Date)?
 
     private override init() {
         super.init()
@@ -66,7 +68,7 @@ final class NetworkConnectivityManager: NSObject, ObservableObject, CWEventDeleg
             let isSatisfied = path.status == .satisfied
             let usesWiFi = isSatisfied && path.usesInterfaceType(.wifi)
             let isHotspot = usesWiFi && path.isExpensive
-            let wiFiName = usesWiFi ? Self.currentWiFiName(using: self.wiFiClient) : nil
+            let wiFiName = usesWiFi ? self.currentWiFiName() : nil
 
             DispatchQueue.main.async { [weak self] in
                 self?.handlePathUpdate(
@@ -98,6 +100,8 @@ final class NetworkConnectivityManager: NSObject, ObservableObject, CWEventDeleg
     func dismissNoConnection() {
         guard hudState == .noConnection else { return }
         noConnectionDismissed = true
+        hideWorkItem?.cancel()
+        hideWorkItem = nil
         hudState = .hidden
     }
 
@@ -126,7 +130,7 @@ final class NetworkConnectivityManager: NSObject, ObservableObject, CWEventDeleg
     private func refreshWiFiIdentity() {
         monitorQueue.async { [weak self] in
             guard let self else { return }
-            let name = Self.currentWiFiName(using: self.wiFiClient)
+            let name = self.currentWiFiName()
             DispatchQueue.main.async { [weak self] in
                 self?.handleWiFiIdentityChange(name)
             }
@@ -159,10 +163,14 @@ final class NetworkConnectivityManager: NSObject, ObservableObject, CWEventDeleg
             lastPathUsedWiFi = false
             lastConnectionWasHotspot = false
             lastWiFiName = nil
-            hideWorkItem?.cancel()
-            hideWorkItem = nil
             if !noConnectionDismissed {
-                hudState = .noConnection
+                if hudState != .noConnection {
+                    showNoConnection()
+                }
+            } else {
+                hideWorkItem?.cancel()
+                hideWorkItem = nil
+                hudState = .hidden
             }
             return
         }
@@ -199,6 +207,17 @@ final class NetworkConnectivityManager: NSObject, ObservableObject, CWEventDeleg
         showConnection(named: name, isHotspot: lastConnectionWasHotspot)
     }
 
+    private func showNoConnection() {
+        hudState = .noConnection
+
+        hideWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.dismissNoConnection()
+        }
+        hideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: workItem)
+    }
+
     private func showConnection(named name: String?, isHotspot: Bool) {
         let displayName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedName: String
@@ -225,16 +244,29 @@ final class NetworkConnectivityManager: NSObject, ObservableObject, CWEventDeleg
 
     /// CoreWLAN is the preferred source. `networksetup` is a permission-free
     /// fallback for macOS configurations where SSID access is privacy-redacted.
-    private static func currentWiFiName(using client: CWWiFiClient) -> String? {
-        if let name = client.interface()?.ssid()?.trimmingCharacters(in: .whitespacesAndNewlines),
+    private func currentWiFiName() -> String? {
+        if let name = wiFiClient.interface()?.ssid()?.trimmingCharacters(in: .whitespacesAndNewlines),
            !name.isEmpty {
             return name
         }
 
-        guard let interfaceName = client.interface()?.interfaceName, !interfaceName.isEmpty else {
+        guard let interfaceName = wiFiClient.interface()?.interfaceName, !interfaceName.isEmpty else {
             return nil
         }
 
+        let now = Date()
+        if let cache = fallbackWiFiNameCache,
+           cache.interfaceName == interfaceName,
+           now.timeIntervalSince(cache.updatedAt) < fallbackWiFiCacheLifetime {
+            return cache.name
+        }
+
+        let name = Self.networkSetupWiFiName(for: interfaceName)
+        fallbackWiFiNameCache = (interfaceName: interfaceName, name: name, updatedAt: now)
+        return name
+    }
+
+    private static func networkSetupWiFiName(for interfaceName: String) -> String? {
         let process = Process()
         let output = Pipe()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/networksetup")

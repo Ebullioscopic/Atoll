@@ -11,6 +11,18 @@
 import SwiftUI
 
 enum NetworkConnectivityHUDMetrics {
+    static func isPresented(
+        state: ConnectivityHUDState,
+        notchState: NotchState,
+        hideOnClosed: Bool,
+        isLocked: Bool
+    ) -> Bool {
+        notchState == .closed
+            && state.isVisible
+            && !hideOnClosed
+            && !isLocked
+    }
+
     static func size(
         for state: ConnectivityHUDState,
         closedNotchSize: CGSize,
@@ -132,7 +144,11 @@ struct NetworkConnectivityHUD: View {
     }
 
     private func connectedNetworkContent(name: String, isHotspot: Bool) -> some View {
-        let totalWidth = max(closedNotchSize.width + 220, 450)
+        let totalWidth = NetworkConnectivityHUDMetrics.size(
+            for: state,
+            closedNotchSize: closedNotchSize,
+            effectiveClosedNotchHeight: effectiveClosedNotchHeight
+        )?.width ?? closedNotchSize.width
         let wingWidth = max(0, (totalWidth - closedNotchSize.width) / 2)
 
         return HStack(spacing: 0) {

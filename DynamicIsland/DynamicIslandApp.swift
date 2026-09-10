@@ -477,7 +477,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func calculateRequiredNotchSize() -> CGSize {
-        if vm.notchState == .closed,
+        if NetworkConnectivityHUDMetrics.isPresented(
+            state: networkConnectivityManager.hudState,
+            notchState: vm.notchState,
+            hideOnClosed: vm.hideOnClosed,
+            isLocked: LockScreenManager.shared.isLocked
+        ),
            let connectivitySize = NetworkConnectivityHUDMetrics.size(
                for: networkConnectivityManager.hudState,
                closedNotchSize: vm.closedNotchSize,

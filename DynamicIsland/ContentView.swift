@@ -447,9 +447,12 @@ struct ContentView: View {
     }
 
     private var isConnectivityHUDVisible: Bool {
-        vm.notchState == .closed
-            && networkConnectivityManager.hudState.isVisible
-            && !lockScreenManager.isLocked
+        NetworkConnectivityHUDMetrics.isPresented(
+            state: networkConnectivityManager.hudState,
+            notchState: vm.notchState,
+            hideOnClosed: vm.hideOnClosed,
+            isLocked: lockScreenManager.isLocked
+        )
     }
 
     /// Whether the fallback top-edge hover detector should run.
