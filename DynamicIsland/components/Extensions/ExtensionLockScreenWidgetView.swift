@@ -108,10 +108,14 @@ struct ExtensionLockScreenWidgetView: View {
                 ZStack {
                     shape
                         .fill(Color.clear)
+                        #if compiler(>=6.2)
                         .glassEffect(
                             .clear.interactive(),
                             in: .rect(cornerRadius: descriptor.cornerRadius)
                         )
+                        #else
+                        .background(.ultraThinMaterial, in: .rect(cornerRadius: descriptor.cornerRadius))
+                        #endif
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                     tintOverlay(shape: shape)

@@ -274,10 +274,14 @@ struct VerticalHUDView: View {
                 } else {
                     Capsule()
                         .fill(.clear)
+                        #if compiler(>=6.2)
                         .glassEffect(
                             .clear.interactive(),
                             in: .capsule
                         )
+                        #else
+                        .background(.ultraThinMaterial, in: .capsule)
+                        #endif
                 }
             } else {
                 Capsule().fill(.ultraThinMaterial)

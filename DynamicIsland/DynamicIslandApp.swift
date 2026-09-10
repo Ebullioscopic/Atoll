@@ -49,6 +49,7 @@ struct DynamicNotchApp: App {
 
     var body: some Scene {
         MenuBarExtra("dynamic.island", systemImage: "mountain.2.fill", isInserted: $showMenuBarIcon) {
+            Button("Open Assistant") { ScreenAssistantManager.shared.showPanels() }
             Button("Settings") {
                 SettingsWindowController.shared.showWindow()
             }
@@ -74,6 +75,14 @@ struct DynamicNotchApp: App {
                 NSApplication.shared.terminate(self)
             }
             .keyboardShortcut(KeyEquivalent("Q"), modifiers: .command)
+        }
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Open Assistant") { ScreenAssistantManager.shared.showPanels() }
+            }
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { SettingsWindowController.shared.showWindow() }
+            }
         }
     }
 
@@ -124,6 +133,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboardingWindowController: NSWindowController?
     private var cancellables = Set<AnyCancellable>()
     private var windowsHiddenForLock = false
+    private var screenIsLocked = false
+    private var unlockGeneration = UUID()
     private var optionalShortcutHandlersRegistered = false
     private weak var focusWithoutDevToolsMenuItem: NSMenuItem?
     private weak var focusUseDevToolsMenuItem: NSMenuItem?
@@ -294,6 +305,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // synchronously here so it is never left frozen. (See issue #568.)
         SystemOSDManager.resumeOSDUIHelperForTermination()
 
+        NotchCompatibilityMonitor.shared.onChange = nil
+        NotchCompatibilityMonitor.shared.stop()
+
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
@@ -307,15 +321,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         LunarManager.shared.appWillTerminate()
     }
     
-    @objc func onScreenLocked(_: Notification) {
-        print("Screen locked")
-        hideWindowsForLock()
-    }
+    @objc func onScreenLocked(_: Notification) { updateScreenLockState(true) }
+    @objc func onScreenUnlocked(_: Notification) { updateScreenLockState(false) }
 
-    @objc func onScreenUnlocked(_: Notification) {
-        print("Screen unlocked")
+    private func updateScreenLockState(_ locked: Bool) {
+        guard screenIsLocked != locked else { return }
+        screenIsLocked = locked
+        unlockGeneration = UUID()
+        if locked {
+            hideWindowsForLock()
+            return
+        }
+        let generation = unlockGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            guard let self = self else { return }
+            guard let self, !self.screenIsLocked, self.unlockGeneration == generation else { return }
             self.restoreWindowsAfterLock()
             self.adjustWindowPosition(changeAlpha: true)
         }
@@ -337,7 +356,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func restoreWindowsAfterLock() {
-        guard windowsHiddenForLock else { return }
+        guard windowsHiddenForLock, !screenIsLocked else { return }
         windowsHiddenForLock = false
 
         if Defaults[.showOnAllDisplays] {
@@ -393,13 +412,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     private func reassertDynamicIslandWindowSpacePresence() {
-        guard !windowsHiddenForLock else { return }
+        guard !windowsHiddenForLock, !screenIsLocked else { return }
 
         syncNotchSpaceMembership()
 
         for window in currentDynamicIslandWindows() {
             window.collectionBehavior = DynamicIslandWindow.pinnedCollectionBehavior
+            if let screen = window.screen {
+                window.level = NotchCompatibilityMonitor.shared.recommendedLevel(for: window.frame, on: screen)
+            }
             window.orderFrontRegardless()
+        }
+    }
+
+    /// Compatibility updates preserve intentional hiding and never activate a window.
+    private func updateNotchCompatibilityLevels() {
+        guard !windowsHiddenForLock, !screenIsLocked else { return }
+        for window in currentDynamicIslandWindows() {
+            guard let screen = window.screen else { continue }
+            let wasVisible = window.isVisible
+            window.level = NotchCompatibilityMonitor.shared.recommendedLevel(for: window.frame, on: screen)
+            if wasVisible { window.orderFrontRegardless() }
         }
     }
 
@@ -430,7 +463,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 //.moveToSky()
         )
         
-        window.orderFrontRegardless()
+        if windowsHiddenForLock || screenIsLocked {
+            window.alphaValue = 0
+            window.orderOut(nil)
+        } else {
+            window.orderFrontRegardless()
+        }
         NotchSpaceManager.shared.notchSpace.windows.insert(window)
         //SkyLightOperator.shared.delegateWindow(window)
         return window
@@ -457,7 +495,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             height: roundedHeight
         ), display: false)
         
-        if changeAlpha {
+        window.level = NotchCompatibilityMonitor.shared.recommendedLevel(for: window.frame, on: screen)
+        if windowsHiddenForLock || screenIsLocked {
+            window.alphaValue = 0
+            window.orderOut(nil)
+        } else if changeAlpha {
             window.alphaValue = 1
         }
     }
@@ -715,6 +757,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         applySelectedAppIcon()
         installTopMenuItemsIfNeeded()
+        NotchCompatibilityMonitor.shared.onChange = { [weak self] in
+            self?.updateNotchCompatibilityLevels()
+        }
+        NotchCompatibilityMonitor.shared.start()
+        LockScreenManager.shared.$isLocked.removeDuplicates()
+            .sink { [weak self] locked in self?.updateScreenLockState(locked) }
+            .store(in: &cancellables)
+
 
         Defaults.publisher(.focusMonitoringMode, options: [])
             .sink { [weak self] _ in
@@ -1051,6 +1101,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             playWelcomeSound()
         }
         
+        if AppRuntimeEnvironment.isUITesting && CommandLine.arguments.contains("--show-chat") {
+            DispatchQueue.main.async { ScreenAssistantManager.shared.showPanels() }
+        }
+
         previousScreens = NSScreen.screens
 
         // Skip weather under UI testing: prepareLocationAccess prompts for Location.
@@ -1593,6 +1647,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc func togglePopover(_ sender: Any?) {
+        guard !screenIsLocked, !windowsHiddenForLock else { return }
         if window?.isVisible == true {
             window?.orderOut(nil)
         } else {

@@ -1,6 +1,897 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "Decrease text size": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "缩小文字"
+        }
+      }
+    }
+  },
+  "Increase text size": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "放大文字"
+        }
+      }
+    }
+  },
+  "Reset text size": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "重置文字大小"
+        }
+      }
+    }
+  },
+  "Decrease text size (⌘−)": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "缩小文字（⌘−）"
+        }
+      }
+    }
+  },
+  "Increase text size (⌘+)": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "放大文字（⌘+）"
+        }
+      }
+    }
+  },
+  "Reset text size (⌘0)": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "重置文字大小（⌘0）"
+        }
+      }
+    }
+  },
+  "Resize window": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "放大或还原窗口"
+        }
+      }
+    }
+  },
+    "Web search" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页搜索"
+          }
+        }
+      }
+    },
+    "Read webpage" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读取网页"
+          }
+        }
+      }
+    },
+    "List files" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列出文件"
+          }
+        }
+      }
+    },
+    "Read file" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读取文件"
+          }
+        }
+      }
+    },
+    "Tools used:" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已使用工具："
+          }
+        }
+      }
+    },
+    "Message" : { "localizations" : { "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "消息" } } } },
+    "Atoll Assistant" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll 助手"
+          }
+        }
+      }
+    },
+    "Open Assistant" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开聊天助手"
+          }
+        }
+      }
+    },
+    "Conversation" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对话"
+          }
+        }
+      }
+    },
+    "New chat" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新对话"
+          }
+        }
+      }
+    },
+    "Clear the current conversation and start again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清空当前对话并重置模型记忆"
+          }
+        }
+      }
+    },
+    "A little help, right here." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随时在这里，为您解答。"
+          }
+        }
+      }
+    },
+    "Ask a question, drop an image, or capture part of your screen." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入问题、拖入图片，或截取屏幕内容。"
+          }
+        }
+      }
+    },
+    "Drop images" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖入图片"
+          }
+        }
+      }
+    },
+    "Paste screenshots" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴截图"
+          }
+        }
+      }
+    },
+    "Drop images to attach" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖入图片以添加附件"
+          }
+        }
+      }
+    },
+    "Drop images or files to attach" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖入图片或文件以添加附件"
+          }
+        }
+      }
+    },
+    "Ask anything, or drop an image…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入问题，或拖入图片…"
+          }
+        }
+      }
+    },
+    "Importing…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在导入…"
+          }
+        }
+      }
+    },
+    "Thinking…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在思考…"
+          }
+        }
+      }
+    },
+    "Connecting…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在连接…"
+          }
+        }
+      }
+    },
+    "Working…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在处理…"
+          }
+        }
+      }
+    },
+    "Replying…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在回复…"
+          }
+        }
+      }
+    },
+    "Using tools:" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在使用工具："
+          }
+        }
+      }
+    },
+    "Stop reply" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止回复"
+          }
+        }
+      }
+    },
+    "Send message" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送消息"
+          }
+        }
+      }
+    },
+    "Send message (Return)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送消息（回车）"
+          }
+        }
+      }
+    },
+    "⇧ Return for a new line" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⇧ 回车换行"
+          }
+        }
+      }
+    },
+    "Follow latest reply" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随最新回复"
+          }
+        }
+      }
+    },
+    "Copy message" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制消息"
+          }
+        }
+      }
+    },
+    "YOU" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您"
+          }
+        }
+      }
+    },
+    "Preview image" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预览图片"
+          }
+        }
+      }
+    },
+    "Click to preview image" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击查看大图"
+          }
+        }
+      }
+    },
+    "Add images" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加图片"
+          }
+        }
+      }
+    },
+    "Model reasoning" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型思考过程"
+          }
+        }
+      }
+    },
+    "Thinking mode" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "思考模式"
+          }
+        }
+      }
+    },
+    "Read-only tools" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只读工具"
+          }
+        }
+      }
+    },
+    "Applies to the next message" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对下一条消息生效"
+          }
+        }
+      }
+    },
+    "Retry last message" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试上一条消息"
+          }
+        }
+      }
+    },
+    "Retry stop" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试停止"
+          }
+        }
+      }
+    },
+    "Stopping backend task…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在停止后端任务…"
+          }
+        }
+      }
+    },
+    "Dismiss attachment error" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭附件提示"
+          }
+        }
+      }
+    },
+    "Attach up to 8 images per message." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每条消息最多添加 8 张图片。"
+          }
+        }
+      }
+    },
+    "Each image must be at most 16 MB." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每张图片不得超过 16 MB。"
+          }
+        }
+      }
+    },
+    "Use PNG, JPEG, GIF or WebP images." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请使用 PNG、JPEG、GIF 或 WebP 图片。"
+          }
+        }
+      }
+    },
+    "Please drop a local file or paste an image." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请拖入本地文件或粘贴图片。"
+          }
+        }
+      }
+    },
+    "Folders cannot be attached. Please choose files." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不支持文件夹，请选择文件。"
+          }
+        }
+      }
+    },
+    "This file could not be read." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取此文件。"
+          }
+        }
+      }
+    },
+    "This image cannot be read, or is too large. Please use an image under 80 megapixels." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取此图片，或图片过大。请使用低于 8000 万像素的图片。"
+          }
+        }
+      }
+    },
+    "This image could not be converted to PNG." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法将此图片转换为 PNG。"
+          }
+        }
+      }
+    },
+    "This model accepts images only. Documents and audio cannot be attached." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前模型仅支持图片附件，不能添加文档或音频。"
+          }
+        }
+      }
+    },
+    "This model accepts images only. Remove unsupported attachments before sending." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前模型仅支持图片，请移除不支持的附件后再发送。"
+          }
+        }
+      }
+    },
+    "This model accepts images only. Start a new chat to switch from document or audio conversations." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前模型仅支持图片。请新建对话后，再从文档或音频会话切换到该模型。"
+          }
+        }
+      }
+    },
+    "Configure the DeepSeek endpoint, model and API key before sending." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先配置 DeepSeek 接口地址、模型和 API Key，再发送消息。"
+          }
+        }
+      }
+    },
+    "Configure a valid local model endpoint before sending." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先配置有效的本地模型接口地址。"
+          }
+        }
+      }
+    },
+    "Invalid local model endpoint." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地模型接口地址无效。"
+          }
+        }
+      }
+    },
+    "Update the Atoll DeepSeek bridge to enable isolated chats and task controls." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请更新 Atoll DeepSeek 桥接服务，以使用独立会话和任务控制。"
+          }
+        }
+      }
+    },
+    "The task timed out. Stop it before retrying." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务已超时，请先停止任务再重试。"
+          }
+        }
+      }
+    },
+    "Invalid bridge task status." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "桥接服务返回的任务状态无效。"
+          }
+        }
+      }
+    },
+    "The model returned no answer. Please retry." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型没有返回回答，请重试。"
+          }
+        }
+      }
+    },
+    "The reply reached the model's length limit." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回答已达到模型长度上限，可继续追问。"
+          }
+        }
+      }
+    },
+    "Could not confirm that the backend stopped. Retry before sending another message." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能确认后端任务已停止，请重试停止后再发送新消息。"
+          }
+        }
+      }
+    },
+    "This conversation contains too much image data. Start a new chat or use smaller images." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本轮对话包含的图片数据过多，请新建对话或使用更小的图片。"
+          }
+        }
+      }
+    },
+    "The service request failed. Please check the connection." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务请求失败，请检查连接。"
+          }
+        }
+      }
+    },
+    "The model request failed (HTTP" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型请求失败（HTTP"
+          }
+        }
+      }
+    },
+    "The response is too large." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型返回的内容过大。"
+          }
+        }
+      }
+    },
+    "The connection ended before the reply was complete. You can retry this message." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回答尚未完成，连接已断开。您可以重试这条消息。"
+          }
+        }
+      }
+    },
+    "Invalid response from the model." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型返回的内容格式无效。"
+          }
+        }
+      }
+    },
+    "The model request failed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型请求失败。"
+          }
+        }
+      }
+    },
+    "Local model name" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地模型名称"
+          }
+        }
+      }
+    },
+    "Use the model installed on your server. The pi bridge displays its actual model after connecting." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填写服务器上已安装的模型名称。连接 pi 桥接后将显示其实际模型。"
+          }
+        }
+      }
+    },
+    "Image model" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片模型"
+          }
+        }
+      }
+    },
+    "Used while this conversation contains images. Custom endpoints keep the selected model." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对话中包含图片时使用此模型。自定义接口使用您所选的模型。"
+          }
+        }
+      }
+    },
+    "Required for remote services; optional for localhost." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "远程接口必须填写，本机接口可留空。"
+          }
+        }
+      }
+    },
+    "DeepSeek Endpoint" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek 接口地址"
+          }
+        }
+      }
+    },
+    "DeepSeek Model" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek 模型"
+          }
+        }
+      }
+    },
+    "DeepSeek API Key" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek API Key"
+          }
+        }
+      }
+    },
+    "Base URL or full /chat/completions URL. Ollama: http://localhost:11434/v1" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "基础地址或完整 /chat/completions 地址。Ollama 示例：http://localhost:11434/v1"
+          }
+        }
+      }
+    },
+    "Official: deepseek-v4-flash or deepseek-v4-pro. Local: your installed model ID." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方模型：deepseek-v4-flash 或 deepseek-v4-pro。本机接口：填写已安装的模型名称。"
+          }
+        }
+      }
+    },
+    "Enter your DeepSeek API key" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入您的 DeepSeek API Key"
+          }
+        }
+      }
+    },
+    "Remove %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除 %@"
+          }
+        }
+      }
+    },
+    "Document" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文档"
+          }
+        }
+      }
+    },
+    "Audio" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频"
+          }
+        }
+      }
+    },
     "" : {
       "localizations" : {
         "ar" : {

@@ -171,10 +171,14 @@ struct CustomOSDView: View {
                     }
                 } else {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        #if compiler(>=6.2)
                         .glassEffect(
                             .clear.interactive(),
                             in: .rect(cornerRadius: 18)
                         )
+                        #else
+                        .background(.ultraThinMaterial, in: .rect(cornerRadius: 18))
+                        #endif
                 }
             } else {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)

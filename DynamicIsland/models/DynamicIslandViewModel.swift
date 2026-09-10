@@ -140,10 +140,22 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     @Published var notchSize: CGSize = getClosedNotchSize()
     @Published var closedNotchSize: CGSize = getClosedNotchSize()
     
+    #if compiler(>=6.2)
     @MainActor
     deinit {
         destroy()
     }
+    #else
+    deinit {
+        // Swift 6.1 cannot isolate deinit. Transfer only the teardown callback,
+        // never the deallocating view model, to the main actor. AnyCancellable
+        // cancels subscriptions automatically as its owning set is released.
+        let teardown = onViewTeardown
+        Task { @MainActor in
+            teardown?()
+        }
+    }
+    #endif
 
     func destroy() {
         onViewTeardown?()

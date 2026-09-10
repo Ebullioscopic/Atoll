@@ -165,3 +165,12 @@ implementation_plan.md
 walkthrough.md
 TemporaryAssets/
 *.profraw
+
+# Source files for the optional local chat bridge and release packaging
+!scripts/package-release-local.py
+!tests/chat_fixture_server.py
+!deepseek-bridge/*.py
+
+# Local Python/runtime data must not be published
+__pycache__/
+*.pyc

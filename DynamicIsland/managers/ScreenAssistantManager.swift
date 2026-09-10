@@ -21,11 +21,16 @@ import SwiftUI
 import AVFoundation
 import Defaults
 import Foundation
+import UniformTypeIdentifiers
 
 // Chat message model
 struct ChatMessage: Identifiable, Codable {
     let id = UUID()
-    let content: String
+    var content: String
+    var reasoning: String = ""
+    var tools: [String] = []
+    var notice: String?
+    var includeInContext = true
     let isFromUser: Bool
     let timestamp: Date
     let attachedFiles: [ScreenAssistantFile]?
@@ -66,11 +71,11 @@ struct ScreenAssistantFile: Identifiable, Codable {
         
         var displayName: String {
             switch self {
-            case .document: return "Document"
-            case .image: return "Image"
-            case .audio: return "Audio"
-            case .video: return "Video"
-            case .other: return "File"
+            case .document: return String(localized: "Document")
+            case .image: return String(localized: "Image")
+            case .audio: return String(localized: "Audio")
+            case .video: return String(localized: "Video")
+            case .other: return String(localized: "File")
             }
         }
     }
@@ -85,7 +90,7 @@ struct ScreenAssistantFile: Identifiable, Codable {
         // Safe file extension extraction
         let fileExtension = fileURL.pathExtension.lowercased()
         switch fileExtension {
-        case "jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "heic":
+        case "jpg", "jpeg", "png", "gif", "bmp", "tif", "tiff", "webp", "heic", "heif":
             self.type = .image
         case "mp3", "wav", "m4a", "aac", "flac":
             self.type = .audio
@@ -118,12 +123,32 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     @Published var chatMessages: [ChatMessage] = []
     @Published var isLoading: Bool = false
     
+    @Published var responseStatus = ""
+    @Published var actualModelName: String?
+    @Published var isBridge = false
+    @Published var isControlling = false
+    @Published var controlError: String?
+    private var chatTask: Task<Void, Never>?
+    private var controlTask: Task<Void, Never>?
+    private var requestGeneration = UUID()
+    private var bridgeSessionID = UUID().uuidString
+    private var activeBridge: (base: URL, session: String, job: String)?
+    private var bridgeBase: URL?
+    private var pendingControl: (base: URL, session: String, job: String, reset: Bool)?
+    private var streamedMessageID: UUID?
+    private var modelSelectionPanel: ModelSelectionPanel?
+
+    @Published var draftMessage = ""
+    @Published var attachmentError: String?
+    @Published private(set) var pendingAttachments = 0
+    private let attachmentQueue = DispatchQueue(label: "Atoll.chat-attachments", qos: .userInitiated)
+    private var attachmentGeneration = UUID()
+
     private var audioRecorder: AVAudioRecorder?
     private var recordingTimer: Timer?
     private var activeRequest: URLSessionTask?
     
     // Panel management
-    private var chatMessagesPanel: ChatMessagesPanel?
     private var chatInputPanel: ChatInputPanel?
     
     // Directory for storing audio recordings
@@ -164,14 +189,10 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         // Close existing panels first
         closePanels()
         
-        // Create and show chat messages panel (left side)
-        chatMessagesPanel = ChatMessagesPanel()
-        chatMessagesPanel?.positionOnLeftSide()
-        chatMessagesPanel?.makeKeyAndOrderFront(nil)
-        
-        // Create and show input panel (center)
+        // Conversation and composer share one resizable native window.
         chatInputPanel = ChatInputPanel()
         chatInputPanel?.positionInCenter()
+        NSApp.activate(ignoringOtherApps: true)
         chatInputPanel?.makeKeyAndOrderFront(nil)
         
         // Focus on input panel for immediate typing
@@ -180,81 +201,124 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         }
     }
     
+    func showModelSelection() {
+        guard !isLoading, !isControlling, !isRecording else { return }
+        // Recreate so cancelling unsaved edits cannot leak into the next visit.
+        modelSelectionPanel?.close()
+        modelSelectionPanel = ModelSelectionPanel()
+        modelSelectionPanel?.positionInCenter()
+        modelSelectionPanel?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    var imagesOnly: Bool { [.deepseek, .local].contains(Defaults[.selectedAIProvider]) }
+    var canRetry: Bool { !isLoading && !isControlling && controlError == nil && chatMessages.last?.notice != nil }
+
+    func toggleWindowZoom() { chatInputPanel?.zoom(nil) }
+
     func closePanels() {
-        chatMessagesPanel?.close()
         chatInputPanel?.close()
-        chatMessagesPanel = nil
         chatInputPanel = nil
     }
     
     func arePanelsVisible() -> Bool {
-        return chatMessagesPanel?.isVisible == true || chatInputPanel?.isVisible == true
+        return chatInputPanel?.isVisible == true
     }
     
     // MARK: - File Management
     
     func addFiles(_ urls: [URL]) {
-        guard !urls.isEmpty else {
-            print("⚠️ ScreenAssistant: No URLs provided to addFiles")
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { self.addFiles(urls) }
             return
         }
-        
-        print("📁 ScreenAssistant: Adding \(urls.count) files")
-        
-        let newFiles = urls.compactMap { url -> ScreenAssistantFile? in
-            // Wrap in autoreleasepool to manage memory
-            return autoreleasepool {
-                do {
-                    // Verify file exists
-                    guard FileManager.default.fileExists(atPath: url.path) else {
-                        print("❌ ScreenAssistant: File does not exist at \(url.path)")
-                        return nil
-                    }
-                    
-                    // Verify file is readable
-                    guard FileManager.default.isReadableFile(atPath: url.path) else {
-                        print("❌ ScreenAssistant: File is not readable at \(url.path)")
-                        return nil
-                    }
-                    
-                    // Create file entry with error handling
+        for url in urls { importAttachment { try ChatAttachmentImport.prepare(file: url) } }
+    }
+
+    func addImageData(_ data: Data) {
+        importAttachment { try ChatAttachmentImport.prepare(data: data) }
+    }
+
+    private func importAttachment(_ prepare: @escaping () throws -> URL) {
+        pendingAttachments += 1
+        attachmentError = nil
+        let generation = attachmentGeneration
+        attachmentQueue.async {
+            let result = Result { try prepare() }
+            DispatchQueue.main.async {
+                self.pendingAttachments -= 1
+                guard generation == self.attachmentGeneration else {
+                    if case .success(let url) = result { ChatAttachmentImport.removeOwnedFile(url) }
+                    return
+                }
+                switch result {
+                case .success(let url):
                     let file = ScreenAssistantFile(fileURL: url)
-                    print("✅ ScreenAssistant: Created file entry for \(file.name)")
-                    return file
-                    
-                } catch {
-                    print("❌ ScreenAssistant: Error creating file entry - \(error)")
-                    return nil
+                    if self.imagesOnly && file.type != .image {
+                        ChatAttachmentImport.removeOwnedFile(url)
+                        self.attachmentError = String(localized: "This model accepts images only. Documents and audio cannot be attached.")
+                        return
+                    }
+                    if file.type == .image && self.attachedFiles.filter({ $0.type == .image }).count >= ChatAttachmentImport.maximumImages {
+                        ChatAttachmentImport.removeOwnedFile(url)
+                        self.attachmentError = String(localized: "Attach up to 8 images per message.")
+                        return
+                    }
+                    guard !self.attachedFiles.contains(where: { $0.fileURL == url.absoluteString }) else { return }
+                    self.attachedFiles.append(file)
+                    self.saveFilesToDefaults()
+                case .failure(let error): self.attachmentError = error.localizedDescription
                 }
             }
         }
-        
-        guard !newFiles.isEmpty else {
-            print("⚠️ ScreenAssistant: No valid files to add")
-            return
-        }
-        
-        // Ensure we're on the main thread for @Published property updates
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else {
-                print("❌ ScreenAssistant: Self deallocated during addFiles")
-                return
-            }
-            
-            self.attachedFiles.append(contentsOf: newFiles)
-            print("📁 ScreenAssistant: Total attached files: \(self.attachedFiles.count)")
-            
-            // Save to defaults with error handling
-            do {
-                self.saveFilesToDefaults()
-            } catch {
-                print("❌ ScreenAssistant: Failed to save files after adding - \(error)")
-            }
-        }
     }
-    
+
+    /// Handles Finder files and actual image data from browsers or other apps.
+    @discardableResult
+    func acceptDrop(_ providers: [NSItemProvider]) -> Bool {
+        let supported = providers.filter { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) || $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) }
+        for provider in supported {
+            pendingAttachments += 1
+            let generation = attachmentGeneration
+            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                provider.loadDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier) { data, error in
+                    DispatchQueue.main.async {
+                        self.pendingAttachments -= 1
+                        guard generation == self.attachmentGeneration else { return }
+                        if let data, let url = URL(dataRepresentation: data, relativeTo: nil) { self.addFiles([url]) }
+                        else { self.attachmentError = error?.localizedDescription ?? "This file could not be imported." }
+                    }
+                }
+            } else {
+                let type = provider.registeredTypeIdentifiers.first { UTType($0)?.conforms(to: .image) == true } ?? UTType.image.identifier
+                provider.loadDataRepresentation(forTypeIdentifier: type) { data, error in
+                    DispatchQueue.main.async {
+                        self.pendingAttachments -= 1
+                        guard generation == self.attachmentGeneration else { return }
+                        if let data { self.addImageData(data) }
+                        else { self.attachmentError = error?.localizedDescription ?? "This image could not be imported." }
+                    }
+                }
+            }
+        }
+        return !supported.isEmpty
+    }
+
+    @discardableResult
+    func acceptPasteboard(_ pasteboard: NSPasteboard) -> Bool {
+        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
+            addFiles(urls)
+            return true
+        }
+        for type in [NSPasteboard.PasteboardType.png, .tiff] {
+            if let data = pasteboard.data(forType: type) { addImageData(data); return true }
+        }
+        return false
+    }
+
     func removeFile(_ file: ScreenAssistantFile) {
         attachedFiles.removeAll { $0.id == file.id }
+        if let path = file.fileURL, let url = URL(string: path) { ChatAttachmentImport.removeOwnedFile(url) }
         
         // Clean up audio file if it exists
         if let audioFileName = file.audioFileName {
@@ -268,6 +332,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     func clearAllFiles() {
         // Clean up all audio files
         for file in attachedFiles {
+            if let path = file.fileURL, let url = URL(string: path) { ChatAttachmentImport.removeOwnedFile(url) }
             if let audioFileName = file.audioFileName {
                 let audioURL = ScreenAssistantManager.audioDataDirectory.appendingPathComponent(audioFileName)
                 try? FileManager.default.removeItem(at: audioURL)
@@ -362,8 +427,12 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     
     // MARK: - Chat Management
     
-    func sendMessage(_ message: String) {
-        print("📤 ScreenAssistant: Sending message - '\(message)'")
+    @discardableResult
+    func sendMessage(_ message: String) -> Bool {
+        guard !isLoading, !isControlling, controlError == nil, pendingAttachments == 0,
+              !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachedFiles.isEmpty else { return false }
+        guard validateDraft() else { return false }
+        print("📤 ScreenAssistant: Sending message")
         print("📁 ScreenAssistant: Attached files count: \(attachedFiles.count)")
         
         // Add user message to chat
@@ -377,15 +446,39 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         
         // Clear input and files after sending
         let currentFiles = attachedFiles
-        clearAllFiles()
+        // Keep files referenced by sent messages available to the API and previews.
+        attachedFiles.removeAll()
+        attachmentError = nil
+        saveFilesToDefaults()
         
         // Send to appropriate AI API based on selected provider
         let provider = Defaults[.selectedAIProvider]
         sendToAI(message: message, files: currentFiles, provider: provider)
+        return true
+    }
+
+    private func validateDraft() -> Bool {
+        let provider = Defaults[.selectedAIProvider]
+        if imagesOnly, attachedFiles.contains(where: { $0.type != .image }) {
+            attachmentError = String(localized: "This model accepts images only. Remove unsupported attachments before sending.")
+            return false
+        }
+        if provider == .deepseek && !DeepSeekConfiguration.isValid(endpoint: Defaults[.deepseekEndpoint], model: Defaults[.deepseekModel], apiKey: Defaults[.deepseekApiKey]) {
+            attachmentError = String(localized: "Configure the DeepSeek endpoint, model and API key before sending.")
+            return false
+        }
+        if provider == .local && ChatRequestBuilder.localBase(Defaults[.localModelEndpoint]) == nil {
+            attachmentError = String(localized: "Configure a valid local model endpoint before sending.")
+            return false
+        }
+        return true
     }
     
     private func sendToAI(message: String, files: [ScreenAssistantFile], provider: AIModelProvider) {
         print("🚀 ScreenAssistant: Making API request to \(provider.displayName)")
+        requestGeneration = UUID()
+        responseStatus = String(localized: "Connecting…")
+        actualModelName = nil
         isLoading = true
         
         switch provider {
@@ -397,6 +490,8 @@ class ScreenAssistantManager: NSObject, ObservableObject {
             sendToClaudeAPI(message: message, files: files)
         case .local:
             sendToLocalAPI(message: message, files: files)
+        case .deepseek:
+            sendToDeepSeekAPI(message: message, files: files)
         case .groq:
             sendToGroqAPI(message: message, files: files)
         }
@@ -446,6 +541,10 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         }
         
         performOpenAIRequest(url: url, requestBody: buildOpenAIRequestBody(message: message, files: files, model: modelId), apiKey: apiKey)
+    }
+
+    private func sendToDeepSeekAPI(message: String, files: [ScreenAssistantFile]) {
+        startModernChat(provider: .deepseek)
     }
 
     private func sendToGroqAPI(message: String, files: [ScreenAssistantFile]) {
@@ -506,24 +605,9 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
     
     private func sendToLocalAPI(message: String, files: [ScreenAssistantFile]) {
-        let endpoint = Defaults[.localModelEndpoint]
-        guard !endpoint.isEmpty else {
-            print("❌ ScreenAssistant: No local endpoint configured")
-            addAssistantMessage("Error: No local endpoint configured. Please set your endpoint in model settings.")
-            isLoading = false
-            return
-        }
-        
-        guard let url = URL(string: "\(endpoint)/api/chat") else {
-            print("❌ ScreenAssistant: Invalid local API URL")
-            addAssistantMessage("Error: Invalid local API URL")
-            isLoading = false
-            return
-        }
-        
-        performAPIRequest(url: url, requestBody: buildOllamaRequestBody(message: message, files: files), provider: .local)
+        startModernChat(provider: .local)
     }
-    
+
     // MARK: - API Request Builders
     
     private func buildGeminiRequestBody(message: String, files: [ScreenAssistantFile]) -> [String: Any] {
@@ -663,22 +747,18 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         ]
     }
     
-    private func buildOllamaRequestBody(message: String, files: [ScreenAssistantFile]) -> [String: Any] {
-        let selectedModel = Defaults[.selectedAIModel] ?? AIModel(id: "llama3.2", name: "Llama 3.2", supportsThinking: false)
-        let contextualMessage = buildContextualMessage(message: message, files: files)
-        
-        return [
-            "model": selectedModel.id,
-            "messages": [
-                [
-                    "role": "user",
-                    "content": contextualMessage
-                ]
-            ],
-            "stream": false
-        ]
+    private func imageAttachments(_ files: [ScreenAssistantFile]) throws -> [ImageAttachment] {
+        guard files.count <= 8 else {
+            throw NSError(domain: "Attachments", code: 1, userInfo: [NSLocalizedDescriptionKey: "Send at most 8 images."])
+        }
+        return try files.map { file in
+            guard file.type == .image, let path = file.fileURL, let url = URL(string: path), url.isFileURL else {
+                throw NSError(domain: "Attachments", code: 2, userInfo: [NSLocalizedDescriptionKey: "This integration supports image attachments only."])
+            }
+            return try ImageAttachment(data: Data(contentsOf: url))
+        }
     }
-    
+
     // MARK: - API Request Performers
     
     private func performAPIRequest(url: URL, requestBody: [String: Any], provider: AIModelProvider) {
@@ -734,6 +814,10 @@ class ScreenAssistantManager: NSObject, ObservableObject {
             return
         }
         
+        performChatRequest(request, provider: provider)
+    }
+
+    private func performChatRequest(_ request: URLRequest, provider: AIModelProvider) {
         var task: URLSessionDataTask?
         task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
@@ -826,7 +910,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         switch provider {
         case .gemini:
             parseGeminiResponse(data: data)
-        case .openai, .groq:
+        case .openai, .groq, .deepseek:
             parseOpenAIResponse(data: data)
         case .claude:
             parseClaudeResponse(data: data)
@@ -1173,20 +1257,257 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         }
     }
     
+    // MARK: - Conversation transport and task controls
+
+    private static func requestTurns(_ messages: [ChatMessage]) throws -> [ChatRequestTurn] {
+        try messages.filter(\.includeInContext).map { message in
+            let images = try (message.attachedFiles ?? []).map { file -> ImageAttachment in
+                guard file.type == .image, let path = file.fileURL, let url = URL(string: path), url.isFileURL else {
+                    throw ChatStreamChunk.failure(String(localized: "This model accepts images only. Start a new chat to switch from document or audio conversations."))
+                }
+                return try ImageAttachment(data: Data(contentsOf: url))
+            }
+            return ChatRequestTurn(role: message.isFromUser ? "user" : "assistant", text: message.content, images: images, reasoning: message.reasoning)
+        }
+    }
+
+    private func startModernChat(provider: AIModelProvider) {
+        let generation = requestGeneration
+        let snapshot = chatMessages
+        let endpoint = provider == .deepseek ? Defaults[.deepseekEndpoint] : Defaults[.localModelEndpoint]
+        let selected = provider == .deepseek ? Defaults[.deepseekModel] : (Defaults[.selectedAIModel]?.id ?? "llama3.2")
+        let key = Defaults[.deepseekApiKey]
+        let vision = Defaults[.deepseekVisionModel]
+        let thinking = Defaults[.enableThinkingMode]
+        let toolsEnabled = Defaults[.chatToolsEnabled]
+        let session = bridgeSessionID
+        chatTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let turns = try await Task.detached(priority: .userInitiated) { try Self.requestTurns(snapshot) }.value
+                try Task.checkCancellation()
+                guard self.requestGeneration == generation else { return }
+                var placeholder = ChatMessage(content: "", isFromUser: false)
+                placeholder.includeInContext = false
+                self.chatMessages.append(placeholder)
+                self.streamedMessageID = placeholder.id
+                if provider == .deepseek {
+                    self.isBridge = false
+                    let model = ChatRequestBuilder.model(endpoint: endpoint, selected: selected, vision: vision, hasImages: turns.contains { !$0.images.isEmpty })
+                    self.actualModelName = model
+                    let request = try DeepSeekConfiguration.request(endpoint: endpoint, model: model, apiKey: key,
+                        messages: ChatRequestBuilder.openAIMessages(turns), stream: true,
+                        thinking: ChatRequestBuilder.isOfficial(endpoint) ? thinking : nil)
+                    try await ChatTransport.stream(request, ollama: false) { chunk in
+                        guard self.requestGeneration == generation else { return }
+                        self.receiveChunk(chunk)
+                    }
+                } else {
+                    guard let base = ChatRequestBuilder.localBase(endpoint) else { throw ChatStreamChunk.failure(String(localized: "Invalid local model endpoint.")) }
+                    let info = try await ChatTransport.bridgeInfo(base)
+                    try Task.checkCancellation()
+                    guard self.requestGeneration == generation else { return }
+                    if let info {
+                        self.isBridge = true
+                        guard (info["protocol_version"] as? Int ?? 0) >= 2 else {
+                            throw ChatStreamChunk.failure(String(localized: "Update the Atoll DeepSeek bridge to enable isolated chats and task controls."))
+                        }
+                        self.bridgeBase = base
+                        let job = generation.uuidString
+                        self.activeBridge = (base, session, job)
+                        self.actualModelName = info["model"] as? String
+                        let admission = try await ChatTransport.json(base.appendingPathComponent("atoll/chat"), body: [
+                            "session_id": session, "request_id": job, "messages": ChatRequestBuilder.ollamaMessages(turns),
+                            "thinking": thinking, "tools": toolsEnabled
+                        ], timeout: 30)
+                        guard (admission["job_id"] as? String)?.lowercased() == job.lowercased(),
+                              ["pending", "completed", "failed"].contains(admission["status"] as? String ?? "") else {
+                            throw ChatStreamChunk.failure(String(localized: "Invalid bridge task status."))
+                        }
+                        let deadline = Date().addingTimeInterval(330)
+                        while true {
+                            try Task.checkCancellation()
+                            guard Date() < deadline else { throw ChatStreamChunk.failure(String(localized: "The task timed out. Stop it before retrying.")) }
+                            let result = try await ChatTransport.json(base.appendingPathComponent("atoll/sessions/\(session)/jobs/\(job)"))
+                            guard self.requestGeneration == generation else { return }
+                            guard (result["job_id"] as? String)?.lowercased() == job.lowercased() else {
+                                throw ChatStreamChunk.failure(String(localized: "Invalid bridge task status."))
+                            }
+                            self.actualModelName = result["model"] as? String ?? self.actualModelName
+                            let toolNames = result["tools"] as? [String] ?? []
+                            let phase = result["phase"] as? String ?? ""
+                            if phase == "tool_execution" {
+                                self.responseStatus = String(localized: "Using tools:") + " " + toolNames.map(Self.toolDisplayName).joined(separator: ", ")
+                            } else {
+                                self.responseStatus = phase == "thinking" ? String(localized: "Thinking…") : (phase == "starting" ? String(localized: "Connecting…") : String(localized: "Replying…"))
+                            }
+                            if let index = self.chatMessages.firstIndex(where: { $0.id == self.streamedMessageID }) { self.chatMessages[index].tools = toolNames }
+                            if let content = result["content"] as? String { self.setStreamedContent(content) }
+                            switch result["status"] as? String {
+                            case "completed": break
+                            case "failed": throw ChatStreamChunk.failure(result["content"] as? String ?? String(localized: "The model request failed."))
+                            case "cancelled": throw CancellationError()
+                            case "pending":
+                                try await Task.sleep(for: .milliseconds(350))
+                                continue
+                            default: throw ChatStreamChunk.failure(String(localized: "Invalid bridge task status."))
+                            }
+                            break
+                        }
+                    } else {
+                        self.isBridge = false
+                        self.actualModelName = selected
+                        var request = URLRequest(url: base.appendingPathComponent("api/chat"))
+                        request.httpMethod = "POST"
+                        request.timeoutInterval = 180
+                        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                        request.httpBody = try JSONSerialization.data(withJSONObject: ["model": selected, "messages": ChatRequestBuilder.ollamaMessages(turns), "stream": true])
+                        try await ChatTransport.stream(request, ollama: true) { chunk in
+                            guard self.requestGeneration == generation else { return }
+                            self.receiveChunk(chunk)
+                        }
+                    }
+                }
+                guard self.requestGeneration == generation else { return }
+                guard let index = self.chatMessages.firstIndex(where: { $0.id == self.streamedMessageID }), !self.chatMessages[index].content.isEmpty else {
+                    throw ChatStreamChunk.failure(String(localized: "The model returned no answer. Please retry."))
+                }
+                self.chatMessages[index].includeInContext = true
+                self.finishModernRequest()
+            } catch {
+                guard self.requestGeneration == generation else { return }
+                let interrupted = error is CancellationError || (error as NSError).code == NSURLErrorCancelled
+                self.markInterrupted(interrupted ? String(localized: "Stopped") : error.localizedDescription)
+                let outstanding = self.activeBridge
+                self.finishModernRequest()
+                // Polling failures must not leave a tool task running invisibly.
+                if let outstanding { self.beginControl(base: outstanding.base, session: outstanding.session, job: outstanding.job, reset: false) }
+            }
+        }
+    }
+
+    private func receiveChunk(_ chunk: ChatStreamChunk) {
+        guard let index = chatMessages.firstIndex(where: { $0.id == streamedMessageID }) else { return }
+        chatMessages[index].content += chunk.text
+        chatMessages[index].reasoning += chunk.reasoning
+        if let model = chunk.model { actualModelName = model }
+        responseStatus = chunk.text.isEmpty && !chunk.reasoning.isEmpty ? String(localized: "Thinking…") : String(localized: "Replying…")
+        if chunk.truncated { chatMessages[index].notice = String(localized: "The reply reached the model's length limit.") }
+    }
+
+    private func setStreamedContent(_ content: String) {
+        if let index = chatMessages.firstIndex(where: { $0.id == streamedMessageID }) { chatMessages[index].content = content }
+    }
+
+    private func markInterrupted(_ reason: String) {
+        if let index = chatMessages.firstIndex(where: { $0.id == streamedMessageID }) {
+            chatMessages[index].notice = reason
+            chatMessages[index].includeInContext = false
+        } else {
+            var message = ChatMessage(content: "", isFromUser: false)
+            message.notice = reason; message.includeInContext = false
+            chatMessages.append(message)
+        }
+    }
+
+    private func finishModernRequest() {
+        isLoading = false; responseStatus = ""; activeBridge = nil; streamedMessageID = nil; chatTask = nil
+    }
+
+    private func cancelLocalRequest() {
+        requestGeneration = UUID()
+        chatTask?.cancel(); chatTask = nil
+        activeRequest?.cancel(); activeRequest = nil
+        finishModernRequest()
+    }
+
+    func stopResponse() {
+        guard isLoading else { return }
+        let bridge = activeBridge
+        markInterrupted(String(localized: "Stopped"))
+        cancelLocalRequest()
+        if let bridge { beginControl(base: bridge.base, session: bridge.session, job: bridge.job, reset: false) }
+    }
+
+    func retryLastMessage() {
+        guard canRetry, let index = chatMessages.lastIndex(where: \.isFromUser) else { return }
+        let message = chatMessages[index]
+        chatMessages.removeSubrange((index + 1)..<chatMessages.count)
+        sendToAI(message: message.content, files: message.attachedFiles ?? [], provider: Defaults[.selectedAIProvider])
+    }
+
+    private func beginControl(base: URL, session: String, job: String, reset: Bool) {
+        pendingControl = (base, session, job, reset)
+        controlError = nil; isControlling = true
+        controlTask = Task { @MainActor [weak self] in
+            do {
+                let acknowledgment = try await ChatTransport.json(base.appendingPathComponent("atoll/sessions/\(session)/\(reset ? "reset" : "stop")"), body: reset ? [:] : ["job_id": job], timeout: 30)
+                let expectedStatus = reset ? "reset" : "cancelled"
+                let acknowledgedID = acknowledgment[reset ? "session_id" : "job_id"] as? String
+                guard acknowledgment["status"] as? String == expectedStatus,
+                      acknowledgedID?.lowercased() == (reset ? session : job).lowercased() else {
+                    throw ChatStreamChunk.failure(String(localized: "Invalid bridge task status."))
+                }
+                self?.pendingControl = nil
+            } catch {
+                self?.controlError = String(localized: "Could not confirm that the backend stopped. Retry before sending another message.")
+            }
+            self?.isControlling = false
+        }
+    }
+
+    func retryBackendControl() {
+        guard !isControlling, let pendingControl else { return }
+        beginControl(base: pendingControl.base, session: pendingControl.session, job: pendingControl.job, reset: pendingControl.reset)
+    }
+
+    func refreshModelStatus() {
+        guard !isLoading else { return }
+        actualModelName = nil; isBridge = false
+        guard Defaults[.selectedAIProvider] == .local, let base = ChatRequestBuilder.localBase(Defaults[.localModelEndpoint]) else { return }
+        let generation = requestGeneration
+        Task { @MainActor [weak self] in
+            let info = try? await ChatTransport.bridgeInfo(base)
+            guard let self, !self.isLoading, self.requestGeneration == generation else { return }
+            guard Defaults[.selectedAIProvider] == .local, ChatRequestBuilder.localBase(Defaults[.localModelEndpoint]) == base else { return }
+            self.isBridge = info != nil
+            self.actualModelName = info?["model"] as? String
+        }
+    }
+
+    static func toolDisplayName(_ name: String) -> String {
+        switch name {
+        case "web_search": return String(localized: "Web search")
+        case "read_webpage": return String(localized: "Read webpage")
+        case "list_files": return String(localized: "List files")
+        case "read_file": return String(localized: "Read file")
+        default: return name
+        }
+    }
+
     func clearChat() {
         resetConversationContext()
     }
 
     func resetConversationContext() {
-        // Cancel any in-flight request
-        activeRequest?.cancel()
-        activeRequest = nil
-        
-        isLoading = false
+        guard !isControlling, controlError == nil else { return }
+        let prior = activeBridge ?? bridgeBase.map { (base: $0, session: bridgeSessionID, job: "") }
+        bridgeBase = nil
+        cancelLocalRequest()
+        bridgeSessionID = UUID().uuidString
+        attachmentGeneration = UUID()
+        for file in attachedFiles + chatMessages.flatMap({ $0.attachedFiles ?? [] }) {
+            if let path = file.fileURL, let url = URL(string: path) { ChatAttachmentImport.removeOwnedFile(url) }
+        }
+        if isRecording { stopRecording() }
         chatMessages.removeAll()
         clearAllFiles()
+        draftMessage = ""
+        attachmentError = nil
+        actualModelName = nil
+        if let prior { beginControl(base: prior.base, session: prior.session, job: prior.job, reset: true) }
     }
-    
+
     private func addAssistantMessage(_ content: String) {
         print("💬 ScreenAssistant: Adding assistant message: \(content.prefix(100))...")
         let assistantMessage = ChatMessage(content: content, isFromUser: false)

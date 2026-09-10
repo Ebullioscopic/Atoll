@@ -115,34 +115,8 @@ struct ScreenAssistantPanelView: View {
 struct MarkdownText: View {
     let content: String
     
-    var body: some View {
-        // Simple markdown parsing for now
-        Text(parseMarkdown(content))
-            .font(.system(size: 14))
-            .textSelection(.enabled)
-    }
-    
-    private func parseMarkdown(_ text: String) -> AttributedString {
-        var attributedString = AttributedString(text)
-        
-        // Simple bold parsing (**text**)
-        let boldPattern = #"\*\*(.*?)\*\*"#
-        if let regex = try? NSRegularExpression(pattern: boldPattern) {
-            let matches = regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
-            for match in matches.reversed() {
-                if let range = Range(match.range, in: text) {
-                    let boldText = String(text[range]).replacingOccurrences(of: "**", with: "")
-                    if let attrRange = Range(match.range, in: attributedString) {
-                        var boldAttributedText = AttributedString(boldText)
-                        boldAttributedText.font = .system(size: 14, weight: .bold)
-                        attributedString.replaceSubrange(attrRange, with: boldAttributedText)
-                    }
-                }
-            }
-        }
-        
-        return attributedString
-    }
+    var body: some View { ChatMarkdownView(content: content) }
+
 }
 
 struct AttachedFileChip: View {
@@ -180,12 +154,12 @@ struct AddFilesButton: View {
     
     var body: some View {
         Button(action: selectFiles) {
-            Image(systemName: "plus.circle.fill")
-                .foregroundColor(.blue)
-                .font(.system(size: 20))
+            Image(systemName: "paperclip")
+                .foregroundColor(.secondary)
+                .font(.system(size: 16))
         }
         .buttonStyle(PlainButtonStyle())
-        .help("Add files")
+        .help(screenAssistantManager.imagesOnly ? String(localized: "Add images") : String(localized: "Add files"))
     }
     
     private func selectFiles() {
@@ -193,7 +167,7 @@ struct AddFilesButton: View {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.allowedContentTypes = [.data, .image, .movie, .audio, .text, .pdf]
+        panel.allowedContentTypes = screenAssistantManager.imagesOnly ? [.image] : [.data, .image, .movie, .audio, .text, .pdf]
         
         if let window = NSApp.keyWindow ?? NSApp.mainWindow {
             panel.beginSheetModal(for: window) { response in
@@ -218,11 +192,11 @@ struct RecordingButton: View {
         }) {
             ZStack {
                 Circle()
-                    .fill(screenAssistantManager.isRecording ? Color.red : Color.blue.opacity(0.2))
-                    .frame(width: 32, height: 32)
+                    .fill(screenAssistantManager.isRecording ? Color.red.opacity(0.15) : Color.clear)
+                    .frame(width: 24, height: 24)
                 
                 Image(systemName: screenAssistantManager.isRecording ? "stop.fill" : "mic.fill")
-                    .foregroundColor(screenAssistantManager.isRecording ? .white : .blue)
+                    .foregroundColor(screenAssistantManager.isRecording ? .red : .secondary)
                     .font(.system(size: 14))
             }
         }

@@ -674,12 +674,16 @@ struct SettingsView: View {
             Group {
                 if #available(macOS 26.0, *) {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        #if compiler(>=6.2)
                         .glassEffect(
                             .clear
                                 .tint(Color.white.opacity(0.1))
                                 .interactive(),
                             in: .rect(cornerRadius: 18)
                         )
+                        #else
+                        .background(.ultraThinMaterial, in: .rect(cornerRadius: 18))
+                        #endif
                 } else {
                     ZStack {
                         Color(NSColor.windowBackgroundColor)
@@ -702,7 +706,9 @@ struct SettingsView: View {
             ToolbarItem(placement: .primaryAction) {
                 toolbarSpacerView
             }
+            #if compiler(>=6.2)
             .sharedBackgroundVisibility(.hidden)
+            #endif
         } else {
             ToolbarItem(placement: .primaryAction) {
                 toolbarSpacerView

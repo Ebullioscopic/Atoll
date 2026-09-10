@@ -1,0 +1,11 @@
+build/
+__pycache__/
+*.pyc
+config.json
+.env
+.env.*
+*.log
+pi-agent/
+pi-native/
+runtime-backups/
+atoll-settings-before.json

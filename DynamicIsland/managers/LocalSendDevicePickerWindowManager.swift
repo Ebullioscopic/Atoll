@@ -550,10 +550,14 @@ private struct LocalSendGlassBackdrop: View {
                 .font(.system(size: dynamicFontSize, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.clear)
                 .frame(width: proxy.size.width, height: proxy.size.height)
+                #if compiler(>=6.2)
                 .glassEffect(
                     .clear.interactive(),
                     in: .rect(cornerRadius: cornerRadius)
                 )
+                #else
+                .background(.ultraThinMaterial, in: .rect(cornerRadius: cornerRadius))
+                #endif
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
