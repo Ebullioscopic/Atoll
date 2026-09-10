@@ -11,10 +11,13 @@ swift_check() {
     "$test_dir/$suite"
 }
 models="$project_dir/DynamicIsland/models"
+swift_check ai_credentials "$models/AICredentialStore.swift"
 swift_check deepseek "$models/DeepSeekConfiguration.swift"
 swift_check images "$models/ImageAttachment.swift"
 swift_check chat_attachments "$models/ImageAttachment.swift" "$models/ChatAttachmentImport.swift"
 swift_check chat_protocol "$models/ImageAttachment.swift" "$models/ChatRequestBuilder.swift"
+swift_check fullscreen_hover "$models/FullscreenHoverState.swift"
+swift_check fullscreen_visibility "$models/FullscreenVisibilityPolicy.swift"
 swift_check notch_compatibility "$models/NotchCompatibilityPolicy.swift"
 swift_check chat_presentation "$models/ChatPresentation.swift"
 swift_check markdown "$models/ChatMarkdown.swift"

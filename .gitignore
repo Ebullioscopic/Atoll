@@ -169,6 +169,7 @@ TemporaryAssets/
 # Source files for the optional local chat bridge and release packaging
 !scripts/package-release-local.py
 !tests/chat_fixture_server.py
+!tests/test_package_release_local.py
 !deepseek-bridge/*.py
 
 # Local Python/runtime data must not be published

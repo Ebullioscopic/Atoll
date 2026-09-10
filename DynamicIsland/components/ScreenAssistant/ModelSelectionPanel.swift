@@ -123,18 +123,20 @@ struct ModelSelectionView: View {
     @State private var enableThinking: Bool = Defaults[.enableThinkingMode]
     
     // API Keys
-    @State private var geminiApiKey: String = Defaults[.geminiApiKey]
-    @State private var openaiApiKey: String = Defaults[.openaiApiKey]
-    @State private var claudeApiKey: String = Defaults[.claudeApiKey]
+    @State private var geminiApiKey: String = AICredentialStore.shared.key(for: .gemini)
+    @State private var openaiApiKey: String = AICredentialStore.shared.key(for: .openai)
+    @State private var claudeApiKey: String = AICredentialStore.shared.key(for: .claude)
     @State private var localEndpoint: String = Defaults[.localModelEndpoint]
-    @State private var deepseekApiKey = Defaults[.deepseekApiKey]
+    @State private var deepseekApiKey = AICredentialStore.shared.key(for: .deepseek)
     @State private var deepseekEndpoint = Defaults[.deepseekEndpoint]
     @State private var deepseekModel = Defaults[.deepseekModel]
     @State private var deepseekVisionModel = Defaults[.deepseekVisionModel]
     @State private var localChatModel = Defaults[.localChatModel]
-    @State private var groqApiKey: String = Defaults[.groqApiKey]
+    @State private var groqApiKey: String = AICredentialStore.shared.key(for: .groq)
     
     @State private var showingApiKeyAlert = false
+    @State private var credentialError: String?
+    @State private var originalCredentials: [AICredentialProvider: String] = [:]
     
     var body: some View {
         VStack(spacing: 0) {
@@ -292,6 +294,11 @@ struct ModelSelectionView: View {
         .onAppear {
             loadCurrentConfiguration()
         }
+        .alert("API Key", isPresented: Binding(get: { credentialError != nil }, set: { if !$0 { credentialError = nil } })) {
+            Button("OK", role: .cancel) { credentialError = nil }
+        } message: {
+            Text(credentialError ?? "")
+        }
 
     }
     
@@ -313,17 +320,22 @@ struct ModelSelectionView: View {
     }
     
     private func loadCurrentConfiguration() {
+        AICredentialStore.shared.reload()
+        credentialError = AICredentialStore.shared.lastError
+        originalCredentials = Dictionary(uniqueKeysWithValues: AICredentialProvider.allCases.map {
+            ($0, AICredentialStore.shared.key(for: $0))
+        })
         selectedProvider = Defaults[.selectedAIProvider]
         selectedModel = Defaults[.selectedAIModel]
         ensureValidModelSelection()
         enableThinking = Defaults[.enableThinkingMode]
         
-        geminiApiKey = Defaults[.geminiApiKey]
-        openaiApiKey = Defaults[.openaiApiKey]
-        claudeApiKey = Defaults[.claudeApiKey]
+        geminiApiKey = AICredentialStore.shared.key(for: .gemini)
+        openaiApiKey = AICredentialStore.shared.key(for: .openai)
+        claudeApiKey = AICredentialStore.shared.key(for: .claude)
         localEndpoint = Defaults[.localModelEndpoint]
-        groqApiKey = Defaults[.groqApiKey]
-        deepseekApiKey = Defaults[.deepseekApiKey]
+        groqApiKey = AICredentialStore.shared.key(for: .groq)
+        deepseekApiKey = AICredentialStore.shared.key(for: .deepseek)
         deepseekEndpoint = Defaults[.deepseekEndpoint]
         deepseekModel = Defaults[.deepseekModel]
         deepseekVisionModel = Defaults[.deepseekVisionModel]
@@ -331,18 +343,24 @@ struct ModelSelectionView: View {
     }
     
     private func saveConfiguration() {
+        guard isConfigurationValid else { return }
+        let credentials: [(AICredentialProvider, String)] = [
+            (.gemini, geminiApiKey), (.openai, openaiApiKey), (.claude, claudeApiKey),
+            (.deepseek, deepseekApiKey), (.groq, groqApiKey)
+        ]
+        do {
+            try AICredentialStore.shared.saveChanges(Dictionary(uniqueKeysWithValues: credentials), original: originalCredentials)
+        } catch {
+            credentialError = error.localizedDescription
+            return
+        }
         ensureValidModelSelection()
 
         Defaults[.selectedAIProvider] = selectedProvider
         Defaults[.selectedAIModel] = selectedModel
         Defaults[.enableThinkingMode] = enableThinking
         
-        Defaults[.geminiApiKey] = geminiApiKey
-        Defaults[.openaiApiKey] = openaiApiKey
-        Defaults[.claudeApiKey] = claudeApiKey
         Defaults[.localModelEndpoint] = localEndpoint
-        Defaults[.groqApiKey] = groqApiKey
-        Defaults[.deepseekApiKey] = deepseekApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         Defaults[.deepseekEndpoint] = deepseekEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
         Defaults[.deepseekModel] = deepseekModel.trimmingCharacters(in: .whitespacesAndNewlines)
         Defaults[.deepseekVisionModel] = deepseekVisionModel.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -567,28 +585,28 @@ struct ApiConfigurationSection: View {
 
 // MARK: - API Key Field
 struct ApiKeyField: View {
-    let title: String
-    let placeholder: String
+    let title: LocalizedStringKey
+    let placeholder: LocalizedStringKey
     @Binding var value: String
-    let helpText: String
+    let helpText: LocalizedStringKey
     var isSecure: Bool = true
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(NSLocalizedString(title, comment: "Model configuration field"))
+            Text(title)
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .foregroundColor(.primary)
             
             if isSecure {
-                SecureField(NSLocalizedString(placeholder, comment: "Model configuration placeholder"), text: $value)
+                SecureField(placeholder, text: $value)
                     .textFieldStyle(.roundedBorder)
             } else {
-                TextField(NSLocalizedString(placeholder, comment: "Model configuration placeholder"), text: $value)
+                TextField(placeholder, text: $value)
                     .textFieldStyle(.roundedBorder)
             }
             
-            Text(NSLocalizedString(helpText, comment: "Model configuration help"))
+            Text(helpText)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }

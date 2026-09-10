@@ -1223,7 +1223,7 @@ extension Defaults.Keys {
         // MARK: Fullscreen Media Detection
     static let alwaysHideInFullscreen = Key<Bool>("alwaysHideInFullscreen", default: false)
     
-    static let hideNotchOption = Key<HideNotchOption>("hideNotchOption", default: .nowPlayingOnly)
+    static let hideNotchOption = Key<HideNotchOption>("hideNotchOption", default: .always)
     
     // MARK: Wobble Animation
     static let enableWobbleAnimation = Key<Bool>("enableWobbleAnimation", default: false)
@@ -1357,17 +1357,12 @@ extension Defaults.Keys {
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)
     static let screenAssistantDisplayMode = Key<ScreenAssistantDisplayMode>("screenAssistantDisplayMode", default: .panel)
-    static let geminiApiKey = Key<String>("geminiApiKey", default: "")
-    static let openaiApiKey = Key<String>("openaiApiKey", default: "")
-    static let claudeApiKey = Key<String>("claudeApiKey", default: "")
-    static let deepseekApiKey = Key<String>("deepseekApiKey", default: "")
     static let deepseekEndpoint = Key<String>("deepseekEndpoint", default: "https://api.deepseek.com")
     static let deepseekVisionModel = Key<String>("deepseekVisionModel", default: "deepseek-v4-flash-vision-exp")
     static let localChatModel = Key<String>("localChatModel", default: "llama3.2")
     static let chatTextScale = Key<Double>("chatTextScale", default: 1.0)
     static let chatToolsEnabled = Key<Bool>("chatToolsEnabled", default: true)
     static let deepseekModel = Key<String>("deepseekModel", default: "deepseek-v4-flash")
-    static let groqApiKey = Key<String>("groqApiKey", default: "")
     static let selectedAIProvider = Key<AIModelProvider>("selectedAIProvider", default: .gemini)
     static let selectedAIModel = Key<AIModel?>("selectedAIModel", default: nil)
     static let enableThinkingMode = Key<Bool>("enableThinkingMode", default: false)

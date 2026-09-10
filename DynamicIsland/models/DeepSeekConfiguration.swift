@@ -2,12 +2,17 @@ import Foundation
 
 /// OpenAI-compatible DeepSeek configuration, shared by settings and requests.
 enum DeepSeekConfiguration {
+    private static func isLoopback(_ host: String) -> Bool {
+        ["localhost", "127.0.0.1", "[::1]", "::1"].contains(host.lowercased())
+    }
+
     static func completionURL(_ endpoint: String) -> URL? {
         let value = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
         guard var components = URLComponents(string: value),
               let scheme = components.scheme?.lowercased(),
               ["http", "https"].contains(scheme),
               let host = components.host, !host.isEmpty,
+              scheme == "https" || isLoopback(host),
               components.user == nil, components.password == nil,
               components.query == nil, components.fragment == nil else { return nil }
         var path = components.path
@@ -20,7 +25,7 @@ enum DeepSeekConfiguration {
     static func isValid(endpoint: String, model: String, apiKey: String) -> Bool {
         guard let url = completionURL(endpoint),
               !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-        let local = ["localhost", "127.0.0.1", "[::1]", "::1"].contains(url.host?.lowercased() ?? "")
+        let local = isLoopback(url.host ?? "")
         return local || !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
@@ -29,7 +34,7 @@ enum DeepSeekConfiguration {
         guard isValid(endpoint: endpoint, model: model, apiKey: apiKey),
               let url = completionURL(endpoint) else {
             throw NSError(domain: "DeepSeek", code: 1, userInfo: [NSLocalizedDescriptionKey:
-                "Check the DeepSeek endpoint, model name, and API key. Only localhost endpoints can omit the key."])
+                String(localized: "Check the DeepSeek endpoint, model name, and API key. Remote endpoints require HTTPS and an API key. Only loopback endpoints (localhost, 127.0.0.1, or [::1]) can use HTTP or omit the key.")])
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

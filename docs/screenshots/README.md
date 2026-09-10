@@ -13,3 +13,5 @@ credentials, or personal chat history. The interface language is Simplified Chin
 The mocked tool label in the fixture is a presentation test, not evidence of an
 external web search. See `DEEPSEEK_SETUP.md` for the real backend configuration
 and automated validation entry point.
+
+Fixture events are written to `build/Acceptance/ui-fixture-events.jsonl` inside this repository, independently of the directory used for build products.

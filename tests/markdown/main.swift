@@ -53,21 +53,44 @@ expect(ChatMarkdown.parse("> ## Quote\n> text\n>\n> - item\n>> nested") == [
 ], "Quotes recursively render headings, lists and nested quotes")
 
 expect(ChatMarkdown.parse("```swift\nlet x = 1\n\nprint(x)\n```\nAfter") == [
-    .code(language: "swift", content: "let x = 1\n\nprint(x)\n", isClosed: true), .paragraph("After")
-], "Fenced code preserves whitespace, final newline and language")
+    .code(language: "swift", content: "let x = 1\n\nprint(x)", isClosed: true), .paragraph("After")
+], "Closed code keeps internal whitespace without adding a line for the closing fence")
 expect(ChatMarkdown.parse("```\n```") == [.code(language: nil, content: "", isClosed: true)], "Empty closed fence")
 expect(ChatMarkdown.parse("```swift") == [.code(language: "swift", content: "", isClosed: false)], "Opening fence only")
 expect(ChatMarkdown.parse("```swift\nlet x =") == [.code(language: "swift", content: "let x =", isClosed: false)],
        "Streaming content without final newline")
 expect(ChatMarkdown.parse("```\nhello\n``") == [.code(language: nil, content: "hello\n``", isClosed: false)],
        "Incomplete closing fence remains visible")
-expect(ChatMarkdown.parse("````text\n```\n~~~\n````") == [.code(language: "text", content: "```\n~~~\n", isClosed: true)],
+expect(ChatMarkdown.parse("````text\n```\n~~~\n````") == [.code(language: "text", content: "```\n~~~", isClosed: true)],
        "Fence closing must match character and minimum length")
-expect(ChatMarkdown.parse("~~~python extra\nx\n~~~~") == [.code(language: "python", content: "x\n", isClosed: true)],
+expect(ChatMarkdown.parse("~~~python extra\nx\n~~~~") == [.code(language: "python", content: "x", isClosed: true)],
        "Tilde fences and info strings")
 expect(ChatMarkdown.parse("- code\n  ```swift\n  x\n  ```") == [
-    .list([.init(marker: "•", blocks: [.paragraph("code"), .code(language: "swift", content: "x\n", isClosed: true)])])
+    .list([.init(marker: "•", blocks: [.paragraph("code"), .code(language: "swift", content: "x", isClosed: true)])])
 ], "Fenced code nested in a list")
+
+for (source, content) in [
+    ("```\nline\n```", "line"),
+    ("```\nline\n```\n\n", "line"),
+    ("```\nline\n\n```", "line\n"),
+    ("```\nline\n\n\n```", "line\n\n"),
+    ("```\n\nline\n```", "\nline"),
+    ("```\n\n\n```", "\n"),
+    ("```\nline  \n \n```", "line  \n "),
+    ("~~~\r\nline\r\n\r\n~~~", "line\n")
+] {
+    expect(ChatMarkdown.parse(source) == [.code(language: nil, content: content, isClosed: true)],
+           "Closed fence strips only the fence separator, preserving actual blank lines: \(String(reflecting: source))")
+}
+let streamingCode = "let x = 1\n\n  print(x)\n"
+for length in 0...streamingCode.count {
+    let partial = String(streamingCode.prefix(length))
+    expect(ChatMarkdown.parse("```swift\n" + partial) == [.code(language: "swift", content: partial, isClosed: false)],
+           "Streaming prefix \(length) preserves every received code character, including final newlines")
+}
+expect(ChatMarkdown.parse("> ```\n> line\n>\n> ```") == [
+    .quote([.code(language: nil, content: "line\n", isClosed: true)])
+], "Quoted code preserves its explicit trailing blank line")
 
 let tableSource = "| Name | Value | Note |\n| :--- | ---: | :---: |\n| A\\|B | **2** | `a|b` |\n| short | 3 |"
 expect(ChatMarkdown.parse(tableSource) == [.table(.init(

@@ -209,10 +209,12 @@ struct RecordingButton: View {
 
 struct ApiKeyAlertView: View {
     @State private var apiKey = ""
+    @State private var credentialError: String?
     
     var body: some View {
         VStack(spacing: 12) {
-            TextField("Enter your Gemini API Key", text: $apiKey)
+            if let credentialError { Text(credentialError).foregroundStyle(.red) }
+            SecureField("Enter your Gemini API Key", text: $apiKey)
                 .textFieldStyle(.roundedBorder)
             
             HStack {
@@ -221,7 +223,10 @@ struct ApiKeyAlertView: View {
                 }
                 
                 Button("Save") {
-                    Defaults[.geminiApiKey] = apiKey
+                    do {
+                        try AICredentialStore.shared.setKey(apiKey, for: .gemini)
+                        credentialError = nil
+                    } catch { credentialError = error.localizedDescription }
                 }
                 .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }

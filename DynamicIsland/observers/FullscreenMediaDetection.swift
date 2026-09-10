@@ -21,141 +21,197 @@
  */
 
 import ApplicationServices
+import Combine
 import Defaults
-import MacroVisionKit
 import SwiftUI
+import Darwin
 
-class FullscreenMediaDetector: ObservableObject {
+/// Metadata-only detection. The parent owns window ordering and lock/Space gates.
+@MainActor
+final class FullscreenMediaDetector: ObservableObject {
     static let shared = FullscreenMediaDetector()
-    private let detector: MacroVisionKit
-    @ObservedObject private var musicManager = MusicManager.shared
-    @MainActor @Published private(set) var fullscreenStatus: [String: Bool] = [:]
-    private var notificationTask: Task<Void, Never>?
+    @Published private(set) var fullscreenStatus: [String: Bool] = [:]
+    private var subscriptions = Set<AnyCancellable>()
+    private var settleTask: Task<Void, Never>?
+    private var pollTimer: Timer?
+    private var isRefreshing = false
 
     private init() {
-        self.detector = MacroVisionKit.shared
-        detector.configuration.includeSystemApps = true
-        setupNotificationObservers()
-        updateFullScreenStatus()
+        let workspace = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.activeSpaceDidChangeNotification,
+                     NSWorkspace.didActivateApplicationNotification,
+                     NSWorkspace.didTerminateApplicationNotification,
+                     NSWorkspace.didHideApplicationNotification,
+                     NSWorkspace.didUnhideApplicationNotification,
+                     NSWorkspace.didWakeNotification] {
+            observe(workspace, name: name)
+        }
+        // AppKit posts this on the default center, not NSWorkspace's center.
+        observe(.default, name: NSApplication.didChangeScreenParametersNotification)
+        Publishers.Merge(
+            Defaults.publisher(.enableFullscreenMediaDetection, options: []).map { _ in () },
+            Defaults.publisher(.hideNotchOption, options: []).map { _ in () }
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] in MainActor.assumeIsolated { self?.handleChange() } }
+        .store(in: &subscriptions)
+        MusicManager.shared.$bundleIdentifier
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.handleChange() } }
+            .store(in: &subscriptions)
+        refresh()
     }
 
-    private func setupNotificationObservers() {
-        notificationTask = Task { @Sendable [weak self] in
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    let activeSpaceNotifications = NSWorkspace.shared.notificationCenter.notifications(
-                        named: NSWorkspace.activeSpaceDidChangeNotification
-                    )
-                    
-                    for await _ in activeSpaceNotifications {
-                        await self?.handleChange()
-                    }
-                }
-                
-                group.addTask {
-                    let screenParameterNotifications = NSWorkspace.shared.notificationCenter.notifications(
-                        named:  NSApplication.didChangeScreenParametersNotification
-                    )
-                    
-                    for await _ in screenParameterNotifications {
-                        await  self?.handleChange()
-                    }
-                }
+    private func observe(_ center: NotificationCenter, name: Notification.Name) {
+        center.publisher(for: name)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.handleChange() } }
+            .store(in: &subscriptions)
+    }
+
+    private func handleChange() {
+        refresh()
+        settleTask?.cancel()
+        // Space notifications may precede the WindowServer/AX transition. A
+        // replaceable task avoids queued stale snapshots or a task per event.
+        settleTask = Task { [weak self] in
+            for delay in [150, 500] {
+                do { try await Task.sleep(for: .milliseconds(delay)) }
+                catch { return }
+                guard !Task.isCancelled else { return }
+                self?.refresh()
             }
         }
     }
 
-    private func handleChange() async {
-        try? await Task.sleep(for: .milliseconds(500))
-        self.updateFullScreenStatus()
+    /// Synchronous main-actor refresh for the parent's activeSpaceDidChange
+    /// handler, before it reasserts window presence. Never changes app settings,
+    /// requests AX permission, or orders any window front.
+    func refresh() {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+        let enabled = Defaults[.enableFullscreenMediaDetection]
+        let mode: FullscreenVisibilityPolicy.HideMode
+        switch Defaults[.hideNotchOption] {
+        case .always: mode = .always
+        case .nowPlayingOnly: mode = .nowPlayingOnly
+        case .never: mode = .never
+        }
+        configurePolling(enabled: enabled && mode != .never)
+        let screens = NSScreen.screens.compactMap { screen -> FullscreenVisibilityPolicy.Screen? in
+            guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { return nil }
+            let frame = CGDisplayBounds(number.uint32Value)
+            let insets = screen.safeAreaInsets
+            let safeFrame = CGRect(x: frame.minX + insets.left, y: frame.minY + insets.top,
+                                   width: frame.width - insets.left - insets.right,
+                                   height: frame.height - insets.top - insets.bottom)
+            return .init(name: screen.localizedName, frame: frame, safeFrame: safeFrame)
+        }
+        let active = enabled && mode != .never
+        let windows = active ? visibleWindows() : []
+        let trusted = active && AXIsProcessTrusted()
+        let candidates = screens.compactMap { FullscreenVisibilityPolicy.candidate(on: $0, windows: windows) }
+        let nativeWindows = trusted ? nativeFullscreenWindows(for: candidates) : []
+        let status = FullscreenVisibilityPolicy.statuses(
+            screens: screens, windows: windows, nativeWindows: nativeWindows,
+            accessibilityTrusted: trusted, enabled: enabled, mode: mode,
+            mediaBundleIdentifier: MusicManager.shared.bundleIdentifier)
+        if status != fullscreenStatus { fullscreenStatus = status }
     }
 
-    private func updateFullScreenStatus() {
-        guard Defaults[.enableFullscreenMediaDetection] else {
-            let reset = Dictionary(uniqueKeysWithValues: NSScreen.screens.map { ($0.localizedName, false) })
-            if reset != fullscreenStatus {
-                fullscreenStatus = reset
-            }
+    private func configurePolling(enabled: Bool) {
+        guard enabled else {
+            pollTimer?.invalidate()
+            pollTimer = nil
             return
         }
-        
+        guard pollTimer == nil else { return }
+        // Covers AX fullscreen changes, window close/resize and permission
+        // changes that produce no Space notification. No polling while disabled.
+        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
+        timer.tolerance = 0.2
+        RunLoop.main.add(timer, forMode: .common)
+        pollTimer = timer
+    }
 
-        let apps = detector.detectFullscreenApps(debug: false)
-        let names = NSScreen.screens.map { $0.localizedName }
-        let hideOption = Defaults[.hideNotchOption]
+    private func visibleWindows() -> [FullscreenVisibilityPolicy.Window] {
+        // MacroVisionKit's local API discards CGWindowID and matches only a
+        // safe-area frame. Keep one on-screen snapshot with exact IDs so an AX
+        // fullscreen window in another Space cannot confirm the visible one.
+        guard let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]] else { return [] }
+        var bundles: [Int32: String] = [:]
+        for app in NSWorkspace.shared.runningApplications {
+            bundles[app.processIdentifier] = app.bundleIdentifier
+        }
+        return info.compactMap { value in
+            guard let pid = value[kCGWindowOwnerPID as String] as? NSNumber,
+                  pid.int32Value != ProcessInfo.processInfo.processIdentifier,
+                  let id = value[kCGWindowNumber as String] as? NSNumber,
+                  let bounds = value[kCGWindowBounds as String] as? [String: Any],
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary),
+                  let layer = value[kCGWindowLayer as String] as? NSNumber,
+                  let alpha = value[kCGWindowAlpha as String] as? NSNumber,
+                  let onscreen = value[kCGWindowIsOnscreen as String] as? NSNumber else { return nil }
+            return .init(id: id.uint32Value, pid: pid.int32Value, bundleIdentifier: bundles[pid.int32Value],
+                         frame: frame, layer: layer.intValue, alpha: alpha.doubleValue, isOnscreen: onscreen.boolValue)
+        }
+    }
 
-        var newStatus: [String: Bool] = [:]
-        for name in names {
-            newStatus[name] = apps.contains { app in
-                guard app.screen.localizedName == name,
-                      app.bundleIdentifier != "com.apple.finder" else { return false }
+    // AX exposes no public CGWindowID accessor. Resolve the system bridge
+    // optionally instead of hard-linking a private symbol. If unavailable we
+    // cannot confirm native fullscreen; never substitute another window's flag.
+    private typealias WindowIDFunction = @convention(c) (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError
+    private static let windowIDFunction: WindowIDFunction? = {
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "_AXUIElementGetWindow") else { return nil }
+        return unsafeBitCast(symbol, to: WindowIDFunction.self)
+    }()
 
-                // The notch stays on display by default (the window's collectionBehavior
-                // rides along with fullscreen spaces). It only hides when the user's
-                // "Hide DynamicIsland" option asks for it.
-                switch hideOption {
-                case .always:
-                    // Hide for any app in genuine native fullscreen on this screen.
-                    return isInNativeFullscreen(app)
-                case .nowPlayingOnly:
-                    // Hide only when the currently playing media app is in fullscreen.
-                    return app.bundleIdentifier == musicManager.bundleIdentifier
-                        && isInNativeFullscreen(app)
-                case .never:
-                    // Always on display; never hide.
-                    return false
+    private func nativeFullscreenWindows(for candidates: [FullscreenVisibilityPolicy.Window]) -> [FullscreenVisibilityPolicy.NativeWindow] {
+        guard let windowIDFunction = Self.windowIDFunction else { return [] }
+        var result: [FullscreenVisibilityPolicy.NativeWindow] = []
+        // Synchronous refresh is bounded even if an application stops responding.
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.2
+        for (pid, targets) in Dictionary(grouping: candidates, by: \.pid).sorted(by: { $0.key < $1.key }) {
+            guard ProcessInfo.processInfo.systemUptime < deadline else { break }
+            let app = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(app, 0.02)
+            var remaining = Set(targets.map(\.id))
+            func inspect(_ element: AXUIElement) {
+                guard !remaining.isEmpty, ProcessInfo.processInfo.systemUptime < deadline else { return }
+                AXUIElementSetMessagingTimeout(element, 0.02)
+                var id: CGWindowID = 0
+                guard windowIDFunction(element, &id) == .success, remaining.contains(id) else { return }
+                let fullscreen: Bool? = copyAttribute("AXFullScreen" as CFString, from: element)
+                result.append(.init(id: id, pid: pid, isFullscreen: fullscreen == true))
+                remaining.remove(id)
+            }
+            if let focused: AXUIElement = copyAttribute(kAXFocusedWindowAttribute as CFString, from: app) {
+                inspect(focused)
+            }
+            guard !remaining.isEmpty, ProcessInfo.processInfo.systemUptime < deadline else { continue }
+            if let windows: [AXUIElement] = copyAttribute(kAXWindowsAttribute as CFString, from: app) {
+                for window in windows.prefix(64) {
+                    guard !remaining.isEmpty, ProcessInfo.processInfo.systemUptime < deadline else { break }
+                    inspect(window)
                 }
             }
         }
-
-        if newStatus != fullscreenStatus {
-            fullscreenStatus = newStatus
-            NSLog("✅ Fullscreen status: \(newStatus)")
-        }
-    }
-
-    /// Confirms an app the detector flagged as screen-filling is in *genuine* native
-    /// fullscreen, not merely maximized/zoomed. On a notched Mac a maximized window and a
-    /// fullscreen window report nearly identical frames, so frame size alone can't tell them
-    /// apart — the Accessibility `AXFullScreen` attribute can. Falls back to the detector's
-    /// frame-based result when Accessibility isn't trusted (so behavior doesn't silently break).
-    private func isInNativeFullscreen(_ app: MacroVisionKit.FullscreenWindowInfo) -> Bool {
-        guard AXIsProcessTrusted() else { return true }
-
-        let appElement = AXUIElementCreateApplication(app.processId)
-
-        // Prefer the focused window, then fall back to scanning all windows.
-        if let focused: AXUIElement = copyAttribute(kAXFocusedWindowAttribute as CFString, from: appElement),
-           isWindowFullscreen(focused) {
-            return true
-        }
-
-        if let windows: [AXUIElement] = copyAttribute(kAXWindowsAttribute as CFString, from: appElement) {
-            return windows.contains { isWindowFullscreen($0) }
-        }
-
-        return false
-    }
-
-    private func isWindowFullscreen(_ window: AXUIElement) -> Bool {
-        // "AXFullScreen" is the (undocumented but stable) attribute set true only in native
-        // fullscreen; maximized/zoomed windows report false or omit it.
-        let value: Bool? = copyAttribute("AXFullScreen" as CFString, from: window)
-        return value ?? false
+        return result
     }
 
     private func copyAttribute<T>(_ attribute: CFString, from element: AXUIElement) -> T? {
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute, &value) == .success,
-              let typed = value as? T else { return nil }
-        return typed
-    }
-
-    private func cleanupNotificationObservers() {
-        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        guard AXUIElementCopyAttributeValue(element, attribute, &value) == .success else { return nil }
+        return value as? T
     }
 
     deinit {
-        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        settleTask?.cancel()
+        pollTimer?.invalidate()
     }
 }

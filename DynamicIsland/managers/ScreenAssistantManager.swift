@@ -463,7 +463,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
             attachmentError = String(localized: "This model accepts images only. Remove unsupported attachments before sending.")
             return false
         }
-        if provider == .deepseek && !DeepSeekConfiguration.isValid(endpoint: Defaults[.deepseekEndpoint], model: Defaults[.deepseekModel], apiKey: Defaults[.deepseekApiKey]) {
+        if provider == .deepseek && !DeepSeekConfiguration.isValid(endpoint: Defaults[.deepseekEndpoint], model: Defaults[.deepseekModel], apiKey: AICredentialStore.shared.key(for: .deepseek)) {
             attachmentError = String(localized: "Configure the DeepSeek endpoint, model and API key before sending.")
             return false
         }
@@ -498,7 +498,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
     
     private func sendToGeminiAPI(message: String, files: [ScreenAssistantFile]) {
-        let apiKey = Defaults[.geminiApiKey]
+        let apiKey = AICredentialStore.shared.key(for: .gemini)
         guard !apiKey.isEmpty else {
             print("❌ ScreenAssistant: No Gemini API key configured")
             addAssistantMessage("Error: No Gemini API key configured. Please set your API key in model settings.")
@@ -521,7 +521,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
     
     private func sendToOpenAIAPI(message: String, files: [ScreenAssistantFile]) {
-        let apiKey = Defaults[.openaiApiKey]
+        let apiKey = AICredentialStore.shared.key(for: .openai)
         guard !apiKey.isEmpty else {
             print("❌ ScreenAssistant: No OpenAI API key configured")
             addAssistantMessage("Error: No OpenAI API key configured. Please set your API key in model settings.")
@@ -548,7 +548,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
 
     private func sendToGroqAPI(message: String, files: [ScreenAssistantFile]) {
-        let apiKey = Defaults[.groqApiKey]
+        let apiKey = AICredentialStore.shared.key(for: .groq)
         guard !apiKey.isEmpty else {
             print("❌ ScreenAssistant: No Groq API key configured")
             addAssistantMessage("Error: No Groq API key configured. Please set your API key in model settings.")
@@ -582,7 +582,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
     
     private func sendToClaudeAPI(message: String, files: [ScreenAssistantFile]) {
-        let apiKey = Defaults[.claudeApiKey]
+        let apiKey = AICredentialStore.shared.key(for: .claude)
         guard !apiKey.isEmpty else {
             print("❌ ScreenAssistant: No Claude API key configured")
             addAssistantMessage("Error: No Claude API key configured. Please set your API key in model settings.")
@@ -1276,7 +1276,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         let snapshot = chatMessages
         let endpoint = provider == .deepseek ? Defaults[.deepseekEndpoint] : Defaults[.localModelEndpoint]
         let selected = provider == .deepseek ? Defaults[.deepseekModel] : (Defaults[.selectedAIModel]?.id ?? "llama3.2")
-        let key = Defaults[.deepseekApiKey]
+        let key = AICredentialStore.shared.key(for: .deepseek)
         let vision = Defaults[.deepseekVisionModel]
         let thinking = Defaults[.enableThinkingMode]
         let toolsEnabled = Defaults[.chatToolsEnabled]

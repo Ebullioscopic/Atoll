@@ -137,7 +137,12 @@ struct LockScreenTimerWidget: View {
                     in: .rect(cornerRadius: Self.cornerRadius)
                 )
                 #else
-                .background(.ultraThinMaterial, in: .rect(cornerRadius: Self.cornerRadius))
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+                        .fill(accentColor.opacity(0.18))
+                        .allowsHitTesting(false)
+                }
                 #endif
         } else {
             frostedBackground

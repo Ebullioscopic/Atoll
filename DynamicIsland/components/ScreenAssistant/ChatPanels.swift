@@ -312,10 +312,10 @@ struct ChatInputView: View {
         guard canSend else { return }
         let key: String
         switch currentProvider {
-        case .gemini: key = Defaults[.geminiApiKey]
-        case .openai: key = Defaults[.openaiApiKey]
-        case .claude: key = Defaults[.claudeApiKey]
-        case .groq: key = Defaults[.groqApiKey]
+        case .gemini: key = AICredentialStore.shared.key(for: .gemini)
+        case .openai: key = AICredentialStore.shared.key(for: .openai)
+        case .claude: key = AICredentialStore.shared.key(for: .claude)
+        case .groq: key = AICredentialStore.shared.key(for: .groq)
         case .local, .deepseek: key = "configured-by-request-builder"
         }
         guard !key.isEmpty else { showingApiKeyAlert = true; return }

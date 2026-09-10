@@ -134,6 +134,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
     private var windowsHiddenForLock = false
     private var screenIsLocked = false
+    private var fullscreenScreenNames = Set<String>()
+    private var fullscreenHiddenWindows = Set<NSWindow>()
+    private var notchHiddenByUser = false
+    private var hiddenForDisplaySelection = false
+    private var fullscreenHoverStates: [NSWindow: FullscreenHoverState] = [:]
+    private var fullscreenHoverTimer: Timer?
     private var unlockGeneration = UUID()
     private var optionalShortcutHandlersRegistered = false
     private weak var focusWithoutDevToolsMenuItem: NSMenuItem?
@@ -307,6 +313,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         NotchCompatibilityMonitor.shared.onChange = nil
         NotchCompatibilityMonitor.shared.stop()
+        fullscreenHoverTimer?.invalidate()
+        fullscreenHoverTimer = nil
 
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
@@ -329,12 +337,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         screenIsLocked = locked
         unlockGeneration = UUID()
         if locked {
+            fullscreenHoverStates.removeAll()
             hideWindowsForLock()
             return
         }
         let generation = unlockGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self, !self.screenIsLocked, self.unlockGeneration == generation else { return }
+            self.refreshFullscreenVisibility()
             self.restoreWindowsAfterLock()
             self.adjustWindowPosition(changeAlpha: true)
         }
@@ -359,14 +369,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard windowsHiddenForLock, !screenIsLocked else { return }
         windowsHiddenForLock = false
 
-        if Defaults[.showOnAllDisplays] {
-            for window in windows.values {
-                window.orderFrontRegardless()
-                window.alphaValue = 1
-            }
-        } else if let window = window {
-            window.orderFrontRegardless()
-            window.alphaValue = 1
+        for window in currentDynamicIslandWindows() {
+            applyNotchVisibility(window, on: screenForNotchWindow(window), showWhenAllowed: true)
         }
     }
     
@@ -378,6 +382,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 viewModels[screen]?.onViewTeardown?()
                 viewModels[screen]?.onViewTeardown = nil
                 NotchSpaceManager.shared.notchSpace.windows.remove(window)
+                fullscreenHiddenWindows.remove(window)
+                fullscreenHoverStates.removeValue(forKey: window)
                 window.close()
             }
             windows.removeAll()
@@ -386,6 +392,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             vm.onViewTeardown?()
             vm.onViewTeardown = nil
             NotchSpaceManager.shared.notchSpace.windows.remove(window)
+            fullscreenHiddenWindows.remove(window)
+            fullscreenHoverStates.removeValue(forKey: window)
             window.close()
             self.window = nil
         }
@@ -394,8 +402,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Rebuilds the notch's CGSSpace membership from the live windows.
     /// This intentionally does not gate on `hideNotchOption == .never`: Space
     /// membership keeps the window anchored while switching desktops, while
-    /// FullscreenMediaDetector/`hideOnClosed` owns whether the closed notch renders
-    /// in fullscreen.
+    /// FullscreenMediaDetector drives actual window hiding; the view-model flag
+    /// also suppresses auxiliary media controls in fullscreen.
     @MainActor
     private func syncNotchSpaceMembership() {
         NotchSpaceManager.shared.notchSpace.windows = currentDynamicIslandWindows()
@@ -410,6 +418,113 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return []
     }
 
+    /// Hidden windows may no longer report a screen, so prefer our display mapping.
+    private func screenForNotchWindow(_ notchWindow: NSWindow) -> NSScreen? {
+        windows.first { $0.value === notchWindow }?.key
+            ?? NSScreen.screens.first { $0.localizedName == vm.screen }
+            ?? notchWindow.screen
+    }
+
+    /// A fullscreen notch stays out of the window stack until cursor intent
+    /// temporarily reveals it. Visible controls retain normal mouse handling.
+    /// iBar, positioning, and Space restoration all use this same gate.
+    private func applyNotchVisibility(_ notchWindow: NSWindow, on screen: NSScreen?, showWhenAllowed: Bool = false) {
+        let inFullscreen = screen.map { fullscreenScreenNames.contains($0.localizedName) } ?? false
+        let wasHiddenForFullscreen = fullscreenHiddenWindows.contains(notchWindow)
+        if inFullscreen { fullscreenHiddenWindows.insert(notchWindow) }
+        else { fullscreenHiddenWindows.remove(notchWindow) }
+        let hoverRevealed = fullscreenHoverStates[notchWindow]?.isRevealed == true
+        let displayHidden = !Defaults[.showOnAllDisplays] && hiddenForDisplaySelection
+        if windowsHiddenForLock || screenIsLocked || notchHiddenByUser || displayHidden || (inFullscreen && !hoverRevealed) {
+            notchWindow.alphaValue = 0
+            notchWindow.orderOut(nil)
+        } else if showWhenAllowed || wasHiddenForFullscreen {
+            notchWindow.alphaValue = 1
+            notchWindow.orderFrontRegardless()
+        }
+    }
+
+    /// Lifecycle callers run on AppKit's main thread; synchronize before raising
+    /// windows rather than waiting for Combine's scheduled notification.
+    private func refreshFullscreenVisibility() {
+        MainActor.assumeIsolated {
+            FullscreenMediaDetector.shared.refresh()
+            applyFullscreenStatus(FullscreenMediaDetector.shared.fullscreenStatus)
+        }
+    }
+
+    private func applyFullscreenStatus(_ status: [String: Bool]) {
+        fullscreenScreenNames = Set(status.compactMap { $0.value ? $0.key : nil })
+        for notchWindow in currentDynamicIslandWindows() {
+            let screen = screenForNotchWindow(notchWindow)
+            if let screen, fullscreenScreenNames.contains(screen.localizedName) {
+                let model = viewModels[screen] ?? vm
+                let revealed = fullscreenHoverStates[notchWindow]?.isRevealed == true
+                model.hideOnClosed = !revealed
+                if !revealed && model.notchState == .open { model.close() }
+            } else {
+                fullscreenHoverStates.removeValue(forKey: notchWindow)
+            }
+            applyNotchVisibility(notchWindow, on: screen)
+        }
+        configureFullscreenHover()
+    }
+
+    /// Polls position only while fullscreen suppression is active. No event tap,
+    /// click interception, or extra Accessibility permission is needed.
+    private func configureFullscreenHover() {
+        guard !fullscreenScreenNames.isEmpty else {
+            fullscreenHoverTimer?.invalidate()
+            fullscreenHoverTimer = nil
+            fullscreenHoverStates.removeAll()
+            return
+        }
+        guard fullscreenHoverTimer == nil else { return }
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            self?.updateFullscreenHover()
+        }
+        timer.tolerance = 0.02
+        RunLoop.main.add(timer, forMode: .common)
+        fullscreenHoverTimer = timer
+    }
+
+    private func updateFullscreenHover() {
+        let location = NSEvent.mouseLocation
+        let now = ProcessInfo.processInfo.systemUptime
+        for notchWindow in currentDynamicIslandWindows() {
+            guard let screen = screenForNotchWindow(notchWindow),
+                  fullscreenScreenNames.contains(screen.localizedName) else { continue }
+            let model = viewModels[screen] ?? vm
+            let width = max(96, model.closedNotchSize.width)
+            // On notched screens the trigger is the hardware-notch area; other
+            // screens use only a narrow top edge, leaving webpage controls free.
+            let activation = CGRect(x: screen.frame.midX - width / 2,
+                                    y: screen.frame.maxY - max(screen.safeAreaInsets.top, 3),
+                                    width: width, height: max(screen.safeAreaInsets.top, 3))
+            let content = CGRect(x: screen.frame.midX - model.notchSize.width / 2 - 8,
+                                 y: screen.frame.maxY - model.notchSize.height - 8,
+                                 width: model.notchSize.width + 16, height: model.notchSize.height + 8)
+            var state = fullscreenHoverStates[notchWindow] ?? FullscreenHoverState()
+            let action = state.update(inActivationArea: activation.contains(location),
+                                      inContentArea: content.contains(location),
+                                      allowed: !screenIsLocked && !windowsHiddenForLock && !notchHiddenByUser
+                                        && (Defaults[.showOnAllDisplays] || !hiddenForDisplaySelection),
+                                      now: now, hoverDelay: Defaults[.minimumHoverDuration])
+            fullscreenHoverStates[notchWindow] = state
+            switch action {
+            case .reveal:
+                model.hideOnClosed = false
+                if Defaults[.openNotchOnHover] { model.open() }
+                applyNotchVisibility(notchWindow, on: screen, showWhenAllowed: true)
+            case .hide:
+                model.hideOnClosed = true
+                if model.notchState == .open { model.close() }
+                applyNotchVisibility(notchWindow, on: screen)
+            case .none: break
+            }
+        }
+    }
+
     @MainActor
     private func reassertDynamicIslandWindowSpacePresence() {
         guard !windowsHiddenForLock, !screenIsLocked else { return }
@@ -418,10 +533,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         for window in currentDynamicIslandWindows() {
             window.collectionBehavior = DynamicIslandWindow.pinnedCollectionBehavior
-            if let screen = window.screen {
+            let screen = screenForNotchWindow(window)
+            if let screen {
                 window.level = NotchCompatibilityMonitor.shared.recommendedLevel(for: window.frame, on: screen)
             }
-            window.orderFrontRegardless()
+            applyNotchVisibility(window, on: screen, showWhenAllowed: true)
         }
     }
 
@@ -429,10 +545,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateNotchCompatibilityLevels() {
         guard !windowsHiddenForLock, !screenIsLocked else { return }
         for window in currentDynamicIslandWindows() {
-            guard let screen = window.screen else { continue }
+            guard let screen = screenForNotchWindow(window) else { continue }
             let wasVisible = window.isVisible
             window.level = NotchCompatibilityMonitor.shared.recommendedLevel(for: window.frame, on: screen)
-            if wasVisible { window.orderFrontRegardless() }
+            applyNotchVisibility(window, on: screen, showWhenAllowed: wasVisible)
         }
     }
 
@@ -463,12 +579,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 //.moveToSky()
         )
         
-        if windowsHiddenForLock || screenIsLocked {
-            window.alphaValue = 0
-            window.orderOut(nil)
-        } else {
-            window.orderFrontRegardless()
-        }
+        applyNotchVisibility(window, on: screen, showWhenAllowed: true)
         NotchSpaceManager.shared.notchSpace.windows.insert(window)
         //SkyLightOperator.shared.delegateWindow(window)
         return window
@@ -496,12 +607,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ), display: false)
         
         window.level = NotchCompatibilityMonitor.shared.recommendedLevel(for: window.frame, on: screen)
-        if windowsHiddenForLock || screenIsLocked {
-            window.alphaValue = 0
-            window.orderOut(nil)
-        } else if changeAlpha {
-            window.alphaValue = 1
-        }
+        applyNotchVisibility(window, on: screen, showWhenAllowed: changeAlpha)
     }
     
     private func updateWindowSizeIfNeeded() {
@@ -717,6 +823,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        _ = AICredentialStore.shared // Migrate legacy AI keys before any assistant request.
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]
@@ -760,7 +867,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotchCompatibilityMonitor.shared.onChange = { [weak self] in
             self?.updateNotchCompatibilityLevels()
         }
+        refreshFullscreenVisibility()
         NotchCompatibilityMonitor.shared.start()
+        FullscreenMediaDetector.shared.$fullscreenStatus
+            .removeDuplicates()
+            .sink { [weak self] status in self?.applyFullscreenStatus(status) }
+            .store(in: &cancellables)
         LockScreenManager.shared.$isLocked.removeDuplicates()
             .sink { [weak self] locked in self?.updateScreenLockState(locked) }
             .store(in: &cancellables)
@@ -980,6 +1092,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
+                self?.refreshFullscreenVisibility()
                 self?.reassertDynamicIslandWindowSpacePresence()
                 self?.adjustWindowPosition()
             }
@@ -1002,8 +1115,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             guard let self = self, let window = self.window else { return }
             DispatchQueue.main.async {
-                window.alphaValue =
-                    self.coordinator.selectedScreen == self.coordinator.preferredScreen ? 1 : 0
+                self.hiddenForDisplaySelection = self.coordinator.selectedScreen != self.coordinator.preferredScreen
+                self.applyNotchVisibility(window, on: self.screenForNotchWindow(window), showWhenAllowed: true)
             }
         }
 
@@ -1648,10 +1761,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc func togglePopover(_ sender: Any?) {
         guard !screenIsLocked, !windowsHiddenForLock else { return }
-        if window?.isVisible == true {
-            window?.orderOut(nil)
-        } else {
-            window?.orderFrontRegardless()
+        notchHiddenByUser.toggle()
+        fullscreenHoverStates.removeAll()
+        for window in currentDynamicIslandWindows() {
+            applyNotchVisibility(window, on: screenForNotchWindow(window), showWhenAllowed: true)
         }
     }
     

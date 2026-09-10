@@ -230,14 +230,18 @@ enum ChatMarkdown {
             if let opening = fence(line) {
                 index += 1
                 var content = ""
+                var firstContentLine = true
                 var closed = false
                 while index < lines.count {
                     if let closing = fence(lines[index]), closing.character == opening.character,
                        closing.count >= opening.count, closing.info.isEmpty {
                         closed = true; index += 1; break
                     }
+                    // Join content lines, not the closing fence. A genuine empty
+                    // line (including a streaming EOF line) still keeps its separator.
+                    if !firstContentLine { content += "\n" }
                     content += droppingIndent(lines[index], indentation(line))
-                    if index + 1 < lines.count { content += "\n" }
+                    firstContentLine = false
                     index += 1
                 }
                 blocks.append(.code(language: opening.info.split(whereSeparator: { $0.isWhitespace }).first.map(String.init),

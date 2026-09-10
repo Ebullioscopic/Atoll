@@ -56,6 +56,7 @@ export default function (pi: any) {
         });
         const abort = () => child.kill("SIGTERM");
         signal?.addEventListener("abort", abort, {once:true});
+        if (signal?.aborted) abort();
         const timer = setTimeout(abort, 110000);
         try {
           const code = await new Promise<number|null>((resolve,reject) => {

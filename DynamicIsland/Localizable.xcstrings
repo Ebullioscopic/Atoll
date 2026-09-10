@@ -1,6 +1,241 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "An API key changed in another window. Reopen model settings before saving to avoid overwriting it.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "API Key 已在另一个窗口中更改。请重新打开模型设置后再保存，避免覆盖新值。"
+        }
+      }
+    }
+  },
+  "Some API keys were already saved. The remaining configuration was not saved; cancelling will not undo those keys. %@": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "部分 API Key 已经保存，其余配置未保存；取消不会撤销已保存的 Key。%@"
+        }
+      }
+    }
+  },
+  "Enter your Gemini API key": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "输入 Gemini API Key"
+        }
+      }
+    }
+  },
+  "Get your API key from Google AI Studio": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "从 Google AI Studio 获取 API Key"
+        }
+      }
+    }
+  },
+  "OpenAI API Key": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "OpenAI API Key"
+        }
+      }
+    }
+  },
+  "Enter your OpenAI API key": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "输入 OpenAI API Key"
+        }
+      }
+    }
+  },
+  "Get your API key from OpenAI Platform": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "从 OpenAI 平台获取 API Key"
+        }
+      }
+    }
+  },
+  "Claude API Key": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Claude API Key"
+        }
+      }
+    }
+  },
+  "Enter your Claude API key": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "输入 Claude API Key"
+        }
+      }
+    }
+  },
+  "Get your API key from Anthropic Console": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "从 Anthropic 控制台获取 API Key"
+        }
+      }
+    }
+  },
+  "Local Endpoint": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "本地接口地址"
+        }
+      }
+    }
+  },
+  "Ollama or compatible API endpoint": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Ollama 或兼容 API 的接口地址"
+        }
+      }
+    }
+  },
+  "Groq API Key": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Groq API Key"
+        }
+      }
+    }
+  },
+  "Enter your Groq API key": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "输入 Groq API Key"
+        }
+      }
+    }
+  },
+  "http://localhost:11434": {
+    "shouldTranslate": false
+  },
+  "llama3.2": {
+    "shouldTranslate": false
+  },
+  "https://api.deepseek.com": {
+    "shouldTranslate": false
+  },
+  "deepseek-v4-flash": {
+    "shouldTranslate": false
+  },
+  "deepseek-v4-flash-vision-exp": {
+    "shouldTranslate": false
+  },
+  "Code": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "代码"
+        }
+      }
+    }
+  },
+  "Copied": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已复制"
+        }
+      }
+    }
+  },
+  "Copy code": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "复制代码"
+        }
+      }
+    }
+  },
+  "Code copied": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "代码已复制"
+        }
+      }
+    }
+  },
+  "API Key": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "API Key"
+        }
+      }
+    }
+  },
+  "Could not access the API key in Keychain. Unlock your login keychain and try again.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法访问钥匙串中的 API Key。请解锁登录钥匙串后重试。"
+        }
+      }
+    }
+  },
+  "Get your API key from Groq Console": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "从 Groq 控制台获取 API Key"
+        }
+      }
+    }
+  },
+  "Check the DeepSeek endpoint, model name, and API key. Remote endpoints require HTTPS and an API key. Only loopback endpoints (localhost, 127.0.0.1, or [::1]) can use HTTP or omit the key.": {
+    "localizations": {
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "请检查 DeepSeek 接口地址、模型名称和 API Key。远程接口必须使用 HTTPS 并提供 API Key。只有回环地址（localhost、127.0.0.1 或 [::1]）可以使用 HTTP 或省略 API Key。"
+        }
+      }
+    }
+  },
   "Decrease text size": {
     "localizations": {
       "zh-Hans": {
@@ -702,12 +937,12 @@
         }
       }
     },
-    "The model request failed (HTTP" : {
+    "The model request failed (HTTP %d)." : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "模型请求失败（HTTP"
+            "value" : "模型请求失败（HTTP %d）。"
           }
         }
       }

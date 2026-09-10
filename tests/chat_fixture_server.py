@@ -7,11 +7,11 @@ import tempfile
 import threading
 import signal
 import time
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'deepseek-bridge'))
+root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root / 'deepseek-bridge'))
 import bridge
 import pi_backend
 
-root = Path(__file__).resolve().parents[2]
 events = root / 'build/Acceptance/ui-fixture-events.jsonl'
 events.parent.mkdir(parents=True, exist_ok=True)
 lock = threading.Lock()

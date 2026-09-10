@@ -35,8 +35,14 @@ class Tests(unittest.TestCase):
         with patch('pi_backend.PiClient',Slow):
             self.assertIn('/result',self.chat('slow'))
             self.assertIn('尚未执行',self.chat('new question'))
-            event.set(); time.sleep(.02)
-            self.assertEqual(self.chat('/result'),'done')
+            event.set()
+            deadline=time.monotonic()+3
+            result=None
+            while time.monotonic()<deadline:
+                result=self.chat('/result')
+                if result=='done': break
+                time.sleep(.005)
+            self.assertEqual(result,'done')
     def test_reset_discards_old_result(self):
         event=threading.Event()
         class Slow(FakePi):

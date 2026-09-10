@@ -124,7 +124,7 @@ private struct ChatMarkdownCodeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Text(verbatim: language ?? "代码")
+                Text(verbatim: language ?? String(localized: "Code"))
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -134,14 +134,15 @@ private struct ChatMarkdownCodeView: View {
                     NSPasteboard.general.clearContents()
                     copied = NSPasteboard.general.setString(content, forType: .string)
                 } label: {
-                    Label(copied ? "已复制" : "复制代码", systemImage: copied ? "checkmark" : "doc.on.doc")
+                    Label(copied ? String(localized: "Copied") : String(localized: "Copy code"),
+                          systemImage: copied ? "checkmark" : "doc.on.doc")
                         .font(.system(size: 11))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .fixedSize()
-                .help("复制代码")
-                .accessibilityLabel(copied ? "代码已复制" : "复制代码")
+                .help(String(localized: "Copy code"))
+                .accessibilityLabel(copied ? String(localized: "Code copied") : String(localized: "Copy code"))
             }
             .padding(.horizontal, 11)
             .padding(.vertical, 8)

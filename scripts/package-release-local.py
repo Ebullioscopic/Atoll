@@ -12,15 +12,16 @@ source = workspace / 'build/DerivedData/Build/Products/Release/Atoll.app'
 output = workspace / 'dist'
 if not source.is_dir():
     raise SystemExit('Build Release first with scripts/build-release-local.command')
+with (source / 'Contents/Info.plist').open('rb') as handle:
+    info = plistlib.load(handle)
+if info.get('CFBundleIdentifier') != 'com.Ebullioscopic.Atoll':
+    raise SystemExit('Unexpected CFBundleIdentifier in Release build')
 output.mkdir(exist_ok=True)
 app = output / 'Atoll.app'
 if app.exists():
     raise SystemExit('dist/Atoll.app already exists; retain or move it before packaging again.')
 subprocess.run(['ditto', str(source), str(app)], check=True)
 info_path = app / 'Contents/Info.plist'
-with info_path.open('rb') as handle:
-    info = plistlib.load(handle)
-assert info['CFBundleIdentifier'] == 'com.Ebullioscopic.Atoll'
 info['SUEnableAutomaticChecks'] = False
 info['SUAllowsAutomaticUpdates'] = False
 info['AtollLocalBuild'] = True

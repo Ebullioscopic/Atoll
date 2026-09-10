@@ -48,7 +48,7 @@ enum ChatTransport {
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            throw ChatStreamChunk.failure(String(localized: "The model request failed (HTTP") + " \(status)).")
+            throw ChatStreamChunk.failure(String(format: String(localized: "The model request failed (HTTP %d)."), status))
         }
         let contentType = (http.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
         let plainJSON = contentType.contains("application/json") && !ollama

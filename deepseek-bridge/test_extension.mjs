@@ -1,8 +1,34 @@
 // Offline test of the actual TypeScript extension's history hooks. No Pi/model run.
 import assert from 'node:assert/strict';
-import {createRequire} from 'node:module';
+import {createRequire, syncBuiltinESMExports} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
+import childProcess from 'node:child_process';
+import {EventEmitter, getEventListeners} from 'node:events';
+
+// Replace the subprocess boundary before loading the real extension. No tool,
+// permission dialog, or network request may be launched by this test.
+const originalSpawn = childProcess.spawn;
+const originalBridgeDir = process.env.ATOLL_BRIDGE_DIR;
+process.env.ATOLL_BRIDGE_DIR = fileURLToPath(new URL('.', import.meta.url));
+let abortDuringSpawn;
+const children = [];
+childProcess.spawn = () => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stdin = new EventEmitter();
+  child.stdin.end = () => {};
+  child.signals = [];
+  child.kill = signal => {
+    child.signals.push(signal);
+    queueMicrotask(() => child.emit('close', null));
+    return true;
+  };
+  children.push(child);
+  abortDuringSpawn?.abort();
+  return child;
+};
+syncBuiltinESMExports();
 
 const piRoot = process.env.ATOLL_TEST_PI_ROOT || '/opt/homebrew/lib/node_modules/@earendil-works/pi-coding-agent';
 const requirePi = createRequire(path.join(piRoot, 'package.json'));
@@ -12,11 +38,12 @@ const jiti = createJiti(import.meta.url, {fsCache: false, moduleCache: false,
 const extension = await jiti.import(fileURLToPath(new URL('./pi-tools.ts', import.meta.url)), {default: true});
 const commands = new Map();
 const events = new Map();
+const tools = new Map();
 let activeTools = [];
 let modelCalls = 0;
 const pi = {
   registerCommand: (name, spec) => commands.set(name, spec),
-  registerTool: () => {},
+  registerTool: tool => tools.set(tool.name, tool),
   on: (name, handler) => events.set(name, handler),
   setActiveTools: names => { activeTools = names; },
   sendUserMessage: () => { modelCalls++; },
@@ -52,3 +79,34 @@ assert.deepEqual((await events.get('context')(turn)).messages, [current]);
 assert.equal(await events.get('before_agent_start')({systemPrompt: 'Base'}), undefined);
 assert.equal(modelCalls, 0);
 console.log('Extension history, image, system, tool-switch, and zero-replay checks passed.');
+
+try {
+  const tool = tools.get('read_file');
+  const alreadyAborted = new AbortController();
+  alreadyAborted.abort();
+  await assert.rejects(tool.execute('before', {path: '/fake'}, alreadyAborted.signal), /Cancelled/);
+  assert.equal(children.length, 0, 'pre-aborted execution must not spawn');
+
+  for (const duringStartup of [true, false]) {
+    const controller = new AbortController();
+    abortDuringSpawn = duringStartup ? controller : undefined;
+    const operation = tool.execute('cancel', {path: '/fake'}, controller.signal);
+    const child = children.at(-1);
+    try {
+      if (!duringStartup) controller.abort();
+      assert.deepEqual(child.signals, ['SIGTERM'], 'startup abort must terminate the child immediately');
+      await assert.rejects(operation, /Cancelled/);
+      assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+    } finally {
+      // Release the pending fake even if a regression skips child.kill().
+      child?.emit('close', null);
+      await operation.catch(() => {});
+    }
+  }
+  console.log('Tool pre-start, startup-race, in-flight abort, and listener cleanup checks passed.');
+} finally {
+  childProcess.spawn = originalSpawn;
+  syncBuiltinESMExports();
+  if (originalBridgeDir === undefined) delete process.env.ATOLL_BRIDGE_DIR;
+  else process.env.ATOLL_BRIDGE_DIR = originalBridgeDir;
+}
