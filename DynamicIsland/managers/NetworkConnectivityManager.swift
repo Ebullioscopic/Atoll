@@ -67,7 +67,10 @@ final class NetworkConnectivityManager: NSObject, ObservableObject, CWEventDeleg
             guard let self else { return }
             let isSatisfied = path.status == .satisfied
             let usesWiFi = isSatisfied && path.usesInterfaceType(.wifi)
-            let isHotspot = usesWiFi && path.isExpensive
+            // `isExpensive` is the only Network framework signal exposed for
+            // Personal Hotspot. Exclude constrained paths so Low Data Mode on
+            // an ordinary Wi‑Fi network does not get the hotspot icon.
+            let isHotspot = usesWiFi && path.isExpensive && !path.isConstrained
             let wiFiName = usesWiFi ? self.currentWiFiName() : nil
 
             DispatchQueue.main.async { [weak self] in
@@ -269,15 +272,25 @@ final class NetworkConnectivityManager: NSObject, ObservableObject, CWEventDeleg
     private static func networkSetupWiFiName(for interfaceName: String) -> String? {
         let process = Process()
         let output = Pipe()
+        let termination = DispatchSemaphore(value: 0)
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/networksetup")
         process.arguments = ["-getairportnetwork", interfaceName]
         process.standardOutput = output
         process.standardError = Pipe()
+        process.terminationHandler = { _ in
+            termination.signal()
+        }
 
         do {
             try process.run()
-            process.waitUntilExit()
         } catch {
+            return nil
+        }
+
+        // `networksetup` normally returns immediately, but do not let a
+        // system-settings or interface race stall the connectivity queue.
+        guard termination.wait(timeout: .now() + 1) == .success else {
+            process.terminate()
             return nil
         }
 
