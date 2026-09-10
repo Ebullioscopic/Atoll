@@ -141,7 +141,7 @@ struct MinimalisticMusicPlayerView: View {
                         .padding(.top, 4)
                 }
 
-                if enableLyrics {
+                if shouldReserveLyricsSpace {
                     lyricsView
                         .padding(.top, 10)
                 }
@@ -260,10 +260,17 @@ struct MinimalisticMusicPlayerView: View {
 
     private var dynamicHeightSignature: Int {
         var signature = reminderEntries.count * 10
-        if enableLyrics { signature += 1 }
+        if shouldReserveLyricsSpace { signature += 1 }
         if shouldShowTimerCountdown { signature += 100 }
         if showMinimalisticBatteryIndicator { signature += 1000 }
         return signature
+    }
+
+    /// Ads do not have lyrics. Reserving the normal lyrics row for them left a
+    /// large empty strip beneath the controls and made the Dynamic Island look
+    /// nearly square instead of keeping its regular compact proportions.
+    private var shouldReserveLyricsSpace: Bool {
+        enableLyrics && !musicManager.isAdvertisement
     }
 
     /// True when the battery indicator is hidden and we are in notch mode (not DI).
@@ -280,7 +287,7 @@ struct MinimalisticMusicPlayerView: View {
             height += 6 + 4          // progress bar top padding + bar
             height += 54 + 2         // controls + top padding
 
-            if enableLyrics {
+            if shouldReserveLyricsSpace {
                 height += 10 + 34 // lyrics padding + estimated height
             }
             if shouldShowTimerCountdown {
@@ -302,7 +309,7 @@ struct MinimalisticMusicPlayerView: View {
         height += 4 + 4          // progress bar top padding + bar
         height += 54 + 2         // controls + top padding
 
-        if enableLyrics {
+        if shouldReserveLyricsSpace {
             height += 10 + 34
         }
         if shouldShowTimerCountdown {
