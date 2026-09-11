@@ -1,11 +1,32 @@
 import Foundation
 import Security
+import Darwin
 
-// Compile with KeychainReader.swift. Uses only UUID-named disposable credentials;
+// Run scripts/test_claude_keychain.sh on macOS with an unlocked default login Keychain.
+// Uses only UUID-named disposable credentials;
 // it does not read, refresh, or modify any Claude login credential.
 @main
 enum ClaudeKeychainTests {
     static func main() throws {
+        if CommandLine.arguments.contains("--closed-pipe") {
+            // Do not inherit an ignored SIGPIPE from a shell or test harness.
+            signal(SIGPIPE, SIG_DFL)
+            let pipe = Pipe()
+            try pipe.fileHandleForReading.close()
+            try require(!ClaudeKeychainStore.writeInput(Data("fake-input".utf8), to: pipe.fileHandleForWriting),
+                        "closed pipe must return failure without terminating the process")
+            return
+        }
+        let child = Process()
+        child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
+        child.arguments = ["--closed-pipe"]
+        try child.run()
+        child.waitUntilExit()
+        try require(child.terminationReason == .exit && child.terminationStatus == 0,
+                    "closed-pipe subprocess survives with default SIGPIPE handling")
+        print("PASS: closed-pipe write returns failure without SIGPIPE termination")
+        try requireLoginKeychain()
+
         let service = "Atoll-keychain-regression-\(UUID().uuidString)"
         let account = "test \"account\" \\ unicode-中文"
         let otherAccount = "other-account"
@@ -48,6 +69,21 @@ enum ClaudeKeychainTests {
         try require(ClaudeKeychainStore.updateCommand(service: service, account: nil, secret: "fake") == nil,
                 "unscoped update rejected")
         print("PASS: three Atoll/owner round trips, unchanged partition permissions, exact payload, account isolation, missing/oversized/invalid input")
+    }
+
+    /// Refuses unavailable or locked test environments before creating any item.
+    private static func requireLoginKeychain() throws {
+        var keychain: SecKeychain?
+        try require(SecKeychainCopyDefault(&keychain) == errSecSuccess, "default login Keychain required")
+        var path = [CChar](repeating: 0, count: Int(PATH_MAX))
+        var length = UInt32(path.count)
+        try require(SecKeychainGetPath(keychain, &length, &path) == errSecSuccess, "read default Keychain path")
+        let name = URL(fileURLWithPath: String(cString: path)).lastPathComponent
+        try require(name == "login.keychain-db" || name == "login.keychain", "default Keychain must be login")
+        var status: SecKeychainStatus = 0
+        let required = UInt32(kSecUnlockStateStatus | kSecReadPermStatus | kSecWritePermStatus)
+        try require(SecKeychainGetStatus(keychain, &status) == errSecSuccess && status & required == required,
+                    "login Keychain must be unlocked, readable, and writable")
     }
 
     private static func partitionIDs(service: String, account: String) throws -> Set<String> {

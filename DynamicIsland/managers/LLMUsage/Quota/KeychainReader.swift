@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import Darwin
 
 enum KeychainReader {
     static func genericPassword(service: String, account: String? = nil) -> String? {
@@ -113,6 +114,20 @@ enum ClaudeKeychainStore {
             .replacingOccurrences(of: "\"", with: "\\\"") + "\""
     }
 
+    /// Writes and closes stdin without allowing a vanished reader to terminate Atoll.
+    /// Descriptor-local suppression preserves signal handling elsewhere in the app.
+    static func writeInput(_ input: Data, to handle: FileHandle) -> Bool {
+        defer { try? handle.close() }
+        guard fcntl(handle.fileDescriptor, F_SETNOSIGPIPE, 1) != -1 else { return false }
+        do {
+            try handle.write(contentsOf: input)
+            return true
+        } catch {
+            // EPIPE and other write failures are operation failures, not success.
+            return false
+        }
+    }
+
     private static func run(arguments: [String], input: Data? = nil) -> (status: Int32, output: Data) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
@@ -124,17 +139,17 @@ enum ClaudeKeychainStore {
         process.standardError = FileHandle.nullDevice
         process.standardInput = input == nil ? FileHandle.nullDevice : inputPipe.fileHandleForReading
         do { try process.run() } catch { return (-1, Data()) }
+        // Only the child should retain a reader; otherwise its early exit can be
+        // hidden by our own read descriptor and the write may incorrectly succeed.
+        try? inputPipe.fileHandleForReading.close()
         let timeout = DispatchWorkItem {
             if process.isRunning { process.terminate() }
         }
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 15, execute: timeout)
         defer { timeout.cancel() }
-        if let input {
-            try? inputPipe.fileHandleForWriting.write(contentsOf: input)
-            try? inputPipe.fileHandleForWriting.close()
-        }
+        let inputSucceeded = input.map { writeInput($0, to: inputPipe.fileHandleForWriting) } ?? true
         let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        return (process.terminationStatus, data)
+        return (inputSucceeded ? process.terminationStatus : -1, data)
     }
 }
