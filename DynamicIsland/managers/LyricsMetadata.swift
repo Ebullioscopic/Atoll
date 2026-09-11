@@ -288,6 +288,36 @@ struct LyricsResolution {
     }
 }
 
+/// LRCLIB is asked first. A thrown request there is the same as an empty
+/// catalogue: neither produced words, so the fallback still has to run.
+/// Folding both calls into one `do` meant a transport failure skipped the
+/// only provider that had the track, and the catch showed "No lyrics found".
+enum LyricsProviderFallback {
+    static func resolve(
+        primary: () async throws -> LyricsResolution,
+        fallback: () async throws -> LyricsResolution
+    ) async -> LyricsResolution {
+        let primaryResult: LyricsResolution
+        do {
+            primaryResult = try await primary()
+        } catch {
+            print("Failed to fetch lyrics: \(error)")
+            primaryResult = LyricsResolution()
+        }
+        guard !Task.isCancelled, primaryResult.availability == .unavailable else {
+            return primaryResult
+        }
+        do {
+            let secondary = try await fallback()
+            if secondary.availability != .unavailable { return secondary }
+        } catch {
+            print("Failed to fetch lyrics: \(error)")
+        }
+        return primaryResult
+    }
+}
+
+
 /// Presentation-only filtering; raw lyrics remain available to the full panel.
 /// Require a complete credit label followed by a colon, never a substring.
 enum LyricTextSemantics {

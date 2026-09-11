@@ -48,15 +48,27 @@ enum NetEaseLyrics {
         guard let searchURL = searchURL(title: title, artist: artist) else { return LyricsResolution() }
 
         let (searchData, searchResponse) = try await session.data(from: searchURL)
-        guard (searchResponse as? HTTPURLResponse)?.statusCode == 200 else { return LyricsResolution() }
+        let searchStatus = (searchResponse as? HTTPURLResponse)?.statusCode
+        guard searchStatus == 200 else {
+            print("NetEase lyrics: search HTTP \(searchStatus ?? -1) title=\(title) artist=\(artist) duration=\(duration)")
+            return LyricsResolution()
+        }
 
         let songs = parseSearchResponse(searchData)
         guard let song = bestMatch(in: songs, title: title, artist: artist, duration: duration),
               let lyricURL = lyricURL(songID: song.id)
-        else { return LyricsResolution() }
+        else {
+            print("NetEase lyrics: no match title=\(title) artist=\(artist) duration=\(duration) songs=\(songs.count)")
+            return LyricsResolution()
+        }
+        print("NetEase lyrics: match id=\(song.id) name=\(song.name) duration=\(song.duration) for title=\(title) artist=\(artist) duration=\(duration) songs=\(songs.count)")
 
         let (lyricData, lyricResponse) = try await session.data(from: lyricURL)
-        guard (lyricResponse as? HTTPURLResponse)?.statusCode == 200 else { return LyricsResolution() }
+        let lyricStatus = (lyricResponse as? HTTPURLResponse)?.statusCode
+        guard lyricStatus == 200 else {
+            print("NetEase lyrics: lyric HTTP \(lyricStatus ?? -1) id=\(song.id)")
+            return LyricsResolution()
+        }
 
         return parseResolution(lyricData)
     }

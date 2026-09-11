@@ -214,6 +214,66 @@ final class LyricsResolutionTests: XCTestCase {
     }
 }
 
+final class LyricsProviderFallbackTests: XCTestCase {
+    private struct Transport: Error {}
+
+    private let sung = LyricsResolution(lines: [LyricLine(timestamp: 1, text: "a")])
+
+    func testPrimaryHitDoesNotAskFallback() async {
+        var asked = false
+        let result = await LyricsProviderFallback.resolve(
+            primary: { self.sung },
+            fallback: {
+                asked = true
+                return LyricsResolution()
+            }
+        )
+        XCTAssertEqual(result.availability, .timed)
+        XCTAssertFalse(asked)
+    }
+
+    func testInstrumentalPrimaryDoesNotAskFallback() async {
+        var asked = false
+        let result = await LyricsProviderFallback.resolve(
+            primary: { LyricsResolution(instrumental: true) },
+            fallback: {
+                asked = true
+                return self.sung
+            }
+        )
+        XCTAssertEqual(result.availability, .instrumental)
+        XCTAssertFalse(asked)
+    }
+
+    func testEmptyPrimaryUsesFallback() async {
+        let result = await LyricsProviderFallback.resolve(
+            primary: { LyricsResolution() },
+            fallback: { self.sung }
+        )
+        XCTAssertEqual(result.availability, .timed)
+        XCTAssertEqual(result.lines.map(\.text), ["a"])
+    }
+
+    func testPrimaryTransportFailureStillAsksFallback() async {
+        let result = await LyricsProviderFallback.resolve(
+            primary: { throw Transport() },
+            fallback: { self.sung }
+        )
+        XCTAssertEqual(result.availability, .timed)
+        XCTAssertEqual(result.lines.map(\.text), ["a"])
+    }
+
+    func testBothTransportFailuresAreUnavailable() async {
+        let result = await LyricsProviderFallback.resolve(
+            primary: { throw Transport() },
+            fallback: { throw Transport() }
+        )
+        XCTAssertEqual(result.availability, .unavailable)
+        XCTAssertTrue(result.lines.isEmpty)
+    }
+}
+
+
 final class PinnedLyricsSettingsTests: XCTestCase {
     func testExistingUsersDefaultToCurrentLine() {
         XCTAssertEqual(Defaults.Keys.pinnedLyricContext.defaultValue, .current)

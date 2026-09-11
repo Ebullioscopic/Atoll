@@ -1759,45 +1759,32 @@ class MusicManager: ObservableObject {
         lyricsFetchTask = Task { [weak self] in
             guard let self else { return }
 
-            do {
-                var lyrics = try await self.fetchLyricsFromAPI(
-                    artist: requestArtist,
-                    title: requestTitle,
-                    album: requestAlbum
-                )
-                guard !Task.isCancelled else { return }
-
-                // LRCLIB had nothing for this track. NetEase Cloud Music's
-                // own catalogue is the other place lyrics live (#713).
-                if lyrics.availability == .unavailable {
-                    let fromNetEase = try await self.fetchLyricsFromNetEase(artist: requestArtist, title: requestTitle)
-                    guard !Task.isCancelled else { return }
-                    if fromNetEase.availability != .unavailable {
-                        lyrics = fromNetEase
-                    }
+            let lyrics = await LyricsProviderFallback.resolve(
+                primary: {
+                    try await self.fetchLyricsFromAPI(
+                        artist: requestArtist,
+                        title: requestTitle,
+                        album: requestAlbum
+                    )
+                },
+                fallback: {
+                    try await self.fetchLyricsFromNetEase(artist: requestArtist, title: requestTitle)
                 }
+            )
+            guard !Task.isCancelled else { return }
 
-                await MainActor.run {
-                    guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
+            await MainActor.run {
+                guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
+                // Empty is not a fact about the track. Caching it would stick a
+                // transport blip — including the old path where LRCLIB threw
+                // and NetEase was never asked — and hide a later hit.
+                if lyrics.availability != .unavailable {
                     self.storeLyricsInCache(lyrics, for: key)
-                    self.lyricsFetchKey = nil
-                    self.lyricsFetchID = nil
-                    self.lyricsFetchTask = nil
-                    self.applyLyricsToDisplay(lyrics)
                 }
-            } catch {
-                print("Failed to fetch lyrics: \(error)")
-                await MainActor.run {
-                    guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
-                    self.lyricsFetchKey = nil
-                    self.lyricsFetchID = nil
-                    self.lyricsFetchTask = nil
-                    self.lyricsAvailability = .unavailable
-                    self.syncedLyrics = []
-                    self.currentLyricIndex = -1
-                    self.currentLyrics = "No lyrics found"
-                    self.stopLyricSync()
-                }
+                self.lyricsFetchKey = nil
+                self.lyricsFetchID = nil
+                self.lyricsFetchTask = nil
+                self.applyLyricsToDisplay(lyrics)
             }
         }
     }

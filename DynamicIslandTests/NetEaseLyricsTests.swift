@@ -81,6 +81,27 @@ final class NetEaseLyricsTests: XCTestCase {
         XCTAssertEqual(NetEaseLyrics.bestMatch(in: [song], title: "deja vu", artist: "olivia rodrigo", duration: 215), song)
     }
 
+    /// Live catalogue shape for the GRe4N BOYZ re-credit of キセキ: integer
+    /// millisecond duration, a Live cut in the same page, and 275 s playing.
+    func testKisekiSearchPagePicksTheStudioCut() throws {
+        let json = """
+        {"result":{"songs":[
+          {"id":733149,"name":"キセキ","artists":[{"name":"GRe4N BOYZ"}],"duration":275826},
+          {"id":733203,"name":"キセキ","artists":[{"name":"GRe4N BOYZ"}],"duration":275826},
+          {"id":732841,"name":"キセキ (Live)","artists":[{"name":"GRe4N BOYZ"}],"duration":289645},
+          {"id":1393124571,"name":"キセキ (For Basketballers)","artists":[{"name":"GRe4N BOYZ"}],"duration":93112}
+        ]},"code":200}
+        """
+        let songs = NetEaseLyrics.parseSearchResponse(Data(json.utf8))
+        XCTAssertEqual(songs.first?.duration ?? 0, 275.826, accuracy: 0.001)
+        let match = try XCTUnwrap(NetEaseLyrics.bestMatch(
+            in: songs, title: "キセキ", artist: "GRe4N BOYZ", duration: 275
+        ))
+        XCTAssertEqual(match.name, "キセキ")
+        XCTAssertEqual(abs(match.duration - 275.826), 0, accuracy: 0.001)
+    }
+
+
     // MARK: - Reading responses
 
     func testSearchResponseParsesSongs() throws {
