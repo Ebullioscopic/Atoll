@@ -131,10 +131,19 @@ struct LockScreenTimerWidget: View {
     private var standardLiquidBackground: some View {
         if #available(macOS 26.0, *) {
             RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+                #if compiler(>=6.2)
                 .glassEffect(
                     .clear.tint(accentColor.opacity(0.18)).interactive(),
                     in: .rect(cornerRadius: Self.cornerRadius)
                 )
+                #else
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+                        .fill(accentColor.opacity(0.18))
+                        .allowsHitTesting(false)
+                }
+                #endif
         } else {
             frostedBackground
         }

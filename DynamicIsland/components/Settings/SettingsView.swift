@@ -674,12 +674,21 @@ struct SettingsView: View {
             Group {
                 if #available(macOS 26.0, *) {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        #if compiler(>=6.2)
                         .glassEffect(
                             .clear
                                 .tint(Color.white.opacity(0.1))
                                 .interactive(),
                             in: .rect(cornerRadius: 18)
                         )
+                        #else
+                        .fill(.ultraThinMaterial)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(Color.white.opacity(0.1))
+                                .allowsHitTesting(false)
+                        }
+                        #endif
                 } else {
                     ZStack {
                         Color(NSColor.windowBackgroundColor)
@@ -702,7 +711,9 @@ struct SettingsView: View {
             ToolbarItem(placement: .primaryAction) {
                 toolbarSpacerView
             }
+            #if compiler(>=6.2)
             .sharedBackgroundVisibility(.hidden)
+            #endif
         } else {
             ToolbarItem(placement: .primaryAction) {
                 toolbarSpacerView
@@ -8640,9 +8651,20 @@ struct ScreenAssistantSettings: View {
     @ObservedObject var screenAssistantManager = ScreenAssistantManager.shared
     @Default(.enableScreenAssistant) var enableScreenAssistant
     @Default(.screenAssistantDisplayMode) var screenAssistantDisplayMode
-    @Default(.geminiApiKey) var geminiApiKey
+    @ObservedObject private var credentials = AICredentialStore.shared
+    private var geminiApiKey: String { credentials.key(for: .gemini) }
+    @State private var credentialError: String?
     @State private var apiKeyText = ""
     @State private var showingApiKey = false
+
+    private func saveAPIKey() {
+        do {
+            try credentials.setKey(apiKeyText, for: .gemini)
+            credentialError = nil
+            showingApiKey = false
+            apiKeyText = ""
+        } catch { credentialError = error.localizedDescription }
+    }
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.screenAssistant.highlightID(for: title)
@@ -8676,11 +8698,12 @@ struct ScreenAssistantSettings: View {
 
                         Button(showingApiKey ? "Hide" : (geminiApiKey.isEmpty ? "Set" : "Change")) {
                             if showingApiKey {
-                                showingApiKey = false
                                 if !apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    Defaults[.geminiApiKey] = apiKeyText
+                                    saveAPIKey()
+                                } else {
+                                    showingApiKey = false
+                                    apiKeyText = ""
                                 }
-                                apiKeyText = ""
                             } else {
                                 showingApiKey = true
                                 apiKeyText = geminiApiKey
@@ -8688,6 +8711,9 @@ struct ScreenAssistantSettings: View {
                         }
                     }
 
+                    if let message = credentialError ?? credentials.lastError {
+                        Text(message).foregroundStyle(.red)
+                    }
                     if showingApiKey {
                         VStack(alignment: .leading, spacing: 8) {
                             SecureField("Enter your Gemini API Key", text: $apiKeyText)
@@ -8706,9 +8732,7 @@ struct ScreenAssistantSettings: View {
                                 Spacer()
 
                                 Button("Save") {
-                                    Defaults[.geminiApiKey] = apiKeyText
-                                    showingApiKey = false
-                                    apiKeyText = ""
+                                    saveAPIKey()
                                 }
                                 .disabled(apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }

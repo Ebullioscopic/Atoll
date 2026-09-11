@@ -31,7 +31,7 @@ class ScreenAssistantPanelManager: ObservableObject {
     func showScreenAssistantPanel() {
         hideScreenAssistantPanel() // Close any existing panel
         
-        // Use the new dual-panel system
+        // Use the unified chat window
         ScreenAssistantManager.shared.showPanels()
         
         // Create a dummy panel for backward compatibility
@@ -41,7 +41,7 @@ class ScreenAssistantPanelManager: ObservableObject {
         // The actual panels are managed by ScreenAssistantManager
         // This is just for compatibility with existing code
         
-        print("ScreenAssistant: New dual-panel system activated")
+        print("ScreenAssistant: Chat window opened")
     }
     
     func hideScreenAssistantPanel() {

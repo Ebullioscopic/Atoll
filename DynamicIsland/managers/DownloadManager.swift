@@ -139,6 +139,7 @@ class DownloadManager {
     }
     
     init() {
+        guard !AppRuntimeEnvironment.isUITesting else { return }
         requestDownloadsPermissionIfNeeded()
         startMonitoringIfNeeded()
         

@@ -54,7 +54,7 @@ class DynamicIslandWindow: NSPanel {
         collectionBehavior = Self.pinnedCollectionBehavior
         
         isReleasedWhenClosed = false
-        level = .mainMenu + 3
+        level = NSWindow.Level(rawValue: NotchCompatibilityPolicy.baselineLevel)
         hasShadow = false
 
         ScreenCaptureVisibilityManager.shared.register(self, scope: .entireInterface)

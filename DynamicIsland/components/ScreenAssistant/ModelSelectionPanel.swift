@@ -117,19 +117,26 @@ class ModelSelectionPanel: NSPanel {
 
 // MARK: - Model Selection View
 struct ModelSelectionView: View {
-    private let primaryProviders: [AIModelProvider] = [.gemini, .openai, .claude, .local]
+    private let primaryProviders: [AIModelProvider] = [.gemini, .openai, .claude, .local, .groq, .deepseek]
     @State private var selectedProvider: AIModelProvider = Defaults[.selectedAIProvider]
     @State private var selectedModel: AIModel? = Defaults[.selectedAIModel]
     @State private var enableThinking: Bool = Defaults[.enableThinkingMode]
     
     // API Keys
-    @State private var geminiApiKey: String = Defaults[.geminiApiKey]
-    @State private var openaiApiKey: String = Defaults[.openaiApiKey]
-    @State private var claudeApiKey: String = Defaults[.claudeApiKey]
+    @State private var geminiApiKey: String = AICredentialStore.shared.key(for: .gemini)
+    @State private var openaiApiKey: String = AICredentialStore.shared.key(for: .openai)
+    @State private var claudeApiKey: String = AICredentialStore.shared.key(for: .claude)
     @State private var localEndpoint: String = Defaults[.localModelEndpoint]
-    @State private var groqApiKey: String = Defaults[.groqApiKey]
+    @State private var deepseekApiKey = AICredentialStore.shared.key(for: .deepseek)
+    @State private var deepseekEndpoint = Defaults[.deepseekEndpoint]
+    @State private var deepseekModel = Defaults[.deepseekModel]
+    @State private var deepseekVisionModel = Defaults[.deepseekVisionModel]
+    @State private var localChatModel = Defaults[.localChatModel]
+    @State private var groqApiKey: String = AICredentialStore.shared.key(for: .groq)
     
     @State private var showingApiKeyAlert = false
+    @State private var credentialError: String?
+    @State private var originalCredentials: [AICredentialProvider: String] = [:]
     
     var body: some View {
         VStack(spacing: 0) {
@@ -180,13 +187,6 @@ struct ModelSelectionView: View {
                                 )
                             }
                         }
-
-                        ProviderCard(
-                            provider: .groq,
-                            isSelected: selectedProvider == .groq,
-                            onSelect: { selectProvider(.groq) },
-                            isWide: true
-                        )
                     }
                     
                     Divider()
@@ -203,7 +203,7 @@ struct ModelSelectionView: View {
                                     ModelRow(
                                         model: model,
                                         isSelected: selectedModel?.id == model.id,
-                                        onSelect: { selectedModel = model }
+                                        onSelect: { selectedModel = model; if selectedProvider == .local { localChatModel = model.id } }
                                     )
                                 }
                             }
@@ -255,7 +255,12 @@ struct ModelSelectionView: View {
                             openaiApiKey: $openaiApiKey,
                             claudeApiKey: $claudeApiKey,
                             localEndpoint: $localEndpoint,
-                            groqApiKey: $groqApiKey
+                            groqApiKey: $groqApiKey,
+                            deepseekApiKey: $deepseekApiKey,
+                            deepseekEndpoint: $deepseekEndpoint,
+                            deepseekModel: $deepseekModel,
+                            deepseekVisionModel: $deepseekVisionModel,
+                            localChatModel: $localChatModel
                         )
                     }
                 }
@@ -289,6 +294,12 @@ struct ModelSelectionView: View {
         .onAppear {
             loadCurrentConfiguration()
         }
+        .alert("API Key", isPresented: Binding(get: { credentialError != nil }, set: { if !$0 { credentialError = nil } })) {
+            Button("OK", role: .cancel) { credentialError = nil }
+        } message: {
+            Text(credentialError ?? "")
+        }
+
     }
     
     private var isConfigurationValid: Bool {
@@ -300,37 +311,66 @@ struct ModelSelectionView: View {
         case .claude:
             return !claudeApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .local:
-            return !localEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return ChatRequestBuilder.localBase(localEndpoint) != nil && !localChatModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .deepseek:
+            return DeepSeekConfiguration.isValid(endpoint: deepseekEndpoint, model: deepseekModel, apiKey: deepseekApiKey) && (!ChatRequestBuilder.isOfficial(deepseekEndpoint) || !deepseekVisionModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         case .groq:
             return !groqApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
     
     private func loadCurrentConfiguration() {
+        AICredentialStore.shared.reload()
+        credentialError = AICredentialStore.shared.lastError
+        originalCredentials = Dictionary(uniqueKeysWithValues: AICredentialProvider.allCases.map {
+            ($0, AICredentialStore.shared.key(for: $0))
+        })
         selectedProvider = Defaults[.selectedAIProvider]
         selectedModel = Defaults[.selectedAIModel]
         ensureValidModelSelection()
         enableThinking = Defaults[.enableThinkingMode]
         
-        geminiApiKey = Defaults[.geminiApiKey]
-        openaiApiKey = Defaults[.openaiApiKey]
-        claudeApiKey = Defaults[.claudeApiKey]
+        geminiApiKey = AICredentialStore.shared.key(for: .gemini)
+        openaiApiKey = AICredentialStore.shared.key(for: .openai)
+        claudeApiKey = AICredentialStore.shared.key(for: .claude)
         localEndpoint = Defaults[.localModelEndpoint]
-        groqApiKey = Defaults[.groqApiKey]
+        groqApiKey = AICredentialStore.shared.key(for: .groq)
+        deepseekApiKey = AICredentialStore.shared.key(for: .deepseek)
+        deepseekEndpoint = Defaults[.deepseekEndpoint]
+        deepseekModel = Defaults[.deepseekModel]
+        deepseekVisionModel = Defaults[.deepseekVisionModel]
+        localChatModel = Defaults[.localChatModel]
     }
     
     private func saveConfiguration() {
+        guard isConfigurationValid else { return }
+        let credentials: [(AICredentialProvider, String)] = [
+            (.gemini, geminiApiKey), (.openai, openaiApiKey), (.claude, claudeApiKey),
+            (.deepseek, deepseekApiKey), (.groq, groqApiKey)
+        ]
+        do {
+            try AICredentialStore.shared.saveChanges(Dictionary(uniqueKeysWithValues: credentials), original: originalCredentials)
+        } catch {
+            credentialError = error.localizedDescription
+            return
+        }
         ensureValidModelSelection()
 
         Defaults[.selectedAIProvider] = selectedProvider
         Defaults[.selectedAIModel] = selectedModel
         Defaults[.enableThinkingMode] = enableThinking
         
-        Defaults[.geminiApiKey] = geminiApiKey
-        Defaults[.openaiApiKey] = openaiApiKey
-        Defaults[.claudeApiKey] = claudeApiKey
         Defaults[.localModelEndpoint] = localEndpoint
-        Defaults[.groqApiKey] = groqApiKey
+        Defaults[.deepseekEndpoint] = deepseekEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        Defaults[.deepseekModel] = deepseekModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        Defaults[.deepseekVisionModel] = deepseekVisionModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        Defaults[.localChatModel] = localChatModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if selectedProvider == .local {
+            Defaults[.selectedAIModel] = AIModel(id: Defaults[.localChatModel], name: Defaults[.localChatModel], supportsThinking: false)
+        }
+        if selectedProvider == .deepseek {
+            Defaults[.selectedAIModel] = AIModel(id: Defaults[.deepseekModel], name: Defaults[.deepseekModel], supportsThinking: ChatRequestBuilder.isOfficial(deepseekEndpoint))
+        }
         
         closePanel()
         
@@ -413,6 +453,7 @@ struct ProviderCard: View {
         case .claude: return "doc.text"
         case .local: return "server.rack"
         case .groq: return "bolt.fill"
+        case .deepseek: return "brain"
         }
     }
 }
@@ -473,6 +514,11 @@ struct ApiConfigurationSection: View {
     @Binding var claudeApiKey: String
     @Binding var localEndpoint: String
     @Binding var groqApiKey: String
+    @Binding var deepseekApiKey: String
+    @Binding var deepseekEndpoint: String
+    @Binding var deepseekModel: String
+    @Binding var deepseekVisionModel: String
+    @Binding var localChatModel: String
     
     var body: some View {
         VStack(spacing: 12) {
@@ -509,6 +555,19 @@ struct ApiConfigurationSection: View {
                     helpText: "Ollama or compatible API endpoint",
                     isSecure: false
                 )
+                ApiKeyField(title: "Local model name", placeholder: "llama3.2", value: $localChatModel,
+                            helpText: "Use the model installed on your server. The pi bridge displays its actual model after connecting.", isSecure: false)
+            case .deepseek:
+                ApiKeyField(title: "DeepSeek Endpoint", placeholder: "https://api.deepseek.com",
+                            value: $deepseekEndpoint, helpText: "Base URL or full /chat/completions URL. Ollama: http://localhost:11434/v1", isSecure: false)
+                ApiKeyField(title: "DeepSeek Model", placeholder: "deepseek-v4-flash",
+                            value: $deepseekModel, helpText: "Official: deepseek-v4-flash or deepseek-v4-pro. Local: your installed model ID.", isSecure: false)
+                if ChatRequestBuilder.isOfficial(deepseekEndpoint) {
+                    ApiKeyField(title: "Image model", placeholder: "deepseek-v4-flash-vision-exp", value: $deepseekVisionModel,
+                                helpText: "Used while this conversation contains images. Custom endpoints keep the selected model.", isSecure: false)
+                }
+                ApiKeyField(title: "DeepSeek API Key", placeholder: "Enter your DeepSeek API key",
+                            value: $deepseekApiKey, helpText: "Required for remote services; optional for localhost.")
             case .groq:
                 ApiKeyField(
                     title: "Groq API Key",
@@ -526,10 +585,10 @@ struct ApiConfigurationSection: View {
 
 // MARK: - API Key Field
 struct ApiKeyField: View {
-    let title: String
-    let placeholder: String
+    let title: LocalizedStringKey
+    let placeholder: LocalizedStringKey
     @Binding var value: String
-    let helpText: String
+    let helpText: LocalizedStringKey
     var isSecure: Bool = true
     
     var body: some View {

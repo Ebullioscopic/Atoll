@@ -779,6 +779,7 @@ enum AIModelProvider: String, CaseIterable, Identifiable, Defaults.Serializable 
     case claude = "Claude"
     case local = "Local Model"
     case groq = "Groq"
+    case deepseek = "DeepSeek"
     
     var id: String { self.rawValue }
     
@@ -792,6 +793,7 @@ enum AIModelProvider: String, CaseIterable, Identifiable, Defaults.Serializable 
         case .openai: return "OpenAI's GPT models with advanced reasoning"
         case .claude: return "Anthropic's Claude with strong analytical skills"
         case .local: return "Local AI model (Ollama or similar)"
+        case .deepseek: return "DeepSeek API or a local OpenAI-compatible server"
         case .groq: return "Groq's fast inference for OpenAI-compatible models"
         }
     }
@@ -833,6 +835,8 @@ enum AIModelProvider: String, CaseIterable, Identifiable, Defaults.Serializable 
                 AIModel(id: "llama3.2", name: "Llama 3.2", supportsThinking: false),
                 AIModel(id: "qwen2.5", name: "Qwen 2.5", supportsThinking: false)
             ]
+        case .deepseek:
+            return [] // Model IDs are configurable for official and local servers.
         case .groq:
             return [
                 AIModel(id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B Versatile", supportsThinking: false),
@@ -1219,7 +1223,7 @@ extension Defaults.Keys {
         // MARK: Fullscreen Media Detection
     static let alwaysHideInFullscreen = Key<Bool>("alwaysHideInFullscreen", default: false)
     
-    static let hideNotchOption = Key<HideNotchOption>("hideNotchOption", default: .nowPlayingOnly)
+    static let hideNotchOption = Key<HideNotchOption>("hideNotchOption", default: .always)
     
     // MARK: Wobble Animation
     static let enableWobbleAnimation = Key<Bool>("enableWobbleAnimation", default: false)
@@ -1353,10 +1357,12 @@ extension Defaults.Keys {
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)
     static let screenAssistantDisplayMode = Key<ScreenAssistantDisplayMode>("screenAssistantDisplayMode", default: .panel)
-    static let geminiApiKey = Key<String>("geminiApiKey", default: "")
-    static let openaiApiKey = Key<String>("openaiApiKey", default: "")
-    static let claudeApiKey = Key<String>("claudeApiKey", default: "")
-    static let groqApiKey = Key<String>("groqApiKey", default: "")
+    static let deepseekEndpoint = Key<String>("deepseekEndpoint", default: "https://api.deepseek.com")
+    static let deepseekVisionModel = Key<String>("deepseekVisionModel", default: "deepseek-v4-flash-vision-exp")
+    static let localChatModel = Key<String>("localChatModel", default: "llama3.2")
+    static let chatTextScale = Key<Double>("chatTextScale", default: 1.0)
+    static let chatToolsEnabled = Key<Bool>("chatToolsEnabled", default: true)
+    static let deepseekModel = Key<String>("deepseekModel", default: "deepseek-v4-flash")
     static let selectedAIProvider = Key<AIModelProvider>("selectedAIProvider", default: .gemini)
     static let selectedAIModel = Key<AIModel?>("selectedAIModel", default: nil)
     static let enableThinkingMode = Key<Bool>("enableThinkingMode", default: false)
