@@ -604,6 +604,10 @@ class MusicManager: ObservableObject {
     @Published var isShuffled: Bool = false
     @Published var repeatMode: RepeatMode = .off
     @Published var isLiveStream: Bool = false
+    /// Spotify advertisements often have no artist, album, artwork, or track
+    /// identifier. Keeping this separate from `isLiveStream` lets the UI avoid
+    /// reserving song-only space (notably lyrics) for that short media item.
+    @Published private(set) var isAdvertisement: Bool = false
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @Published var usingAppIconForArtwork: Bool = false
     @Published private(set) var skipGesturePulse: SkipGesturePulse?
@@ -886,6 +890,16 @@ class MusicManager: ObservableObject {
     @MainActor
     // swiftlint:disable:next cyclomatic_complexity function_body_length
     private func updateFromPlaybackState(_ state: PlaybackState) {
+        let advertisement = Self.isLikelyAdvertisement(state)
+        let advertisementStarted = advertisement && !isAdvertisement
+        if advertisement != isAdvertisement {
+            isAdvertisement = advertisement
+        }
+
+        if advertisementStarted {
+            dismissTransientMusicPreview()
+        }
+
         // Check for playback state changes (playing/paused)
         let eventIsPlaying = state.isPlaying
         let expectedState = optimisticPlaybackTransition.expectedState
@@ -1478,7 +1492,7 @@ class MusicManager: ObservableObject {
         let standardControlsEnabled = Defaults[.showStandardMediaControls]
         let minimalisticEnabled = Defaults[.enableMinimalisticUI]
 
-        guard standardControlsEnabled || minimalisticEnabled else { return }
+        guard !isAdvertisement, standardControlsEnabled || minimalisticEnabled else { return }
 
         if isPlaying && Defaults[.enableSneakPeek] {
             if Defaults[.sneakPeekStyles] == .standard {
@@ -1487,6 +1501,47 @@ class MusicManager: ObservableObject {
                 coordinator.toggleExpandingView(status: true, type: .music)
             }
         }
+    }
+
+    @MainActor
+    private func dismissTransientMusicPreview() {
+        if coordinator.sneakPeek.show, coordinator.sneakPeek.type == .music {
+            coordinator.toggleSneakPeek(status: false, type: .music)
+        }
+        if coordinator.expandingView.show, coordinator.expandingView.type == .music {
+            coordinator.toggleExpandingView(status: false, type: .music)
+        }
+    }
+
+    /// Media Remote does not expose an explicit "advertisement" bit. Spotify
+    /// does, however, identify ads with an `ad` URI when possible; older
+    /// clients instead publish a short titled item with none of the metadata a
+    /// song owns. Requiring the Spotify source and missing artwork keeps the
+    /// fallback narrow enough not to classify ordinary short tracks as ads.
+    static func isLikelyAdvertisement(_ state: PlaybackState) -> Bool {
+        guard state.bundleIdentifier.caseInsensitiveCompare(SpotifyController.bundleIdentifier)
+            == .orderedSame else { return false }
+
+        let identifiers = [state.contentIdentifier, state.contentURL]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        if identifiers.contains(where: {
+            $0.hasPrefix("spotify:ad:") || $0.contains("/ad/")
+        }) {
+            return true
+        }
+
+        func isMissing(_ value: String) -> Bool {
+            let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return normalized.isEmpty || normalized == "unknown"
+        }
+
+        let hasPromoTitle = !isMissing(state.title)
+        let hasShortDuration = state.duration.isFinite && state.duration > 0 && state.duration <= 120
+        return hasPromoTitle
+            && hasShortDuration
+            && isMissing(state.artist)
+            && isMissing(state.album)
+            && state.artwork == nil
     }
 
     // MARK: - Public Methods for controlling playback
@@ -1707,6 +1762,11 @@ class MusicManager: ObservableObject {
         // still sent to LRCLIB on every track change, and nothing consumed the
         // reply. Stop before the request rather than after it.
         guard Defaults[.enableLyrics] else {
+            discardLyrics()
+            return
+        }
+
+        guard !isAdvertisement else {
             discardLyrics()
             return
         }

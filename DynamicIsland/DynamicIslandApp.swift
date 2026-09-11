@@ -112,6 +112,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let webcamManager = WebcamManager.shared
     let dndManager = DoNotDisturbManager.shared  // NEW: DND detection
     let bluetoothAudioManager = BluetoothAudioManager.shared  // NEW: Bluetooth audio detection
+    let networkConnectivityManager = NetworkConnectivityManager.shared
     let idleAnimationManager = IdleAnimationManager.shared  // NEW: Custom idle animations
     let downloadManager = DownloadManager.shared  // NEW: browser downloads detection
     let lockScreenPanelManager = LockScreenPanelManager.shared  // NEW: Lock screen music panel
@@ -299,6 +300,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.removeObserver(self)
         extensionXPCServiceHost.stop()
         extensionRPCServer.stop()
+        networkConnectivityManager.stopMonitoring()
         
         // Stop AudioTap capture
         AudioTap.shared.stopCapture()
@@ -475,6 +477,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func calculateRequiredNotchSize() -> CGSize {
+        if NetworkConnectivityHUDMetrics.isPresented(
+            state: networkConnectivityManager.hudState,
+            notchState: vm.notchState,
+            hideOnClosed: vm.hideOnClosed,
+            isLocked: LockScreenManager.shared.isLocked
+        ),
+           let connectivitySize = NetworkConnectivityHUDMetrics.size(
+               for: networkConnectivityManager.hudState,
+               closedNotchSize: vm.closedNotchSize,
+               effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+           ) {
+            return addShadowPadding(
+                to: connectivitySize,
+                isMinimalistic: Defaults[.enableMinimalisticUI]
+            )
+        }
+
         // Check if inline sneak peek is showing and notch is closed
         let airPodsListeningModeSneakActive = vm.notchState == .closed &&
                                       coordinator.sneakPeek.show &&
@@ -748,6 +767,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup Privacy Indicator Manager (camera/mic; skipped under UI testing).
         if !AppRuntimeEnvironment.isUITesting {
             PrivacyIndicatorManager.shared.startMonitoring()
+            networkConnectivityManager.startMonitoring()
         }
         
         // Setup Real-time Audio Waveform capture if enabled
@@ -781,6 +801,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateWindowSizeForTabSwitch()
             }
         }.store(in: &cancellables)
+
+        networkConnectivityManager.$hudState
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                // @Published emits before assigning the new state, so calculate
+                // the target dimensions on the next main-run-loop turn.
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeIfNeeded()
+                }
+            }
+            .store(in: &cancellables)
+
+        MusicManager.shared.$isAdvertisement
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                // @Published emits before assignment; recalculate after the
+                // ad flag has changed so minimalistic mode drops/adds the
+                // lyrics height from both the SwiftUI surface and NSWindow.
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeIfNeeded()
+                }
+            }
+            .store(in: &cancellables)
 
         coordinator.$notesLayoutState
             .removeDuplicates()
