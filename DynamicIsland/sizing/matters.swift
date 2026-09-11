@@ -179,7 +179,7 @@ func minimalisticOpenNotchSize(isDynamicIslandMode: Bool) -> CGSize {
         size.height = 144 // Exact height of the minimalistic music player view
     }
 
-    if Defaults[.enableLyrics] {
+    if Defaults[.enableLyrics] && !MusicManager.shared.isAdvertisement {
         size.height += minimalisticLyricsExtraHeight
     }
     
