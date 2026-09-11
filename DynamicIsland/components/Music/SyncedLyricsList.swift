@@ -83,15 +83,25 @@ enum PinnedLyricsContextRows {
     static func slots(lines: [LyricLine], duration: TimeInterval, currentIndex: Int,
                       context: PinnedLyricContext) -> [Slot] {
         let rows = SyncedLyricsRows.rows(for: lines, duration: duration)
-        let sung = rows.compactMap { row -> (index: Int, text: String)? in
+        // Parallel text at one timestamp belongs to one context slot. Keep the
+        // first sung row in source order without guessing its language or
+        // removing translations and romanization from the full lyrics panel.
+        var timestamps = Set<TimeInterval>()
+        let sung = rows.compactMap { row -> (index: Int, timestamp: TimeInterval, text: String)? in
             guard case let .line(index, text) = row,
-                  lines[index].isTimed, LyricTextSemantics.isLyric(text) else { return nil }
-            return (index, text)
+                  lines[index].isTimed, LyricTextSemantics.isLyric(text),
+                  timestamps.insert(lines[index].timestamp).inserted else { return nil }
+            return (index, lines[index].timestamp, text)
         }
+        let timestamp = lines.indices.contains(currentIndex) ? lines[currentIndex].timestamp : nil
         let radius = context.rawValue / 2
-        let previous = Array(sung.filter { $0.index < currentIndex }.suffix(radius))
-        let next = Array(sung.filter { $0.index > currentIndex }.prefix(radius))
-        let current = sung.first { $0.index == currentIndex }?.text
+        let previous = Array(sung.filter { row in
+            timestamp.map { row.timestamp < $0 } ?? (row.index < currentIndex)
+        }.suffix(radius))
+        let next = Array(sung.filter { row in
+            timestamp.map { row.timestamp > $0 } ?? (row.index > currentIndex)
+        }.prefix(radius))
+        let current = sung.first { $0.timestamp == timestamp }?.text
         let inGap = rows.contains {
             if case let .instrumental(index) = $0 { return index == currentIndex }
             return false

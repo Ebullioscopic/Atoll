@@ -100,6 +100,45 @@ final class PinnedLyricsContextTests: XCTestCase {
             context: .three).map(\.text), ["", "", ""])
     }
 
+    func testParallelTextUsesOneSlotForEitherPlaybackIndex() {
+        let parallel = LRCParser.parse("""
+        [00:01]Before
+        [00:04.85]響めき 煌めきと君も
+        [00:04.85]kyoumeki koumekitokunmo
+        [00:08]After
+        [00:08]译文
+        [00:12]Last
+        """)
+        for index in [1, 2] {
+            XCTAssertEqual(PinnedLyricsContextRows.slots(lines: parallel, duration: 20,
+                currentIndex: index, context: .three).map(\.text),
+                ["Before", "響めき 煌めきと君も", "After"])
+            XCTAssertEqual(PinnedLyricsContextRows.slots(lines: parallel, duration: 20,
+                currentIndex: index, context: .five).map(\.text),
+                ["", "Before", "響めき 煌めきと君も", "After", "Last"])
+        }
+        XCTAssertEqual(parallel.count, 6)
+        XCTAssertEqual(SyncedLyricsRows.rows(for: parallel, duration: 20).count, 6)
+    }
+
+    func testParallelTextDoesNotPreferAnyLanguage() {
+        let parallel = LRCParser.parse("[00:01]English first\n[00:01]中文译文\n[00:03]Next")
+        XCTAssertEqual(PinnedLyricsContextRows.slots(lines: parallel, duration: 10,
+            currentIndex: 1, context: .current).map(\.text), ["English first"])
+    }
+
+    func testCreditsAndBlanksDoNotClaimTimestampGroup() {
+        let parallel = LRCParser.parse("[00:01]作曲：A\n[00:01]\n[00:01]Words\n[00:03]Next")
+        XCTAssertEqual(PinnedLyricsContextRows.slots(lines: parallel, duration: 10,
+            currentIndex: 2, context: .three).map(\.text), ["", "Words", "Next"])
+    }
+
+    func testDifferentTimestampsRemainSeparateEvenWithIdenticalText() {
+        let repeated = LRCParser.parse("[00:01]Words\n[00:01.01]Words\n[00:03]Next")
+        XCTAssertEqual(PinnedLyricsContextRows.slots(lines: repeated, duration: 10,
+            currentIndex: 1, context: .three).map(\.text), ["Words", "Words", "Next"])
+    }
+
     func testHeightIsIdenticalAcrossEveryPositionAndContext() {
         let availability = LyricsResolution(lines: lines).availability
         XCTAssertEqual(availability, .timed)
