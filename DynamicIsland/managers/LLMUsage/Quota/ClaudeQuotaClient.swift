@@ -176,7 +176,9 @@ struct ClaudeQuotaClient {
         if let data = try? Data(contentsOf: path), let parsed = Credentials.parse(data, source: .file(path)) {
             return parsed
         }
-        guard let item = KeychainReader.freshestGenericPassword(servicePrefix: "Claude Code-credentials") else { return nil }
+        guard let item = KeychainReader.freshestGenericPassword(
+            servicePrefix: "Claude Code-credentials", readSecret: ClaudeKeychainStore.read
+        ) else { return nil }
         return Credentials.parse(Data(item.secret.utf8), source: .keychain(service: item.service, account: item.account))
     }
 
@@ -195,7 +197,7 @@ struct ClaudeQuotaClient {
             }
         case .keychain(let service, let account):
             guard let secret = String(data: creds.raw, encoding: .utf8) else { return }
-            if let status = KeychainReader.updateGenericPassword(service: service, account: account, secret: secret) {
+            if let status = ClaudeKeychainStore.update(service: service, account: account, secret: secret) {
                 print("⚠️ ClaudeQuotaClient: could not write refreshed credentials to Keychain item \(service): OSStatus \(status)")
             }
         }
@@ -212,6 +214,19 @@ struct ClaudeQuotaClient {
         let reloaded = await reloadCredentials()
         if let reloaded, reloaded.expiresAt > nowMs { return reloaded.accessToken }
         let current = reloaded ?? creds
+
+        // Do not consume a shared refresh token if this credential cannot be
+        // written back through the prompt-compatible path. Leave refresh to
+        // Claude Code for oversized records, keeping its login intact.
+        if case .keychain(let service, let account) = current.source {
+            guard let compact = try? JSONSerialization.data(withJSONObject:
+                    JSONSerialization.jsonObject(with: current.raw)),
+                  let secret = String(data: compact, encoding: .utf8),
+                  let command = ClaudeKeychainStore.updateCommand(service: service, account: account, secret: secret),
+                  command.count + 512 <= ClaudeKeychainStore.maximumCommandBytes else {
+                return nil
+            }
+        }
 
         var request = URLRequest(url: URL(string: "https://platform.claude.com/v1/oauth/token")!)
         request.httpMethod = "POST"
