@@ -333,3 +333,119 @@ final class PinnedLyricsSettingsTests: XCTestCase {
         }
     }
 }
+
+@MainActor
+final class LyricsRecordingIdentityTests: XCTestCase {
+    private func key(_ duration: Double, id: String? = nil, source: String = "test.player") -> LyricsLookupKey {
+        LyricsLookupKey(title: "song", artist: "artist", album: "album", source: source,
+                        contentIdentifier: id, duration: duration)
+    }
+
+    func testRecordingIDsTakePrecedenceOverDurationAndAreSourceScoped() {
+        XCTAssertEqual(key(100, id: "track:a"), key(101, id: "track:a"))
+        XCTAssertNotEqual(key(100, id: "track:a"), key(100, id: "track:b"))
+        XCTAssertNotEqual(key(100, id: "1"), key(100, id: "1", source: "other.player"))
+    }
+
+    func testDurationFallbackNormalizesPrecisionAndMissingValues() {
+        XCTAssertEqual(key(214.01), key(214.1, id: "  "))
+        XCTAssertNotEqual(key(76), key(214))
+        XCTAssertEqual(key(.nan), key(0))
+        XCTAssertEqual(key(.infinity), key(-1))
+        XCTAssertNotEqual(key(0), key(214))
+    }
+
+    func testDurationOnlyChangeDoesNotReuseInstrumentalCache() {
+        assertRecordingChange(firstDuration: 76, secondDuration: 214)
+    }
+
+    func testDurationArrivalReplacesUnknownDurationCache() {
+        assertRecordingChange(firstDuration: 0, secondDuration: 214)
+    }
+
+    func testIdentifierOnlyChangeDoesNotReuseInstrumentalCache() {
+        assertRecordingChange(firstDuration: 214, secondDuration: 214,
+                              firstID: "track:a", secondID: "track:b")
+    }
+
+    private func assertRecordingChange(firstDuration: Double, secondDuration: Double,
+                                       firstID: String? = nil, secondID: String? = nil) {
+        let wasEnabled = Defaults[.enableLyrics]
+        Defaults[.enableLyrics] = true
+        let manager = MusicManager(startsControllerSetup: false)
+        defer {
+            manager.destroy()
+            Defaults[.enableLyrics] = wasEnabled
+        }
+        manager.storeLyricsInCache(LyricsResolution(instrumental: true),
+                                   for: key(firstDuration, id: firstID))
+        manager.storeLyricsInCache(LyricsResolution(lines: [LyricLine(timestamp: 1, text: "Words")]),
+                                   for: key(secondDuration, id: secondID))
+        var state = PlaybackState(bundleIdentifier: "test.player", title: "Song", artist: "Artist",
+                                  album: "Album", contentIdentifier: firstID, duration: firstDuration)
+        manager.updateFromPlaybackState(state)
+        XCTAssertEqual(manager.lyricsAvailability, .instrumental)
+        state.duration = secondDuration
+        state.contentIdentifier = secondID
+        manager.updateFromPlaybackState(state)
+        XCTAssertEqual(manager.songDuration, secondDuration)
+        XCTAssertEqual(manager.lyricsAvailability, .timed)
+        XCTAssertEqual(manager.syncedLyrics.map(\.text), ["Words"])
+        var updates = 0
+        let observation = manager.$lyricsAvailability.dropFirst().sink { _ in updates += 1 }
+        state.duration += 0.01
+        manager.updateFromPlaybackState(state)
+        XCTAssertEqual(updates, 0, "Subsecond duration noise must not reset the lyric display")
+        withExtendedLifetime(observation) {}
+        state.duration = firstDuration
+        state.contentIdentifier = firstID
+        manager.updateFromPlaybackState(state)
+        XCTAssertEqual(manager.lyricsAvailability, .instrumental)
+        XCTAssertTrue(manager.syncedLyrics.isEmpty)
+    }
+
+    func testDurationOnlyAdvertisementStartDiscardsLyricsAndReservation() {
+        let wasEnabled = Defaults[.enableLyrics]
+        Defaults[.enableLyrics] = true
+        let manager = MusicManager(startsControllerSetup: false)
+        defer {
+            manager.destroy()
+            Defaults[.enableLyrics] = wasEnabled
+        }
+        var state = PlaybackState(bundleIdentifier: "com.spotify.client", title: "Promotion",
+                                  artist: "", album: "", duration: 0)
+        manager.updateFromPlaybackState(state)
+        manager.applyLyricsToDisplay(LyricsResolution(lines: [LyricLine(timestamp: 1, text: "Old words")]))
+        XCTAssertEqual(manager.lyricsAvailability, .timed)
+        state.duration = 30
+        manager.updateFromPlaybackState(state)
+        XCTAssertTrue(manager.isAdvertisement)
+        XCTAssertTrue(manager.syncedLyrics.isEmpty)
+        XCTAssertEqual(manager.currentLyricIndex, -1)
+        XCTAssertEqual(PinnedLyricsView.reservedHeight(isEligible: true,
+            availability: manager.lyricsAvailability, context: .three), 0)
+    }
+
+    func testDurationOnlyAdvertisementEndPreparesLyricsAgain() {
+        let wasEnabled = Defaults[.enableLyrics]
+        Defaults[.enableLyrics] = true
+        let manager = MusicManager(startsControllerSetup: false)
+        defer {
+            manager.destroy()
+            Defaults[.enableLyrics] = wasEnabled
+        }
+        var state = PlaybackState(bundleIdentifier: "com.spotify.client", title: "Promotion",
+                                  artist: "", album: "", duration: 30)
+        manager.updateFromPlaybackState(state)
+        XCTAssertTrue(manager.isAdvertisement)
+        var updates: [LyricsAvailability] = []
+        let observation = manager.$lyricsAvailability.dropFirst().sink { updates.append($0) }
+        state.duration = 180
+        manager.updateFromPlaybackState(state)
+        XCTAssertFalse(manager.isAdvertisement)
+        // Preparation must run even though all content metadata is unchanged.
+        // This incomplete metadata is rejected locally without a network lookup.
+        XCTAssertEqual(updates, [.unavailable])
+        withExtendedLifetime(observation) {}
+    }
+}

@@ -66,10 +66,30 @@ struct LyricLine: Identifiable, Codable, Equatable {
     }
 }
 
-private struct LyricsLookupKey: Hashable {
+struct LyricsLookupKey: Hashable {
     let title: String
     let artist: String
     let album: String
+    let recording: Recording
+
+    enum Recording: Hashable {
+        case identifier(source: String, value: String)
+        case duration(TimeInterval?)
+    }
+
+    init(title: String, artist: String, album: String, source: String,
+         contentIdentifier: String?, duration: TimeInterval) {
+        self.title = title
+        self.artist = artist
+        self.album = album
+        let identifier = contentIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !identifier.isEmpty {
+            recording = .identifier(source: source, value: identifier)
+        } else {
+            // Whole seconds absorb insignificant provider precision differences.
+            recording = .duration(duration.isFinite && duration > 0 ? duration.rounded() : nil)
+        }
+    }
 
     /// Whether this is worth searching for.
     ///
@@ -659,7 +679,7 @@ class MusicManager: ObservableObject {
     private var likeToggleTask: Task<Void, Never>?
 
     /// Inserts lyrics with insertion-order eviction to keep the cache bounded.
-    private func storeLyricsInCache(_ lyrics: LyricsResolution, for key: LyricsLookupKey) {
+    func storeLyricsInCache(_ lyrics: LyricsResolution, for key: LyricsLookupKey) {
         if lyricsCache[key] == nil {
             lyricsCacheOrder.append(key)
             while lyricsCacheOrder.count > Self.lyricsCacheLimit {
@@ -890,14 +910,16 @@ class MusicManager: ObservableObject {
     // MARK: - Update Methods
     @MainActor
     // swiftlint:disable:next cyclomatic_complexity function_body_length
-    private func updateFromPlaybackState(_ state: PlaybackState) {
+    func updateFromPlaybackState(_ state: PlaybackState) {
         let advertisement = Self.isLikelyAdvertisement(state)
+        let advertisementChanged = advertisement != isAdvertisement
         let advertisementStarted = advertisement && !isAdvertisement
         if advertisement != isAdvertisement {
             isAdvertisement = advertisement
         }
 
         if advertisementStarted {
+            discardLyrics()
             dismissTransientMusicPreview()
         }
 
@@ -965,6 +987,11 @@ class MusicManager: ObservableObject {
             self.album = state.album
         }
 
+        let durationChanged = state.duration != self.songDuration
+        if durationChanged {
+            self.songDuration = state.duration
+        }
+
         // Handle artwork and visual transitions for changed content
         let shouldAutoPeekOnTrackChange = Defaults[.showSneakPeekOnTrackChange]
 
@@ -990,7 +1017,6 @@ class MusicManager: ObservableObject {
             self.lastArtworkContentIdentifier = state.contentIdentifier
             self.lastArtworkContentURL = state.contentURL
 
-            self.prepareLyricsForCurrentTrack()
             if let liveArtworkURL = state.liveArtworkURL {
                 self.videoArtworkURL = liveArtworkURL
             } else {
@@ -1008,8 +1034,13 @@ class MusicManager: ObservableObject {
             self.refreshExplicitFlag(for: state)
         }
 
+        // Duration-only updates can identify another recording or start/end an ad.
+        let lyricsIdentityChanged = durationChanged && currentLyricsLookupContext()?.key != activeLyricsKey
+        if hasContentChange || lyricsIdentityChanged || advertisementChanged {
+            self.prepareLyricsForCurrentTrack()
+        }
+
         let timeChanged = state.currentTime != self.elapsedTime
-        let durationChanged = state.duration != self.songDuration
         let playbackRateChanged = state.playbackRate != self.playbackRate
         let shuffleChanged = state.isShuffled != self.isShuffled
         let repeatModeChanged = state.repeatMode != self.repeatMode
@@ -1018,10 +1049,6 @@ class MusicManager: ObservableObject {
             self.elapsedTime = state.currentTime
             // Update current lyric based on elapsed time
             self.updateCurrentLyric(for: state.currentTime)
-        }
-
-        if durationChanged {
-            self.songDuration = state.duration
         }
 
         if playbackRateChanged {
@@ -1905,7 +1932,10 @@ class MusicManager: ObservableObject {
         let key = LyricsLookupKey(
             title: requestTitle.lowercased(),
             artist: requestArtist.lowercased(),
-            album: requestAlbum.lowercased()
+            album: requestAlbum.lowercased(),
+            source: lastArtworkBundleIdentifier ?? "",
+            contentIdentifier: lastArtworkContentIdentifier,
+            duration: songDuration
         )
 
         return key.isValid ? (key, requestArtist, requestTitle, requestAlbum) : nil
@@ -1942,7 +1972,7 @@ class MusicManager: ObservableObject {
         LyricsSearchResults.bestMatch(in: results, artist: artist, title: title, album: album, duration: duration)
     }
 
-    private func applyLyricsToDisplay(_ resolution: LyricsResolution) {
+    func applyLyricsToDisplay(_ resolution: LyricsResolution) {
         let lyrics = resolution.lines
         syncedLyrics = lyrics
         lyricsAvailability = resolution.availability
