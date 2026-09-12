@@ -54,6 +54,10 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
 
     /// True only after a stream line explicitly identified the selected app as the now playing source.
     private var targetSessionActive = false
+    /// Diff lines omit the source. Remember when they belong to another app so
+    /// they cannot overwrite a preserved target snapshot.
+    private var competingSessionActive = false
+    private var competingSessionSource: String?
 
     init?(bundleIdentifier: String, controllerName: String) {
         self.targetBundleIdentifier = bundleIdentifier
@@ -250,7 +254,16 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
 
     private func applyIdleBecauseDifferentSource() {
         targetSessionActive = false
+        competingSessionActive = true
+        competingSessionSource = nil
         playbackState = Self.makeIdlePlaybackState(bundleIdentifier: targetBundleIdentifier)
+    }
+
+    /// Subclasses may retain their state while another Media Remote client is
+    /// in front, but only when they can independently prove they are still
+    /// producing audio. The default keeps the existing strict filtering.
+    func shouldPreservePlaybackState(whenCompetingWith source: String) -> Bool {
+        false
     }
 
     private func handleAdapterUpdate(_ update: NowPlayingUpdate) async {
@@ -267,10 +280,27 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
 
         if let source = explicitSource {
             if source != targetBundleIdentifier {
+                if shouldPreservePlaybackState(whenCompetingWith: source) {
+                    competingSessionActive = true
+                    competingSessionSource = source
+                    return
+                }
                 applyIdleBecauseDifferentSource()
                 return
             }
             targetSessionActive = true
+            competingSessionActive = false
+            competingSessionSource = nil
+        } else if competingSessionActive {
+            // Source-less lines are diffs for the most recently identified
+            // source, which is the competing app at this point. Revalidate
+            // the preserved source on each diff so a stopped TIDAL stream
+            // cannot leave stale metadata indefinitely.
+            if let source = competingSessionSource,
+               !shouldPreservePlaybackState(whenCompetingWith: source) {
+                applyIdleBecauseDifferentSource()
+            }
+            return
         } else if !diff {
             applyIdleBecauseDifferentSource()
             return
