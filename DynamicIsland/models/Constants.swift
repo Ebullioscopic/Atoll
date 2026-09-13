@@ -1222,6 +1222,7 @@ extension Defaults.Keys {
     static let enableCursorProvider = Key<Bool>("enableCursorProvider", default: true)
     static let enableAntigravityProvider = Key<Bool>("enableAntigravityProvider", default: true)
     static let enableNewAPIProvider = Key<Bool>("enableNewAPIProvider", default: false)
+    static let enableOpenRouterProvider = Key<Bool>("enableOpenRouterProvider", default: false)
     static let newAPIAccounts = Key<[NewAPIAccount]>("newAPIAccounts", default: [])
     static let autoStartStatsMonitoring = Key<Bool>("autoStartStatsMonitoring", default: true)
     static let statsStopWhenNotchCloses = Key<Bool>("statsStopWhenNotchCloses", default: true)

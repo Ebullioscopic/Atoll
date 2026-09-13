@@ -905,6 +905,8 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .stats, title: "Cursor Provider", keywords: ["llm", "cursor", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Cursor Provider")),
             SettingsSearchEntry(tab: .stats, title: "Antigravity Provider", keywords: ["llm", "antigravity", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Antigravity Provider")),
             SettingsSearchEntry(tab: .stats, title: "New API Provider", keywords: ["llm", "new api", "newapi", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "New API Provider")),
+            SettingsSearchEntry(tab: .stats, title: "OpenRouter Provider", keywords: ["llm", "openrouter", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter Provider")),
+            SettingsSearchEntry(tab: .stats, title: "OpenRouter Management Key", keywords: ["llm", "openrouter", "management", "key", "token", "analytics"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter Management Key")),
             SettingsSearchEntry(tab: .stats, title: "New API Accounts", keywords: ["llm", "new api", "newapi", "accounts", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "New API Accounts")),
             SettingsSearchEntry(tab: .stats, title: "Stop monitoring after closing the notch", keywords: ["stats", "auto stop"], highlightID: SettingsTab.stats.highlightID(for: "Stop monitoring after closing the notch")),
             SettingsSearchEntry(tab: .stats, title: "CPU Usage", keywords: ["cpu", "graph"], highlightID: SettingsTab.stats.highlightID(for: "CPU Usage")),
@@ -7762,6 +7764,7 @@ struct StatsSettings: View {
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.enableLLMUsageFeature) var enableLLMUsageFeature
     @Default(.enableNewAPIProvider) var enableNewAPIProvider
+    @Default(.enableOpenRouterProvider) var enableOpenRouterProvider
     @Default(.statsStopWhenNotchCloses) var statsStopWhenNotchCloses
     @Default(.statsUpdateInterval) var statsUpdateInterval
     @Default(.showCpuGraph) var showCpuGraph
@@ -7771,10 +7774,12 @@ struct StatsSettings: View {
     @Default(.showDiskGraph) var showDiskGraph
     @Default(.cpuTemperatureUnit) var cpuTemperatureUnit
     @State private var newAPIAccounts = Defaults[.newAPIAccounts]
+    @State private var openRouterAPIKey = OpenRouterKeychain.read() ?? ""
     @State private var isNewAPIEditorPresented = false
     @State private var editingNewAPIAccount: NewAPIAccount?
     @State private var accountPendingDeletion: NewAPIAccount?
     @State private var newAPIAccountErrorMessage: String?
+    @State private var openRouterErrorMessage: String?
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.stats.highlightID(for: title)
@@ -7797,6 +7802,33 @@ struct StatsSettings: View {
 
     private var shouldShowStatsBatteryWarning: Bool {
         !statsStopWhenNotchCloses && statsUpdateInterval <= 5
+    }
+
+    private func saveOpenRouterKey() {
+        let trimmed = openRouterAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            openRouterErrorMessage = "Enter an OpenRouter management key."
+            return
+        }
+        do {
+            try OpenRouterKeychain.save(trimmed)
+            openRouterAPIKey = trimmed
+            openRouterErrorMessage = nil
+            LLMUsageManager.shared.refreshAll(force: true)
+        } catch {
+            openRouterErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteOpenRouterKey() {
+        do {
+            try OpenRouterKeychain.delete()
+            openRouterAPIKey = ""
+            openRouterErrorMessage = nil
+            LLMUsageManager.shared.refreshAll(force: true)
+        } catch {
+            openRouterErrorMessage = error.localizedDescription
+        }
     }
 
     var body: some View {
@@ -7856,6 +7888,14 @@ struct StatsSettings: View {
                     .onChange(of: enableNewAPIProvider) { _, _ in
                         LLMUsageManager.shared.refreshAll(force: true)
                     }
+
+                    Defaults.Toggle(key: .enableOpenRouterProvider) {
+                        Text("OpenRouter")
+                    }
+                    .settingsHighlight(id: highlightID("OpenRouter Provider"))
+                    .onChange(of: enableOpenRouterProvider) { _, _ in
+                        LLMUsageManager.shared.refreshAll(force: true)
+                    }
                 } header: {
                     Text("LLM Providers")
                 } footer: {
@@ -7863,6 +7903,38 @@ struct StatsSettings: View {
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                     .font(.caption)
+                }
+
+                Section {
+                    SecureField("Management key", text: $openRouterAPIKey)
+                        .textContentType(.password)
+                        .settingsHighlight(id: highlightID("OpenRouter Management Key"))
+
+                    HStack {
+                        Button("Save OpenRouter Key") {
+                            saveOpenRouterKey()
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Button("Remove Key", role: .destructive) {
+                            deleteOpenRouterKey()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled((OpenRouterKeychain.read() ?? "").isEmpty)
+                    }
+
+                    if let openRouterErrorMessage {
+                        Text(openRouterErrorMessage)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("OpenRouter")
+                } footer: {
+                    Text("OpenRouter credits and analytics require a management key from OpenRouter Settings → Management Keys. The key is stored in the macOS Keychain.")
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
                 }
 
                 Section {
@@ -8124,6 +8196,7 @@ struct StatsSettings: View {
         .navigationTitle("Stats")
         .onAppear {
             newAPIAccounts = Defaults[.newAPIAccounts]
+            openRouterAPIKey = OpenRouterKeychain.read() ?? ""
         }
         .sheet(isPresented: $isNewAPIEditorPresented) {
             NewAPIAccountEditor(account: editingNewAPIAccount) { account, apiKey in

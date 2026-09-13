@@ -227,3 +227,77 @@ private struct TestAccountSource: NewAPIAccountProviding {
 
     func apiKey(for account: NewAPIAccount) -> String? { keys[account.id] }
 }
+
+final class OpenRouterUsageTests: XCTestCase {
+    func testDecodesCreditsAndAnalyticsNumericStrings() throws {
+        let credits = try JSONDecoder().decode(
+            OpenRouterCredits.self,
+            from: Data(#"{"total_credits":"100.5","total_usage":25.75}"#.utf8)
+        )
+        XCTAssertEqual(credits, OpenRouterCredits(totalCredits: 100.5, totalUsage: 25.75))
+
+        let row = try JSONDecoder().decode(
+            OpenRouterAnalyticsRow.self,
+            from: Data(#"{"model":"openai/gpt-4o-mini","total_usage":"0.005","tokens_total":"6331","request_count":"6"}"#.utf8)
+        )
+        XCTAssertEqual(row, OpenRouterAnalyticsRow(model: "openai/gpt-4o-mini", totalUsage: 0.005, tokensTotal: 6331, requestCount: 6))
+    }
+
+    func testFetchSnapshotUsesManagementEndpointsAndMapsUsage() async throws {
+        let recorder = RequestRecorder()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let client = OpenRouterClient { request in
+            recorder.append(request)
+            let body: String
+            if request.url?.path == "/api/v1/credits" {
+                body = #"{"data":{"total_credits":100.0,"total_usage":25.0}}"#
+            } else if request.url?.path == "/api/v1/analytics/query" {
+                body = #"{"data":{"data":[{"model":"openai/gpt-4o-mini","total_usage":0.5,"tokens_total":"1000","request_count":"4"},{"model":"anthropic/claude-sonnet-4","total_usage":"0.25","tokens_total":500,"request_count":2}],"metadata":{"row_count":2,"truncated":false}}}"#
+            } else {
+                XCTFail("Unexpected OpenRouter request: \(request.url?.absoluteString ?? "nil")")
+                body = #"{"data":{"data":[]}}"#
+            }
+            return (
+                Data(body.utf8),
+                HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            )
+        }
+
+        let snapshot = try await client.fetchSnapshot(apiKey: "management-key", now: now, calendar: calendar)
+
+        XCTAssertEqual(snapshot.sessionLimit?.used, 25.0)
+        XCTAssertEqual(snapshot.sessionLimit?.limit, 100.0)
+        XCTAssertEqual(snapshot.today.totalTokens, 1_500)
+        XCTAssertEqual(snapshot.today.requestCount, 6)
+        XCTAssertEqual(snapshot.today.costUSD, 0.75, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.week.totalTokens, 1_500)
+        XCTAssertEqual(snapshot.models.map(\.model), ["openai/gpt-4o-mini", "anthropic/claude-sonnet-4"])
+        XCTAssertEqual(recorder.requests.count, 3)
+        for request in recorder.requests {
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer management-key")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
+        }
+        XCTAssertEqual(recorder.requests.filter { $0.httpMethod == "POST" }.count, 2)
+    }
+
+    func testOpenRouterProviderRequiresConfiguredKey() async throws {
+        let provider = OpenRouterUsageProvider(keySource: TestOpenRouterKeySource(key: nil), client: OpenRouterClient { _ in
+            XCTFail("Missing OpenRouter key must not create a request")
+            throw OpenRouterClientError.httpFailure
+        })
+
+        do {
+            _ = try await provider.fetchSnapshot(now: Date())
+            XCTFail("Expected missing key to throw")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, "OpenRouter management key not configured")
+        }
+    }
+}
+
+private struct TestOpenRouterKeySource: OpenRouterAPIKeyProviding {
+    let key: String?
+    func apiKey() -> String? { key }
+}

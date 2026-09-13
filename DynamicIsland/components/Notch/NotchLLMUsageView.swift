@@ -79,6 +79,8 @@ struct NotchLLMUsageView: View {
             case .success(let snap):
                 if provider == .newAPI {
                     newAPISuccess(snap)
+                } else if provider == .openrouter {
+                    openRouterSuccess(snap)
                 } else {
                     success(snap, provider: provider)
                 }
@@ -151,6 +153,44 @@ struct NotchLLMUsageView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func openRouterSuccess(_ snap: UsageSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let limit = snap.sessionLimit { quotaGauge("Credits", limit) }
+            openRouterWindow("Today", snap.today)
+            openRouterWindow("Week", snap.week)
+            let models = Array(snap.models.prefix(3))
+            if !models.isEmpty {
+                Divider().opacity(0.25)
+                ForEach(models) { model in
+                    openRouterWindow(model.model, model.totals)
+                }
+            }
+        }
+    }
+
+    private func openRouterWindow(_ label: String, _ totals: UsageTotals) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .leading)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Text(tokens(totals.totalTokens))
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+            Spacer(minLength: 4)
+            Text("\(quota(totals.requestCount)) req")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+            Text(money(totals.costUSD))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         }
     }
 
@@ -318,7 +358,7 @@ struct NotchLLMUsageView: View {
         if totals.hasUnpricedModel {
             return "Estimated API-equivalent cost from local token counts (not your subscription bill). Some models used do not have usable pricing, so this is partial or unavailable."
         }
-        return "Estimated API-equivalent cost from local token counts, not your subscription bill."
+        return "Cost shown in USD. Local-provider costs are API-equivalent estimates; hosted provider costs come from the provider API."
     }
 
     private func tokens(_ n: Int) -> String {
