@@ -405,6 +405,21 @@ extension Notification.Name {
 
 // Media controller types for selection in settings
 /// How the line being sung is picked out from the rest.
+enum PinnedLyricContext: Int, CaseIterable, Identifiable, Defaults.Serializable {
+    case current = 1
+    case three = 3
+    case five = 5
+
+    var id: Int { rawValue }
+    var localizedName: String {
+        switch self {
+        case .current: return String(localized: "Current")
+        case .three: return String(localized: "3 lines")
+        case .five: return String(localized: "5 lines")
+        }
+    }
+}
+
 enum LyricHighlightStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
     case sweep = "Sweep"
     case gradient = "Gradient"
@@ -1493,6 +1508,7 @@ extension Defaults.Keys {
     /// Whether the sung line is swept or simply lit.
     static let lyricHighlightStyle = Key<LyricHighlightStyle>("lyricHighlightStyle", default: .sweep)
     /// Keeps the current line under the closed notch after the panel is gone.
+    static let pinnedLyricContext = Key<PinnedLyricContext>("pinnedLyricContext", default: .current)
     static let pinLyricsWhenClosed = Key<Bool>("pinLyricsWhenClosed", default: false)
     static let lyricsPanelWidth = Key<CGFloat>("lyricsPanelWidth", default: 280)
     static let lyricsPanelOffset = Key<CGFloat>("lyricsPanelOffset", default: 0)

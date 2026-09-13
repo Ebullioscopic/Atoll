@@ -1,6 +1,61 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Pinned lyric context": {
+      "comment": "Pinned lyrics setting in Media settings.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pinned lyric context"
+          }
+        }
+      }
+    },
+    "Current": {
+      "comment": "Pinned lyrics setting in Media settings.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current"
+          }
+        }
+      }
+    },
+    "3 lines": {
+      "comment": "Pinned lyrics setting in Media settings.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3 lines"
+          }
+        }
+      }
+    },
+    "5 lines": {
+      "comment": "Pinned lyrics setting in Media settings.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 lines"
+          }
+        }
+      }
+    },
+    "Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen. Can also be toggled from the pin on the lyrics panel.": {
+      "comment": "Pinned lyrics setting in Media settings.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen. Can also be toggled from the pin on the lyrics panel."
+          }
+        }
+      }
+    },
     "": {
       "localizations": {
         "ar": {

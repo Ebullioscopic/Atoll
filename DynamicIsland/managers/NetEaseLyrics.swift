@@ -36,29 +36,41 @@ enum NetEaseLyrics {
     /// publish, so an exact comparison would reject the right song.
     static let durationTolerance: TimeInterval = 2
 
-    /// Returns the LRC text for the closest matching track, or nil when NetEase
-    /// has no plausible match or no lyrics for it. Throws only on transport
+    /// Returns lyrics or an explicit instrumental/unavailable result for the
+    /// closest matching track. Throws only on transport
     /// failure, so the caller can tell "nothing there" from "could not ask".
-    static func fetchLRC(
+    static func fetch(
         title: String,
         artist: String,
         duration: TimeInterval,
         session: URLSession = .shared
-    ) async throws -> String? {
-        guard let searchURL = searchURL(title: title, artist: artist) else { return nil }
+    ) async throws -> LyricsResolution {
+        guard let searchURL = searchURL(title: title, artist: artist) else { return LyricsResolution() }
 
         let (searchData, searchResponse) = try await session.data(from: searchURL)
-        guard (searchResponse as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        let searchStatus = (searchResponse as? HTTPURLResponse)?.statusCode
+        guard searchStatus == 200 else {
+            print("NetEase lyrics: search HTTP \(searchStatus ?? -1) title=\(title) artist=\(artist) duration=\(duration)")
+            return LyricsResolution()
+        }
 
         let songs = parseSearchResponse(searchData)
         guard let song = bestMatch(in: songs, title: title, artist: artist, duration: duration),
               let lyricURL = lyricURL(songID: song.id)
-        else { return nil }
+        else {
+            print("NetEase lyrics: no match title=\(title) artist=\(artist) duration=\(duration) songs=\(songs.count)")
+            return LyricsResolution()
+        }
+        print("NetEase lyrics: match id=\(song.id) name=\(song.name) duration=\(song.duration) for title=\(title) artist=\(artist) duration=\(duration) songs=\(songs.count)")
 
         let (lyricData, lyricResponse) = try await session.data(from: lyricURL)
-        guard (lyricResponse as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        let lyricStatus = (lyricResponse as? HTTPURLResponse)?.statusCode
+        guard lyricStatus == 200 else {
+            print("NetEase lyrics: lyric HTTP \(lyricStatus ?? -1) id=\(song.id)")
+            return LyricsResolution()
+        }
 
-        return parseLyricResponse(lyricData)
+        return parseResolution(lyricData)
     }
 
     // MARK: - Requests
@@ -105,6 +117,15 @@ enum NetEaseLyrics {
             let milliseconds = (song["duration"] as? Double) ?? 0
             return Song(id: id, name: name, artists: artists, duration: milliseconds / 1000)
         }
+    }
+
+    /// Keep the explicit instrumental signal separate from unavailable lyrics.
+    static func parseResolution(_ data: Data) -> LyricsResolution {
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           json["nolyric"] as? Bool == true {
+            return LyricsResolution(instrumental: true)
+        }
+        return LyricsResolution(lines: parseLyricResponse(data).map(LRCParser.parse) ?? [])
     }
 
     /// The LRC body, or nil when NetEase says there is none. The text is

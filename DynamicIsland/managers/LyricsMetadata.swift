@@ -78,7 +78,8 @@ enum LyricsSearchResults {
         in results: [[String: Any]],
         artist: String,
         title: String,
-        album: String
+        album: String,
+        duration: TimeInterval = 0
     ) -> [String: Any]? {
         let artist = normalizedForMatching(artist)
         let title = normalizedForMatching(title)
@@ -98,13 +99,31 @@ enum LyricsSearchResults {
         // it is decided first and the score only separates rows that are alike
         // in it.
         return results
-            .filter { agreesOnTitleAndArtist($0, artist: artist, title: title) }
+            .filter {
+                agreesOnTitleAndArtist($0, artist: artist, title: title)
+                    && ($0["instrumental"] as? Bool != true
+                        || isReliableInstrumentalMatch($0, title: title, duration: duration))
+            }
             .max { lhs, rhs in
                 let lhsRank = (carriesSyncedLyrics(lhs), score(for: lhs, artist: artist, title: title, album: album))
                 let rhsRank = (carriesSyncedLyrics(rhs), score(for: rhs, artist: artist, title: title, album: album))
                 if lhsRank.0 != rhsRank.0 { return rhsRank.0 }
                 return lhsRank.1 < rhsRank.1
             }
+    }
+
+    /// An instrumental result ends provider fallback, so a substring title
+    /// match is not enough. For example, LRCLIB returns a 76-second alternate
+    /// version of 深呼吸 when the playing original is 214 seconds long.
+    /// Trust the flag only for an exact normalized title and, when both sides
+    /// report a duration, the same recording length (allowing rounding).
+    static func isReliableInstrumentalMatch(_ result: [String: Any], title: String,
+                                            duration: TimeInterval) -> Bool {
+        guard field(result, "trackName") == normalizedForMatching(title) else { return false }
+        guard duration.isFinite, duration > 0,
+              let candidateDuration = result["duration"] as? Double,
+              candidateDuration.isFinite, candidateDuration > 0 else { return true }
+        return abs(candidateDuration - duration) <= 2
     }
 
     /// Whether a result actually carries timed lyrics.
@@ -230,5 +249,101 @@ enum LyricsSearchResults {
             .folding(options: .diacriticInsensitive, locale: .current)
             .lowercased()
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// Track-level availability is independent of the line currently playing.
+enum LyricsAvailability: Equatable {
+    case loading, timed, untimed, instrumental, unavailable
+}
+
+/// Cached alongside the words so provider metadata survives cache hits.
+struct LyricsResolution {
+    let lines: [LyricLine]
+    let availability: LyricsAvailability
+
+    init(lines: [LyricLine] = [], instrumental: Bool = false) {
+        self.lines = lines
+        let meaningful = lines.filter { LyricTextSemantics.isLyric($0.text) }
+        if instrumental {
+            availability = .instrumental
+        } else if !meaningful.isEmpty {
+            availability = meaningful.contains { $0.isTimed } ? .timed : .untimed
+        } else if lines.contains(where: { LyricTextSemantics.isPlaceholder($0.text) }) {
+            availability = .instrumental
+        } else {
+            availability = .unavailable
+        }
+    }
+
+    static func lrclib(_ result: [String: Any]) -> LyricsResolution {
+        if result["instrumental"] as? Bool == true {
+            return LyricsResolution(instrumental: true)
+        }
+        let synced = (result["syncedLyrics"] as? String) ?? ""
+        if !synced.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return LyricsResolution(lines: LRCParser.parse(synced))
+        }
+        return LyricsResolution(lines: LyricLine.untimedLines(from: (result["plainLyrics"] as? String) ?? ""))
+    }
+}
+
+/// LRCLIB is asked first. A thrown request there is the same as an empty
+/// catalogue: neither produced words, so the fallback still has to run.
+/// Folding both calls into one `do` meant a transport failure skipped the
+/// only provider that had the track, and the catch showed "No lyrics found".
+enum LyricsProviderFallback {
+    static func resolve(
+        primary: () async throws -> LyricsResolution,
+        fallback: () async throws -> LyricsResolution
+    ) async -> LyricsResolution {
+        let primaryResult: LyricsResolution
+        do {
+            primaryResult = try await primary()
+        } catch {
+            print("Failed to fetch lyrics: \(error)")
+            primaryResult = LyricsResolution()
+        }
+        guard !Task.isCancelled, primaryResult.availability == .unavailable else {
+            return primaryResult
+        }
+        do {
+            let secondary = try await fallback()
+            if secondary.availability != .unavailable { return secondary }
+        } catch {
+            print("Failed to fetch lyrics: \(error)")
+        }
+        return primaryResult
+    }
+}
+
+
+/// Presentation-only filtering; raw lyrics remain available to the full panel.
+/// Require a complete credit label followed by a colon, never a substring.
+enum LyricTextSemantics {
+    private static let creditLabels: Set<String> = [
+        "作词", "作詞", "作曲", "编曲", "編曲", "制作人", "製作人", "混音", "母带", "母帶",
+        "lyrics by", "lyricist", "composer", "arranger", "producer", "mix", "mixing", "mastering"
+    ]
+    private static let placeholders: Set<String> = [
+        "纯音乐请欣赏", "純音樂請欣賞", "此歌曲为没有填词的纯音乐请您欣赏",
+        "该歌曲为纯音乐请欣赏", "instrumental", "instrumentaltrack", "nolyrics"
+    ]
+
+    static func isPlaceholder(_ text: String) -> Bool {
+        let normalized = text.lowercased().unicodeScalars.filter {
+            !CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters).contains($0)
+        }
+        return placeholders.contains(String(String.UnicodeScalarView(normalized)))
+    }
+
+    static func isLyric(_ text: String) -> Bool {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !isPlaceholder(text) else { return false }
+        if let colon = text.firstIndex(where: { $0 == ":" || $0 == "：" }) {
+            let label = text[..<colon].trimmingCharacters(in: .whitespaces).lowercased()
+            if creditLabels.contains(label) { return false }
+        }
+        return true
     }
 }

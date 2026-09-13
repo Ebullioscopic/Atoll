@@ -296,3 +296,55 @@ final class LyricsSearchResultsTests: XCTestCase {
         )
     }
 }
+
+final class InstrumentalRecordingMatchTests: XCTestCase {
+    private func result(title: String = "深呼吸", duration: Double = 214.826) -> [String: Any] {
+        ["trackName": title, "artistName": "ハナレグミ", "albumName": "深呼吸",
+         "duration": duration, "instrumental": true]
+    }
+
+    private func match(_ rows: [[String: Any]], duration: Double = 214) -> [String: Any]? {
+        LyricsSearchResults.bestMatch(in: rows, artist: "ハナレグミ", title: "深呼吸",
+                                     album: "深呼吸", duration: duration)
+    }
+
+    func testDeepBreathAlternateInstrumentalDoesNotBlockFallback() {
+        // Metadata from LRCLIB's real search response; no copyrighted lyrics.
+        let alternate = result(title: "深呼吸（遠慮すんなよミズノ買ってやるよ！ver.）", duration: 76)
+        XCTAssertNil(match([alternate]))
+    }
+
+    func testExactTitleWithWrongDurationDoesNotBlockFallback() {
+        XCTAssertNil(match([result(duration: 76)]))
+    }
+
+    func testSameRecordingPreservesInstrumentalState() {
+        let selected = match([result()])
+        XCTAssertNotNil(selected)
+        XCTAssertEqual(LyricsResolution.lrclib(selected!).availability, .instrumental)
+    }
+
+    func testReportedDurationAllowsRoundingButNotAnotherRecording() {
+        XCTAssertNotNil(match([result(duration: 216)], duration: 214))
+        XCTAssertNil(match([result(duration: 217)], duration: 214))
+    }
+
+    func testMissingDurationStillRequiresExactTitle() {
+        XCTAssertNotNil(match([result()], duration: 0))
+        XCTAssertNil(match([result(title: "深呼吸（別バージョン）")], duration: 0))
+    }
+
+    func testUntrustedInstrumentalDoesNotHideValidUntimedLyrics() {
+        let plain: [String: Any] = ["trackName": "深呼吸", "artistName": "ハナレグミ",
+                                   "plainLyrics": "Test lyric", "instrumental": false]
+        let selected = match([result(duration: 76), plain])
+        XCTAssertEqual(selected?["plainLyrics"] as? String, "Test lyric")
+    }
+
+    func testExplicitlyRequestedAlternateCanStillBeInstrumental() {
+        let title = "深呼吸（遠慮すんなよミズノ買ってやるよ！ver.）"
+        let selected = LyricsSearchResults.bestMatch(in: [result(title: title, duration: 76)],
+            artist: "ハナレグミ", title: title, album: "深呼吸", duration: 76)
+        XCTAssertNotNil(selected)
+    }
+}
