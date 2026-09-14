@@ -193,12 +193,12 @@ struct ClaudeQuotaClient {
                 try creds.raw.write(to: url, options: .atomic)
                 try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
             } catch {
-                print("⚠️ ClaudeQuotaClient: could not write refreshed credentials to \(url.lastPathComponent): \(error)")
+                Logger.log("ClaudeQuotaClient: could not write refreshed credentials to \(url.lastPathComponent): \(error)", category: .warning)
             }
         case .keychain(let service, let account):
             guard let secret = String(data: creds.raw, encoding: .utf8) else { return }
             if let status = ClaudeKeychainStore.update(service: service, account: account, secret: secret) {
-                print("⚠️ ClaudeQuotaClient: could not write refreshed credentials to Keychain item \(service): OSStatus \(status)")
+                Logger.log("ClaudeQuotaClient: could not write refreshed credentials to Keychain item \(service): OSStatus \(status)", category: .warning)
             }
         }
     }
