@@ -1,6 +1,601 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Pinned lyric context" : {
+      "comment" : "Pinned lyrics setting in Media settings.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pinned lyric context"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "سياق كلمات الأغنية المثبّتة"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kontext připnutého textu písně"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kontext angehefteter Songtexte"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pinned lyric context"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Contexto de las letras fijadas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Contexte des paroles épinglées"
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Rögzített dalszöveg környezete"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Contesto del testo fissato"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "고정된 가사 문맥"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Context van vastgezette songteksten"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kontekst przypiętego tekstu piosenki"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Contexto das letras fixadas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Контекст закреплённого текста песни"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "บริบทของเนื้อเพลงที่ปักหมุด"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Sabitlenen şarkı sözlerinin bağlamı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Контекст закріпленого тексту пісні"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "固定歌词上下文"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "固定歌詞上下文"
+          }
+        }
+      }
+    },
+    "Current" : {
+      "comment" : "Pinned lyrics setting in Media settings.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "السطر الحالي"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aktuální řádek"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aktuelle Zeile"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Current"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Línea actual"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ligne actuelle"
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aktuális sor"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Riga attuale"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "현재 줄"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Huidige regel"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bieżący wiersz"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Linha atual"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Текущая строка"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "บรรทัดปัจจุบัน"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Geçerli satır"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Поточний рядок"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "当前行"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "目前行"
+          }
+        }
+      }
+    },
+    "3 lines" : {
+      "comment" : "Pinned lyrics setting in Media settings.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 lines"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 أسطر"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 řádky"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 Zeilen"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 lines"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 líneas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 lignes"
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 sor"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 righe"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3줄"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 regels"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 wiersze"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 linhas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 строки"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 บรรทัด"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 satır"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 рядки"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 行"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 行"
+          }
+        }
+      }
+    },
+    "5 lines" : {
+      "comment" : "Pinned lyrics setting in Media settings.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5 lines"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 أسطر"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 řádků"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 Zeilen"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 lines"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 líneas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 lignes"
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 sor"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 righe"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5줄"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 regels"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 wierszy"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 linhas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 строк"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 บรรทัด"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 satır"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 рядків"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 行"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 行"
+          }
+        }
+      }
+    },
+    "Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen. Can also be toggled from the pin on the lyrics panel." : {
+      "comment" : "Pinned lyrics setting in Media settings.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen. Can also be toggled from the pin on the lyrics panel."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "يعرض كلمات الأغنية المتزامنة أسفل النتوء المغلق مع السياق المحدد. يحتفظ بالمساحة أثناء المقاطع الموسيقية دون غناء، ويخفي الكلمات عند ظهور عرض HUD على الشاشة. يمكن أيضًا تبديله من زر التثبيت في لوحة كلمات الأغنية."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Zobrazuje synchronizovaný text písně pod zavřeným výřezem s vybraným kontextem. Během instrumentálních pasáží zachovává místo; při zobrazení HUD skryje slova. Lze také přepnout pomocí připínáčku na panelu textu písně."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Zeigt synchronisierte Songtexte mit dem gewählten Kontext unter der geschlossenen Notch an. Behält den Platz während Instrumentalpassagen bei und blendet den Text aus, solange ein HUD angezeigt wird. Kann auch über die Stecknadel im Songtextbereich umgeschaltet werden."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen. Can also be toggled from the pin on the lyrics panel."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Muestra las letras sincronizadas debajo de la muesca cerrada con el contexto seleccionado. Conserva el espacio durante los pasajes instrumentales y oculta el texto mientras se muestra un HUD. También se puede activar o desactivar desde la chincheta del panel de letras."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Affiche les paroles synchronisées sous l’encoche fermée avec le contexte sélectionné. Conserve l’espace pendant les passages instrumentaux et masque les paroles lorsqu’un HUD est affiché. Peut aussi être activé ou désactivé depuis l’épingle du panneau des paroles."
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Az időzített dalszöveget a kiválasztott környezettel jeleníti meg a bezárt kivágás alatt. A hangszeres részek alatt megtartja a helyet, és elrejti a szöveget, amíg HUD látható a képernyőn. A dalszövegpanel gombostűjével is be- vagy kikapcsolható."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mostra il testo sincronizzato sotto il notch chiuso con il contesto selezionato. Mantiene lo spazio durante i passaggi strumentali e nasconde il testo mentre è visualizzato un HUD. Si può anche attivare o disattivare dalla puntina nel pannello del testo."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "선택한 문맥과 함께 닫힌 노치 아래에 동기화된 가사를 표시합니다. 간주 중에도 공간을 유지하며, 화면에 HUD가 표시되는 동안 가사를 숨깁니다. 가사 패널의 고정 버튼으로도 켜거나 끌 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Toont gesynchroniseerde songteksten onder de gesloten notch met de gekozen context. Behoudt de ruimte tijdens instrumentale passages en verbergt de tekst zolang een HUD op het scherm staat. Kan ook worden in- of uitgeschakeld via de punaise in het songtekstenpaneel."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Wyświetla zsynchronizowany tekst piosenki pod zamkniętym wcięciem z wybranym kontekstem. Zachowuje miejsce podczas fragmentów instrumentalnych i ukrywa tekst, gdy na ekranie jest HUD. Można też przełączać przypinanie pinezką w panelu tekstu piosenki."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mostra as letras sincronizadas abaixo do notch fechado com o contexto selecionado. Mantém o espaço durante os trechos instrumentais e oculta as letras enquanto um HUD é exibido na tela. Também pode ser ativado ou desativado pelo alfinete no painel de letras."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Показывает синхронизированный текст песни под закрытым вырезом с выбранным контекстом. Сохраняет место во время инструментальных проигрышей и скрывает слова, пока на экране отображается HUD. Также можно переключить закрепление кнопкой булавки на панели текста песни."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "แสดงเนื้อเพลงที่ซิงค์ตามเวลาใต้รอยบากที่ปิดอยู่พร้อมบริบทที่เลือก คงพื้นที่ไว้ระหว่างช่วงบรรเลงและซ่อนเนื้อเพลงขณะที่ HUD แสดงบนหน้าจอ สามารถเปิดหรือปิดได้จากหมุดบนแผงเนื้อเพลง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Seçilen bağlamla birlikte kapalı çentiğin altında zamanla eşleşen şarkı sözlerini gösterir. Enstrümantal bölümlerde alanı korur; ekranda bir HUD gösterilirken sözleri gizler. Şarkı sözleri panelindeki raptiyeyle de açılıp kapatılabilir."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Показує синхронізований текст пісні під закритим вирізом із вибраним контекстом. Зберігає місце під час інструментальних програшів і приховує слова, поки на екрані відображається HUD. Також можна перемикати закріплення кнопкою шпильки на панелі тексту пісні."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "在收起的刘海下方显示同步歌词及所选上下文。间奏期间保留空间；屏幕上显示 HUD 时隐藏歌词。也可通过歌词面板上的固定按钮切换。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "在收合的瀏海下方顯示同步歌詞及所選上下文。間奏期間保留空間；螢幕上顯示 HUD 時隱藏歌詞。也可透過歌詞面板上的固定按鈕切換。"
+          }
+        }
+      }
+    },
     "" : {
       "localizations" : {
         "ar" : {

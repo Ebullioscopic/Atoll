@@ -50,7 +50,7 @@ enum NetEaseLyrics {
         let (searchData, searchResponse) = try await session.data(from: searchURL)
         let searchStatus = (searchResponse as? HTTPURLResponse)?.statusCode
         guard searchStatus == 200 else {
-            print("NetEase lyrics: search HTTP \(searchStatus ?? -1) title=\(title) artist=\(artist) duration=\(duration)")
+            Logger.log("NetEase lyrics: search HTTP \(searchStatus ?? -1) title=\(title) artist=\(artist) duration=\(duration)", category: .network)
             return LyricsResolution()
         }
 
@@ -58,15 +58,15 @@ enum NetEaseLyrics {
         guard let song = bestMatch(in: songs, title: title, artist: artist, duration: duration),
               let lyricURL = lyricURL(songID: song.id)
         else {
-            print("NetEase lyrics: no match title=\(title) artist=\(artist) duration=\(duration) songs=\(songs.count)")
+            Logger.log("NetEase lyrics: no match title=\(title) artist=\(artist) duration=\(duration) songs=\(songs.count)", category: .debug)
             return LyricsResolution()
         }
-        print("NetEase lyrics: match id=\(song.id) name=\(song.name) duration=\(song.duration) for title=\(title) artist=\(artist) duration=\(duration) songs=\(songs.count)")
+        Logger.log("NetEase lyrics: match id=\(song.id) name=\(song.name) duration=\(song.duration) for title=\(title) artist=\(artist) duration=\(duration) songs=\(songs.count)", category: .debug)
 
         let (lyricData, lyricResponse) = try await session.data(from: lyricURL)
         let lyricStatus = (lyricResponse as? HTTPURLResponse)?.statusCode
         guard lyricStatus == 200 else {
-            print("NetEase lyrics: lyric HTTP \(lyricStatus ?? -1) id=\(song.id)")
+            Logger.log("NetEase lyrics: lyric HTTP \(lyricStatus ?? -1) id=\(song.id)", category: .network)
             return LyricsResolution()
         }
 
