@@ -20,57 +20,13 @@ import AppKit
 import Defaults
 import SwiftUI
 
-/// The line being sung, under the closed notch, for as long as lyrics are
-/// pinned.
-///
-/// The side panel only exists while the notch is open, so pinning is the only
-/// way to keep reading along without holding the pointer over the notch. Only
-/// the current line is shown -- there is no room under a closed notch for a
-/// list, and the line that matters is the one playing.
-///
-/// Applied as a modifier rather than added to the notch's stack, because the
-/// notch panel sizes itself to its widest child and paints black behind the
-/// result. Anything placed in that stack that reports a width -- a sized
-/// `Text`, or a `GeometryReader`, which returns whatever width it is offered
-/// and so claims the whole screen -- stretches the panel into a full-width
-/// slab, and re-centres the music row inside it so the spectrum slides under
-/// the physical notch cutout. Padding adds the height, and an overlay draws
-/// the words into it: an overlay is proposed its parent's size and never
-/// changes it.
+/// Height-only padding plus an overlay: lyrics never report an intrinsic width
+/// to the closed notch's stack. Keep this invariant when changing rendering.
 struct PinnedLyricsModifier: ViewModifier {
     @ObservedObject private var musicManager = MusicManager.shared
-
+    @Default(.pinnedLyricContext) private var context
     let isVisible: Bool
-
-    /// The size the strip's one line is set at. The frame below is measured
-    /// from it, so the two cannot drift apart.
-    private static let lyricFontSize: CGFloat = 10
-
-    /// One line of that font, rounded up to a whole point, plus a point so a
-    /// descender is not shaved off by the frame. Comes out at the 13 this was
-    /// written as by hand.
-    private static let stripHeight: CGFloat = {
-        let font = NSFont.systemFont(ofSize: lyricFontSize, weight: .medium)
-        return (font.ascender - font.descender + font.leading).rounded(.up) + 1
-    }()
-
-    /// Space between the strip and the notch body above it. A gap the eye
-    /// judges rather than anything derived from the text.
-    private static let stripGap: CGFloat = 4
-
-    private var currentLine: String? {
-        guard PinnedLyricsView.hasCurrentLine(
-            index: musicManager.currentLyricIndex,
-            lineCount: musicManager.syncedLyrics.count
-        ) else { return nil }
-
-        let text = musicManager.syncedLyrics[musicManager.currentLyricIndex].text
-        return text.isEmpty ? nil : text
-    }
-
-    private var isShowing: Bool {
-        isVisible && currentLine != nil
-    }
+    let isContentHidden: Bool
 
     private var tint: Color {
         Defaults[.playerColorTinting]
@@ -79,73 +35,74 @@ struct PinnedLyricsModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
+        let height = PinnedLyricsView.reservedHeight(isEligible: isVisible,
+            availability: musicManager.lyricsAvailability, context: context)
         content
-            // Height only. Padding cannot widen the panel, so the music row
-            // keeps the width -- and therefore the position -- it had before
-            // lyrics were pinned.
-            .padding(.bottom, isShowing ? Self.stripHeight + Self.stripGap : 0)
-            .overlay(alignment: .bottom) { lyricLine }
-            // Height as well as opacity, so the panel grows into the strip
-            // rather than jumping taller a frame before the words arrive.
-            .animation(.smooth(duration: 0.28), value: isShowing)
-            // Separate and quicker: one line replacing another is a smaller
-            // event than the strip arriving, and sharing the timing made every
-            // line change feel like the panel resizing.
-            .animation(.smooth(duration: 0.18), value: currentLine)
+            .padding(.bottom, height)
+            .overlay(alignment: .bottom) {
+                if height > 0 {
+                    lyricRows
+                        .opacity(isContentHidden ? 0 : 1)
+                        .accessibilityHidden(isContentHidden)
+                }
+            }
+            .animation(.smooth(duration: 0.28), value: height)
     }
 
-    private var lyricLine: some View {
-        // Redrawn per frame while playing so the sweep tracks the music, and
-        // frozen when paused so a paused notch is not animating.
-        TimelineView(.animation(paused: !musicManager.isPlaying)) { timeline in
-            // A plain Text swept as one rather than the panel's word-by-word
-            // layout: that exists to sweep a wrapped line in reading order,
-            // and this is deliberately one line.
-            Text(currentLine ?? "")
-                .font(.system(size: Self.lyricFontSize, weight: .medium))
-                .lineLimit(1)
-                // Truncated rather than wrapped: the overlay is only one line
-                // tall, and a second row would be clipped.
-                //
-                // Scrolling it instead was tried and reverted -- in testing
-                // it just did not look up to par next to the rest of the UI.
-                // Truncating is the easy way out rather than the considered
-                // answer, so a long line still loses its end. Anyone picking
-                // the marquee back up should start from how it ought to look,
-                // not from this.
-                .truncationMode(.tail)
-                .contentTransition(.opacity)
-                .lyricSweep(
-                    progress: musicManager.currentLyricSweepProgress(at: timeline.date),
-                    isCurrent: true,
-                    sung: .white,
-                    unsung: tint.opacity(0.55),
-                    idle: .white.opacity(0.5)
-                )
+    private var lyricRows: some View {
+        let slots = PinnedLyricsContextRows.slots(lines: musicManager.syncedLyrics,
+            duration: musicManager.songDuration, currentIndex: musicManager.currentLyricIndex,
+            context: context)
+        return TimelineView(.animation(paused: !musicManager.isPlaying || isContentHidden)) { timeline in
+            VStack(spacing: 0) {
+                ForEach(slots.indices, id: \.self) { index in
+                    let slot = slots[index]
+                    Text(slot.text)
+                        .font(.system(size: PinnedLyricsView.fontSize, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .contentTransition(.opacity)
+                        .lyricSweep(
+                            progress: musicManager.currentLyricSweepProgress(at: timeline.date),
+                            isCurrent: slot.isCurrent,
+                            sung: .white,
+                            unsung: tint.opacity(0.55),
+                            idle: .white.opacity(0.45)
+                        )
+                        .frame(height: PinnedLyricsView.rowHeight)
+                }
+            }
+            .animation(.smooth(duration: 0.18), value: slots)
         }
         .padding(.horizontal, 10)
-        .frame(height: Self.stripHeight)
-        .padding(.bottom, Self.stripGap)
-        .opacity(isShowing ? 1 : 0)
+        .frame(height: PinnedLyricsView.rowHeight * CGFloat(context.rawValue))
+        .padding(.bottom, PinnedLyricsView.gap)
+        .clipped()
     }
 }
 
 extension View {
-    /// Draws the line currently being sung under this view, without changing
-    /// its width. See `PinnedLyricsModifier`.
-    func pinnedLyrics(isVisible: Bool) -> some View {
-        modifier(PinnedLyricsModifier(isVisible: isVisible))
+    func pinnedLyrics(isVisible: Bool, isContentHidden: Bool = false) -> some View {
+        modifier(PinnedLyricsModifier(isVisible: isVisible, isContentHidden: isContentHidden))
     }
 }
 
-/// Namespace for the bounds check the modifier and its tests share.
 enum PinnedLyricsView {
-    /// Whether there is a line to draw at all.
-    ///
-    /// `-1` is where a track sits before its first timestamp, and the index can
-    /// briefly outlive a shorter set of lyrics when a new track's arrive first;
-    /// both would trap on the subscript.
-    static func hasCurrentLine(index: Int, lineCount: Int) -> Bool {
-        index >= 0 && index < lineCount
+    static let fontSize: CGFloat = 10
+    static let gap: CGFloat = 4
+    static let rowHeight: CGFloat = {
+        let font = NSFont.systemFont(ofSize: fontSize, weight: .medium)
+        return (font.ascender - font.descender + font.leading).rounded(.up) + 1
+    }()
+
+    static func shouldReserve(lyricsEnabled: Bool, pinEnabled: Bool,
+                              surfaceEligible: Bool, availability: LyricsAvailability) -> Bool {
+        lyricsEnabled && pinEnabled && surfaceEligible && availability == .timed
+    }
+
+    /// Deliberately takes no current index, current text, or HUD state.
+    static func reservedHeight(isEligible: Bool, availability: LyricsAvailability,
+                               context: PinnedLyricContext) -> CGFloat {
+        isEligible && availability == .timed ? rowHeight * CGFloat(context.rawValue) + gap : 0
     }
 }
