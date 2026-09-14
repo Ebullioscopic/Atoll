@@ -50,8 +50,20 @@ class StatusBarMenu: NSMenu {
         }
         
         // Set up the menu
+        let settingsItem = NSMenuItem(
+            title: "Settings…",
+            action: #selector(openSettings),
+            keyEquivalent: ","
+        )
+        settingsItem.target = self
+        self.addItem(settingsItem)
+        self.addItem(.separator())
         self.addItem(NSMenuItem(title: "Quit", action: #selector(NSApp.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = self
+    }
+
+    @objc private func openSettings() {
+        SettingsWindowController.shared.showWindow()
     }
 
 }
