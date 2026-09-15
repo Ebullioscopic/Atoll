@@ -37,7 +37,15 @@ struct ModelUsage: Equatable, Identifiable {
     let model: String
     let totals: UsageTotals
     let pool: String? // "gemini" or "claude" for Antigravity
+    let resetsAt: Date? // quota reset time for percentage-based providers
     var id: String { model }
+
+    init(model: String, totals: UsageTotals, pool: String? = nil, resetsAt: Date? = nil) {
+        self.model = model
+        self.totals = totals
+        self.pool = pool
+        self.resetsAt = resetsAt
+    }
 }
 
 struct UsageLimit: Equatable {

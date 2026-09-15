@@ -167,8 +167,6 @@ let minimalisticTimerCountdownContentHeight: CGFloat = 82
 let minimalisticTimerCountdownBlockHeight: CGFloat = minimalisticTimerCountdownTopPadding + minimalisticTimerCountdownContentHeight
 let statsSecondRowContentHeight: CGFloat = 120
 let statsGridSpacingHeight: CGFloat = 12
-let llmUsageOpenNotchHeight: CGFloat = 220
-let llmUsageProviderCardHeight: CGFloat = 188
 let notchShadowPaddingStandard: CGFloat = 18
 let notchShadowPaddingMinimalistic: CGFloat = 12
 
@@ -181,7 +179,7 @@ func minimalisticOpenNotchSize(isDynamicIslandMode: Bool) -> CGSize {
         size.height = 144 // Exact height of the minimalistic music player view
     }
 
-    if Defaults[.enableLyrics] {
+    if Defaults[.enableLyrics] && !MusicManager.shared.isAdvertisement {
         size.height += minimalisticLyricsExtraHeight
     }
     

@@ -76,6 +76,8 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         }
     }
     @Published var isTimerPopoverActive: Bool = false
+    @Published var isPerAppVolumePopoverActive: Bool = false
+    @Published var isCaffeinatePopoverActive: Bool = false
     @Published var shouldRecheckHover: Bool = false
     @Published var isScrollGestureActive: Bool = false
     private var scrollGestureSuppressionTokens: Set<UUID> = []
@@ -423,11 +425,6 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
             let preferred = coordinator.notesLayoutState.preferredHeight
             adjustedSize.height = max(adjustedSize.height, preferred)
-            return adjustedSize
-        }
-
-        if coordinator.currentView == .llmUsage {
-            adjustedSize.height = max(adjustedSize.height, llmUsageOpenNotchHeight)
             return adjustedSize
         }
 

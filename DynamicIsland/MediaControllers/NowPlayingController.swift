@@ -139,14 +139,115 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     func isActive() -> Bool {
         return true
     }
+
+    // MARK: - Favouriting
+
+    /// This source fronts whatever app is playing, so favouriting has to be
+    /// answered by that app rather than by the source. Under Now Playing the
+    /// user has not told us which player they are using -- MediaRemote has.
+    @MainActor
+    var canEverFavorite: Bool {
+        switch playbackState.bundleIdentifier {
+        case AppleMusicFavoriting.bundleIdentifier,
+             SpotifyController.bundleIdentifier,
+             YouTubeMusicFavoriting.bundleIdentifier,
+             TidalAccessibility.bundleIdentifier:
+            return true
+        default:
+            return false
+        }
+    }
+
+    @MainActor
+    var supportsFavoriting: Bool {
+        switch playbackState.bundleIdentifier {
+        case AppleMusicFavoriting.bundleIdentifier:
+            return AppleMusicFavoriting.isAvailable
+        case SpotifyController.bundleIdentifier:
+            return SpotifyFavoriting.isAvailable
+        case YouTubeMusicFavoriting.bundleIdentifier:
+            return YouTubeMusicFavoriting.default.isAvailable
+        case TidalAccessibility.bundleIdentifier:
+            return TidalAccessibility.isAvailable
+        default:
+            return false
+        }
+    }
+
+    /// TIDAL reports the favourited state but will not accept a change.
+    @MainActor
+    var favoritingIsReadOnly: Bool {
+        playbackState.bundleIdentifier == TidalAccessibility.bundleIdentifier
+    }
+
+    func isCurrentTrackFavorited() async -> Bool? {
+        switch playbackState.bundleIdentifier {
+        case AppleMusicFavoriting.bundleIdentifier:
+            return await AppleMusicFavoriting.isCurrentTrackFavorited()
+        case SpotifyController.bundleIdentifier:
+            return await SpotifyFavoriting.isFavorited(
+                contentIdentifier: playbackState.contentIdentifier,
+                contentURL: playbackState.contentURL
+            )
+        case YouTubeMusicFavoriting.bundleIdentifier:
+            return await YouTubeMusicFavoriting.default.isCurrentTrackFavorited()
+        case TidalAccessibility.bundleIdentifier:
+            return await TidalAccessibility.isCurrentTrackFavorited()
+        default:
+            return nil
+        }
+    }
+
+    @discardableResult
+    func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
+        switch playbackState.bundleIdentifier {
+        case AppleMusicFavoriting.bundleIdentifier:
+            return await AppleMusicFavoriting.setCurrentTrackFavorited(favorited)
+        case SpotifyController.bundleIdentifier:
+            return await SpotifyFavoriting.setFavorited(
+                favorited,
+                contentIdentifier: playbackState.contentIdentifier,
+                contentURL: playbackState.contentURL
+            )
+        case YouTubeMusicFavoriting.bundleIdentifier:
+            return await YouTubeMusicFavoriting.default.setCurrentTrackFavorited(favorited)
+        default:
+            return false
+        }
+    }
     
     func toggleShuffle() async {
+        // TIDAL never registered a shuffle command, so the Media Remote call
+        // below reaches nothing: the button moved and the app carried on. Its
+        // Playback menu is the one place that both reports and accepts it.
+        if playbackState.bundleIdentifier == TidalAccessibility.bundleIdentifier {
+            let current = await TidalAccessibility.isShuffled() ?? playbackState.isShuffled
+            guard await TidalAccessibility.setShuffled(!current) else { return }
+            await MainActor.run { playbackState.isShuffled = !current }
+            return
+        }
+
         // MRMediaRemoteSendCommandFunction(6, nil)
         MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
         playbackState.isShuffled.toggle()
     }
     
     func toggleRepeat() async {
+        // Same as shuffle, and the menu is better than a cycling button: each
+        // repeat item sets its own mode, so there is nothing to overshoot.
+        if playbackState.bundleIdentifier == TidalAccessibility.bundleIdentifier {
+            let current = await TidalAccessibility.repeatMode() ?? playbackState.repeatMode
+            let next: RepeatMode
+            switch current {
+            case .off: next = .all
+            case .all: next = .one
+            case .one: next = .off
+            }
+            guard await TidalAccessibility.setRepeatMode(next) else { return }
+            await MainActor.run { playbackState.repeatMode = next }
+            return
+        }
+
         // MRMediaRemoteSendCommandFunction(7, nil)
         let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
         playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off

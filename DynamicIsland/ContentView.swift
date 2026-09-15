@@ -36,6 +36,9 @@ import UIKit
 
 @MainActor
 struct ContentView: View {
+    @Default(.pinnedLyricContext) private var pinnedLyricContext
+    @Default(.pinLyricsWhenClosed) private var pinLyricsWhenClosed
+    @Default(.enableLyrics) private var enableLyrics
     @EnvironmentObject var vm: DynamicIslandViewModel
     @EnvironmentObject var webcamManager: WebcamManager
 
@@ -49,6 +52,7 @@ struct ContentView: View {
     @ObservedObject var privacyManager = PrivacyIndicatorManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
     @ObservedObject var lockScreenManager = LockScreenManager.shared
+    @ObservedObject private var networkConnectivityManager = NetworkConnectivityManager.shared
     @ObservedObject private var menuBarLayout = MenuBarLayout.shared
     /// Width of the closed-notch content, measured so its left edge can be
     /// compared against the frontmost app's menus. Only the *size* is read --
@@ -105,6 +109,15 @@ struct ContentView: View {
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: isDynamicIslandMode) : openNotchSize
+
+        if isConnectivityHUDVisible,
+           let connectivitySize = NetworkConnectivityHUDMetrics.size(
+               for: networkConnectivityManager.hudState,
+               closedNotchSize: vm.closedNotchSize,
+               effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+           ) {
+            return connectivitySize
+        }
         
         // When inline sneak peek is active in closed notch, use the wider inline width
         // so the outer maxWidth frame doesn't clip the expanded content
@@ -210,10 +223,6 @@ struct ContentView: View {
             return CGSize(width: baseSize.width, height: preferredHeight)
         }
 
-        if coordinator.currentView == .llmUsage {
-            return CGSize(width: baseSize.width, height: max(baseSize.height, llmUsageOpenNotchHeight))
-        }
-        
         guard coordinator.currentView == .stats else {
             return inlineLyricsAdjustedNotchSize(
                 from: baseSize,
@@ -433,7 +442,20 @@ struct ContentView: View {
     /// Whether the notch/island should hide off-screen when closed on a non-notch display.
     /// Temporarily reveals the notch when a sneakPeek HUD (volume, brightness, music, etc.) is active.
     private var shouldHideUntilHover: Bool {
-        hideNonNotchUntilHover && isNonNotchScreen && vm.notchState == .closed && !isSneakPeekVisibleOnCurrentScreen
+        hideNonNotchUntilHover
+            && isNonNotchScreen
+            && vm.notchState == .closed
+            && !isSneakPeekVisibleOnCurrentScreen
+            && !isConnectivityHUDVisible
+    }
+
+    private var isConnectivityHUDVisible: Bool {
+        NetworkConnectivityHUDMetrics.isPresented(
+            state: networkConnectivityManager.hudState,
+            notchState: vm.notchState,
+            hideOnClosed: vm.hideOnClosed,
+            isLocked: lockScreenManager.isLocked
+        )
     }
 
     /// Whether the fallback top-edge hover detector should run.
@@ -601,6 +623,19 @@ struct ContentView: View {
     /// Resolves the clip/content shape per-screen: pill on non-notch screens
     /// when dynamic island mode is active, standard notch shape otherwise.
     private var resolvedClipShape: AnyShape {
+        if isConnectivityHUDVisible {
+            if isDynamicIslandMode {
+                let radius: CGFloat = networkConnectivityManager.hudState == .noConnection ? 40 : 24
+                return AnyShape(DynamicIslandPillShape(cornerRadius: radius))
+            }
+            let bottomRadius: CGFloat = networkConnectivityManager.hudState == .noConnection ? 40 : 20
+            return AnyShape(
+                NotchShape(
+                    topCornerRadius: activeCornerRadiusInsets.closed.top,
+                    bottomCornerRadius: bottomRadius
+                )
+            )
+        }
         if let activeClosedRecordingSurfaceShape {
             return activeClosedRecordingSurfaceShape
         }
@@ -620,7 +655,10 @@ struct ContentView: View {
     private var mainLayoutBase: some View {
         NotchLayout()
             .frame(alignment: .top)
-            .padding(.horizontal, notchHorizontalPadding)
+            // Connectivity HUD metrics already describe the complete surface.
+            // Applying the regular closed-notch inset here makes that surface
+            // wider than both the root view and its NSWindow, clipping both sides.
+            .padding(.horizontal, isConnectivityHUDVisible ? 0 : notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
             .background(.black)
             .clipShape(resolvedClipShape)
@@ -678,6 +716,7 @@ struct ContentView: View {
                         handleHover(hovering)
                     }
                     .onTapGesture {
+                        guard !isConnectivityHUDVisible else { return }
                         guard !recordingOpenGestureLocked else { return }
                         if handleClosedMusicWaveformTapIfNeeded() {
                             return
@@ -715,7 +754,7 @@ struct ContentView: View {
                 : 0
             )
             .onAppear(perform: {
-                if coordinator.firstLaunch {
+                if coordinator.firstLaunch && !isConnectivityHUDVisible {
                     // Single open during first launch; closeHello() handles the timed close.
                     runAfter(1) {
                         openNotch()
@@ -1016,7 +1055,13 @@ struct ContentView: View {
       func NotchLayout() -> some View {
           VStack(alignment: .leading) {
               VStack(alignment: .leading) {
-                  if coordinator.firstLaunch {
+                  if isConnectivityHUDVisible {
+                      NetworkConnectivityHUD(
+                          state: networkConnectivityManager.hudState,
+                          closedNotchSize: vm.closedNotchSize,
+                          effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+                      )
+                  } else if coordinator.firstLaunch {
                       Spacer()
                       HelloAnimation().frame(width: 200, height: 80).onAppear(perform: {
                           vm.closeHello()
@@ -1227,7 +1272,13 @@ struct ContentView: View {
                           .onChange(of: geo.size.width) { _, width in closedContentWidth = width }
                   }
               }
-              .offset(x: menuBarClearanceOffset)
+              .pinnedLyrics(isVisible: pinnedLyricsVisible,
+                  isContentHidden: isSneakPeekVisibleOnCurrentScreen || isConnectivityHUDVisible)
+              // A connectivity HUD must remain centred on the physical notch:
+              // its middle transparent lane is what keeps both wings visible.
+              // Menu-bar clearance would shift that lane underneath the camera
+              // housing and clip one of the two content areas.
+              .offset(x: isConnectivityHUDVisible ? 0 : menuBarClearanceOffset)
               .animation(.smooth(duration: 0.25), value: menuBarClearanceOffset)
               .zIndex(2)
               
@@ -2158,6 +2209,7 @@ struct ContentView: View {
 
     private func startHoverClickMonitor() {
         guard Defaults[.openNotchOnHover] else { return }
+        guard !isConnectivityHUDVisible else { return }
         guard !recordingLiveActivityVisibleOnClosedNotch else { return }
         guard hoverClickMonitor == nil else { return }
 
@@ -2166,6 +2218,7 @@ struct ContentView: View {
                 guard let vm, let lockScreenManager else { return }
                 guard !lockScreenManager.isLocked else { return }
                 guard vm.notchState == .closed else { return }
+                guard !self.isConnectivityHUDVisible else { return }
                 guard !self.recordingOpenGestureLocked else { return }
                 guard !self.coordinator.isHoverOpenSuppressed else { return }
                 guard self.isHovering else { return }
@@ -2282,6 +2335,7 @@ struct ContentView: View {
 
             guard vm.notchState == .closed,
                 !isSneakPeekVisibleOnCurrentScreen,
+                !isConnectivityHUDVisible,
                 !recordingLiveActivityVisibleOnClosedNotch,
                 (Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
 
@@ -2295,6 +2349,7 @@ struct ContentView: View {
                           !self.recordingManager.isRecording,
                           !self.recordingLiveActivityVisibleOnClosedNotch,
                           !self.isSneakPeekVisibleOnCurrentScreen,
+                          !self.isConnectivityHUDVisible,
                           !self.coordinator.isHoverOpenSuppressed else { return }
 
                     if shouldFocusTimerTab {
@@ -2361,6 +2416,8 @@ struct ContentView: View {
             effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
         )
         let height = max(closedHeight, recordingSize?.height ?? 0) + 6
+            + PinnedLyricsView.reservedHeight(isEligible: pinnedLyricsVisible,
+                availability: musicManager.lyricsAvailability, context: pinnedLyricContext)
         let width = max(closedWidth, recordingSize?.width ?? 0) + 24
         // Same shift the content is drawn with, so the hit area stays under it.
         let minX = screen.frame.midX - width / 2 + menuBarClearanceOffset
@@ -2389,6 +2446,17 @@ struct ContentView: View {
             && point.y >= frame.minY && point.y <= frame.maxY
     }
     
+    /// Track-level reservation. A sneak peek hides only the overlaid words.
+    private var pinnedLyricsVisible: Bool {
+        PinnedLyricsView.shouldReserve(
+            lyricsEnabled: enableLyrics,
+            pinEnabled: pinLyricsWhenClosed,
+            surfaceEligible: vm.notchState == .closed && !vm.hideOnClosed
+                && !lockScreenManager.isLocked && musicManager.isPlaying,
+            availability: musicManager.lyricsAvailability
+        )
+    }
+
     // Helper function to check if any popovers are active
     private func hasAnyActivePopovers() -> Bool {
      return vm.isBatteryPopoverActive || 
@@ -2396,6 +2464,8 @@ struct ContentView: View {
          vm.isColorPickerPopoverActive || 
          vm.isStatsPopoverActive ||
          vm.isTimerPopoverActive ||
+         vm.isPerAppVolumePopoverActive ||
+         vm.isCaffeinatePopoverActive ||
          vm.isMediaOutputPopoverActive ||
          vm.isReminderPopoverActive
     }

@@ -54,6 +54,10 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
 
     /// True only after a stream line explicitly identified the selected app as the now playing source.
     private var targetSessionActive = false
+    /// Diff lines omit the source. Remember when they belong to another app so
+    /// they cannot overwrite a preserved target snapshot.
+    private var competingSessionActive = false
+    private var competingSessionSource: String?
 
     init?(bundleIdentifier: String, controllerName: String) {
         self.targetBundleIdentifier = bundleIdentifier
@@ -135,9 +139,43 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == targetBundleIdentifier }
     }
 
+    // MARK: - Favouriting
+
+    // Declared here rather than left to the protocol's defaults so subclasses
+    // can override them: the conformance is on this class, so a witness picked
+    // from an extension would be the one used no matter what a subclass says.
+
+    @MainActor
+    var canEverFavorite: Bool { false }
+
+    @MainActor
+    var supportsFavoriting: Bool { false }
+
+    @MainActor
+    var favoritingIsReadOnly: Bool { false }
+
+    func isCurrentTrackFavorited() async -> Bool? { nil }
+
+    @discardableResult
+    func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool { false }
+
     func toggleShuffle() async {
         MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
         playbackState.isShuffled.toggle()
+    }
+
+    /// Openings for a subclass whose app reports shuffle and repeat somewhere
+    /// other than the Media Remote stream. `playbackState` is settable only in
+    /// this file, so a subclass cannot reach it directly.
+
+    func applyShuffleState(_ isShuffled: Bool) {
+        guard playbackState.isShuffled != isShuffled else { return }
+        playbackState.isShuffled = isShuffled
+    }
+
+    func applyRepeatMode(_ mode: RepeatMode) {
+        guard playbackState.repeatMode != mode else { return }
+        playbackState.repeatMode = mode
     }
 
     func toggleRepeat() async {
@@ -216,7 +254,16 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
 
     private func applyIdleBecauseDifferentSource() {
         targetSessionActive = false
+        competingSessionActive = true
+        competingSessionSource = nil
         playbackState = Self.makeIdlePlaybackState(bundleIdentifier: targetBundleIdentifier)
+    }
+
+    /// Subclasses may retain their state while another Media Remote client is
+    /// in front, but only when they can independently prove they are still
+    /// producing audio. The default keeps the existing strict filtering.
+    func shouldPreservePlaybackState(whenCompetingWith source: String) -> Bool {
+        false
     }
 
     private func handleAdapterUpdate(_ update: NowPlayingUpdate) async {
@@ -233,10 +280,27 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
 
         if let source = explicitSource {
             if source != targetBundleIdentifier {
+                if shouldPreservePlaybackState(whenCompetingWith: source) {
+                    competingSessionActive = true
+                    competingSessionSource = source
+                    return
+                }
                 applyIdleBecauseDifferentSource()
                 return
             }
             targetSessionActive = true
+            competingSessionActive = false
+            competingSessionSource = nil
+        } else if competingSessionActive {
+            // Source-less lines are diffs for the most recently identified
+            // source, which is the competing app at this point. Revalidate
+            // the preserved source on each diff so a stopped TIDAL stream
+            // cannot leave stale metadata indefinitely.
+            if let source = competingSessionSource,
+               !shouldPreservePlaybackState(whenCompetingWith: source) {
+                applyIdleBecauseDifferentSource()
+            }
+            return
         } else if !diff {
             applyIdleBecauseDifferentSource()
             return
@@ -303,13 +367,5 @@ final class AmazonMusicController: FilteredNowPlayingController {
     }
 }
 
-final class CiderController: FilteredNowPlayingController {
-    static let bundleIdentifier = "sh.cider.genten.mac"
-
-    init?() {
-        super.init(
-            bundleIdentifier: Self.bundleIdentifier,
-            controllerName: "CiderController"
-        )
-    }
-}
+// CiderController now lives in CiderController.swift, where its
+// favouriting support sits alongside it.

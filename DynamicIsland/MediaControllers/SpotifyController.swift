@@ -146,6 +146,30 @@ class SpotifyController: MediaControllerProtocol {
         NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == playbackState.bundleIdentifier }
     }
 
+    // MARK: - Favouriting
+
+    @MainActor
+    var canEverFavorite: Bool { true }
+
+    @MainActor
+    var supportsFavoriting: Bool { SpotifyFavoriting.isAvailable }
+
+    func isCurrentTrackFavorited() async -> Bool? {
+        await SpotifyFavoriting.isFavorited(
+            contentIdentifier: playbackState.contentIdentifier,
+            contentURL: playbackState.contentURL
+        )
+    }
+
+    @discardableResult
+    func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool {
+        await SpotifyFavoriting.setFavorited(
+            favorited,
+            contentIdentifier: playbackState.contentIdentifier,
+            contentURL: playbackState.contentURL
+        )
+    }
+
     func updatePlaybackInfo() async {
         guard let descriptor = try? await fetchPlaybackInfoAsync() else { return }
         guard descriptor.numberOfItems >= 11 else { return }
@@ -808,5 +832,72 @@ private struct ProtobufReader {
             throw ReaderError.unexpectedEnd
         }
         index = endIndex
+    }
+}
+
+
+/// Saving the playing track to Spotify's Liked Songs.
+///
+/// Lives apart from ``SpotifyController`` because the Now Playing source needs
+/// it too: that controller fronts whatever app is playing, and when that app is
+/// Spotify this is the answer. Keeping it here rather than in `MusicManager` --
+/// where it used to live, spelled out inline -- is what lets both reach it.
+enum SpotifyFavoriting {
+    /// This goes through the Web API, so it needs the account the user has
+    /// already connected in settings. Without that there is nothing to
+    /// favourite into, and the control stays hidden.
+    @MainActor
+    static var isAvailable: Bool { SpotifyLibraryManager.shared.isAuthenticated }
+
+    static func isFavorited(contentIdentifier: String?, contentURL: String?) async -> Bool? {
+        guard await isAvailable,
+              let trackID = trackID(contentIdentifier: contentIdentifier, contentURL: contentURL)
+        else { return nil }
+        return await SpotifyLibraryManager.shared.isTrackSaved(trackID: trackID)
+    }
+
+    @discardableResult
+    static func setFavorited(
+        _ favorited: Bool,
+        contentIdentifier: String?,
+        contentURL: String?
+    ) async -> Bool {
+        guard await isAvailable,
+              let trackID = trackID(contentIdentifier: contentIdentifier, contentURL: contentURL)
+        else { return false }
+        return await SpotifyLibraryManager.shared.setTrackSaved(favorited, trackID: trackID)
+    }
+
+    static func trackID(contentIdentifier: String?, contentURL: String?) -> String? {
+        trackID(from: contentIdentifier) ?? trackID(from: contentURL)
+    }
+
+    /// Spotify hands out ids as `spotify:track:<id>` or as a share URL with
+    /// `/track/<id>` in its path.
+    private static func trackID(from rawValue: String?) -> String? {
+        guard let trimmed = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+
+        if trimmed.hasPrefix("spotify:track:") {
+            return validTrackID(String(trimmed.dropFirst("spotify:track:".count)))
+        }
+
+        if let url = URL(string: trimmed) {
+            let components = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
+            if let index = components.firstIndex(of: "track"), index + 1 < components.count {
+                return validTrackID(components[index + 1])
+            }
+        }
+
+        return nil
+    }
+
+    /// Spotify ids are 22 base62 characters. Anything else is a local file or a
+    /// podcast episode, neither of which can be saved to Liked Songs.
+    private static func validTrackID(_ candidate: String) -> String? {
+        guard candidate.count == 22,
+              candidate.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) })
+        else { return nil }
+        return candidate
     }
 }

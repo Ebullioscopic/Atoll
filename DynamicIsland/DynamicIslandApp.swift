@@ -112,6 +112,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let webcamManager = WebcamManager.shared
     let dndManager = DoNotDisturbManager.shared  // NEW: DND detection
     let bluetoothAudioManager = BluetoothAudioManager.shared  // NEW: Bluetooth audio detection
+    let networkConnectivityManager = NetworkConnectivityManager.shared
     let idleAnimationManager = IdleAnimationManager.shared  // NEW: Custom idle animations
     let downloadManager = DownloadManager.shared  // NEW: browser downloads detection
     let lockScreenPanelManager = LockScreenPanelManager.shared  // NEW: Lock screen music panel
@@ -299,6 +300,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.removeObserver(self)
         extensionXPCServiceHost.stop()
         extensionRPCServer.stop()
+        networkConnectivityManager.stopMonitoring()
         
         // Stop AudioTap capture
         AudioTap.shared.stopCapture()
@@ -475,6 +477,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func calculateRequiredNotchSize() -> CGSize {
+        if NetworkConnectivityHUDMetrics.isPresented(
+            state: networkConnectivityManager.hudState,
+            notchState: vm.notchState,
+            hideOnClosed: vm.hideOnClosed,
+            isLocked: LockScreenManager.shared.isLocked
+        ),
+           let connectivitySize = NetworkConnectivityHUDMetrics.size(
+               for: networkConnectivityManager.hudState,
+               closedNotchSize: vm.closedNotchSize,
+               effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+           ) {
+            return addShadowPadding(
+                to: connectivitySize,
+                isMinimalistic: Defaults[.enableMinimalisticUI]
+            )
+        }
+
         // Check if inline sneak peek is showing and notch is closed
         let airPodsListeningModeSneakActive = vm.notchState == .closed &&
                                       coordinator.sneakPeek.show &&
@@ -558,8 +577,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
             let maxFraction = Defaults[.terminalMaxHeightFraction]
             baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
-        } else if coordinator.currentView == .llmUsage {
-            baseSize.height = max(baseSize.height, llmUsageOpenNotchHeight)
         }
         
         baseSize = inlineLyricsAdjustedNotchSize(
@@ -701,12 +718,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.Keys.migrateClipboardShortcutToV()
 
         Defaults.publisher(.enableThirdPartyDDCIntegration, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { _ in
                 Defaults.Keys.syncLegacyThirdPartyDDCKeys()
             }
             .store(in: &cancellables)
 
         Defaults.publisher(.thirdPartyDDCProvider, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { _ in
                 Defaults.Keys.syncLegacyThirdPartyDDCKeys()
             }
@@ -719,6 +738,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         installTopMenuItemsIfNeeded()
 
         Defaults.publisher(.focusMonitoringMode, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateFocusMenuState()
             }
@@ -733,6 +753,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup Lunar integration
         LunarManager.shared.configure(coordinator: coordinator)
         
+        // Honour "Save History Across Restarts" before anything can read the
+        // stored history back.
+        ClipboardManager.purgeStoredHistoryIfPersistenceDisabled()
+
         // Setup ScreenRecording Manager
         if Defaults[.enableScreenRecordingDetection] && !AppRuntimeEnvironment.isUITesting {
             ScreenRecordingManager.shared.startMonitoring()
@@ -746,6 +770,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup Privacy Indicator Manager (camera/mic; skipped under UI testing).
         if !AppRuntimeEnvironment.isUITesting {
             PrivacyIndicatorManager.shared.startMonitoring()
+            networkConnectivityManager.startMonitoring()
         }
         
         // Setup Real-time Audio Waveform capture if enabled
@@ -758,6 +783,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Observe enableRealTimeWaveform changes
         Defaults.publisher(.enableRealTimeWaveform, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 if change.newValue {
                     Task {
@@ -779,6 +805,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateWindowSizeForTabSwitch()
             }
         }.store(in: &cancellables)
+
+        networkConnectivityManager.$hudState
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                // @Published emits before assigning the new state, so calculate
+                // the target dimensions on the next main-run-loop turn.
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeIfNeeded()
+                }
+            }
+            .store(in: &cancellables)
+
+        MusicManager.shared.$isAdvertisement
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                // @Published emits before assignment; recalculate after the
+                // ad flag has changed so minimalistic mode drops/adds the
+                // lyrics height from both the SwiftUI surface and NSWindow.
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeIfNeeded()
+                }
+            }
+            .store(in: &cancellables)
 
         coordinator.$notesLayoutState
             .removeDuplicates()
@@ -869,6 +918,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }.store(in: &cancellables)
 
         Defaults.publisher(.enableScreenAssistant, options: []).sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.updateFeatureShortcutAvailability()
+            }
+        }.store(in: &cancellables)
+
+        Defaults.publisher(.enableCaffeinate, options: []).sink { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.updateFeatureShortcutAvailability()
             }
@@ -1413,6 +1468,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ColorPickerPanelManager.shared.toggleColorPickerPanel()
         }
 
+        KeyboardShortcuts.onKeyDown(for: .toggleCaffeinate) {
+            guard Defaults[.enableShortcuts], Defaults[.enableCaffeinate] else { return }
+            CaffeinateManager.shared.toggle()
+        }
+
         KeyboardShortcuts.onKeyDown(for: .toggleTerminalTab) { [weak self] in
             guard let self else { return }
             guard Defaults[.enableShortcuts], Defaults[.enableTerminalFeature] else { return }
@@ -1468,6 +1528,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateShortcut(.colorPickerPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableColorPickerFeature])
         updateShortcut(.screenAssistantPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableScreenAssistant])
         updateShortcut(.toggleTerminalTab, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableTerminalFeature])
+        updateShortcut(.toggleCaffeinate, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableCaffeinate])
     }
 
     @MainActor

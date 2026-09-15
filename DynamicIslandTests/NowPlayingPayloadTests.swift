@@ -77,4 +77,33 @@ final class NowPlayingPayloadTests: XCTestCase {
             accuracy: 0.0001
         )
     }
+
+    func testSpotifyAdvertisementURIIsRecognized() {
+        var state = PlaybackState(bundleIdentifier: SpotifyController.bundleIdentifier)
+        state.contentIdentifier = "spotify:ad:campaign-123"
+        state.title = "Sponsored message"
+        state.duration = 30
+
+        XCTAssertTrue(MusicManager.isLikelyAdvertisement(state))
+    }
+
+    func testRegularShortSpotifyTrackIsNotRecognizedAsAdvertisement() {
+        var state = PlaybackState(bundleIdentifier: SpotifyController.bundleIdentifier)
+        state.contentIdentifier = "spotify:track:123"
+        state.title = "Short song"
+        state.artist = "Artist"
+        state.album = "Album"
+        state.duration = 45
+
+        XCTAssertFalse(MusicManager.isLikelyAdvertisement(state))
+    }
+
+    func testAdvertisementHeuristicDoesNotApplyToOtherSources() {
+        var state = PlaybackState(bundleIdentifier: "com.apple.Music")
+        state.contentIdentifier = "spotify:ad:campaign-123"
+        state.title = "Sponsored message"
+        state.duration = 30
+
+        XCTAssertFalse(MusicManager.isLikelyAdvertisement(state))
+    }
 }
