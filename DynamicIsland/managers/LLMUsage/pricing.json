@@ -201,16 +201,6 @@
       }
     },
     {
-      "id": "google/gemini-2.5-pro-preview-05-06",
-      "name": "Google: Gemini 2.5 Pro Preview 05-06",
-      "pricing": {
-        "prompt": "0.00000125",
-        "completion": "0.00001",
-        "cache_read": "0.000000125",
-        "cache_write": "0.000000375"
-      }
-    },
-    {
       "id": "google/gemini-3-flash-preview",
       "name": "Google: Gemini 3 Flash Preview",
       "pricing": {
@@ -413,16 +403,6 @@
     {
       "id": "openai/gpt-4-turbo",
       "name": "OpenAI: GPT-4 Turbo",
-      "pricing": {
-        "prompt": "0.00001",
-        "completion": "0.00003",
-        "cache_read": "",
-        "cache_write": ""
-      }
-    },
-    {
-      "id": "openai/gpt-4-turbo-preview",
-      "name": "OpenAI: GPT-4 Turbo Preview",
       "pricing": {
         "prompt": "0.00001",
         "completion": "0.00003",
@@ -941,5 +921,5 @@
       }
     }
   ],
-  "last_updated": "2026-09-14T00:07:28Z"
+  "last_updated": "2026-09-15T00:06:52Z"
 }
