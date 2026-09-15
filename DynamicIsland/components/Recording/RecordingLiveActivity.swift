@@ -153,7 +153,7 @@ struct RecordingLiveActivity: View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(verbatim: "Screen Recording")
+                    Text(verbatim: String(localized: "Screen Recording"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.84))
                         .lineLimit(1)
