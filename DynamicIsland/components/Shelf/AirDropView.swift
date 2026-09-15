@@ -83,10 +83,7 @@ struct AirDropView: View {
                                             HStack(spacing: 8) {
                                                 Group {
                                                     if let imgData = provider.imageData, let nsImg = NSImage(data: imgData) {
-                                                        Image(nsImage: nsImg)
-                                                            .resizable()
-                                                            .scaledToFit()
-                                                            .frame(width: 16, height: 16)
+                                                        Image(nsImage: nsImg.fitted(toSide: 16))
                                                             .clipShape(RoundedRectangle(cornerRadius: 3))
                                                     } else {
                                                         Image(systemName: "square.and.arrow.up")
@@ -109,10 +106,7 @@ struct AirDropView: View {
                                         HStack(alignment: .top, spacing: 8) {
                                             Group {
                                                 if let imgData = selected.imageData, let nsImg = NSImage(data: imgData) {
-                                                    Image(nsImage: nsImg)
-                                                        .resizable()
-                                                        .scaledToFit()
-                                                        .frame(width: 20, height: 20)
+                                                    Image(nsImage: nsImg.fitted(toSide: 20))
                                                         .clipShape(RoundedRectangle(cornerRadius: 4))
                                                 } else {
                                                     Image(systemName: "square.and.arrow.up")

@@ -61,6 +61,92 @@ struct BatteryView: View {
     }
 
     var body: some View {
+        if showPercentInside {
+            filledBody
+        } else {
+            outlinedBody
+        }
+    }
+
+    // MARK: - Filled body
+
+    /// Apple draws the battery as a filled shape with the figure sitting on it:
+    /// a light body, the charge as a coloured fill running from the left, and
+    /// the percentage in dark type centred over the whole body — not over the
+    /// fill, so it does not move as the charge does.
+    ///
+    /// The outlined drawing below puts a thin `battery.0` symbol around a small
+    /// inner bar, which is the older treatment and leaves the figure competing
+    /// with the outline for the same few points.
+    private var filledBody: some View {
+        let height = batteryWidth * 0.52
+        let inset: CGFloat = 1.5
+        let bodyRadius = height * 0.34
+        let fraction = min(max(CGFloat(levelBattery) / 100, 0), 1)
+
+        return HStack(spacing: height * 0.11) {
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: bodyRadius, style: .continuous)
+                    .fill(bodyFill)
+
+                RoundedRectangle(cornerRadius: bodyRadius - inset * 0.5, style: .continuous)
+                    .fill(batteryColor)
+                    // Proportional, with a floor only above zero and only wide
+                    // enough to be visible. Flooring it at the body's height
+                    // instead -- reasoning that a fill wants to be at least as
+                    // wide as it is round -- put the floor at 12.6pt of a 27pt
+                    // track on a 30pt battery, so an empty one drew as 47% full
+                    // and every level below that was overstated.
+                    .frame(width: fillWidth(fraction: fraction, inset: inset))
+                    .padding(inset)
+
+                HStack(spacing: height * 0.04) {
+                    Text("\(Int(levelBattery))")
+                        .font(.system(size: height * 0.62, weight: .bold, design: .rounded))
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+
+                    if let statusSymbol {
+                        Image(systemName: statusSymbol)
+                            .font(.system(size: height * 0.42, weight: .bold))
+                    }
+                }
+                .foregroundStyle(Color.black.opacity(0.82))
+                .frame(width: batteryWidth, alignment: .center)
+            }
+            .frame(width: batteryWidth, height: height)
+
+            // The terminal. Apple keeps it detached from the body.
+            RoundedRectangle(cornerRadius: height * 0.1, style: .continuous)
+                .fill(bodyFill)
+                .frame(width: height * 0.11, height: height * 0.36)
+        }
+        .animation(.smooth(duration: 0.3), value: levelBattery)
+        .animation(.smooth(duration: 0.3), value: batteryColor)
+    }
+
+    private func fillWidth(fraction: CGFloat, inset: CGFloat) -> CGFloat {
+        guard fraction > 0 else { return 0 }
+        return max((batteryWidth - inset * 2) * fraction, 2)
+    }
+
+    /// The unfilled part of the battery, and its terminal. Light enough that
+    /// the dark figure reads against it even at a very low charge, when there
+    /// is almost no coloured fill behind the number.
+    private var bodyFill: Color {
+        .white.opacity(0.45)
+    }
+
+    private var statusSymbol: String? {
+        guard iconStatus != "", isForNotification || showPowerStatusIcons else { return nil }
+        if isCharging { return "bolt.fill" }
+        if isPluggedIn { return "powerplug.fill" }
+        return nil
+    }
+
+    // MARK: - Outlined body
+
+    private var outlinedBody: some View {
         ZStack(alignment: .leading) {
 
             Image(systemName: icon)
@@ -80,31 +166,7 @@ struct BatteryView: View {
                 )
                 .padding(.leading, 2)
 
-            if showPercentInside {
-                let showsStatusGlyph = iconStatus != "" && (isForNotification || showPowerStatusIcons)
-                let bodyHeight = (batteryWidth - 2.75) - 18
-                let glyphColor: Color = isCharging ? .white : .black
-                let statusSymbol: String? = {
-                    guard showsStatusGlyph else { return nil }
-                    if isCharging { return "bolt.fill" }
-                    if isPluggedIn { return "powerplug.fill" }
-                    return nil
-                }()
-                HStack(spacing: 0.5) {
-                    Text("\(Int(levelBattery))")
-                        .font(.system(size: batteryWidth * 0.42, weight: .heavy, design: .rounded))
-                        .foregroundStyle(glyphColor)
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                    if let statusSymbol {
-                        Image(systemName: statusSymbol)
-                            .font(.system(size: batteryWidth * 0.22, weight: .black))
-                            .foregroundStyle(glyphColor)
-                    }
-                }
-                .frame(width: batteryWidth - 7, height: bodyHeight, alignment: .center)
-                .padding(.leading, 2)
-            } else if iconStatus != "" && (isForNotification || showPowerStatusIcons) {
+            if iconStatus != "" && (isForNotification || showPowerStatusIcons) {
                 ZStack {
                     Image(iconStatus)
                         .resizable()
@@ -302,6 +364,7 @@ struct BatteryMenuView: View {
 struct DynamicIslandBatteryView: View {
     
     @Default(.showBatteryPercentage) var showBatteryPercentage
+    @Default(.showBatteryPercentInside) var showBatteryPercentInside
     @State var batteryWidth: CGFloat = 26
     var isCharging: Bool = false
     var isInLowPowerMode: Bool = false
@@ -319,7 +382,8 @@ struct DynamicIslandBatteryView: View {
 
     var body: some View {
         HStack {
-            if showBatteryPercentage {
+            // The number goes in one place or the other, never both.
+            if showBatteryPercentage && !showBatteryPercentInside {
                 ZStack(alignment: .trailing) {
                     Text("100%")
                         .font(.callout)
@@ -338,7 +402,8 @@ struct DynamicIslandBatteryView: View {
                 isCharging: isCharging,
                 isInLowPowerMode: isInLowPowerMode,
                 batteryWidth: batteryWidth,
-                isForNotification: isForNotification
+                isForNotification: isForNotification,
+                showPercentInside: showBatteryPercentInside
             )
         }
         .scaleEffect(isPressed ? 0.95 : 1.0)

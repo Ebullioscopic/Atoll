@@ -3,6 +3,14 @@
     <channel>
         <title>Atoll</title>
         <item>
+            <title>2.3.3-beta.2</title>
+            <pubDate>Thu, 20 Aug 2026 10:07:54 +0000</pubDate>
+            <sparkle:version>20260720004</sparkle:version>
+            <sparkle:shortVersionString>2.3.3-beta.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.6</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/Ebullioscopic/Atoll/releases/download/v2.3.3-beta.2/Atoll-2.3.3-beta.2.dmg" length="22070099" type="application/octet-stream" sparkle:edSignature="qNC8hN9FYWXRbxsvhDNhPXnf4i2Mh2ONWX8S4lM+oznCJyykxpVzY+QupT9i1pFaeo0Rx1LdJTU0a1jn/KUDCA=="/>
+        </item>
+        <item>
             <title>2.3.0-beta.1</title>
             <pubDate>Mon, 20 Jul 2026 08:06:57 +0000</pubDate>
             <sparkle:version>20260720003</sparkle:version>

@@ -1,6 +1,601 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Pinned lyric context" : {
+      "comment" : "Pinned lyrics setting in Media settings.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pinned lyric context"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "سياق كلمات الأغنية المثبّتة"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kontext připnutého textu písně"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kontext angehefteter Songtexte"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pinned lyric context"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Contexto de las letras fijadas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Contexte des paroles épinglées"
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Rögzített dalszöveg környezete"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Contesto del testo fissato"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "고정된 가사 문맥"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Context van vastgezette songteksten"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kontekst przypiętego tekstu piosenki"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Contexto das letras fixadas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Контекст закреплённого текста песни"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "บริบทของเนื้อเพลงที่ปักหมุด"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Sabitlenen şarkı sözlerinin bağlamı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Контекст закріпленого тексту пісні"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "固定歌词上下文"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "固定歌詞上下文"
+          }
+        }
+      }
+    },
+    "Current" : {
+      "comment" : "Pinned lyrics setting in Media settings.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "السطر الحالي"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aktuální řádek"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aktuelle Zeile"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Current"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Línea actual"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Ligne actuelle"
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Aktuális sor"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Riga attuale"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "현재 줄"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Huidige regel"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Bieżący wiersz"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Linha atual"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Текущая строка"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "บรรทัดปัจจุบัน"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Geçerli satır"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Поточний рядок"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "当前行"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "目前行"
+          }
+        }
+      }
+    },
+    "3 lines" : {
+      "comment" : "Pinned lyrics setting in Media settings.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 lines"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 أسطر"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 řádky"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 Zeilen"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 lines"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 líneas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 lignes"
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 sor"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 righe"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3줄"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 regels"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 wiersze"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 linhas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 строки"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 บรรทัด"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 satır"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 рядки"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 行"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "3 行"
+          }
+        }
+      }
+    },
+    "5 lines" : {
+      "comment" : "Pinned lyrics setting in Media settings.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5 lines"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 أسطر"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 řádků"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 Zeilen"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 lines"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 líneas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 lignes"
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 sor"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 righe"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5줄"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 regels"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 wierszy"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 linhas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 строк"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 บรรทัด"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 satır"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 рядків"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 行"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "5 行"
+          }
+        }
+      }
+    },
+    "Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen. Can also be toggled from the pin on the lyrics panel." : {
+      "comment" : "Pinned lyrics setting in Media settings.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen. Can also be toggled from the pin on the lyrics panel."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "يعرض كلمات الأغنية المتزامنة أسفل النتوء المغلق مع السياق المحدد. يحتفظ بالمساحة أثناء المقاطع الموسيقية دون غناء، ويخفي الكلمات عند ظهور عرض HUD على الشاشة. يمكن أيضًا تبديله من زر التثبيت في لوحة كلمات الأغنية."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Zobrazuje synchronizovaný text písně pod zavřeným výřezem s vybraným kontextem. Během instrumentálních pasáží zachovává místo; při zobrazení HUD skryje slova. Lze také přepnout pomocí připínáčku na panelu textu písně."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Zeigt synchronisierte Songtexte mit dem gewählten Kontext unter der geschlossenen Notch an. Behält den Platz während Instrumentalpassagen bei und blendet den Text aus, solange ein HUD angezeigt wird. Kann auch über die Stecknadel im Songtextbereich umgeschaltet werden."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen. Can also be toggled from the pin on the lyrics panel."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Muestra las letras sincronizadas debajo de la muesca cerrada con el contexto seleccionado. Conserva el espacio durante los pasajes instrumentales y oculta el texto mientras se muestra un HUD. También se puede activar o desactivar desde la chincheta del panel de letras."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Affiche les paroles synchronisées sous l’encoche fermée avec le contexte sélectionné. Conserve l’espace pendant les passages instrumentaux et masque les paroles lorsqu’un HUD est affiché. Peut aussi être activé ou désactivé depuis l’épingle du panneau des paroles."
+          }
+        },
+        "hu" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Az időzített dalszöveget a kiválasztott környezettel jeleníti meg a bezárt kivágás alatt. A hangszeres részek alatt megtartja a helyet, és elrejti a szöveget, amíg HUD látható a képernyőn. A dalszövegpanel gombostűjével is be- vagy kikapcsolható."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mostra il testo sincronizzato sotto il notch chiuso con il contesto selezionato. Mantiene lo spazio durante i passaggi strumentali e nasconde il testo mentre è visualizzato un HUD. Si può anche attivare o disattivare dalla puntina nel pannello del testo."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "선택한 문맥과 함께 닫힌 노치 아래에 동기화된 가사를 표시합니다. 간주 중에도 공간을 유지하며, 화면에 HUD가 표시되는 동안 가사를 숨깁니다. 가사 패널의 고정 버튼으로도 켜거나 끌 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Toont gesynchroniseerde songteksten onder de gesloten notch met de gekozen context. Behoudt de ruimte tijdens instrumentale passages en verbergt de tekst zolang een HUD op het scherm staat. Kan ook worden in- of uitgeschakeld via de punaise in het songtekstenpaneel."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Wyświetla zsynchronizowany tekst piosenki pod zamkniętym wcięciem z wybranym kontekstem. Zachowuje miejsce podczas fragmentów instrumentalnych i ukrywa tekst, gdy na ekranie jest HUD. Można też przełączać przypinanie pinezką w panelu tekstu piosenki."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Mostra as letras sincronizadas abaixo do notch fechado com o contexto selecionado. Mantém o espaço durante os trechos instrumentais e oculta as letras enquanto um HUD é exibido na tela. Também pode ser ativado ou desativado pelo alfinete no painel de letras."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Показывает синхронизированный текст песни под закрытым вырезом с выбранным контекстом. Сохраняет место во время инструментальных проигрышей и скрывает слова, пока на экране отображается HUD. Также можно переключить закрепление кнопкой булавки на панели текста песни."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "แสดงเนื้อเพลงที่ซิงค์ตามเวลาใต้รอยบากที่ปิดอยู่พร้อมบริบทที่เลือก คงพื้นที่ไว้ระหว่างช่วงบรรเลงและซ่อนเนื้อเพลงขณะที่ HUD แสดงบนหน้าจอ สามารถเปิดหรือปิดได้จากหมุดบนแผงเนื้อเพลง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Seçilen bağlamla birlikte kapalı çentiğin altında zamanla eşleşen şarkı sözlerini gösterir. Enstrümantal bölümlerde alanı korur; ekranda bir HUD gösterilirken sözleri gizler. Şarkı sözleri panelindeki raptiyeyle de açılıp kapatılabilir."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Показує синхронізований текст пісні під закритим вирізом із вибраним контекстом. Зберігає місце під час інструментальних програшів і приховує слова, поки на екрані відображається HUD. Також можна перемикати закріплення кнопкою шпильки на панелі тексту пісні."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "在收起的刘海下方显示同步歌词及所选上下文。间奏期间保留空间；屏幕上显示 HUD 时隐藏歌词。也可通过歌词面板上的固定按钮切换。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "在收合的瀏海下方顯示同步歌詞及所選上下文。間奏期間保留空間；螢幕上顯示 HUD 時隱藏歌詞。也可透過歌詞面板上的固定按鈕切換。"
+          }
+        }
+      }
+    },
     "" : {
       "localizations" : {
         "ar" : {
@@ -1130,6 +1725,12 @@
             "value" : "%@ kanalı"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 频道"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1401,6 +2002,16 @@
         }
       }
     },
+    "%@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
     "%@. Focus active: %@" : {
       "comment" : "A row that combines a calendar event with a focus indicator. The first argument is the text of the calendar event. The second argument is the name of the focus.",
       "isCommentAutoGenerated" : true,
@@ -1451,6 +2062,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@。專注模式已啟用：%@"
+          }
+        }
+      }
+    },
+    "%@%lld px" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$lld px"
           }
         }
       }
@@ -2464,6 +3085,12 @@
             "value" : "%lld%% kaldı"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剩余 %lld%%"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2486,6 +3113,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld%% kullanıldı"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已使用 %lld%%"
           }
         },
         "zh-Hant" : {
@@ -2563,6 +3196,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld дн. назад"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天前"
           }
         },
         "zh-Hant" : {
@@ -2690,6 +3329,12 @@
             "value" : "%lld ч. назад"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 小时前"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2813,6 +3458,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld мин. назад"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分钟前"
           }
         },
         "zh-Hant" : {
@@ -3707,7 +4358,6 @@
     },
     "±10 Seconds" : {
       "comment" : "Display name for the \"±10 Seconds\" music skip behavior option.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -4325,6 +4975,12 @@
             "state" : "translated",
             "value" : "3D"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3D"
+          }
         }
       }
     },
@@ -4335,12 +4991,24 @@
             "state" : "translated",
             "value" : "4"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4"
+          }
         }
       }
     },
     "5" : {
       "localizations" : {
         "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "5"
@@ -4561,6 +5229,12 @@
     "6" : {
       "localizations" : {
         "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "6"
@@ -5295,6 +5969,12 @@
             "value" : "Atoll'un yeni bir sürümü mevcut!"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll 有新版本可用！"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5424,7 +6104,6 @@
     },
     "Accent" : {
       "comment" : "Display name for the caps lock indicator tint mode.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -5842,6 +6521,12 @@
             "value" : "Erişilebilirlik izni, Dynamic Island'ın yerleşik ses, parlaklık ve klavye HUD'larını değiştirmesine olanak tanır."
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "辅助功能权限允许 Dynamic Island 替换系统原生的音量、亮度和键盘 HUD。"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5875,6 +6560,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Erişilebilirlik izni gerekli"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要辅助功能权限"
           }
         },
         "zh-Hant" : {
@@ -6352,7 +7043,6 @@
     },
     "Adaptive gradient" : {
       "comment" : "Display name for the timer icon color mode: adaptive gradient.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -6398,6 +7088,9 @@
           }
         }
       }
+    },
+    "Adapts based on power source and battery level." : {
+
     },
     "Add" : {
       "localizations" : {
@@ -8935,6 +9628,9 @@
         }
       }
     },
+    "Allow moving files when dragging out" : {
+
+    },
     "Allowed Features" : {
       "comment" : "A label describing the allowed features for an app extension.",
       "isCommentAutoGenerated" : true,
@@ -9270,7 +9966,6 @@
       }
     },
     "Amazon Music" : {
-      "extractionState" : "stale",
       "localizations" : {
         "nl" : {
           "stringUnit" : {
@@ -9291,6 +9986,12 @@
           }
         },
         "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amazon Music"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Amazon Music"
@@ -9917,7 +10618,6 @@
     },
     "Apple Music" : {
       "comment" : "Media controller type for Apple Music",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -10397,6 +11097,12 @@
             "state" : "translated",
             "value" : "Atoll %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll %@"
+          }
         }
       }
     },
@@ -10709,6 +11415,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll, güncellemeleri düzenli aralıklarla otomatik denetleyecek."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll 会定期自动检查更新。"
           }
         },
         "zh-Hant" : {
@@ -11086,6 +11798,9 @@
           }
         }
       }
+    },
+    "Automatic" : {
+
     },
     "Automatically check for updates" : {
       "localizations" : {
@@ -11575,9 +12290,11 @@
         }
       }
     },
+    "Balanced" : {
+
+    },
     "Bar" : {
       "comment" : "Name of the timer progress style that shows a horizontal bar.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -13142,6 +13859,12 @@
             "value" : "İkisi de etkin"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两者都在使用"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -14402,6 +15125,12 @@
             "value" : "Yalnızca kamera"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅摄像头"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15480,6 +16209,12 @@
             "value" : "Güncellemeler denetleniyor…"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查更新…"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16038,6 +16773,12 @@
             "value" : "Kullanım sekmesinde hangi yapay zekâ sağlayıcılarının görüneceğini seçin."
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择要在“用量”标签页中显示的 AI 提供商。"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16331,6 +17072,9 @@
           }
         }
       }
+    },
+    "Cider" : {
+
     },
     "Circle" : {
       "localizations" : {
@@ -16657,6 +17401,12 @@
           }
         },
         "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude"
+          }
+        },
+        "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Claude"
@@ -17586,6 +18336,12 @@
         }
       }
     },
+    "Client ID" : {
+
+    },
+    "Client ID saved. Connect your Spotify account." : {
+
+    },
     "Clipboard" : {
       "localizations" : {
         "fr" : {
@@ -18193,6 +18949,12 @@
             "state" : "translated",
             "value" : "Codex"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex"
+          }
         }
       }
     },
@@ -18332,6 +19094,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Renk çıkarımı"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "颜色提取"
           }
         },
         "zh-Hant" : {
@@ -19220,7 +19988,6 @@
       }
     },
     "Compact" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -19244,6 +20011,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kompakt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "紧凑"
           }
         },
         "zh-Hant" : {
@@ -19799,6 +20572,9 @@
         }
       }
     },
+    "Connect Spotify Account" : {
+
+    },
     "Connected" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -19845,6 +20621,12 @@
           }
         }
       }
+    },
+    "Connected — like button ready." : {
+
+    },
+    "Connecting..." : {
+
     },
     "Connects directly to the Apple Music app." : {
       "localizations" : {
@@ -20647,6 +21429,9 @@
         }
       }
     },
+    "Copy something to see it here" : {
+
+    },
     "Copy something to start" : {
       "localizations" : {
         "fr" : {
@@ -20707,6 +21492,7 @@
     },
     "Copy text to see it here" : {
       "comment" : "A description below the \"No copies yet\" text, instructing the user to copy text to see it in the clipboard.",
+      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -21312,6 +22098,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Geçerli yapı: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前构建版本：%@"
           }
         },
         "zh-Hant" : {
@@ -23413,6 +24205,88 @@
         }
       }
     },
+    "Dark" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dunkel"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oscuro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sombre"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다크"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Donker"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ciemny"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escuro"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тёмная"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เข้ม"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Koyu"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Темна"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深色"
+          }
+        }
+      }
+    },
     "Dash outline equals the exact notch bounds." : {
       "comment" : "A description under the live preview section of the animation editor.",
       "isCommentAutoGenerated" : true,
@@ -24030,6 +24904,9 @@
           }
         }
       }
+    },
+    "Delete this item" : {
+
     },
     "Denied" : {
       "localizations" : {
@@ -24664,7 +25541,6 @@
     },
     "Digital" : {
       "comment" : "The display name for the \"Digital\" reminder presentation style.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -24928,6 +25804,24 @@
         }
       }
     },
+    "Disable Minimalistic UI to show lyrics in the side panel." : {
+
+    },
+    "Disable Minimalistic UI to use side lyrics." : {
+
+    },
+    "Disable side lyrics to show the calendar." : {
+
+    },
+    "Disable side lyrics to use the calendar." : {
+
+    },
+    "Disable the calendar to show lyrics in the side panel." : {
+
+    },
+    "Disable the calendar to use side lyrics." : {
+
+    },
     "Disabled" : {
       "localizations" : {
         "ar" : {
@@ -25171,6 +26065,9 @@
           }
         }
       }
+    },
+    "Disconnect" : {
+
     },
     "Discrete transitions snap between Green (0–60%), Yellow (60–85%), and Red (85–100%)." : {
       "comment" : "A description of how the color-coded progress bars work when not using smooth transitions.",
@@ -25496,6 +26393,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kapat"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
           }
         },
         "zh-Hant" : {
@@ -27395,6 +28298,12 @@
             "value" : "Düzenle"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -28787,6 +29696,12 @@
         }
       }
     },
+    "Enable Dynamic Island media controls to show lyrics in the side panel." : {
+
+    },
+    "Enable Dynamic Island media controls to use side lyrics." : {
+
+    },
     "Enable Dynamic mirror" : {
       "localizations" : {
         "ko" : {
@@ -29570,6 +30485,12 @@
             "value" : "LLM Kullanım İzleyicisini etkinleştir"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用 LLM 用量监控"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -29625,6 +30546,7 @@
       }
     },
     "Enable lyrics" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -34161,7 +35083,15 @@
     },
     "Gemini" : {
       "comment" : "A label for a segment in a picker that lets the user select an Antigravity pool.",
-      "isCommentAutoGenerated" : true
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini"
+          }
+        }
+      }
     },
     "Gemini API Key" : {
       "localizations" : {
@@ -35569,7 +36499,6 @@
     },
     "Green" : {
       "comment" : "Display name for the green caps lock indicator tint mode.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -35758,6 +36687,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Merhaba, cam!"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你好，玻璃！"
           }
         },
         "zh-Hant" : {
@@ -36311,6 +37246,12 @@
             "value" : "Sürüm Notlarını Gizle"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏更新说明"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -36602,6 +37543,9 @@
         }
       }
     },
+    "High Performance" : {
+
+    },
     "High-frequency updates without a timeout can increase battery usage." : {
       "localizations" : {
         "ko" : {
@@ -36653,6 +37597,9 @@
           }
         }
       }
+    },
+    "Higher speeds allow widgets to hide almost instantly when Siri is invoked, but may impact battery life when on battery power." : {
+
     },
     "History" : {
       "comment" : "Localized name of each tab in the clipboard view.",
@@ -38378,6 +39325,12 @@
             "value" : "Kur ve Yeniden Başlat"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装并重新启动"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -38400,6 +39353,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Güncellemeyi Kur"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装更新"
           }
         },
         "zh-Hant" : {
@@ -39823,6 +40782,12 @@
             "value" : "Eski"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "旧版"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -39884,6 +40849,88 @@
         }
       }
     },
+    "Light" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hell"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claro"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clair"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이트"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licht"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jasny"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claro"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Светлая"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "สว่าง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Açık"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Світла"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浅色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "淺色"
+          }
+        }
+      }
+    },
     "Light Use" : {
       "comment" : "Name of the \"Light Use\" user profile.",
       "isCommentAutoGenerated" : true,
@@ -39931,6 +40978,9 @@
           }
         }
       }
+    },
+    "Like Song" : {
+
     },
     "Line Width: %lldpx" : {
       "localizations" : {
@@ -40632,6 +41682,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LLM Sağlayıcıları"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LLM 提供商"
           }
         },
         "zh-Hant" : {
@@ -41534,6 +42590,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll'un yeni sürümü aranıyor"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在查找 Atoll 的新版本"
           }
         },
         "zh-Hant" : {
@@ -45350,6 +46412,12 @@
             "value" : "Yalnızca mikrofon"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅麦克风"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -46274,56 +47342,56 @@
         }
       }
     },
-    "Monitor your Downloads folder for Chromium-style downloads (.crdownload files) and show a live activity in the Dynamic Island while downloads are in progress." : {
+    "Shows a live activity in the Dynamic Island while a file is downloading. Works with Safari, Firefox, and Chrome and the browsers built on it — Edge, Brave, Arc, Vivaldi and Opera. Only your Downloads folder is watched, so a file saved anywhere else will not appear." : {
       "comment" : "A footer description for the \"Downloads\" section of the settings view.",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "다운로드 폴더에서 크로미움 스타일의 다운로드(.crdownload 파일)를 감지하고, 다운로드가 진행되는 동안 Dynamic Island에 실시간 현황을 표시합니다."
+            "state" : "needs_review",
+            "value" : "파일을 다운로드하는 동안 Dynamic Island에 실시간 현황을 표시합니다. Safari, Firefox, Chrome 및 Chrome을 기반으로 만들어진 브라우저(Edge, Brave, Arc, Vivaldi, Opera)에서 작동합니다. 다운로드 폴더만 감시하므로 다른 위치에 저장된 파일은 표시되지 않습니다."
           }
         },
         "nl" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Controleer je map Downloads op downloads in Chromium-stijl (.crdownload-bestanden) en toon een live activiteit in Dynamic Island terwijl downloads bezig zijn."
+            "state" : "needs_review",
+            "value" : "Toont een live activiteit in Dynamic Island terwijl een bestand wordt gedownload. Werkt met Safari, Firefox en Chrome en de browsers die daarop zijn gebouwd — Edge, Brave, Arc, Vivaldi en Opera. Alleen je map Downloads wordt bekeken, dus een bestand dat ergens anders is bewaard verschijnt niet."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Monitore sua pasta Downloads para downloads no estilo Chromium (arquivos .crdownload) e mostre uma atividade ao vivo na Dynamic Island enquanto os downloads estão em andamento."
+            "state" : "needs_review",
+            "value" : "Mostra uma atividade ao vivo na Dynamic Island enquanto um arquivo está sendo baixado. Funciona com Safari, Firefox e Chrome e os navegadores baseados nele — Edge, Brave, Arc, Vivaldi e Opera. Apenas a sua pasta Downloads é monitorada, então um arquivo salvo em outro lugar não aparecerá."
           }
         },
         "ru" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Отслеживает папку загрузок на наличие файлов Chromium (.crdownload) и показывает процесс в Dynamic Island."
+            "state" : "needs_review",
+            "value" : "Показывает процесс в Dynamic Island, пока файл загружается. Работает с Safari, Firefox и Chrome, а также с браузерами на его основе — Edge, Brave, Arc, Vivaldi и Opera. Отслеживается только папка загрузок, поэтому файл, сохранённый в другом месте, не появится."
           }
         },
         "th" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "ตรวจสอบโฟลเดอร์ดาวน์โหลดของคุณสำหรับการดาวน์โหลดสไตล์ Chromium (.crdownload) และแสดงกิจกรรมสดในไดนามิกไอแลนด์ขณะดาวน์โหลด"
+            "state" : "needs_review",
+            "value" : "แสดงกิจกรรมสดในไดนามิกไอแลนด์ขณะที่ไฟล์กำลังดาวน์โหลด รองรับ Safari, Firefox และ Chrome รวมถึงเบราว์เซอร์ที่สร้างบน Chrome — Edge, Brave, Arc, Vivaldi และ Opera ระบบจะตรวจสอบเฉพาะโฟลเดอร์ดาวน์โหลดของคุณเท่านั้น ไฟล์ที่บันทึกไว้ที่อื่นจะไม่ปรากฏ"
           }
         },
         "tr" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chromium tarzı indirmeler (.crdownload dosyaları) için İndirilenler klasörünüzü izleyin ve indirmeler devam ederken Dynamic Island'de canlı bir etkinlik gösterin."
+            "state" : "needs_review",
+            "value" : "Bir dosya indirilirken Dynamic Island'da canlı bir etkinlik gösterir. Safari, Firefox ve Chrome ile ve Chrome üzerine kurulu tarayıcılarla — Edge, Brave, Arc, Vivaldi ve Opera — çalışır. Yalnızca İndirilenler klasörünüz izlenir, bu nedenle başka bir yere kaydedilen dosyalar görünmez."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "监控下载文件夹中 Chromium 风格的下载（.crdownload 文件），并在下载进行时在灵动岛中显示实时活动。"
+            "state" : "needs_review",
+            "value" : "在文件下载期间于灵动岛中显示实时活动。支持 Safari、Firefox 和 Chrome，以及基于 Chrome 的浏览器 — Edge、Brave、Arc、Vivaldi 和 Opera。仅监控「下载」文件夹，因此保存到其他位置的文件不会显示。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
-            "state" : "translated",
-            "value" : "監控下載資料夾中 Chromium 風格的下載（.crdownload 檔案），並在下載進行時在動態島中顯示即時動態。"
+            "state" : "needs_review",
+            "value" : "在檔案下載期間於動態島中顯示即時動態。支援 Safari、Firefox 和 Chrome，以及以 Chrome 為基礎的瀏覽器 — Edge、Brave、Arc、Vivaldi 和 Opera。僅監控「下載」資料夾，因此儲存到其他位置的檔案不會顯示。"
           }
         }
       }
@@ -49802,6 +50870,9 @@
         }
       }
     },
+    "Not connected." : {
+
+    },
     "Not Determined" : {
       "localizations" : {
         "ko" : {
@@ -49997,6 +51068,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kayıt yok"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未在录制"
           }
         },
         "zh-Hant" : {
@@ -50456,6 +51533,12 @@
         }
       }
     },
+    "Notch Tab" : {
+
+    },
+    "Notch Tab mode shows clipboard in its own tab inside the notch. Drag text, image, or single-file items straight out to Finder or another app." : {
+
+    },
     "Notch Width" : {
       "comment" : "A section header for adjusting the expanded notch width.",
       "isCommentAutoGenerated" : true,
@@ -50782,7 +51865,6 @@
     },
     "Now Playing" : {
       "comment" : "Name of the media controller type for the \"Now Playing\" option.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -50889,6 +51971,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "/ %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共 %@"
           }
         },
         "zh-Hant" : {
@@ -51312,6 +52400,12 @@
             "value" : "Yalnızca uygulama simgesi"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅应用图标"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -51467,6 +52561,12 @@
             "value" : "Yalnızca indir simgesi"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅下载图标"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -51474,6 +52574,9 @@
           }
         }
       }
+    },
+    "Open Developer Dashboard" : {
+
     },
     "Open Google AI Studio" : {
       "localizations" : {
@@ -51792,6 +52895,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ayarları Aç"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开设置"
           }
         },
         "zh-Hant" : {
@@ -52492,7 +53601,6 @@
     },
     "Panel" : {
       "comment" : "Display name for the clipboard display mode \"Panel\".",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -52785,6 +53893,9 @@
         }
       }
     },
+    "Paste the Client ID of your Spotify Developer app first." : {
+
+    },
     "Pause" : {
       "localizations" : {
         "nl" : {
@@ -52825,6 +53936,10 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Pause and stop buttons appear inline inside the notch while a timer runs." : {
+      "comment" : "A description of the pause and stop buttons in the timer notch.",
+      "isCommentAutoGenerated" : true
     },
     "Paused" : {
       "comment" : "Text displayed in the timer view when the timer is paused.",
@@ -54401,6 +55516,9 @@
         }
       }
     },
+    "Power Saver" : {
+
+    },
     "Preset name" : {
       "comment" : "A label for the name of a timer preset.",
       "isCommentAutoGenerated" : true,
@@ -55059,6 +56177,12 @@
             "state" : "translated",
             "value" : "PRO"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRO"
+          }
         }
       }
     },
@@ -55124,6 +56248,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "İlerleme"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进度"
           }
         },
         "zh-Hant" : {
@@ -55919,6 +57049,12 @@
             "value" : "kota kullanılamıyor"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配额不可用"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -56454,6 +57590,12 @@
             "value" : "Kayıt etkin"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在录制"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -56461,6 +57603,10 @@
           }
         }
       }
+    },
+    "Recording controls" : {
+      "comment" : "Picker label for choosing whether the recording HUD shows only status or includes a stop button.",
+      "isCommentAutoGenerated" : true
     },
     "Recording Detected" : {
       "comment" : "A text description of a red dot displayed in the Atoll header when screen recording is active.",
@@ -56522,6 +57668,10 @@
         }
       }
     },
+    "Recording hover style" : {
+      "comment" : "Picker label for choosing the expanded or inline recording HUD presentation on hover.",
+      "isCommentAutoGenerated" : true
+    },
     "Recording Status" : {
       "localizations" : {
         "fr" : {
@@ -56579,6 +57729,9 @@
           }
         }
       }
+    },
+    "Redirect URI:" : {
+
     },
     "Refresh detection" : {
       "comment" : "A button label that refreshes the detection status of BetterDisplay.",
@@ -56974,6 +58127,12 @@
             "value" : "Sonra Hatırlat"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稍后提醒我"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -57308,6 +58467,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Raftan Kaldır"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从置物架移除"
           }
         }
       }
@@ -59531,7 +60696,6 @@
     },
     "Ring" : {
       "comment" : "The name of the timer progress style that shows a ring shape.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -60898,6 +62062,12 @@
             "value" : "Gezinilebilir gerçek zamanlı dalga formu"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可拖动的实时波形"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -62146,7 +63316,6 @@
     },
     "Separate Tab" : {
       "comment" : "Display name for the clipboard display mode option to open the clipboard in a separate tab.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -62799,6 +63968,9 @@
         }
       }
     },
+    "Shelf item" : {
+
+    },
     "Shell" : {
       "localizations" : {
         "ko" : {
@@ -63088,6 +64260,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AirPods dinleme modu değişikliklerini göster"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示 AirPods 聆听模式变化"
           }
         },
         "zh-Hant" : {
@@ -64586,6 +65764,7 @@
       }
     },
     "Show floating pause/stop controls" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -65191,6 +66370,9 @@
         }
       }
     },
+    "Show lyrics on the side (requires calendar off)" : {
+
+    },
     "Show media app icon" : {
       "localizations" : {
         "ko" : {
@@ -65657,6 +66839,10 @@
         }
       }
     },
+    "Show pause/stop controls in the notch" : {
+      "comment" : "A toggle that shows a button to pause or stop a timer.",
+      "isCommentAutoGenerated" : true
+    },
     "Show Percentage" : {
       "localizations" : {
         "ko" : {
@@ -66013,6 +67199,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sürüm Notlarını Göster"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示更新说明"
           }
         },
         "zh-Hant" : {
@@ -66535,7 +67727,6 @@
     },
     "Shows screen assistant as a dropdown attached to the AI button" : {
       "comment" : "Description of the screen assistant display mode option that shows the screen assistant as a dropdown attached to the AI button.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -66584,7 +67775,6 @@
     },
     "Shows screen assistant in a floating panel near the notch" : {
       "comment" : "Description of the screen assistant display mode option that shows the screen assistant in a floating panel near the notch.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -66833,6 +68023,12 @@
         }
       }
     },
+    "Side lyrics horizontal offset" : {
+
+    },
+    "Side lyrics width" : {
+
+    },
     "Sign in to Spotify to capture the `sp_dc` cookie automatically, or paste it in below." : {
       "comment" : "A description of how to sign in to Spotify to get the `sp_dc` cookie.",
       "isCommentAutoGenerated" : true,
@@ -66962,6 +68158,12 @@
           }
         }
       }
+    },
+    "Siri Detection" : {
+
+    },
+    "Siri detection speed" : {
+
     },
     "Size & Scale" : {
       "extractionState" : "stale",
@@ -67124,7 +68326,6 @@
     },
     "Skip forward or backward by ten seconds" : {
       "comment" : "Description of a music skip behavior option.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -67185,6 +68386,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bu Sürümü Atla"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过此版本"
           }
         },
         "zh-Hant" : {
@@ -67312,6 +68519,9 @@
           }
         }
       }
+    },
+    "Slower detection (4Hz) to maximize battery life." : {
+
     },
     "Smooth color transitions" : {
       "localizations" : {
@@ -68196,7 +69406,6 @@
     },
     "Spotify" : {
       "comment" : "Spotify media controller type.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -68285,6 +69494,15 @@
         }
       }
     },
+    "Spotify did not return an authorization code." : {
+
+    },
+    "Spotify Like Button" : {
+
+    },
+    "Spotify login failed: %@" : {
+
+    },
     "Spotify often blocks in-app logins. Sign in via your normal browser, then paste sp_dc in Settings." : {
       "comment" : "A help message for the Spotify login sheet.",
       "isCommentAutoGenerated" : true,
@@ -68326,6 +69544,9 @@
           }
         }
       }
+    },
+    "Spotify revoked access. Connect your account again." : {
+
     },
     "Square" : {
       "localizations" : {
@@ -68538,6 +69759,9 @@
         }
       }
     },
+    "Standard detection (16Hz) for smooth responsiveness." : {
+
+    },
     "Standard Notch" : {
       "comment" : "Text for the \"Standard Notch\" option in the external display style picker.",
       "isCommentAutoGenerated" : true,
@@ -68680,7 +69904,6 @@
     },
     "Standard previous/next track controls" : {
       "comment" : "Description of the music skip behavior option to use standard previous/next track controls.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -70854,6 +72077,12 @@
             "value" : "Sembol"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "符号"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -71852,6 +73081,9 @@
         }
       }
     },
+    "The like button needs its own Spotify app registration (the Canvas cookie session cannot modify your library). Create a free app at developer.spotify.com, add the redirect URI below, then paste the app's Client ID here." : {
+
+    },
     "TheDynamicIsland" : {
       "localizations" : {
         "nl" : {
@@ -71892,6 +73124,9 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "These controls apply when the calendar is disabled." : {
+
     },
     "These controls mirror the Lock Screen tab so you can tune the media overlay while focusing on playback settings." : {
       "localizations" : {
@@ -71940,6 +73175,7 @@
       }
     },
     "These controls sit beside the notch while a timer runs. They require the timer name to stay hidden for spacing." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -73768,6 +75004,9 @@
         }
       }
     },
+    "Token exchange failed: %@" : {
+
+    },
     "Top Processes" : {
       "localizations" : {
         "ko" : {
@@ -73917,7 +75156,6 @@
     },
     "Track Skip" : {
       "comment" : "Display name for the \"Track Skip\" music skip behavior.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -74142,6 +75380,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tekrar Dene"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重试"
           }
         },
         "zh-Hant" : {
@@ -74577,6 +75821,12 @@
           }
         }
       }
+    },
+    "Ultra-fast detection (30Hz) for near-instant hiding." : {
+
+    },
+    "Unable to generate secure random data for the login." : {
+
     },
     "Uninstall" : {
       "comment" : "merge:ko:alt='제거'",
@@ -75129,6 +76379,12 @@
             "value" : "Güncelleme kanalı"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新频道"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -75151,6 +76407,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Güncelleme Başarısız"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新失败"
           }
         },
         "zh-Hant" : {
@@ -76023,6 +77285,88 @@
         }
       }
     },
+    "Use Light when the wallpaper is bright so titles and labels stay readable." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wähle Hell bei hellem Hintergrundbild, damit Titel und Beschriftungen lesbar bleiben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa Claro cuando el fondo de pantalla sea brillante para que títulos y etiquetas se lean bien."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez Clair si le fond d’écran est lumineux afin que les titres et libellés restent lisibles."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "배경화면이 밝을 때는 라이트를 선택하면 제목과 라벨이 잘 보입니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kies Licht bij een heldere achtergrond, zodat titels en labels leesbaar blijven."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wybierz Jasny przy jasnej tapecie, aby tytuły i etykiety pozostały czytelne."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Claro quando o papel de parede for claro para manter títulos e rótulos legíveis."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выберите «Светлая», если обои светлые — тогда названия и подписи останутся читаемыми."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เลือกแบบสว่างเมื่อวอลเปเปอร์สว่าง เพื่อให้ชื่อและป้ายกำกับอ่านได้ชัด"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duvar kağıdı açıksa Açık’ı seçin; böylece başlıklar ve etiketler okunaklı kalır."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оберіть «Світла», якщо шпалери світлі — тоді назви та підписи залишаться читабельними."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "壁纸较亮时请选择浅色，以便标题和标签保持清晰可读。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "桌布較亮時請選擇淺色，以便標題與標籤保持清晰可讀。"
+          }
+        }
+      }
+    },
     "Use MacBook icon when on battery" : {
       "localizations" : {
         "ko" : {
@@ -76623,6 +77967,12 @@
             "value" : "Cider etkin medya kaynağıyken macOS Now Playing'i kullanır. Oynatma denetimleri sistem Now Playing hedefini izler."
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当 Cider 为当前媒体来源时，使用 macOS 的“正在播放”。播放控制将跟随系统的“正在播放”目标。"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -76672,6 +78022,9 @@
           }
         }
       }
+    },
+    "Uses Spotify's official Web API (OAuth) with access limited to reading and changing your Liked Songs. Add the 'Like Song' control to a media slot to show the button." : {
+
     },
     "Uses the frosted blur treatment while glass mode is enabled." : {
       "comment" : "A description of the frosted blur treatment when glass mode is enabled. | A description of the frosted blur treatment when glass mode is enabled. | merge:ko:alt='Glass 모드가 활성화되어 있는 동안에는 Frosted 블러 효과가 적용됩니다.'",
@@ -77422,6 +78775,12 @@
             "value" : "Canlı"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鲜艳"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -77618,6 +78977,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Görselleştirici çubukları"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可视化长条"
           }
         },
         "zh-Hant" : {
@@ -78397,6 +79762,12 @@
             "value" : "Karşılama penceresi"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "欢迎窗口"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -78980,6 +80351,12 @@
             "value" : "Etkinleştirildiğinde, İstatistikler sekmesi gerçek zamanlı sistem performansı grafikleri gösterir. Bu özellik sistem izinleri gerektirir ve ek pil kullanabilir. LLM Kullanım İzleyicisini etkinleştirmek, yapılandırdığınız yapay zekâ sağlayıcılarındaki jeton kullanımını ve harcamayı izleyen bir Kullanım sekmesi ekler."
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用后，“统计”标签页会显示实时系统性能图表。此功能需要系统权限，并可能增加耗电量。启用 LLM 用量监控会添加一个“用量”标签页，用于跟踪已配置的各 AI 提供商的 token 用量和费用。"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -79030,6 +80407,88 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "白色"
+          }
+        }
+      }
+    },
+    "Widget appearance" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget-Darstellung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apariencia del widget"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apparence des widgets"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯 모양"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widgetuiterlijk"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wygląd widżetów"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aparência do widget"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оформление виджетов"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ลักษณะวิดเจ็ต"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget görünümü"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оформлення віджетів"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小组件外观"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小工具外觀"
           }
         }
       }
@@ -79854,6 +81313,12 @@
             "value" : "Güncelsiniz!"
           }
         },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已是最新版本！"
+          }
+        },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
@@ -80016,7 +81481,6 @@
     },
     "Youtube Music" : {
       "comment" : "Spotify music service.",
-      "extractionState" : "stale",
       "isCommentAutoGenerated" : true,
       "localizations" : {
         "ko" : {
@@ -80178,334 +81642,6 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "YouTube 音樂需要安裝此第三方 App： "
-          }
-        }
-      }
-    },
-    "Dark" : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Тёмная"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "深色"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "深色"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다크"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Donker"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "เข้ม"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Koyu"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escuro"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sombre"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dunkel"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Oscuro"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ciemny"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Темна"
-          }
-        }
-      }
-    },
-    "Light" : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Светлая"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "浅色"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "淺色"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "라이트"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Licht"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "สว่าง"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Açık"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Claro"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clair"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hell"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Claro"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jasny"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Світла"
-          }
-        }
-      }
-    },
-    "Widget appearance" : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Оформление виджетов"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "小组件外观"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "小工具外觀"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "위젯 모양"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Widgetuiterlijk"
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ลักษณะวิดเจ็ต"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Widget görünümü"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aparência do widget"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apparence des widgets"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Widget-Darstellung"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apariencia del widget"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wygląd widżetów"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Оформлення віджетів"
-          }
-        }
-      }
-    },
-    "Use Light when the wallpaper is bright so titles and labels stay readable." : {
-      "localizations" : {
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Выберите «Светлая», если обои светлые — тогда названия и подписи останутся читаемыми."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "壁纸较亮时请选择浅色，以便标题和标签保持清晰可读。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "桌布較亮時請選擇淺色，以便標題與標籤保持清晰可讀。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "배경화면이 밝을 때는 라이트를 선택하면 제목과 라벨이 잘 보입니다."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kies Licht bij een heldere achtergrond, zodat titels en labels leesbaar blijven."
-          }
-        },
-        "th" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "เลือกแบบสว่างเมื่อวอลเปเปอร์สว่าง เพื่อให้ชื่อและป้ายกำกับอ่านได้ชัด"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Duvar kağıdı açıksa Açık’ı seçin; böylece başlıklar ve etiketler okunaklı kalır."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use Claro quando o papel de parede for claro para manter títulos e rótulos legíveis."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choisissez Clair si le fond d’écran est lumineux afin que les titres et libellés restent lisibles."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wähle Hell bei hellem Hintergrundbild, damit Titel und Beschriftungen lesbar bleiben."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usa Claro cuando el fondo de pantalla sea brillante para que títulos y etiquetas se lean bien."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wybierz Jasny przy jasnej tapecie, aby tytuły i etykiety pozostały czytelne."
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Оберіть «Світла», якщо шпалери світлі — тоді назви та підписи залишаться читабельними."
           }
         }
       }

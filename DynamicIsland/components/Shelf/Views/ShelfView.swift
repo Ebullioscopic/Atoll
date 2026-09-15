@@ -45,11 +45,18 @@ private struct ShelfBackgroundClickCatcher: NSViewRepresentable {
     }
 }
 
+private struct ShelfViewportSizeKey: PreferenceKey {
+    static let defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) { value = nextValue() }
+}
+
 struct ShelfView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @StateObject var tvm = ShelfStateViewModel.shared
     @StateObject var selection = ShelfSelectionModel.shared
     @StateObject private var quickLookService = QuickLookService()
+    @State private var autoCloseToken = UUID()
+    @State private var viewportSize: CGSize = .zero
     private let spacing: CGFloat = 8
 
     var body: some View {
@@ -62,15 +69,23 @@ struct ShelfView: View {
                     handleDrop(providers: providers)
                 }
         }
-        // Bind Quick Look to shelf selection
+        // Bind Quick Look to shelf selection. Skipped mid-marquee so a sweep
+        // doesn't spawn a resolve Task per intermediate selection.
         .onChange(of: selection.selectedIDs) {
+            guard !selection.isMarqueeSelecting else { return }
             updateQuickLookSelection()
+        }
+        .onChange(of: selection.isMarqueeSelecting) { _, active in
+            if !active { updateQuickLookSelection() }
+        }
+        .onDisappear {
+            vm.setAutoCloseSuppression(false, token: autoCloseToken)
         }
         .quickLookPresenter(using: quickLookService)
     }
-    
+
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        guard !selection.isDragging else { return false }
+        guard !selection.isDragging, !selection.isMarqueeSelecting else { return false }
         vm.dropEvent = true
         ShelfStateViewModel.shared.load(providers)
         return true
@@ -113,8 +128,11 @@ struct ShelfView: View {
             )
             .overlay {
                 ZStack {
+                    // Covers the ring between the padded content and the panel
+                    // edge, plus the whole panel when the shelf is empty. The
+                    // marquee overlay only spans the ScrollView's content.
                     ShelfBackgroundClickCatcher {
-                        guard !selection.isDragging else { return }
+                        guard !selection.isDragging, !selection.isMarqueeSelecting else { return }
                         selection.clear()
                     }
 
@@ -151,9 +169,36 @@ struct ShelfView: View {
                                 .environmentObject(quickLookService)
                         }
                     }
+                    // Stretch the content to at least the viewport so the
+                    // marquee overlay also covers the gap right of the last item
+                    // — that gap is where a rubber-band selection usually starts.
+                    .frame(
+                        minWidth: viewportSize.width,
+                        minHeight: viewportSize.height,
+                        alignment: .leading
+                    )
+                    .overlay {
+                        ShelfMarqueeSelectionView(
+                            onBackgroundClick: {
+                                guard !selection.isDragging else { return }
+                                selection.clear()
+                            },
+                            onActiveChange: { active in
+                                vm.setAutoCloseSuppression(active, token: autoCloseToken)
+                            }
+                        )
+                    }
                 }
                 .padding(-spacing)
                 .scrollIndicators(.never)
+                // Measures the ScrollView itself (the viewport), not its
+                // content, so this only fires when the panel resizes.
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(key: ShelfViewportSizeKey.self, value: proxy.size)
+                    }
+                )
+                .onPreferenceChange(ShelfViewportSizeKey.self) { viewportSize = $0 }
                 .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $vm.dragDetectorTargeting) { providers in
                     handleDrop(providers: providers)
                 }

@@ -101,6 +101,21 @@ struct Bookmark: Sendable, Equatable, Codable {
         }
     }
 
+    /// Same as `resolve()`, but never tries to mount a volume: on an unreachable
+    /// network share `URL(resolvingBookmarkData:)` otherwise blocks for the mount
+    /// timeout. Use this on synchronous main-actor paths; `resolveAsync()`
+    /// deliberately keeps mounting since it runs off the main actor.
+    func resolveWithoutMounting() -> URL? {
+        guard !data.isEmpty else { return nil }
+        var isStale = false
+        return try? URL(
+            resolvingBookmarkData: data,
+            options: [.withoutMounting],
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        )
+    }
+
     func validate() async -> Bool {
         let (url, _) = await resolveAsync()
         guard let url = url else { return false }

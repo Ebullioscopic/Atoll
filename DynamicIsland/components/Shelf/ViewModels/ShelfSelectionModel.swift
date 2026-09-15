@@ -83,6 +83,13 @@ final class ShelfSelectionModel: ObservableObject {
         lastAnchorID = nil
     }
 
+    func selectAll(in allItems: [ShelfItem]) {
+        let all = Set(allItems.map(\.id))
+        if selectedIDs != all { selectedIDs = all }
+        if let anchor = lastAnchorID, all.contains(anchor) { return }
+        lastAnchorID = allItems.first?.id
+    }
+
     func reconcileSelection(with allItems: [ShelfItem]) {
         let validIDs = Set(allItems.map(\.id))
         let filteredSelection = selectedIDs.intersection(validIDs)
@@ -93,6 +100,15 @@ final class ShelfSelectionModel: ObservableObject {
 
         if let anchor = lastAnchorID, !validIDs.contains(anchor) {
             lastAnchorID = selectedIDs.first
+        }
+
+        // An item removed mid-marquee would otherwise linger in the base set and
+        // get re-added by the next `updateMarquee`, or come back as part of the
+        // selection `cancelMarquee` restores.
+        marqueeBaseSelection.formIntersection(validIDs)
+        marqueePreviousSelection.formIntersection(validIDs)
+        if let first = marqueeFirstHitID, !validIDs.contains(first) {
+            marqueeFirstHitID = nil
         }
     }
 
@@ -111,5 +127,85 @@ final class ShelfSelectionModel: ObservableObject {
 
     func endDrag() {
         isDragging = false
+    }
+
+    // MARK: - Marquee (rubber-band) selection
+
+    /// A rubber-band selection is in progress. Deliberately separate from
+    /// `isDragging`, which means "an NSDraggingSession is carrying items out of
+    /// the shelf" and gates `ShelfView.handleDrop`. Conflating the two would
+    /// make `.onDrop` silently reject drops while the band is up.
+    @Published private(set) var isMarqueeSelecting: Bool = false
+
+    enum MarqueeMode {
+        case replace   // no modifier
+        case union     // Shift
+        case toggle    // Command
+    }
+
+    /// What `updateMarquee` unions/toggles the hit set against — empty in
+    /// `.replace` mode, since the band there defines the whole selection.
+    private var marqueeBaseSelection: Set<UUID> = []
+    /// What was selected before the band started. Distinct from the base set,
+    /// which `.replace` deliberately empties, and which therefore cannot serve
+    /// as the thing `cancelMarquee` restores.
+    private var marqueePreviousSelection: Set<UUID> = []
+    private var marqueeMode: MarqueeMode = .replace
+    private var marqueeFirstHitID: UUID?
+
+    func beginMarquee(mode: MarqueeMode) {
+        isMarqueeSelecting = true
+        marqueeMode = mode
+        marqueeFirstHitID = nil
+        marqueePreviousSelection = selectedIDs
+        marqueeBaseSelection = (mode == .replace) ? [] : selectedIDs
+        if mode == .replace && !selectedIDs.isEmpty {
+            selectedIDs = []
+        }
+    }
+
+    func updateMarquee(hitIDs: Set<UUID>) {
+        guard isMarqueeSelecting else { return }
+        if marqueeFirstHitID == nil { marqueeFirstHitID = hitIDs.first }
+
+        let next: Set<UUID>
+        switch marqueeMode {
+        case .replace, .union:
+            next = marqueeBaseSelection.union(hitIDs)
+        case .toggle:
+            next = marqueeBaseSelection.symmetricDifference(hitIDs)
+        }
+
+        // Publishing redraws every ShelfItemView; this runs on every mouse-moved
+        // event, so only write when the set actually changed.
+        guard next != selectedIDs else { return }
+        selectedIDs = next
+    }
+
+    func endMarquee() {
+        guard isMarqueeSelecting else { return }
+        isMarqueeSelecting = false
+        marqueeBaseSelection = []
+        marqueePreviousSelection = []
+        // Anchor a following Shift-click somewhere sensible.
+        if let first = marqueeFirstHitID, selectedIDs.contains(first) {
+            lastAnchorID = first
+        } else if let anchor = lastAnchorID, selectedIDs.contains(anchor) {
+            // keep it
+        } else {
+            lastAnchorID = selectedIDs.first
+        }
+        marqueeFirstHitID = nil
+    }
+
+    /// Escape, or the view being torn down mid-drag: restore what was selected
+    /// before the band started.
+    func cancelMarquee() {
+        guard isMarqueeSelecting else { return }
+        isMarqueeSelecting = false
+        if selectedIDs != marqueePreviousSelection { selectedIDs = marqueePreviousSelection }
+        marqueeBaseSelection = []
+        marqueePreviousSelection = []
+        marqueeFirstHitID = nil
     }
 }

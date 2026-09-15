@@ -33,18 +33,22 @@ struct LikeTrackPresentation {
     let iconName: String
     /// Whether the track is currently liked (drives each view's active tint).
     let isActive: Bool
-    /// Whether the control should be non-interactive (liked-state unknown).
+    /// Whether the control should be non-interactive: the liked-state is
+    /// unknown, or the source will report it but not change it.
     let isDisabled: Bool
     /// Opacity to dim the control with while the liked-state is unknown.
     let dimmedOpacity: Double
 
-    init(isCurrentTrackLiked: Bool?) {
+    init(isCurrentTrackLiked: Bool?, isReadOnly: Bool = false) {
         let liked = isCurrentTrackLiked == true
         let unknown = isCurrentTrackLiked == nil
 
         iconName = liked ? "heart.fill" : "heart"
         isActive = liked
-        isDisabled = unknown
+        isDisabled = unknown || isReadOnly
+        // A read-only heart is not dimmed. It is showing a real answer, and
+        // dimming it would read as "not working" rather than "not yours to
+        // change from here".
         dimmedOpacity = unknown ? 0.4 : 1
     }
 }
@@ -82,7 +86,10 @@ struct LikeTrackControl<Content: View>: View {
     }
 
     var body: some View {
-        let presentation = LikeTrackPresentation(isCurrentTrackLiked: musicManager.isCurrentTrackLiked)
+        let presentation = LikeTrackPresentation(
+            isCurrentTrackLiked: musicManager.isCurrentTrackLiked,
+            isReadOnly: musicManager.activeSourceFavoritingIsReadOnly
+        )
 
         content(presentation) {
             MusicManager.shared.toggleLike()

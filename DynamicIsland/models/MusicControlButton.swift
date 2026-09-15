@@ -73,8 +73,13 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
         self == .airPlay
     }
 
-    /// Controls that are only available when Spotify is the active media source.
-    var isSpotifyExclusive: Bool {
+    /// Controls that need the playing source to support favouriting.
+    ///
+    /// This used to ask whether the source was Spotify, which was true only
+    /// because Spotify was the only source that could favourite. Apple Music
+    /// can too -- Music.app exposes it to AppleScript -- so the question is
+    /// what the source can do, not which one it is.
+    var requiresFavoriting: Bool {
         self == .likeTrack
     }
 
@@ -99,7 +104,7 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
         case .lyrics:
             return String(localized: "Lyrics")
         case .likeTrack:
-            return String(localized: "Like Song")
+            return String(localized: "Favorite Song")
         case .seekBackward:
             return String(localized: "Rewind 10s")
         case .seekForward:
@@ -144,11 +149,11 @@ enum MusicControlButton: String, CaseIterable, Identifiable, Codable, Defaults.S
 }
 
 extension Array where Element == MusicControlButton {
-    func normalized(allowingMediaOutput: Bool, isAppleMusicActive: Bool = true, isSpotifyActive: Bool = true) -> [MusicControlButton] {
+    func normalized(allowingMediaOutput: Bool, isAppleMusicActive: Bool = true, canFavorite: Bool = true) -> [MusicControlButton] {
         var sanitized = map { button -> MusicControlButton in
             if button == .mediaOutput && !allowingMediaOutput { return .none }
             if button.isAppleMusicExclusive && !isAppleMusicActive { return .none }
-            if button.isSpotifyExclusive && !isSpotifyActive { return .none }
+            if button.requiresFavoriting && !canFavorite { return .none }
             return button
         }
 

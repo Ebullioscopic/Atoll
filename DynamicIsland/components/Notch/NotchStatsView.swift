@@ -440,35 +440,35 @@ struct UnifiedStatsCard: View {
                     .foregroundStyle(Color.white.opacity(0.8))
                 
                 Spacer()
-                
-                // Show value on right for single graphs like boring.notch
+            }
+            
+            // Values section - same height for every card so the grid boxes match
+            Group {
                 if let singleData = graphData as? SingleGraphData {
                     Text(singleData.value)
                         .font(.caption) // Match boring.notch font size
                         .fontWeight(.bold)
                         .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                } else if let dualData = graphData as? DualGraphData {
+                    HStack(spacing: 6) {
+                        Text(dualData.positiveValue)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(dualData.positiveColor)
+                        
+                        Text("•")
+                            .font(.caption2)
+                            .foregroundStyle(Color.white.opacity(0.45))
+                        
+                        Text(dualData.negativeValue)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(dualData.negativeColor)
+                    }
                 }
             }
-            
-            // Values section for dual graphs only
-            if let dualData = graphData as? DualGraphData {
-                HStack(spacing: 6) {
-                    Text(dualData.positiveValue)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(dualData.positiveColor)
-                    
-                    Text("•")
-                        .font(.caption2)
-                        .foregroundStyle(Color.white.opacity(0.45))
-                    
-                    Text(dualData.negativeValue)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(dualData.negativeColor)
-                }
-                .frame(height: 18) // Smaller for dual graphs
-            }
+            .frame(height: 18) // Fixed height for the values section
             
             // Graph section - adapts based on graph type
             Group {

@@ -133,6 +133,18 @@ private struct ScrollMonitor: NSViewRepresentable {
                 return
             }
 
+            // Momentum is the tail of a flick the user has already let go of, not
+            // new input. A trackpad delivers a swipe as a run of touch events and
+            // then a run of momentum ones, and the gesture ends between the two --
+            // so the momentum was accumulating from zero against the same
+            // threshold the touch had just crossed, firing the action a second
+            // time. One swipe skipped two tracks.
+            //
+            // Discrete gestures read the touch, not the coast. The cost is that a
+            // very light flick that only used to reach the threshold once momentum
+            // carried it now needs a slightly longer swipe.
+            guard event.momentumPhase.isEmpty else { return }
+
             let s = direction.signed(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
             guard s.magnitude > noiseThreshold else { return }
             accumulated = s > 0 ? accumulated + s : 0
