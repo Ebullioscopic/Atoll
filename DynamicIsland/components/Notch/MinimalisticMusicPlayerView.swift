@@ -288,7 +288,7 @@ struct MinimalisticMusicPlayerView: View {
             height += 54 + 2         // controls + top padding
 
             if shouldReserveLyricsSpace {
-                height += 10 + 34 // lyrics padding + estimated height
+                height += 10 + 40 // lyrics padding + estimated height (increased for 2-line lyrics)
             }
             if shouldShowTimerCountdown {
                 height += minimalisticTimerCountdownBlockHeight
@@ -310,7 +310,7 @@ struct MinimalisticMusicPlayerView: View {
         height += 54 + 2         // controls + top padding
 
         if shouldReserveLyricsSpace {
-            height += 10 + 34
+            height += 10 + 40
         }
         if shouldShowTimerCountdown {
             height += minimalisticTimerCountdownBlockHeight
@@ -483,7 +483,7 @@ struct MinimalisticMusicPlayerView: View {
             }
         }
         .padding(.horizontal, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: 40, alignment: .topLeading)
         .animation(.smooth(duration: 0.32), value: line)
     }
     
