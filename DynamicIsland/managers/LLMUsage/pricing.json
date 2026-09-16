@@ -102,7 +102,7 @@
     },
     {
       "id": "anthropic/claude-opus-5",
-      "name": "Claude Opus 5",
+      "name": "Anthropic: Claude Opus 5",
       "pricing": {
         "prompt": "0.000005",
         "completion": "0.000025",
@@ -921,5 +921,5 @@
       }
     }
   ],
-  "last_updated": "2026-09-15T00:06:52Z"
+  "last_updated": "2026-09-16T00:06:21Z"
 }

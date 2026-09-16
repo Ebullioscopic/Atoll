@@ -870,7 +870,7 @@
         },
         "es": {
           "stringUnit": {
-            "state": "needs_review",
+            "state": "translated",
             "value": ""
           }
         },
@@ -1167,8 +1167,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": " %@"
           }
         },
         "fi": {
@@ -1318,8 +1318,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "-%@"
           }
         },
         "fi": {
@@ -1462,8 +1462,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "—"
           }
         },
         "fi": {
@@ -2360,8 +2360,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "%@ · %@"
           }
         },
         "fi": {
@@ -2508,8 +2508,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "%@ modelos"
           }
         },
         "fi": {
@@ -2657,8 +2657,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Desplazamiento de %@"
           }
         },
         "fi": {
@@ -2806,8 +2806,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "%@ pt"
           }
         },
         "fi": {
@@ -2950,8 +2950,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "%@°"
           }
         },
         "fi": {
@@ -3241,8 +3241,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "%lld"
           }
         },
         "fi": {
@@ -3385,8 +3385,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "%lld animaciones"
           }
         },
         "fi": {
@@ -3533,8 +3533,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "%lld colores"
           }
         },
         "fi": {
@@ -3682,8 +3682,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "%lld min"
           }
         },
         "fi": {
@@ -3831,8 +3831,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "%lld px"
           }
         },
         "fi": {
@@ -3980,8 +3980,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "%lld s"
           }
         },
         "fi": {
@@ -4271,8 +4271,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "%lldx"
           }
         },
         "fi": {
@@ -4420,8 +4420,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "•"
           }
         },
         "fi": {
@@ -4718,8 +4718,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "• Vidrio esmerilado: efecto de desenfoque translúcido"
           }
         },
         "fi": {
@@ -5027,8 +5027,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "• Vidrio líquido: efecto de vidrio moderno (macOS 26+)"
           }
         },
         "es-419": {
@@ -5342,8 +5342,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "• Sólido oscuro/claro/automático: fondos opacos"
           }
         },
         "es-419": {
@@ -5502,8 +5502,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "• Pensando"
           }
         },
         "es-419": {
@@ -5657,8 +5657,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "• Actualizado %@"
           }
         },
         "es-419": {
@@ -5811,8 +5811,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "••••••••"
           }
         },
         "fi": {
@@ -5954,8 +5954,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "+%lld más"
           }
         },
         "fi": {
@@ -6118,6 +6118,12 @@
             "state": "translated",
             "value": "⚠️ 警告：系統 HUD 可能無法正常工作！"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⚠️  ADVERTENCIA: es posible que el HUD del sistema no funcione correctamente"
+          }
         }
       }
     },
@@ -6158,6 +6164,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "⚠️ 錯誤："
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⚠️ Error:"
           }
         }
       }
@@ -6200,6 +6212,12 @@
             "state": "translated",
             "value": "🔋 最大容量"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🔋 Capacidad máxima"
+          }
         }
       }
     },
@@ -6241,6 +6259,12 @@
             "state": "translated",
             "value": "🕒 充滿所需時間："
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🕒 Tiempo para carga completa:"
+          }
         }
       }
     },
@@ -6279,8 +6303,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "0"
           }
         },
         "fi": {
@@ -6423,8 +6447,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "00:05:00"
           }
         },
         "fi": {
@@ -6566,8 +6590,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "1x"
           }
         },
         "fi": {
@@ -6714,8 +6738,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "3 elementos"
           }
         },
         "fi": {
@@ -6862,8 +6886,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "5 colores"
           }
         },
         "fi": {
@@ -7010,8 +7034,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "5 elementos"
           }
         },
         "fi": {
@@ -7158,8 +7182,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "7 elementos"
           }
         },
         "fi": {
@@ -7306,8 +7330,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "10 colores"
           }
         },
         "fi": {
@@ -7454,8 +7478,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "10 elementos"
           }
         },
         "fi": {
@@ -7602,8 +7626,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "15 colores"
           }
         },
         "fi": {
@@ -7750,8 +7774,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "20"
           }
         },
         "fi": {
@@ -7893,8 +7917,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "20 colores"
           }
         },
         "fi": {
@@ -8041,8 +8065,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "30"
           }
         },
         "fi": {
@@ -8185,8 +8209,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "100"
           }
         },
         "fi": {
@@ -8328,8 +8352,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "100%"
           }
         },
         "fi": {
@@ -8769,8 +8793,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Color de énfasis"
           }
         },
         "fi": {
@@ -9071,8 +9095,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Accesibilidad"
           }
         },
         "fi": {
@@ -9220,8 +9244,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Se requiere permiso de accesibilidad"
           }
         },
         "es-419": {
@@ -9380,8 +9404,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Acciones"
           }
         },
         "fi": {
@@ -9528,8 +9552,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activar"
           }
         },
         "fi": {
@@ -9676,8 +9700,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activa tu licencia"
           }
         },
         "fi": {
@@ -9824,8 +9848,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activación"
           }
         },
         "fi": {
@@ -9972,8 +9996,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activo"
           }
         },
         "fi": {
@@ -10120,8 +10144,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activo - Sin foco"
           }
         },
         "fi": {
@@ -10269,8 +10293,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activo - Sin grabación"
           }
         },
         "fi": {
@@ -10572,8 +10596,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Añadir animación desde URL"
           }
         },
         "fi": {
@@ -10720,8 +10744,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Añadir archivos"
           }
         },
         "fi": {
@@ -10869,8 +10893,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Añadir desde URL..."
           }
         },
         "fi": {
@@ -11167,8 +11191,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Añadir nueva"
           }
         },
         "fi": {
@@ -11464,8 +11488,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Añadir preajuste"
           }
         },
         "fi": {
@@ -11761,8 +11785,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ajusta las opciones anteriores para ver los cambios en tiempo real. El OSD real aparece en la parte inferior central de la pantalla."
           }
         },
         "es-419": {
@@ -11921,8 +11945,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Asistente de IA"
           }
         },
         "fi": {
@@ -12069,8 +12093,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "La IA está pensando..."
           }
         },
         "fi": {
@@ -12217,8 +12241,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Selección de modelo de IA"
           }
         },
         "fi": {
@@ -12365,8 +12389,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Proveedor de IA"
           }
         },
         "es-419": {
@@ -12519,8 +12543,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Asistente con IA que puede analizar archivos, imágenes y ofrecer ayuda conversacional. Usa Cmd+Shift+A para acceder rápidamente al asistente."
           }
         },
         "es-419": {
@@ -12680,8 +12704,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Índice de calidad del aire %d, %@"
           }
         },
         "es-419": {
@@ -12834,8 +12858,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "La calidad del aire requiere el proveedor Open Meteo."
           }
         },
         "es-419": {
@@ -12988,8 +13012,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Escala de calidad del aire"
           }
         },
         "es-419": {
@@ -13735,8 +13759,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "ALFA"
           }
         },
         "fi": {
@@ -13879,8 +13903,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Advertencia de función alfa"
           }
         },
         "fi": {
@@ -14323,8 +14347,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Amazon Music"
           }
         },
         "fi": {
@@ -14471,8 +14495,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Animación"
           }
         },
         "fi": {
@@ -14620,8 +14644,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Nombre de la animación"
           }
         },
         "fi": {
@@ -14768,8 +14792,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Configuración de la API"
           }
         },
         "fi": {
@@ -14916,8 +14940,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Se requiere clave de API"
           }
         },
         "fi": {
@@ -15364,6 +15388,12 @@
             "state": "translated",
             "value": "外觀"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "apariencia"
+          }
         }
       }
     },
@@ -15393,6 +15423,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "空氣品質指數"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ICA"
           }
         }
       }
@@ -15432,8 +15468,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "¿Seguro que quieres eliminar \"%@\"?"
           }
         },
         "fi": {
@@ -15746,8 +15782,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Pregúntame lo que quieras..."
           }
         },
         "fi": {
@@ -15894,8 +15930,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Atoll"
           }
         },
         "fi": {
@@ -16046,6 +16082,12 @@
             "state": "translated",
             "value": "Atoll 需要權限來儲存和讀取 AI 助理檔案。"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atoll necesita acceso para guardar y leer archivos del asistente de IA."
+          }
         }
       }
     },
@@ -16086,6 +16128,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Atoll 需要權限將截圖儲存到桌面。"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atoll necesita acceso para guardar capturas de pantalla en tu escritorio."
           }
         }
       }
@@ -16134,6 +16182,12 @@
             "state": "translated",
             "value": "Atoll 需要藍牙存取權限來偵測音訊裝置連線並在 HUD 中顯示其電池狀態。"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atoll necesita acceso a Bluetooth para detectar cuándo se conectan dispositivos de audio y mostrar su estado de batería en el HUD."
+          }
         }
       }
     },
@@ -16181,6 +16235,12 @@
             "state": "translated",
             "value": "Atoll 使用 AppleScript 控制 Spotify 和 Apple Music"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atoll usa AppleScripts para controlar Spotify y Apple Music"
+          }
         }
       }
     },
@@ -16218,8 +16278,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Archivos adjuntos"
           }
         },
         "fi": {
@@ -16367,8 +16427,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Desplazar automáticamente al siguiente evento"
           }
         },
         "fi": {
@@ -16827,6 +16887,12 @@
             "state": "translated",
             "value": "自動切換顯示器"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiar de pantalla automáticamente"
+          }
         }
       }
     },
@@ -16865,8 +16931,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Promedios"
           }
         },
         "fi": {
@@ -17014,8 +17080,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Retroiluminación"
           }
         },
         "fi": {
@@ -17311,8 +17377,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Batería al %d por ciento"
           }
         },
         "fi": {
@@ -17460,8 +17526,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Batería cargando"
           }
         },
         "fi": {
@@ -17609,8 +17675,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Cargando batería, quedan %@"
           }
         },
         "fi": {
@@ -17758,8 +17824,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Batería completamente cargada"
           }
         },
         "fi": {
@@ -18499,8 +18565,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Dispositivos de audio Bluetooth"
           }
         },
         "fi": {
@@ -18648,8 +18714,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Dispositivo Bluetooth %@ al %d por ciento"
           }
         },
         "fi": {
@@ -18950,8 +19016,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ambos"
           }
         },
         "fi": {
@@ -19098,8 +19164,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Relleno inferior:"
           }
         },
         "fi": {
@@ -19247,8 +19313,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Desglose"
           }
         },
         "fi": {
@@ -19396,8 +19462,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Brillo"
           }
         },
         "fi": {
@@ -19544,8 +19610,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "HUD de brillo"
           }
         },
         "fi": {
@@ -19693,8 +19759,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "OSD de brillo"
           }
         },
         "fi": {
@@ -19842,8 +19908,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Integrado"
           }
         },
         "fi": {
@@ -19991,8 +20057,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Monitoreo del sistema integrado"
           }
         },
         "fi": {
@@ -20900,8 +20966,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Calendarios"
           }
         },
         "fi": {
@@ -21049,8 +21115,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Cámara"
           }
         },
         "fi": {
@@ -21197,8 +21263,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Cámara activa"
           }
         },
         "fi": {
@@ -21355,6 +21421,12 @@
             "state": "translated",
             "value": "相機正被某個 App 使用"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una aplicación está usando la cámara"
+          }
         }
       }
     },
@@ -21392,8 +21464,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estado de la cámara"
           }
         },
         "fi": {
@@ -21688,8 +21760,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Centro"
           }
         },
         "fi": {
@@ -21836,8 +21908,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Cambiar"
           }
         },
         "fi": {
@@ -22430,8 +22502,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Color del chip"
           }
         },
         "fi": {
@@ -22881,8 +22953,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Elegir modelo de IA"
           }
         },
         "fi": {
@@ -23184,8 +23256,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Elegir archivo"
           }
         },
         "fi": {
@@ -23630,8 +23702,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Elige tu modelo de IA y configuración preferidos"
           }
         },
         "fi": {
@@ -23785,8 +23857,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Elige tu perfil"
           }
         },
         "fi": {
@@ -24082,8 +24154,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Borrar"
           }
         },
         "fi": {
@@ -24230,8 +24302,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Borrar todos los archivos"
           }
         },
         "fi": {
@@ -24526,8 +24598,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Borrar historial del portapapeles"
           }
         },
         "fi": {
@@ -24822,8 +24894,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Borrar historial de colores"
           }
         },
         "fi": {
@@ -25118,8 +25190,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Borrar datos"
           }
         },
         "fi": {
@@ -25266,8 +25338,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Borrar elementos fijados"
           }
         },
         "fi": {
@@ -25415,8 +25487,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Borrar búsqueda"
           }
         },
         "fi": {
@@ -25563,8 +25635,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Haz clic en \"Elegir color\" o usa Cmd+Shift+P para empezar a elegir colores"
           }
         },
         "fi": {
@@ -25712,8 +25784,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Haz clic para más detalles"
           }
         },
         "fi": {
@@ -25860,8 +25932,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Portapapeles"
           }
         },
         "fi": {
@@ -26008,8 +26080,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "La función de portapapeles está desactivada"
           }
         },
         "fi": {
@@ -26156,8 +26228,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Historial del portapapeles"
           }
         },
         "fi": {
@@ -26304,8 +26376,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Historial del portapapeles:"
           }
         },
         "fi": {
@@ -26452,8 +26524,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Administrador del portapapeles"
           }
         },
         "fi": {
@@ -26748,8 +26820,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Cerrar asistente"
           }
         },
         "fi": {
@@ -26900,6 +26972,12 @@
             "state": "translated",
             "value": "關閉手勢"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gesto para cerrar"
+          }
         }
       }
     },
@@ -26938,8 +27016,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Recopila el último informe de fallos para compartirlo con el desarrollador al reportar problemas de la pantalla de bloqueo o la superposición."
           }
         },
         "fi": {
@@ -27086,8 +27164,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Detalles del color"
           }
         },
         "fi": {
@@ -27234,8 +27312,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Formatos de color"
           }
         },
         "fi": {
@@ -27382,8 +27460,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Historial de colores"
           }
         },
         "fi": {
@@ -27531,8 +27609,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Las opciones de color controlan el aspecto del ícono y la barra de progreso. \"Automático\" se adapta al tema del sistema."
           }
         },
         "fi": {
@@ -27685,8 +27763,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "¡Color elegido!"
           }
         },
         "fi": {
@@ -27833,8 +27911,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Selector de color"
           }
         },
         "fi": {
@@ -27981,8 +28059,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "La función de selector de color está desactivada"
           }
         },
         "fi": {
@@ -28129,8 +28207,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Panel del selector de color:"
           }
         },
         "fi": {
@@ -28280,6 +28358,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "彩色電池顯示"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indicador de batería con código de colores"
           }
         }
       }
@@ -28480,8 +28564,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Barras de progreso con código de colores"
           }
         },
         "fi": {
@@ -28634,8 +28718,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Selector de color desactivado"
           }
         },
         "fi": {
@@ -28930,8 +29014,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Configuración"
           }
         },
         "fi": {
@@ -29400,8 +29484,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Configura los preajustes en Ajustes"
           }
         },
         "fi": {
@@ -29549,8 +29633,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Conectado"
           }
         },
         "fi": {
@@ -29694,6 +29778,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "容器"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contenedor"
           }
         }
       }
@@ -30040,8 +30130,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Controles"
           }
         },
         "fi": {
@@ -30670,8 +30760,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Copiar enlace del evento"
           }
         },
         "fi": {
@@ -30818,8 +30908,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Copiar último informe de fallos"
           }
         },
         "fi": {
@@ -30966,8 +31056,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Copia algo para empezar"
           }
         },
         "fi": {
@@ -31114,8 +31204,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Copia algo para empezar"
           }
         },
         "fi": {
@@ -31263,8 +31353,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Núcleo %lld"
           }
         },
         "fi": {
@@ -31414,6 +31504,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "圓角縮放"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escalado del radio de las esquinas"
           }
         }
       }
@@ -31601,8 +31697,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Uso de CPU"
           }
         },
         "fi": {
@@ -31750,8 +31846,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Temporizador personalizado actual:"
           }
         },
         "fi": {
@@ -31899,8 +31995,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Predeterminado actual:"
           }
         },
         "fi": {
@@ -32047,8 +32143,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Historial actual"
           }
         },
         "fi": {
@@ -32195,8 +32291,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Elementos actuales"
           }
         },
         "fi": {
@@ -32344,8 +32440,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Actualmente activa"
           }
         },
         "fi": {
@@ -32492,8 +32588,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Personalizado"
           }
         },
         "fi": {
@@ -32641,8 +32737,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Color personalizado"
           }
         },
         "fi": {
@@ -33234,8 +33330,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "OSD personalizado"
           }
         },
         "fi": {
@@ -33858,8 +33954,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Temporizador personalizado"
           }
         },
         "fi": {
@@ -34007,8 +34103,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Duración del temporizador personalizado"
           }
         },
         "fi": {
@@ -34303,8 +34399,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Personalizado: %@"
           }
         },
         "fi": {
@@ -34451,8 +34547,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Personalizar animación"
           }
         },
         "fi": {
@@ -34896,8 +34992,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Temporizador personalizado predeterminado"
           }
         },
         "fi": {
@@ -35044,8 +35140,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Predeterminado: dynamic.m4a"
           }
         },
         "fi": {
@@ -35192,8 +35288,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Eliminar"
           }
         },
         "fi": {
@@ -35341,8 +35437,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Eliminar animación"
           }
         },
         "fi": {
@@ -35489,8 +35585,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Eliminar color"
           }
         },
         "fi": {
@@ -35790,6 +35886,12 @@
             "state": "translated",
             "value": "詳細檢視"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vista de detalle"
+          }
         }
       }
     },
@@ -35828,8 +35930,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estado de detección"
           }
         },
         "fi": {
@@ -35977,8 +36079,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Diagnóstico"
           }
         },
         "fi": {
@@ -36577,8 +36679,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Lectura de disco"
           }
         },
         "fi": {
@@ -36725,8 +36827,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Escritura de disco"
           }
         },
         "fi": {
@@ -37034,8 +37136,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Modo de visualización"
           }
         },
         "fi": {
@@ -37182,8 +37284,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Opciones de visualización"
           }
         },
         "fi": {
@@ -37651,8 +37753,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "No molestar"
           }
         },
         "fi": {
@@ -37947,8 +38049,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estilo del ícono de descarga"
           }
         },
         "fi": {
@@ -38095,8 +38197,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estilo del indicador de descarga"
           }
         },
         "fi": {
@@ -38243,8 +38345,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Indicadores de descarga"
           }
         },
         "fi": {
@@ -38394,6 +38496,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "下載"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "descargas"
           }
         }
       }
@@ -38888,8 +38996,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "dynamic.island"
           }
         },
         "fi": {
@@ -39195,6 +39303,12 @@
             "state": "translated",
             "value": "歐洲空氣品質指數"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ICAE"
+          }
         }
       }
     },
@@ -39392,8 +39506,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Editar animación"
           }
         },
         "fi": {
@@ -39688,8 +39802,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Dirección de correo electrónico"
           }
         },
         "fi": {
@@ -40159,8 +40273,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activar de todos modos"
           }
         },
         "fi": {
@@ -40311,6 +40425,12 @@
             "state": "translated",
             "value": "啟用專輯封面後的模糊效果"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar efecto de desenfoque detrás de la portada del álbum"
+          }
         }
       }
     },
@@ -40355,8 +40475,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activar HUD del sistema integrado"
           }
         },
         "fi": {
@@ -40667,6 +40787,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "啟用相機偵測"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar detección de cámara"
           }
         }
       }
@@ -41003,8 +41129,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activar OSD personalizado"
           }
         },
         "fi": {
@@ -41155,6 +41281,12 @@
             "state": "translated",
             "value": "啟用動態鏡像"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar espejo dinámico"
+          }
         }
       }
     },
@@ -41195,6 +41327,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "啟用手勢"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar gestos"
           }
         }
       }
@@ -41239,8 +41377,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activa los atajos de teclado globales arriba para personalizarlos."
           }
         },
         "fi": {
@@ -41388,8 +41526,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activa la visibilidad de gráficos en Ajustes → Estadísticas para ver los datos de rendimiento."
           }
         },
         "fi": {
@@ -41835,8 +41973,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activar HUDs"
           }
         },
         "fi": {
@@ -41987,6 +42125,12 @@
             "state": "translated",
             "value": "啟用歌詞"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar letras"
+          }
         }
       }
     },
@@ -42027,6 +42171,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "啟用媒體 "
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar reproductor multimedia"
           }
         }
       }
@@ -42069,6 +42219,12 @@
             "state": "translated",
             "value": "啟用媒體面板模糊"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar desenfoque del panel multimedia"
+          }
         }
       }
     },
@@ -42109,6 +42265,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "啟用麥克風偵測"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar detección de micrófono"
           }
         }
       }
@@ -42298,6 +42460,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "啟用提醒即時動態"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar actividad en vivo de recordatorios"
           }
         }
       }
@@ -42494,6 +42662,12 @@
             "state": "translated",
             "value": "啟用螢幕錄製偵測"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar detección de grabación de pantalla"
+          }
         }
       }
     },
@@ -42531,8 +42705,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activar vista previa rápida"
           }
         },
         "fi": {
@@ -42994,8 +43168,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activar modo de razonamiento"
           }
         },
         "fi": {
@@ -43146,6 +43320,12 @@
             "state": "translated",
             "value": "啟用計時器模糊"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar desenfoque del temporizador"
+          }
         }
       }
     },
@@ -43183,8 +43363,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activa la función de temporizador en Ajustes para usar esta pestaña"
           }
         },
         "fi": {
@@ -43331,8 +43511,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Activar actividad en vivo del temporizador"
           }
         },
         "fi": {
@@ -43483,6 +43663,12 @@
             "state": "translated",
             "value": "啟用視窗陰影"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar sombra de ventana"
+          }
         }
       }
     },
@@ -43521,8 +43707,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Uso del motor"
           }
         },
         "fi": {
@@ -43965,8 +44151,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Introduce tu clave de API de Gemini"
           }
         },
         "fi": {
@@ -44262,8 +44448,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Lista de eventos"
           }
         },
         "fi": {
@@ -44410,8 +44596,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Excluir aplicaciones"
           }
         },
         "fi": {
@@ -44706,8 +44892,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Expandir el notch con animación"
           }
         },
         "fi": {
@@ -44855,8 +45041,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ancho del notch expandido"
           }
         },
         "fi": {
@@ -45006,6 +45192,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "延伸功能瀏海範圍，使剪貼簿、取色器和其他尾部圖示在縮放顯示（如更多空間）上保持可見。"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extiende el ancho del notch para que el portapapeles, el selector de color y otros íconos finales sigan visibles en pantallas con escalado (p. ej. Más espacio)."
           }
         }
       }
@@ -45194,8 +45386,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Externo"
           }
         },
         "fi": {
@@ -45346,6 +45538,12 @@
             "state": "translated",
             "value": "讀取崩潰報告失敗："
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudieron leer los informes de fallos:"
+          }
         }
       }
     },
@@ -45383,8 +45581,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Rellenar el notch"
           }
         },
         "fi": {
@@ -45679,8 +45877,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ajustar al notch"
           }
         },
         "fi": {
@@ -45827,8 +46025,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estado del foco"
           }
         },
         "fi": {
@@ -45976,8 +46174,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Libre · %@"
           }
         },
         "fi": {
@@ -46125,8 +46323,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Completamente cargada"
           }
         },
         "fi": {
@@ -46273,8 +46471,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Clave de API de Gemini"
           }
         },
         "fi": {
@@ -47013,8 +47211,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Obtén tu clave de API gratuita en Google AI Studio"
           }
         },
         "fi": {
@@ -47457,8 +47655,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Uso de GPU"
           }
         },
         "fi": {
@@ -48073,8 +48271,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Visibilidad de gráficos"
           }
         },
         "fi": {
@@ -48221,8 +48419,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Altura:"
           }
         },
         "fi": {
@@ -48369,8 +48567,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ocultar"
           }
         },
         "fi": {
@@ -48518,8 +48716,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ocultar eventos de todo el día"
           }
         },
         "fi": {
@@ -48667,8 +48865,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ocultar recordatorios completados"
           }
         },
         "fi": {
@@ -48815,8 +49013,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ocultar opciones de Dynamic Island"
           }
         },
         "fi": {
@@ -48964,8 +49162,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ocultar del notch"
           }
         },
         "fi": {
@@ -49705,8 +49903,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Tamaño del historial"
           }
         },
         "fi": {
@@ -49853,8 +50051,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Horizontal:"
           }
         },
         "fi": {
@@ -50002,8 +50200,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "https://ejemplo.com/animacion.json"
           }
         },
         "fi": {
@@ -50751,8 +50949,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Color del ícono y del progreso"
           }
         },
         "fi": {
@@ -50900,8 +51098,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Inactivo"
           }
         },
         "fi": {
@@ -51197,8 +51395,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Importar"
           }
         },
         "fi": {
@@ -51346,8 +51544,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Error de importación"
           }
         },
         "fi": {
@@ -51495,8 +51693,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Importar archivo..."
           }
         },
         "fi": {
@@ -51791,8 +51989,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Inactivo"
           }
         },
         "fi": {
@@ -52087,8 +52285,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Vista previa integrada"
           }
         },
         "fi": {
@@ -52534,8 +52732,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "IPv4 · %@"
           }
         },
         "fi": {
@@ -52678,8 +52876,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "IPv6 · %@"
           }
         },
         "fi": {
@@ -52825,6 +53023,12 @@
             "state": "translated",
             "value": "金鑰"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tecla"
+          }
         }
       }
     },
@@ -52859,6 +53063,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "金鑰 1"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tecla 1"
           }
         }
       }
@@ -53194,8 +53404,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Los atajos de teclado están desactivados"
           }
         },
         "fi": {
@@ -53342,8 +53552,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Última actualización"
           }
         },
         "fi": {
@@ -53642,6 +53852,12 @@
             "state": "translated",
             "value": "登入時啟動"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar al arrancar sesión"
+          }
         }
       }
     },
@@ -53680,8 +53896,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Diseño"
           }
         },
         "fi": {
@@ -53828,8 +54044,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Clave de licencia"
           }
         },
         "fi": {
@@ -53976,8 +54192,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "LinkedIn"
           }
         },
         "fi": {
@@ -54119,8 +54335,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Vidrio líquido requiere macOS 26 o posterior."
           }
         },
         "fi": {
@@ -54273,8 +54489,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Detecta cambios de sesión de Foco mediante notificaciones distribuidas"
           }
         },
         "fi": {
@@ -54422,8 +54638,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "EN VIVO"
           }
         },
         "fi": {
@@ -54571,8 +54787,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Actividades en vivo"
           }
         },
         "fi": {
@@ -54720,8 +54936,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Actividad en vivo y comentarios"
           }
         },
         "fi": {
@@ -54869,8 +55085,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Monitoreo en vivo"
           }
         },
         "fi": {
@@ -55017,8 +55233,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Datos de rendimiento en vivo"
           }
         },
         "fi": {
@@ -55166,8 +55382,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Vista previa en vivo"
           }
         },
         "fi": {
@@ -55315,8 +55531,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Indicador de transmisión en vivo"
           }
         },
         "fi": {
@@ -55464,8 +55680,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Carga promedio"
           }
         },
         "fi": {
@@ -55612,8 +55828,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Pantalla de bloqueo"
           }
         },
         "fi": {
@@ -55760,8 +55976,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Integración con la pantalla de bloqueo"
           }
         },
         "fi": {
@@ -55909,8 +56125,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Vista previa del panel de la pantalla de bloqueo"
           }
         },
         "fi": {
@@ -56058,8 +56274,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Posicionamiento en la pantalla de bloqueo"
           }
         },
         "fi": {
@@ -56207,8 +56423,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Widget de recordatorios en la pantalla de bloqueo"
           }
         },
         "fi": {
@@ -56348,6 +56564,12 @@
             "state": "translated",
             "value": "鎖定畫面"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pantallaDeBloqueo"
+          }
         }
       }
     },
@@ -56385,8 +56607,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Modo de repetición"
           }
         },
         "fi": {
@@ -56533,8 +56755,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Modo de repetición:"
           }
         },
         "fi": {
@@ -57127,8 +57349,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Batería del Mac al %d por ciento"
           }
         },
         "fi": {
@@ -57276,8 +57498,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Se requiere macOS 15 o posterior"
           }
         },
         "fi": {
@@ -57431,8 +57653,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Hecho con ❤️ por Ebullioscopic"
           }
         },
         "fi": {
@@ -57586,8 +57808,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Administra las preferencias del indicador desde Ajustes → Privacidad. No es necesario activar el micrófono manualmente."
           }
         },
         "fi": {
@@ -57740,8 +57962,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Administra el temporizador desde la app Reloj."
           }
         },
         "fi": {
@@ -57889,8 +58111,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Marcar como completado"
           }
         },
         "fi": {
@@ -58038,8 +58260,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Marcar como incompleto"
           }
         },
         "fi": {
@@ -58483,8 +58705,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Material"
           }
         },
         "fi": {
@@ -58632,8 +58854,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Opciones de material:"
           }
         },
         "fi": {
@@ -59522,8 +59744,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Actividad en vivo multimedia"
           }
         },
         "fi": {
@@ -59671,8 +59893,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Salida multimedia"
           }
         },
         "fi": {
@@ -59820,8 +60042,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Panel multimedia"
           }
         },
         "fi": {
@@ -60413,8 +60635,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Uso de memoria"
           }
         },
         "fi": {
@@ -60860,8 +61082,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Micrófono silenciado"
           }
         },
         "fi": {
@@ -61009,8 +61231,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Micrófono activado"
           }
         },
         "fi": {
@@ -61158,8 +61380,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Micrófono"
           }
         },
         "fi": {
@@ -61306,8 +61528,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Micrófono activo"
           }
         },
         "fi": {
@@ -61458,6 +61680,12 @@
             "state": "translated",
             "value": "麥克風正被某個 App 使用"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una aplicación está usando el micrófono"
+          }
         }
       }
     },
@@ -61502,8 +61730,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "El indicador de privacidad del micrófono se activa automáticamente cuando las apps acceden al audio."
           }
         },
         "fi": {
@@ -61656,8 +61884,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estado del micrófono"
           }
         },
         "fi": {
@@ -61804,8 +62032,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "mín"
           }
         },
         "fi": {
@@ -61958,8 +62186,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "El modo minimalista se centra en los controles multimedia y los HUD del sistema, ocultando todas las funciones adicionales para una experiencia limpia y enfocada. Activa automáticamente animaciones más simples."
           }
         },
         "fi": {
@@ -62261,8 +62489,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Minutos"
           }
         },
         "fi": {
@@ -62703,6 +62931,12 @@
             "state": "translated",
             "value": "同步系統計時器"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reflejar el temporizador del sistema"
+          }
         }
       }
     },
@@ -62746,8 +62980,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Refleja el interruptor de los ajustes de la pantalla de bloqueo, para que los flujos específicos del temporizador puedan activar o desactivar el widget sin cambiar de pestaña."
           }
         },
         "fi": {
@@ -63060,8 +63294,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Comportamiento del monitoreo"
           }
         },
         "fi": {
@@ -63208,8 +63442,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estado del monitoreo"
           }
         },
         "fi": {
@@ -63357,8 +63591,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Monitoreo detenido"
           }
         },
         "fi": {
@@ -63654,8 +63888,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mover hacia abajo"
           }
         },
         "fi": {
@@ -63803,8 +64037,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mover hacia arriba"
           }
         },
         "fi": {
@@ -64248,8 +64482,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mi animación"
           }
         },
         "fi": {
@@ -64544,8 +64778,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Navegación"
           }
         },
         "fi": {
@@ -64840,8 +65074,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Descarga de red"
           }
         },
         "fi": {
@@ -64988,8 +65222,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Subida de red"
           }
         },
         "fi": {
@@ -65285,8 +65519,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Aún no se detectan interfaces activas."
           }
         },
         "fi": {
@@ -65434,8 +65668,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "No hay salidas de audio disponibles"
           }
         },
         "fi": {
@@ -65582,8 +65816,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Sin historial del portapapeles"
           }
         },
         "fi": {
@@ -65730,8 +65964,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "No se encontraron colores"
           }
         },
         "fi": {
@@ -65878,8 +66112,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ningún color coincide con '%@'"
           }
         },
         "fi": {
@@ -66026,8 +66260,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Aún no hay colores"
           }
         },
         "fi": {
@@ -66471,8 +66705,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Sin eventos"
           }
         },
         "fi": {
@@ -66767,8 +67001,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "No hay aplicaciones excluidas"
           }
         },
         "fi": {
@@ -66916,8 +67150,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Sin exclusiones"
           }
         },
         "fi": {
@@ -67213,8 +67447,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Sin favoritos"
           }
         },
         "fi": {
@@ -67362,8 +67596,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "No hay gráficos activados"
           }
         },
         "fi": {
@@ -67517,8 +67751,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "No hay preajustes configurados. Añade uno para que aparezca en el menú del temporizador."
           }
         },
         "fi": {
@@ -67678,8 +67912,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Aún no hay datos de procesos. Mantén las estadísticas abiertas un momento."
           }
         },
         "fi": {
@@ -67826,8 +68060,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Sin resultados"
           }
         },
         "fi": {
@@ -67974,8 +68208,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "No se encontraron resultados"
           }
         },
         "fi": {
@@ -68123,8 +68357,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Aún no se detectan dispositivos de almacenamiento."
           }
         },
         "fi": {
@@ -68420,8 +68654,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "No activa"
           }
         },
         "fi": {
@@ -68716,8 +68950,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Sin configurar"
           }
         },
         "fi": {
@@ -69309,8 +69543,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ancho del notch"
           }
         },
         "fi": {
@@ -69458,8 +69692,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Avisar con antelación"
           }
         },
         "fi": {
@@ -69902,8 +70136,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Solo el ícono de la app"
           }
         },
         "fi": {
@@ -70050,8 +70284,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Solo el ícono de descarga"
           }
         },
         "fi": {
@@ -70198,8 +70432,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Opacidad:"
           }
         },
         "fi": {
@@ -70346,8 +70580,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Abrir Google AI Studio"
           }
         },
         "fi": {
@@ -70501,8 +70735,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Abrir en Calendario"
           }
         },
         "fi": {
@@ -70649,8 +70883,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Abrir ajustes del modelo"
           }
         },
         "fi": {
@@ -70807,6 +71041,12 @@
             "state": "translated",
             "value": "懸停時開啟瀏海"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir el notch al pasar el cursor"
+          }
         }
       }
     },
@@ -70845,8 +71085,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Abrir ajustes"
           }
         },
         "fi": {
@@ -70993,8 +71233,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Abrir ajustes del sistema"
           }
         },
         "fi": {
@@ -71153,8 +71393,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Abre el panel del asistente de IA para analizar archivos y conversar. El atajo predeterminado es Cmd+Shift+A. Solo funciona si la función de asistente en pantalla está activada."
           }
         },
         "fi": {
@@ -71313,8 +71553,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Abre el panel de historial del portapapeles. El atajo predeterminado es Cmd+Shift+V (similar a Windows+V en PC). Solo funciona si la función de portapapeles está activada."
           }
         },
         "fi": {
@@ -71473,8 +71713,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Abre el panel del selector de color para capturar colores de la pantalla. El atajo predeterminado es Cmd+Shift+P. Solo funciona si la función de selector de color está activada."
           }
         },
         "fi": {
@@ -71628,8 +71868,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Dispositivos de salida"
           }
         },
         "fi": {
@@ -71777,8 +72017,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Volumen de salida"
           }
         },
         "fi": {
@@ -71931,8 +72171,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "El modo panel muestra el portapapeles en una ventana flotante cerca del notch. El modo menú emergente lo muestra como un desplegable adjunto al botón del portapapeles."
           }
         },
         "fi": {
@@ -72091,8 +72331,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "El modo panel muestra el selector de color en una ventana flotante. El modo menú emergente lo muestra como un desplegable adjunto al botón del selector de color."
           }
         },
         "fi": {
@@ -72251,8 +72491,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "El modo panel muestra el asistente en una ventana flotante cerca del notch. El modo menú emergente lo muestra como un desplegable adjunto al botón de IA."
           }
         },
         "fi": {
@@ -72405,8 +72645,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Pausar"
           }
         },
         "fi": {
@@ -72553,8 +72793,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Pausado"
           }
         },
         "fi": {
@@ -72701,8 +72941,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Porcentaje"
           }
         },
         "fi": {
@@ -72849,8 +73089,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Permisos"
           }
         },
         "fi": {
@@ -72997,8 +73237,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Elegir color"
           }
         },
         "fi": {
@@ -73145,8 +73385,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Elegido %@"
           }
         },
         "fi": {
@@ -73293,8 +73533,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Color elegido"
           }
         },
         "fi": {
@@ -73441,8 +73681,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estado de selección"
           }
         },
         "fi": {
@@ -73737,8 +73977,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Fija elementos para añadirlos a favoritos"
           }
         },
         "fi": {
@@ -73885,8 +74125,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Fija elementos para añadirlos a favoritos"
           }
         },
         "fi": {
@@ -74033,8 +74273,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Elementos fijados"
           }
         },
         "fi": {
@@ -74486,6 +74726,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "加"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "más"
           }
         }
       }
@@ -75004,8 +75250,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Posición"
           }
         },
         "fi": {
@@ -75153,8 +75399,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Nombre del preajuste"
           }
         },
         "fi": {
@@ -75302,8 +75548,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Preajustes"
           }
         },
         "fi": {
@@ -75612,8 +75858,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Presión"
           }
         },
         "fi": {
@@ -75760,8 +76006,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Vista previa"
           }
         },
         "fi": {
@@ -75908,8 +76154,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Zoom de la vista previa:"
           }
         },
         "fi": {
@@ -76057,8 +76303,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Indicadores de privacidad"
           }
         },
         "fi": {
@@ -76206,8 +76452,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Política de privacidad"
           }
         },
         "fi": {
@@ -76354,8 +76600,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Barra de progreso"
           }
         },
         "fi": {
@@ -76502,8 +76748,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estilo de progreso"
           }
         },
         "fi": {
@@ -76798,8 +77044,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Acciones rápidas"
           }
         },
         "fi": {
@@ -76946,8 +77192,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Preajustes rápidos"
           }
         },
         "fi": {
@@ -77095,8 +77341,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Inicio rápido"
           }
         },
         "fi": {
@@ -77540,8 +77786,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Salir de boring.notch"
           }
         },
         "fi": {
@@ -77689,8 +77935,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Lectura"
           }
         },
         "fi": {
@@ -77837,8 +78083,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Listo"
           }
         },
         "fi": {
@@ -77985,8 +78231,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Modo de razonamiento"
           }
         },
         "fi": {
@@ -78133,8 +78379,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Colores recientes"
           }
         },
         "fi": {
@@ -78281,8 +78527,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Grabando"
           }
         },
         "fi": {
@@ -78430,8 +78676,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Grabación detectada"
           }
         },
         "fi": {
@@ -78578,8 +78824,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estado de grabación"
           }
         },
         "fi": {
@@ -79023,8 +79269,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Actividad en vivo de recordatorios"
           }
         },
         "fi": {
@@ -79171,8 +79417,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Recordatorios"
           }
         },
         "fi": {
@@ -79474,8 +79720,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Solicitar acceso"
           }
         },
         "fi": {
@@ -79622,8 +79868,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Restablecer"
           }
         },
         "fi": {
@@ -79770,8 +80016,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Restablecer todo"
           }
         },
         "fi": {
@@ -79922,6 +80168,12 @@
             "state": "translated",
             "value": "重置音樂"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restablecer música"
+          }
         }
       }
     },
@@ -79963,6 +80215,12 @@
             "state": "translated",
             "value": "重置計時器"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restablecer temporizador"
+          }
         }
       }
     },
@@ -80000,8 +80258,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Restablecer al valor predeterminado"
           }
         },
         "fi": {
@@ -80152,6 +80410,12 @@
             "state": "translated",
             "value": "重置天氣"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restablecer clima"
+          }
         }
       }
     },
@@ -80190,8 +80454,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Restablecer ancho"
           }
         },
         "fi": {
@@ -80487,8 +80751,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Reiniciar Atoll"
           }
         },
         "fi": {
@@ -80636,8 +80900,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Restaurar"
           }
         },
         "fi": {
@@ -80934,8 +81198,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Restaurar valores predeterminados"
           }
         },
         "fi": {
@@ -81082,8 +81346,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Reanudar"
           }
         },
         "fi": {
@@ -81230,8 +81494,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Rotación:"
           }
         },
         "fi": {
@@ -81675,8 +81939,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Guardar"
           }
         },
         "fi": {
@@ -81823,8 +82087,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Guardar cambios"
           }
         },
         "fi": {
@@ -81971,8 +82235,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Guardar configuración"
           }
         },
         "fi": {
@@ -82119,8 +82383,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Reducir escala"
           }
         },
         "fi": {
@@ -82267,8 +82531,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Aumentar escala 2x"
           }
         },
         "fi": {
@@ -82415,8 +82679,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Escala:"
           }
         },
         "fi": {
@@ -82563,8 +82827,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Asistente en pantalla"
           }
         },
         "fi": {
@@ -82711,8 +82975,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "La función de asistente en pantalla está desactivada"
           }
         },
         "fi": {
@@ -82861,8 +83125,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Asistente en pantalla:"
           }
         },
         "fi": {
@@ -83007,6 +83271,12 @@
             "state": "translated",
             "value": "螢幕邊距：%@畫素"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relleno de pantalla: %@px"
+          }
         }
       }
     },
@@ -83044,8 +83314,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Grabación de pantalla"
           }
         },
         "fi": {
@@ -83192,8 +83462,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Opciones de captura de pantalla"
           }
         },
         "fi": {
@@ -83340,8 +83610,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Tipo de captura de pantalla"
           }
         },
         "fi": {
@@ -83492,6 +83762,12 @@
             "state": "translated",
             "value": "在 HUD 中滾動顯示裝置名稱"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desplazar el nombre del dispositivo en el HUD"
+          }
         }
       }
     },
@@ -83529,8 +83805,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Buscar en el portapapeles..."
           }
         },
         "fi": {
@@ -83677,8 +83953,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Buscar colores..."
           }
         },
         "fi": {
@@ -83826,8 +84102,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Buscar en ajustes"
           }
         },
         "fi": {
@@ -83974,8 +84250,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Buscar..."
           }
         },
         "fi": {
@@ -84123,8 +84399,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "segundos"
           }
         },
         "fi": {
@@ -84273,8 +84549,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Segundos"
           }
         },
         "fi": {
@@ -84421,8 +84697,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Segmentado"
           }
         },
         "fi": {
@@ -84569,8 +84845,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Selecciona un color para ver los detalles"
           }
         },
         "fi": {
@@ -84872,8 +85148,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Seleccionar calendarios"
           }
         },
         "fi": {
@@ -85466,8 +85742,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Seleccionada"
           }
         },
         "fi": {
@@ -85763,8 +86039,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Sensibilidad"
           }
         },
         "fi": {
@@ -85912,8 +86188,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Sesión · ↓ %@ · ↑ %@"
           }
         },
         "fi": {
@@ -86060,8 +86336,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Establecer"
           }
         },
         "fi": {
@@ -86360,6 +86636,12 @@
             "state": "translated",
             "value": "瀏海中的設定圖示"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ícono de ajustes en el notch"
+          }
         }
       }
     },
@@ -86398,8 +86680,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ajustes…"
           }
         },
         "fi": {
@@ -86846,6 +87128,12 @@
             "state": "translated",
             "value": "顯示空氣品質小工具"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar widget del ICA"
+          }
         }
       }
     },
@@ -87036,6 +87324,12 @@
             "state": "translated",
             "value": "在 HUD 中顯示電池百分比文字"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar porcentaje de batería en el HUD"
+          }
         }
       }
     },
@@ -87076,6 +87370,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "顯示藍牙電池"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar batería de Bluetooth"
           }
         }
       }
@@ -87118,6 +87418,12 @@
             "state": "translated",
             "value": "顯示藍牙裝置連線"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mostrar conexiones de dispositivos Bluetooth"
+          }
         }
       }
     },
@@ -87158,6 +87464,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "顯示行事曆"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar calendario"
           }
         }
       }
@@ -87200,6 +87512,12 @@
             "state": "translated",
             "value": "在瀏海中顯示行事曆事件"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar eventos del calendario dentro del notch"
+          }
         }
       }
     },
@@ -87238,8 +87556,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mostrar indicador de carga"
           }
         },
         "fi": {
@@ -87390,6 +87708,12 @@
             "state": "translated",
             "value": "顯示充電百分比"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar porcentaje de carga"
+          }
         }
       }
     },
@@ -87431,6 +87755,12 @@
             "state": "translated",
             "value": "顯示充電狀態"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar estado de carga"
+          }
         }
       }
     },
@@ -87468,8 +87798,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mostrar historial de colores"
           }
         },
         "fi": {
@@ -87616,8 +87946,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mostrar panel del selector de color"
           }
         },
         "fi": {
@@ -87913,8 +88243,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mostrar cuenta regresiva"
           }
         },
         "fi": {
@@ -88062,8 +88392,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mostrar progreso de descarga"
           }
         },
         "fi": {
@@ -88210,8 +88540,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mostrar controles flotantes de pausa/detención"
           }
         },
         "es-419": {
@@ -88368,6 +88698,12 @@
             "state": "translated",
             "value": "顯示專注指示器"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar indicador de foco"
+          }
         }
       }
     },
@@ -88409,6 +88745,12 @@
             "state": "translated",
             "value": "顯示專注標籤"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar etiqueta de foco"
+          }
         }
       }
     },
@@ -88447,8 +88789,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mostrar títulos completos de eventos"
           }
         },
         "fi": {
@@ -88599,6 +88941,12 @@
             "state": "translated",
             "value": "顯示位置標籤"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar etiqueta de ubicación"
+          }
         }
       }
     },
@@ -88639,6 +88987,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "顯示鎖定畫面媒體面板"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar panel multimedia en la pantalla de bloqueo"
           }
         }
       }
@@ -88681,6 +89035,12 @@
             "state": "translated",
             "value": "顯示鎖定畫面計時器"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar temporizador en la pantalla de bloqueo"
+          }
         }
       }
     },
@@ -88722,6 +89082,12 @@
             "state": "translated",
             "value": "顯示鎖定畫面天氣"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar clima en la pantalla de bloqueo"
+          }
         }
       }
     },
@@ -88760,8 +89126,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mostrar el control de salida multimedia en otros diseños"
           }
         },
         "fi": {
@@ -89208,6 +89574,12 @@
             "state": "translated",
             "value": "顯示面板邊框"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar borde del panel"
+          }
         }
       }
     },
@@ -89245,8 +89617,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mostrar progreso"
           }
         },
         "fi": {
@@ -89396,6 +89768,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "顯示錄製指示器"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar indicador de grabación"
           }
         }
       }
@@ -89582,8 +89960,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Mostrar nombre del temporizador"
           }
         },
         "fi": {
@@ -89730,8 +90108,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Muestra el ícono de cámara en verde y el de micrófono en amarillo mientras están en uso. Usa las APIs CoreAudio y CoreMediaIO basadas en eventos."
           }
         },
         "fi": {
@@ -89878,8 +90256,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Muestra el proceso de razonamiento del modelo antes de la respuesta final"
           }
         },
         "fi": {
@@ -90026,8 +90404,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Muestra el temporizador del sistema (app Reloj) en el notch cuando está disponible. Requiere permiso de accesibilidad para leer el ítem de estado."
           }
         },
         "fi": {
@@ -90178,6 +90556,12 @@
             "state": "translated",
             "value": "單個指示器"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indicadores individuales"
+          }
         }
       }
     },
@@ -90215,8 +90599,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Tamaño y escala"
           }
         },
         "fi": {
@@ -90364,8 +90748,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Comportamiento de salto"
           }
         },
         "fi": {
@@ -90513,8 +90897,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Botones de salto"
           }
         },
         "fi": {
@@ -90810,8 +91194,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Las transiciones suaves combinan verde (0–60 %), amarillo (60–85 %) y rojo (85–100 %) a lo largo de todo el relleno."
           }
         },
         "fi": {
@@ -90959,8 +91343,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Duración de la vista previa rápida"
           }
         },
         "fi": {
@@ -91404,8 +91788,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "El estilo de vista previa rápida está fijado en Estándar en el modo minimalista"
           }
         },
         "fi": {
@@ -91700,8 +92084,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Color sólido"
           }
         },
         "fi": {
@@ -91996,8 +92380,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Velocidad:"
           }
         },
         "fi": {
@@ -92293,8 +92677,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Iniciar"
           }
         },
         "fi": {
@@ -92441,8 +92825,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Inicia una conversación para ver aquí tu historial de chat"
           }
         },
         "fi": {
@@ -92589,8 +92973,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Empezar a elegir colores"
           }
         },
         "fi": {
@@ -92738,8 +93122,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Iniciar temporizador personalizado"
           }
         },
         "fi": {
@@ -92886,8 +93270,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Iniciar temporizador de demostración:"
           }
         },
         "fi": {
@@ -93034,8 +93418,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Iniciar monitoreo"
           }
         },
         "fi": {
@@ -93182,8 +93566,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Empieza a elegir colores para construir tu historial"
           }
         },
         "fi": {
@@ -93330,8 +93714,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Iniciar grabación"
           }
         },
         "fi": {
@@ -93626,8 +94010,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estadísticas"
           }
         },
         "fi": {
@@ -93923,8 +94307,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Función de estadísticas desactivada"
           }
         },
         "fi": {
@@ -94072,8 +94456,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "La función de estadísticas está desactivada"
           }
         },
         "fi": {
@@ -94221,8 +94605,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "El panel de estadísticas está desactivado"
           }
         },
         "fi": {
@@ -94370,8 +94754,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Panel de estadísticas:"
           }
         },
         "fi": {
@@ -94518,8 +94902,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Intervalo de actualización de estadísticas"
           }
         },
         "fi": {
@@ -94666,8 +95050,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Estado y acciones"
           }
         },
         "fi": {
@@ -94814,8 +95198,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Detener"
           }
         },
         "fi": {
@@ -94957,8 +95341,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Detener monitoreo"
           }
         },
         "fi": {
@@ -95105,8 +95489,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Detener grabación"
           }
         },
         "fi": {
@@ -95550,8 +95934,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Admite el modo de razonamiento"
           }
         },
         "fi": {
@@ -95699,8 +96083,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Memoria de intercambio"
           }
         },
         "fi": {
@@ -95848,8 +96232,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "La memoria de intercambio está desactivada en este sistema."
           }
         },
         "fi": {
@@ -95997,8 +96381,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Sistema"
           }
         },
         "fi": {
@@ -96294,8 +96678,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Monitor de rendimiento del sistema"
           }
         },
         "fi": {
@@ -96442,8 +96826,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Capturar un área de la pantalla"
           }
         },
         "fi": {
@@ -96590,8 +96974,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Unidad de temperatura"
           }
         },
         "fi": {
@@ -96887,8 +97271,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "TheDynamicIsland"
           }
         },
         "fi": {
@@ -97627,6 +98011,12 @@
             "state": "translated",
             "value": "此時長用於計時器彈出式視窗中的「自訂」選項，方便快速存取。"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta duración alimenta la opción \"Personalizado\" dentro del menú del temporizador para un acceso rápido."
+          }
         }
       }
     },
@@ -97665,8 +98055,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Intervalo de tiempo"
           }
         },
         "fi": {
@@ -97961,8 +98351,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Temporizador"
           }
         },
         "fi": {
@@ -98109,8 +98499,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Temporizador desactivado"
           }
         },
         "fi": {
@@ -98257,8 +98647,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Función de temporizador"
           }
         },
         "fi": {
@@ -98405,8 +98795,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "La función de temporizador está desactivada"
           }
         },
         "fi": {
@@ -98554,8 +98944,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Preajustes de temporizador"
           }
         },
         "fi": {
@@ -98702,8 +99092,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Sonido del temporizador"
           }
         },
         "fi": {
@@ -98850,8 +99240,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Color del temporizador"
           }
         },
         "fi": {
@@ -98999,8 +99389,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Widget de temporizador"
           }
         },
         "fi": {
@@ -99444,8 +99834,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Abre o cierra Dynamic Island desde cualquier lugar."
           }
         },
         "fi": {
@@ -99599,8 +99989,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Total · %@"
           }
         },
         "fi": {
@@ -99747,8 +100137,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Transformar"
           }
         },
         "fi": {
@@ -99895,8 +100285,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Transforma tu notch a tu manera"
           }
         },
         "fi": {
@@ -100049,8 +100439,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Prueba ajustando los términos de búsqueda"
           }
         },
         "fi": {
@@ -100197,8 +100587,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Prueba con otros términos de búsqueda"
           }
         },
         "fi": {
@@ -100348,6 +100738,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "嘗試按音量鍵來測試系統 HUD 功能"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prueba presionar las teclas de volumen para comprobar el funcionamiento del HUD del sistema"
           }
         }
       }
@@ -100541,8 +100937,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Modo de interfaz"
           }
         },
         "fi": {
@@ -101134,8 +101530,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Intervalo de actualización"
           }
         },
         "fi": {
@@ -101283,8 +101679,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Actualizar temporizador"
           }
         },
         "fi": {
@@ -101580,8 +101976,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Subida"
           }
         },
         "fi": {
@@ -101729,8 +102125,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Uso"
           }
         },
         "fi": {
@@ -101878,8 +102274,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Desglose de uso"
           }
         },
         "fi": {
@@ -102030,6 +102426,12 @@
             "state": "translated",
             "value": "使用圓形電池指示器"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "usar un indicador de batería circular"
+          }
         }
       }
     },
@@ -102071,6 +102473,12 @@
             "state": "translated",
             "value": "使用彩色儀表"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar medidores con color"
+          }
         }
       }
     },
@@ -102111,6 +102519,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用電池時顯示 MacBook 圖示"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar el ícono de MacBook cuando funciona con batería"
           }
         }
       }
@@ -102301,6 +102715,12 @@
             "state": "translated",
             "value": "使用更簡單的關閉動畫"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar una animación de cierre más simple"
+          }
         }
       }
     },
@@ -102488,8 +102908,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Usado"
           }
         },
         "fi": {
@@ -102637,8 +103057,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Usado · %@"
           }
         },
         "fi": {
@@ -102933,8 +103353,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Usa \"Reproduciendo\" de macOS cuando Amazon Music es la fuente multimedia activa. Los controles de reproducción siguen al destino del sistema \"Reproduciendo\". Es posible que desplazar la línea de tiempo no funcione si Amazon Music no admite búsqueda remota."
           }
         },
         "fi": {
@@ -103082,8 +103502,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Uso"
           }
         },
         "fi": {
@@ -103526,8 +103946,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Vertical:"
           }
         },
         "fi": {
@@ -103823,8 +104243,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Volumen"
           }
         },
         "fi": {
@@ -103971,8 +104391,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "HUD de volumen"
           }
         },
         "fi": {
@@ -104120,8 +104540,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "OSD de volumen"
           }
         },
         "fi": {
@@ -104278,6 +104698,12 @@
             "state": "translated",
             "value": "鏡像模式需要使用你的相機"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Necesitamos tu cámara para el modo espejo"
+          }
         }
       }
     },
@@ -104316,8 +104742,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Clima"
           }
         },
         "fi": {
@@ -104613,8 +105039,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Widget del clima"
           }
         },
         "fi": {
@@ -104762,8 +105188,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Clima: %@ %@"
           }
         },
         "fi": {
@@ -104911,8 +105337,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Clima: %@ %@ en %@"
           }
         },
         "fi": {
@@ -105364,6 +105790,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "停用後，所有鍵盤快速鍵將不可用。你仍然可以使用介面控制"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuando está desactivado, todos los atajos de teclado quedan inactivos. Aun así puedes usar los controles de la interfaz"
           }
         }
       }
@@ -106034,6 +106466,12 @@
             "state": "translated",
             "value": "寬度調整僅適用於標準瀏海版面配置。停用簡約介面以編輯此值。"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los ajustes de ancho solo se aplican al diseño estándar del notch. Desactiva la interfaz minimalista para editar este valor."
+          }
         }
       }
     },
@@ -106071,8 +106509,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Ancho:"
           }
         },
         "fi": {
@@ -106219,8 +106657,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Con %lld gráficos activados, Dynamic Island se expandirá horizontalmente para mostrarlos todos en una sola fila."
           }
         },
         "fi": {
@@ -106374,8 +106812,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Escritura"
           }
         },
         "fi": {
@@ -106522,8 +106960,8 @@
         },
         "es": {
           "stringUnit": {
-            "state": "new",
-            "value": ""
+            "state": "translated",
+            "value": "Tú"
           }
         },
         "fi": {
@@ -107111,6 +107549,12 @@
             "state": "translated",
             "value": "15 分鐘"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "15 min"
+          }
         }
       }
     },
@@ -107144,6 +107588,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "30 分鐘"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 min"
           }
         }
       }
@@ -107179,6 +107629,12 @@
             "state": "translated",
             "value": "1 小時"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 hora"
+          }
         }
       }
     },
@@ -107212,6 +107668,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "3 小時"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3 horas"
           }
         }
       }
@@ -107247,6 +107709,12 @@
             "state": "translated",
             "value": "6 小時"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "6 horas"
+          }
         }
       }
     },
@@ -107280,6 +107748,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "12 小時"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "12 horas"
           }
         }
       }
@@ -107315,6 +107789,12 @@
             "state": "translated",
             "value": "今天餘下的時間"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resto del día"
+          }
         }
       }
     },
@@ -107349,6 +107829,12 @@
             "state": "translated",
             "value": "所有時間"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo el tiempo"
+          }
         }
       }
     },
@@ -107377,6 +107863,12 @@
             "state": "translated",
             "value": "符號"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Símbolo"
+          }
         }
       }
     },
@@ -107401,6 +107893,12 @@
           }
         },
         "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3D"
+          }
+        },
+        "es": {
           "stringUnit": {
             "state": "translated",
             "value": "3D"
@@ -107439,6 +107937,12 @@
             "state": "translated",
             "value": "左對齊"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Izquierda"
+          }
         }
       }
     },
@@ -107472,6 +107976,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "右對齊"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Derecha"
           }
         }
       }
@@ -107507,6 +108017,12 @@
             "state": "translated",
             "value": "啟用極簡 UI"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar interfaz minimalista"
+          }
         }
       }
     },
@@ -107540,6 +108056,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "截圖和錄屏時隱藏動態島"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar Dynamic Island durante capturas y grabaciones"
           }
         }
       }
@@ -107575,6 +108097,12 @@
             "state": "translated",
             "value": "關閉手勢"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesto para cerrar"
+          }
         }
       }
     },
@@ -107608,6 +108136,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "反向滑動"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invertir gestos de deslizamiento"
           }
         }
       }
@@ -107643,6 +108177,12 @@
             "state": "translated",
             "value": "反向滾動"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invertir gestos de desplazamiento"
+          }
         }
       }
     },
@@ -107676,6 +108216,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "延伸功能懸停區域"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ampliar el área de detección del cursor"
           }
         }
       }
@@ -107711,6 +108257,12 @@
             "state": "translated",
             "value": "外接顯示器樣式"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estilo en pantalla externa"
+          }
         }
       }
     },
@@ -107744,6 +108296,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "懸停時顯示"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar hasta pasar el cursor"
           }
         }
       }
@@ -107779,6 +108337,12 @@
             "state": "translated",
             "value": "啟用專注模式偵測"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar detección de foco"
+          }
         }
       }
     },
@@ -107812,6 +108376,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "輔助使用權限允許動態島替換原生的音量、亮度和鍵盤提示框。"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El permiso de accesibilidad permite que Dynamic Island reemplace los HUD nativos de volumen, brillo y teclado."
           }
         }
       }
@@ -107847,6 +108417,12 @@
             "state": "translated",
             "value": "全域模式需要完整磁碟取用權"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acceso completo al disco para el modo global"
+          }
         }
       }
     },
@@ -107874,6 +108450,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "如果沒有完整磁碟取用權，暫存器只能讀取文件和下載目錄的檔案。授予完整磁碟取用權以使暫存器能在全域範圍工作。"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin acceso completo al disco, Shelf solo puede leer archivos de Documentos y Descargas. Concede acceso completo al disco para que Shelf funcione globalmente."
           }
         }
       }
@@ -107909,6 +108491,12 @@
             "state": "translated",
             "value": "請求完整磁碟取用權"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solicitar acceso completo al disco"
+          }
         }
       }
     },
@@ -107943,6 +108531,12 @@
             "state": "translated",
             "value": "開啟隱私與安全性"
           }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir Privacidad y seguridad"
+          }
         }
       }
     },
@@ -107970,6 +108564,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "粗體文字顯示為亮色"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Texto en negrita con colores brillantes"
           }
         }
       }

@@ -121,11 +121,11 @@ final class FullDiskAccessPermissionStore: ObservableObject {
     func requestAccessPrompt() {
 #if os(macOS)
         let alert = NSAlert()
-        alert.messageText = "Full Disk Access Required"
-        alert.informativeText = "Dynamic Island needs Full Disk Access to detect custom Focus indicators and power the Shelf. Click Continue to open Full Disk Access settings, then press the + button and select Dynamic Island (we'll reveal it in Finder for you)."
+        alert.messageText = String(localized: "Full Disk Access Required")
+        alert.informativeText = String(localized: "Dynamic Island needs Full Disk Access to detect custom Focus indicators and power the Shelf. Click Continue to open Full Disk Access settings, then press the + button and select Dynamic Island (we'll reveal it in Finder for you).")
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Continue")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Continue"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
 
         if alert.runModal() == .alertFirstButtonReturn {
             openSystemSettings()

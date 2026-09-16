@@ -659,12 +659,12 @@ enum TerminalCursorStyleOption: String, CaseIterable, Defaults.Serializable {
 
     var displayName: String {
         switch self {
-        case .blinkBlock: return "Block (blinking)"
-        case .steadyBlock: return "Block (steady)"
-        case .blinkUnderline: return "Underline (blinking)"
-        case .steadyUnderline: return "Underline (steady)"
-        case .blinkBar: return "Bar (blinking)"
-        case .steadyBar: return "Bar (steady)"
+        case .blinkBlock: return String(localized: "Block (blinking)")
+        case .steadyBlock: return String(localized: "Block (steady)")
+        case .blinkUnderline: return String(localized: "Underline (blinking)")
+        case .steadyUnderline: return String(localized: "Underline (steady)")
+        case .blinkBar: return String(localized: "Bar (blinking)")
+        case .steadyBar: return String(localized: "Bar (steady)")
         }
     }
 }
