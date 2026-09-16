@@ -648,18 +648,18 @@ struct BatteryTemporaryActivityView: View {
     private var compactTitle: String {
         switch kind {
         case .charging:
-            return "Charging"
+            return String(localized: "Charging")
         case .lowBattery:
-            return "Low Battery"
+            return String(localized: "Low Battery")
         case .fullBattery:
-            return "Full Battery"
+            return String(localized: "Full Battery")
         }
     }
 
     @ViewBuilder
     private var standardTitle: some View {
         HStack(spacing: 5) {
-            Text(verbatim: kind == .lowBattery ? "Battery Low" : "Full Battery")
+            Text(verbatim: kind == .lowBattery ? String(localized: "Battery Low") : String(localized: "Full Battery"))
                 .font(.system(size: kind == .lowBattery ? 13 : 13, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.82))
                 .lineLimit(1)
@@ -678,22 +678,22 @@ struct BatteryTemporaryActivityView: View {
         case .lowBattery:
             if isLowPowerMode {
                 (
-                    Text(verbatim: "Low Power Mode enabled")
+                    Text(verbatim: String(localized: "Low Power Mode enabled"))
                         .foregroundColor(.yellow)
                         .font(.system(size: 10, weight: .medium))
                     +
-                    Text(verbatim: ", it is recommended to charge it.")
+                    Text(verbatim: String(localized: ", it is recommended to charge it."))
                         .foregroundColor(.gray.opacity(0.6))
                         .font(.system(size: 10, weight: .medium))
                 )
             } else {
-                Text(verbatim: "Turn on Low Power Mode or it\nis recommended to charge it.")
+                Text(verbatim: String(localized: "Turn on Low Power Mode or it\nis recommended to charge it."))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.gray.opacity(0.6))
                     .lineLimit(2)
             }
         case .fullBattery:
-            Text(verbatim: "Your Mac is fully charged.")
+            Text(verbatim: String(localized: "Your Mac is fully charged."))
                 .font(.system(size: 10))
                 .foregroundStyle(.gray.opacity(0.6))
                 .fontWeight(.medium)
