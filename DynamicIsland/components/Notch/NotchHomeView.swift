@@ -26,10 +26,34 @@ import SwiftUI
 import AppKit
 import AVFoundation
 
+private final class DynamicIslandArtworkLoopRegistry {
+    static let shared = DynamicIslandArtworkLoopRegistry()
+    private var playersByURL: [URL: DynamicIslandArtworkLoopController] = [:]
+
+    func player(for url: URL) -> DynamicIslandArtworkLoopController {
+        if let existing = playersByURL[url] {
+            existing.retain()
+            return existing
+        }
+        let controller = DynamicIslandArtworkLoopController(url: url)
+        controller.retain()
+        playersByURL[url] = controller
+        return controller
+    }
+
+    func release(_ controller: DynamicIslandArtworkLoopController, for url: URL) {
+        controller.release()
+        if playersByURL[url] === controller, controller.referenceCount == 0 {
+            playersByURL[url] = nil
+        }
+    }
+}
+
 private final class DynamicIslandArtworkLoopController {
     let player: AVQueuePlayer
     private var looper: AVPlayerLooper?
     private var playbackStateCancellable: AnyCancellable?
+    var referenceCount = 0
 
     init(url: URL) {
         let item = AVPlayerItem(url: url)
@@ -53,6 +77,14 @@ private final class DynamicIslandArtworkLoopController {
                     self.player.pause()
                 }
             }
+    }
+
+    func retain() {
+        referenceCount += 1
+    }
+
+    func release() {
+        referenceCount -= 1
     }
 
     deinit {
@@ -100,7 +132,12 @@ private struct DynamicIslandArtworkVideoView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> DynamicIslandArtworkVideoContainerView {
         let view = DynamicIslandArtworkVideoContainerView(frame: .zero)
-        context.coordinator.attach(layer: view.playerLayer, url: url, gravity: videoGravity)
+        // SwiftUI mounts this view during the open transition; the shared
+        // player is already warm, so attaching the layer on the next runloop
+        // turn keeps AVPlayerLayer setup off the mount's critical path.
+        Task { @MainActor in
+            context.coordinator.attach(layer: view.playerLayer, url: url, gravity: videoGravity)
+        }
         return view
     }
 
@@ -116,13 +153,25 @@ private struct DynamicIslandArtworkVideoView: NSViewRepresentable {
             layer.videoGravity = gravity
 
             if currentURL != url || controller == nil {
+                detach()
                 currentURL = url
-                controller = DynamicIslandArtworkLoopController(url: url)
+                controller = DynamicIslandArtworkLoopRegistry.shared.player(for: url)
             }
 
             if layer.player !== controller?.player {
                 layer.player = controller?.player
             }
+        }
+
+        func detach() {
+            guard let controller, let currentURL else { return }
+            DynamicIslandArtworkLoopRegistry.shared.release(controller, for: currentURL)
+            self.controller = nil
+            self.currentURL = nil
+        }
+
+        deinit {
+            detach()
         }
     }
 }
@@ -133,9 +182,10 @@ struct DynamicIslandArtworkSourceView: View {
 
     let cornerRadius: CGFloat
     let contentMode: ContentMode
+    var prefersVideo: Bool = true
 
     private var liveCanvasURL: URL? {
-        guard showLiveCanvasInDynamicIsland else { return nil }
+        guard showLiveCanvasInDynamicIsland, prefersVideo else { return nil }
         return musicManager.videoArtworkURL
     }
 
@@ -283,29 +333,36 @@ struct AlbumArtView: View {
     }
 
     private var albumArtBackground: some View {
-        Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .background(
-                DynamicIslandArtworkSourceView(
-                    cornerRadius: albumArtCornerRadius,
-                    contentMode: .fill
+        GeometryReader { geo in
+            Color.clear
+                .background(
+                    Image(nsImage: musicManager.albumArtGlowTexture)
+                        .resizable()
+                        .aspectRatio(nil, contentMode: .fill)
                 )
-            )
-            .clipped()
-            .scaleEffect(x: 1.3, y: 1.4)
-            .rotationEffect(.degrees(92))
-            .blur(radius: 40)
-            .opacity(
-                usesLiveCanvasArtwork
-                    ? (musicManager.isPlaying ? 0.62 : 0.18)
-                    : (musicManager.isPlaying ? 0.5 : 0)
-            )
-            .shadow(
-                color: Color(nsColor: musicManager.avgColor).opacity(usesLiveCanvasArtwork ? 0.24 : 0.16),
-                radius: usesLiveCanvasArtwork ? 22 : 14,
-                x: 0,
-                y: 0
-            )
+                .mask(
+                    RadialGradient(
+                        gradient: Gradient(colors: [.white, .white.opacity(0.7), .clear]),
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: geo.size.width * 0.65
+                    )
+                )
+                .scaleEffect(x: 1.3, y: 1.4)
+                .rotationEffect(.degrees(92))
+                .opacity(
+                    usesLiveCanvasArtwork
+                        ? (musicManager.isPlaying ? 0.62 : 0.18)
+                        : (musicManager.isPlaying ? 0.5 : 0)
+                )
+                .shadow(
+                    color: Color(nsColor: musicManager.avgColor).opacity(usesLiveCanvasArtwork ? 0.24 : 0.16),
+                    radius: usesLiveCanvasArtwork ? 22 : 14,
+                    x: 0,
+                    y: 0
+                )
+        }
+        .aspectRatio(1, contentMode: .fit)
     }
 
     private var albumArtButton: some View {
@@ -479,7 +536,7 @@ struct MusicControlsView: View {
     }
 
     private var musicSlider: some View {
-        TimelineView(.animation(paused: isProgressTimelinePaused)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: isProgressTimelinePaused)) { timeline in
             MusicSliderView(
                 sliderValue: $sliderValue,
                 duration: $musicManager.songDuration,
@@ -826,6 +883,7 @@ struct NotchHomeView: View {
     @Default(.enableLyrics) private var enableLyrics
     @Default(.lyricsPanelWidth) private var lyricsPanelWidth
     @Default(.lyricsPanelOffset) private var lyricsPanelOffset
+    @State private var showCalendarDeferred = false
     let albumArtNamespace: Namespace.ID
 
     /// Whether the music player should actively display (enabled AND has real content).
@@ -841,9 +899,15 @@ struct NotchHomeView: View {
         Group {
             if !coordinator.firstLaunch {
                 mainContent
+                    .onAppear {
+                        guard showCalendar else { return }
+                        DispatchQueue.main.async {
+                            showCalendarDeferred = true
+                        }
+                    }
             }
         }
-        .transition(.opacity.combined(with: .blurReplace))
+        .transition(.opacity)
     }
 
     private var mainContent: some View {
@@ -867,7 +931,7 @@ struct NotchHomeView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    if showCalendar {
+                    if showCalendar && showCalendarDeferred {
                         Group {
                             if shouldShowMusicPlayer {
                                 CalendarView()
@@ -889,7 +953,6 @@ struct NotchHomeView: View {
             }
         }
         .transition(.opacity.animation(.smooth.speed(0.9))
-            .combined(with: .blurReplace.animation(.smooth.speed(0.9)))
             .combined(with: .move(edge: .top)))
         .blur(radius: vm.notchState == .closed ? 30 : 0)
         .padding(Defaults[.enableMinimalisticUI] ? 0 : 8) //Putting the main padding for home view here for consistency
@@ -1066,10 +1129,10 @@ struct MusicSliderView: View {
 
     @ViewBuilder
     private var sliderCore: some View {
-        if hasUsableDuration {
+        if effectiveDuration > 0 {
             CustomSlider(
                 value: $sliderValue,
-                range: 0 ... duration,
+                range: 0 ... effectiveDuration,
                 color: sliderTint,
                 dragging: $dragging,
                 lastDragged: $lastDragged,
@@ -1079,14 +1142,28 @@ struct MusicSliderView: View {
                 desaturatesWhenIdle: desaturatesWhenIdle
             )
         } else {
-            // `0 ... duration` traps when the upper bound is below the lower
-            // one, so a negative duration crashes here before any of the
-            // formatting guards get a look at it. A length nobody has reported
-            // also has nothing to scrub within, so the track is inert.
-            Capsule(style: .continuous)
-                .fill(sliderTint.opacity(0.18))
-                .frame(height: restingTrackHeight)
-                .frame(maxWidth: .infinity)
+            // Fallback that matches CustomSlider's idle appearance: gray track +
+            // colored fill at the current sliderValue, so no visual flash when
+            // the real duration arrives.
+            let progress = effectiveDuration > 0 ? min(max(sliderValue / effectiveDuration, 0), 1) : 0
+            GeometryReader { geometry in
+                let width = geometry.size.width
+                let trackHeight = restingTrackHeight
+                let filledWidth = max(1, width) * progress
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(.gray.opacity(0.3))
+                        .frame(height: trackHeight)
+                        .cornerRadius(trackHeight / 2)
+                        .transaction { $0.disablesAnimations = true }
+                    Rectangle()
+                        .fill(sliderTint)
+                        .frame(width: filledWidth, height: trackHeight)
+                        .cornerRadius(trackHeight / 2)
+                        .transaction { $0.disablesAnimations = true }
+                }
+            }
+            .frame(height: restingTrackHeight)
         }
     }
 
@@ -1119,9 +1196,24 @@ struct MusicSliderView: View {
     /// give, and some hand back a sentinel or an epoch timestamp instead. The
     /// remaining-time label subtracts the position from it and formats the
     /// result as hours, so an epoch came out on screen as `-1732919508:00:54`.
-    /// A day is well past any track and well short of any of those.
+    /// A day is well past any track and well short of those.
     private var hasUsableDuration: Bool {
         duration.isFinite && duration > 0 && duration <= 24 * 60 * 60
+    }
+
+    /// Effective duration for the slider: falls back to a reasonable value
+    /// when the track is playing but the real duration hasn't arrived yet.
+    private var effectiveDuration: Double {
+        if hasUsableDuration {
+            return duration
+        }
+        // If playing but duration missing, use a fallback so the slider
+        // renders a progress bar instead of the inert capsule.
+        if isPlaying && elapsedTime.isFinite && elapsedTime > 0 {
+            // Use max of 1s or 2x elapsed to show a meaningful progress bar
+            return max(1, elapsedTime * 2)
+        }
+        return 0
     }
 
     /// Shown in place of a time there is no sensible value for, rather than a
@@ -1212,7 +1304,7 @@ struct CustomSlider: View {
             let rangeSpan = range.upperBound - range.lowerBound
 
             let progress = rangeSpan == .zero ? 0 : (value - range.lowerBound) / rangeSpan
-            let filledTrackWidth = min(max(progress, 0), 1) * width
+            let filledTrackWidth = min(max(progress, 0), 1) * max(1, width)
             
             let showScrubber = isHovering && enableRealTimeWaveform && enableWaveformScrubber
 
@@ -1227,11 +1319,13 @@ struct CustomSlider: View {
                     )
                     .frame(height: trackHeight * 3.5)
                     .offset(y: trackHeight * 0.2)
+                    .transaction { $0.disablesAnimations = true }
                 } else {
                     Rectangle()
                         .fill(.gray.opacity(0.3))
                         .frame(height: trackHeight)
                         .cornerRadius(trackHeight / 2)
+                        .transaction { $0.disablesAnimations = true }
                 }
 
                 // Filled track
@@ -1240,6 +1334,7 @@ struct CustomSlider: View {
                         .fill(color)
                         .frame(width: filledTrackWidth, height: trackHeight)
                         .cornerRadius(trackHeight / 2)
+                        .transaction { $0.disablesAnimations = true }
                 }
             }
             // The track swells from its middle, so it grows into the space
