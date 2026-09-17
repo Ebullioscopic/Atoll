@@ -161,7 +161,8 @@ func enforceMinimumNotchWidth() {
     }
 }
 private let minimalisticBaseOpenNotchSize: CGSize = .init(width: 420, height: 180)
-private let minimalisticLyricsExtraHeight: CGFloat = 40
+// 10pt top padding + 40pt lyrics content; keep in sync with MinimalisticMusicPlayerView.calculateDynamicHeight
+private let minimalisticLyricsExtraHeight: CGFloat = 50
 let minimalisticTimerCountdownTopPadding: CGFloat = 12
 let minimalisticTimerCountdownContentHeight: CGFloat = 82
 let minimalisticTimerCountdownBlockHeight: CGFloat = minimalisticTimerCountdownTopPadding + minimalisticTimerCountdownContentHeight
