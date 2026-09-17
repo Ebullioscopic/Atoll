@@ -570,6 +570,7 @@ class MusicManager: ObservableObject {
     @Published var artistName: String = "Me"
     @Published var albumArt: NSImage = defaultImage
     @Published var albumArtGlowTexture: NSImage = defaultImage
+    private var albumArtGeneration: Int = 0
     @Published var isPlaying = false
     @Published var album: String = "Self Love"
     @Published var isPlayerIdle: Bool = true
@@ -1496,10 +1497,14 @@ class MusicManager: ObservableObject {
             avgColor = newAlbumArt.quickAverageColor()
             calculateAverageColor()
         }
+        // Capture generation to discard stale glow texture results
+        let generation = albumArtGeneration + 1
+        albumArtGeneration = generation
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let glowTexture = newAlbumArt.preBlurred(radius: 40)
             DispatchQueue.main.async {
-                self?.albumArtGlowTexture = glowTexture
+                guard let self, self.albumArtGeneration == generation else { return }
+                self.albumArtGlowTexture = glowTexture
             }
         }
     }

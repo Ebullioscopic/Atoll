@@ -135,19 +135,34 @@ private struct DynamicIslandArtworkVideoView: NSViewRepresentable {
         // SwiftUI mounts this view during the open transition; the shared
         // player is already warm, so attaching the layer on the next runloop
         // turn keeps AVPlayerLayer setup off the mount's critical path.
-        Task { @MainActor in
-            context.coordinator.attach(layer: view.playerLayer, url: url, gravity: videoGravity)
-        }
+        context.coordinator.scheduleAttach(layer: view.playerLayer, url: url, gravity: videoGravity)
         return view
     }
 
     func updateNSView(_ nsView: DynamicIslandArtworkVideoContainerView, context: Context) {
-        context.coordinator.attach(layer: nsView.playerLayer, url: url, gravity: videoGravity)
+        context.coordinator.scheduleAttach(layer: nsView.playerLayer, url: url, gravity: videoGravity)
     }
 
     final class Coordinator {
         private var controller: DynamicIslandArtworkLoopController?
         private var currentURL: URL?
+        private var attachTask: Task<Void, Never>?
+        private var attachGeneration: Int = 0
+
+        func scheduleAttach(layer: AVPlayerLayer, url: URL, gravity: AVLayerVideoGravity) {
+            // Increment generation to invalidate any pending deferred attach
+            attachGeneration &+= 1
+            let generation = attachGeneration
+
+            attachTask?.cancel()
+            attachTask = Task { @MainActor in
+                // Yield to let updateNSView run first if it's pending
+                await Task.yield()
+                // Only proceed if this is still the latest generation
+                guard generation == attachGeneration else { return }
+                attach(layer: layer, url: url, gravity: gravity)
+            }
+        }
 
         func attach(layer: AVPlayerLayer, url: URL, gravity: AVLayerVideoGravity) {
             layer.videoGravity = gravity
@@ -164,6 +179,8 @@ private struct DynamicIslandArtworkVideoView: NSViewRepresentable {
         }
 
         func detach() {
+            attachTask?.cancel()
+            attachTask = nil
             guard let controller, let currentURL else { return }
             DynamicIslandArtworkLoopRegistry.shared.release(controller, for: currentURL)
             self.controller = nil
@@ -900,14 +917,24 @@ struct NotchHomeView: View {
             if !coordinator.firstLaunch {
                 mainContent
                     .onAppear {
-                        guard showCalendar else { return }
-                        DispatchQueue.main.async {
-                            showCalendarDeferred = true
-                        }
+                        syncCalendarDeferred()
+                    }
+                    .onChange(of: showCalendar) { _, newValue in
+                        syncCalendarDeferred()
                     }
             }
         }
         .transition(.opacity)
+    }
+
+    private func syncCalendarDeferred() {
+        guard showCalendar else {
+            showCalendarDeferred = false
+            return
+        }
+        DispatchQueue.main.async {
+            showCalendarDeferred = true
+        }
     }
 
     private var mainContent: some View {
@@ -1129,10 +1156,10 @@ struct MusicSliderView: View {
 
     @ViewBuilder
     private var sliderCore: some View {
-        if effectiveDuration > 0 {
+        if hasUsableDuration {
             CustomSlider(
                 value: $sliderValue,
-                range: 0 ... effectiveDuration,
+                range: 0 ... duration,
                 color: sliderTint,
                 dragging: $dragging,
                 lastDragged: $lastDragged,
@@ -1142,10 +1169,10 @@ struct MusicSliderView: View {
                 desaturatesWhenIdle: desaturatesWhenIdle
             )
         } else {
-            // Fallback that matches CustomSlider's idle appearance: gray track +
-            // colored fill at the current sliderValue, so no visual flash when
-            // the real duration arrives.
-            let progress = effectiveDuration > 0 ? min(max(sliderValue / effectiveDuration, 0), 1) : 0
+            // Non-interactive fallback matching CustomSlider's idle appearance:
+            // gray track + colored fill at current sliderValue. No seeking allowed
+            // until hasUsableDuration becomes true.
+            let progress = (duration.isFinite && duration > 0) ? min(max(sliderValue / duration, 0), 1) : 0
             GeometryReader { geometry in
                 let width = geometry.size.width
                 let trackHeight = restingTrackHeight
@@ -1199,21 +1226,6 @@ struct MusicSliderView: View {
     /// A day is well past any track and well short of those.
     private var hasUsableDuration: Bool {
         duration.isFinite && duration > 0 && duration <= 24 * 60 * 60
-    }
-
-    /// Effective duration for the slider: falls back to a reasonable value
-    /// when the track is playing but the real duration hasn't arrived yet.
-    private var effectiveDuration: Double {
-        if hasUsableDuration {
-            return duration
-        }
-        // If playing but duration missing, use a fallback so the slider
-        // renders a progress bar instead of the inert capsule.
-        if isPlaying && elapsedTime.isFinite && elapsedTime > 0 {
-            // Use max of 1s or 2x elapsed to show a meaningful progress bar
-            return max(1, elapsedTime * 2)
-        }
-        return 0
     }
 
     /// Shown in place of a time there is no sensible value for, rather than a
