@@ -131,6 +131,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
+    private var waveformAutoDisabledByBluetooth = false
 
     // Block-based AudioTap observers, kept with their center so they can be removed by token
     private var audioTapObserverTokens: [(center: NotificationCenter, token: NSObjectProtocol)] = []
@@ -833,6 +834,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .removeDuplicates()
             .sink { [weak self] _ in
                 self?.updateWindowSizeIfNeeded()
+            }
+            .store(in: &cancellables)
+        
+        // Observe Bluetooth audio connection - disable real-time waveform on Bluetooth connect
+        bluetoothAudioManager.$isBluetoothAudioConnected
+            .removeDuplicates()
+            .sink { [weak self] isConnected in
+                if isConnected && Defaults[.enableRealTimeWaveform] {
+                    print("🎧 [DynamicIslandApp] Bluetooth connected — disabling real-time waveform (unsupported on Bluetooth)")
+                    Defaults[.enableRealTimeWaveform] = false
+                    AudioTap.shared.stopCapture()
+                    self?.tearDownAudioTapMusicObservers()
+                    self?.waveformAutoDisabledByBluetooth = true
+                } else if !isConnected && self?.waveformAutoDisabledByBluetooth == true {
+                    print("🎧 [DynamicIslandApp] Bluetooth disconnected — restoring real-time waveform")
+                    Defaults[.enableRealTimeWaveform] = true
+                    Task {
+                        await AudioTap.shared.startCapture()
+                    }
+                    self?.setupAudioTapMusicObservers()
+                    self?.waveformAutoDisabledByBluetooth = false
+                }
             }
             .store(in: &cancellables)
         

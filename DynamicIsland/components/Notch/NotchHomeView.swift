@@ -1332,11 +1332,12 @@ struct CustomSlider: View {
             let progress = rangeSpan == .zero ? 0 : (value - range.lowerBound) / rangeSpan
             let filledTrackWidth = min(max(progress, 0), 1) * max(1, width)
             
-            let showScrubber = isHovering && enableRealTimeWaveform && enableWaveformScrubber
+            let showScrubber = enableRealTimeWaveform && enableWaveformScrubber
+            let showWaveform = enableRealTimeWaveform
 
             ZStack(alignment: .bottomLeading) {
                 // Background track
-                if showScrubber {
+                if showWaveform {
                     RealTimeWaveformScrubberView(
                         color: color,
                         secondaryColor: Defaults[.coloredSpectrogram] ? Color(nsColor: MusicManager.shared.secondaryColor) : nil,
@@ -1352,10 +1353,8 @@ struct CustomSlider: View {
                         .frame(height: trackHeight)
                         .cornerRadius(trackHeight / 2)
                         .transaction { $0.disablesAnimations = true }
-                }
 
-                // Filled track
-                if !showScrubber {
+                    // Filled track
                     Rectangle()
                         .fill(color)
                         .frame(width: filledTrackWidth, height: trackHeight)
@@ -1370,7 +1369,7 @@ struct CustomSlider: View {
             // is drawn to rise out of the bar, so it stays bottom-anchored.
             .frame(
                 height: max(restingTrackHeight, draggingTrackHeight),
-                alignment: showScrubber ? .bottom : .center
+                alignment: showWaveform ? .bottom : .center
             )
             .contentShape(Rectangle())
             .highPriorityGesture(
