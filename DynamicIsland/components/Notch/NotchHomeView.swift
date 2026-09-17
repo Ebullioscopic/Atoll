@@ -901,6 +901,7 @@ struct NotchHomeView: View {
     @Default(.lyricsPanelWidth) private var lyricsPanelWidth
     @Default(.lyricsPanelOffset) private var lyricsPanelOffset
     @State private var showCalendarDeferred = false
+    @State private var calendarSyncGeneration = 0
     let albumArtNamespace: Namespace.ID
 
     /// Whether the music player should actively display (enabled AND has real content).
@@ -930,10 +931,14 @@ struct NotchHomeView: View {
     private func syncCalendarDeferred() {
         guard showCalendar else {
             showCalendarDeferred = false
+            calendarSyncGeneration &+= 1
             return
         }
+        let generation = calendarSyncGeneration
         DispatchQueue.main.async {
-            showCalendarDeferred = true
+            if generation == calendarSyncGeneration {
+                showCalendarDeferred = true
+            }
         }
     }
 
@@ -1170,9 +1175,18 @@ struct MusicSliderView: View {
             )
         } else {
             // Non-interactive fallback matching CustomSlider's idle appearance:
-            // gray track + colored fill at current sliderValue. No seeking allowed
-            // until hasUsableDuration becomes true.
-            let progress = (duration.isFinite && duration > 0) ? min(max(sliderValue / duration, 0), 1) : 0
+            // gray track + colored fill at current estimated position. No seeking
+            // allowed until hasUsableDuration becomes true.
+            // Use estimated playback position and a surrogate duration so the
+            // fill renders meaningfully even before the real duration arrives.
+            let estimatedPosition: Double = {
+                guard isPlaying else { return min(elapsedTime, duration) }
+                let timeDifference = currentDate.timeIntervalSince(timestampDate)
+                let estimated = elapsedTime + (timeDifference * playbackRate)
+                return min(max(0, estimated), duration)
+            }()
+            let surrogateDuration = max(1, estimatedPosition * 2, elapsedTime * 2)
+            let progress = surrogateDuration > 0 ? min(max(estimatedPosition / surrogateDuration, 0), 1) : 0
             GeometryReader { geometry in
                 let width = geometry.size.width
                 let trackHeight = restingTrackHeight
