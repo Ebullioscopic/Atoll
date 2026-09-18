@@ -774,8 +774,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             networkConnectivityManager.startMonitoring()
         }
         
-        // Setup Real-time Audio Waveform capture if enabled
-        if Defaults[.enableRealTimeWaveform] {
+        // Setup Real-time Audio Waveform capture if enabled and no Bluetooth
+        if Defaults[.enableRealTimeWaveform] && !bluetoothAudioManager.isBluetoothAudioConnected {
             Task { @MainActor in
                 await AudioTap.shared.startCapture()
             }
@@ -786,7 +786,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.publisher(.enableRealTimeWaveform, options: [])
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
-                if change.newValue {
+                if change.newValue && !(self?.bluetoothAudioManager.isBluetoothAudioConnected ?? false) {
                     Task { @MainActor in
                         await AudioTap.shared.startCapture()
                     }
@@ -842,15 +842,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isConnected in
-                if isConnected && Defaults[.enableRealTimeWaveform] {
-                    print("🎧 [DynamicIslandApp] Bluetooth connected — disabling real-time waveform (unsupported on Bluetooth)")
-                    Defaults[.enableRealTimeWaveform] = false
+                if isConnected {
+                    print("🎧 [DynamicIslandApp] Bluetooth connected — suppressing real-time waveform (unsupported on Bluetooth)")
                     AudioTap.shared.stopCapture()
                     self?.tearDownAudioTapMusicObservers()
                     self?.waveformAutoDisabledByBluetooth = true
                 } else if !isConnected && self?.waveformAutoDisabledByBluetooth == true {
                     print("🎧 [DynamicIslandApp] Bluetooth disconnected — restoring real-time waveform")
-                    Defaults[.enableRealTimeWaveform] = true
                     Task { @MainActor in
                         await AudioTap.shared.startCapture()
                     }

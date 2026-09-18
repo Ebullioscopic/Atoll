@@ -212,10 +212,12 @@ class AudioTap: NSObject {
                 : lhsBundleIdentifier < rhsBundleIdentifier
         }
 
+        let tapUID = UUID().uuidString as CFString
         let description = CATapDescription()
         description.processes = sortedTargetProcessObjects
         description.isMixdown = true
         description.isMono = true
+        description.uuid = UUID()
 
         print("📋 [AudioTap] Creating tap for \(sortedTargetProcessObjects.count) processes: \(sortedTargetProcessObjects)")
 
@@ -226,25 +228,6 @@ class AudioTap: NSObject {
             return
         }
         print("✅ [AudioTap] Created process tap with ID: \(tapID)")
-
-        // Get the tap's unique hardware UID (for logging)
-        var tapUID: CFString = "" as CFString
-        var propertySize = UInt32(MemoryLayout<CFString>.stride)
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioTapPropertyUID,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        status = withUnsafeMutablePointer(to: &tapUID) { uidPtr in
-            AudioObjectGetPropertyData(tapID, &propertyAddress, 0, nil, &propertySize, uidPtr)
-        }
-        if status != noErr {
-            print("⚠️ [AudioTap] UID Error (non-fatal): \(status) (\(fourCharCodeToString(status))) - generating UUID fallback")
-            tapUID = UUID().uuidString as CFString
-        } else {
-            print("✅ [AudioTap] Got tap UID: \(tapUID)")
-        }
 
         // Create the Aggregate Device (a "virtual microphone" that we can route the tap into)
         let tapList = [[kAudioSubTapUIDKey: tapUID]]

@@ -1171,7 +1171,8 @@ struct MusicSliderView: View {
                 onValueChange: onValueChange,
                 restingTrackHeight: restingTrackHeight,
                 draggingTrackHeight: draggingTrackHeight,
-                desaturatesWhenIdle: desaturatesWhenIdle
+                desaturatesWhenIdle: desaturatesWhenIdle,
+                showsWaveform: true
             )
         } else {
             // Non-interactive fallback matching CustomSlider's idle appearance:
@@ -1307,6 +1308,8 @@ struct CustomSlider: View {
     var draggingTrackHeight: CGFloat = 14
     /// See `MusicSliderView.desaturatesWhenIdle`.
     var desaturatesWhenIdle: Bool = false
+    /// When true, shows the real-time waveform scrubber instead of the standard track.
+    var showsWaveform: Bool = false
     
     @State private var isHovering: Bool = false
     @Default(.enableRealTimeWaveform) var enableRealTimeWaveform
@@ -1332,8 +1335,8 @@ struct CustomSlider: View {
             let progress = rangeSpan == .zero ? 0 : (value - range.lowerBound) / rangeSpan
             let filledTrackWidth = min(max(progress, 0), 1) * max(1, width)
             
-            let showScrubber = enableRealTimeWaveform && enableWaveformScrubber
-            let showWaveform = enableRealTimeWaveform
+            let showWaveform = showsWaveform && enableRealTimeWaveform
+            let showScrubber = showWaveform && enableWaveformScrubber
 
             ZStack(alignment: .bottomLeading) {
                 // Background track
@@ -1341,7 +1344,7 @@ struct CustomSlider: View {
                     RealTimeWaveformScrubberView(
                         color: color,
                         secondaryColor: Defaults[.coloredSpectrogram] ? Color(nsColor: MusicManager.shared.secondaryColor) : nil,
-                        progress: progress,
+                        progress: showScrubber ? progress : 1.0,
                         minHeight: trackHeight
                     )
                     .frame(height: trackHeight * 3.5)
