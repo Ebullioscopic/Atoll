@@ -773,8 +773,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             networkConnectivityManager.startMonitoring()
         }
 
-        // Setup Dropover-style Floating Shelf Manager
-        FloatingShelfManager.shared.startMonitoring()
+        // Setup Dropover-style Floating Shelf Manager if enabled by user preference
+        if Defaults[.enableShakeToSummon] {
+            FloatingShelfManager.shared.startMonitoring()
+        }
 
         // Setup Real-time Audio Waveform capture if enabled
         if Defaults[.enableRealTimeWaveform] {
@@ -929,6 +931,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.publisher(.enableCaffeinate, options: []).sink { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.updateFeatureShortcutAvailability()
+            }
+        }.store(in: &cancellables)
+
+        Defaults.publisher(.enableShakeToSummon, options: []).sink { change in
+            Task { @MainActor in
+                if change.newValue {
+                    FloatingShelfManager.shared.startMonitoring()
+                } else {
+                    FloatingShelfManager.shared.stopMonitoring()
+                }
             }
         }.store(in: &cancellables)
 
@@ -1392,6 +1404,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Toggles the on-screen visibility of the Dropover-style floating shelf window.
     @objc private func toggleFloatingShelf() {
         FloatingShelfManager.shared.toggle()
     }

@@ -9,12 +9,22 @@ import SwiftUI
 import AppKit
 import Defaults
 
+/// A standalone SwiftUI view presenting the floating shelf container.
+/// Allows dropping, inspecting, and dragging items out from any location on screen.
 struct FloatingShelfView: View {
+    /// Observed view model tracking the current shelf items.
     @ObservedObject var tvm = ShelfStateViewModel.shared
+
+    /// State tracking whether a drag operation is currently hovering over the shelf.
     @State private var isTargeted = false
+
+    /// Callback triggered when the close button is clicked.
     var onClose: () -> Void = {}
+
+    /// Callback triggered when the "Dock to Notch" button is clicked.
     var onDockToNotch: () -> Void = {}
 
+    /// Main SwiftUI body layout.
     var body: some View {
         VStack(spacing: 12) {
             // Header: Title and action buttons
@@ -114,6 +124,7 @@ struct FloatingShelfView: View {
 
     // MARK: - Subviews
 
+    /// Drop area placeholder displayed when no items are currently on the shelf.
     private var emptyDropTarget: some View {
         VStack(spacing: 8) {
             Image(systemName: isTargeted ? "arrow.down.doc.fill" : "arrow.down.doc")
@@ -141,6 +152,7 @@ struct FloatingShelfView: View {
         )
     }
 
+    /// Horizontal scroll container rendering individual shelf item cards.
     private var itemsContent: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
@@ -175,10 +187,16 @@ struct FloatingShelfView: View {
 }
 
 // MARK: - Item Card with native Drag-Out and Double-Click Open
+
+/// Card view representing a single shelf item within the floating shelf.
 struct FloatingShelfItemCard: View {
+    /// The shelf item represented by this card.
     let item: ShelfItem
+
+    /// Tracks mouse hover state to reveal card controls.
     @State private var isHovering = false
 
+    /// Card view body layout.
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 5) {
@@ -241,11 +259,19 @@ struct FloatingShelfItemCard: View {
 }
 
 // MARK: - Native AppKit Dragging Source Overlay
+
+/// NSViewRepresentable bridging AppKit dragging and tracking capabilities to SwiftUI item cards.
 struct FloatingNativeDragOverlay: NSViewRepresentable {
+    /// The associated shelf item to drag.
     let item: ShelfItem
+
+    /// Callback notifying parent view of hover state transitions.
     var onHover: ((Bool) -> Void)?
+
+    /// Callback notifying parent view of a double-click activation.
     var onDoubleClick: () -> Void
 
+    /// Creates and configures the native AppKit dragging source view.
     func makeNSView(context: Context) -> FloatingNativeDragNSView {
         let view = FloatingNativeDragNSView()
         view.item = item
@@ -254,6 +280,7 @@ struct FloatingNativeDragOverlay: NSViewRepresentable {
         return view
     }
 
+    /// Updates existing AppKit view configuration on SwiftUI state changes.
     func updateNSView(_ nsView: FloatingNativeDragNSView, context: Context) {
         nsView.item = item
         nsView.onHover = onHover
@@ -261,14 +288,27 @@ struct FloatingNativeDragOverlay: NSViewRepresentable {
     }
 }
 
+/// Custom NSView acting as an NSDraggingSource and tracking area owner for floating shelf cards.
 final class FloatingNativeDragNSView: NSView, NSDraggingSource {
+    /// The shelf item associated with this drag source.
     var item: ShelfItem?
+
+    /// Closure called when mouse enters or exits this card view.
     var onHover: ((Bool) -> Void)?
+
+    /// Closure called on a double-click gesture.
     var onDoubleClick: (() -> Void)?
+
+    /// Initial mouse-down event to measure drag distance threshold.
     private var mouseDownEvent: NSEvent?
+
+    /// Active mouse tracking area for hover observation.
     private var trackingArea: NSTrackingArea?
+
+    /// Distance in points before a mouse drag initiates an AppKit dragging session.
     private let dragThreshold: CGFloat = 3.0
 
+    /// Recomputes mouse tracking areas when view geometry updates.
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let trackingArea = trackingArea {
@@ -284,16 +324,18 @@ final class FloatingNativeDragNSView: NSView, NSDraggingSource {
         self.trackingArea = area
     }
 
+    /// Handles cursor entering the card bounds.
     override func mouseEntered(with event: NSEvent) {
         onHover?(true)
     }
 
+    /// Handles cursor leaving the card bounds.
     override func mouseExited(with event: NSEvent) {
         onHover?(false)
     }
 
+    /// Yields hit-testing for the top-right corner to allow delete button interactions.
     override func hitTest(_ point: NSPoint) -> NSView? {
-        // Yield top-right corner to the remove button
         let cornerSize: CGFloat = 26
         let cornerRect = NSRect(
             x: bounds.maxX - cornerSize,
@@ -307,6 +349,7 @@ final class FloatingNativeDragNSView: NSView, NSDraggingSource {
         return super.hitTest(point)
     }
 
+    /// Captures mouse-down events and handles double-click item opening.
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2 {
             onDoubleClick?()
@@ -315,6 +358,7 @@ final class FloatingNativeDragNSView: NSView, NSDraggingSource {
         mouseDownEvent = event
     }
 
+    /// Monitors mouse movement to initiate dragging once the distance threshold is exceeded.
     override func mouseDragged(with event: NSEvent) {
         guard let initial = mouseDownEvent, let item = item else {
             super.mouseDragged(with: event)
@@ -332,11 +376,16 @@ final class FloatingNativeDragNSView: NSView, NSDraggingSource {
         }
     }
 
+    /// Resets mouse-down tracking upon button release.
     override func mouseUp(with event: NSEvent) {
         mouseDownEvent = nil
         super.mouseUp(with: event)
     }
 
+    /// Initiates a system dragging session for the specified shelf item.
+    /// - Parameters:
+    ///   - event: The mouse event that triggered the drag.
+    ///   - item: The shelf item being dragged.
     private func startDrag(with event: NSEvent, item: ShelfItem) {
         var draggingItems: [NSDraggingItem] = []
         let icon = item.icon
@@ -363,6 +412,7 @@ final class FloatingNativeDragNSView: NSView, NSDraggingSource {
         beginDraggingSession(with: draggingItems, event: event, source: self)
     }
 
+    /// Determines permissible drag operations based on external versus internal destination context.
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
         switch context {
         case .outsideApplication:
@@ -376,6 +426,7 @@ final class FloatingNativeDragNSView: NSView, NSDraggingSource {
         }
     }
 
+    /// Handles completion of a dragging session, auto-removing items if configured.
     func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
         if Defaults[.autoRemoveShelfItems] && !operation.isEmpty {
             if let item = item {

@@ -90,6 +90,7 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
         self.cachedPath = cachedPath
     }
     
+    /// User-facing display name resolved from cache, captured path, or file URL.
     var displayName: String {
         switch kind {
         case .file:
@@ -127,6 +128,7 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
         }
     }
     
+    /// Visual icon image resolved from compact thumbnail cache, file path, or item kind symbol.
     var icon: NSImage {
         if let cachedData = cachedIconData, let cachedImage = NSImage(data: cachedData) {
             return cachedImage

@@ -106,6 +106,11 @@ struct ShelfDropService {
         )
     }
 
+    /// Generates a compact PNG representation of the specified icon scaled to target dimensions.
+    /// - Parameters:
+    ///   - icon: The source NSImage to render.
+    ///   - targetSize: Desired thumbnail size in points; defaults to 64x64.
+    /// - Returns: Compressed PNG data, or `nil` if rendering fails.
     private static func compactIconData(for icon: NSImage, targetSize: NSSize = NSSize(width: 64, height: 64)) -> Data? {
         let resized = NSImage(size: targetSize)
         resized.lockFocus()

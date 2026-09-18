@@ -137,6 +137,7 @@ final class ShelfStateViewModel: ObservableObject {
         ExtensionRPCServer.shared.notifyShelfItemsChanged(itemIDs: [item.id.uuidString], action: "removed")
     }
 
+    /// Removes all items currently on the shelf, cleaning up temporary files and broadcasting changes once.
     func removeAll() {
         guard !items.isEmpty else { return }
         for item in items {

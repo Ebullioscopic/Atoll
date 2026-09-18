@@ -75,6 +75,7 @@ struct FileShareView: View {
             }
     }
 
+    /// Visual drop container view with dynamic targeting highlights and border stroke.
     private var dropArea: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)

@@ -12,28 +12,51 @@ import QuartzCore
 /// Inspired by Dropover's shake-to-summon mechanism.
 @MainActor
 final class FloatingShakeDetector {
+    /// Closure invoked on the main actor when a shake gesture is confirmed.
     var onShake: ((NSPoint) -> Void)?
 
+    /// Global monitor for drag and mouse-up events occurring in other applications.
     private var globalMonitor: Any?
+
+    /// Local monitor for drag and mouse-up events occurring within Atoll.
     private var localMonitor: Any?
+
+    /// Polling timer used as a fallback to track mouse position during modal system drags.
     private var pollingTimer: Timer?
+
+    /// Low-level CoreGraphics event tap port.
     private var eventTap: CFMachPort?
+
+    /// Run loop source associated with the event tap.
     private var runLoopSource: CFRunLoopSource?
 
+    /// Individual mouse position sample along with its timestamp.
     private struct Sample {
         let time: CFTimeInterval
         let point: NSPoint
     }
 
+    /// Rolling collection of recent mouse samples within the time window.
     private var samples: [Sample] = []
+
+    /// Timestamp of the most recent confirmed shake to enforce cooldown.
     private var lastShakeTime: CFTimeInterval = 0
 
-    // Configuration tunables
+    // MARK: - Configuration Tunables
+
+    /// Time window in seconds over which shake reversals are evaluated.
     private let timeWindow: CFTimeInterval = 0.45
-    private let minReversals = 3           // At least 3 rapid horizontal direction changes
+
+    /// Minimum number of horizontal reversals required to trigger a shake.
+    private let minReversals = 3
+
+    /// Minimum horizontal distance in points required for each leg of a reversal.
     private let minTravelPerLeg: CGFloat = 12
+
+    /// Minimum duration in seconds between consecutive shake detections.
     private let cooldown: CFTimeInterval = 1.0
 
+    /// Starts monitoring for shake gestures across the system.
     func start() {
         stop()
 
@@ -67,6 +90,7 @@ final class FloatingShakeDetector {
         pollingTimer = timer
     }
 
+    /// Stops all monitors, timers, and event taps, clearing active samples.
     func stop() {
         if let m = globalMonitor { NSEvent.removeMonitor(m) }
         if let m = localMonitor { NSEvent.removeMonitor(m) }
@@ -80,6 +104,7 @@ final class FloatingShakeDetector {
         samples.removeAll()
     }
 
+    /// Installs a passive CoreGraphics event tap listening for left mouse drags and releases.
     private func installEventTap() {
         guard eventTap == nil else { return }
         let mask = (1 << CGEventType.leftMouseDragged.rawValue) | (1 << CGEventType.leftMouseUp.rawValue)
@@ -87,8 +112,18 @@ final class FloatingShakeDetector {
         let callback: CGEventTapCallBack = { _, type, cgEvent, userInfo in
             guard let userInfo else { return Unmanaged.passUnretained(cgEvent) }
             let detector = Unmanaged<FloatingShakeDetector>.fromOpaque(userInfo).takeUnretainedValue()
+
+            // Automatically re-enable event tap if temporarily disabled by system timeout
+            if type == .tapDisabledByTimeout {
+                if let tap = detector.eventTap {
+                    CGEvent.tapEnable(tap: tap, enable: true)
+                }
+                return Unmanaged.passUnretained(cgEvent)
+            }
+
             if type == .leftMouseDragged {
-                let location = cgEvent.location
+                // Use unflippedLocation to align with AppKit coordinate system
+                let location = cgEvent.unflippedLocation
                 DispatchQueue.main.async {
                     detector.record(point: NSPoint(x: location.x, y: location.y))
                 }
@@ -116,6 +151,7 @@ final class FloatingShakeDetector {
         }
     }
 
+    /// Removes and disables the active CoreGraphics event tap.
     private func removeEventTap() {
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
@@ -127,6 +163,7 @@ final class FloatingShakeDetector {
         runLoopSource = nil
     }
 
+    /// Periodically samples the cursor location while the primary mouse button is held down.
     private func pollMousePosition() {
         let isLeftMouseDown = (NSEvent.pressedMouseButtons & 1) != 0
         guard isLeftMouseDown else {
@@ -138,6 +175,8 @@ final class FloatingShakeDetector {
         record(point: NSEvent.mouseLocation)
     }
 
+    /// Processes NSEvent instances from global or local monitors.
+    /// - Parameter event: The received mouse event.
     private func handle(_ event: NSEvent) {
         switch event.type {
         case .leftMouseUp:
@@ -149,6 +188,8 @@ final class FloatingShakeDetector {
         }
     }
 
+    /// Records a mouse position sample and checks if the gesture conditions are met.
+    /// - Parameter point: The current mouse coordinates in AppKit screen space.
     private func record(point: NSPoint) {
         // Suppress if user is interacting with an open Notch window
         if let keyWindow = NSApp.keyWindow, keyWindow.frame.contains(point), keyWindow.isVisible {
@@ -170,6 +211,8 @@ final class FloatingShakeDetector {
         }
     }
 
+    /// Analyzes the recorded samples to determine if a horizontal shake gesture occurred.
+    /// - Returns: `true` if horizontal reversals satisfy the minimum threshold and ratio.
     private func detectShake() -> Bool {
         guard samples.count >= 4 else { return false }
 

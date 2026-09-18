@@ -8,10 +8,17 @@
 import AppKit
 import SwiftUI
 
+/// An NSPanel that displays the floating companion shelf near the cursor.
+/// Styled with a dark continuous-corner visual effect backdrop and non-activating window level.
 @MainActor
 final class FloatingShelfPanel: NSPanel {
+    /// Flag indicating whether an animated dismissal is in progress.
     private var isHiding = false
 
+    /// The display on which the panel is currently presented.
+    private weak var currentScreen: NSScreen?
+
+    /// Initializes a new floating shelf panel with translucent backdrop and SwiftUI hosting view.
     init() {
         let defaultRect = NSRect(x: 0, y: 0, width: 360, height: 180)
         super.init(
@@ -54,11 +61,14 @@ final class FloatingShelfPanel: NSPanel {
                 self?.hideAnimated()
             },
             onDockToNotch: { [weak self] in
-                self?.hideAnimated()
-                // Switch Atoll's main notch to shelf view and open the notch
+                guard let self = self else { return }
+                let targetScreen = self.currentScreen ?? NSScreen.main ?? NSScreen.screens[0]
+                let targetVM = AppDelegate.shared?.viewModels[targetScreen] ?? AppDelegate.shared?.vm
+                self.hideAnimated()
+
                 DispatchQueue.main.async {
                     DynamicIslandViewCoordinator.shared.currentView = .shelf
-                    AppDelegate.shared?.vm.open()
+                    targetVM?.open()
                 }
             }
         )
@@ -84,13 +94,19 @@ final class FloatingShelfPanel: NSPanel {
         contentView = root
     }
 
+    /// Allows the panel to become key so items can be focused and manipulated.
     override var canBecomeKey: Bool { true }
+
+    /// Prevents the panel from taking over as the main application window.
     override var canBecomeMain: Bool { false }
 
+    /// Presents the floating shelf positioned adjacent to the specified screen coordinate.
+    /// - Parameter point: The mouse location in AppKit screen coordinates.
     func show(at point: NSPoint) {
         isHiding = false
         let size = NSSize(width: 360, height: 180)
         let screen = NSScreen.screens.first(where: { NSPointInRect(point, $0.frame) }) ?? NSScreen.main ?? NSScreen.screens[0]
+        currentScreen = screen
         let visibleFrame = screen.visibleFrame
 
         // Center slightly offset from cursor so user isn't directly clicking on edge
@@ -120,6 +136,7 @@ final class FloatingShelfPanel: NSPanel {
         }
     }
 
+    /// Fades out and dismisses the panel with an ease-in animation.
     func hideAnimated() {
         guard !isHiding else { return }
         isHiding = true

@@ -118,6 +118,7 @@ struct ShelfView: View {
         }
     }
 
+    /// Background rounded rectangle panel providing visual boundaries and drop-targeting highlights.
     var panel: some View {
         RoundedRectangle(cornerRadius: 16, style: .continuous)
             .fill(
