@@ -141,11 +141,22 @@ class AudioTap: NSObject {
     func getSmoothedMagnitudes() -> [Float] {
         return displayMagnitudes
     }
-
+    
+    private var captureGeneration = 0
+    
     func startCapture() async {
         await withCheckedContinuation { continuation in
             audioQueue.async { [weak self] in
                 self?.startCaptureSync()
+                continuation.resume()
+            }
+        }
+    }
+    
+    func startCaptureWithGeneration() async {
+        await withCheckedContinuation { continuation in
+            audioQueue.async { [weak self] in
+                self?.startCaptureSyncWithGeneration()
                 continuation.resume()
             }
         }
@@ -276,9 +287,145 @@ class AudioTap: NSObject {
             self?.updateTimer = timer
         }
 
-        print("🟢 [AudioTap] CoreAudio CATap flowing through Aggregate Device!")
+print("🟢 [AudioTap] CoreAudio CATap flowing through Aggregate Device!")
     }
-
+    
+    /// Starts capture with generation check — aborts if generation changed (stale request).
+    private func startCaptureSyncWithGeneration() {
+        let expectedGeneration = captureGeneration
+        guard !captureIsRunning else {
+            print("⚠️ [AudioTap] Capture already running, skipping start")
+            return
+        }
+        
+        var targetProcessObjects = Set<AudioObjectID>()
+        var bundleIdentifierByProcessObject: [AudioObjectID: String] = [:]
+        
+        // Enumerate CoreAudio's process objects rather than relying only on
+        // NSRunningApplication. Electron players commonly render and play from
+        // nested helpers; TIDAL, for example, emits audio from
+        // `com.tidal.desktop.player`, while its main app PID has no audio object.
+        for processObject in getAudioProcessObjectIDs() {
+            guard let processBundleIdentifier = getBundleIdentifier(for: processObject),
+                  let targetBundleIdentifier = AudioTapTargetMatcher.targetBundleIdentifier(
+                    for: processBundleIdentifier,
+                    among: targetBundleIDs
+                  ) else {
+                continue
+            }
+            
+            targetProcessObjects.insert(processObject)
+            bundleIdentifierByProcessObject[processObject] = processBundleIdentifier
+            let pidDescription = getPID(for: processObject).map(String.init) ?? "unknown"
+            print("🎯 [AudioTap] Found audio process \(processBundleIdentifier) with PID: \(pidDescription), AudioObjectID: \(processObject)")
+        }
+        
+        // Preserve the previous PID translation as a fallback for applications
+        // whose CoreAudio process does not publish a bundle identifier.
+        for app in NSWorkspace.shared.runningApplications {
+            guard let bundleIdentifier = app.bundleIdentifier,
+                  targetBundleIDs.contains(bundleIdentifier) else { continue }
+            if let processObject = getAudioObjectID(for: app.processIdentifier),
+               targetProcessObjects.insert(processObject).inserted {
+                bundleIdentifierByProcessObject[processObject] = bundleIdentifier
+                print("🎯 [AudioTap] Found \(app.localizedName ?? "App") with PID: \(app.processIdentifier), AudioObjectID: \(processObject)")
+            }
+        }
+        
+        if targetProcessObjects.isEmpty {
+            print("⚠️ [AudioTap] None of our target apps are running right now.")
+            return
+        }
+        
+        let sortedTargetProcessObjects = targetProcessObjects.sorted { lhs, rhs in
+            let lhsBundleIdentifier = bundleIdentifierByProcessObject[lhs]?.lowercased() ?? ""
+            let rhsBundleIdentifier = bundleIdentifierByProcessObject[rhs]?.lowercased() ?? ""
+            return lhsBundleIdentifier == rhsBundleIdentifier
+                ? lhs < rhs
+                : lhsBundleIdentifier < rhsBundleIdentifier
+        }
+        
+        let tapUID = UUID().uuidString as CFString
+        let description = CATapDescription()
+        description.processes = sortedTargetProcessObjects
+        description.isMixdown = true
+        description.isMono = true
+        description.uuid = UUID()
+        
+        print("📋 [AudioTap] Creating tap for \(sortedTargetProcessObjects.count) processes: \(sortedTargetProcessObjects)")
+        
+        tapID = AudioObjectID(kAudioObjectUnknown)
+        var status = AudioHardwareCreateProcessTap(description, &tapID)
+        guard status == noErr else {
+            print("🛑 [AudioTap] Tap Error: \(status) (\(fourCharCodeToString(status)))")
+            return
+        }
+        print("✅ [AudioTap] Created process tap with ID: \(tapID)")
+        
+        // Create the Aggregate Device (a "virtual microphone" that we can route the tap into)
+        let tapList = [[kAudioSubTapUIDKey: tapUID]]
+        let aggregateDict: [String: Any] = [
+            kAudioAggregateDeviceNameKey: "Atoll_Virtual_Tap",
+            kAudioAggregateDeviceUIDKey: UUID().uuidString,
+            kAudioAggregateDeviceIsPrivateKey: true,  // Hides it from the user's sound settings
+            kAudioAggregateDeviceTapListKey: tapList,
+        ]
+        
+        aggregateDeviceID = AudioObjectID(kAudioObjectUnknown)
+        status = AudioHardwareCreateAggregateDevice(
+            aggregateDict as CFDictionary, &aggregateDeviceID)
+        guard status == noErr else {
+            print("🛑 [AudioTap] Aggregate Error: \(status) (\(fourCharCodeToString(status)))")
+            cleanupPartialSetup()
+            return
+        }
+        print("✅ [AudioTap] Created aggregate device with ID: \(aggregateDeviceID)")
+        
+        // Check generation before binding callback
+        guard captureGeneration == expectedGeneration else {
+            print("🛑 [AudioTap] Generation changed, aborting capture start")
+            cleanupPartialSetup()
+            return
+        }
+        
+        // Bind the Callback to the aggregate device
+        let selfPointer = Unmanaged.passUnretained(self).toOpaque()
+        status = AudioDeviceCreateIOProcID(aggregateDeviceID, audioIOProc, selfPointer, &ioProcID)
+        
+        guard status == noErr, let validIOProcID = ioProcID else {
+            print("🛑 [AudioTap] IOProc Error: \(status) (\(fourCharCodeToString(status)))")
+            cleanupPartialSetup()
+            return
+        }
+        print("✅ [AudioTap] Created IO proc on aggregate device")
+        
+        // Check generation before starting
+        guard captureGeneration == expectedGeneration else {
+            print("🛑 [AudioTap] Generation changed, aborting capture start")
+            cleanupPartialSetup()
+            return
+        }
+        
+        // Start listening on the aggregate device
+        status = AudioDeviceStart(aggregateDeviceID, validIOProcID)
+        guard status == noErr else {
+            print("🛑 [AudioTap] Start Error: \(status) (\(fourCharCodeToString(status)))")
+            cleanupPartialSetup()
+            return
+        }
+        
+        captureIsRunning = true
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.updateTimer?.invalidate()
+            let timer = Timer(timeInterval: 1.0 / 30.0, target: self as Any, selector: #selector(self?.updateSmoothedMagnitudes), userInfo: nil, repeats: true)
+            RunLoop.main.add(timer, forMode: .common)
+            self?.updateTimer = timer
+        }
+        
+print("🟢 [AudioTap] CoreAudio CATap flowing through Aggregate Device!")
+    }
+    
     private func cleanupPartialSetup() {
         if let validIOProcID = ioProcID {
             if aggregateDeviceID != kAudioObjectUnknown {
@@ -302,7 +449,7 @@ class AudioTap: NSObject {
             self?.updateTimer = nil
         }
     }
-
+    
     func restartCapture() {
         // Cancel any pending restart
         pendingRestartWorkItem?.cancel()
@@ -340,6 +487,9 @@ class AudioTap: NSObject {
     }
     
     private func stopCaptureSync() {
+        // Increment generation to invalidate any pending startCaptureSyncWithGeneration calls
+        captureGeneration &+= 1
+        
         guard captureIsRunning else { return }
 
         // Determine what we're stopping: process tap + aggregate, process tap direct, or output device tap

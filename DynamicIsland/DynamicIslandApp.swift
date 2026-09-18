@@ -777,7 +777,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup Real-time Audio Waveform capture if enabled and no Bluetooth
         if Defaults[.enableRealTimeWaveform] && !bluetoothAudioManager.isBluetoothAudioConnected {
             Task { @MainActor in
-                await AudioTap.shared.startCapture()
+                await AudioTap.shared.startCaptureWithGeneration()
             }
             setupAudioTapMusicObservers()
         }
@@ -788,7 +788,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] change in
                 if change.newValue && !(self?.bluetoothAudioManager.isBluetoothAudioConnected ?? false) {
                     Task { @MainActor in
-                        await AudioTap.shared.startCapture()
+                        await AudioTap.shared.startCaptureWithGeneration()
                     }
                     self?.setupAudioTapMusicObservers()
                 } else {
@@ -848,12 +848,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.tearDownAudioTapMusicObservers()
                     self?.waveformAutoDisabledByBluetooth = true
                 } else if !isConnected && self?.waveformAutoDisabledByBluetooth == true {
+                    // Clear suppression flag first
+                    self?.waveformAutoDisabledByBluetooth = false
+                    // Check if user actually has the feature enabled
+                    guard Defaults[.enableRealTimeWaveform] else {
+                        print("🎧 [DynamicIslandApp] Bluetooth disconnected — real-time waveform was disabled by user, not restoring")
+                        return
+                    }
                     print("🎧 [DynamicIslandApp] Bluetooth disconnected — restoring real-time waveform")
                     Task { @MainActor in
-                        await AudioTap.shared.startCapture()
+                        await AudioTap.shared.startCaptureWithGeneration()
                     }
                     self?.setupAudioTapMusicObservers()
-                    self?.waveformAutoDisabledByBluetooth = false
                 }
             }
             .store(in: &cancellables)
