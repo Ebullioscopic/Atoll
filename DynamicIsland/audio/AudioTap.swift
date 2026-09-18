@@ -224,14 +224,13 @@ class AudioTap: NSObject {
                 : lhsBundleIdentifier < rhsBundleIdentifier
         }
 
-        let tapUID = UUID().uuidString as CFString
+        let tapUUID = UUID()
+        let tapUID = tapUUID.uuidString as CFString
         let description = CATapDescription()
         description.processes = sortedTargetProcessObjects
         description.isMixdown = true
         description.isMono = true
-        description.uuid = UUID()
-
-        print("📋 [AudioTap] Creating tap for \(sortedTargetProcessObjects.count) processes: \(sortedTargetProcessObjects)")
+        description.uuid = tapUUID
 
         tapID = AudioObjectID(kAudioObjectUnknown)
         var status = AudioHardwareCreateProcessTap(description, &tapID)
