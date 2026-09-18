@@ -4506,6 +4506,11 @@ struct Shelf: View {
                     Text("Remove from shelf after dragging")
                 }
                 .settingsHighlight(id: highlightID("Remove from shelf after dragging"))
+
+                Defaults.Toggle(key: .enableShakeToSummon) {
+                    Text("Enable shake-to-summon floating shelf")
+                }
+                .settingsHighlight(id: highlightID("Enable shake-to-summon floating shelf"))
             } header: {
                 HStack {
                     Text("General")

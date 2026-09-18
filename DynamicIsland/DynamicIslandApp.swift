@@ -772,7 +772,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             PrivacyIndicatorManager.shared.startMonitoring()
             networkConnectivityManager.startMonitoring()
         }
-        
+
+        // Setup Dropover-style Floating Shelf Manager
+        FloatingShelfManager.shared.startMonitoring()
+
         // Setup Real-time Audio Waveform capture if enabled
         if Defaults[.enableRealTimeWaveform] {
             Task {
@@ -1238,6 +1241,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         exportLogsItem.target = self
         toolsSubmenu.addItem(exportLogsItem)
 
+        let floatingShelfItem = NSMenuItem(title: "Toggle Floating Shelf (Dropover)", action: #selector(toggleFloatingShelf), keyEquivalent: "")
+        floatingShelfItem.target = self
+        toolsSubmenu.addItem(floatingShelfItem)
+
         toolsMenuItem.submenu = toolsSubmenu
         mainMenu.insertItem(toolsMenuItem, at: insertionIndex + 3)
 
@@ -1383,6 +1390,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+    }
+
+    @objc private func toggleFloatingShelf() {
+        FloatingShelfManager.shared.toggle()
     }
 
     // Cancel the auto-close armed by `toggleNotchOpen`. Switching to the clipboard tab

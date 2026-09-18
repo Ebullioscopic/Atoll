@@ -119,12 +119,20 @@ struct ShelfView: View {
     }
 
     var panel: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .stroke(
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(
                 vm.dragDetectorTargeting
-                    ? Color.accentColor.opacity(0.9)
-                    : Color.white.opacity(0.1),
-                style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [10])
+                    ? Color.accentColor.opacity(0.12)
+                    : Color.white.opacity(0.04)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(
+                        vm.dragDetectorTargeting
+                            ? Color.accentColor
+                            : Color.white.opacity(0.12),
+                        lineWidth: vm.dragDetectorTargeting ? 1.5 : 1
+                    )
             )
             .overlay {
                 ZStack {

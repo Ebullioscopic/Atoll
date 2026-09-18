@@ -92,11 +92,28 @@ struct ShelfDropService {
     /// on the main actor.
     private static func fileItem(for url: URL, isTemporary: Bool) async -> ShelfItem? {
         guard let bookmark = createBookmark(for: url) else { return nil }
+        let standardized = url.standardizedFileURL
+        let path = standardized.path
+        let name = standardized.lastPathComponent
+        let icon = NSWorkspace.shared.icon(forFile: path)
+        let iconData = compactIconData(for: icon)
         return await ShelfItem(
             kind: .file(bookmark: bookmark),
             isTemporary: isTemporary,
-            cachedPath: url.standardizedFileURL.path
+            cachedDisplayName: name,
+            cachedIconData: iconData,
+            cachedPath: path
         )
+    }
+
+    private static func compactIconData(for icon: NSImage, targetSize: NSSize = NSSize(width: 64, height: 64)) -> Data? {
+        let resized = NSImage(size: targetSize)
+        resized.lockFocus()
+        icon.draw(in: NSRect(origin: .zero, size: targetSize), from: .zero, operation: .copy, fraction: 1.0)
+        resized.unlockFocus()
+        guard let tiff = resized.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff) else { return nil }
+        return rep.representation(using: .png, properties: [:])
     }
 
     private static func createBookmark(for url: URL) -> Data? {
