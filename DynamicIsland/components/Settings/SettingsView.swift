@@ -3157,6 +3157,7 @@ struct Media: View {
     @Default(.waitInterval) var waitInterval
     @Default(.mediaController) var mediaController
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
+    @ObservedObject private var bluetoothManager = BluetoothAudioManager.shared
     @Default(.hideNotchOption) var hideNotchOption
     @Default(.enableSneakPeek) private var enableSneakPeek
     @Default(.sneakPeekStyles) var sneakPeekStyles
@@ -3515,6 +3516,7 @@ struct Media: View {
                         customBadge(text: "Beta")
                     }
                 }
+                .disabled(bluetoothManager.isBluetoothAudioConnected)
                 .settingsHighlight(id: highlightID("Enable real-time waveform"))
                 
                 Picker("Visualizer candles", selection: $visualizerBarCount) {
@@ -3529,10 +3531,18 @@ struct Media: View {
                 }
                 
                 Toggle("Scrubbable real-time waveform", isOn: $enableWaveformScrubber)
+                    .disabled(bluetoothManager.isBluetoothAudioConnected)
             } header: {
                 Text("Music Visualizer")
             } footer: {
-                Text("When enabled, the music visualizer displays real-time audio spectrum data synced to your music. Requires macOS 14.2+ and uses minimal CPU/GPU resources via the Accelerate framework.")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("When enabled, the music visualizer displays real-time audio spectrum data synced to your music. Requires macOS 14.2+ and uses minimal CPU/GPU resources via the Accelerate framework.")
+                    if bluetoothManager.isBluetoothAudioConnected {
+                        Text("⚠️ Disabled: Real-time waveform is not supported on Bluetooth output due to macOS CoreAudio limitations. Works on internal speakers and wired headphones.")
+                            .foregroundStyle(.orange)
+                            .font(.caption)
+                    }
+                }
             }
 
             Section {
