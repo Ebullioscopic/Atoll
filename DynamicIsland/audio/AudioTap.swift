@@ -154,9 +154,10 @@ class AudioTap: NSObject {
     }
     
     func startCaptureWithGeneration() async {
+        let expectedGeneration = captureGeneration
         await withCheckedContinuation { continuation in
             audioQueue.async { [weak self] in
-                self?.startCaptureSyncWithGeneration()
+                self?.startCaptureSyncWithGeneration(expectedGeneration: expectedGeneration)
                 continuation.resume()
             }
         }
@@ -291,8 +292,7 @@ print("🟢 [AudioTap] CoreAudio CATap flowing through Aggregate Device!")
     }
     
     /// Starts capture with generation check — aborts if generation changed (stale request).
-    private func startCaptureSyncWithGeneration() {
-        let expectedGeneration = captureGeneration
+    private func startCaptureSyncWithGeneration(expectedGeneration: Int) {
         guard !captureIsRunning else {
             print("⚠️ [AudioTap] Capture already running, skipping start")
             return
@@ -468,7 +468,7 @@ print("🟢 [AudioTap] CoreAudio CATap flowing through Aggregate Device!")
                     print("⏹️ [AudioTap] Waveform disabled during restart, staying stopped")
                     return
                 }
-                self?.startCaptureSync()
+                self?.startCaptureSyncWithGeneration(expectedGeneration: self?.captureGeneration ?? 0)
             }
         }
         pendingRestartWorkItem = workItem
