@@ -569,6 +569,8 @@ class MusicManager: ObservableObject {
     @Published var songTitle: String = "I'm Handsome"
     @Published var artistName: String = "Me"
     @Published var albumArt: NSImage = defaultImage
+    @Published var albumArtGlowTexture: NSImage = defaultImage
+    private var albumArtGeneration: Int = 0
     @Published var isPlaying = false
     @Published var album: String = "Self Love"
     @Published var isPlayerIdle: Bool = true
@@ -1490,8 +1492,19 @@ class MusicManager: ObservableObject {
     private func applyAlbumArt(_ newAlbumArt: NSImage) {
         withAnimation(.smooth) {
             albumArt = newAlbumArt
-            if Defaults[.coloredSpectrogram] {
-                calculateAverageColor()
+        }
+        if Defaults[.coloredSpectrogram] {
+            avgColor = newAlbumArt.quickAverageColor()
+            calculateAverageColor()
+        }
+        // Capture generation to discard stale glow texture results
+        let generation = albumArtGeneration + 1
+        albumArtGeneration = generation
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let glowTexture = newAlbumArt.preBlurred(radius: 40)
+            DispatchQueue.main.async {
+                guard let self, self.albumArtGeneration == generation else { return }
+                self.albumArtGlowTexture = glowTexture
             }
         }
     }
@@ -1508,10 +1521,8 @@ class MusicManager: ObservableObject {
     func calculateAverageColor() {
         albumArt.prominentOpposingColors { [weak self] primary, secondary in
             DispatchQueue.main.async {
-                withAnimation(.smooth) {
-                    self?.avgColor = primary
-                    self?.secondaryColor = secondary
-                }
+                self?.avgColor = primary
+                self?.secondaryColor = secondary
             }
         }
     }

@@ -778,11 +778,7 @@ private struct MinimalisticReminderDetailsView: View {
     }
 
     private var progressBar: some View {
-        TimelineView(
-            .animation(
-                paused: isProgressTimelinePaused
-            )
-        ) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: isProgressTimelinePaused)) { timeline in
             MusicSliderView(
                 sliderValue: $sliderValue,
                 duration: Binding(
@@ -1261,7 +1257,8 @@ struct MinimalisticAlbumArtView: View {
             .background(
                 DynamicIslandArtworkSourceView(
                     cornerRadius: albumArtCornerRadius,
-                    contentMode: .fill
+                    contentMode: .fill,
+                    prefersVideo: false
                 )
             )
             .clipped()

@@ -95,8 +95,6 @@ class RealTimeAudioSpectrum: NSView {
         resetBars()
     }
     
-    private var debugLogCounter = 0
-    
     private func updateBarsFromAudio() {
         guard isPlaying else {
             resetBars()
@@ -105,14 +103,6 @@ class RealTimeAudioSpectrum: NSView {
         
         // Get real-time magnitudes from AudioTap
         let magnitudes = AudioTap.shared.getSmoothedMagnitudes()
-        
-        // Debug: log magnitudes periodically
-        debugLogCounter += 1
-        if debugLogCounter % 60 == 0 { // Every 2 seconds at 30fps
-            if magnitudes.count >= 4 {
-                print("📊 [Spectrum] Magnitudes: [\(magnitudes[0]), \(magnitudes[1]), \(magnitudes[2]), \(magnitudes[3])]")
-            }
-        }
         
         // Update each bar with its corresponding band magnitude
         for (index, barLayer) in barLayers.enumerated() {

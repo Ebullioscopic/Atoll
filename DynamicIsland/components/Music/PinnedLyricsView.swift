@@ -53,7 +53,7 @@ struct PinnedLyricsModifier: ViewModifier {
         let slots = PinnedLyricsContextRows.slots(lines: musicManager.syncedLyrics,
             duration: musicManager.songDuration, currentIndex: musicManager.currentLyricIndex,
             context: context)
-        return TimelineView(.animation(paused: !musicManager.isPlaying || isContentHidden)) { timeline in
+        return TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !musicManager.isPlaying || isContentHidden)) { timeline in
             VStack(spacing: 0) {
                 ForEach(slots.indices, id: \.self) { index in
                     let slot = slots[index]

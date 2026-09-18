@@ -322,7 +322,7 @@ class AudioTap: NSObject {
         
         DispatchQueue.main.async { [weak self] in
             self?.updateTimer?.invalidate()
-            let timer = Timer(timeInterval: 1.0 / 60.0, target: self as Any, selector: #selector(self?.updateSmoothedMagnitudes), userInfo: nil, repeats: true)
+            let timer = Timer(timeInterval: 1.0 / 30.0, target: self as Any, selector: #selector(self?.updateSmoothedMagnitudes), userInfo: nil, repeats: true)
             RunLoop.main.add(timer, forMode: .common)
             self?.updateTimer = timer
         }
