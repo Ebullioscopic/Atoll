@@ -8,6 +8,18 @@
 import AppKit
 import SwiftUI
 
+
+/// Custom hosting view allowing first-mouse clicks and window dragging on background clicks.
+final class FloatingShelfHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
+    override var mouseDownCanMoveWindow: Bool {
+        true
+    }
+}
+
 /// An NSPanel that displays the floating companion shelf near the cursor.
 /// Styled with a dark continuous-corner visual effect backdrop and non-activating window level.
 @MainActor
@@ -23,7 +35,7 @@ final class FloatingShelfPanel: NSPanel {
         let defaultRect = NSRect(x: 0, y: 0, width: 360, height: 180)
         super.init(
             contentRect: defaultRect,
-            styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
+            styleMask: [.nonactivatingPanel, .fullSizeContentView, .titled],
             backing: .buffered,
             defer: false
         )
@@ -43,25 +55,13 @@ final class FloatingShelfPanel: NSPanel {
         hasShadow = true
         animationBehavior = .utilityWindow
 
-        let root = NSView(frame: defaultRect)
-        root.wantsLayer = true
-        root.layer?.cornerRadius = 20
-        root.layer?.cornerCurve = .continuous
-        root.layer?.masksToBounds = true
-
-        let blur = NSVisualEffectView()
-        blur.material = .hudWindow
-        blur.blendingMode = .behindWindow
-        blur.state = .active
-        blur.appearance = NSAppearance(named: .vibrantDark)
-        blur.translatesAutoresizingMaskIntoConstraints = false
-
         let swiftUIView = FloatingShelfView(
             onClose: { [weak self] in
                 self?.hideAnimated()
             },
             onDockToNotch: { [weak self] in
                 guard let self = self else { return }
+                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
                 let targetScreen = self.currentScreen ?? NSScreen.main ?? NSScreen.screens[0]
                 let targetVM = AppDelegate.shared?.viewModels[targetScreen] ?? AppDelegate.shared?.vm
                 self.hideAnimated()
@@ -73,25 +73,8 @@ final class FloatingShelfPanel: NSPanel {
             }
         )
 
-        let hosting = FirstMouseHostingView(rootView: swiftUIView)
-        hosting.translatesAutoresizingMaskIntoConstraints = false
-
-        root.addSubview(blur)
-        root.addSubview(hosting)
-
-        NSLayoutConstraint.activate([
-            blur.topAnchor.constraint(equalTo: root.topAnchor),
-            blur.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            blur.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            blur.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-
-            hosting.topAnchor.constraint(equalTo: root.topAnchor),
-            hosting.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            hosting.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            hosting.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-        ])
-
-        contentView = root
+        let hosting = FloatingShelfHostingView(rootView: swiftUIView)
+        contentView = hosting
     }
 
     /// Allows the panel to become key so items can be focused and manipulated.

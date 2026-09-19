@@ -47,8 +47,13 @@ struct FloatingShelfView: View {
                             .background(Capsule().fill(Color.accentColor.opacity(0.8)))
                     }
                 }
+                .contentShape(Rectangle())
+                .floatingShelfWindowDraggable()
 
                 Spacer()
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .floatingShelfWindowDraggable()
 
                 HStack(spacing: 6) {
                     if !tvm.items.isEmpty {
@@ -70,7 +75,7 @@ struct FloatingShelfView: View {
                                 .foregroundStyle(Color.white.opacity(0.7))
                         }
                         .buttonStyle(.plain)
-                        .help("Dock to Notch")
+                        .help("Dock to Notch (Move items into Dynamic Island)")
                     }
 
                     Button {
@@ -100,6 +105,8 @@ struct FloatingShelfView: View {
                     .foregroundStyle(Color.white.opacity(0.45))
                 Spacer()
             }
+            .contentShape(Rectangle())
+            .floatingShelfWindowDraggable()
             .padding(.horizontal, 4)
         }
         .padding(14)
@@ -114,6 +121,8 @@ struct FloatingShelfView: View {
                             lineWidth: isTargeted ? 2 : 1
                         )
                 )
+                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .floatingShelfWindowDraggable()
         )
         .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $isTargeted) { providers in
             tvm.load(providers)
@@ -435,3 +444,24 @@ final class FloatingNativeDragNSView: NSView, NSDraggingSource {
         }
     }
 }
+
+// MARK: - Window Dragging Modifier
+
+/// Modifier enabling window dragging via native SwiftUI WindowDragGesture on macOS 15+.
+private struct FloatingShelfWindowDragModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.gesture(WindowDragGesture())
+        } else {
+            content
+        }
+    }
+}
+
+private extension View {
+    /// Makes the view surface draggable to move the host window.
+    func floatingShelfWindowDraggable() -> some View {
+        modifier(FloatingShelfWindowDragModifier())
+    }
+}
+
