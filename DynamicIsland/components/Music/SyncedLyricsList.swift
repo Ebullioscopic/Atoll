@@ -159,9 +159,9 @@ struct SyncedLyricsList: View {
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    // Redraw on every frame while playing so the highlight
-                    // tracks the music instead of stepping line by line.
-                    TimelineView(.animation(paused: !musicManager.isPlaying)) { timeline in
+                    // Redraw at 30fps while playing so the highlight tracks the music
+                    // without stepping line by line, matching the lyric sweep rate.
+                    TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !musicManager.isPlaying)) { timeline in
                         let current = musicManager.currentLyricIndex
                         let progress = musicManager.currentLyricSweepProgress(at: timeline.date)
 
