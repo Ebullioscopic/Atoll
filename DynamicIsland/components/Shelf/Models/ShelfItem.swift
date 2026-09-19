@@ -90,14 +90,19 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
         self.cachedPath = cachedPath
     }
     
+    /// User-facing display name resolved from cache, captured path, or file URL.
     var displayName: String {
         switch kind {
-        case .file(let bookmarkData):
+        case .file:
             if let cached = cachedDisplayName, !cached.isEmpty {
                 return cached
             }
-            // No synchronous fallback - return empty string if not cached
-            // Async resolution should be done via loadDisplayName()
+            if let path = cachedPath, !path.isEmpty {
+                return Foundation.URL(fileURLWithPath: path).lastPathComponent
+            }
+            if let url = resolvedFileURL {
+                return url.lastPathComponent
+            }
             return ""
         case .text(let string):
             return string.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -123,6 +128,7 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
         }
     }
     
+    /// Visual icon image resolved from compact thumbnail cache, file path, or item kind symbol.
     var icon: NSImage {
         if let cachedData = cachedIconData, let cachedImage = NSImage(data: cachedData) {
             return cachedImage
@@ -130,7 +136,12 @@ struct ShelfItem: Identifiable, Codable, Equatable, Sendable {
         guard case .file = kind else {
             return Self.thumbnailSymbolImage(systemName: kind.iconSymbolName) ?? NSImage()
         }
-        // Return generic file icon instead of blocking on bookmark resolution
+        if let path = cachedPath, !path.isEmpty {
+            return NSWorkspace.shared.icon(forFile: path)
+        }
+        if let url = resolvedFileURL {
+            return NSWorkspace.shared.icon(forFile: url.path)
+        }
         return NSWorkspace.shared.icon(forFileType: "public.item")
     }
     

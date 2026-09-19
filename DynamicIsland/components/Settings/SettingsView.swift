@@ -355,6 +355,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .shelf, title: "Expanded drag detection area", keywords: ["shelf", "drag"], highlightID: SettingsTab.shelf.highlightID(for: "Expanded drag detection area")),
         SettingsSearchEntry(tab: .shelf, title: "Copy items on drag", keywords: ["shelf", "drag", "copy"], highlightID: SettingsTab.shelf.highlightID(for: "Copy items on drag")),
         SettingsSearchEntry(tab: .shelf, title: "Remove from shelf after dragging", keywords: ["shelf", "drag", "remove"], highlightID: SettingsTab.shelf.highlightID(for: "Remove from shelf after dragging")),
+        SettingsSearchEntry(tab: .shelf, title: "Enable shake-to-summon floating shelf", keywords: ["shelf", "floating", "shake", "dropover", "summon"], highlightID: SettingsTab.shelf.highlightID(for: "Enable shake-to-summon floating shelf")),
         SettingsSearchEntry(tab: .shelf, title: "Quick Share Service", keywords: ["shelf", "share", "airdrop", "localsend"], highlightID: SettingsTab.shelf.highlightID(for: "Quick Share Service")),
         SettingsSearchEntry(tab: .shelf, title: "LocalSend Device Picker Style", keywords: ["localsend", "glass", "picker", "material"], highlightID: SettingsTab.shelf.highlightID(for: "Device Picker Style")),
 
@@ -4506,6 +4507,11 @@ struct Shelf: View {
                     Text("Remove from shelf after dragging")
                 }
                 .settingsHighlight(id: highlightID("Remove from shelf after dragging"))
+
+                Defaults.Toggle(key: .enableShakeToSummon) {
+                    Text("Enable shake-to-summon floating shelf")
+                }
+                .settingsHighlight(id: highlightID("Enable shake-to-summon floating shelf"))
             } header: {
                 HStack {
                     Text("General")
