@@ -777,7 +777,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup Real-time Audio Waveform capture if enabled and no Bluetooth
         if Defaults[.enableRealTimeWaveform] && !bluetoothAudioManager.isBluetoothAudioConnected {
             Task { @MainActor in
-                await AudioTap.shared.startCaptureWithGeneration()
+                await AudioTap.shared.startCapture()
             }
             setupAudioTapMusicObservers()
         }
@@ -788,7 +788,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] change in
                 if change.newValue && !(self?.bluetoothAudioManager.isBluetoothAudioConnected ?? false) {
                     Task { @MainActor in
-                        await AudioTap.shared.startCaptureWithGeneration()
+                        await AudioTap.shared.startCapture()
                     }
                     self?.setupAudioTapMusicObservers()
                 } else {
@@ -857,7 +857,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                     print("🎧 [DynamicIslandApp] Bluetooth disconnected — restoring real-time waveform")
                     Task { @MainActor in
-                        await AudioTap.shared.startCaptureWithGeneration()
+                        await AudioTap.shared.startCapture()
                     }
                     self?.setupAudioTapMusicObservers()
                 }
