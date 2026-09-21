@@ -24,7 +24,7 @@ jobs:
     strategy:
       matrix:
         # macos-14 runners cap at Xcode 16.2 (Swift 6.0); the app source needs Swift 6.1+.
-        macos_version: [macos-15, macos-26]
+        macos_version: [macos-15, macos-26, macos-27]
       fail-fast: false
     runs-on: ${{ matrix.macos_version }}
 
