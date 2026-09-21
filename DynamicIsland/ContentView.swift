@@ -2571,7 +2571,8 @@ struct ContentView: View {
     }
 
     private func handleScrollGesture(isDownward: Bool, translation: CGFloat, phase: NSEvent.Phase) {
-        if phase == .ended { isScrollGestureSpent = false }
+        // .began too: the scroll monitor drops .ended once the pointer leaves the shrunken surface, and drags never send .began.
+        if phase == .began || phase == .ended { isScrollGestureSpent = false }
         guard !isScrollGestureSpent else { return }
 
         let reverse = Defaults[.reverseScrollGestures]
