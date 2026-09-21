@@ -246,6 +246,9 @@ struct ContentView: View {
     @State private var isHoveringClosedMusicWaveformControl: Bool = false
 
     @State private var gestureProgress: CGFloat = .zero
+    @State private var isClosedActivityTucked = false
+    // One swipe performs one action; otherwise a close would roll straight into a tuck.
+    @State private var isScrollGestureSpent = false
     @State private var skipGestureActiveDirection: MusicManager.SkipDirection?
     @State private var isMusicControlWindowVisible = false
     @State private var pendingMusicControlTask: Task<Void, Never>?
@@ -518,6 +521,39 @@ struct ContentView: View {
 
     private var recordingLiveActivityVisibleOnClosedNotch: Bool {
         recordingHUDLayout.isVisible
+    }
+
+    private struct ClosedActivitySources: OptionSet {
+        let rawValue: Int
+
+        static let capsLock = Self(rawValue: 1 << 0)
+        static let music = Self(rawValue: 1 << 1)
+        static let timer = Self(rawValue: 1 << 2)
+        static let reminder = Self(rawValue: 1 << 3)
+        static let recording = Self(rawValue: 1 << 4)
+        static let download = Self(rawValue: 1 << 5)
+        static let localSend = Self(rawValue: 1 << 6)
+        static let doNotDisturb = Self(rawValue: 1 << 7)
+        static let privacy = Self(rawValue: 1 << 8)
+        static let extensionActivity = Self(rawValue: 1 << 9)
+        static let shelf = Self(rawValue: 1 << 10)
+    }
+
+    private var closedActivitySources: ClosedActivitySources {
+        let flags: [(isActive: Bool, source: ClosedActivitySources)] = [
+            (capsLockManager.isCapsLockActive, .capsLock),
+            (!musicManager.isPlayerIdle, .music),
+            (timerManager.isTimerActive, .timer),
+            (reminderManager.isActive, .reminder),
+            (recordingManager.isRecording, .recording),
+            (downloadManager.isDownloading, .download),
+            (localSendLiveActivityActive, .localSend),
+            (doNotDisturbManager.isDoNotDisturbActive, .doNotDisturb),
+            (privacyManager.hasAnyIndicator, .privacy),
+            (!extensionLiveActivityManager.activeActivities.isEmpty, .extensionActivity),
+            (!shelfState.isEmpty, .shelf),
+        ]
+        return ClosedActivitySources(flags.filter(\.isActive).map(\.source))
     }
 
     private var recordingHUDLayout: RecordingHUDLayout {
@@ -938,6 +974,21 @@ struct ContentView: View {
                     enqueueMusicControlWindowSync(forceRefresh: true, delay: 0.05)
                 }
             }
+            .onChange(of: isClosedActivityTucked) { _, tucked in
+                if tucked {
+                    cancelMusicControlWindowSync()
+                    hideMusicControlWindow()
+                } else {
+                    enqueueMusicControlWindowSync(forceRefresh: true, delay: 0.05)
+                }
+            }
+            .onChange(of: vm.notchState) { _, state in
+                if state == .open { isClosedActivityTucked = false }
+            }
+            // Something starting or stopping deserves to be seen, so it ends the tuck.
+            .onChange(of: closedActivitySources) { _, _ in
+                isClosedActivityTucked = false
+            }
             .onChange(of: lockScreenManager.isLocked) { _, locked in
                 if locked {
                     suppressMusicControlWindowUpdates()
@@ -1084,6 +1135,8 @@ struct ContentView: View {
                                       ? AnyTransition.move(edge: .trailing).combined(with: .opacity)
                                       : AnyTransition.opacity
                               )
+                      } else if vm.notchState == .closed && isClosedActivityTucked {
+                          Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                       } else if vm.notchState == .closed && capsLockManager.isCapsLockActive && Defaults[.enableCapsLockIndicator] && !vm.hideOnClosed && !lockScreenManager.isLocked {
                           InlineHUD(type: .constant(.capsLock), value: .constant(1.0), icon: .constant(""), hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
@@ -2388,7 +2441,7 @@ struct ContentView: View {
         PinnedLyricsView.shouldReserve(
             lyricsEnabled: enableLyrics,
             pinEnabled: pinLyricsWhenClosed,
-            surfaceEligible: vm.notchState == .closed && !vm.hideOnClosed
+            surfaceEligible: vm.notchState == .closed && !vm.hideOnClosed && !isClosedActivityTucked
                 && !lockScreenManager.isLocked && musicManager.isPlaying,
             availability: musicManager.lyricsAvailability
         )
@@ -2518,14 +2571,39 @@ struct ContentView: View {
     }
 
     private func handleScrollGesture(isDownward: Bool, translation: CGFloat, phase: NSEvent.Phase) {
+        if phase == .ended { isScrollGestureSpent = false }
+        guard !isScrollGestureSpent else { return }
+
         let reverse = Defaults[.reverseScrollGestures]
         let shouldOpen = isDownward ? !reverse : reverse
 
         if shouldOpen {
-            handleOpenScrollGesture(translation: translation, phase: phase)
+            if isClosedActivityTucked {
+                handleTuckScrollGesture(tuck: false, translation: translation)
+            } else {
+                handleOpenScrollGesture(translation: translation, phase: phase)
+            }
         } else {
             guard Defaults[.closeGestureEnabled] else { return }
-            handleCloseScrollGesture(translation: translation, phase: phase)
+            if vm.notchState == .closed {
+                handleTuckScrollGesture(tuck: true, translation: translation)
+            } else {
+                handleCloseScrollGesture(translation: translation, phase: phase)
+            }
+        }
+    }
+
+    private func handleTuckScrollGesture(tuck: Bool, translation: CGFloat) {
+        guard vm.notchState == .closed, !vm.hideOnClosed else { return }
+        guard translation > Defaults[.gestureSensitivity] else { return }
+        guard !tuck || !closedActivitySources.isEmpty else { return }
+
+        isScrollGestureSpent = true
+        withAnimation(.smooth) {
+            isClosedActivityTucked = tuck
+        }
+        if Defaults[.enableHaptics] {
+            triggerHapticIfAllowed()
         }
     }
 
@@ -2572,6 +2650,7 @@ struct ContentView: View {
         }
 
         if translation > Defaults[.gestureSensitivity] {
+            isScrollGestureSpent = true
             withAnimation(.smooth) {
                 gestureProgress = .zero
                 isHovering = false
@@ -2785,6 +2864,7 @@ struct ContentView: View {
               standardMediaControlsActive,
               vm.notchState == .closed,
               !vm.hideOnClosed,
+              !isClosedActivityTucked,
               !lockScreenManager.isLocked,
               !isMusicHUDDeferredAfterUnlock,
               !isMusicControlWindowSuppressed else {
