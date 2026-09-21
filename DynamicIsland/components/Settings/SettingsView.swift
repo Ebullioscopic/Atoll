@@ -3516,7 +3516,6 @@ struct Media: View {
                         customBadge(text: "Beta")
                     }
                 }
-                .disabled(bluetoothManager.isBluetoothAudioConnected)
                 .settingsHighlight(id: highlightID("Enable real-time waveform"))
                 
                 Picker("Visualizer candles", selection: $visualizerBarCount) {
@@ -3531,15 +3530,14 @@ struct Media: View {
                 }
                 
                 Toggle("Scrubbable real-time waveform", isOn: $enableWaveformScrubber)
-                    .disabled(bluetoothManager.isBluetoothAudioConnected)
             } header: {
                 Text("Music Visualizer")
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("When enabled, the music visualizer displays real-time audio spectrum data synced to your music. Requires macOS 14.2+ and uses minimal CPU/GPU resources via the Accelerate framework.")
                     if bluetoothManager.isBluetoothAudioConnected {
-                        Text("⚠️ Disabled: Real-time waveform is not supported on Bluetooth output due to macOS CoreAudio limitations. Works on internal speakers and wired headphones.")
-                            .foregroundStyle(.orange)
+                        Text("macOS can't capture Bluetooth output, so the standard visualizer is shown while a Bluetooth audio device is connected. The real-time waveform returns on internal speakers and wired headphones.")
+                            .foregroundStyle(.secondary)
                             .font(.caption)
                     }
                 }

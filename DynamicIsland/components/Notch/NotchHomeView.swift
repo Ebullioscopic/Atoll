@@ -1314,6 +1314,7 @@ struct CustomSlider: View {
     @State private var isHovering: Bool = false
     @Default(.enableRealTimeWaveform) var enableRealTimeWaveform
     @Default(.enableWaveformScrubber) var enableWaveformScrubber
+    @ObservedObject private var bluetoothAudioManager = BluetoothAudioManager.shared
 
     private var isEngaged: Bool { dragging || isHovering }
 
@@ -1335,7 +1336,7 @@ struct CustomSlider: View {
             let progress = rangeSpan == .zero ? 0 : (value - range.lowerBound) / rangeSpan
             let filledTrackWidth = min(max(progress, 0), 1) * max(1, width)
             
-            let showWaveform = showsWaveform && enableRealTimeWaveform
+            let showWaveform = showsWaveform && enableRealTimeWaveform && !bluetoothAudioManager.isBluetoothAudioConnected
             let showScrubber = showWaveform && enableWaveformScrubber
 
             ZStack(alignment: .bottomLeading) {
