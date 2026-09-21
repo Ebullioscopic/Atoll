@@ -1513,6 +1513,10 @@ struct ConferenceJoinButton: View {
     
     var body: some View {
         Button(action: {
+            if provider == .zoom {
+                openURL(url)
+                return
+            }
             if let scheme = provider.nativeURLScheme,
                var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
                 components.scheme = scheme

@@ -148,10 +148,10 @@ enum ExtensionPermissionScope: String, CaseIterable, Codable, Defaults.Serializa
 
     var displayName: String {
         switch self {
-        case .liveActivities: return "Live Activities"
-        case .lockScreenWidgets: return "Lock Screen Widgets"
-        case .notchExperiences: return "Notch Experiences"
-        case .fileSharing: return "File Sharing"
+        case .liveActivities: return String(localized: "Live Activities")
+        case .lockScreenWidgets: return String(localized: "Lock Screen Widgets")
+        case .notchExperiences: return String(localized: "Notch Experiences")
+        case .fileSharing: return String(localized: "File Sharing")
         }
     }
 }
@@ -263,8 +263,8 @@ enum FantasticalViewStyle: String, CaseIterable, Codable, Defaults.Serializable 
     
     var displayName: String {
         switch self {
-        case .mini: return "Mini View"
-        case .calendar: return "Full Calendar"
+        case .mini: return String(localized: "Mini View")
+        case .calendar: return String(localized: "Full Calendar")
         }
     }
 }
@@ -355,15 +355,15 @@ enum ColorPickerDisplayMode: String, CaseIterable, Codable, Defaults.Serializabl
     
     var displayName: String {
         switch self {
-        case .popover: return "Popover"
-        case .panel: return "Panel"
+        case .popover: return String(localized: "Popover")
+        case .panel: return String(localized: "Panel")
         }
     }
     
     var description: String {
         switch self {
-        case .popover: return "Shows color picker as a dropdown attached to the color picker button"
-        case .panel: return "Shows color picker in a floating panel near the notch"
+        case .popover: return String(localized: "Shows color picker as a dropdown attached to the color picker button")
+        case .panel: return String(localized: "Shows color picker in a floating panel near the notch")
         }
     }
 }
@@ -405,6 +405,21 @@ extension Notification.Name {
 
 // Media controller types for selection in settings
 /// How the line being sung is picked out from the rest.
+enum PinnedLyricContext: Int, CaseIterable, Identifiable, Defaults.Serializable {
+    case current = 1
+    case three = 3
+    case five = 5
+
+    var id: Int { rawValue }
+    var localizedName: String {
+        switch self {
+        case .current: return String(localized: "Current")
+        case .three: return String(localized: "3 lines")
+        case .five: return String(localized: "5 lines")
+        }
+    }
+}
+
 enum LyricHighlightStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
     case sweep = "Sweep"
     case gradient = "Gradient"
@@ -588,13 +603,13 @@ enum MusicAuxiliaryControl: String, CaseIterable, Identifiable, Defaults.Seriali
     var displayName: String {
         switch self {
         case .shuffle:
-            return "Shuffle"
+            return String(localized: "Shuffle")
         case .repeatMode:
-            return "Repeat"
+            return String(localized: "Repeat")
         case .mediaOutput:
-            return "Media Output"
+            return String(localized: "Media Output")
         case .lyrics:
-            return "Lyrics"
+            return String(localized: "Lyrics")
         }
     }
 
@@ -788,11 +803,11 @@ enum AIModelProvider: String, CaseIterable, Identifiable, Defaults.Serializable 
     
     var description: String {
         switch self {
-        case .gemini: return "Google's Gemini AI with multimodal capabilities"
-        case .openai: return "OpenAI's GPT models with advanced reasoning"
-        case .claude: return "Anthropic's Claude with strong analytical skills"
-        case .local: return "Local AI model (Ollama or similar)"
-        case .groq: return "Groq's fast inference for OpenAI-compatible models"
+        case .gemini: return String(localized: "Google's Gemini AI with multimodal capabilities")
+        case .openai: return String(localized: "OpenAI's GPT models with advanced reasoning")
+        case .claude: return String(localized: "Anthropic's Claude with strong analytical skills")
+        case .local: return String(localized: "Local AI model (Ollama or similar)")
+        case .groq: return String(localized: "Groq's fast inference for OpenAI-compatible models")
         }
     }
     
@@ -1494,6 +1509,7 @@ extension Defaults.Keys {
     /// Whether the sung line is swept or simply lit.
     static let lyricHighlightStyle = Key<LyricHighlightStyle>("lyricHighlightStyle", default: .sweep)
     /// Keeps the current line under the closed notch after the panel is gone.
+    static let pinnedLyricContext = Key<PinnedLyricContext>("pinnedLyricContext", default: .current)
     static let pinLyricsWhenClosed = Key<Bool>("pinLyricsWhenClosed", default: false)
     static let lyricsPanelWidth = Key<CGFloat>("lyricsPanelWidth", default: 280)
     static let lyricsPanelOffset = Key<CGFloat>("lyricsPanelOffset", default: 0)

@@ -102,7 +102,7 @@
     },
     {
       "id": "anthropic/claude-opus-5",
-      "name": "Claude Opus 5",
+      "name": "Anthropic: Claude Opus 5",
       "pricing": {
         "prompt": "0.000005",
         "completion": "0.000025",
@@ -193,16 +193,6 @@
     {
       "id": "google/gemini-2.5-pro-preview",
       "name": "Google: Gemini 2.5 Pro Preview 06-05",
-      "pricing": {
-        "prompt": "0.00000125",
-        "completion": "0.00001",
-        "cache_read": "0.000000125",
-        "cache_write": "0.000000375"
-      }
-    },
-    {
-      "id": "google/gemini-2.5-pro-preview-05-06",
-      "name": "Google: Gemini 2.5 Pro Preview 05-06",
       "pricing": {
         "prompt": "0.00000125",
         "completion": "0.00001",
@@ -413,16 +403,6 @@
     {
       "id": "openai/gpt-4-turbo",
       "name": "OpenAI: GPT-4 Turbo",
-      "pricing": {
-        "prompt": "0.00001",
-        "completion": "0.00003",
-        "cache_read": "",
-        "cache_write": ""
-      }
-    },
-    {
-      "id": "openai/gpt-4-turbo-preview",
-      "name": "OpenAI: GPT-4 Turbo Preview",
       "pricing": {
         "prompt": "0.00001",
         "completion": "0.00003",
@@ -854,9 +834,9 @@
       "id": "openai/gpt-oss-120b",
       "name": "OpenAI: gpt-oss-120b",
       "pricing": {
-        "prompt": "0.000000037",
-        "completion": "0.00000017",
-        "cache_read": "",
+        "prompt": "0.00000015",
+        "completion": "0.0000006",
+        "cache_read": "0.000000075",
         "cache_write": ""
       }
     },
@@ -941,5 +921,5 @@
       }
     }
   ],
-  "last_updated": "2026-09-12T00:06:41Z"
+  "last_updated": "2026-09-21T00:07:36Z"
 }

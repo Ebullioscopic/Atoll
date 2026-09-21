@@ -714,12 +714,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.Keys.migrateClipboardShortcutToV()
 
         Defaults.publisher(.enableThirdPartyDDCIntegration, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { _ in
                 Defaults.Keys.syncLegacyThirdPartyDDCKeys()
             }
             .store(in: &cancellables)
 
         Defaults.publisher(.thirdPartyDDCProvider, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { _ in
                 Defaults.Keys.syncLegacyThirdPartyDDCKeys()
             }
@@ -732,6 +734,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         installTopMenuItemsIfNeeded()
 
         Defaults.publisher(.focusMonitoringMode, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateFocusMenuState()
             }
@@ -776,6 +779,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Observe enableRealTimeWaveform changes
         Defaults.publisher(.enableRealTimeWaveform, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 if change.newValue {
                     Task {
@@ -1127,7 +1131,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let insertionIndex = preferredMenuInsertionIndex(in: mainMenu)
 
-        let focusMenuItem = NSMenuItem(title: "Focus", action: nil, keyEquivalent: "")
+        let focusMenuItem = NSMenuItem(title: String(localized: "Focus"), action: nil, keyEquivalent: "")
         focusMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Focus.Menu")
         let focusSubmenu = NSMenu(title: "Focus")
 
@@ -1153,7 +1157,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         focusWithoutDevToolsMenuItem = withoutDevTools
         focusUseDevToolsMenuItem = useDevTools
 
-        let accessibilityMenuItem = NSMenuItem(title: "Accessibility", action: nil, keyEquivalent: "")
+        let accessibilityMenuItem = NSMenuItem(title: String(localized: "Accessibility"), action: nil, keyEquivalent: "")
         accessibilityMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Accessibility.Menu")
         let accessibilitySubmenu = NSMenu(title: "Accessibility")
 
@@ -1176,7 +1180,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         accessibilityMenuItem.submenu = accessibilitySubmenu
         mainMenu.insertItem(accessibilityMenuItem, at: insertionIndex + 1)
 
-        let permissionsMenuItem = NSMenuItem(title: "Permissions", action: nil, keyEquivalent: "")
+        let permissionsMenuItem = NSMenuItem(title: String(localized: "Permissions"), action: nil, keyEquivalent: "")
         permissionsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Permissions.Menu")
         let permissionsSubmenu = NSMenu(title: "Permissions")
 
@@ -1208,19 +1212,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         permissionsMenuItem.submenu = permissionsSubmenu
         mainMenu.insertItem(permissionsMenuItem, at: insertionIndex + 2)
 
-        let toolsMenuItem = NSMenuItem(title: "Tools", action: nil, keyEquivalent: "")
+        let toolsMenuItem = NSMenuItem(title: String(localized: "Tools"), action: nil, keyEquivalent: "")
         toolsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Tools.Menu")
         let toolsSubmenu = NSMenu(title: "Tools")
 
-        let loggingLevelItem = NSMenuItem(title: "Logging Level", action: nil, keyEquivalent: "")
+        let loggingLevelItem = NSMenuItem(title: String(localized: "Logging Level"), action: nil, keyEquivalent: "")
+        loggingLevelItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Tools.LoggingLevel")
         let loggingLevelSubmenu = NSMenu(title: "Logging Level")
         
+        // Dispatched by tag, so the titles are safe to localize.
         let levels: [(String, LogLevel)] = [
-            ("No Logging", .none),
-            ("Error", .error),
-            ("Warning", .warning),
-            ("Info", .info),
-            ("Debug", .debug)
+            (String(localized: "No Logging"), .none),
+            (String(localized: "Error"), .error),
+            (String(localized: "Warning"), .warning),
+            (String(localized: "Info"), .info),
+            (String(localized: "Debug"), .debug)
         ]
         
         for (title, level) in levels {
@@ -1235,7 +1241,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         toolsSubmenu.addItem(NSMenuItem.separator())
         
-        let exportLogsItem = NSMenuItem(title: "Export Logs", action: #selector(exportLogs), keyEquivalent: "")
+        let exportLogsItem = NSMenuItem(title: String(localized: "Export Logs"), action: #selector(exportLogs), keyEquivalent: "")
         exportLogsItem.target = self
         toolsSubmenu.addItem(exportLogsItem)
 
@@ -1305,10 +1311,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let level = LogLevel(rawValue: sender.tag) else { return }
         Defaults[.logLevel] = level
         
+        // Look these up by identifier: the titles are localized.
         guard let mainMenu = NSApp.mainMenu,
-              let toolsItem = mainMenu.item(withTitle: "Tools"),
+              let toolsItem = mainMenu.items.first(where: { $0.identifier?.rawValue == "Atoll.Tools.Menu" }),
               let toolsMenu = toolsItem.submenu,
-              let loggingItem = toolsMenu.items.first(where: { $0.title == "Logging Level" }),
+              let loggingItem = toolsMenu.items.first(where: { $0.identifier?.rawValue == "Atoll.Tools.LoggingLevel" }),
               let loggingSubmenu = loggingItem.submenu else { return }
               
         for item in loggingSubmenu.items {
@@ -1367,16 +1374,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     
                     DispatchQueue.main.async {
                         let alert = NSAlert()
-                        alert.messageText = "Logs Exported"
-                        alert.informativeText = "Logs and crash reports have been successfully exported to \(url.lastPathComponent)."
+                        alert.messageText = String(localized: "Logs Exported")
+                        alert.informativeText = String(localized: "Logs and crash reports have been successfully exported to \(url.lastPathComponent).")
                         alert.alertStyle = .informational
                         alert.runModal()
                     }
                 } catch {
                     DispatchQueue.main.async {
                         let alert = NSAlert()
-                        alert.messageText = "Export Failed"
-                        alert.informativeText = "Failed to export logs: \(error.localizedDescription)"
+                        alert.messageText = String(localized: "Export Failed")
+                        alert.informativeText = String(localized: "Failed to export logs: \(error.localizedDescription)")
                         alert.alertStyle = .critical
                         alert.runModal()
                     }

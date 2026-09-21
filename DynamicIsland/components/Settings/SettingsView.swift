@@ -314,6 +314,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .media, title: "Music Source", keywords: ["media source", "controller"], highlightID: SettingsTab.media.highlightID(for: "Music Source")),
         SettingsSearchEntry(tab: .media, title: "Skip buttons", keywords: ["skip", "controls", "±10"], highlightID: SettingsTab.media.highlightID(for: "Skip buttons")),
         SettingsSearchEntry(tab: .media, title: "Sneak Peek Style", keywords: ["sneak peek", "preview"], highlightID: SettingsTab.media.highlightID(for: "Sneak Peek Style")),
+        SettingsSearchEntry(tab: .media, title: "Pinned lyric context", keywords: ["pinned lyrics", "lyric context", "lyrics lines", "closed notch", "lyrics height"], highlightID: SettingsTab.media.highlightID(for: "Pinned lyric context")),
         SettingsSearchEntry(tab: .media, title: "Keep lyrics under the closed notch", keywords: ["lyrics", "pin", "pinned", "closed notch", "always show"], highlightID: SettingsTab.media.highlightID(for: "Keep lyrics under the closed notch")),
         SettingsSearchEntry(tab: .media, title: "Show lyrics", keywords: ["lyrics", "song text", "side panel", "calendar", "inline"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
         // Targets the lyrics toggle rather than the Highlight picker: the picker
@@ -3174,6 +3175,8 @@ struct Media: View {
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
     @Default(.showCalendar) private var showCalendar
     @Default(.enableLyrics) private var enableLyrics
+    @Default(.pinLyricsWhenClosed) private var pinLyricsWhenClosed
+    @Default(.pinnedLyricContext) private var pinnedLyricContext
     @Default(.lyricHighlightStyle) private var lyricHighlightStyle
     @Default(.lyricsPanelWidth) private var lyricsPanelWidth
     @Default(.lyricsPanelOffset) private var lyricsPanelOffset
@@ -3403,7 +3406,16 @@ struct Media: View {
                     }
                     .settingsHighlight(id: highlightID("Keep lyrics under the closed notch"))
 
-                    Text("Shows the line currently being sung below the notch while it is closed, so lyrics stay readable without hovering. Can also be toggled from the pin on the lyrics panel. Hidden while a HUD is on screen.")
+                    SettingsSegmentedPicker(
+                        "Pinned lyric context",
+                        selection: $pinnedLyricContext,
+                        items: Array(PinnedLyricContext.allCases)
+                    ) { $0.localizedName }
+                    .disabled(!pinLyricsWhenClosed)
+                    .settingsHighlight(id: highlightID("Pinned lyric context"))
+
+
+                    Text("Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen. Can also be toggled from the pin on the lyrics panel.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -3703,14 +3715,14 @@ struct CalendarSettings: View {
 
         var title: String {
             switch self {
-            case .mins15: return "15 mins"
-            case .mins30: return "30 mins"
-            case .hour1: return "1 hour"
-            case .hours3: return "3 hours"
-            case .hours6: return "6 hours"
-            case .hours12: return "12 hours"
-            case .restOfDay: return "Rest of the day"
-            case .allTime: return "All time"
+            case .mins15: return String(localized: "15 mins")
+            case .mins30: return String(localized: "30 mins")
+            case .hour1: return String(localized: "1 hour")
+            case .hours3: return String(localized: "3 hours")
+            case .hours6: return String(localized: "6 hours")
+            case .hours12: return String(localized: "12 hours")
+            case .restOfDay: return String(localized: "Rest of the day")
+            case .allTime: return String(localized: "All time")
             }
         }
     }
@@ -4284,9 +4296,9 @@ private extension DevicesSettingsView {
         var title: String {
             switch self {
             case .symbol:
-                return "Symbol"
+                return String(localized: "Symbol")
             case .threeD:
-                return "3D"
+                return String(localized: "3D")
             }
         }
     }
@@ -5716,14 +5728,14 @@ struct LockScreenSettings: View {
 
         var title: String {
             switch self {
-            case .mins15: return "15 mins"
-            case .mins30: return "30 mins"
-            case .hour1: return "1 hour"
-            case .hours3: return "3 hours"
-            case .hours6: return "6 hours"
-            case .hours12: return "12 hours"
-            case .restOfDay: return "Rest of the day"
-            case .allTime: return "All time"
+            case .mins15: return String(localized: "15 mins")
+            case .mins30: return String(localized: "30 mins")
+            case .hour1: return String(localized: "1 hour")
+            case .hours3: return String(localized: "3 hours")
+            case .hours6: return String(localized: "6 hours")
+            case .hours12: return String(localized: "12 hours")
+            case .restOfDay: return String(localized: "Rest of the day")
+            case .allTime: return String(localized: "All time")
             }
         }
     }
@@ -5737,9 +5749,9 @@ struct LockScreenSettings: View {
 
         var title: String {
             switch self {
-            case .leading: return "Left"
-            case .center: return "Center"
-            case .trailing: return "Right"
+            case .leading: return String(localized: "Left")
+            case .center: return String(localized: "Center")
+            case .trailing: return String(localized: "Right")
             }
         }
     }
@@ -7083,8 +7095,8 @@ private func copyLatestCrashReport() {
 
         guard let latestCrash = crashFiles.sorted(by: >).first else {
             let alert = NSAlert()
-            alert.messageText = "No Crash Reports Found"
-            alert.informativeText = "No crash reports found for DynamicIsland"
+            alert.messageText = String(localized: "No Crash Reports Found")
+            alert.informativeText = String(localized: "No crash reports found for DynamicIsland")
             alert.alertStyle = .informational
             alert.runModal()
             return
@@ -7097,14 +7109,14 @@ private func copyLatestCrashReport() {
         NSPasteboard.general.setString(crashContent, forType: .string)
 
         let alert = NSAlert()
-        alert.messageText = "Crash Report Copied"
-        alert.informativeText = "Crash report '\(latestCrash)' has been copied to clipboard"
+        alert.messageText = String(localized: "Crash Report Copied")
+        alert.informativeText = String(localized: "Crash report '\(latestCrash)' has been copied to clipboard")
         alert.alertStyle = .informational
         alert.runModal()
     } catch {
         let alert = NSAlert()
-        alert.messageText = "Error"
-        alert.informativeText = "Failed to read crash reports: \(error.localizedDescription)"
+        alert.messageText = String(localized: "Error")
+        alert.informativeText = String(localized: "Failed to read crash reports: \(error.localizedDescription)")
         alert.alertStyle = .warning
         alert.runModal()
     }
