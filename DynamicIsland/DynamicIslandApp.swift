@@ -694,6 +694,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 GIStore.shared.startDemo()
                 GIReaderWindowController.shared.show()
+                GINotchPreviewProbe.run(app: self)
             }
         }
         let userInfo: [String: Any] = [

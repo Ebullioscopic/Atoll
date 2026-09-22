@@ -27,10 +27,6 @@ final class GIReaderWindowController: NSWindowController {
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        if ProcessInfo.processInfo.arguments.contains("--gitee-notch-preview"), GIStore.shared.demoMode {
-            window?.orderOut(nil)
-            GINotchPreviewProbe.run()
-        }
         // Explicit synthetic UI preview only; ordinary launches are unchanged.
         if ProcessInfo.processInfo.arguments.contains("--gitee-settings-preview") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { GISettingsNavigation.shared.open() }
@@ -65,7 +61,7 @@ struct GINotchView: View {
             .accessibilityIdentifier("gitee-notch-header")
 
             ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     if store.account == nil {
                         if store.isConnecting {
                             message("正在连接 Gitee…", detail: "正在验证账户并恢复查看项目。")
@@ -109,7 +105,7 @@ struct GINotchView: View {
                                     Text(item.issue.stateTitle).font(.system(size: 10))
                                         .foregroundStyle(secondary).fixedSize()
                                 }
-                                .padding(.horizontal, 8).padding(.vertical, 5)
+                                .padding(.horizontal, 8).padding(.vertical, 3)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 7))
                                 .contentShape(Rectangle())
@@ -430,12 +426,15 @@ enum GIPasteboard {
 }
 
 /// Explicit synthetic regression only. Never runs on a normal application launch.
+/// The real delegate is passed from the existing demo launch closure: SwiftUI may
+/// install a delegate adaptor, so NSApp.delegate must not be cast to AppDelegate.
 @MainActor
-private enum GINotchPreviewProbe {
-    static func run() {
-        guard let app = AppDelegate.shared,
-              let output = ProcessInfo.processInfo.environment["TOOLISLE_NOTCH_PREVIEW_RESULT"] else { return }
+enum GINotchPreviewProbe {
+    static func run(app: AppDelegate) {
         let args = ProcessInfo.processInfo.arguments
+        guard args.contains("--gitee-notch-preview"), GIStore.shared.demoMode,
+              let output = ProcessInfo.processInfo.environment["TOOLISLE_NOTCH_PREVIEW_RESULT"] else { return }
+        GIReaderWindowController.shared.window?.orderOut(nil)
         NSApp.appearance = NSAppearance(named: args.contains("--notch-dark") ? .darkAqua : .aqua)
         Defaults[.enableMinimalisticUI] = false
         let coordinator = DynamicIslandViewCoordinator.shared
@@ -450,13 +449,16 @@ private enum GINotchPreviewProbe {
             let value: [String: Any] = [
                 "synthetic_data": true, "private_account_tested": false,
                 "window_id": window?.windowNumber ?? -1,
-                "width": window?.frame.width ?? 0, "height": window?.frame.height ?? 0,
+                "width": Double(window?.frame.width ?? 0), "height": Double(window?.frame.height ?? 0),
                 "gitee_selected": coordinator.currentView == .giteeIssues,
                 "loaded": GIStore.shared.items.count, "filtered": GIStore.shared.filteredItems.count,
                 "outer_appearance": args.contains("--notch-dark") ? "dark" : "light"
             ]
-            if let data = try? JSONSerialization.data(withJSONObject: value, options: .prettyPrinted) {
-                try? data.write(to: URL(fileURLWithPath: output))
+            do {
+                let data = try JSONSerialization.data(withJSONObject: value, options: .prettyPrinted)
+                try data.write(to: URL(fileURLWithPath: output))
+            } catch {
+                try? String(describing: error).write(toFile: output + ".error", atomically: true, encoding: .utf8)
             }
         }
     }
