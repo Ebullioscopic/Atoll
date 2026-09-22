@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 concurrency:
   group: toolisle-gitee-reader-preview
   cancel-in-progress: false
@@ -26,19 +29,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Apply checked integration only
+      - name: Apply checked feature integration and window refinements
         run: |
+          set -euo pipefail
+          python3 scripts/integrate_gitee_reader.py
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('scripts/integrate_gitee_reader.py')
-          p.write_text(p.read_text().replace('if old not in value and new in value: return','if new in value: return'))
+          import importlib.util
+          spec=importlib.util.spec_from_file_location('integrate','scripts/integrate_gitee_reader.py')
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          path='DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift'
+          m.replace(path,'width: 1040, height: 720','width: 960, height: 660')
+          m.replace(path,'        super.init(window: window)\n','        super.init(window: window)\n        window.collectionBehavior = [.managed, .participatesInCycle]\n        window.hidesOnDeactivate = false\n        ScreenCaptureVisibilityManager.shared.register(window, scope: .panelsOnly)\n')
+          m.replace(path,'idealWidth: 300, maxWidth: 370','idealWidth: 280, maxWidth: 320')
+          # Surface third-party licenses inside the reader, as well as in source/package resources.
+          m.replace(path,'            Button("账户与项目设置…") { GIReaderWindowController.shared.show() }','            Button("账户与项目设置…") { GIReaderWindowController.shared.show() }\n            Button("Markdown 组件许可证…") {\n                if let url = Bundle.main.url(forResource: "gitee-markdown-licenses", withExtension: "txt") { NSWorkspace.shared.open(url) }\n            }')
           PY
-          python3 scripts/integrate_gitee_reader.py
-      - name: Vendor pinned Markdown renderer with licenses, no runtime CDN
+      - name: Vendor pinned local Markdown with inert parsing and licenses
         run: |
+          set -euo pipefail
           mkdir -p third_party/gitee-markdown "$RUNNER_TEMP/gitee-vendor"
           python3 - <<'PY'
-          import json, os
+          import json,os
           from pathlib import Path
           source=Path('third_party/gitee-markdown')
           package={'name':'toolisle-gitee-markdown-build','private':True,'version':'0.1.0','dependencies':{'marked':'18.0.9','dompurify':'3.4.15','esbuild':'0.25.12','jsdom':'27.0.1'}}
@@ -46,11 +58,19 @@ jobs:
           entry='''import { marked } from 'marked';
           import DOMPurify from 'dompurify';
           export function render(source) {
-            return DOMPurify.sanitize(marked.parse(source, {gfm:true, breaks:false}), {
-              ALLOWED_TAGS:['p','br','hr','h1','h2','h3','h4','h5','h6','a','strong','em','b','i','del','s','blockquote','pre','code','ul','ol','li','table','thead','tbody','tr','th','td','img','details','summary','input','kbd','sup','sub'],
+            // Both parsing and sanitization happen in an inert template document.
+            // An image must not fetch before the reader's explicit image opt-in gate.
+            const template = document.createElement('template');
+            const wrapper = document.createElement('div');
+            template.content.append(wrapper);
+            wrapper.innerHTML = marked.parse(source, {gfm:true, breaks:false});
+            DOMPurify.sanitize(wrapper, {
+              IN_PLACE:true,
+              ALLOWED_TAGS:['div','p','br','hr','h1','h2','h3','h4','h5','h6','a','strong','em','b','i','del','s','blockquote','pre','code','ul','ol','li','table','thead','tbody','tr','th','td','img','details','summary','input','kbd','sup','sub'],
               ALLOWED_ATTR:['href','title','src','alt','colspan','rowspan','align','type','checked','disabled','start'],
               ALLOW_DATA_ATTR:false, ALLOW_ARIA_ATTR:false, RETURN_TRUSTED_TYPE:false
             });
+            return wrapper.innerHTML;
           }
           '''
           (source/'entry.js').write_text(entry)
@@ -72,6 +92,7 @@ jobs:
           assert(render('```swift\nlet a = 1\n```').includes('<pre><code'));
           assert(render('[关联](https://gitee.com/team/repo/issues/IABC)').includes('href="https://gitee.com/'));
           assert(render('- [x] done').includes('checked'));
+          assert(!dom.window.pwned);
           console.log('PASS: real bundled Markdown table/code/link/task rendering and HTML sanitization assertions.');
           JS
           cd "$GITHUB_WORKSPACE"
@@ -86,18 +107,23 @@ jobs:
               p=tmp/'node_modules'/name
               package=json.loads((p/'package.json').read_text())
               license_text.append(f"\n{name} {package['version']}\n")
-              for f in sorted(p.glob('LICENSE*')):
-                  if f.is_file(): license_text.append(f.read_text())
+              matches=[f for f in sorted(p.glob('LICENSE*')) if f.is_file()]
+              assert matches,f'Missing package license: {name}'
+              license_text.extend(f.read_text() for f in matches)
           text='\n'.join(license_text)
           assert len(text)>2000
           (out/'gitee-markdown-licenses.txt').write_text(text)
-          (Path('third_party/gitee-markdown')/'package-lock.json').write_bytes((tmp/'package-lock.json').read_bytes())
-          (Path('third_party/gitee-markdown')/'SHA256SUMS.txt').write_text(hashlib.sha256((out/'gitee-markdown.js').read_bytes()).hexdigest()+'  gitee-markdown.js\n')
+          third=Path('third_party/gitee-markdown')
+          (third/'package-lock.json').write_bytes((tmp/'package-lock.json').read_bytes())
+          (third/'SHA256SUMS.txt').write_text(hashlib.sha256((out/'gitee-markdown.js').read_bytes()).hexdigest()+'  gitee-markdown.js\n')
           PY
-      - name: Commit only auditable feature scope
+      - name: Commit audited feature scope and mandatory license resources
         id: commit
         run: |
+          set -euo pipefail
           git add DynamicIsland/ToolIsleFeatures/Gitee DynamicIsland/enums/generic.swift DynamicIsland/ContentView.swift DynamicIsland/DynamicIslandViewCoordinator.swift DynamicIsland/DynamicIslandApp.swift DynamicIsland/components/Tabs/TabSelectionView.swift DynamicIsland/components/Settings/SettingsView.swift DynamicIsland.xcodeproj/project.pbxproj scripts/integrate_gitee_reader.py third_party/gitee-markdown
+          # The upstream ignore rules omit .txt files; legal resources must be tracked explicitly.
+          git add -f DynamicIsland/ToolIsleFeatures/Gitee/Resources/gitee-markdown-licenses.txt third_party/gitee-markdown/SHA256SUMS.txt
           python3 - <<'PY'
           import subprocess
           base='9527eed3a9dcf64edbea65374de6c643265b68d3'
@@ -107,11 +133,12 @@ jobs:
           assert not [p for p in changes if p in old and p not in allowed],changes
           for p in changes:
               assert p in allowed or p.startswith(('DynamicIsland/ToolIsleFeatures/Gitee/','third_party/gitee-markdown/')) or p in {'scripts/integrate_gitee_reader.py','tests/GiteeReaderRegression.swift','TOOLISLE-GITEE-READER.md','.github/workflows/toolisle-gitee-reader.yml'},p
+          subprocess.run(['git','ls-files','--error-unmatch','DynamicIsland/ToolIsleFeatures/Gitee/Resources/gitee-markdown-licenses.txt','third_party/gitee-markdown/SHA256SUMS.txt'],check=True)
           PY
           if ! git diff --cached --quiet; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'feat(gitee): integrate optional reader in original Atoll target; vendor sanitized Markdown'
+            git commit -m 'fix(gitee): finalize inert rendering, window integration and packaged licenses'
             git push origin HEAD:refs/heads/feat/gitee-issue-reader
           fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -138,6 +165,7 @@ jobs:
           xcode-version: latest-stable
       - name: Scope and baseline audit
         run: |
+          set -euo pipefail
           mkdir -p "$RUNNER_TEMP/gitee-output"
           { sw_vers; xcodebuild -version; uname -m; git rev-parse HEAD; } > "$RUNNER_TEMP/gitee-output/environment.txt"
           python3 - <<'PY' | tee "$RUNNER_TEMP/gitee-output/source-audit.json"
@@ -150,7 +178,7 @@ jobs:
           count=0
           for path in old:
               if path in allowed:continue
-              p=Path(path); expected=subprocess.check_output(['git','show',f'{base}:{path}'])
+              p=Path(path);expected=subprocess.check_output(['git','show',f'{base}:{path}'])
               actual=str(p.readlink()).encode() if p.is_symlink() else p.read_bytes()
               if expected.startswith(b'version https://git-lfs'):
                   fields=dict(x.split(' ',1) for x in expected.decode().strip().splitlines())
@@ -161,15 +189,15 @@ jobs:
           PY
       - name: Original regressions and production Gitee core tests
         run: |
-          set -o pipefail
+          set -euo pipefail
           python3 -m unittest tests.test_privacy_configuration tests.test_timer_lifecycle tests.test_notch_display_selection 2>&1 | tee "$RUNNER_TEMP/gitee-output/upstream-tests.txt"
           swiftc DynamicIsland/ToolIsleFeatures/Gitee/GICore.swift tests/GiteeReaderRegression.swift -o "$RUNNER_TEMP/gitee-regression"
           "$RUNNER_TEMP/gitee-regression" | tee "$RUNNER_TEMP/gitee-output/gitee-tests.txt"
       - name: Fresh Release build of original Xcode target
         run: |
+          set -euo pipefail
           sudo xcodebuild -runFirstLaunch
           sudo xcodebuild -downloadComponent MetalToolchain
-          set -o pipefail
           xcodebuild build -project DynamicIsland.xcodeproj -scheme DynamicIsland -configuration Release \
             -destination 'platform=macOS,arch=arm64' -derivedDataPath "$RUNNER_TEMP/GiteeDerivedData" \
             -disableAutomaticPackageResolution ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
@@ -178,8 +206,9 @@ jobs:
             OTHER_CODE_SIGN_FLAGS='--timestamp=none' 2>&1 | tee "$RUNNER_TEMP/gitee-output/build.log"
           mkdir -p "$RUNNER_TEMP/ToolIsleGiteePreview"
           ditto "$RUNNER_TEMP/GiteeDerivedData/Build/Products/Release/ToolIsle.app" "$RUNNER_TEMP/ToolIsleGiteePreview/ToolIsle.app"
-      - name: Validate resources, preserve original permissions and sign preview
+      - name: Validate resources, retain original entitlements and sign preview
         run: |
+          set -euo pipefail
           export APP="$RUNNER_TEMP/ToolIsleGiteePreview/ToolIsle.app"
           codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/gitee-output/entitlements.plist"
           python3 - <<'PY' | tee "$RUNNER_TEMP/gitee-output/package-audit.json"
@@ -190,19 +219,24 @@ jobs:
           assert info['CFBundleExecutable']=='ToolIsle' and info['CFBundleDisplayName']=='ToolIsle'
           assert str(info['CFBundleVersion'])=='1639'
           for name in ('gitee-markdown.js','gitee-markdown-licenses.txt'):
-              assert (r/name).exists(),f'Missing automatic Xcode resource: {name}'
-          for p in Path('DynamicIsland/BluetoothHUDAnimations').glob('*.mov'):
-              assert not p.read_bytes().startswith(b'version https://git-lfs')
+              source=Path('DynamicIsland/ToolIsleFeatures/Gitee/Resources')/name
+              assert (r/name).is_file(),f'Missing Xcode resource: {name}'
+              assert (r/name).read_bytes()==source.read_bytes(),f'Resource mismatch: {name}'
+          assert (r/'gitee-markdown-licenses.txt').stat().st_size>2000
+          movies=list(Path('DynamicIsland/BluetoothHUDAnimations').glob('*.mov'));assert len(movies)==8
+          for p in movies:
+              data=p.read_bytes();assert not data.startswith(b'version https://git-lfs') and len(data)>100000
               (r/'BluetoothHUDAnimations').mkdir(exist_ok=True)
               shutil.copy2(p,r/p.name);shutil.copy2(p,r/'BluetoothHUDAnimations'/p.name)
           permissions=plistlib.loads((Path(os.environ['RUNNER_TEMP'])/'gitee-output/entitlements.plist').read_bytes())
           assert 'com.ebullioscopic.Atoll.xpc' in permissions.get('com.apple.security.mach-services',[])
-          print(json.dumps({'app_name':info['CFBundleDisplayName'],'bundle_id':info['CFBundleIdentifier'],'version':info['CFBundleShortVersionString'],'build':info['CFBundleVersion'],'minimum_os':info.get('LSMinimumSystemVersion'),'markdown_sha256':hashlib.sha256((r/'gitee-markdown.js').read_bytes()).hexdigest(),'original_permissions_retained':True,'notarized':False},indent=2))
+          print(json.dumps({'app_name':info['CFBundleDisplayName'],'bundle_id':info['CFBundleIdentifier'],'version':info['CFBundleShortVersionString'],'build':info['CFBundleVersion'],'minimum_os':info.get('LSMinimumSystemVersion'),'markdown_sha256':hashlib.sha256((r/'gitee-markdown.js').read_bytes()).hexdigest(),'license_bytes':(r/'gitee-markdown-licenses.txt').stat().st_size,'real_movie_count':len(movies),'original_permissions_retained':True,'notarized':False},indent=2))
           PY
           codesign --force --sign '-' --timestamp=none --options runtime --entitlements "$RUNNER_TEMP/gitee-output/entitlements.plist" "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP" 2>&1 | tee "$RUNNER_TEMP/gitee-output/codesign.txt"
-      - name: Normal original startup and real WebKit A to B to A regression
+      - name: Normal startup and real WebKit cross-issue navigation
         run: |
+          set -euo pipefail
           python3 - <<'PY'
           import os,json,subprocess,time,socket
           from pathlib import Path
@@ -214,8 +248,7 @@ jobs:
           with (out/'normal-launch.log').open('w') as log:
               p=subprocess.Popen([str(binary)],stdout=log,stderr=subprocess.STDOUT)
               time.sleep(15)
-              alive=p.poll() is None
-              rpc=False
+              alive=p.poll() is None;rpc=False
               try:
                   with socket.create_connection(('127.0.0.1',9020),timeout=3):rpc=True
               except OSError:pass
@@ -233,20 +266,23 @@ jobs:
               assert (out/'webkit-navigation.json').exists(),'Real WKWebView navigation did not finish'
               report=json.loads((out/'webkit-navigation.json').read_text())
               assert report['initial']['hasRenderer'] and report['initial']['tableCount']>=1 and report['initial']['codeCount']>=1,report
+              assert report['initial']['imageCount']==0 and report['restored']['imageCount']==0,report
               assert report['linked']['title']=='共享模块：跨仓库问题跟踪',report
               assert report['restored']['title']=='Gitee Issue 阅读与关联跳转',report
               assert abs(report['restored']['y']-600)<12,report
               assert report['selected_repository_unchanged'] and report['selected_issue_unchanged'],report
           with (out/'gitee-preview.log').open('w') as log:
               p=subprocess.Popen([str(binary),'--gitee-reader-demo'],stdout=log,stderr=subprocess.STDOUT)
-              time.sleep(12)
-              assert p.poll() is None
+              time.sleep(12);assert p.poll() is None
               subprocess.run(['/usr/sbin/screencapture','-x',str(out/'gitee-reader-preview.png')],check=False)
               stop(p)
           PY
-      - name: Package application, exact source and reports
+      - name: Package application with exact source, licenses and reports
         run: |
+          set -euo pipefail
           cp TOOLISLE-GITEE-READER.md "$RUNNER_TEMP/ToolIsleGiteePreview/README-先读.md"
+          cp LICENSE NOTICE COPYRIGHT_ASSETS "$RUNNER_TEMP/ToolIsleGiteePreview/"
+          cp DynamicIsland/ToolIsleFeatures/Gitee/Resources/gitee-markdown-licenses.txt "$RUNNER_TEMP/ToolIsleGiteePreview/"
           ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/ToolIsleGiteePreview" "$RUNNER_TEMP/gitee-output/ToolIsle-2.3.3-gitee.1-macOS-arm64.zip"
           hdiutil create -volname 'ToolIsle Gitee Reader' -srcfolder "$RUNNER_TEMP/ToolIsleGiteePreview" -ov -format UDZO "$RUNNER_TEMP/gitee-output/ToolIsle-2.3.3-gitee.1-macOS-arm64.dmg"
           git archive --format=zip --prefix=ToolIsle-gitee-reader/ -o "$RUNNER_TEMP/gitee-output/ToolIsle-gitee-reader-source.zip" HEAD
@@ -255,7 +291,7 @@ jobs:
           cp TOOLISLE-GITEE-READER.md "$RUNNER_TEMP/gitee-output/"
           cd "$RUNNER_TEMP/gitee-output"
           shasum -a 256 *.zip *.dmg > SHA256SUMS.txt
-      - name: Collect failures without changing runtime behavior
+      - name: Collect failures without disabling original capabilities
         if: failure()
         run: |
           mkdir -p "$RUNNER_TEMP/gitee-output"
