@@ -25,34 +25,50 @@ jobs:
           fetch-depth: 0
           lfs: true
           ref: fix/gitee-settings-and-repo-path
-      - name: Commit only the scoped repair on its isolated branch
+      - name: Apply and commit narrowly scoped settings navigation refinements
         run: |
-          set -euo pipefail
-          if [ -f scripts/repair_gitee_settings_path.py ]; then
-            python3 scripts/repair_gitee_settings_path.py
-            python3 - <<'PY'
+          python3 - <<'PY'
           from pathlib import Path
-          p=Path('tests/GiteeRepositoryPathRegression.swift')
-          p.write_text(p.read_text().replace(')==.issue', ') == .issue'))
-          p=Path('DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift')
-          s=p.read_text();old='''        NSApp.activate(ignoringOtherApps: true)
-              }
-          }'''
-          new='''        NSApp.activate(ignoringOtherApps: true)
-                  // Explicit synthetic UI preview only; ordinary launches are unchanged.
-                  if ProcessInfo.processInfo.arguments.contains("--gitee-settings-preview") {
-                      DispatchQueue.main.asyncAfter(deadline: .now() + 1) { GISettingsNavigation.shared.open() }
-                  }
-              }
-          }'''
-          assert s.count(old)==1
-          p.write_text(s.replace(old,new))
+          r=Path.cwd()
+          p=r/'DynamicIsland/ToolIsleFeatures/Gitee/GISettingsView.swift';s=p.read_text()
+          if '.navigationTitle("Gitee")' not in s:
+              assert s.count('        .formStyle(.grouped)')==1
+              p.write_text(s.replace('        .formStyle(.grouped)','        .formStyle(.grouped)\n        .navigationTitle("Gitee")'))
+          p=r/'DynamicIsland/components/Settings/SettingsView.swift';s=p.read_text()
+          if 'ScrollViewReader { giteeSidebarProxy in' not in s:
+              old='                List(selection: selectionBinding) {'
+              assert s.count(old)==1
+              s=s.replace(old,'                ScrollViewReader { giteeSidebarProxy in\n'+old)
+              old='''                                NavigationLink(value: tab) {
+                                              sidebarRow(for: tab)
+                                          }'''.replace('                                              sidebarRow','                                    sidebarRow').replace('                                          }','                                }')
+              assert s.count(old)==1
+              s=s.replace(old,old+'.id(tab)')
+              old='                .environment(\\.defaultMinListRowHeight, 44)'
+              assert s.count(old)==1
+              s=s.replace(old,old+'''
+                          .onChange(of: selectedTab, initial: true) { _, value in
+                              guard value == .gitee else { return }
+                              DispatchQueue.main.async {
+                                  guard selectedTab == .gitee else { return }
+                                  giteeSidebarProxy.scrollTo(SettingsTab.gitee, anchor: .center)
+                              }
+                          }
+                          }'''.replace('\n                          ', '\n                '))
+              p.write_text(s)
+          p=r/'tests/test_gitee_settings.py';s=p.read_text()
+          anchor='    def test_reader_routes_to_settings(self):'
+          if 'dedicated.navigationTitle' not in s:
+              assert s.count(anchor)==1
+              s=s.replace(anchor,'        self.assertIn("giteeSidebarProxy.scrollTo(SettingsTab.gitee",s)\n        dedicated=(R/"DynamicIsland/ToolIsleFeatures/Gitee/GISettingsView.swift").read_text()\n        self.assertIn(\'.navigationTitle("Gitee")\',dedicated)  # dedicated.navigationTitle\n'+anchor)
+              p.write_text(s)
+          print('Gitee title and selected sidebar row visibility verified.')
           PY
-            git rm scripts/repair_gitee_settings_path.py
-            git add DynamicIsland/ToolIsleFeatures/Gitee DynamicIsland/components/Settings/SettingsView.swift DynamicIsland.xcodeproj/project.pbxproj scripts/integrate_gitee_reader.py tests/GiteeRepositoryPathRegression.swift
+          git add DynamicIsland/ToolIsleFeatures/Gitee/GISettingsView.swift DynamicIsland/components/Settings/SettingsView.swift tests/test_gitee_settings.py
+          if ! git diff --cached --quiet; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'fix(gitee): canonical repository paths and independent settings page'
+            git commit -m 'fix(gitee): show the dedicated page title and selected settings row'
             git push origin HEAD:refs/heads/fix/gitee-settings-and-repo-path
           fi
       - uses: maxim-lobanov/setup-xcode@v1
