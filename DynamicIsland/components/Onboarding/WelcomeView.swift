@@ -41,7 +41,7 @@ struct WelcomeView: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 100, height: 100)
                         .padding(.bottom, 8)
-                    Text("Atoll")
+                    Text(verbatim: "ToolIsle")
                         .font(.system(.largeTitle, design: .default))
                         .fontWeight(.semibold)
                     Text("Welcome")

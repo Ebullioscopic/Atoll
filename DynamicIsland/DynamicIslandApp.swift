@@ -48,25 +48,17 @@ struct DynamicNotchApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("dynamic.island", systemImage: "mountain.2.fill", isInserted: $showMenuBarIcon) {
+        MenuBarExtra("ToolIsle", systemImage: "mountain.2.fill", isInserted: $showMenuBarIcon) {
             Button("Settings") {
                 SettingsWindowController.shared.showWindow()
             }
             CheckForUpdatesView(updater: updaterController.updater)
             Divider()
-            Button("Restart Atoll") {
-                guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
-
-                let workspace = NSWorkspace.shared
-
-                if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleIdentifier)
-                {
-
-                    let configuration = NSWorkspace.OpenConfiguration()
-                    configuration.createsNewApplicationInstance = true
-
-                    workspace.openApplication(at: appURL, configuration: configuration)
-                }
+            Button("Restart ToolIsle") {
+                let configuration = NSWorkspace.OpenConfiguration()
+                configuration.createsNewApplicationInstance = true
+                NSWorkspace.shared.openApplication(
+                    at: Bundle.main.bundleURL, configuration: configuration)
 
                 NSApplication.shared.terminate(self)
             }
@@ -997,10 +989,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             forName: Notification.Name.automaticallySwitchDisplayChanged, object: nil, queue: nil
         ) { [weak self] _ in
-            guard let self = self, let window = self.window else { return }
-            DispatchQueue.main.async {
-                window.alphaValue =
-                    self.coordinator.selectedScreen == self.coordinator.preferredScreen ? 1 : 0
+            DispatchQueue.main.async { [weak self] in
+                self?.adjustWindowPosition(changeAlpha: true)
             }
         }
 
@@ -1010,15 +1000,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self = self else { return }
             self.cleanupWindows(shouldInvert: true)
 
-            if !Defaults[.showOnAllDisplays] {
-                let viewModel = self.vm
-                let window = self.createDynamicIslandWindow(
-                    for: NSScreen.main ?? NSScreen.screens.first!, with: viewModel)
-                self.window = window
-                self.adjustWindowPosition(changeAlpha: true)
-            } else {
-                self.adjustWindowPosition()
-            }
+            self.adjustWindowPosition(changeAlpha: !Defaults[.showOnAllDisplays])
         }
 
         DistributedNotificationCenter.default().addObserver(
@@ -1080,15 +1062,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         registerOptionalShortcutHandlers()
         updateFeatureShortcutAvailability()
 
-        if !Defaults[.showOnAllDisplays] {
-            let viewModel = self.vm
-            let window = createDynamicIslandWindow(
-                for: NSScreen.main ?? NSScreen.screens.first!, with: viewModel)
-            self.window = window
-            adjustWindowPosition(changeAlpha: true)
-        } else {
-            adjustWindowPosition(changeAlpha: true)
-        }
+        // Resolve the target before constructing the window to avoid a flash on
+        // the focused external display. The multi-display path remains unchanged.
+        adjustWindowPosition(changeAlpha: true)
         
         // Skip onboarding window and welcome sound under UI testing.
         if coordinator.firstLaunch && !AppRuntimeEnvironment.isUITesting {
@@ -1607,22 +1583,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         } else {
-            let selectedScreen: NSScreen
-
-            if let preferredScreen = NSScreen.screens.first(where: {
-                $0.localizedName == coordinator.preferredScreen
-            }) {
-                coordinator.selectedScreen = coordinator.preferredScreen
-                selectedScreen = preferredScreen
-            } else if Defaults[.automaticallySwitchDisplay], let mainScreen = NSScreen.main {
-                coordinator.selectedScreen = mainScreen.localizedName
-                selectedScreen = mainScreen
-            } else {
-                if let window = window {
-                    window.alphaValue = 0
-                }
+            guard let selectedScreen = NotchDisplaySelection.screen(
+                preferredName: coordinator.preferredScreen,
+                allowsFallback: Defaults[.automaticallySwitchDisplay]
+            ) else {
+                window?.alphaValue = 0
                 return
             }
+            coordinator.selectedScreen = selectedScreen.localizedName
             
             vm.screen = selectedScreen.localizedName
             vm.notchSize = getClosedNotchSize(screen: selectedScreen.localizedName)

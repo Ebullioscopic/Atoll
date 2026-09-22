@@ -32,7 +32,7 @@ class PrivacyConfigurationTests(unittest.TestCase):
         self.assertEqual(
             2,
             project.count(
-                'INFOPLIST_KEY_NSAppleEventsUsageDescription = "Atoll uses AppleScripts to control Spotify, Apple Music, and Notes.";'
+                'INFOPLIST_KEY_NSAppleEventsUsageDescription = "ToolIsle uses AppleScripts to control Spotify, Apple Music, and Notes.";'
             ),
         )
 

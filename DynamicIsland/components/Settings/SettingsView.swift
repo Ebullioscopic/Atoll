@@ -1206,6 +1206,7 @@ struct GeneralSettings: View {
                 }
                 .settingsHighlight(id: highlightID("Show on all displays"))
                 Picker("Show on a specific display", selection: $coordinator.preferredScreen) {
+                    Text("Automatic (built-in display first)").tag("")
                     ForEach(screens, id: \.self) { screen in
                         Text(screen)
                     }
@@ -4134,7 +4135,7 @@ struct About: View {
                     HStack {
                         Text("Release name")
                         Spacer()
-                        Text(Defaults[.releaseName])
+                        Text(verbatim: "ToolIsle · \(Defaults[.releaseName])")
                             .foregroundStyle(.secondary)
                     }
                     HStack {

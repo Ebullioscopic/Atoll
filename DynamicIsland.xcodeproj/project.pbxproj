@@ -123,7 +123,7 @@
 		E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JSONLUsageParserTests.swift; sourceTree = "<group>"; };
 		F2E3D4C5B6A7E8F9A0B1C2D3 /* Contents/Helpers/NowPlayingTestClient */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "compiled.mach-o.executable"; path = Contents/Helpers/NowPlayingTestClient; sourceTree = "<group>"; };
 		F4C1DD09EC134302938E84F6 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = Frameworks/MediaRemoteAdapter.framework; sourceTree = SOURCE_ROOT; };
-		F54406E72CD4987A00C7AFD9 /* Atoll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atoll.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F54406E72CD4987A00C7AFD9 /* ToolIsle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ToolIsle.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6B7C8D9E0F1A2B3C4D5E6F7 /* NewAPIUsageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewAPIUsageTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -313,7 +313,7 @@
 		F54406E82CD4987A00C7AFD9 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F54406E72CD4987A00C7AFD9 /* Atoll.app */,
+				F54406E72CD4987A00C7AFD9 /* ToolIsle.app */,
 				A058D80A7EF44593B0F24EB7 /* DynamicIslandUITests.xctest */,
 				0796C681D7B557C0110EC381 /* DynamicIslandTests.xctest */,
 			);
@@ -391,7 +391,7 @@
 				7EF19C162F577040005B9929 /* SwiftTerm */,
 			);
 			productName = DynamicIsland;
-			productReference = F54406E72CD4987A00C7AFD9 /* Atoll.app */;
+			productReference = F54406E72CD4987A00C7AFD9 /* ToolIsle.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -577,7 +577,7 @@
 				PRODUCT_NAME = DynamicIslandTests;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Atoll.app/Contents/MacOS/Atoll";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ToolIsle.app/Contents/MacOS/ToolIsle";
 			};
 			name = Debug;
 		};
@@ -598,7 +598,7 @@
 				PRODUCT_NAME = DynamicIslandTests;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Atoll.app/Contents/MacOS/Atoll";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ToolIsle.app/Contents/MacOS/ToolIsle";
 			};
 			name = Release;
 		};
@@ -785,7 +785,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1637;
+				CURRENT_PROJECT_VERSION = 1638;
 				DEVELOPMENT_ASSET_PATHS = "\"DynamicIsland/Preview Content\"";
 				DEVELOPMENT_TEAM = 9Y64TRM77N;
 				ENABLE_APP_SANDBOX = NO;
@@ -805,24 +805,24 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DynamicIsland/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Atoll;
+				INFOPLIST_KEY_CFBundleDisplayName = ToolIsle;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_MetalCaptureEnabled = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Atoll uses AppleScripts to control Spotify, Apple Music, and Notes.";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Atoll needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "ToolIsle uses AppleScripts to control Spotify, Apple Music, and Notes.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "ToolIsle needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show calender events inside the notch";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Need for Calendar Mode";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need your camera for Mirror mode";
-				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Atoll needs access to save screenshots to your desktop.";
-				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Atoll needs access to save and read shelf dragged files.";
-				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Atoll needs access to read files in the downloads folder.";
+				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "ToolIsle needs access to save screenshots to your desktop.";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "ToolIsle needs access to save and read shelf dragged files.";
+				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "ToolIsle needs access to read files in the downloads folder.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Atoll needs microphone access to record voice questions for the AI assistant feature.";
-				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Atoll needs Reminders access to show your reminders";
-				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
+				INFOPLIST_KEY_NSLocationUsageDescription = "ToolIsle uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "ToolIsle uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "ToolIsle needs microphone access to record voice questions for the AI assistant feature.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "ToolIsle needs Reminders access to show your reminders";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "ToolIsle needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -830,7 +830,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 2.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Ebullioscopic.Atoll.dev;
-				PRODUCT_NAME = Atoll;
+				PRODUCT_NAME = ToolIsle;
+				PRODUCT_MODULE_NAME = Atoll;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
@@ -859,7 +860,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1637;
+				CURRENT_PROJECT_VERSION = 1638;
 				DEVELOPMENT_ASSET_PATHS = "\"DynamicIsland/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = 9Y64TRM77N;
@@ -880,24 +881,24 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DynamicIsland/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Atoll;
+				INFOPLIST_KEY_CFBundleDisplayName = ToolIsle;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_MetalCaptureEnabled = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Atoll uses AppleScripts to control Spotify, Apple Music, and Notes.";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Atoll needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "ToolIsle uses AppleScripts to control Spotify, Apple Music, and Notes.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "ToolIsle needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show calender events inside the notch";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Need for Calendar Mode";
 				INFOPLIST_KEY_NSCameraUsageDescription = "We need your camera for Mirror mode";
-				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Atoll needs access to save screenshots to your desktop.";
-				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Atoll needs access to save and read shelf dragged files.";
-				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Atoll needs access to read files in the downloads folder.";
+				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "ToolIsle needs access to save screenshots to your desktop.";
+				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "ToolIsle needs access to save and read shelf dragged files.";
+				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "ToolIsle needs access to read files in the downloads folder.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSLocationUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Atoll uses your location to display accurate lock screen weather.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Atoll needs microphone access to record voice questions for the AI assistant feature.";
-				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Atoll needs Reminders access to show your reminders";
-				INFOPLIST_KEY_NSRemindersUsageDescription = "Atoll needs Reminders access to show your reminders";
+				INFOPLIST_KEY_NSLocationUsageDescription = "ToolIsle uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "ToolIsle uses your location to display accurate lock screen weather.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "ToolIsle needs microphone access to record voice questions for the AI assistant feature.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "ToolIsle needs Reminders access to show your reminders";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "ToolIsle needs Reminders access to show your reminders";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -905,7 +906,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 2.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.Ebullioscopic.Atoll;
-				PRODUCT_NAME = Atoll;
+				PRODUCT_NAME = ToolIsle;
+				PRODUCT_MODULE_NAME = Atoll;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;

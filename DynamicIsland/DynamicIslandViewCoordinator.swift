@@ -152,20 +152,28 @@ class DynamicIslandViewCoordinator: ObservableObject {
     
     @AppStorage("hudReplacement") var hudReplacement: Bool = true
     
-    @AppStorage("preferred_screen_name") var preferredScreen = NSScreen.main?.localizedName ?? "Unknown" {
+    // Empty means automatic. Do not persist whichever display had keyboard focus
+    // at launch; resolve the active built-in display again after every hot-plug.
+    @AppStorage("preferred_screen_name") var preferredScreen = "" {
         didSet {
-            selectedScreen = preferredScreen
+            selectedScreen = NotchDisplaySelection.screen(
+                preferredName: preferredScreen,
+                allowsFallback: Defaults[.automaticallySwitchDisplay]
+            )?.localizedName ?? "Unknown"
             NotificationCenter.default.post(name: Notification.Name.selectedScreenChanged, object: nil)
         }
     }
     
-    @Published var selectedScreen: String = NSScreen.main?.localizedName ?? "Unknown"
+    @Published var selectedScreen: String = NotchDisplaySelection.screen()?.localizedName ?? "Unknown"
 
     @Published var optionKeyPressed: Bool = true
     private let extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     
     private init() {
-        selectedScreen = preferredScreen
+        selectedScreen = NotchDisplaySelection.screen(
+            preferredName: preferredScreen,
+            allowsFallback: Defaults[.automaticallySwitchDisplay]
+        )?.localizedName ?? "Unknown"
         Defaults.publisher(.timerDisplayMode)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
