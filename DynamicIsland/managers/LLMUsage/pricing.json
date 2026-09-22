@@ -41,16 +41,6 @@
       }
     },
     {
-      "id": "anthropic/claude-opus-4",
-      "name": "Anthropic: Claude Opus 4",
-      "pricing": {
-        "prompt": "0.000015",
-        "completion": "0.000075",
-        "cache_read": "0.0000015",
-        "cache_write": "0.00001875"
-      }
-    },
-    {
       "id": "anthropic/claude-opus-4.1",
       "name": "Anthropic: Claude Opus 4.1",
       "pricing": {
@@ -921,5 +911,5 @@
       }
     }
   ],
-  "last_updated": "2026-09-21T00:07:36Z"
+  "last_updated": "2026-09-22T00:07:10Z"
 }
