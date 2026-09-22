@@ -11,6 +11,9 @@ class GiteeSettingsTests(unittest.TestCase):
         s=(R/'DynamicIsland/components/Settings/SettingsView.swift').read_text()
         for marker in ['case gitee','SettingsForm(tab: .gitee)','GIDedicatedSettingsView()','case .extensions, .gitee:','SettingsSearchEntry(tab: .gitee']:
             self.assertIn(marker,s)
+        self.assertIn("giteeSidebarProxy.scrollTo(SettingsTab.gitee",s)
+        dedicated=(R/"DynamicIsland/ToolIsleFeatures/Gitee/GISettingsView.swift").read_text()
+        self.assertIn('.navigationTitle("Gitee")',dedicated)  # dedicated.navigationTitle
     def test_reader_routes_to_settings(self):
         s=(R/'DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift').read_text()
         self.assertNotIn('GIAccountView',s)

@@ -79,6 +79,7 @@ struct GIDedicatedSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .navigationTitle("Gitee")
         .onAppear { store.activate() }
         .onChange(of: enabled) { _, value in if value { store.activate() } }
         .onChange(of: store.account?.id) { _, _ in changeToken = false; source = "subscriptions" }

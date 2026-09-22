@@ -637,13 +637,14 @@ struct SettingsView: View {
                 Divider()
                     .padding(.horizontal, 12)
 
+                ScrollViewReader { giteeSidebarProxy in
                 List(selection: selectionBinding) {
                     ForEach(groupedFilteredTabs, id: \.group) { section in
                         Section {
                             ForEach(section.tabs) { tab in
                                 NavigationLink(value: tab) {
                                     sidebarRow(for: tab)
-                                }
+                                }.id(tab)
                             }
                         } header: {
                             if let title = section.group.title {
@@ -658,6 +659,14 @@ struct SettingsView: View {
                 .toolbar(removing: .sidebarToggle)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 210, max: 240)
                 .environment(\.defaultMinListRowHeight, 44)
+                .onChange(of: selectedTab, initial: true) { _, value in
+                    guard value == .gitee else { return }
+                    DispatchQueue.main.async {
+                        guard selectedTab == .gitee else { return }
+                        giteeSidebarProxy.scrollTo(SettingsTab.gitee, anchor: .center)
+                    }
+                }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         } detail: {
