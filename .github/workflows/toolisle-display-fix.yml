@@ -1,0 +1,183 @@
+name: ToolIsle display fix preview
+on:
+  push:
+    branches: [fix/notch-display-and-name]
+    paths: [.github/workflows/toolisle-display-fix.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: toolisle-display-fix-preview
+  cancel-in-progress: false
+jobs:
+  macos:
+    if: github.repository == 'lideming0815/ToolIsle' && github.ref == 'refs/heads/fix/notch-display-and-name'
+    runs-on: macos-26
+    timeout-minutes: 40
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '14.6'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Apply checked one-time source changes on the isolated branch
+        run: |
+          git merge-base --is-ancestor 39ed49bb5924c3814ac70f0206501b460b73232d HEAD
+          if [ -f scripts/apply-display-name-fix.py ]; then
+            python3 scripts/apply-display-name-fix.py
+            git diff --check
+            git add -- DynamicIsland.xcodeproj/project.pbxproj DynamicIsland.xcodeproj/xcshareddata/xcschemes/DynamicIsland.xcscheme DynamicIsland/DynamicIslandApp.swift DynamicIsland/DynamicIslandViewCoordinator.swift DynamicIsland/Info.plist DynamicIsland/components/Onboarding/OnboardingView.swift DynamicIsland/components/Onboarding/WelcomeView.swift DynamicIsland/components/Settings/SettingsView.swift DynamicIsland/components/Settings/SettingsWindowController.swift tests/test_privacy_configuration.py TOOLISLE-DISPLAY-FIX.md
+            git rm -- scripts/apply-display-name-fix.py
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'fix: prefer built-in notch display and rename product to ToolIsle without replacing Atoll runtime'
+            git push origin HEAD:refs/heads/fix/notch-display-and-name
+          fi
+          mkdir -p "$RUNNER_TEMP/review-output"
+          git rev-parse HEAD > "$RUNNER_TEMP/review-output/source-commit.txt"
+      - name: Audit scope and real LFS resources
+        run: |
+          python3 - <<'PY' | tee "$RUNNER_TEMP/review-output/source-audit.json"
+          from pathlib import Path
+          import hashlib, json, subprocess
+          base = '39ed49bb5924c3814ac70f0206501b460b73232d'
+          def git(*args): return subprocess.check_output(['git', *args])
+          allowed = {'DynamicIsland.xcodeproj/project.pbxproj', 'DynamicIsland.xcodeproj/xcshareddata/xcschemes/DynamicIsland.xcscheme', 'DynamicIsland/DynamicIslandApp.swift', 'DynamicIsland/DynamicIslandViewCoordinator.swift', 'DynamicIsland/Info.plist', 'DynamicIsland/components/Onboarding/OnboardingView.swift', 'DynamicIsland/components/Onboarding/WelcomeView.swift', 'DynamicIsland/components/Settings/SettingsView.swift', 'DynamicIsland/components/Settings/SettingsWindowController.swift', 'DynamicIsland/helpers/NotchDisplaySelection.swift', 'tests/test_privacy_configuration.py', 'tests/test_notch_display_selection.py', 'tests/NotchDisplaySelectionRegression.swift', 'TOOLISLE-DISPLAY-FIX.md', '.github/workflows/toolisle-display-fix.yml'}
+          changes = git('diff', '--name-only', base, 'HEAD').decode().splitlines()
+          assert set(changes) <= allowed, changes
+          verified = 0
+          media = []
+          for path in git('ls-tree', '-r', '--name-only', base).decode().splitlines():
+              if path in allowed: continue
+              p = Path(path)
+              expected = git('show', f'{base}:{path}')
+              actual = str(p.readlink()).encode() if p.is_symlink() else p.read_bytes()
+              if expected.startswith(b'version https://git-lfs.github.com/spec/v1'):
+                  fields = dict(line.split(' ', 1) for line in expected.decode().strip().splitlines())
+                  assert len(actual) == int(fields['size']), path
+                  assert hashlib.sha256(actual).hexdigest() == fields['oid'].split(':')[1], path
+                  media.append(path)
+              else: assert actual == expected, path
+              verified += 1
+          print(json.dumps({'baseline': base, 'unchanged_files_verified': verified, 'changed_files': changes, 'lfs_verified': media, 'runtime_reimplemented': False}, indent=2))
+          PY
+          { sw_vers; xcodebuild -version; uname -m; git rev-parse HEAD; } > "$RUNNER_TEMP/review-output/environment.txt"
+      - name: Run original tests and 19 production display-policy cases
+        run: |
+          set -o pipefail
+          python3 -m unittest tests.test_privacy_configuration tests.test_timer_lifecycle tests.test_notch_display_selection 2>&1 | tee "$RUNNER_TEMP/review-output/tests.txt"
+      - name: Build original Xcode application with Release configuration
+        run: |
+          sudo xcodebuild -runFirstLaunch
+          sudo xcodebuild -downloadComponent MetalToolchain
+          set -o pipefail
+          xcodebuild build -project DynamicIsland.xcodeproj -scheme DynamicIsland \
+            -configuration Release -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "$RUNNER_TEMP/ToolIsleDerivedData" -disableAutomaticPackageResolution \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM='' \
+            CODE_SIGN_IDENTITY='-' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=YES OTHER_CODE_SIGN_FLAGS='--timestamp=none' \
+            2>&1 | tee "$RUNNER_TEMP/review-output/build.log"
+          mkdir -p "$RUNNER_TEMP/ToolIslePreview"
+          ditto "$RUNNER_TEMP/ToolIsleDerivedData/Build/Products/Release/ToolIsle.app" "$RUNNER_TEMP/ToolIslePreview/ToolIsle.app"
+      - name: Verify product identity, original permissions and complete resources
+        run: |
+          export APP="$RUNNER_TEMP/ToolIslePreview/ToolIsle.app"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/original-entitlements.plist"
+          python3 - <<'PY' | tee "$RUNNER_TEMP/review-output/package-audit.json"
+          from pathlib import Path
+          import hashlib, json, os, plistlib, shutil
+          app = Path(os.environ['APP'])
+          info = plistlib.loads((app/'Contents/Info.plist').read_bytes())
+          for key in ('CFBundleDisplayName', 'CFBundleName', 'CFBundleExecutable'):
+              assert info[key] == 'ToolIsle', (key, info.get(key))
+          assert info['CFBundleIdentifier'] == 'com.Ebullioscopic.Atoll'
+          assert str(info['CFBundleVersion']) == '1638'
+          resources = app/'Contents/Resources'
+          folder = resources/'BluetoothHUDAnimations'
+          folder.mkdir(exist_ok=True)
+          movies = []
+          for p in sorted(Path('DynamicIsland/BluetoothHUDAnimations').glob('*.mov')):
+              data = p.read_bytes()
+              assert not data.startswith(b'version https://git-lfs'), p
+              for target in (resources/p.name, folder/p.name):
+                  shutil.copy2(p, target)
+                  assert target.read_bytes() == data
+              movies.append({'file': p.name, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
+          assert len(movies) == 8
+          for p in resources.rglob('*'):
+              if p.is_file() and not p.is_symlink():
+                  with p.open('rb') as f: assert not f.read(64).startswith(b'version https://git-lfs'), p
+          print(json.dumps({'app_name': info['CFBundleDisplayName'], 'bundle_id': info['CFBundleIdentifier'], 'version': info['CFBundleShortVersionString'], 'build': info['CFBundleVersion'], 'minimum_os': info.get('LSMinimumSystemVersion'), 'configuration': 'Release', 'movies': movies, 'notarized': False}, indent=2))
+          PY
+          codesign --force --sign '-' --timestamp=none --options runtime --entitlements "$RUNNER_TEMP/original-entitlements.plist" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP" 2>&1 | tee "$RUNNER_TEMP/review-output/codesign.txt"
+          codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/review-output/entitlements.plist"
+          python3 - <<'PY'
+          import os, plistlib
+          from pathlib import Path
+          p = Path(os.environ['RUNNER_TEMP'])
+          before = plistlib.loads((p/'original-entitlements.plist').read_bytes())
+          after = plistlib.loads((p/'review-output/entitlements.plist').read_bytes())
+          assert before == after
+          assert after.get('com.apple.security.device.camera')
+          assert after.get('com.apple.security.automation.apple-events')
+          assert 'com.ebullioscopic.Atoll.xpc' in after.get('com.apple.security.mach-services', [])
+          PY
+          lipo -archs "$APP/Contents/MacOS/ToolIsle" > "$RUNNER_TEMP/review-output/architectures.txt"
+          git diff --exit-code -- DynamicIsland DynamicIsland.xcodeproj
+      - name: Normal startup without UI-test mode
+        run: |
+          python3 - <<'PY'
+          import json, os, socket, subprocess, time
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          out = root/'review-output'
+          binary = root/'ToolIslePreview/ToolIsle.app/Contents/MacOS/ToolIsle'
+          with (out/'launch.log').open('w') as log:
+              p = subprocess.Popen([str(binary)], stdout=log, stderr=subprocess.STDOUT)
+              time.sleep(20)
+              code = p.poll()
+              rpc = False
+              if code is None:
+                  try:
+                      with socket.create_connection(('127.0.0.1', 9020), timeout=3): rpc = True
+                  except OSError: pass
+              report = {'alive_after_20_seconds': code is None, 'exit_code': code, 'configuration': 'Release', 'ui_testing_argument': False, 'original_rpc_port_9020_open': rpc, 'physical_multi_display_tested': False, 'limitations': 'Real Mac display hot-plug, lid state, TCC, media and lock-screen acceptance remains necessary.'}
+              (out/'launch-result.json').write_text(json.dumps(report, indent=2))
+              print(json.dumps(report, indent=2))
+              if code is None:
+                  subprocess.run(['/usr/sbin/screencapture', '-x', str(out/'runner-screen.png')], timeout=10, check=False)
+                  p.terminate()
+                  try: p.wait(timeout=10)
+                  except subprocess.TimeoutExpired: p.kill(); p.wait()
+              assert code is None, 'Normal startup failed. Do not disable upstream functionality to mask it.'
+          PY
+      - name: Package application and exact source
+        run: |
+          cp TOOLISLE-DISPLAY-FIX.md "$RUNNER_TEMP/ToolIslePreview/README-先读.md"
+          cp "$RUNNER_TEMP/review-output/launch-result.json" "$RUNNER_TEMP/ToolIslePreview/"
+          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/ToolIslePreview" "$RUNNER_TEMP/review-output/ToolIsle-2.3.3-displayfix.1-macOS-arm64.zip"
+          hdiutil create -volname 'ToolIsle Display Fix' -srcfolder "$RUNNER_TEMP/ToolIslePreview" -ov -format UDZO "$RUNNER_TEMP/review-output/ToolIsle-2.3.3-displayfix.1-macOS-arm64.dmg"
+          git archive --format=zip --prefix=ToolIsle-display-fix/ -o "$RUNNER_TEMP/review-output/ToolIsle-display-fix-source.zip" HEAD
+          git diff --binary 39ed49bb5924c3814ac70f0206501b460b73232d HEAD > "$RUNNER_TEMP/review-output/display-name.patch"
+          cp TOOLISLE-DISPLAY-FIX.md "$RUNNER_TEMP/review-output/"
+          cd "$RUNNER_TEMP/review-output"
+          shasum -a 256 *.zip *.dmg > SHA256SUMS.txt
+      - name: Collect failure diagnostics
+        if: failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/review-output"
+          find ~/Library/Logs/DiagnosticReports -maxdepth 1 \( -iname '*Atoll*' -o -iname '*ToolIsle*' \) -exec cp {} "$RUNNER_TEMP/review-output/" \; || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: toolisle-display-fix-preview
+          path: ${{ runner.temp }}/review-output/
+          retention-days: 14
+          if-no-files-found: warn
