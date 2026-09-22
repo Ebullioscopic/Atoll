@@ -269,7 +269,12 @@ final class GIStore: ObservableObject {
         detailTask?.cancel(); loadingDetail = false; detailError = nil
         guard Defaults[.enableGiteeReader], let visit else { return }
         if demoMode { loadDemo(visit.route); return }
-        if !force, pages[visit.route] != nil { return }
+        if !force, let cached = pages[visit.route] {
+            if let anchor = GIIssueLinks.commentID(visit.fragment), !visit.anchorHandled,
+               !cached.comments.contains(where: { $0.id == anchor }), cached.hasMoreComments {
+                // Fall through to the bounded anchor-aware load below.
+            } else { return }
+        }
         guard let client = api else { detailError = "请先连接 Gitee。"; return }
         loadingDetail = true
         let session = epoch, visitID = visit.id, route = visit.route

@@ -60,6 +60,7 @@ struct TabSelectionView: View {
     @Default(.showMirror) private var showMirror
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
+    @Default(.enableGiteeReader) private var enableGiteeReader
     @Namespace var animation
     
     private var tabs: [TabModel] {
@@ -111,6 +112,9 @@ struct TabSelectionView: View {
                 )
             }
         }
+        if enableGiteeReader {
+            tabsArray.append(TabModel(label: "Gitee", icon: "text.bubble", view: .giteeIssues))
+        }
         return tabsArray
     }
     var body: some View {
@@ -146,6 +150,7 @@ struct TabSelectionView: View {
             }
         }
         .clipShape(Capsule())
+        .modifier(GITabOverflow(enabled: enableGiteeReader))
         .onAppear {
             ensureValidSelection(with: tabs)
         }

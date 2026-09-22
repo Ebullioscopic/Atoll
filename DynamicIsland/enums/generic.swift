@@ -81,6 +81,7 @@ public enum NotchViews {
     case clipboard
     case terminal
     case extensionExperience
+    case giteeIssues
 }
 
 enum NotesLayoutState: Equatable {

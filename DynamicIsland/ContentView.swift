@@ -185,6 +185,10 @@ struct ContentView: View {
             }
         }
         
+        if coordinator.currentView == .giteeIssues {
+            return CGSize(width: baseSize.width, height: max(baseSize.height, 250))
+        }
+
         if coordinator.currentView == .timer {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
         }
@@ -1304,6 +1308,8 @@ struct ContentView: View {
                                 NotchClipboardView()
                             case .terminal:
                                 NotchTerminalView()
+                            case .giteeIssues:
+                                GINotchView()
                             case .extensionExperience:
                                 if let payload = currentExtensionTabPayload() {
                                     ExtensionNotchExperienceTabView(payload: payload)

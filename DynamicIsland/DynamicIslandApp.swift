@@ -52,6 +52,7 @@ struct DynamicNotchApp: App {
             Button("Settings") {
                 SettingsWindowController.shared.showWindow()
             }
+            Button("Gitee Issues…") { GIReaderWindowController.shared.show() }
             CheckForUpdatesView(updater: updaterController.updater)
             Divider()
             Button("Restart ToolIsle") {
@@ -565,6 +566,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else if coordinator.currentView == .clipboard {
             // Clipboard has its own fixed height source; don't inherit the notes layout state.
             baseSize.height = max(baseSize.height, NotesLayoutState.list.preferredHeight)
+        } else if coordinator.currentView == .giteeIssues {
+            baseSize.height = max(baseSize.height, 250)
         } else if coordinator.currentView == .terminal {
             let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
             let maxFraction = Defaults[.terminalMaxHeightFraction]
@@ -686,6 +689,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Explicit fixture-only preview. No behavior changes during ordinary launches.
+        if ProcessInfo.processInfo.arguments.contains("--gitee-reader-demo") || ProcessInfo.processInfo.arguments.contains("--gitee-reader-smoke") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                GIStore.shared.startDemo()
+                GIReaderWindowController.shared.show()
+            }
+        }
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]

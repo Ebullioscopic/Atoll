@@ -1,0 +1,11 @@
+{
+  "name": "toolisle-gitee-markdown-build",
+  "private": true,
+  "version": "0.1.0",
+  "dependencies": {
+    "marked": "18.0.9",
+    "dompurify": "3.4.15",
+    "esbuild": "0.25.12",
+    "jsdom": "27.0.1"
+  }
+}

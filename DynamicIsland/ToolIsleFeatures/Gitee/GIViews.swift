@@ -18,7 +18,7 @@ final class GIReaderWindowController: NSWindowController {
         window.setFrameAutosaveName("ToolIsle.GiteeReader.Window")
         super.init(window: window)
     }
-    required init?(coder: NSCoder) { nil }
+    required init?(coder: NSCoder) { return nil }
     func show(route: GIIssueRoute? = nil) {
         if let route { GIStore.shared.open(route, fromList: true) }
         showWindow(nil)
@@ -30,7 +30,7 @@ final class GIReaderWindowController: NSWindowController {
 struct GIReaderSettingsSection: View {
     var body: some View {
         Section("Gitee Issues") {
-            Defaults.Toggle("启用 Gitee 阅读", key: .enableGiteeReader)
+            Defaults.Toggle(key: .enableGiteeReader) { Text("启用 Gitee 阅读") }
             Text("只读查看关注项目的 Issue。不会更改默认首页、媒体、锁屏或文件暂存行为。")
                 .font(.caption).foregroundStyle(.secondary)
             Button("账户与项目设置…") { GIReaderWindowController.shared.show() }

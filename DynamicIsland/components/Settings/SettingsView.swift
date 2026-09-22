@@ -1152,6 +1152,7 @@ struct GeneralSettings: View {
 
     var body: some View {
         Form {
+            GIReaderSettingsSection()
             Section {
                 Defaults.Toggle(key: .enableMinimalisticUI) {
                     Text("Enable Minimalistic UI")

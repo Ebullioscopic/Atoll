@@ -10,7 +10,7 @@ BASE = '9527eed3a9dcf64edbea65374de6c643265b68d3'
 def replace(path, old, new, count=1):
     p = ROOT/path
     value = p.read_text()
-    if old not in value and new in value: return
+    if new in value: return
     if value.count(old) != count:
         raise RuntimeError(f'Unexpected source context: {path}, expected {count}, got {value.count(old)}')
     p.write_text(value.replace(old, new))

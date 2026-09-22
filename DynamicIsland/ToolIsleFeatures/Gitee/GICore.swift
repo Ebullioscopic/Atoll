@@ -18,7 +18,14 @@ struct GIRepository: Codable, Identifiable, Hashable {
     let name: String
     let description: String?
     let html_url: String?
-    var path: String { full_name }
+    var path: String {
+        if let raw = html_url, let url = URL(string: raw),
+           GIIssueLinks.hosts.contains(url.host?.lowercased() ?? "") {
+            let parts = url.path.split(separator: "/")
+            if parts.count == 2 { return parts.joined(separator: "/") }
+        }
+        return full_name
+    }
 }
 
 struct GIIssue: Codable, Identifiable {
@@ -140,7 +147,7 @@ struct GIHistory {
     var canBack: Bool { position > 0 }
     var canForward: Bool { position >= 0 && position + 1 < visits.count }
     mutating func push(_ route: GIIssueRoute, fragment: String? = nil) {
-        if current?.route == route && current?.fragment == fragment { return }
+        if current?.route == route && current?.fragment == nil && fragment == nil { return }
         if position + 1 < visits.count { visits.removeSubrange((position + 1)..<visits.count) }
         visits.append(GIVisit(route: route, fragment: fragment))
         if visits.count > 100 { visits.removeFirst(visits.count - 100) }
