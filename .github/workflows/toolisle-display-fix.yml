@@ -5,7 +5,8 @@ on:
     paths: [.github/workflows/toolisle-display-fix.yml]
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
+  actions: read
 concurrency:
   group: toolisle-display-fix-preview
   cancel-in-progress: false
@@ -21,32 +22,21 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
+          persist-credentials: false
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
-      - name: Apply checked one-time source changes on the isolated branch
-        run: |
-          git merge-base --is-ancestor 39ed49bb5924c3814ac70f0206501b460b73232d HEAD
-          if [ -f scripts/apply-display-name-fix.py ]; then
-            python3 scripts/apply-display-name-fix.py
-            git diff --check
-            git add -- DynamicIsland.xcodeproj/project.pbxproj DynamicIsland.xcodeproj/xcshareddata/xcschemes/DynamicIsland.xcscheme DynamicIsland/DynamicIslandApp.swift DynamicIsland/DynamicIslandViewCoordinator.swift DynamicIsland/Info.plist DynamicIsland/components/Onboarding/OnboardingView.swift DynamicIsland/components/Onboarding/WelcomeView.swift DynamicIsland/components/Settings/SettingsView.swift DynamicIsland/components/Settings/SettingsWindowController.swift tests/test_privacy_configuration.py TOOLISLE-DISPLAY-FIX.md
-            git rm -- scripts/apply-display-name-fix.py
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'fix: prefer built-in notch display and rename product to ToolIsle without replacing Atoll runtime'
-            git push origin HEAD:refs/heads/fix/notch-display-and-name
-          fi
-          mkdir -p "$RUNNER_TEMP/review-output"
-          git rev-parse HEAD > "$RUNNER_TEMP/review-output/source-commit.txt"
       - name: Audit scope and real LFS resources
         run: |
+          mkdir -p "$RUNNER_TEMP/review-output"
+          git merge-base --is-ancestor 39ed49bb5924c3814ac70f0206501b460b73232d HEAD
+          git rev-parse HEAD > "$RUNNER_TEMP/review-output/source-commit.txt"
           python3 - <<'PY' | tee "$RUNNER_TEMP/review-output/source-audit.json"
           from pathlib import Path
           import hashlib, json, subprocess
           base = '39ed49bb5924c3814ac70f0206501b460b73232d'
           def git(*args): return subprocess.check_output(['git', *args])
-          allowed = {'DynamicIsland.xcodeproj/project.pbxproj', 'DynamicIsland.xcodeproj/xcshareddata/xcschemes/DynamicIsland.xcscheme', 'DynamicIsland/DynamicIslandApp.swift', 'DynamicIsland/DynamicIslandViewCoordinator.swift', 'DynamicIsland/Info.plist', 'DynamicIsland/components/Onboarding/OnboardingView.swift', 'DynamicIsland/components/Onboarding/WelcomeView.swift', 'DynamicIsland/components/Settings/SettingsView.swift', 'DynamicIsland/components/Settings/SettingsWindowController.swift', 'DynamicIsland/helpers/NotchDisplaySelection.swift', 'tests/test_privacy_configuration.py', 'tests/test_notch_display_selection.py', 'tests/NotchDisplaySelectionRegression.swift', 'TOOLISLE-DISPLAY-FIX.md', '.github/workflows/toolisle-display-fix.yml'}
+          allowed = {'DynamicIsland.xcodeproj/project.pbxproj', 'DynamicIsland.xcodeproj/xcshareddata/xcschemes/DynamicIsland.xcscheme', 'DynamicIsland/DynamicIslandApp.swift', 'DynamicIsland/DynamicIslandViewCoordinator.swift', 'DynamicIsland/Info.plist', 'DynamicIsland/components/Onboarding/OnboardingView.swift', 'DynamicIsland/components/Onboarding/WelcomeView.swift', 'DynamicIsland/components/Settings/SettingsView.swift', 'DynamicIsland/components/Settings/SettingsWindowController.swift', 'DynamicIsland/helpers/NotchDisplaySelection.swift', 'DynamicIsland/tr.lproj/InfoPlist.strings', 'tests/test_privacy_configuration.py', 'tests/test_notch_display_selection.py', 'tests/NotchDisplaySelectionRegression.swift', 'TOOLISLE-DISPLAY-FIX.md', '.github/workflows/toolisle-display-fix.yml'}
           changes = git('diff', '--name-only', base, 'HEAD').decode().splitlines()
           assert set(changes) <= allowed, changes
           verified = 0
@@ -70,7 +60,39 @@ jobs:
         run: |
           set -o pipefail
           python3 -m unittest tests.test_privacy_configuration tests.test_timer_lifecycle tests.test_notch_display_selection 2>&1 | tee "$RUNNER_TEMP/review-output/tests.txt"
-      - name: Build original Xcode application with Release configuration
+      - name: Optional download of previously verified Release build
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: toolisle-display-fix-preview
+          run-id: 35696043443
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/previous-build
+      - name: Reuse only if compiled sources and build settings match exactly
+        id: reuse
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, subprocess
+          root = Path(os.environ['RUNNER_TEMP'])
+          previous = root/'previous-build'
+          compiled = '7615c8ec1acb188568e33a19c625415976a2d78d'
+          delta = subprocess.check_output(['git','diff','--name-only',compiled,'HEAD','--','DynamicIsland','DynamicIsland.xcodeproj']).decode().splitlines()
+          compatible = set(delta) <= {'DynamicIsland/tr.lproj/InfoPlist.strings'}
+          archive = previous/'ToolIsle-2.3.3-displayfix.1-macOS-arm64.zip'
+          ready = compatible and archive.exists() and (previous/'source-commit.txt').exists() and (previous/'source-commit.txt').read_text().strip() == compiled
+          if ready:
+              for line in (previous/'SHA256SUMS.txt').read_text().splitlines():
+                  digest, name = line.split(maxsplit=1)
+                  assert hashlib.sha256((previous/name).read_bytes()).hexdigest() == digest, name
+              subprocess.run(['ditto','-x','-k',str(archive),str(root)],check=True)
+              for name in ('build.log',):
+                  (root/'review-output'/name).write_bytes((previous/name).read_bytes())
+          (root/'review-output/reuse.json').write_text(json.dumps({'reused_compiled_code': ready, 'compiled_source_commit': compiled if ready else None, 'source_resource_only_changes': delta},indent=2))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write('ready=' + str(ready).lower() + '\n')
+          PY
+      - name: Fresh Release build when verified identical code is unavailable
+        if: steps.reuse.outputs.ready != 'true'
         run: |
           sudo xcodebuild -runFirstLaunch
           sudo xcodebuild -downloadComponent MetalToolchain
@@ -84,14 +106,14 @@ jobs:
             2>&1 | tee "$RUNNER_TEMP/review-output/build.log"
           mkdir -p "$RUNNER_TEMP/ToolIslePreview"
           ditto "$RUNNER_TEMP/ToolIsleDerivedData/Build/Products/Release/ToolIsle.app" "$RUNNER_TEMP/ToolIslePreview/ToolIsle.app"
-      - name: Verify product identity, original permissions and complete resources
+      - name: Verify all product names, preserve permissions and complete resources
         run: |
           export APP="$RUNNER_TEMP/ToolIslePreview/ToolIsle.app"
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/original-entitlements.plist"
           python3 - <<'PY' | tee "$RUNNER_TEMP/review-output/package-audit.json"
           from pathlib import Path
-          import hashlib, json, os, plistlib, shutil
+          import hashlib, json, os, plistlib, shutil, subprocess
           app = Path(os.environ['APP'])
           info = plistlib.loads((app/'Contents/Info.plist').read_bytes())
           for key in ('CFBundleDisplayName', 'CFBundleName', 'CFBundleExecutable'):
@@ -99,6 +121,17 @@ jobs:
           assert info['CFBundleIdentifier'] == 'com.Ebullioscopic.Atoll'
           assert str(info['CFBundleVersion']) == '1638'
           resources = app/'Contents/Resources'
+          localized = []
+          for source in Path('DynamicIsland').glob('*.lproj/InfoPlist.strings'):
+              target = resources/source.parent.name/source.name
+              target.parent.mkdir(exist_ok=True)
+              subprocess.run(['/usr/bin/plutil','-convert','binary1','-o',str(target),str(source)],check=True)
+          for target in resources.glob('*.lproj/InfoPlist.strings'):
+              values = plistlib.loads(target.read_bytes())
+              for key in ('CFBundleDisplayName','CFBundleName'):
+                  if key in values:
+                      assert values[key] == 'ToolIsle', (str(target),key,values[key])
+                      localized.append({'locale':target.parent.name,'key':key,'value':values[key]})
           folder = resources/'BluetoothHUDAnimations'
           folder.mkdir(exist_ok=True)
           movies = []
@@ -113,7 +146,7 @@ jobs:
           for p in resources.rglob('*'):
               if p.is_file() and not p.is_symlink():
                   with p.open('rb') as f: assert not f.read(64).startswith(b'version https://git-lfs'), p
-          print(json.dumps({'app_name': info['CFBundleDisplayName'], 'bundle_id': info['CFBundleIdentifier'], 'version': info['CFBundleShortVersionString'], 'build': info['CFBundleVersion'], 'minimum_os': info.get('LSMinimumSystemVersion'), 'configuration': 'Release', 'movies': movies, 'notarized': False}, indent=2))
+          print(json.dumps({'app_name': info['CFBundleDisplayName'], 'bundle_id': info['CFBundleIdentifier'], 'version': info['CFBundleShortVersionString'], 'build': info['CFBundleVersion'], 'minimum_os': info.get('LSMinimumSystemVersion'), 'configuration': 'Release', 'localized_names':localized, 'movies': movies, 'notarized': False}, indent=2))
           PY
           codesign --force --sign '-' --timestamp=none --options runtime --entitlements "$RUNNER_TEMP/original-entitlements.plist" "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP" 2>&1 | tee "$RUNNER_TEMP/review-output/codesign.txt"
