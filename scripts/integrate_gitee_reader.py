@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 """Idempotent, narrowly scoped integration for the existing Atoll Xcode target.
-Run only on the feature branch before reviewing the resulting source diff.
 No unrelated defaults, services, permissions, display policy or updater are changed.
 """
 from pathlib import Path
 import subprocess
-
 ROOT = Path(__file__).resolve().parents[1]
 BASE = '9527eed3a9dcf64edbea65374de6c643265b68d3'
 
 def replace(path, old, new, count=1):
     p = ROOT/path
     value = p.read_text()
-    if old not in value and new in value:
-        return
+    if old not in value and new in value: return
     if value.count(old) != count:
         raise RuntimeError(f'Unexpected source context: {path}, expected {count}, got {value.count(old)}')
     p.write_text(value.replace(old, new))
@@ -52,10 +49,9 @@ def main():
             }
         }
 ''')
-    replace('DynamicIsland/DynamicIslandApp.swift', '        } else if coordinator.currentView == .terminal {\n', '        } else if coordinator.currentView == .giteeIssues {\n            return CGSize(width: baseSize.width, height: max(baseSize.height, 250))\n        } else if coordinator.currentView == .terminal {\n')
-    replace('DynamicIsland/components/Settings/SettingsView.swift', '                GeneralSettings()\n', '                GeneralSettings()\n                GIReaderSettingsSection()\n')
+    replace('DynamicIsland/DynamicIslandApp.swift', '        } else if coordinator.currentView == .terminal {\n', '        } else if coordinator.currentView == .giteeIssues {\n            baseSize.height = max(baseSize.height, 250)\n        } else if coordinator.currentView == .terminal {\n')
+    replace('DynamicIsland/components/Settings/SettingsView.swift', '        Form {\n            Section {\n                Defaults.Toggle(key: .enableMinimalisticUI)', '        Form {\n            GIReaderSettingsSection()\n            Section {\n                Defaults.Toggle(key: .enableMinimalisticUI)')
     replace('DynamicIsland.xcodeproj/project.pbxproj', 'CURRENT_PROJECT_VERSION = 1638;', 'CURRENT_PROJECT_VERSION = 1639;', count=2)
-    # Small corrections performed before the first build.
     replace('DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift', '    required init?(coder: NSCoder) { nil }', '    required init?(coder: NSCoder) { return nil }')
     replace('DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift', '            Defaults.Toggle("启用 Gitee 阅读", key: .enableGiteeReader)', '            Defaults.Toggle(key: .enableGiteeReader) { Text("启用 Gitee 阅读") }')
     replace('DynamicIsland/ToolIsleFeatures/Gitee/GICore.swift', '    var path: String { full_name }', '''    var path: String {
@@ -67,7 +63,6 @@ def main():
         return full_name
     }''')
     replace('DynamicIsland/ToolIsleFeatures/Gitee/GICore.swift', '        if current?.route == route && current?.fragment == fragment { return }', '        if current?.route == route && current?.fragment == nil && fragment == nil { return }')
-    # A cached linked issue can still require a comment page that was not fetched earlier.
     replace('DynamicIsland/ToolIsleFeatures/Gitee/GIStore.swift', '        if !force, pages[visit.route] != nil { return }', '''        if !force, let cached = pages[visit.route] {
             if let anchor = GIIssueLinks.commentID(visit.fragment), !visit.anchorHandled,
                !cached.comments.contains(where: { $0.id == anchor }), cached.hasMoreComments {
