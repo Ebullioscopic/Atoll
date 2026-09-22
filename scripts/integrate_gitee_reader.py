@@ -52,9 +52,14 @@ def main():
     replace('DynamicIsland/DynamicIslandApp.swift', '        } else if coordinator.currentView == .terminal {\n', '        } else if coordinator.currentView == .giteeIssues {\n            baseSize.height = max(baseSize.height, 250)\n        } else if coordinator.currentView == .terminal {\n')
     replace('DynamicIsland/components/Settings/SettingsView.swift', '        Form {\n            Section {\n                Defaults.Toggle(key: .enableMinimalisticUI)', '        Form {\n            GIReaderSettingsSection()\n            Section {\n                Defaults.Toggle(key: .enableMinimalisticUI)')
     replace('DynamicIsland.xcodeproj/project.pbxproj', 'CURRENT_PROJECT_VERSION = 1638;', 'CURRENT_PROJECT_VERSION = 1639;', count=2)
-    replace('DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift', '    required init?(coder: NSCoder) { nil }', '    required init?(coder: NSCoder) { return nil }')
-    replace('DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift', '            Defaults.Toggle("启用 Gitee 阅读", key: .enableGiteeReader)', '            Defaults.Toggle(key: .enableGiteeReader) { Text("启用 Gitee 阅读") }')
-    replace('DynamicIsland/ToolIsleFeatures/Gitee/GICore.swift', '    var path: String { full_name }', '''    var path: String {
+    views='DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift'
+    core='DynamicIsland/ToolIsleFeatures/Gitee/GICore.swift'
+    store='DynamicIsland/ToolIsleFeatures/Gitee/GIStore.swift'
+    web='DynamicIsland/ToolIsleFeatures/Gitee/GIWebReader.swift'
+    replace(views, '    required init?(coder: NSCoder) { nil }', '    required init?(coder: NSCoder) { return nil }')
+    replace(views, '            Defaults.Toggle("启用 Gitee 阅读", key: .enableGiteeReader)', '            Defaults.Toggle(key: .enableGiteeReader) { Text("启用 Gitee 阅读") }')
+    replace(views, 'Text("最近完整刷新")', 'Text("最近成功刷新")')
+    replace(core, '    var path: String { full_name }', '''    var path: String {
         if let raw = html_url, let url = URL(string: raw),
            GIIssueLinks.hosts.contains(url.host?.lowercased() ?? "") {
             let parts = url.path.split(separator: "/")
@@ -62,13 +67,21 @@ def main():
         }
         return full_name
     }''')
-    replace('DynamicIsland/ToolIsleFeatures/Gitee/GICore.swift', '        if current?.route == route && current?.fragment == fragment { return }', '        if current?.route == route && current?.fragment == nil && fragment == nil { return }')
-    replace('DynamicIsland/ToolIsleFeatures/Gitee/GIStore.swift', '        if !force, pages[visit.route] != nil { return }', '''        if !force, let cached = pages[visit.route] {
+    replace(core, '        if current?.route == route && current?.fragment == fragment { return }', '        if current?.route == route && current?.fragment == nil && fragment == nil { return }')
+    replace(store, '        if !force, pages[visit.route] != nil { return }', '''        if !force, let cached = pages[visit.route] {
             if let anchor = GIIssueLinks.commentID(visit.fragment), !visit.anchorHandled,
                !cached.comments.contains(where: { $0.id == anchor }), cached.hasMoreComments {
                 // Fall through to the bounded anchor-aware load below.
             } else { return }
         }''')
+    replace(web, '        box.innerHTML=GIText.render(source);', '''        // Template contents are inert: no image request may start before the opt-in check.
+        const template=document.createElement('template');
+        template.innerHTML=GIText.render(source);
+        const fragment=template.content;''')
+    replace(web, 'box.querySelectorAll', 'fragment.querySelectorAll', count=5)
+    replace(web, '        return box;\n      }', '        box.append(fragment);\n        return box;\n      }')
+    replace(web, 'hasRenderer:!!window.GIText', "hasRenderer:!!window.GIText,imageCount:document.querySelectorAll('img').length")
+    replace(store, '\\n\\n### 阅读位置测试', '\\n\\n![演示图片](https://foruda.gitee.com/images/toolisle-fixture.png)\\n\\n### 阅读位置测试')
     print('Minimal integration applied. Review git diff before committing.')
 
 if __name__ == '__main__': main()
