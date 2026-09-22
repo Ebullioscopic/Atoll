@@ -1,0 +1,201 @@
+name: Atoll baseline preview
+on:
+  push:
+    branches: [review/atoll-logo-only]
+    paths:
+      - .github/workflows/toolisle-baseline-preview.yml
+      - .github/assets/toolisle-logo.svg
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: atoll-baseline-preview
+  cancel-in-progress: false
+jobs:
+  branding:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review/atoll-logo-only
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install SVG renderer
+        run: python -m pip install CairoSVG==2.8.2
+      - name: Generate only existing logo assets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import cairosvg
+          root = Path.cwd()
+          svg = (root / '.github/assets/toolisle-logo.svg').read_text()
+          svg = svg.replace('viewBox="0 0 64 64"', 'viewBox="-6 -6 76 76"')
+          cache = {}
+          def png(size):
+              if size not in cache:
+                  cache[size] = cairosvg.svg2png(bytestring=svg.encode(), output_width=size, output_height=size)
+              return cache[size]
+          assets = root / 'DynamicIsland/Assets.xcassets'
+          for asset in sorted(assets.glob('AppIcon*.appiconset')):
+              for image in json.loads((asset / 'Contents.json').read_text())['images']:
+                  if image.get('filename'):
+                      size = int(image['size'].split('x')[0]) * int(image.get('scale', '1x').rstrip('x'))
+                      (asset / image['filename']).write_bytes(png(size))
+          for name in ('logo', 'logo2'):
+              asset = assets / f'{name}.imageset'
+              for image in json.loads((asset / 'Contents.json').read_text())['images']:
+                  if image.get('filename'):
+                      (asset / image['filename']).write_bytes(png(1024))
+          (root / '.github/assets/atoll-logo.png').write_bytes(png(1024))
+          p = root / 'ReadMe.md'
+          banner = '> **ToolIsle：Atoll 原版基线验证版。** 仅替换提供的 Logo 并增加文档及打包验证；保留原版功能、入口和配置。基线与使用注意见 [TOOLISLE.md](TOOLISLE.md)。\n\n'
+          content = p.read_text()
+          if not content.startswith(banner):
+              p.write_text(banner + content)
+          PY
+      - name: Verify no functional changes
+        run: |
+          mkdir -p /tmp/atoll-review
+          python - <<'PY' | tee /tmp/atoll-review/baseline-audit.json
+          from pathlib import Path
+          import json, subprocess
+          base = '83d15438efc5254635c5b425406d6603c80b8ece'
+          def git(*args):
+              return subprocess.check_output(['git', *args])
+          def allowed(p):
+              return (p in {'ReadMe.md', 'TOOLISLE.md', '.github/assets/atoll-logo.png', '.github/assets/toolisle-logo.svg', '.github/workflows/toolisle-baseline-preview.yml'} or (p.startswith('DynamicIsland/Assets.xcassets/AppIcon') and '.appiconset/' in p and p.endswith('.png')) or (p.startswith(('DynamicIsland/Assets.xcassets/logo.imageset/', 'DynamicIsland/Assets.xcassets/logo2.imageset/')) and p.endswith('.png')))
+          changes = git('diff', '--name-only', base).decode().splitlines()
+          assert not [p for p in changes if not allowed(p)], changes
+          checked = 0
+          for p in git('ls-tree', '-r', '--name-only', base).decode().splitlines():
+              if allowed(p):
+                  continue
+              f = Path(p)
+              data = str(f.readlink()).encode() if f.is_symlink() else f.read_bytes()
+              assert data == git('show', f'{base}:{p}'), p
+              checked += 1
+          print(json.dumps({'baseline': base, 'unchanged_file_count': checked, 'allowed_changes': changes, 'functional_source_changes': 0}, ensure_ascii=False, indent=2))
+          PY
+          python3 -m unittest tests.test_privacy_configuration tests.test_timer_lifecycle 2>&1 | tee /tmp/atoll-review/upstream-tests.txt
+      - name: Commit only branding on isolated review branch
+        id: commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -u -- ReadMe.md .github/assets/atoll-logo.png DynamicIsland/Assets.xcassets
+          if ! git diff --cached --quiet; then
+            git commit -m 'brand: replace logo assets only; keep Atoll baseline behavior'
+            git push origin HEAD:refs/heads/review/atoll-logo-only
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git archive --format=zip --prefix=ToolIsle-Atoll-baseline/ -o /tmp/atoll-review/ToolIsle-Atoll-baseline-source.zip HEAD
+          git bundle create /tmp/atoll-review/ToolIsle-Atoll-baseline.bundle HEAD ^83d15438efc5254635c5b425406d6603c80b8ece
+          git diff --binary 83d15438efc5254635c5b425406d6603c80b8ece HEAD > /tmp/atoll-review/logo-only.patch
+          git rev-parse HEAD > /tmp/atoll-review/source-commit.txt
+          cp TOOLISLE.md /tmp/atoll-review/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atoll-baseline-source
+          path: /tmp/atoll-review/
+          retention-days: 14
+  macos:
+    needs: branding
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.branding.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Prepare build environment
+        run: |
+          mkdir -p "$RUNNER_TEMP/review-output"
+          { sw_vers; xcodebuild -version; uname -m; git rev-parse HEAD; } | tee "$RUNNER_TEMP/review-output/environment.txt"
+          sudo xcodebuild -runFirstLaunch
+          sudo xcodebuild -downloadComponent MetalToolchain
+      - name: Build original Xcode app, no source edits and no UI test mode
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project DynamicIsland.xcodeproj \
+            -scheme DynamicIsland \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "$RUNNER_TEMP/AtollDerivedData" \
+            -resultBundlePath "$RUNNER_TEMP/AtollBuild.xcresult" \
+            -disableAutomaticPackageResolution \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM='' \
+            CODE_SIGN_IDENTITY='-' CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_INJECT_BASE_ENTITLEMENTS=YES \
+            OTHER_CODE_SIGN_FLAGS='--timestamp=none' \
+            2>&1 | tee "$RUNNER_TEMP/review-output/build.log"
+      - name: Verify signature, resources and original entitlements
+        run: |
+          APP="$RUNNER_TEMP/AtollDerivedData/Build/Products/Debug/Atoll.app"
+          codesign --verify --deep --strict --verbose=2 "$APP" 2>&1 | tee "$RUNNER_TEMP/review-output/codesign-verify.txt"
+          codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/review-output/entitlements.plist"
+          /usr/libexec/PlistBuddy -c Print "$APP/Contents/Info.plist" > "$RUNNER_TEMP/review-output/app-info.txt"
+          lipo -archs "$APP/Contents/MacOS/Atoll" > "$RUNNER_TEMP/review-output/architectures.txt"
+          git diff --exit-code -- DynamicIsland DynamicIsland.xcodeproj
+      - name: Normal-start smoke test without --uitesting
+        run: |
+          APP="$RUNNER_TEMP/AtollDerivedData/Build/Products/Debug/Atoll.app"
+          export APP
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess, time
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'review-output'
+          app = pathlib.Path(os.environ['APP'])
+          executable = app / 'Contents/MacOS/Atoll'
+          with (output / 'launch.log').open('w') as log:
+              p = subprocess.Popen([str(executable)], stdout=log, stderr=subprocess.STDOUT)
+              time.sleep(20)
+              code = p.poll()
+              report = {'command': str(executable), 'ui_testing_argument': False, 'seconds_observed': 20, 'alive_after_observation': code is None, 'exit_code': code, 'limitations': 'Headless process check only; physical desktop, permissions, music and lock-screen acceptance untested.'}
+              (output / 'launch-result.json').write_text(json.dumps(report, indent=2))
+              print(json.dumps(report, indent=2))
+              if code is None:
+                  p.terminate()
+                  try:
+                      p.wait(timeout=10)
+                  except subprocess.TimeoutExpired:
+                      p.kill(); p.wait()
+              if code is not None:
+                  raise SystemExit('Original signed app did not survive normal startup; inspect launch logs. No functional code was disabled.')
+          PY
+      - name: Package runnable preview
+        run: |
+          APP="$RUNNER_TEMP/AtollDerivedData/Build/Products/Debug/Atoll.app"
+          STAGE="$RUNNER_TEMP/AtollPreview"
+          mkdir -p "$STAGE"
+          ditto "$APP" "$STAGE/Atoll.app"
+          cp TOOLISLE.md "$STAGE/README-先读.md"
+          cp "$RUNNER_TEMP/review-output/launch-result.json" "$STAGE/"
+          ditto -c -k --sequesterRsrc --keepParent "$STAGE" "$RUNNER_TEMP/review-output/ToolIsle-Atoll-baseline-macOS-arm64.zip"
+          hdiutil create -volname 'Atoll Baseline Review' -srcfolder "$STAGE" -ov -format UDZO "$RUNNER_TEMP/review-output/ToolIsle-Atoll-baseline-macOS-arm64.dmg"
+          shasum -a 256 "$RUNNER_TEMP/review-output/"*.zip "$RUNNER_TEMP/review-output/"*.dmg > "$RUNNER_TEMP/review-output/SHA256SUMS"
+      - name: Collect failure context
+        if: failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/review-output"
+          ls -lt ~/Library/Logs/DiagnosticReports/ | head -20 > "$RUNNER_TEMP/review-output/diagnostic-list.txt" || true
+          find ~/Library/Logs/DiagnosticReports -maxdepth 1 -iname '*Atoll*' -exec cp {} "$RUNNER_TEMP/review-output/" \; || true
+          xcrun xcresulttool get build-results --path "$RUNNER_TEMP/AtollBuild.xcresult" > "$RUNNER_TEMP/review-output/build-result.json" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atoll-baseline-macos-preview
+          path: ${{ runner.temp }}/review-output/
+          retention-days: 14
+          if-no-files-found: warn

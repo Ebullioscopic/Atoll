@@ -1,62 +1,171 @@
-<p align="center"><img src=".github/assets/toolisle-logo.svg" width="96" alt="ToolIsle Logo"></p>
+> **ToolIsle：Atoll 原版基线验证版。** 仅替换提供的 Logo 并增加文档及打包验证；保留原版功能、入口和配置。基线与使用注意见 [TOOLISLE.md](TOOLISLE.md)。
 
-# ToolIsle · 团队工具箱
+<p align="center">
+  <img src=".github/assets/atoll-logo.png" alt="Atoll logo" width="120">
+</p>
+<h1 align="center">Atoll - DynamicIsland for macOS</h1>
+<p align="center">
+<a href="https://trendshift.io/repositories/15291" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15291" alt="Ebullioscopic%2FAtoll | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+</p>
+<p align="center">
+  <a href="https://github.com/Ebullioscopic/Atoll/stargazers">
+    <img src="https://img.shields.io/github/stars/Ebullioscopic/Atoll?style=social" alt="GitHub stars"/>
+  </a>
+  <a href="https://github.com/Ebullioscopic/Atoll/network/members">
+    <img src="https://img.shields.io/github/forks/Ebullioscopic/Atoll?style=social" alt="GitHub forks"/>
+  </a>
+  <a href="https://github.com/Ebullioscopic/Atoll/releases">
+    <img src="https://img.shields.io/github/downloads/Ebullioscopic/Atoll/total?label=Downloads" alt="GitHub downloads"/>
+  </a>
+  <a href="https://discord.gg/PaqFkRTDF8">
+    <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/PaqFkRTDF8?style=flat" alt="Discord server"/>
+  </a>
+</p>
 
-独立 macOS 团队工具箱，使用项目维护者提供的渐变螺旋星光 Logo。保留 Atoll 的来源与版权，但不是 Atoll 官方发行版。
+<p align="center">
+  <a href="https://github.com/sponsors/Ebullioscopic">
+    <img src="https://img.shields.io/badge/Sponsor-Ebullioscopic-ff69b4?style=for-the-badge&logo=github" alt="Sponsor Ebullioscopic"/>
+  </a>
+  <a href="https://github.com/Ebullioscopic/Atoll/releases/latest">
+    <img src="https://img.shields.io/badge/Download-Atoll%20for%20macOS-0A84FF?style=for-the-badge&logo=apple" alt="Download Atoll for macOS"/>
+  </a>
+  <a href="https://www.buymeacoffee.com/kryoscopic">
+    <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-kryoscopic-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=000000" alt="Buy Me a Coffee for kryoscopic"/>
+  </a>
+</p>
 
-## 新入口与上游代码
+<p align="center">
+  <a href="https://discord.gg/PaqFkRTDF8">Join our Discord community</a>
+</p>
 
-当前应用由根目录 `Package.swift` 构建：`ToolIsle/App` 是桌面界面，`ToolIsle/Core` 是可测试数据层。
-原有 `DynamicIsland/` 与 `DynamicIsland.xcodeproj` 保留供参考和后续迁移，**不参与 ToolIsle 的构建与运行**。请勿使用旧 Xcode 工程发布新应用。
+Atoll turns the MacBook notch into a focused command surface for media, system insight, and quick utilities. It stays out of the way until needed, then expands with responsive, native SwiftUI animations.
 
-此前暂存的基础压缩载荷损坏，因此这轮重新建立了可核验的独立 target，而非把那个载荷标为已合并。新 target 不链接旧后台服务、Sparkle、XPC/RPC、AI 助手、媒体捕获或锁屏组件。
+<p align="center">
+  <img src="https://i.postimg.cc/t49mW5yN/Screenshot-2026-03-02-at-6-00-22-PM.png" alt="Atoll lock screen" width="920">
+</p>
 
-## 功能
 
-- 菜单栏和可关闭的轻量灵动岛入口；搜索、分类、收藏和独立工具窗口。
-- JSON 校验/格式化/压缩；秒/毫秒时间戳与 ISO 8601 日期转换；UTF-8 Base64 编解码。
-- Gitee 个人访问令牌连接；Watch/Star 仓库分页；按仓库查看 Issues、状态/标题/标签筛选、未读更新、正文与分页评论。
-- 仓库 README、目录浏览、分支/Tag/Commit 与指定文件读取；分支菜单显示前 100 个，也可直接输入任意完整 ref。
-- 原生 Markdown 阅读：标题、表格、代码块、任务列表、引用、链接与图片；源码切换与复制。
-- 打开本地 UTF-8 `.md`/`.markdown`/`.mdown`/`.txt` 文件。默认只读取文件所在目录内的相对资源；父目录图片需通过“授权图片/链接根目录”选择授权根目录。
-- 手动刷新、完整分页入口、明确的限流/权限/网络错误。筛选仅作用于已加载内容，数量不是服务器总数。
-- 会话内缓存与可选磁盘缓存；离线展示带时间标识。首次连接必须联网验证；已连接且启用磁盘缓存的账户可在断网启动时读取已有缓存。
 
-## macOS 构建
 
-macOS 14+，支持 Swift 6.0+ 的 Xcode 工具链。打开根目录 `Package.swift` 可编辑运行；生成可安装应用：
+
+## Highlights
+- Media controls for Apple Music, Spotify, Cider, and more with inline previews.
+- Live Activities for media playback, Focus, screen recording, privacy indicators, downloads (beta), and battery/charging.
+- Lock screen widgets for media, timers, charging, Bluetooth devices, and weather.
+- Lightweight system insight for CPU, GPU, memory, network, and disk usage.
+- Productivity tools including timers, clipboard history, color picker, and calendar previews.
+- Customization for layouts, animations, hover behavior, and shortcut remapping.
+
+## Other Features
+- Gesture controls for opening/closing the notch and media navigation.
+- Parallax hover interactions with smooth transitions.
+- Lock screen appearance and positioning controls for panels and widgets.
+
+<p align="center">
+  <img src="https://i.postimg.cc/HkLGn6yH/846F86A4_A2F9_4CD6_BC84_1D720D377728_1_201_a.jpg" alt="Atoll preview" width="920">
+</p>
+
+## Requirements
+- macOS 14.0 or later (optimised for macOS 15+).
+- MacBook with a notch (14/16‑inch MBP across Apple silicon generations).
+- Xcode 15+ to build from source.
+- Permissions as needed: Accessibility, Camera, Calendar, Screen Recording, Music.
+
+## Installation
+1) Download the latest DMG [here](https://github.com/Ebullioscopic/Atoll/releases/latest).
+2) Open the DMG and drag Atoll into Applications.
+3) Launch Atoll and grant the requested permissions.
+
+## Quick Start
+- Hover near the notch to expand; click to enter controls.
+- Use tabs for Media, Stats, Timers, Clipboard, and more.
+- Adjust layout, appearance, and shortcuts from Settings.
+- Add files to Shelf from Terminal: `open -a Atoll /path/to/file`.
+
+## Settings
+- Choose appearance, animation style, and per‑feature toggles.
+- Remap global shortcuts and adjust hover behaviour.
+- Enable lock screen widgets and select data sources.
+
+## Gesture Controls
+- Two-finger swipe down to open the notch when hover-to-open is disabled; swipe up to close.
+- Enable horizontal media gestures in **Settings → General → Gesture control** to turn the music pane into a trackpad for previous/next or ±10 second seeks.
+- Pick the gesture skip behaviour (track vs ±10s) independently from the skip button configuration so swipes can scrub while buttons change tracks—or vice versa.
+- Horizontal swipes trigger the same haptics and button animations you see in the notch, keeping visual feedback consistent with tap interactions.
+
+## Troubleshooting (Basics)
+- After granting Accessibility or Screen Recording, quit and relaunch the app.
+- If metrics are empty, enable categories in Settings → Stats.
+- Media not responding: verify player is active and Music permission is granted.
+
+## License
+Atoll is released under the GPL v3 License. Refer to [LICENSE](LICENSE) for the full terms.
+
+## Acknowledgments
+
+Atoll builds upon the work of several open-source projects and draws inspiration from innovative macOS applications:
+
+- [**Boring.Notch**](https://github.com/TheBoredTeam/boring.notch) - foundational codebase that provided the initial media player integration, AirDrop surface implementation, file dock functionality, and calendar event display. Major architectural patterns and notch interaction models were adapted from this project.
+
+- [**Alcove**](https://tryalcove.com) - primary inspiration for the Minimalistic Mode interface design and the conceptual framework for lock screen widget integration that informed Atoll's compact layout strategy.
+
+- [**Stats**](https://github.com/exelban/stats) - source implementation for CPU temperature monitoring via SMC (System Management Controller) access, frequency sampling through IOReport bindings, and per-core CPU utilisation tracking. The system metrics collection architecture derives from Stats project readers.
+
+- [**Open Meteo**](https://open-meteo.com) - weather apis for the lock screen widgets
+
+- [**SkyLightWindow**](https://github.com/Lakr233/SkyLightWindow) - window rendering for Lock Screen Widgets
+
+- [**rtaudio**](https://github.com/ZephyrCodesStuff/rtaudio) - Live music visualizer using C++ was adapted from this project
+
+- [**SwiftTerm**](https://github.com/migueldeicaza/SwiftTerm) - Terminal tab implementation in the standard mode was adapted from this project
+
+- [**DynamicNotch**](https://github.com/jackson-storm/DynamicNotch) - thanks DynamicNotch for letting us use their battery huds
+
+- Wick - Thanks Nate for allowing us to replicate the iOS like Timer design for the Lock Screen Widget
+
+- [**OpenUsage**](https://github.com/robinebers/openusage) - LLM Usage Tracking features
+
+- [**OpenRouter**](https://openrouter.ai) - API for getting automated model pricing
+
+## Contributors
+
+<a href="https://github.com/Ebullioscopic/Atoll/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Ebullioscopic/Atoll" />
+</a>
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Ebullioscopic/Atoll&type=timeline&legend=top-left)](https://www.star-history.com/#Ebullioscopic/Atoll&type=timeline&legend=top-left)
+
+## Updating Existing Clones
+If you previously cloned DynamicIsland, update the remote to track the Atoll repository:
 
 ```bash
-swift test
-bash scripts/build-toolisle.sh release
-open dist/ToolIsle.app
+git remote set-url origin https://github.com/Ebullioscopic/Atoll.git
 ```
 
-Debug 使用 `bash scripts/build-toolisle.sh debug`。正式 Bundle ID 为 `io.github.lideming0815.toolisle`，Debug 为其 `.dev` 后缀。
-脚本生成 `ToolIsle.app` 与按实际架构命名的 ZIP，并执行 ad-hoc 签名校验；**不代表 Developer ID 签名或 Apple 公证**。团队正式分发需自行配置 Developer ID 和公证，不建议全局关闭 Gatekeeper。
+A heartfelt thanks to [TheBoredTeam](https://github.com/TheBoredTeam) for being supportive and being totally awesome, Atoll would not have been possible without Boring.Notch
 
-图标已提交；重新生成需 Python、CairoSVG 2.7.1、Pillow 11.3.0，以及 Cairo 库，然后运行 `python3 scripts/prepare-toolisle.py`。
+---
 
-## Gitee 连接
+<p align="center">
+  <img src=".github/assets/iosdevcentre.jpeg" alt="iOS Development Centre exterior" width="420">
+  <br>
+  <sub>Backed by</sub>
+  <br>
+  <strong>iOS Development Centre</strong>
+  <br>
+  Powered by Apple and Infosys
+  <br>
+  SRM Institute of Science and Technology, Chennai, India
+</p>
 
-在 Gitee 的个人设置中创建个人访问令牌，按读取需求授予资料、仓库、Issues、评论相关权限，在应用中粘贴并验证。只发送 GET 请求。未实现网页密码登录或 OAuth 应用注册；不收集、不保存 Gitee 密码。
-令牌只保存在当前应用命名空间的 macOS Keychain；不会进入 URL、源代码、日志、Markdown 或 CI。HTTP 重定向被拒绝，避免转发授权头。
-仓库文件中的相对图片通过同仓库、同 ref 的 Contents API 读取；外部 HTTPS 图片默认禁用，开启后使用无令牌、无 Cookie 的独立请求。Markdown 不执行 HTML/JavaScript。
+<p align="center">
+  <a href="https://buymeacoffee.com/kryoscopic">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="200" />
+  </a>
+</p>
 
-磁盘缓存默认关闭。开启后按账户分隔、最多 7 天 / 100 项 / 10 MB，文件权限为当前系统用户可读写。**缓存未加密**；设备丢失风险应结合 FileVault 管理。退出账户会清理凭据与缓存，清理失败会明确显示错误。401/403/404 不会用离线缓存掩盖权限变化。
-
-## 扩展工具
-
-在 `ToolIsle/App/ToolIsleApp.swift` 的 `ToolRegistry.tools` 增加一个 `ToolDescriptor`，实现独立 SwiftUI View；纯逻辑放到 Core 并补充 XCTest。工具由窗口路由统一管理，默认不在启动时执行、不自动读取剪贴板。
-当前仅支持编译期内置模块，不对外开放不受信任的动态插件。保留的旧 Atoll 扩展代码不在新进程中启动。
-
-## 已知边界与验收
-
-当前按仓库浏览，不是跨仓库全量聚合；不含写操作、推送通知、自动轮询、Mermaid、数学公式、完整 HTML、富文本编辑、多账户同时在线或私有化 Gitee 服务器。
-自动化测试使用模拟 API 响应，不使用任何私人账号凭据。真实私有仓库权限、实际图片/附件差异、Keychain 与窗口交互仍需在团队 Mac 上验收。CI 编译通过不等于这些人工场景已经测试。
-
-## 许可与来源
-
-保留根目录 `LICENSE`、`NOTICE`、`COPYRIGHT_ASSETS`、`TRADEMARKS` 和原始代码版权；新增代码采用 GPL-3.0-or-later。上游 README 保存在 `Docs/Upstream-Atoll-ReadMe.md`。
-MarkdownUI 2.4.1 为 MIT 组件，已进入维护模式；此版本用于稳定的原生阅读，渲染组件可独立替换。打包脚本从锁定依赖中收集完整许可证，应用“关于与许可证”可阅读。
-原作者商标/赞助入口不作为 ToolIsle 的品牌入口。Logo 来源于维护者提供的 SVG；对外分发前由维护者确认素材权利与全部依赖许可。
+<p align="center">
+  Your support helps fund teaching children software development.
+</p>

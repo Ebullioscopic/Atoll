@@ -165,8 +165,3 @@ implementation_plan.md
 walkthrough.md
 TemporaryAssets/
 *.profraw
-
-/.build/
-/dist/
-/.swiftpm/
-/ToolIsleArtifacts/
