@@ -173,16 +173,19 @@ struct GIWebReader: NSViewRepresentable {
         const box=node('div');
         if(!window.GIText) {box.textContent=source;return box}
         if(source.length>1000000){box.className='error';box.textContent='正文过长，请在 Gitee 中打开完整内容。';return box}
-        box.innerHTML=GIText.render(source);
-        for(const e of box.querySelectorAll('input')) {
+        // Template contents are inert: no image request may start before the opt-in check.
+        const template=document.createElement('template');
+        template.innerHTML=GIText.render(source);
+        const fragment=template.content;
+        for(const e of fragment.querySelectorAll('input')) {
           const check=node('span',e.hasAttribute('checked')?'☑':'☐','checkbox');e.replaceWith(check);
         }
-        for(const e of box.querySelectorAll('a')) {
+        for(const e of fragment.querySelectorAll('a')) {
           const raw=e.getAttribute('href')||'';const u=safeURL(raw,base);
           if(!u){e.removeAttribute('href');e.title='此链接不可打开';continue}
           e.setAttribute('href',u.href);e.title=u.href;e.rel='noreferrer noopener';e.removeAttribute('target');
         }
-        for(const e of box.querySelectorAll('img')) {
+        for(const e of fragment.querySelectorAll('img')) {
           const raw=e.getAttribute('src')||'';const alt=e.getAttribute('alt')||'图片';
           const data=/^data:image\/(png|jpeg|gif|webp);base64,[a-z0-9+/=]+$/i.test(raw)&&raw.length<2000000;
           const u=safeURL(raw,base);
@@ -198,13 +201,14 @@ struct GIWebReader: NSViewRepresentable {
             e.replaceWith(button);
           }
         }
-        for(const e of box.querySelectorAll('table')) {const wrapper=node('div',undefined,'table-scroll');e.replaceWith(wrapper);wrapper.append(e)}
-        for(const pre of box.querySelectorAll('pre')) {
+        for(const e of fragment.querySelectorAll('table')) {const wrapper=node('div',undefined,'table-scroll');e.replaceWith(wrapper);wrapper.append(e)}
+        for(const pre of fragment.querySelectorAll('pre')) {
           const code=pre.querySelector('code');if(!code)continue;
           const button=node('button','复制','copy');button.title='复制代码';
           button.addEventListener('click',()=>{post('copy',{text:code.textContent});button.textContent='已复制';setTimeout(()=>{button.textContent='复制'},1200)});
           pre.prepend(button);
         }
+        box.append(fragment);
         return box;
       }
       function render(data) {
@@ -247,7 +251,7 @@ struct GIWebReader: NSViewRepresentable {
       });
       window.GIReader={
         renderBase64(value){const bytes=Uint8Array.from(atob(value),c=>c.charCodeAt(0));render(JSON.parse(new TextDecoder().decode(bytes)))},
-        inspect(){return {title:document.querySelector('h1')?.textContent||'',y:window.scrollY,linkCount:document.querySelectorAll('a[href]').length,tableCount:document.querySelectorAll('table').length,codeCount:document.querySelectorAll('pre code').length,commentCount:document.querySelectorAll('.comment').length,hasRenderer:!!window.GIText}},
+        inspect(){return {title:document.querySelector('h1')?.textContent||'',y:window.scrollY,linkCount:document.querySelectorAll('a[href]').length,tableCount:document.querySelectorAll('table').length,codeCount:document.querySelectorAll('pre code').length,commentCount:document.querySelectorAll('.comment').length,hasRenderer:!!window.GIText,imageCount:document.querySelectorAll('img').length}},
         followDemoLink(){window.scrollTo(0,600);snapshot();const a=[...document.querySelectorAll('a[href]')].find(a=>a.href.includes('/IDEMOB#note_202'));if(a)a.click();return !!a}
       };
     })();

@@ -8,7 +8,7 @@ import SwiftUI
 final class GIReaderWindowController: NSWindowController {
     static let shared = GIReaderWindowController()
     private init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 960, height: 660),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "Gitee Issues · ToolIsle"
         window.minSize = NSSize(width: 740, height: 480)
@@ -17,6 +17,9 @@ final class GIReaderWindowController: NSWindowController {
         window.center()
         window.setFrameAutosaveName("ToolIsle.GiteeReader.Window")
         super.init(window: window)
+        window.collectionBehavior = [.managed, .participatesInCycle]
+        window.hidesOnDeactivate = false
+        ScreenCaptureVisibilityManager.shared.register(window, scope: .panelsOnly)
     }
     required init?(coder: NSCoder) { return nil }
     func show(route: GIIssueRoute? = nil) {
@@ -34,6 +37,9 @@ struct GIReaderSettingsSection: View {
             Text("只读查看关注项目的 Issue。不会更改默认首页、媒体、锁屏或文件暂存行为。")
                 .font(.caption).foregroundStyle(.secondary)
             Button("账户与项目设置…") { GIReaderWindowController.shared.show() }
+            Button("Markdown 组件许可证…") {
+                if let url = Bundle.main.url(forResource: "gitee-markdown-licenses", withExtension: "txt") { NSWorkspace.shared.open(url) }
+            }
         }
     }
 }
@@ -104,7 +110,7 @@ struct GIReaderRootView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 HSplitView {
-                    if showList { GIIssueListView().frame(minWidth: 240, idealWidth: 300, maxWidth: 370) }
+                    if showList { GIIssueListView().frame(minWidth: 240, idealWidth: 280, maxWidth: 320) }
                     detail.frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -261,7 +267,7 @@ private struct GIIssueListView: View {
                                 .frame(width: 360, height: 240)
                         }
                 } else if let date = store.lastSync {
-                    HStack { Text("最近完整刷新"); Text(date, style: .time); Spacer() }.font(.caption2).foregroundStyle(.secondary)
+                    HStack { Text("最近成功刷新"); Text(date, style: .time); Spacer() }.font(.caption2).foregroundStyle(.secondary)
                 }
             }.padding(10)
         }
