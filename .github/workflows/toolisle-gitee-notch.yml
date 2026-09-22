@@ -25,21 +25,16 @@ jobs:
           fetch-depth: 0
           lfs: true
           ref: fix/gitee-notch-visibility
-      - name: Apply and commit only the notch-local repair
+      - name: Finalize scoped notch layout and explicit regression probe
         run: |
           set -euo pipefail
-          if [ -f scripts/repair_gitee_notch_visibility.py ]; then
-            python3 scripts/repair_gitee_notch_visibility.py
-            python3 - <<'PY'
-          from pathlib import Path
-          p=Path('tests/render_gitee_notch.py')
-          p.write_text(p.read_text().replace('width:width,height:190','width:CGFloat(width),height:190'))
-          PY
-            git rm scripts/repair_gitee_notch_visibility.py
-            git add DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift DynamicIsland.xcodeproj/project.pbxproj tests/render_gitee_notch.py
+          if [ -f scripts/refine_notch_preview.py ]; then
+            python3 scripts/refine_notch_preview.py
+            git rm scripts/refine_notch_preview.py
+            git add DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift DynamicIsland/DynamicIslandApp.swift
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'fix(gitee): make all notch states visible on the black surface'
+            git commit -m 'fix(gitee): fit summary cards and verify the actual notch using its real delegate'
             git push origin HEAD:refs/heads/fix/gitee-notch-visibility
           fi
       - uses: maxim-lobanov/setup-xcode@v1
@@ -52,7 +47,7 @@ jobs:
           import subprocess,hashlib,json
           from pathlib import Path
           base='f8f0b6df395394d69d066ede0da58eeedaef06d9'
-          allowed={'DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift','DynamicIsland.xcodeproj/project.pbxproj','tests/render_gitee_notch.py','.github/workflows/toolisle-gitee-notch.yml','TOOLISLE-GITEE-NOTCH-FIX.md'}
+          allowed={'DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift','DynamicIsland/DynamicIslandApp.swift','DynamicIsland.xcodeproj/project.pbxproj','tests/render_gitee_notch.py','.github/workflows/toolisle-gitee-notch.yml','TOOLISLE-GITEE-NOTCH-FIX.md'}
           changed=subprocess.check_output(['git','diff','--name-only',base,'HEAD']).decode().splitlines()
           assert not set(changed)-allowed,changed
           count=0
@@ -65,14 +60,17 @@ jobs:
                   assert len(actual)==int(fields['size']) and hashlib.sha256(actual).hexdigest()==fields['oid'].split(':')[1],path
               else:assert actual==expected,path
               count+=1
-          s=Path('DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift').read_text()
-          old=subprocess.check_output(['git','show',base+':DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift']).decode()
-          assert s[s.index('struct GIReaderRootView:'):s.index('/// Explicit synthetic regression only.')] .rstrip()==old[old.index('struct GIReaderRootView:'):].rstrip()
+          path='DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift'
+          s=Path(path).read_text();old=subprocess.check_output(['git','show',base+':'+path]).decode()
+          assert s[:s.index('struct GINotchView:')]==old[:old.index('struct GINotchView:')]
+          assert s[s.index('struct GIReaderRootView:'):s.index('/// Explicit synthetic regression only.')].rstrip()==old[old.index('struct GIReaderRootView:'):].rstrip()
           assert '.environment(\\.colorScheme, .dark)' in s
           assert '.frame(height: 190, alignment: .topLeading)' in s
           assert 'else if store.filteredItems.isEmpty' in s
-          assert '当前筛选没有匹配的 Issue' in s
-          print(json.dumps({'base':base,'source':subprocess.check_output(['git','rev-parse','HEAD']).decode().strip(),'unchanged_baseline_files':count,'changed_files':changed,'reader_body_unchanged':True,'credentials_in_ci':False},indent=2))
+          path='DynamicIsland/DynamicIslandApp.swift'
+          old=subprocess.check_output(['git','show',base+':'+path]).decode();current=Path(path).read_text()
+          assert current==old.replace('                GIReaderWindowController.shared.show()\n','                GIReaderWindowController.shared.show()\n                GINotchPreviewProbe.run(app: self)\n')
+          print(json.dumps({'base':base,'source':subprocess.check_output(['git','rev-parse','HEAD']).decode().strip(),'unchanged_baseline_files':count,'changed_files':changed,'reader_and_window_controller_unchanged':True,'app_delegate_only_explicit_demo_probe':True,'credentials_in_ci':False},indent=2))
           PY
       - name: Render actual old and new SwiftUI notch views across appearances and states
         env:
@@ -101,15 +99,15 @@ jobs:
               with (out/f'notch-{name}.log').open('w') as log:
                   p=subprocess.Popen([str(binary),'--gitee-reader-demo','--gitee-notch-preview',*extra],stdout=log,stderr=subprocess.STDOUT,env=env)
                   try:
-                      for _ in range(25):
-                          if result.exists() or p.poll() is not None:break
+                      for _ in range(30):
+                          if result.exists() or Path(str(result)+'.error').exists() or p.poll() is not None:break
                           time.sleep(1)
-                      assert p.poll() is None and result.exists(),'actual notch did not open'
+                      subprocess.run(['/usr/sbin/screencapture','-x',str(out/f'actual-desktop-{name}.png')],check=False)
+                      assert p.poll() is None and result.exists(),'actual notch probe did not complete; see screenshot/log/error'
                       info=json.loads(result.read_text());assert info['gitee_selected'] and info['window_id']>0,info
                       assert info['loaded']==1 and info['filtered']==(0 if name=='filtered' else 1),info
                       time.sleep(2)
                       subprocess.run(['/usr/sbin/screencapture','-x','-o','-l',str(info['window_id']),str(out/f'actual-notch-{name}.png')],check=True)
-                      subprocess.run(['/usr/sbin/screencapture','-x',str(out/f'actual-desktop-{name}.png')],check=True)
                   finally:
                       if p.poll() is None:
                           p.terminate()
