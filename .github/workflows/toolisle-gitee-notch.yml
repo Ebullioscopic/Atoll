@@ -1,0 +1,130 @@
+name: ToolIsle Gitee notch visibility
+on:
+  push:
+    branches: [fix/gitee-notch-visibility]
+    paths: [.github/workflows/toolisle-gitee-notch.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+concurrency:
+  group: toolisle-gitee-notch-preview
+  cancel-in-progress: false
+jobs:
+  macos:
+    if: github.repository == 'lideming0815/ToolIsle' && github.ref == 'refs/heads/fix/gitee-notch-visibility'
+    runs-on: macos-26
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+          ref: fix/gitee-notch-visibility
+      - name: Apply and commit only the notch-local repair
+        run: |
+          set -euo pipefail
+          if [ -f scripts/repair_gitee_notch_visibility.py ]; then
+            python3 scripts/repair_gitee_notch_visibility.py
+            python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/render_gitee_notch.py')
+          p.write_text(p.read_text().replace('width:width,height:190','width:CGFloat(width),height:190'))
+          PY
+            git rm scripts/repair_gitee_notch_visibility.py
+            git add DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift DynamicIsland.xcodeproj/project.pbxproj tests/render_gitee_notch.py
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'fix(gitee): make all notch states visible on the black surface'
+            git push origin HEAD:refs/heads/fix/gitee-notch-visibility
+          fi
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Audit changes and preserve all non-notch functionality
+        run: |
+          mkdir -p "$RUNNER_TEMP/gitee-fix-output"
+          python3 - <<'PY' | tee "$RUNNER_TEMP/gitee-fix-output/notch-scope-audit.json"
+          import subprocess,hashlib,json
+          from pathlib import Path
+          base='f8f0b6df395394d69d066ede0da58eeedaef06d9'
+          allowed={'DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift','DynamicIsland.xcodeproj/project.pbxproj','tests/render_gitee_notch.py','.github/workflows/toolisle-gitee-notch.yml','TOOLISLE-GITEE-NOTCH-FIX.md'}
+          changed=subprocess.check_output(['git','diff','--name-only',base,'HEAD']).decode().splitlines()
+          assert not set(changed)-allowed,changed
+          count=0
+          for path in subprocess.check_output(['git','ls-tree','-r','--name-only',base]).decode().splitlines():
+              if path in allowed:continue
+              p=Path(path);expected=subprocess.check_output(['git','show',f'{base}:{path}'])
+              actual=str(p.readlink()).encode() if p.is_symlink() else p.read_bytes()
+              if expected.startswith(b'version https://git-lfs'):
+                  fields=dict(x.split(' ',1) for x in expected.decode().strip().splitlines())
+                  assert len(actual)==int(fields['size']) and hashlib.sha256(actual).hexdigest()==fields['oid'].split(':')[1],path
+              else:assert actual==expected,path
+              count+=1
+          s=Path('DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift').read_text()
+          old=subprocess.check_output(['git','show',base+':DynamicIsland/ToolIsleFeatures/Gitee/GIViews.swift']).decode()
+          assert s[s.index('struct GIReaderRootView:'):s.index('/// Explicit synthetic regression only.')] .rstrip()==old[old.index('struct GIReaderRootView:'):].rstrip()
+          assert '.environment(\\.colorScheme, .dark)' in s
+          assert '.frame(height: 190, alignment: .topLeading)' in s
+          assert 'else if store.filteredItems.isEmpty' in s
+          assert '当前筛选没有匹配的 Issue' in s
+          print(json.dumps({'base':base,'source':subprocess.check_output(['git','rev-parse','HEAD']).decode().strip(),'unchanged_baseline_files':count,'changed_files':changed,'reader_body_unchanged':True,'credentials_in_ci':False},indent=2))
+          PY
+      - name: Render actual old and new SwiftUI notch views across appearances and states
+        env:
+          OUT: ${{ runner.temp }}/gitee-fix-output
+        run: python3 tests/render_gitee_notch.py 2>&1 | tee "$OUT/notch-render-tests.log"
+      - name: Build original Release target, run existing regressions and package
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/build_gitee_settings_preview.sh').read_text()
+          s=s.replace('1640','1641').replace('gitee.2','gitee.3').replace('TOOLISLE-GITEE-SETTINGS-FIX.md','TOOLISLE-GITEE-NOTCH-FIX.md')
+          Path('scripts/.build_notch_preview.sh').write_text(s)
+          PY
+          bash scripts/.build_notch_preview.sh
+          rm scripts/.build_notch_preview.sh
+      - name: Open the actual application notch in light, dark, and filtered states
+        run: |
+          python3 - <<'PY'
+          import os,json,subprocess,time
+          from pathlib import Path
+          out=Path(os.environ['RUNNER_TEMP'])/'gitee-fix-output'
+          binary=Path(os.environ['RUNNER_TEMP'])/'ToolIsleGiteeFix/ToolIsle.app/Contents/MacOS/ToolIsle'
+          for name,extra in [('light',[]),('dark',['--notch-dark']),('filtered',['--notch-filtered'])]:
+              result=out/f'notch-{name}.json'
+              env=os.environ.copy();env['TOOLISLE_NOTCH_PREVIEW_RESULT']=str(result)
+              with (out/f'notch-{name}.log').open('w') as log:
+                  p=subprocess.Popen([str(binary),'--gitee-reader-demo','--gitee-notch-preview',*extra],stdout=log,stderr=subprocess.STDOUT,env=env)
+                  try:
+                      for _ in range(25):
+                          if result.exists() or p.poll() is not None:break
+                          time.sleep(1)
+                      assert p.poll() is None and result.exists(),'actual notch did not open'
+                      info=json.loads(result.read_text());assert info['gitee_selected'] and info['window_id']>0,info
+                      assert info['loaded']==1 and info['filtered']==(0 if name=='filtered' else 1),info
+                      time.sleep(2)
+                      subprocess.run(['/usr/sbin/screencapture','-x','-o','-l',str(info['window_id']),str(out/f'actual-notch-{name}.png')],check=True)
+                      subprocess.run(['/usr/sbin/screencapture','-x',str(out/f'actual-desktop-{name}.png')],check=True)
+                  finally:
+                      if p.poll() is None:
+                          p.terminate()
+                          try:p.wait(timeout=10)
+                          except subprocess.TimeoutExpired:p.kill();p.wait()
+          PY
+      - name: Collect failure diagnostics without suppressing original capabilities
+        if: failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/gitee-fix-output"
+          find ~/Library/Logs/DiagnosticReports -maxdepth 1 \( -iname '*ToolIsle*' -o -iname '*Atoll*' \) -exec cp {} "$RUNNER_TEMP/gitee-fix-output/" \; || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: toolisle-gitee-notch-preview
+          path: ${{ runner.temp }}/gitee-fix-output/
+          retention-days: 14
+          if-no-files-found: error
