@@ -27,19 +27,9 @@ final class GIReaderWindowController: NSWindowController {
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-    }
-}
-
-struct GIReaderSettingsSection: View {
-    var body: some View {
-        Section("Gitee Issues") {
-            Defaults.Toggle(key: .enableGiteeReader) { Text("启用 Gitee 阅读") }
-            Text("只读查看关注项目的 Issue。不会更改默认首页、媒体、锁屏或文件暂存行为。")
-                .font(.caption).foregroundStyle(.secondary)
-            Button("账户与项目设置…") { GIReaderWindowController.shared.show() }
-            Button("Markdown 组件许可证…") {
-                if let url = Bundle.main.url(forResource: "gitee-markdown-licenses", withExtension: "txt") { NSWorkspace.shared.open(url) }
-            }
+        // Explicit synthetic UI preview only; ordinary launches are unchanged.
+        if ProcessInfo.processInfo.arguments.contains("--gitee-settings-preview") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { GISettingsNavigation.shared.open() }
         }
     }
 }
@@ -60,11 +50,11 @@ struct GINotchView: View {
             if store.account == nil {
                 Text("连接 Gitee，阅读关注项目的 Issue。")
                     .font(.caption).foregroundStyle(.secondary)
-                Button("连接与设置…") { GIReaderWindowController.shared.show() }.controlSize(.small)
+                Button("连接与设置…") { GISettingsNavigation.shared.open() }.controlSize(.small)
             } else if store.items.isEmpty {
                 Text(store.loadingList ? "正在加载已选项目…" : "尚无已加载的 Issue")
                     .font(.caption).foregroundStyle(.secondary)
-                Button("选择项目 / 查看详情…") { GIReaderWindowController.shared.show() }.controlSize(.small)
+                Button("选择查看项目…") { GISettingsNavigation.shared.open() }.controlSize(.small)
             } else {
                 ForEach(Array(store.filteredItems.prefix(3))) { item in
                     Button { GIReaderWindowController.shared.show(route: item.route) } label: {
@@ -91,8 +81,7 @@ struct GINotchView: View {
 struct GIReaderRootView: View {
     @ObservedObject private var store = GIStore.shared
     @Default(.enableGiteeReader) private var enabled
-    @State private var settings = false
-    @State private var showList = true
+        @State private var showList = true
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -103,11 +92,12 @@ struct GIReaderRootView: View {
                     Text("阅读项目中的讨论").font(.title2.weight(.semibold))
                     Text("在 Atoll 中查看 Gitee Issue，并沿着关联链接连续阅读。\n仅在启用并连接账户后请求 Gitee；不读取本地文件。")
                         .multilineTextAlignment(.center).foregroundStyle(.secondary)
-                    Button("启用 Gitee 阅读") { enabled = true; store.activate() }.buttonStyle(.borderedProminent)
+                    Button("前往 Gitee 设置") { GISettingsNavigation.shared.open() }.buttonStyle(.borderedProminent)
                 }.padding(40).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if store.account == nil {
-                GIConnectionView().frame(maxWidth: 440).padding(32)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                GIEmptyState(symbol: "person.badge.key", title: "尚未连接 Gitee", detail: "账户、查看项目和阅读偏好统一在设置侧栏的 Gitee 页面管理。") {
+                    Button("打开 Gitee 设置") { GISettingsNavigation.shared.open() }.buttonStyle(.borderedProminent)
+                }
             } else {
                 HSplitView {
                     if showList { GIIssueListView().frame(minWidth: 240, idealWidth: 280, maxWidth: 320) }
@@ -117,8 +107,7 @@ struct GIReaderRootView: View {
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .frame(minWidth: 720, minHeight: 420)
-        .sheet(isPresented: $settings) { GIAccountView() }
-        .onAppear { store.activate() }
+                .onAppear { store.activate() }
         .onChange(of: enabled) { _, value in if value { store.activate() } }
     }
     private var header: some View {
@@ -143,8 +132,8 @@ struct GIReaderRootView: View {
                     .disabled(store.loadingDetail || store.demoMode).help("刷新当前 Issue").keyboardShortcut("r", modifiers: .command)
                 Button { store.browserOpen() } label: { Image(systemName: "arrow.up.right.square") }.help("在 Gitee 中打开")
             }
-            Button { settings = true } label: { Image(systemName: "person.crop.circle") }
-                .help("账户与查看项目")
+            Button { GISettingsNavigation.shared.open() } label: { Image(systemName: "gearshape") }
+                .help("打开设置中的 Gitee 页面")
         }
         .buttonStyle(.borderless).controlSize(.regular)
         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -196,7 +185,7 @@ struct GIReaderRootView: View {
             }
         } else {
             GIEmptyState(symbol: "text.bubble", title: "选择一个 Issue", detail: "从左侧选择讨论。正文中的关联 Issue 会在这里打开，原列表不会切换。") {
-                Button("选择查看项目…") { settings = true }
+                Button("选择查看项目…") { GISettingsNavigation.shared.open() }
             }
         }
     }
@@ -228,7 +217,7 @@ private struct GIIssueListView: View {
             if store.filteredItems.isEmpty {
                 VStack(spacing: 10) {
                     if store.loadingList { ProgressView().controlSize(.small) }
-                    Text(store.loadingList ? "正在读取项目…" : (store.selectedRepositories.isEmpty ? "请先选择查看项目" : "已加载范围内没有匹配结果"))
+                    Text(store.loadingList ? "正在读取项目…" : (store.selectedRepositories.isEmpty ? "请先选择查看项目" : (!store.listFailures.isEmpty && store.items.isEmpty ? "项目读取失败，请查看下方原因或重试" : "已加载范围内没有匹配结果")))
                         .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }.padding(20).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -263,8 +252,29 @@ private struct GIIssueListView: View {
                 if !store.listFailures.isEmpty {
                     Button("\(store.listFailures.count) 个项目读取失败 · 查看原因") { showFailures = true }
                         .font(.caption).popover(isPresented: $showFailures) {
-                            ScrollView { Text(store.listFailures.joined(separator: "\n\n")).textSelection(.enabled).padding(16) }
-                                .frame(width: 360, height: 240)
+                            VStack(alignment: .leading, spacing: 12) {
+                                Label("项目读取诊断", systemImage: "exclamationmark.triangle").font(.headline)
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 16) {
+                                        ForEach(store.listFailures) { failure in
+                                            VStack(alignment: .leading, spacing: 5) {
+                                                Text(failure.repository).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                                                if let status = failure.status { Text("HTTP \(status)").font(.caption).foregroundStyle(.secondary) }
+                                                Text(failure.message).font(.callout).textSelection(.enabled)
+                                                    .fixedSize(horizontal: false, vertical: true)
+                                            }.frame(maxWidth: .infinity, alignment: .leading)
+                                        }
+                                    }
+                                }.frame(maxHeight: 250)
+                                Divider()
+                                HStack {
+                                    Button("Gitee 设置…") { showFailures = false; GISettingsNavigation.shared.open() }
+                                    Spacer()
+                                    Button("重试失败项目") { showFailures = false; store.retryFailedRepositories() }
+                                        .disabled(store.loadingList)
+                                }
+                            }.padding(16).frame(width: 400)
+                                .background(Color(nsColor: .windowBackgroundColor))
                         }
                 } else if let date = store.lastSync {
                     HStack { Text("最近成功刷新"); Text(date, style: .time); Spacer() }.font(.caption2).foregroundStyle(.secondary)
@@ -274,7 +284,7 @@ private struct GIIssueListView: View {
     }
 }
 
-private struct GIConnectionView: View {
+struct GIConnectionView: View {
     @ObservedObject private var store = GIStore.shared
     @State private var token = ""
     var body: some View {
@@ -301,89 +311,6 @@ private struct GIConnectionView: View {
         }
     }
     private func submit() { let value = token; token = ""; store.connect(value) }
-}
-
-private struct GIAccountView: View {
-    @ObservedObject private var store = GIStore.shared
-    @Default(.enableGiteeReader) private var enabled
-    @Environment(\.dismiss) private var dismiss
-    @State private var source = "subscriptions"
-    @State private var selection: [Int64: GIRepository] = [:]
-    @State private var filter = ""
-    @State private var changeAccount = false
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Gitee 账户与项目").font(.title3.weight(.semibold))
-                Spacer()
-                Toggle("启用", isOn: $enabled).toggleStyle(.switch).controlSize(.small)
-            }
-            if enabled, let account = store.account {
-                HStack {
-                    Label(account.displayName, systemImage: "person.crop.circle")
-                    Spacer()
-                    if store.demoMode {
-                        Button("退出演示") { store.deactivate() }
-                    } else {
-                        Button("更换令牌") { changeAccount.toggle() }
-                        Button("退出账户") { store.disconnect() }
-                    }
-                }
-                if changeAccount && !store.demoMode { GIConnectionView() }
-                Text("勾选需要查看的项目。此处增删只影响本机列表，不会修改 Gitee 的 Watch 或 Star。")
-                    .font(.caption).foregroundStyle(.secondary)
-                Picker("项目来源", selection: $source) {
-                    Text("Watch 关注").tag("subscriptions"); Text("Star 收藏").tag("starred")
-                }.pickerStyle(.segmented).disabled(store.demoMode)
-                TextField("筛选已加载项目", text: $filter).textFieldStyle(.roundedBorder)
-                List {
-                    ForEach(store.repositories.filter { filter.isEmpty || $0.full_name.localizedCaseInsensitiveContains(filter) }) { repo in
-                        Toggle(isOn: Binding(get: { selection[repo.id] != nil }, set: { value in selection[repo.id] = value ? repo : nil })) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(repo.full_name).lineLimit(1)
-                                if let description = repo.description, !description.isEmpty {
-                                    Text(description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                }
-                            }
-                        }.toggleStyle(.checkbox).padding(.vertical, 3)
-                    }
-                }.frame(minHeight: 160, maxHeight: .infinity)
-                if let error = store.repositoryError {
-                    HStack { Text(error).font(.caption); Button("重试") { store.refreshRepositories(source: source, reset: true) } }
-                }
-                HStack {
-                    Text("已选 \(selection.count) 个 · 已加载 \(store.repositories.count) 个").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    if store.loadingRepositories { ProgressView().controlSize(.small) }
-                    if store.moreRepositories { Button("加载更多项目") { store.refreshRepositories(source: source, reset: false) }.disabled(store.loadingRepositories) }
-                }
-            } else if enabled {
-                GIConnectionView()
-                Spacer(minLength: 0)
-            } else {
-                Text("关闭后不发送 Gitee 请求，并清除内存中的阅读内容。钥匙串令牌保留，可重新启用或在连接后退出账户。")
-                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Spacer()
-            }
-            Divider()
-            HStack {
-                Text("本期仅阅读 Issue 与评论").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button("完成") {
-                    if enabled, store.account != nil, Set(selection.keys) != Set(store.selectedRepositories.map(\.id)) {
-                        store.applySelection(Array(selection.values))
-                    }
-                    dismiss()
-                }.keyboardShortcut(.defaultAction)
-            }
-        }.padding(22).frame(width: 560, height: 600)
-        .onAppear { selection = Dictionary(uniqueKeysWithValues: store.selectedRepositories.map { ($0.id, $0) }) }
-        .onChange(of: store.account?.id) { _, _ in
-            selection = Dictionary(uniqueKeysWithValues: store.selectedRepositories.map { ($0.id, $0) }); changeAccount = false
-        }
-        .onChange(of: source) { _, value in store.refreshRepositories(source: value, reset: true) }
-        .onChange(of: enabled) { _, value in if value { store.activate() } }
-    }
 }
 
 private struct GIEmptyState<Actions: View>: View {

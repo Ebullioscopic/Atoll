@@ -17,3 +17,14 @@ struct GITabOverflow: ViewModifier {
         }
     }
 }
+
+/// A single cross-window route, confined to the optional Gitee feature.
+@MainActor
+final class GISettingsNavigation: ObservableObject {
+    static let shared = GISettingsNavigation()
+    @Published var request: UUID?
+    func open() {
+        request = UUID()
+        SettingsWindowController.shared.showWindow()
+    }
+}

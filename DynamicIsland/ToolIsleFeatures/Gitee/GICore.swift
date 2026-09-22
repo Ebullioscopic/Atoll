@@ -12,19 +12,75 @@ struct GIUser: Codable, Hashable {
     var displayName: String { name.flatMap { $0.isEmpty ? nil : $0 } ?? login }
 }
 
+/// Minimal namespace metadata; deliberately distinct from the display name.
+struct GIRepositorySpace: Codable, Hashable {
+    let path: String?
+    let login: String?
+}
+
+enum GIRepositoryAddress {
+    /// Only legacy URL/full_name fallbacks lose the clone suffix. Explicit API
+    /// path metadata is authoritative and is never blindly renamed.
+    static func legacyPath(_ value: String) -> String? {
+        let raw = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidate: String
+        if raw.contains("://") {
+            guard let c = URLComponents(string: raw),
+                  ["https", "http"].contains(c.scheme?.lowercased() ?? ""),
+                  GIIssueLinks.hosts.contains(c.host?.lowercased() ?? ""),
+                  c.user == nil, c.password == nil,
+                  c.port == nil || c.port == (c.scheme == "https" ? 443 : 80),
+                  !c.percentEncodedPath.lowercased().contains("%2f"),
+                  !c.percentEncodedPath.lowercased().contains("%5c") else { return nil }
+            candidate = c.path
+        } else if raw.hasPrefix("git@gitee.com:") {
+            candidate = String(raw.dropFirst("git@gitee.com:".count))
+        } else {
+            guard !raw.contains("://"), !raw.contains(":"), !raw.contains("?"), !raw.contains("#") else { return nil }
+            candidate = raw
+        }
+        var parts = candidate.split(separator: "/").map(String.init)
+        guard parts.count == 2 else { return nil }
+        if parts[1].hasSuffix(".git") { parts[1].removeLast(4) }
+        guard parts.allSatisfy(validSlug) else { return nil }
+        return parts.joined(separator: "/")
+    }
+    static func validSlug(_ part: String) -> Bool {
+        GIIssueLinks.validPart(part) && !part.contains("%") && !part.contains(":") &&
+        !part.contains("?") && !part.contains("#") && !part.contains("@") &&
+        !part.unicodeScalars.contains(where: { CharacterSet.whitespacesAndNewlines.contains($0) })
+    }
+}
+
 struct GIRepository: Codable, Identifiable, Hashable {
     let id: Int64
     let full_name: String
     let name: String
     let description: String?
     let html_url: String?
+    let repositoryPath: String?
+    let namespace: GIRepositorySpace?
+    let owner: GIRepositorySpace?
+    enum CodingKeys: String, CodingKey {
+        case id, full_name, name, description, html_url, namespace, owner
+        case repositoryPath = "path"
+    }
+    init(id: Int64, full_name: String, name: String, description: String?, html_url: String?,
+         repositoryPath: String? = nil, namespace: GIRepositorySpace? = nil, owner: GIRepositorySpace? = nil) {
+        self.id = id; self.full_name = full_name; self.name = name
+        self.description = description; self.html_url = html_url
+        self.repositoryPath = repositoryPath; self.namespace = namespace; self.owner = owner
+    }
     var path: String {
-        if let raw = html_url, let url = URL(string: raw),
-           GIIssueLinks.hosts.contains(url.host?.lowercased() ?? "") {
-            let parts = url.path.split(separator: "/")
-            if parts.count == 2 { return parts.joined(separator: "/") }
+        let web = html_url.flatMap(GIRepositoryAddress.legacyPath)
+        let fallback = GIRepositoryAddress.legacyPath(full_name)
+        if let repo = repositoryPath, GIRepositoryAddress.validSlug(repo) {
+            let space = [namespace?.path, web?.split(separator: "/").first.map(String.init),
+                         fallback?.split(separator: "/").first.map(String.init), owner?.path, owner?.login]
+                .compactMap { $0 }.first(where: GIRepositoryAddress.validSlug)
+            if let space { return "\(space)/\(repo)" }
         }
-        return full_name
+        return web ?? fallback ?? ""
     }
 }
 
@@ -108,7 +164,8 @@ enum GIIssueLinks {
               parts[3].unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) && $0.isASCII }) else {
             return .external(url)
         }
-        return .issue(GIIssueRoute(repository: "\(parts[0])/\(parts[1])", number: parts[3]), fragment: c.fragment.flatMap { $0.isEmpty ? nil : $0 })
+        guard let repository = GIRepositoryAddress.legacyPath("\(parts[0])/\(parts[1])") else { return .external(url) }
+        return .issue(GIIssueRoute(repository: repository, number: parts[3]), fragment: c.fragment.flatMap { $0.isEmpty ? nil : $0 })
     }
 
     static func validPart(_ value: String) -> Bool {
@@ -179,6 +236,25 @@ struct GIPage {
     var revision = UUID()
 }
 
+struct GIRepositoryFailure: Identifiable {
+    let repository: String
+    let message: String
+    let status: Int?
+    var id: String { repository }
+    init(repository: String, error: Error) {
+        self.repository = repository
+        self.message = GIServiceError.message(error)
+        switch error as? GIServiceError {
+        case .missingToken: status = 401
+        case .forbidden: status = 403
+        case .missing: status = 404
+        case .throttled: status = 429
+        case .response(let code): status = code
+        default: status = nil
+        }
+    }
+}
+
 enum GIServiceError: Error, LocalizedError {
     case missingToken, forbidden, missing, throttled, response(Int), format, tooLarge, unsafeRedirect
     var errorDescription: String? {
@@ -200,6 +276,9 @@ enum GIServiceError: Error, LocalizedError {
                 return "当前离线。已加载内容仍可阅读，联网后可重试。"
             }
             if e.code == .timedOut { return "连接超时，请重试。" }
+            if e.code == .cannotFindHost || e.code == .dnsLookupFailed {
+                return "无法解析 Gitee 地址，请检查网络或 DNS 设置。"
+            }
         }
         // Never show an underlying URLSession error containing a credential-bearing URL.
         return "加载失败，请检查网络后重试。"
@@ -261,7 +340,9 @@ final class GIAPI: @unchecked Sendable {
         try await get(["user", source == "starred" ? "starred" : "subscriptions"], query: Self.page(page))
     }
     func issues(repository: String, page: Int) async throws -> [GIIssue] {
-        try await get(["repos"] + repository.split(separator: "/").map(String.init) + ["issues"], query: Self.page(page) + [
+        guard repository.split(separator: "/").count == 2,
+              repository.split(separator: "/").allSatisfy({ GIRepositoryAddress.validSlug(String($0)) }) else { throw GIServiceError.format }
+        return try await get(["repos"] + repository.split(separator: "/").map(String.init) + ["issues"], query: Self.page(page) + [
             URLQueryItem(name: "state", value: "all"), URLQueryItem(name: "sort", value: "updated"), URLQueryItem(name: "direction", value: "desc")
         ])
     }

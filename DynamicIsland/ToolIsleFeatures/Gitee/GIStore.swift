@@ -59,7 +59,7 @@ final class GIStore: ObservableObject {
     @Published var repositoryError: String?
     @Published private(set) var items: [GIListItem] = []
     @Published private(set) var loadingList = false
-    @Published private(set) var listFailures: [String] = []
+    @Published private(set) var listFailures: [GIRepositoryFailure] = []
     @Published private(set) var lastSync: Date?
     @Published var repositoryFilter = ""
     @Published var query = ""
@@ -184,6 +184,14 @@ final class GIStore: ObservableObject {
                 for repo in repos { unique[repo.id] = repo }
                 self.repositories = unique.values.sorted { $0.full_name.localizedStandardCompare($1.full_name) == .orderedAscending }
                 self.repositoryPage = page + 1; self.moreRepositories = repos.count == 50
+                // Reconcile stored records by repository ID without losing user selections.
+                let fresh = Dictionary(repos.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
+                let previousPaths = self.selectedRepositories.map(\.path)
+                self.selectedRepositories = self.selectedRepositories.map { fresh[$0.id] ?? $0 }
+                if let key = self.selectionKey, let data = try? JSONEncoder().encode(self.selectedRepositories) {
+                    UserDefaults.standard.set(data, forKey: key)
+                }
+                if previousPaths != self.selectedRepositories.map(\.path) { self.refreshIssues(reset: true) }
             } catch {
                 guard !Task.isCancelled, self.epoch == session else { return }
                 self.repositoryError = GIServiceError.message(error)
@@ -192,19 +200,19 @@ final class GIStore: ObservableObject {
         }
     }
     func applySelection(_ selection: [GIRepository]) {
-        selectedRepositories = selection.sorted { $0.full_name < $1.full_name }
+        selectedRepositories = selection.filter { !$0.path.isEmpty }.sorted { $0.full_name < $1.full_name }
         if !selectedRepositories.contains(where: { $0.path == repositoryFilter }) { repositoryFilter = "" }
         if !demoMode, let key = selectionKey, let data = try? JSONEncoder().encode(selectedRepositories) {
             UserDefaults.standard.set(data, forKey: key)
         }
         refreshIssues(reset: true)
     }
-    func refreshIssues(reset: Bool) {
+    func refreshIssues(reset: Bool, only: Set<String>? = nil) {
         guard Defaults[.enableGiteeReader], !demoMode, let client = api else { return }
         if loadingList && !reset { return }
         listTask?.cancel()
-        if reset { nextIssuePages = Dictionary(uniqueKeysWithValues: selectedRepositories.map { ($0.path, 1) }) }
-        let requests = nextIssuePages.sorted { $0.key < $1.key }, session = epoch
+        if reset { nextIssuePages = Dictionary(selectedRepositories.filter { !$0.path.isEmpty }.map { ($0.path, 1) }, uniquingKeysWith: { first, _ in first }) }
+        let requests = nextIssuePages.filter { only == nil || only!.contains($0.key) }.sorted { $0.key < $1.key }, session = epoch
         let selected = Set(selectedRepositories.map(\.path))
         if reset { items.removeAll { !selected.contains($0.route.repository) } }
         guard !requests.isEmpty else { loadingList = false; return }
@@ -225,7 +233,7 @@ final class GIStore: ObservableObject {
                     self.nextIssuePages[repo] = issues.count == 50 ? page + 1 : nil
                 } catch {
                     guard !Task.isCancelled, self.epoch == session else { return }
-                    self.listFailures.append("\(repo)：\(GIServiceError.message(error))")
+                    self.listFailures.append(GIRepositoryFailure(repository: repo, error: error))
                 }
                 self.items = merged.values.sorted {
                     if $0.issue.updated_at == $1.issue.updated_at { return $0.route.label < $1.route.label }
@@ -237,6 +245,12 @@ final class GIStore: ObservableObject {
                 if self.listFailures.isEmpty { self.lastSync = Date() }
             }
         }
+    }
+    func retryFailedRepositories() {
+        guard !loadingList else { return }
+        let pending = Set(listFailures.map(\.repository))
+        for repo in pending { nextIssuePages[repo] = nextIssuePages[repo] ?? 1 }
+        refreshIssues(reset: false, only: pending)
     }
     func open(_ route: GIIssueRoute, fragment: String? = nil, fromList: Bool = false) {
         if fromList { selectedListID = route }

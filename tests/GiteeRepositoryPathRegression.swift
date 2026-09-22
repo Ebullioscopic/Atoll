@@ -53,7 +53,7 @@ final class GIPathFixture: URLProtocol {
             expect(GIRepositoryAddress.legacyPath(raw)==nil,"reject unsafe or non-repository address")
         }
         let a=GIIssueRoute(repository:"team/project",number:"IAbC12")
-        expect(GIIssueLinks.resolve("https://gitee.com/team/project.git/issues/IAbC12#note_42",relativeTo:a.url)==.issue(a,fragment:"note_42"),"linked clone URL normalized with case and anchor preserved")
+        expect(GIIssueLinks.resolve("https://gitee.com/team/project.git/issues/IAbC12#note_42",relativeTo:a.url) == .issue(a,fragment:"note_42"),"linked clone URL normalized with case and anchor preserved")
         expect(GIServiceError.message(URLError(.cannotFindHost)).contains("DNS"),"DNS failure distinct from auth")
         let config=URLSessionConfiguration.ephemeral;config.protocolClasses=[GIPathFixture.self]
         let api=GIAPI(token:"fixture-only",configuration:config)
@@ -64,7 +64,7 @@ final class GIPathFixture: URLProtocol {
         let issues=try await api.issues(repository:repos[0].path,page:1)
         expect(issues.count==1 && issues[0].number=="IAbC12","watch metadata to successful canonical issues list")
         let b=GIIssueRoute(repository:"other/linked",number:"ILink")
-        expect(GIIssueLinks.resolve(b.url.absoluteString+"#note_42",relativeTo:a.url)==.issue(b,fragment:"note_42"),"cross issue link")
+        expect(GIIssueLinks.resolve(b.url.absoluteString+"#note_42",relativeTo:a.url) == .issue(b,fragment:"note_42"),"cross issue link")
         let detail=try await api.issue(b);let comments=try await api.comments(b,page:1)
         expect(detail.number=="ILink" && comments.first?.id==42,"linked detail and comment decode")
         for request in GIPathFixture.requests {
