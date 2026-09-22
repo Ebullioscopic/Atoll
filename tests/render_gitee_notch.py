@@ -91,7 +91,7 @@ import SwiftUI
                             if legacy { LegacyGINotchView() } else { GINotchView() }
                         }.environment(\.colorScheme,scheme).frame(width:CGFloat(width),height:190).background(Color.black))
                         let host=NSHostingView(rootView:root)
-                        let window=NSWindow(contentRect:NSRect(x:100,y:100,width:width,height:190),styleMask:.borderless,backing:.buffered,defer:false)
+                        let window=NSWindow(contentRect:NSRect(x:100,y:100,width:CGFloat(width),height:190),styleMask:.borderless,backing:.buffered,defer:false)
                         window.isReleasedWhenClosed=false; window.appearance=appearance; window.contentView=host
                         window.makeKeyAndOrderFront(nil)
                         RunLoop.main.run(until:Date().addingTimeInterval(0.25))
