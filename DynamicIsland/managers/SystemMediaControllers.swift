@@ -797,7 +797,7 @@ final class SystemBrightnessController {
         // Refresh baseline from system in case auto-brightness adjusted it.
         syncWithSystemBrightnessIfNeeded()
 
-        let start = lastEmittedBrightness
+        let start = confirmedBrightness ?? lastEmittedBrightness
         if abs(start - target) <= 0.0005 {
             applyBrightness(target)
             emitBrightnessChange(value: target)
