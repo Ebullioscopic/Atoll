@@ -848,15 +848,19 @@ final class SystemBrightnessController {
     private func applyBrightness(_ value: Float) {
         let clamped = max(0, min(1, value))
         if coreBrightnessClient.setBrightness(clamped) {
+            confirmedBrightness = clamped
             return
         }
         if setBrightnessViaDisplayServices(clamped) {
+            confirmedBrightness = clamped
             return
         }
         guard let service = displayService() else { return }
         let status = IODisplaySetFloatParameter(service, 0, kIODisplayBrightnessKey as CFString, clamped)
         IOObjectRelease(service)
-        if status != kIOReturnSuccess {
+        if status == kIOReturnSuccess {
+            confirmedBrightness = clamped
+        } else {
             NSLog("⚠️ Failed to set brightness via IODisplay: \(status)")
         }
     }
@@ -864,7 +868,6 @@ final class SystemBrightnessController {
     private func emitBrightnessChange(value: Float, force: Bool = false) {
         let clamped = max(0, min(1, value))
         lastEmittedBrightness = clamped
-        confirmedBrightness = clamped
 
         // Throttle rapid emissions to avoid notification storms when the
         // animation timer fires ~10 times per step during key-spam.
