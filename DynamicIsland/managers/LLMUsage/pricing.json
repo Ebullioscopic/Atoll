@@ -41,16 +41,6 @@
       }
     },
     {
-      "id": "anthropic/claude-opus-4",
-      "name": "Anthropic: Claude Opus 4",
-      "pricing": {
-        "prompt": "0.000015",
-        "completion": "0.000075",
-        "cache_read": "0.0000015",
-        "cache_write": "0.00001875"
-      }
-    },
-    {
       "id": "anthropic/claude-opus-4.1",
       "name": "Anthropic: Claude Opus 4.1",
       "pricing": {
@@ -108,6 +98,16 @@
         "completion": "0.000025",
         "cache_read": "0.0000005",
         "cache_write": "0.00000625"
+      }
+    },
+    {
+      "id": "anthropic/claude-opus-5.5",
+      "name": "Anthropic: Claude Opus 5.5",
+      "pricing": {
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "cache_read": "0.0000002",
+        "cache_write": "0.000005"
       }
     },
     {
@@ -801,6 +801,46 @@
       }
     },
     {
+      "id": "openai/gpt-6-luna",
+      "name": "OpenAI: GPT-6 Luna",
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000005",
+        "cache_read": "0.00000001",
+        "cache_write": "0.000000125"
+      }
+    },
+    {
+      "id": "openai/gpt-6-luna-pro",
+      "name": "OpenAI: GPT-6 Luna Pro",
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000005",
+        "cache_read": "0.00000001",
+        "cache_write": "0.000000125"
+      }
+    },
+    {
+      "id": "openai/gpt-6-sol",
+      "name": "OpenAI: GPT-6 Sol",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000002",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/gpt-6-sol-pro",
+      "name": "OpenAI: GPT-6 Sol Pro",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000002",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
       "id": "openai/gpt-audio",
       "name": "OpenAI: GPT Audio",
       "pricing": {
@@ -844,9 +884,9 @@
       "id": "openai/gpt-oss-20b",
       "name": "OpenAI: gpt-oss-20b",
       "pricing": {
-        "prompt": "0.00000003",
-        "completion": "0.00000013",
-        "cache_read": "0.00000003",
+        "prompt": "0.000000018",
+        "completion": "0.00000009",
+        "cache_read": "",
         "cache_write": ""
       }
     },
@@ -921,5 +961,5 @@
       }
     }
   ],
-  "last_updated": "2026-09-21T00:07:36Z"
+  "last_updated": "2026-09-24T00:06:14Z"
 }
