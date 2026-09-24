@@ -659,7 +659,6 @@ final class SystemBrightnessController {
     private let maximumBrightnessAnimationDuration: TimeInterval = 0.3
     private let brightnessAnimationDurationScale: TimeInterval = 1.6
     private var lastEmittedBrightness: Float = 0.5
-    private var pendingAdjustTarget: Float?
     private let coreBrightnessClient = CoreBrightnessDisplayClient.shared
     private var pollTimer: Timer?
     private let pollInterval: TimeInterval = 0.15
@@ -690,12 +689,10 @@ final class SystemBrightnessController {
             NSLog("⚠️ SystemBrightnessController: CoreBrightnessDisplayClient unavailable; will rely on DisplayServices / IODisplay + polling fallback")
         }
         notifyCurrentBrightness()
-        // Only start polling as a fallback when CoreBrightness notifications
-        // are unavailable.  When CoreBrightness IS available the distributed
-        // notifications (registerExternalNotifications) handle detection.
-        if !coreBrightnessClient.isAvailable {
-            startPolling()
-        }
+        // Always start polling to keep lastEmittedBrightness in sync with macOS
+        // auto-brightness (Ambient Light Sensor). On recent macOS versions,
+        // DistributedNotificationCenter does not receive ALS brightness changes.
+        startPolling()
     }
 
     func stop() {
@@ -707,23 +704,19 @@ final class SystemBrightnessController {
         userInitiatedResetTimer?.invalidate()
         userInitiatedResetTimer = nil
         userInitiatedBrightnessChange = false
-        pendingAdjustTarget = nil
     }
 
     func adjust(by delta: Float) {
         markUserInitiated()
 
-        // Do not synchronously query CoreBrightness/DisplayServices here. This
-        // method is reached from hardware-key handling, and those calls can be
-        // slow enough for macOS to disable the event tap. beginBrightnessAnimation
-        // still refreshes the system baseline after the tap callback has returned.
-        let inFlightTarget = brightnessAnimationTimer == nil ? nil : brightnessAnimationTarget
-        let base = pendingAdjustTarget ?? inFlightTarget ?? lastEmittedBrightness
-        pendingAdjustTarget = max(0, min(1, base + delta))
-
+        // Keep event-tap callback fast to avoid macOS disabling the tap.
+        // Compute delta and start animation on main queue after syncing baseline with system.
         DispatchQueue.main.async { [weak self] in
-            guard let self, let target = self.pendingAdjustTarget else { return }
-            self.pendingAdjustTarget = nil
+            guard let self else { return }
+            self.syncWithSystemBrightnessIfNeeded()
+            let inFlightTarget = self.brightnessAnimationTimer == nil ? nil : self.brightnessAnimationTarget
+            let base = inFlightTarget ?? self.lastEmittedBrightness
+            let target = max(0, min(1, base + delta))
             self.beginBrightnessAnimation(to: target)
         }
     }
