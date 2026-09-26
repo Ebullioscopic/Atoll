@@ -1397,10 +1397,13 @@ struct GeneralSettings: View {
                 customBadge(text: "Beta")
             }
         } footer: {
-            Text("Two-finger swipe up on notch to close, two-finger swipe down on notch to open when **Open notch on hover** option is disabled")
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(.secondary)
-                .font(.caption)
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("Two-finger swipe up on notch to close, two-finger swipe down on notch to open when **Open notch on hover** option is disabled")
+                Text("With **Close gesture** on, swipe up on a closed notch to tuck its live activity away and reach the menus and icons beside it. Swipe down to bring it back.")
+            }
+            .multilineTextAlignment(.trailing)
+            .foregroundStyle(.secondary)
+            .font(.caption)
         }
     }
 

@@ -53,11 +53,6 @@ struct ContentView: View {
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
     @ObservedObject var lockScreenManager = LockScreenManager.shared
     @ObservedObject private var networkConnectivityManager = NetworkConnectivityManager.shared
-    @ObservedObject private var menuBarLayout = MenuBarLayout.shared
-    /// Width of the closed-notch content, measured so its left edge can be
-    /// compared against the frontmost app's menus. Only the *size* is read --
-    /// the offset that follows does not change it, so there is no feedback.
-    @State private var closedContentWidth: CGFloat = 0
     @ObservedObject var capsLockManager = CapsLockManager.shared
     @ObservedObject var extensionLiveActivityManager = ExtensionLiveActivityManager.shared
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
@@ -251,6 +246,9 @@ struct ContentView: View {
     @State private var isHoveringClosedMusicWaveformControl: Bool = false
 
     @State private var gestureProgress: CGFloat = .zero
+    @State private var isClosedActivityTucked = false
+    // One swipe performs one action; otherwise a close would roll straight into a tuck.
+    @State private var isScrollGestureSpent = false
     @State private var skipGestureActiveDirection: MusicManager.SkipDirection?
     @State private var isMusicControlWindowVisible = false
     @State private var pendingMusicControlTask: Task<Void, Never>?
@@ -523,6 +521,39 @@ struct ContentView: View {
 
     private var recordingLiveActivityVisibleOnClosedNotch: Bool {
         recordingHUDLayout.isVisible
+    }
+
+    private struct ClosedActivitySources: OptionSet {
+        let rawValue: Int
+
+        static let capsLock = Self(rawValue: 1 << 0)
+        static let music = Self(rawValue: 1 << 1)
+        static let timer = Self(rawValue: 1 << 2)
+        static let reminder = Self(rawValue: 1 << 3)
+        static let recording = Self(rawValue: 1 << 4)
+        static let download = Self(rawValue: 1 << 5)
+        static let localSend = Self(rawValue: 1 << 6)
+        static let doNotDisturb = Self(rawValue: 1 << 7)
+        static let privacy = Self(rawValue: 1 << 8)
+        static let extensionActivity = Self(rawValue: 1 << 9)
+        static let shelf = Self(rawValue: 1 << 10)
+    }
+
+    private var closedActivitySources: ClosedActivitySources {
+        let flags: [(isActive: Bool, source: ClosedActivitySources)] = [
+            (capsLockManager.isCapsLockActive, .capsLock),
+            (!musicManager.isPlayerIdle, .music),
+            (timerManager.isTimerActive, .timer),
+            (reminderManager.isActive, .reminder),
+            (recordingManager.isRecording, .recording),
+            (downloadManager.isDownloading, .download),
+            (localSendLiveActivityActive, .localSend),
+            (doNotDisturbManager.isDoNotDisturbActive, .doNotDisturb),
+            (privacyManager.hasAnyIndicator, .privacy),
+            (!extensionLiveActivityManager.activeActivities.isEmpty, .extensionActivity),
+            (!shelfState.isEmpty, .shelf),
+        ]
+        return ClosedActivitySources(flags.filter(\.isActive).map(\.source))
     }
 
     private var recordingHUDLayout: RecordingHUDLayout {
@@ -943,6 +974,21 @@ struct ContentView: View {
                     enqueueMusicControlWindowSync(forceRefresh: true, delay: 0.05)
                 }
             }
+            .onChange(of: isClosedActivityTucked) { _, tucked in
+                if tucked {
+                    cancelMusicControlWindowSync()
+                    hideMusicControlWindow()
+                } else {
+                    enqueueMusicControlWindowSync(forceRefresh: true, delay: 0.05)
+                }
+            }
+            .onChange(of: vm.notchState) { _, state in
+                if state == .open { isClosedActivityTucked = false }
+            }
+            // Something starting or stopping deserves to be seen, so it ends the tuck.
+            .onChange(of: closedActivitySources) { _, _ in
+                isClosedActivityTucked = false
+            }
             .onChange(of: lockScreenManager.isLocked) { _, locked in
                 if locked {
                     suppressMusicControlWindowUpdates()
@@ -1006,49 +1052,9 @@ struct ContentView: View {
                     enqueueMusicControlWindowSync(forceRefresh: true)
                 }
             }
-            .onAppear {
-                if vm.notchState == .closed { menuBarLayout.startTracking() }
-            }
-            .onChange(of: vm.notchState) { _, state in
-                // An open notch covers the menu bar wholesale and is the user's
-                // own doing, so there is nothing to step around while it is up.
-                if state == .closed {
-                    menuBarLayout.startTracking()
-                } else {
-                    menuBarLayout.stopTracking()
-                }
-            }
             .onDisappear {
                 performViewTeardown()
             }
-    }
-
-    /// How far right the closed-notch content has to move so it stops covering
-    /// the frontmost app's menus.
-    ///
-    /// A live activity's left wing draws into the strip of menu bar beside the
-    /// notch, which is where the app's own menus live. macOS lays those out
-    /// against `NSScreen.auxiliaryTopLeftArea` and there is no way to tell it
-    /// some of that strip is spoken for -- both auxiliary areas are read-only.
-    /// So the content moves instead of the menus.
-    ///
-    /// Zero unless something is actually being covered: no live activity, an
-    /// open notch, no accessibility permission, or menus that end before the
-    /// content begins all leave the notch centred where it belongs.
-    private var menuBarClearanceOffset: CGFloat {
-        guard vm.notchState == .closed,
-              !vm.hideOnClosed,
-              closedContentWidth > 0,
-              let menusRightEdge = menuBarLayout.appMenusRightEdge,
-              let screenFrame = getScreenFrame(currentScreenName)
-        else { return 0 }
-
-        return MenuBarLayout.clearanceOffset(
-            contentWidth: closedContentWidth,
-            screenFrame: screenFrame,
-            menusRightEdge: menusRightEdge,
-            gap: MenuBarLayout.clearanceGap
-        )
     }
 
     @ViewBuilder
@@ -1129,6 +1135,8 @@ struct ContentView: View {
                                       ? AnyTransition.move(edge: .trailing).combined(with: .opacity)
                                       : AnyTransition.opacity
                               )
+                      } else if vm.notchState == .closed && isClosedActivityTucked {
+                          Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                       } else if vm.notchState == .closed && capsLockManager.isCapsLockActive && Defaults[.enableCapsLockIndicator] && !vm.hideOnClosed && !lockScreenManager.isLocked {
                           InlineHUD(type: .constant(.capsLock), value: .constant(1.0), icon: .constant(""), hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
@@ -1265,21 +1273,8 @@ struct ContentView: View {
                   view
                       .fixedSize()
               }
-              .background {
-                  GeometryReader { geo in
-                      Color.clear
-                          .onAppear { closedContentWidth = geo.size.width }
-                          .onChange(of: geo.size.width) { _, width in closedContentWidth = width }
-                  }
-              }
               .pinnedLyrics(isVisible: pinnedLyricsVisible,
                   isContentHidden: isSneakPeekVisibleOnCurrentScreen || isConnectivityHUDVisible)
-              // A connectivity HUD must remain centred on the physical notch:
-              // its middle transparent lane is what keeps both wings visible.
-              // Menu-bar clearance would shift that lane underneath the camera
-              // housing and clip one of the two content areas.
-              .offset(x: isConnectivityHUDVisible ? 0 : menuBarClearanceOffset)
-              .animation(.smooth(duration: 0.25), value: menuBarClearanceOffset)
               .zIndex(2)
               
               ZStack {
@@ -2135,11 +2130,8 @@ struct ContentView: View {
         let activationWidth = vm.closedNotchSize.width + horizontalPadding * 2
         let activationHeight = max(vm.closedNotchSize.height + zeroHeightHoverPadding, 14)
 
-        // Follows the rendered content: when a live activity has stepped aside
-         // from the menus, activating at the old centre would arm the notch where
-         // nothing is drawn and refuse the pointer where it is.
         let activationRect = CGRect(
-            x: screen.frame.midX - activationWidth / 2 + menuBarClearanceOffset,
+            x: screen.frame.midX - activationWidth / 2,
             y: screen.frame.maxY - activationHeight,
             width: activationWidth,
             height: activationHeight
@@ -2151,7 +2143,6 @@ struct ContentView: View {
     /// Cancels every long-lived task / event monitor this view owns. Called from
     /// `.onDisappear` and from `vm.onViewTeardown` on window close. Idempotent.
     private func performViewTeardown() {
-        menuBarLayout.stopTracking()
         hoverTask?.cancel()
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
@@ -2419,8 +2410,7 @@ struct ContentView: View {
             + PinnedLyricsView.reservedHeight(isEligible: pinnedLyricsVisible,
                 availability: musicManager.lyricsAvailability, context: pinnedLyricContext)
         let width = max(closedWidth, recordingSize?.width ?? 0) + 24
-        // Same shift the content is drawn with, so the hit area stays under it.
-        let minX = screen.frame.midX - width / 2 + menuBarClearanceOffset
+        let minX = screen.frame.midX - width / 2
         let minY = screen.frame.maxY - height
 
         return location.x >= minX && location.x <= minX + width
@@ -2451,7 +2441,7 @@ struct ContentView: View {
         PinnedLyricsView.shouldReserve(
             lyricsEnabled: enableLyrics,
             pinEnabled: pinLyricsWhenClosed,
-            surfaceEligible: vm.notchState == .closed && !vm.hideOnClosed
+            surfaceEligible: vm.notchState == .closed && !vm.hideOnClosed && !isClosedActivityTucked
                 && !lockScreenManager.isLocked && musicManager.isPlaying,
             availability: musicManager.lyricsAvailability
         )
@@ -2581,14 +2571,40 @@ struct ContentView: View {
     }
 
     private func handleScrollGesture(isDownward: Bool, translation: CGFloat, phase: NSEvent.Phase) {
+        // .began too: the scroll monitor drops .ended once the pointer leaves the shrunken surface, and drags never send .began.
+        if phase == .began || phase == .ended { isScrollGestureSpent = false }
+        guard !isScrollGestureSpent else { return }
+
         let reverse = Defaults[.reverseScrollGestures]
         let shouldOpen = isDownward ? !reverse : reverse
 
         if shouldOpen {
-            handleOpenScrollGesture(translation: translation, phase: phase)
+            if isClosedActivityTucked {
+                handleTuckScrollGesture(tuck: false, translation: translation)
+            } else {
+                handleOpenScrollGesture(translation: translation, phase: phase)
+            }
         } else {
             guard Defaults[.closeGestureEnabled] else { return }
-            handleCloseScrollGesture(translation: translation, phase: phase)
+            if vm.notchState == .closed {
+                handleTuckScrollGesture(tuck: true, translation: translation)
+            } else {
+                handleCloseScrollGesture(translation: translation, phase: phase)
+            }
+        }
+    }
+
+    private func handleTuckScrollGesture(tuck: Bool, translation: CGFloat) {
+        guard vm.notchState == .closed, !vm.hideOnClosed else { return }
+        guard translation > Defaults[.gestureSensitivity] else { return }
+        guard !tuck || !closedActivitySources.isEmpty else { return }
+
+        isScrollGestureSpent = true
+        withAnimation(.smooth) {
+            isClosedActivityTucked = tuck
+        }
+        if Defaults[.enableHaptics] {
+            triggerHapticIfAllowed()
         }
     }
 
@@ -2635,6 +2651,7 @@ struct ContentView: View {
         }
 
         if translation > Defaults[.gestureSensitivity] {
+            isScrollGestureSpent = true
             withAnimation(.smooth) {
                 gestureProgress = .zero
                 isHovering = false
@@ -2848,6 +2865,7 @@ struct ContentView: View {
               standardMediaControlsActive,
               vm.notchState == .closed,
               !vm.hideOnClosed,
+              !isClosedActivityTucked,
               !lockScreenManager.isLocked,
               !isMusicHUDDeferredAfterUnlock,
               !isMusicControlWindowSuppressed else {
