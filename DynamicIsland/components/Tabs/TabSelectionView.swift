@@ -56,6 +56,7 @@ struct TabSelectionView: View {
     @Default(.enableThirdPartyExtensions) private var enableThirdPartyExtensions
     @Default(.enableExtensionNotchExperiences) private var enableExtensionNotchExperiences
     @Default(.enableExtensionNotchTabs) private var enableExtensionNotchTabs
+    @Default(.showExtensionTabSelectionBackground) private var showExtensionTabSelectionBackground
     @Default(.showCalendar) private var showCalendar
     @Default(.showMirror) private var showMirror
     @Default(.showStandardMediaControls) private var showStandardMediaControls
@@ -129,7 +130,11 @@ struct TabSelectionView: View {
                 .frame(height: 26)
                 .foregroundStyle(isSelected ? activeAccent : .gray)
                 .background {
-                    if isSelected {
+                    if shouldDisplayTabSelectionCapsule(
+                        isSelected: isSelected,
+                        isExtensionTab: tab.view == .extensionExperience,
+                        showExtensionBackground: showExtensionTabSelectionBackground
+                    ) {
                         Capsule()
                             .fill((tab.accentColor ?? Color(nsColor: .secondarySystemFill)).opacity(0.25))
                             .shadow(color: (tab.accentColor ?? .clear).opacity(0.4), radius: 8)

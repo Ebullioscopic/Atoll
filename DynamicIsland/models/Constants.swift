@@ -1384,6 +1384,7 @@ extension Defaults.Keys {
     static let enableExtensionNotchExperiences = Key<Bool>("enableExtensionNotchExperiences", default: true)
     static let enableExtensionNotchTabs = Key<Bool>("enableExtensionNotchTabs", default: true)
     static let enableExtensionNotchMinimalisticOverrides = Key<Bool>("enableExtensionNotchMinimalisticOverrides", default: true)
+    static let showExtensionTabSelectionBackground = Key<Bool>("showExtensionTabSelectionBackground", default: true)
     static let enableExtensionNotchInteractiveWebViews = Key<Bool>("enableExtensionNotchInteractiveWebViews", default: true)
     static let extensionAuthorizationEntries = Key<[ExtensionAuthorizationEntry]>("extensionAuthorizationEntries", default: [])
     static let extensionRateLimitRecords = Key<[ExtensionRateLimitRecord]>("extensionRateLimitRecords", default: [])

@@ -125,6 +125,8 @@ struct ExtensionsSettingsView: View {
                             .tint(.accentColor)
                         Defaults.Toggle(String(localized:"Allow interactive web content"), key: .enableExtensionNotchInteractiveWebViews)
                             .tint(.accentColor)
+                        Defaults.Toggle(String(localized:"Show selection background for extension tabs"), key: .showExtensionTabSelectionBackground)
+                            .tint(.accentColor)
                     }
                     .padding(.leading, 4)
                 }
