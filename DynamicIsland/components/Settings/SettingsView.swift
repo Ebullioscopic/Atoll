@@ -274,6 +274,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .battery, title: "Test full battery HUD", keywords: ["battery", "test", "full", "preview"], highlightID: nil),
         SettingsSearchEntry(tab: .battery, title: "Low battery style", keywords: ["battery", "style", "compact", "standard"], highlightID: SettingsTab.battery.highlightID(for: "Low battery style")),
         SettingsSearchEntry(tab: .battery, title: "Low battery threshold", keywords: ["battery", "threshold", "percent"], highlightID: SettingsTab.battery.highlightID(for: "Low battery threshold")),
+        SettingsSearchEntry(tab: .battery, title: "Click to turn on Low Power Mode", keywords: ["battery", "low power mode", "energy", "click", "tap"], highlightID: SettingsTab.battery.highlightID(for: "Click to turn on Low Power Mode")),
         SettingsSearchEntry(tab: .battery, title: "Full battery style", keywords: ["battery", "style", "compact", "standard"], highlightID: SettingsTab.battery.highlightID(for: "Full battery style")),
         SettingsSearchEntry(tab: .battery, title: "Full charge threshold", keywords: ["battery", "threshold", "full"], highlightID: SettingsTab.battery.highlightID(for: "Full charge threshold")),
         SettingsSearchEntry(tab: .devices, title: "Enable per-app volume", keywords: ["per app volume", "app volume", "mixer", "audio", "mute app"], highlightID: SettingsTab.devices.highlightID(for: "Enable per-app volume")),
@@ -1659,6 +1660,16 @@ struct Charge: View {
                         Slider(value: lowBatteryThresholdBinding, in: 5...30, step: 1)
                     }
                     .settingsHighlight(id: highlightID("Low battery threshold"))
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Defaults.Toggle(key: .lowBatteryHUDTapEnablesLowPowerMode) {
+                            Text("Click to turn on Low Power Mode")
+                        }
+                        Text("Clicking the low battery HUD turns on Low Power Mode while on battery, like tapping the alert on an iPhone. macOS asks for an administrator password first.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .settingsHighlight(id: highlightID("Click to turn on Low Power Mode"))
                 } header: {
                     Text("Low Battery")
                 }
