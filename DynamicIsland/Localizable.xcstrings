@@ -64458,7 +64458,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "敏感人群"
+            "value" : "敏感人群注意"
           }
         }
       }
@@ -76953,7 +76953,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "透明度"
+            "value" : "通透模式"
           }
         }
       }
