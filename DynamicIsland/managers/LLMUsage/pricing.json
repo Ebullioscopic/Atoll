@@ -1,16 +1,6 @@
 {
   "models": [
     {
-      "id": "anthropic/claude-3-haiku",
-      "name": "Anthropic: Claude 3 Haiku",
-      "pricing": {
-        "prompt": "0.00000025",
-        "completion": "0.00000125",
-        "cache_read": "0.00000003",
-        "cache_write": "0.0000003"
-      }
-    },
-    {
       "id": "anthropic/claude-fable-5",
       "name": "Anthropic: Claude Fable 5",
       "pricing": {
@@ -961,5 +951,5 @@
       }
     }
   ],
-  "last_updated": "2026-09-26T00:06:40Z"
+  "last_updated": "2026-09-27T00:08:09Z"
 }
