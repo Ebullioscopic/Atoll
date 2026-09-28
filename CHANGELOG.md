@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Shake-to-summon floating shelf**: Drag files anywhere on the desktop and shake them horizontally to open a Dropover-style floating Shelf near the pointer. The feature is optional and can be enabled in Settings → Shelf.
 - **Connection status HUDs**: Atoll now shows a Dynamic Island HUD when the Mac goes offline, and a compact inline HUD when it connects to Wi-Fi or Personal Hotspot, using the matching Wi-Fi or hotspot symbol and the connected network name. (#827)
 - **Pin lyrics under the closed notch**: a pin button in the Lyrics panel keeps the line being sung visible after the notch closes, so a song can be followed without holding the pointer over the notch. The strip is drawn as an overlay on padding rather than as a row in the notch stack, so it never widens the panel or shifts the music row. Off by default, and inert unless lyrics are enabled.
 - **Per-app volume and mute**: a mixer in the notch header gives every app currently playing audio its own volume slider and mute button, with levels remembered per app. Built on the CoreAudio process taps already used for the waveform, and a tap is only created for an app that is actually muted or turned down. Off by default; needs audio capture permission.

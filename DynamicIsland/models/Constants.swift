@@ -1017,6 +1017,7 @@ extension Defaults.Keys {
         //static let openLastTabByDefault = Key<Bool>("openLastTabByDefault", default: false)
     
         // MARK: Appearance
+    static let enableShakeToSummon = Key<Bool>("enableShakeToSummon", default: true)
     static let showEmojis = Key<Bool>("showEmojis", default: false)
         //static let alwaysShowTabs = Key<Bool>("alwaysShowTabs", default: true)
     static let showMirror = Key<Bool>("showMirror", default: false)

@@ -137,6 +137,18 @@ final class ShelfStateViewModel: ObservableObject {
         ExtensionRPCServer.shared.notifyShelfItemsChanged(itemIDs: [item.id.uuidString], action: "removed")
     }
 
+    /// Removes all items currently on the shelf, cleaning up temporary files and broadcasting changes once.
+    func removeAll() {
+        guard !items.isEmpty else { return }
+        for item in items {
+            item.cleanupStoredData()
+        }
+        let removedIDs = items.map { $0.id.uuidString }
+        items.removeAll()
+        invalidateURLCache()
+        ExtensionRPCServer.shared.notifyShelfItemsChanged(itemIDs: removedIDs, action: "removed")
+    }
+
     /// Pass `path` whenever the caller already resolved the new bookmark —
     /// leaving `cachedPath` pointing at the old location would make dedup treat
     /// a renamed file as a new one.
