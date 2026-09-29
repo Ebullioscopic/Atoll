@@ -126,6 +126,13 @@ class TimerManager: ObservableObject {
     private var timerInstance: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var soundPlayer: AVAudioPlayer?
+    private var countdownGeneration = UUID()
+    private lazy var alertController = TimerAlertController(
+        ringDuration: { Defaults[.timerAlertDurationSeconds] },
+        repeatIntervalMinutes: { Defaults[.timerAlertRepeatIntervalMinutes] },
+        playSound: { [weak self] in self?.playTimerSound() },
+        stopSound: { [weak self] in self?.soundPlayer?.stop() }
+    )
     private var smoothCloseWorkItem: DispatchWorkItem?
     private var lifecycle = TimerLifecycle()
     private let logger = os.Logger(subsystem: "com.Ebullioscopic.Atoll", category: "TimerManager")
@@ -143,6 +150,14 @@ class TimerManager: ObservableObject {
     }
     // MARK: - Initialization
     private init() {
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.alertController.prepareForSleep() }
+            .store(in: &cancellables)
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.alertController.update() }
+            .store(in: &cancellables)
         // Views observe TimerManager, not the bridge; forward capability
         // changes so allowsManualInteraction reflects Clock app lifecycle.
         SystemTimerBridge.shared.$canControlClockTimer
@@ -168,7 +183,7 @@ class TimerManager: ObservableObject {
 
         // Stop any existing timer
         timerInstance?.invalidate()
-        soundPlayer?.stop()
+        alertController.stop()
         beginTimerSession()
         
         // Start new timer
@@ -187,32 +202,7 @@ class TimerManager: ObservableObject {
 
         activePresetId = preset?.id
         
-        // Start countdown timer
-        timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            
-            Task { @MainActor in
-                if !self.isPaused {
-                    if self.remainingTime > 0 {
-                        // Normal countdown
-                        self.remainingTime -= 1
-                        self.elapsedTime = self.totalDuration - self.remainingTime
-                        self.lastUpdated = Date()
-                    } else if self.remainingTime == 0 {
-                        // Timer just finished - play sound and start overtime
-                        self.isFinished = true
-                        self.isOvertime = true
-                        self.playTimerSound()
-                        self.remainingTime = -1
-                        self.lastUpdated = Date()
-                    } else {
-                        // Overtime - count negative
-                        self.remainingTime -= 1
-                        self.lastUpdated = Date()
-                    }
-                }
-            }
-        }
+        scheduleCountdown()
     }
     
     func startDemoTimer(duration: TimeInterval) {
@@ -236,7 +226,7 @@ class TimerManager: ObservableObject {
 
         timerInstance?.invalidate()
         timerInstance = nil
-        soundPlayer?.stop()
+        alertController.stop()
         
         // Smooth close animation for live activity
         if isTimerActive {
@@ -255,7 +245,7 @@ class TimerManager: ObservableObject {
         // Immediate stop for user action (stop button)
         timerInstance?.invalidate()
         timerInstance = nil
-        soundPlayer?.stop()
+        alertController.stop()
         withAnimation(.smooth) {
             isTimerActive = false
         }
@@ -274,6 +264,8 @@ class TimerManager: ObservableObject {
         guard activeSource == .manual else { return }
         guard isTimerActive && !isPaused else { return }
         isPaused = true
+        countdownGeneration = UUID()
+        alertController.stop()
         timerInstance?.invalidate()
         timerInstance = nil
     }
@@ -292,30 +284,33 @@ class TimerManager: ObservableObject {
         isPaused = false
         lastUpdated = Date()
         
-        // Resume countdown timer with same logic as start timer
+        if isOvertime {
+            alertController.start()
+        }
+        scheduleCountdown()
+    }
+
+    private func scheduleCountdown() {
+        countdownGeneration = UUID()
+        let generation = countdownGeneration
         timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            
-            Task { @MainActor in
-                if !self.isPaused {
-                    if self.remainingTime > 0 {
-                        // Normal countdown
-                        self.remainingTime -= 1
-                        self.elapsedTime = self.totalDuration - self.remainingTime
-                        self.lastUpdated = Date()
-                    } else if self.remainingTime == 0 {
-                        // Timer just finished - play sound and start overtime
-                        self.isFinished = true
-                        self.isOvertime = true
-                        self.playTimerSound()
-                        self.remainingTime = -1
-                        self.lastUpdated = Date()
-                    } else {
-                        // Overtime - count negative
-                        self.remainingTime -= 1
-                        self.lastUpdated = Date()
-                    }
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.countdownGeneration == generation,
+                      self.activeSource == .manual,
+                      self.isTimerActive, !self.isPaused else { return }
+                if self.remainingTime > 0 {
+                    self.remainingTime -= 1
+                    self.elapsedTime = self.totalDuration - self.remainingTime
+                } else if self.remainingTime == 0 {
+                    self.isFinished = true
+                    self.isOvertime = true
+                    self.alertController.start()
+                    self.remainingTime = -1
+                } else {
+                    self.remainingTime -= 1
                 }
+                self.lastUpdated = Date()
             }
         }
     }
@@ -325,7 +320,7 @@ class TimerManager: ObservableObject {
 
         timerInstance?.invalidate()
         timerInstance = nil
-        soundPlayer?.stop()
+        alertController.stop()
         beginTimerSession()
 
         activeSource = .external
@@ -472,18 +467,24 @@ class TimerManager: ObservableObject {
     }
 
     private func beginTimerSession() {
+        countdownGeneration = UUID()
+        alertController.stop()
         smoothCloseWorkItem?.cancel()
         smoothCloseWorkItem = nil
         lifecycle.beginSession()
     }
 
     private func endTimerSession() {
+        countdownGeneration = UUID()
+        alertController.stop()
         smoothCloseWorkItem?.cancel()
         smoothCloseWorkItem = nil
         lifecycle.endSession()
     }
     
     private func playTimerSound() {
+        soundPlayer?.stop()
+        soundPlayer = nil
         var soundURL: URL?
         
         // Check for custom timer sound first
@@ -512,7 +513,7 @@ class TimerManager: ObservableObject {
         
         do {
             soundPlayer = try AVAudioPlayer(contentsOf: finalSoundURL)
-            soundPlayer?.numberOfLoops = -1 // Loop indefinitely
+            soundPlayer?.numberOfLoops = -1 // Loop only during the bounded ringing phase
             soundPlayer?.play()
         } catch {
             // Fallback to system sound if there's an error playing the custom sound

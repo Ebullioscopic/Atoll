@@ -7375,6 +7375,8 @@ func warningBadge(_ text: String, _ description: String) -> some View {
 }
 
 struct TimerSettings: View {
+    @Default(.timerAlertDurationSeconds) private var alertDurationSeconds
+    @Default(.timerAlertRepeatIntervalMinutes) private var alertRepeatIntervalMinutes
     @ObservedObject private var coordinator = DynamicIslandViewCoordinator.shared
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.timerPresets) private var timerPresets
@@ -7481,6 +7483,7 @@ struct TimerSettings: View {
             appearanceSection
             timerPresetsSection
             timerSoundSection
+            timerAlertSection
         }
     }
 
@@ -7708,6 +7711,13 @@ struct TimerSettings: View {
         }
     }
 
+    private var timerAlertSection: some View {
+        TimerAlertConfiguration(
+            durationSeconds: $alertDurationSeconds,
+            repeatMinutes: $alertRepeatIntervalMinutes
+        )
+    }
+
     private var customDurationDisplay: String {
         let formatter = DateComponentsFormatter()
         formatter.allowedUnits = customTimerDuration >= 3600 ? [.hour, .minute, .second] : [.minute, .second]
@@ -7776,6 +7786,68 @@ struct TimerSettings: View {
             if let url = panel.url {
                 UserDefaults.standard.set(url.path, forKey: "customTimerSoundPath")
             }
+        }
+    }
+}
+
+private struct TimerAlertConfiguration: View {
+    @Binding var durationSeconds: Int
+    @Binding var repeatMinutes: Int
+
+    private var duration: Int {
+        TimerAlertController.clamp(durationSeconds, to: TimerAlertController.ringDurationRange)
+    }
+
+    private var minutesBinding: Binding<Int> {
+        Binding(
+            get: { duration / 60 },
+            set: { durationSeconds = TimerAlertController.duration(minutes: $0, seconds: duration % 60) }
+        )
+    }
+
+    private var secondsBinding: Binding<Int> {
+        Binding(
+            get: { duration % 60 },
+            set: { durationSeconds = TimerAlertController.duration(minutes: duration / 60, seconds: $0) }
+        )
+    }
+
+    private var intervalBinding: Binding<Int> {
+        Binding(
+            get: { TimerAlertController.clamp(repeatMinutes, to: TimerAlertController.repeatIntervalRange) },
+            set: { repeatMinutes = TimerAlertController.clamp($0, to: TimerAlertController.repeatIntervalRange) }
+        )
+    }
+
+    private var secondsRange: ClosedRange<Int> {
+        if duration / 60 == 60 { return 0...0 }
+        return duration / 60 == 0 ? 1...59 : 0...59
+    }
+
+    var body: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Ring duration")
+                HStack(spacing: 16) {
+                    TimerPresetComponentControl(title: String(localized: "Minutes"), value: minutesBinding, range: 0...60)
+                    TimerPresetComponentControl(title: String(localized: "Seconds"), value: secondsBinding, range: secondsRange)
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Remind again after")
+                HStack {
+                    TimerPresetComponentControl(title: String(localized: "Minutes"), value: intervalBinding, range: TimerAlertController.repeatIntervalRange)
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Timer Alerts")
+        } footer: {
+            Text("When an Atoll timer ends, it rings for the selected duration, then stays silent for the selected interval. This repeats until you stop the timer. Changes also apply to an active reminder.")
         }
     }
 }
