@@ -5,6 +5,7 @@ import Foundation
 // /tmp/atoll-timer-alert-tests
 @main
 struct TimerAlertRegression {
+    /// Exercises phase timing and lifecycle behavior with simulated playback.
     static func main() {
         precondition(TimerAlertController.duration(minutes: 0, seconds: 30) == 30)
         precondition(TimerAlertController.duration(minutes: 1, seconds: 30) == 90)
@@ -24,6 +25,7 @@ struct TimerAlertRegression {
             playSound: { playing = true; playCount += 1 },
             stopSound: { playing = false }
         )
+        /// Advances the simulated clock and processes one alert update.
         func advance(_ seconds: TimeInterval) {
             date.addTimeInterval(seconds)
             controller.update()

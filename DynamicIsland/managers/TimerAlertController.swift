@@ -26,6 +26,7 @@ final class TimerAlertController {
     private let playSound: () -> Void
     private let stopSound: () -> Void
 
+    /// Injects the clock, settings, and playback callbacks used by each alert phase.
     init(
         now: @escaping () -> Date = Date.init,
         ringDuration: @escaping () -> Int,
@@ -40,11 +41,13 @@ final class TimerAlertController {
         self.stopSound = stopSound
     }
 
+    /// Cancels scheduled updates and silences playback when the controller is released.
     deinit {
         timer?.invalidate()
         stopSound()
     }
 
+    /// Replaces any current alert with an immediate ring and schedules phase updates.
     func start() {
         stop()
         phase = .ringing(now())
@@ -57,6 +60,7 @@ final class TimerAlertController {
         RunLoop.main.add(timer, forMode: .common)
     }
 
+    /// Cancels future reminders, clears the phase, and stops the current sound.
     func stop() {
         timer?.invalidate()
         timer = nil
@@ -101,6 +105,7 @@ final class TimerAlertController {
         return clamp(total, to: ringDurationRange)
     }
 
+    /// Bounds a setting to its supported range, including invalid persisted values.
     static func clamp(_ value: Int, to range: ClosedRange<Int>) -> Int {
         min(range.upperBound, max(range.lowerBound, value))
     }

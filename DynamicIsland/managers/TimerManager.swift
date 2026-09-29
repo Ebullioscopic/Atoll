@@ -150,6 +150,7 @@ class TimerManager: ObservableObject {
         lifecycle.completedSessionID
     }
     // MARK: - Initialization
+    /// Connects timer state to sleep, wake, and external timer availability changes.
     private init() {
         // Stop playback before sleep and advance the alert once on wake;
         // missed ring/silence cycles must not be replayed in a burst.
@@ -179,6 +180,7 @@ class TimerManager: ObservableObject {
     }
     
     // MARK: - Timer Methods
+    /// Replaces the active timer with a manual countdown and clears its previous alerts.
     func startTimer(duration: TimeInterval, name: String = "Timer", preset: TimerPreset? = nil) {
         if activeSource == .external {
             endExternalTimer(triggerSmoothClose: false)
@@ -212,6 +214,7 @@ class TimerManager: ObservableObject {
         startTimer(duration: duration, name: "Demo Timer")
     }
     
+    /// Stops the active timer and allows its live activity to close smoothly.
     func stopTimer() {
         if activeSource == .external {
             if isFinished || isOvertime {
@@ -239,6 +242,7 @@ class TimerManager: ObservableObject {
         resetTimer()
     }
     
+    /// Stops the active timer and closes its live activity immediately.
     func forceStopTimer() {
         if activeSource == .external {
             endExternalTimer(triggerSmoothClose: false)
@@ -255,6 +259,7 @@ class TimerManager: ObservableObject {
         resetTimer()
     }
     
+    /// Pauses a manual countdown and cancels any ring or pending reminder.
     func pauseTimer() {
         if activeSource == .external {
             SystemTimerBridge.shared.controlClockTimer(.pause) { [weak self] success in
@@ -273,6 +278,7 @@ class TimerManager: ObservableObject {
         timerInstance = nil
     }
     
+    /// Resumes the countdown, starting a new ring if it is already in overtime.
     func resumeTimer() {
         if activeSource == .external {
             SystemTimerBridge.shared.controlClockTimer(.resume) { [weak self] success in
@@ -293,6 +299,7 @@ class TimerManager: ObservableObject {
         scheduleCountdown()
     }
 
+    /// Schedules countdown ticks and rejects tasks queued by an earlier timer run.
     private func scheduleCountdown() {
         countdownGeneration = UUID()
         let generation = countdownGeneration
@@ -320,6 +327,7 @@ class TimerManager: ObservableObject {
         }
     }
 
+    /// Presents an external timer after clearing the manual timer's alert state.
     func adoptExternalTimer(name: String, totalDuration: TimeInterval, remaining: TimeInterval, isPaused: Bool) {
         guard activeSource != .manual else { return }
 
@@ -471,6 +479,7 @@ class TimerManager: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: workItem)
     }
 
+    /// Starts a new lifecycle session and invalidates callbacks from the old one.
     private func beginTimerSession() {
         countdownGeneration = UUID()
         alertController.stop()
@@ -479,6 +488,7 @@ class TimerManager: ObservableObject {
         lifecycle.beginSession()
     }
 
+    /// Ends the lifecycle session and cancels its countdown and alert callbacks.
     private func endTimerSession() {
         countdownGeneration = UUID()
         alertController.stop()
@@ -487,6 +497,7 @@ class TimerManager: ObservableObject {
         lifecycle.endSession()
     }
     
+    /// Starts a fresh player for this ring, using the configured or bundled sound.
     private func playTimerSound() {
         soundPlayer?.stop()
         soundPlayer = nil

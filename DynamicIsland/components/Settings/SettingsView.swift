@@ -7475,6 +7475,7 @@ struct TimerSettings: View {
         }
     }
 
+    /// Builds the Timer sections shown while the feature is enabled.
     @ViewBuilder
     private var timerConfigurationSections: some View {
         Group {
@@ -7711,6 +7712,7 @@ struct TimerSettings: View {
         }
     }
 
+    /// Connects the saved alert duration and repeat interval to their controls.
     private var timerAlertSection: some View {
         TimerAlertConfiguration(
             durationSeconds: $alertDurationSeconds,
@@ -7794,11 +7796,12 @@ private struct TimerAlertConfiguration: View {
     @Binding var durationSeconds: Int
     @Binding var repeatMinutes: Int
 
-    // Store one total duration so editing either field preserves the other.
+    /// Clamps the stored total so editing either field preserves the other.
     private var duration: Int {
         TimerAlertController.clamp(durationSeconds, to: TimerAlertController.ringDurationRange)
     }
 
+    /// Edits the minute component while preserving the stored seconds.
     private var minutesBinding: Binding<Int> {
         Binding(
             get: { duration / 60 },
@@ -7806,6 +7809,7 @@ private struct TimerAlertConfiguration: View {
         )
     }
 
+    /// Edits the second component while preserving the stored minutes.
     private var secondsBinding: Binding<Int> {
         Binding(
             get: { duration % 60 },
@@ -7813,6 +7817,7 @@ private struct TimerAlertConfiguration: View {
         )
     }
 
+    /// Reads and writes the bounded silent interval in minutes.
     private var intervalBinding: Binding<Int> {
         Binding(
             get: { TimerAlertController.clamp(repeatMinutes, to: TimerAlertController.repeatIntervalRange) },
@@ -7820,12 +7825,13 @@ private struct TimerAlertConfiguration: View {
         )
     }
 
-    // Exclude 0:00 and values above the one-hour maximum from the editor.
+    /// Excludes `0:00` and durations above one hour from the editor.
     private var secondsRange: ClosedRange<Int> {
         if duration / 60 == 60 { return 0...0 }
         return duration / 60 == 0 ? 1...59 : 0...59
     }
 
+    /// Displays ring duration and silent interval controls in Timer settings.
     var body: some View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
