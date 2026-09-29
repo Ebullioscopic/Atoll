@@ -141,6 +141,16 @@
       }
     },
     {
+      "id": "anthropic/claude-sonnet-5.5",
+      "name": "Anthropic: Claude Sonnet 5.5",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000002",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
       "id": "google/gemini-2.5-flash",
       "name": "Google: Gemini 2.5 Flash",
       "pricing": {
@@ -744,10 +754,10 @@
       "id": "openai/gpt-5.6-sol-pro",
       "name": "OpenAI: GPT-5.6 Sol Pro",
       "pricing": {
-        "prompt": "0.000002",
-        "completion": "0.00001",
-        "cache_read": "0.0000002",
-        "cache_write": "0.0000025"
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "cache_read": "0.0000004",
+        "cache_write": "0.000005"
       }
     },
     {
@@ -876,7 +886,7 @@
       "pricing": {
         "prompt": "0.000000018",
         "completion": "0.00000009",
-        "cache_read": "",
+        "cache_read": "0.000000009",
         "cache_write": ""
       }
     },
@@ -951,5 +961,5 @@
       }
     }
   ],
-  "last_updated": "2026-09-28T00:08:01Z"
+  "last_updated": "2026-09-29T00:07:53Z"
 }
