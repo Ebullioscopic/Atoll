@@ -7794,6 +7794,7 @@ private struct TimerAlertConfiguration: View {
     @Binding var durationSeconds: Int
     @Binding var repeatMinutes: Int
 
+    // Store one total duration so editing either field preserves the other.
     private var duration: Int {
         TimerAlertController.clamp(durationSeconds, to: TimerAlertController.ringDurationRange)
     }
@@ -7819,6 +7820,7 @@ private struct TimerAlertConfiguration: View {
         )
     }
 
+    // Exclude 0:00 and values above the one-hour maximum from the editor.
     private var secondsRange: ClosedRange<Int> {
         if duration / 60 == 60 { return 0...0 }
         return duration / 60 == 0 ? 1...59 : 0...59

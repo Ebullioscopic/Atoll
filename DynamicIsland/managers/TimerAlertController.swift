@@ -12,6 +12,7 @@ final class TimerAlertController {
     static let ringDurationRange = 1...3600
     static let repeatIntervalRange = 1...1440
 
+    /// Each date marks the start of the current phase, not the original expiry.
     private enum Phase {
         case ringing(Date)
         case waiting(Date)
@@ -48,6 +49,7 @@ final class TimerAlertController {
         stop()
         phase = .ringing(now())
         playSound()
+        // Common mode keeps phase changes scheduled while the UI is being tracked.
         let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
             self?.update()
         }

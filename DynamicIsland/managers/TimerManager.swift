@@ -126,6 +126,7 @@ class TimerManager: ObservableObject {
     private var timerInstance: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var soundPlayer: AVAudioPlayer?
+    /// Invalidates countdown callbacks already queued on MainActor when a run changes.
     private var countdownGeneration = UUID()
     private lazy var alertController = TimerAlertController(
         ringDuration: { Defaults[.timerAlertDurationSeconds] },
@@ -150,6 +151,8 @@ class TimerManager: ObservableObject {
     }
     // MARK: - Initialization
     private init() {
+        // Stop playback before sleep and advance the alert once on wake;
+        // missed ring/silence cycles must not be replayed in a burst.
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.alertController.prepareForSleep() }
@@ -295,6 +298,7 @@ class TimerManager: ObservableObject {
         let generation = countdownGeneration
         timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
+                // Invalidating Timer does not cancel a tick already queued as a Task.
                 guard let self,
                       self.countdownGeneration == generation,
                       self.activeSource == .manual,
@@ -303,6 +307,7 @@ class TimerManager: ObservableObject {
                     self.remainingTime -= 1
                     self.elapsedTime = self.totalDuration - self.remainingTime
                 } else if self.remainingTime == 0 {
+                    // Enter overtime once; the alert controller owns later rings.
                     self.isFinished = true
                     self.isOvertime = true
                     self.alertController.start()
@@ -513,7 +518,8 @@ class TimerManager: ObservableObject {
         
         do {
             soundPlayer = try AVAudioPlayer(contentsOf: finalSoundURL)
-            soundPlayer?.numberOfLoops = -1 // Loop only during the bounded ringing phase
+            // Loop until TimerAlertController ends this ringing phase.
+            soundPlayer?.numberOfLoops = -1
             soundPlayer?.play()
         } catch {
             // Fallback to system sound if there's an error playing the custom sound

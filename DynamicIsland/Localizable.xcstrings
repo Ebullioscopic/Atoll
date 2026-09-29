@@ -2,6 +2,7 @@
   "sourceLanguage" : "en",
   "strings" : {
     "Ring duration" : {
+      "comment" : "Length of each audible ring after an Atoll timer expires.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -19,6 +20,7 @@
       }
     },
     "Remind again after" : {
+      "comment" : "Silent interval before the next Atoll timer ring.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -36,6 +38,7 @@
       }
     },
     "Timer Alerts" : {
+      "comment" : "Heading for Atoll timer ring duration and repeat interval settings.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -53,6 +56,7 @@
       }
     },
     "When an Atoll timer ends, it rings for the selected duration, then stays silent for the selected interval. This repeats until you stop the timer. Changes also apply to an active reminder." : {
+      "comment" : "Help text below the Atoll timer alert settings.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
