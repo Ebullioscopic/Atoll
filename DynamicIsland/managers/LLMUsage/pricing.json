@@ -841,6 +841,26 @@
       }
     },
     {
+      "id": "openai/gpt-6.1-sol",
+      "name": "OpenAI: GPT-6.1 Sol",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000001",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/gpt-6.1-sol-pro",
+      "name": "OpenAI: GPT-6.1 Sol Pro",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000001",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
       "id": "openai/gpt-audio",
       "name": "OpenAI: GPT Audio",
       "pricing": {
@@ -874,9 +894,9 @@
       "id": "openai/gpt-oss-120b",
       "name": "OpenAI: gpt-oss-120b",
       "pricing": {
-        "prompt": "0.00000015",
-        "completion": "0.0000006",
-        "cache_read": "0.000000075",
+        "prompt": "0.000000037",
+        "completion": "0.00000017",
+        "cache_read": "",
         "cache_write": ""
       }
     },
@@ -961,5 +981,5 @@
       }
     }
   ],
-  "last_updated": "2026-09-29T00:07:53Z"
+  "last_updated": "2026-09-30T00:07:28Z"
 }
