@@ -852,6 +852,8 @@ class MusicManager: ObservableObject {
             newController = TidalController()
         case .cider:
             newController = CiderController()
+        case .qobuz:
+            newController = QobuzMediaController()
         }
 
         // Set up state observation for the new controller

@@ -167,9 +167,11 @@ sub set_env_option_value {
 }
 
 my $symbol_name = "adapter_$function_name";
+my $qobuz_send_id;
 if ($function_name eq "send") {
   my $id = shift @ARGV;
   fail "Missing ID for '$function_name' command" unless defined $id;
+  $qobuz_send_id = $id;
   set_env_param($symbol_name, 0, "command", "$id");
   $symbol_name = env_func($symbol_name);
 }
@@ -242,6 +244,33 @@ elsif ($function_name eq "test") {
 
 if (defined shift @ARGV) {
   fail "Too many arguments";
+}
+
+my $qobuz_adapter = File::Spec->catfile(File::Basename::dirname(__FILE__), "atoll-qobuz-adapter.py");
+if (-f $qobuz_adapter) {
+  if ($function_name eq "get") {
+    my $qobuz_out = `python3 "$qobuz_adapter" get 2>/dev/null`;
+    if ($? == 0 && $qobuz_out =~ /^{/) {
+      print $qobuz_out;
+      exit 0;
+    }
+  }
+  elsif ($function_name eq "send" && defined $qobuz_send_id) {
+    system("python3", "$qobuz_adapter", "send", "$qobuz_send_id");
+  }
+  elsif ($function_name eq "stream") {
+    my $bridge_bin = File::Spec->catfile(File::Basename::dirname(__FILE__), "QobuzBridge");
+    if (-x $bridge_bin) {
+      my $qobuz_pid = fork();
+      if (defined $qobuz_pid && $qobuz_pid == 0) {
+        exec("$bridge_bin");
+        exit 0;
+      }
+      $SIG{TERM} = sub { kill 'KILL', $qobuz_pid if $qobuz_pid; exit 0; };
+      $SIG{INT}  = sub { kill 'KILL', $qobuz_pid if $qobuz_pid; exit 0; };
+      $SIG{HUP}  = sub { kill 'KILL', $qobuz_pid if $qobuz_pid; exit 0; };
+    }
+  }
 }
 
 my $symbol = DynaLoader::dl_find_symbol($handle, "$symbol_name")

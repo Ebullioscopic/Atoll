@@ -4992,7 +4992,6 @@ struct Appearance: View {
                     "Use music visualizer spectrogram",
                     isOn: $useMusicVisualizer.animation()
                 )
-                .disabled(true)
                 if !useMusicVisualizer {
                     if customVisualizers.count > 0 {
                         Picker(
@@ -5047,10 +5046,7 @@ struct Appearance: View {
                         )
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if selectedListVisualizer == visualizer {
-                                selectedListVisualizer = nil
-                                return
-                            }
+                            selectedVisualizer = visualizer
                             selectedListVisualizer = visualizer
                         }
                     }
