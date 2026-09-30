@@ -468,6 +468,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
         case .amazonMusic: return String(localized: "Amazon Music")
         case .tidal: return String(localized: "TIDAL")
         case .cider: return String(localized: "Cider")
+        case .qobuz: return "Qobuz"
         }
     }
 }

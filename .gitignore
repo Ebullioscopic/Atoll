@@ -139,6 +139,9 @@ referenceimages
 PrivateWorks
 
 *.py
+!mediaremote-adapter/qobuz_engine.py
+!tests/test_qobuz_engine.py
+!tools/qobuz-compatibility/install.py
 !tests/test_privacy_configuration.py
 !tests/test_timer_lifecycle.py
 *.sh
@@ -165,3 +168,6 @@ implementation_plan.md
 walkthrough.md
 TemporaryAssets/
 *.profraw
+
+!mediaremote-adapter/build-qobuz-controls.sh
+!tests/run_qobuz_controller_regression.sh

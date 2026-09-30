@@ -802,6 +802,7 @@ private struct MinimalisticReminderDetailsView: View {
                 restingTrackHeight: 7,
                 draggingTrackHeight: 11
             )
+            .allowsHitTesting(musicManager.activeSourceSupportsSeeking)
         }
         .onAppear {
             sliderValue = musicManager.elapsedTime

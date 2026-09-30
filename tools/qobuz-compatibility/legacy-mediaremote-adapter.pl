@@ -10,6 +10,33 @@ use DynaLoader;
 use File::Spec;
 use File::Basename;
 
+# Dedicated Qobuz routing. Legacy installed builds use the Amazon Music slot.
+# Source builds request this backend explicitly using --qobuz.
+my $selected = "";
+my $dedicated_qobuz = grep { $_ eq "--qobuz" } @ARGV;
+@ARGV = grep { $_ ne "--qobuz" } @ARGV;
+if (!$dedicated_qobuz) {
+  if (open(my $prefs, "-|", "/usr/bin/defaults", "read", "com.Ebullioscopic.Atoll", "mediaController")) {
+    local $/;
+    $selected = <$prefs> // "";
+    close($prefs);
+    $selected =~ s/\s+$//;
+    $dedicated_qobuz = $selected eq "Amazon Music" || $selected eq "Qobuz";
+  }
+}
+if ($dedicated_qobuz && @ARGV >= 2) {
+  my $engine = File::Spec->catfile(File::Basename::dirname(__FILE__), "qobuz_engine.py");
+  my $function_index = ($ARGV[1] =~ m{NowPlayingTestClient|/}) ? 2 : 1;
+  my $function = $ARGV[$function_index] // "";
+  if ($function eq "get" || $function eq "stream" || $function eq "send") {
+    my @params = $function eq "send" ? ($ARGV[$function_index + 1] // 2) : $function eq "stream" && $selected ne "" ? ("--provider-selection=$selected") : ();
+    exec("/usr/bin/python3", $engine, $function, @params);
+    die "Cannot start dedicated Qobuz engine: $!";
+  }
+  die "Unsupported dedicated Qobuz control: $function\n" if $function =~ /^(seek|shuffle|repeat|speed)$/;
+}
+
+
 sub print_help() {
   print <<'HELP';
 Usage:

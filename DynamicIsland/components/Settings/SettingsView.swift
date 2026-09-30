@@ -3125,6 +3125,8 @@ private extension MediaControllerType {
             return [TidalController.bundleIdentifier]
         case .cider:
             return ["sh.cider.genten.mac"]
+        case .qobuz:
+            return [QobuzMediaController.bundleIdentifier]
         }
     }
 
@@ -3137,6 +3139,7 @@ private extension MediaControllerType {
         case .amazonMusic: return "music.note.list"
         case .tidal: return "waveform.path"
         case .cider: return "cup.and.saucer.fill"
+        case .qobuz: return "music.note"
         }
     }
 
@@ -3149,6 +3152,7 @@ private extension MediaControllerType {
         case .amazonMusic: return .cyan
         case .tidal: return .primary
         case .cider: return .orange
+        case .qobuz: return .blue
         }
     }
 }

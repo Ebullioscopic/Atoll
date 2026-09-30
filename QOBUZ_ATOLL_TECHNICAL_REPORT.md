@@ -1,136 +1,74 @@
-# Qobuz Native Controller for Atoll
+# Dedicated Qobuz provider: correction and verification
 
-Date: 2026-09-25
+Updated: 2026-09-30. This report supersedes the earlier claims in this file, including “Production Solved”, globally posted media keys, all-notification observers, newest-cover fallback and generic MediaRemote hooks. The original contribution is commit `969b290` on `feature/qobuz-and-visualizer-fix`.
 
-## Local Findings
+## Problem and final behavior
 
-- Atoll installed locally: `/Applications/Atoll.app`, bundle id `com.Ebullioscopic.Atoll`, version `2.3.3`, build `20260720004`.
-- Qobuz installed locally: `/Applications/Qobuz.app`, bundle id `com.qobuz.desktop`, version `8.2.0-b033`.
-- The local Qobuz app is Electron-based (`Electron 32.3.3` helper processes were active), not a C++/Qt app as assumed in the original brief.
-- macOS Notification Center has an entry for `com.qobuz.desktop`.
-- A 12-second `DistributedNotificationCenter` sniff filtered for Qobuz/media terms did not observe a Qobuz notification while no track change occurred.
-- A 6-second unified-log stream for Qobuz/usernotifications also captured no notification payload during the idle window.
-- Qobuz writes album covers locally under:
-  `~/Library/Application Support/Qobuz/tmp/Assets/<asset-id>/large_cover.png`
-  and `small_cover.png`.
-- Recent artwork writes were observed at `2026-09-25 07:03:08`, proving the cache updates during active Qobuz use.
-- AppleScript saw only a shallow Electron AX tree for Qobuz. The implemented Like action therefore searches the Accessibility tree recursively for button labels such as `like`, `favorite`, `favorito`, `curtir`, `heart`, then performs `kAXPressAction`.
+With Qobuz selected, browser or messenger media must not replace the notch's track or receive its playback commands. The previous controller posted global media keys; its generic Perl changes could send both a Qobuz command and the regular global command. Its source also referred to nonexistent `PlaybackState.supportsLike/isLiked` fields and omitted `.qobuz` from exhaustive UI/capability switches.
 
-## Implementation Summary
+The corrected source uses `QobuzMediaController` exclusively through `.qobuz`. Amazon Music retains its original provider, and Spotify retains `SpotifyController` and its native AppleScript path. The original visualizer/Lottie changes remain in this branch and were not modified by this correction.
 
-- Added `DynamicIsland/MediaControllers/QobuzMediaController.swift`.
-- Added `.qobuz` to `MediaControllerType`.
-- Added `isLiked` and `supportsLike` to `PlaybackState`.
-- Added default `toggleLike()` and `supportsLike` support to `MediaControllerProtocol`.
-- Wired Qobuz into `MusicManager.createController(for:)`.
-- Added Like state propagation in `MusicManager`.
-- Added `MusicControlButton.like`.
-- Added Like buttons to:
-  - floating music controls
-  - standard expanded player controls
-  - minimalistic music player controls
-  - lock screen music panel controls
-  - music slot configuration picker when the active controller supports Like
+## Architecture
 
-## Controller Design
+```text
+Qobuz player-0.json + readonly qobuz.db + current-release artwork
+    -> qobuz_engine.py (owned, bounded worker)
+    -> JSONLinesPipeHandler
+    -> QobuzMediaController playbackStatePublisher
+    -> MusicManager -> notch / lock screen
 
-`QobuzMediaController` is `@MainActor` and event-oriented:
-
-- It listens to all distributed notifications and filters for `qobuz` / `com.qobuz.desktop`.
-- It reads Qobuz local playback state from `~/Library/Application Support/Qobuz/player-0.json`.
-- It resolves the current track through `~/Library/Application Support/Qobuz/qobuz.db`, including `L_Track` fallback for tracks not present in `S_Track`.
-- It prefers `shuffledItems[currentIndex]` when Qobuz shuffle is enabled, with fallback to `items[currentIndex]`.
-- It watches `player-0.json` with `DispatchSourceFileSystemObject` and refreshes in-process when Qobuz updates state.
-- It uses a `DispatchSourceFileSystemObject` watcher on the Qobuz artwork cache directory.
-- It debounces cache updates by 250 ms and loads the newest `large_cover.png` or `small_cover.png`.
-- It avoids continuous polling loops.
-- It sends playback commands through macOS media keys:
-  - `NX_KEYTYPE_PLAY`
-  - `NX_KEYTYPE_FAST`
-  - `NX_KEYTYPE_REWIND`
-- It performs Like through Accessibility, with a clear console log if Accessibility permission is missing or the button cannot be found.
-
-## Known Limits
-
-- The exact Qobuz distributed-notification name was not observed during the short local window. The listener is intentionally broad and filtered so it can pick up the event when Qobuz emits one on track change.
-- Like state is optimistic after a successful AX press because the local Qobuz AX tree did not expose a verified pressed/favorited state during this run.
-- Build validation was limited because this Mac has Command Line Tools active instead of full Xcode:
-  `xcodebuild` returned `tool 'xcodebuild' requires Xcode`.
-
-## Validation Performed
-
-```bash
-swiftc -typecheck \
-  DynamicIsland/models/PlaybackState.swift \
-  DynamicIsland/MediaControllers/MediaControllerProtocol.swift \
-  DynamicIsland/MediaControllers/QobuzMediaController.swift
+Notch command -> dedicated Qobuz controller -> qobuz_engine.py
+    play/pause/next/previous -> CGEventPostToPid(Qobuz PID)
+    shuffle/repeat -> signed qobuz_controls -> Qobuz-only AX DOM classes
 ```
 
-Result: passed with no output after the `@preconcurrency` conformance adjustment.
+This provider never reads or publishes system Now Playing. The generic `mediaremote-adapter.pl` was restored to its original implementation. Helpers fail within the selected provider; there is no fallback to another app's global media controls.
 
-```bash
-swiftc -parse \
-  DynamicIsland/models/PlaybackState.swift \
-  DynamicIsland/MediaControllers/MediaControllerProtocol.swift \
-  DynamicIsland/MediaControllers/QobuzMediaController.swift \
-  DynamicIsland/managers/MusicManager.swift \
-  DynamicIsland/models/Constants.swift \
-  DynamicIsland/models/MusicControlButton.swift \
-  DynamicIsland/components/Music/MusicControlOverlay.swift \
-  DynamicIsland/components/Notch/NotchHomeView.swift \
-  DynamicIsland/components/Notch/MinimalisticMusicPlayerView.swift \
-  DynamicIsland/components/LockScreen/LockScreenMusicPanel.swift \
-  DynamicIsland/components/Settings/MusicSlotConfigurationView.swift \
-  DynamicIsland/components/Onboarding/MusicControllerSelectionView.swift
-```
+The reader selects `shuffledItems` when shuffle is active, resolves track/artist/album/duration from SQLite, converts millisecond positions to seconds, and looks up artwork under that release's directory. It never takes the newest unrelated album cover. SQLite connections are explicitly closed. The artwork cache holds only one cover.
 
-Result: passed with no output.
+Qobuz can persist position samples more than ten seconds apart. The stream refreshes once per second, with the sample's actual timestamp (including microseconds) as the position anchor. Recent local `Playing`/`Stopped` events refine playback state; incompatible timestamps or an old pause from a previous launch are ignored. A stale position sample is conservative. Metadata latency still includes Qobuz's own persistence delay; no universal sub-10-ms update claim is made.
 
-## 2026-09-29 Local Correction
+## Lifecycle and resources
 
-The external `Qobuz Now Playing Bridge.app` path was disabled and archived. The intended runtime path is now the native Atoll fork only: select the `Qobuz` media controller in the built Atoll app and do not run a separate Qobuz bridge process.
+Only one telemetry worker belongs to an active controller. It exits on parent death, closed stdout, or provider preference change. There is no LaunchAgent, scheduler, login daemon or global Qobuz publisher in this implementation. Commands are limited to one in flight in the native controller and have a timeout. Advanced helpers are terminated/reaped when their wrapper is terminated.
 
-The local source was updated so `QobuzMediaController` no longer depends on Qobuz distributed notifications for title/artist/album. It reads Qobuz local state and cache directly inside Atoll, keeping the integration in the fork instead of a parallel helper app.
+The controller task owns the pipe handler and captures the controller weakly per update. It does not await an unbounded instance method that would retain the controller. The shared pipe handler remembers its pending continuation, resumes EOF on close, and closes handles. Generic and filtered Now Playing stream tasks received the same lifetime correction. Closing a pipe can no longer leave that read suspended forever.
 
-Validation on this Intel macOS host:
+This is evidence of the tested component lifetimes and bounded ownership, not a claim that every part of Atoll or macOS is free of memory leaks for all future workloads.
 
-```bash
-swiftc -typecheck \
-  DynamicIsland/models/PlaybackState.swift \
-  DynamicIsland/MediaControllers/MediaControllerProtocol.swift \
-  DynamicIsland/MediaControllers/QobuzMediaController.swift
+## Supported controls and explicit limits
 
-swiftc -parse \
-  DynamicIsland/models/PlaybackState.swift \
-  DynamicIsland/MediaControllers/MediaControllerProtocol.swift \
-  DynamicIsland/MediaControllers/QobuzMediaController.swift \
-  DynamicIsland/managers/MusicManager.swift \
-  DynamicIsland/models/Constants.swift \
-  DynamicIsland/models/MusicControlButton.swift
-```
+| Control | Result |
+|---|---|
+| Play/pause | Verified by real clicks in installed Atoll and Qobuz status logs |
+| Next | Verified: selected track changed |
+| Previous | Verified: Qobuz restarted the current track, matching its normal behavior |
+| Shuffle/repeat | Verified through Qobuz-specific Accessibility actions; authorization is required |
+| Timeline seeking | Unavailable: background attempts did not move real playback; native source disables interaction |
+| Favoriting | Unavailable: no current-track favorite-state contract was validated |
 
-Both commands passed with no output. Full `.app` build/install remains blocked on this machine because full Xcode is not installed; only Command Line Tools are active.
+The installed compatibility layer keeps seeking unavailable and never redirects it globally. Full tests with simultaneously playing WhatsApp/Instagram/Telegram media were not performed. Isolation is established by the exclusive data source, identity rejection test and PID/AX command routing; live controls were tested with another app in front.
 
-## Build and Run
+## Build and persistence
 
-On a machine with full Xcode selected:
+`qobuz_engine.py` is a declared Copy Bundle Resources input. The Xcode helper build phase compiles `qobuz_controls.swift` for the requested architectures, includes it in app Resources and signs it. Real distribution identities use hardened runtime and a secure timestamp; local debug installation uses ad-hoc signing. There are no third-party Python dependencies. This local host already has Command Line Tools and `/usr/bin/python3` available; a distribution without Python must satisfy that runtime prerequisite.
 
-```bash
-sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-cd ~/Devops/projects/Atoll
-xcodebuild -list -project DynamicIsland.xcodeproj
-xcodebuild -project DynamicIsland.xcodeproj -scheme DynamicIsland -configuration Debug build
-```
+The full app requires Xcode and its existing package dependencies. This Intel host has Command Line Tools only; it did not compile the full GUI target or validate notarization. Existing GitHub CI compiles the target on macOS 15 and 26 and now runs the Qobuz regression checks. Its final result must be read independently of local parse/typecheck results.
 
-Then:
+For the installed Intel Atoll 2.3.3 bundle, `tools/qobuz-compatibility/install.py` provides a guarded compatibility layer. It checks the exact provider initializer, string location and unused Mach-O header space; fixes the Swift string count from 16 to 17 bytes; loads a small dedicated control shim; installs/signs the helpers and verifies the bundle. Its legacy Amazon-slot marker migrates to native `.qobuz` when the corrected source is built. It does not alter `Atoll.orig`. See that tool's README for rollback and supported version restrictions. App updates can replace this local layer.
 
-## 2026-09-30 Native In-App Integration (Production Solved)
+## Executed validation
 
-The requirement for an external service/LaunchAgent was completely eliminated. The integration now runs 100% native inside `/Applications/Atoll.app`:
-1. Embedded `/Applications/Atoll.app/Contents/Resources/atoll-qobuz-adapter.py` reading Qobuz state (`player-0.json`, `qobuz.db` and artwork cache) directly.
-2. Hooked into `/Applications/Atoll.app/Contents/Resources/mediaremote-adapter.pl` so Atoll's native `Now Playing` stream pipe directly receives Qobuz JSON updates in real-time.
-3. Media controls (`send 0/1/2/4/5`) are posted directly to Qobuz PID via CoreGraphics keyboard events without stealing window focus.
-4. Process lifecycle is 100% managed by Atoll: when Atoll starts, the stream starts; when Atoll quits, all child processes terminate cleanly with zero background daemons.
-5. All files synchronized to the local fork repository under `mediaremote-adapter/`.
-4. Grant Accessibility permission to the built Atoll app if macOS prompts.
-5. Change tracks in Qobuz and watch the Atoll media surface for artwork and metadata updates.
+- Eleven Python regressions passed: metadata, shuffle selection, millisecond position, explicit pause, delayed persistence, stale log/session handling, artwork identity, track artist, closed-app idle, SQLite descriptors and parent-exit cleanup.
+- Compiled Swift regression passed: Qobuz identity decoding, foreign-source rejection, unsupported seeking capability, weak controller lifetime and child termination.
+- Swift typecheck passed for the dedicated controller/protocol/state/transport contract. Edited GUI source parsed successfully; parsing does not prove whole-target compilation.
+- Perl syntax, Xcode project parsing, unique object identifiers/resource references and Git whitespace checks passed.
+- Installed app displayed real title/artist/artwork. Play/pause/next/previous were clicked in the notch with another app in front. Shuffle/repeat helpers changed Qobuz's state.
+- Bundle deep/strict signature verification passed after compatibility installation.
+- A broader local test run passed fourteen cases; unrelated `test_replacement_session_invalidates_delayed_cleanup_token` was interrupted after its Swift compilation ran for more than six minutes. It is not reported as passing. The targeted Qobuz checks were rerun successfully after subsequent changes.
+
+## Operational recovery
+
+Keep the installer's backup manifest and its original files. Stop Atoll, restore only paths listed by that manifest, remove only files listed as newly created, re-sign and remove the compatibility migration marker. Source builds use `.qobuz` directly and keep normal provider selection. Do not restart the retired global Qobuz Now Playing bridge to work around an unavailable control.
+
+The private Central-macOS/MiniMax and Memo Coruja records contain the execution-packet lineage, fuller incident chronology, app hashes, final process audit and memory receipts. Secrets, session databases, private screenshots and music artwork are not included in this public contribution.
