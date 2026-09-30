@@ -160,10 +160,10 @@ if __name__ == '__main__':
                 if selection:
                     try:
                         result = subprocess.run(['/usr/bin/defaults', 'read', 'com.Ebullioscopic.Atoll', 'mediaController'], capture_output=True, text=True, timeout=1)
-                        if result.returncode or result.stdout.strip() != selection:
+                        if result.returncode == 0 and result.stdout.strip() != selection:
                             break
                     except subprocess.TimeoutExpired:
-                        break
+                        pass
                 print(json.dumps(get_qobuz_now_playing()), flush=True)
                 time.sleep(1)
         except BrokenPipeError:
