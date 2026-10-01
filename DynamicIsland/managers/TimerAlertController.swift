@@ -6,107 +6,36 @@
 
 import Foundation
 
-/// Alternates bounded ringing with silence until the timer is dismissed.
-/// Owned and called on the main thread, like TimerManager.
-final class TimerAlertController {
-    static let ringDurationRange = 1...3600
-    static let repeatIntervalRange = 1...1440
+/// Alert timing only; TimerManager owns the existing timer and audio player.
+struct TimerAlertController {
+    private var phaseStarted: Date?
+    private(set) var isRinging = false
 
-    /// Each date marks the start of the current phase, not the original expiry.
-    private enum Phase {
-        case ringing(Date)
-        case waiting(Date)
+    mutating func start(at date: Date = Date()) {
+        phaseStarted = date
+        isRinging = true
     }
 
-    private var phase: Phase?
-    private var timer: Timer?
-    private let now: () -> Date
-    private let ringDuration: () -> Int
-    private let repeatIntervalMinutes: () -> Int
-    private let playSound: () -> Void
-    private let stopSound: () -> Void
-
-    /// Injects the clock, settings, and playback callbacks used by each alert phase.
-    init(
-        now: @escaping () -> Date = Date.init,
-        ringDuration: @escaping () -> Int,
-        repeatIntervalMinutes: @escaping () -> Int,
-        playSound: @escaping () -> Void,
-        stopSound: @escaping () -> Void
-    ) {
-        self.now = now
-        self.ringDuration = ringDuration
-        self.repeatIntervalMinutes = repeatIntervalMinutes
-        self.playSound = playSound
-        self.stopSound = stopSound
+    mutating func stop() {
+        phaseStarted = nil
+        isRinging = false
     }
 
-    /// Cancels scheduled updates and silences playback when the controller is released.
-    deinit {
-        timer?.invalidate()
-        stopSound()
-    }
-
-    /// Replaces any current alert with an immediate ring and schedules phase updates.
-    func start() {
-        stop()
-        phase = .ringing(now())
-        playSound()
-        // Common mode keeps phase changes scheduled while the UI is being tracked.
-        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
-            self?.update()
-        }
-        self.timer = timer
-        RunLoop.main.add(timer, forMode: .common)
-    }
-
-    /// Cancels future reminders, clears the phase, and stops the current sound.
-    func stop() {
-        timer?.invalidate()
-        timer = nil
-        phase = nil
-        stopSound()
-    }
-
-    /// Silence before sleep. On wake, at most one new reminder is played;
-    /// missed reminders are never replayed in a burst.
-    func prepareForSleep() {
-        guard let phase else { return }
-        if case .ringing = phase {
-            self.phase = .waiting(now())
-        }
-        stopSound()
-    }
-
-    /// Read settings on each tick so edits also affect an ongoing alert.
-    func update() {
-        let date = now()
-        switch phase {
-        case .ringing(let started):
-            let seconds = Self.clamp(ringDuration(), to: Self.ringDurationRange)
-            guard date.timeIntervalSince(started) >= Double(seconds) else { return }
-            stopSound()
-            // Measure silence from when playback actually stops, even if the
-            // run loop was delayed. Do not catch up through elapsed cycles.
-            phase = .waiting(date)
-        case .waiting(let started):
-            let minutes = Self.clamp(repeatIntervalMinutes(), to: Self.repeatIntervalRange)
-            guard date.timeIntervalSince(started) >= Double(minutes) * 60 else { return }
-            phase = .ringing(date)
-            playSound()
-        case nil:
-            break
+    mutating func prepareForSleep(at date: Date = Date()) {
+        if isRinging {
+            phaseStarted = date
+            isRinging = false
         }
     }
 
-    /// Keep persistence in seconds while the settings editor uses minutes and seconds.
-    static func duration(minutes: Int, seconds: Int) -> Int {
-        let total = clamp(minutes, to: 0...60) * 60 + clamp(seconds, to: 0...59)
-        return clamp(total, to: ringDurationRange)
-    }
-
-    /// Bounds a setting to its supported range, including invalid persisted values.
-    static func clamp(_ value: Int, to range: ClosedRange<Int>) -> Int {
-        min(range.upperBound, max(range.lowerBound, value))
+    /// Returns a playback change, or nil when no transition is due.
+    /// Start each phase now so delayed ticks never replay missed reminders.
+    mutating func update(at date: Date = Date(), duration: Int, interval: Int) -> Bool? {
+        guard let phaseStarted else { return nil }
+        let seconds = isRinging ? min(3600, max(1, duration)) : min(1440, max(1, interval)) * 60
+        guard date.timeIntervalSince(phaseStarted) >= Double(seconds) else { return nil }
+        isRinging.toggle()
+        self.phaseStarted = date
+        return isRinging
     }
 }
