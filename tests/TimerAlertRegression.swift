@@ -5,7 +5,7 @@ import Foundation
 // /tmp/atoll-timer-alert-tests
 @main
 struct TimerAlertRegression {
-    /// Exercises phase timing and lifecycle behavior with simulated playback.
+    /// Checks alert phase boundaries, lifecycle cancellation, and invalid settings.
     static func main() {
         var date = Date(timeIntervalSince1970: 0)
         var duration = 30
@@ -13,15 +13,18 @@ struct TimerAlertRegression {
         var playing = false
         var playCount = 0
         var controller = TimerAlertController()
+        /// Starts an alert at the simulated time and records the audible ring.
         func start() {
             controller.start(at: date)
             playing = true
             playCount += 1
         }
+        /// Cancels the simulated alert and playback together.
         func stop() {
             controller.stop()
             playing = false
         }
+        /// Advances the simulated clock and applies one phase transition, if due.
         func advance(_ seconds: TimeInterval) {
             date.addTimeInterval(seconds)
             if let ringing = controller.update(at: date, duration: duration, interval: interval) {

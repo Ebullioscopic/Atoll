@@ -11,16 +11,19 @@ struct TimerAlertController {
     private var phaseStarted: Date?
     private(set) var isRinging = false
 
+    /// Begins a ring at `date`, replacing any previous alert phase.
     mutating func start(at date: Date = Date()) {
         phaseStarted = date
         isRinging = true
     }
 
+    /// Cancels both the current ring and any pending repeat reminder.
     mutating func stop() {
         phaseStarted = nil
         isRinging = false
     }
 
+    /// Converts an active ring to silence before playback is stopped for sleep.
     mutating func prepareForSleep(at date: Date = Date()) {
         if isRinging {
             phaseStarted = date

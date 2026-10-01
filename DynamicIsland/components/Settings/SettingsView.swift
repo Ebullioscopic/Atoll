@@ -7475,6 +7475,7 @@ struct TimerSettings: View {
         }
     }
 
+    /// Groups the enabled timer settings, including the repeat-alert controls.
     @ViewBuilder
     private var timerConfigurationSections: some View {
         Group {
@@ -7711,10 +7712,12 @@ struct TimerSettings: View {
         }
     }
 
+    /// Bounds the saved ring duration before showing its minute and second components.
     private var duration: Int {
         min(3600, max(1, alertDurationSeconds))
     }
 
+    /// Edits ring minutes while preserving the saved seconds component.
     private var minutesBinding: Binding<Int> {
         Binding(
             get: { duration / 60 },
@@ -7722,6 +7725,7 @@ struct TimerSettings: View {
         )
     }
 
+    /// Edits ring seconds while preserving the saved minutes component.
     private var secondsBinding: Binding<Int> {
         Binding(
             get: { duration % 60 },
@@ -7729,6 +7733,7 @@ struct TimerSettings: View {
         )
     }
 
+    /// Bounds and edits the silent interval in whole minutes.
     private var intervalBinding: Binding<Int> {
         Binding(
             get: { min(1440, max(1, alertRepeatIntervalMinutes)) },
@@ -7736,11 +7741,13 @@ struct TimerSettings: View {
         )
     }
 
+    /// Excludes a zero-length ring and values beyond one hour.
     private var secondsRange: ClosedRange<Int> {
         if duration / 60 == 60 { return 0...0 }
         return duration / 60 == 0 ? 1...59 : 0...59
     }
 
+    /// Presents ring duration and repeat interval using existing timer controls.
     private var timerAlertSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
