@@ -78,11 +78,11 @@ final class MenuBarClearanceTests: XCTestCase {
             isNotchClosed: true,
             isHideOnClosed: false,
             isConnectivityHUDVisible: false,
-            isSneakPeekVisible: false
+            isSymmetricalHUDVisible: false
         ))
     }
 
-    func testClearanceSuppressedWhenSneakPeekIsVisible() {
+    func testClearanceSuppressedWhenSymmetricalHUDIsVisible() {
         // Volume / brightness / backlight Sneak Peeks are symmetrical HUDs
         // wrapping around the physical camera notch. Applying clearance offset
         // displaces the notch spacer and clips the slider wing.
@@ -90,7 +90,18 @@ final class MenuBarClearanceTests: XCTestCase {
             isNotchClosed: true,
             isHideOnClosed: false,
             isConnectivityHUDVisible: false,
-            isSneakPeekVisible: true
+            isSymmetricalHUDVisible: true
+        ))
+    }
+
+    func testClearanceAllowedForNonSymmetricalSneakPeek() {
+        // Non-symmetrical Sneak Peeks (like Music track changes or Timer) preserve
+        // clearance so the live activity can step aside from application menus.
+        XCTAssertTrue(MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: true,
+            isHideOnClosed: false,
+            isConnectivityHUDVisible: false,
+            isSymmetricalHUDVisible: false
         ))
     }
 
@@ -99,7 +110,7 @@ final class MenuBarClearanceTests: XCTestCase {
             isNotchClosed: true,
             isHideOnClosed: false,
             isConnectivityHUDVisible: true,
-            isSneakPeekVisible: false
+            isSymmetricalHUDVisible: false
         ))
     }
 
@@ -108,7 +119,7 @@ final class MenuBarClearanceTests: XCTestCase {
             isNotchClosed: false,
             isHideOnClosed: false,
             isConnectivityHUDVisible: false,
-            isSneakPeekVisible: false
+            isSymmetricalHUDVisible: false
         ))
     }
 
@@ -117,7 +128,7 @@ final class MenuBarClearanceTests: XCTestCase {
             isNotchClosed: true,
             isHideOnClosed: true,
             isConnectivityHUDVisible: false,
-            isSneakPeekVisible: false
+            isSymmetricalHUDVisible: false
         ))
     }
 }

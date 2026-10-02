@@ -74,12 +74,12 @@ final class MenuBarLayout: ObservableObject {
         isNotchClosed: Bool,
         isHideOnClosed: Bool,
         isConnectivityHUDVisible: Bool,
-        isSneakPeekVisible: Bool
+        isSymmetricalHUDVisible: Bool
     ) -> Bool {
         guard isNotchClosed,
               !isHideOnClosed,
               !isConnectivityHUDVisible,
-              !isSneakPeekVisible
+              !isSymmetricalHUDVisible
         else { return false }
         return true
     }
