@@ -1031,20 +1031,6 @@ struct ContentView: View {
     /// against `NSScreen.auxiliaryTopLeftArea` and there is no way to tell it
     /// some of that strip is spoken for -- both auxiliary areas are read-only.
     /// So the content moves instead of the menus.
-    ///
-    /// Whether an active Sneak Peek is a symmetrical system HUD (volume, brightness, backlight, mic, bluetooth).
-    /// Symmetrical HUDs wrap around the hardware camera notch, so clearance offsets must be suppressed
-    /// to avoid displacing the internal notch spacer, driving the icon under the camera and clipping the slider.
-    private var isSymmetricalHUDSneakPeekVisible: Bool {
-        guard isSneakPeekVisibleOnCurrentScreen else { return false }
-        switch coordinator.sneakPeek.type {
-        case .volume, .brightness, .backlight, .mic, .bluetoothAudio:
-            return true
-        default:
-            return false
-        }
-    }
-
     /// Zero unless something is actually being covered: no live activity, an
     /// open notch, an active symmetrical HUD, no accessibility permission, or menus
     /// that end before the content begins all leave the notch centred where it belongs.
@@ -1053,7 +1039,8 @@ struct ContentView: View {
             isNotchClosed: vm.notchState == .closed,
             isHideOnClosed: vm.hideOnClosed,
             isConnectivityHUDVisible: isConnectivityHUDVisible,
-            isSymmetricalHUDVisible: isSymmetricalHUDSneakPeekVisible
+            sneakPeekType: coordinator.sneakPeek.type,
+            isSneakPeekVisible: isSneakPeekVisibleOnCurrentScreen
         ),
         closedContentWidth > 0,
         let menusRightEdge = menuBarLayout.appMenusRightEdge,

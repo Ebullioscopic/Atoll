@@ -64,6 +64,17 @@ final class MenuBarLayout: ObservableObject {
         return min(overlap, rightHeadroom)
     }
 
+    /// Whether a given Sneak Peek content type represents a symmetrical system HUD
+    /// that wraps evenly around the hardware camera notch.
+    nonisolated static func isSymmetricalHUD(type: SneakContentType) -> Bool {
+        switch type {
+        case .volume, .brightness, .backlight, .mic, .bluetoothAudio:
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Whether menu bar clearance should be applied given the current presentation state.
     ///
     /// Symmetrical notch HUDs (such as volume/brightness Sneak Peeks or the connectivity HUD)
@@ -74,13 +85,17 @@ final class MenuBarLayout: ObservableObject {
         isNotchClosed: Bool,
         isHideOnClosed: Bool,
         isConnectivityHUDVisible: Bool,
-        isSymmetricalHUDVisible: Bool
+        sneakPeekType: SneakContentType?,
+        isSneakPeekVisible: Bool
     ) -> Bool {
         guard isNotchClosed,
               !isHideOnClosed,
-              !isConnectivityHUDVisible,
-              !isSymmetricalHUDVisible
+              !isConnectivityHUDVisible
         else { return false }
+
+        if isSneakPeekVisible, let sneakPeekType, isSymmetricalHUD(type: sneakPeekType) {
+            return false
+        }
         return true
     }
 
