@@ -70,4 +70,55 @@ final class MenuBarClearanceTests: XCTestCase {
         XCTAssertEqual(offset(contentWidth: 300, menusEnd: 2850, screen: external), 18)
         XCTAssertEqual(offset(contentWidth: 300, menusEnd: 2000, screen: external), 0)
     }
+
+    // MARK: - Symmetrical HUD Centering (TDD)
+
+    func testClearanceAllowedWhenClosedWithoutHUD() {
+        XCTAssertTrue(MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: true,
+            isHideOnClosed: false,
+            isConnectivityHUDVisible: false,
+            isSneakPeekVisible: false
+        ))
+    }
+
+    func testClearanceSuppressedWhenSneakPeekIsVisible() {
+        // Volume / brightness / backlight Sneak Peeks are symmetrical HUDs
+        // wrapping around the physical camera notch. Applying clearance offset
+        // displaces the notch spacer and clips the slider wing.
+        XCTAssertFalse(MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: true,
+            isHideOnClosed: false,
+            isConnectivityHUDVisible: false,
+            isSneakPeekVisible: true
+        ))
+    }
+
+    func testClearanceSuppressedWhenConnectivityHUDIsVisible() {
+        XCTAssertFalse(MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: true,
+            isHideOnClosed: false,
+            isConnectivityHUDVisible: true,
+            isSneakPeekVisible: false
+        ))
+    }
+
+    func testClearanceSuppressedWhenNotchIsOpen() {
+        XCTAssertFalse(MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: false,
+            isHideOnClosed: false,
+            isConnectivityHUDVisible: false,
+            isSneakPeekVisible: false
+        ))
+    }
+
+    func testClearanceSuppressedWhenHiddenOnClosed() {
+        XCTAssertFalse(MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: true,
+            isHideOnClosed: true,
+            isConnectivityHUDVisible: false,
+            isSneakPeekVisible: false
+        ))
+    }
 }
+

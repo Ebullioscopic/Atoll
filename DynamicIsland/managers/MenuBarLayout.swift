@@ -64,6 +64,26 @@ final class MenuBarLayout: ObservableObject {
         return min(overlap, rightHeadroom)
     }
 
+    /// Whether menu bar clearance should be applied given the current presentation state.
+    ///
+    /// Symmetrical notch HUDs (such as volume/brightness Sneak Peeks or the connectivity HUD)
+    /// wrap symmetrically around the physical camera notch. Shifting them aside displaces the
+    /// internal notch spacer, driving the leading wing under the camera housing and clipping
+    /// the trailing wing against the screen edge or status items.
+    nonisolated static func shouldApplyClearance(
+        isNotchClosed: Bool,
+        isHideOnClosed: Bool,
+        isConnectivityHUDVisible: Bool,
+        isSneakPeekVisible: Bool
+    ) -> Bool {
+        guard isNotchClosed,
+              !isHideOnClosed,
+              !isConnectivityHUDVisible,
+              !isSneakPeekVisible
+        else { return false }
+        return true
+    }
+
     /// Breathing room between the last menu and the notch content, so they do
     /// not end up flush against each other.
     nonisolated static let clearanceGap: CGFloat = 8

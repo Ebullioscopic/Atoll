@@ -1033,14 +1033,18 @@ struct ContentView: View {
     /// So the content moves instead of the menus.
     ///
     /// Zero unless something is actually being covered: no live activity, an
-    /// open notch, no accessibility permission, or menus that end before the
-    /// content begins all leave the notch centred where it belongs.
+    /// open notch, an active HUD/sneak peek, no accessibility permission, or menus
+    /// that end before the content begins all leave the notch centred where it belongs.
     private var menuBarClearanceOffset: CGFloat {
-        guard vm.notchState == .closed,
-              !vm.hideOnClosed,
-              closedContentWidth > 0,
-              let menusRightEdge = menuBarLayout.appMenusRightEdge,
-              let screenFrame = getScreenFrame(currentScreenName)
+        guard MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: vm.notchState == .closed,
+            isHideOnClosed: vm.hideOnClosed,
+            isConnectivityHUDVisible: isConnectivityHUDVisible,
+            isSneakPeekVisible: isSneakPeekVisibleOnCurrentScreen
+        ),
+        closedContentWidth > 0,
+        let menusRightEdge = menuBarLayout.appMenusRightEdge,
+        let screenFrame = getScreenFrame(currentScreenName)
         else { return 0 }
 
         return MenuBarLayout.clearanceOffset(
@@ -1274,11 +1278,10 @@ struct ContentView: View {
               }
               .pinnedLyrics(isVisible: pinnedLyricsVisible,
                   isContentHidden: isSneakPeekVisibleOnCurrentScreen || isConnectivityHUDVisible)
-              // A connectivity HUD must remain centred on the physical notch:
-              // its middle transparent lane is what keeps both wings visible.
-              // Menu-bar clearance would shift that lane underneath the camera
-              // housing and clip one of the two content areas.
-              .offset(x: isConnectivityHUDVisible ? 0 : menuBarClearanceOffset)
+              // Symmetrical HUDs (connectivity HUD, volume/brightness Sneak Peeks)
+              // must remain centred on the physical notch: their middle transparent
+              // lane wraps the camera housing and keeps both wings visible without clipping.
+              .offset(x: menuBarClearanceOffset)
               .animation(.smooth(duration: 0.25), value: menuBarClearanceOffset)
               .zIndex(2)
               
