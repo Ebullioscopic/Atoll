@@ -19,8 +19,6 @@
 import SwiftUI
 import Defaults
 
-let ALT_MODE = true;
-
 enum AntigravityPool: String, CaseIterable {
     case gemini = "Gemini"
     case claude = "Claude"
@@ -244,6 +242,7 @@ struct NotchLLMUsageView: View {
     private func quotaGauge(_ label: String, _ limit: UsageLimit) -> some View {
         let usedPct = Int(limit.used.rounded())
         let leftPct = max(0, 100 - usedPct)
+        let altMode = Defaults[.enableUsageRemainingDisplay]
         VStack(alignment: .leading, spacing: 3) {
             HStack {
                 Text(label).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
@@ -255,14 +254,14 @@ struct NotchLLMUsageView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(.white.opacity(0.15))
-                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: max(4, geo.size.width * (!ALT_MODE ? limit.fraction : 1 - limit.fraction)))
+                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: max(4, geo.size.width * (!altMode ? limit.fraction : 1 - limit.fraction)))
                 }
             }
             .frame(height: 6)
             HStack {
-                Text(!ALT_MODE ? "\(usedPct)% used" : "\(leftPct)% left").font(.caption2).monospacedDigit()
+                Text(!altMode ? "\(usedPct)% used" : "\(leftPct)% left").font(.caption2).monospacedDigit()
                 Spacer()
-                Text(!ALT_MODE ? "\(leftPct)% left" : "\(usedPct)% Used").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                Text(!altMode ? "\(leftPct)% left" : "\(usedPct)% Used").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             }
         }
     }

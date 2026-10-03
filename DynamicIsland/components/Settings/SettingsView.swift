@@ -7975,6 +7975,7 @@ struct StatsSettings: View {
     @ObservedObject var statsManager = StatsManager.shared
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.enableLLMUsageFeature) var enableLLMUsageFeature
+    @Default(.enableUsageRemainingDisplay) var enableUsageRemainingDisplay
     @Default(.enableNewAPIProvider) var enableNewAPIProvider
     @Default(.statsStopWhenNotchCloses) var statsStopWhenNotchCloses
     @Default(.statsUpdateInterval) var statsUpdateInterval
@@ -8031,6 +8032,7 @@ struct StatsSettings: View {
                     Text("Enable LLM Usage Monitor")
                 }
                 .settingsHighlight(id: highlightID("Enable LLM Usage Monitor"))
+                
 
             } header: {
                 Text("General")
@@ -8042,6 +8044,20 @@ struct StatsSettings: View {
             }
 
             if enableLLMUsageFeature {
+                Section {
+                    Defaults.Toggle(key: .enableUsageRemainingDisplay) {
+                        Text("Enable Usage Remaining Display Mode")
+                    }
+                    .settingsHighlight(id: highlightID("Enable Usage Remaining Display Mode"))
+                } header: {
+                    Text("LLM Usage Options")
+                } footer: {
+                    Text("When enabled, the usage display flips to represent the amount of usage remaining.")
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    .font(.caption)
+                }
+                    
                 Section {
                     Defaults.Toggle(key: .enableClaudeProvider) {
                         Text("Claude")
