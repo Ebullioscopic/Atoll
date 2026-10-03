@@ -298,20 +298,13 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
         do {
             try process.run()
-            streamTask = Task { [weak self] in
-                await self?.processJSONStream()
+            streamTask = Task { [weak self, pipeHandler] in
+                await pipeHandler.readJSONLines(as: NowPlayingUpdate.self) { [weak self] update in
+                    await self?.handleAdapterUpdate(update)
+                }
             }
         } catch {
             assertionFailure("Failed to launch mediaremote-adapter.pl: \(error)")
-        }
-    }
-
-    // MARK: - Async Stream Processing
-    private func processJSONStream() async {
-        guard let pipeHandler = self.pipeHandler else { return }
-        
-        await pipeHandler.readJSONLines(as: NowPlayingUpdate.self) { [weak self] update in
-            await self?.handleAdapterUpdate(update)
         }
     }
 
@@ -558,6 +551,8 @@ actor JSONLinesPipeHandler {
     private let pipe: Pipe
     private let fileHandle: FileHandle
     private var buffer = ""
+    private var pendingRead: CheckedContinuation<Data, Error>?
+    private var isClosed = false
     
     init() {
         self.pipe = Pipe()
@@ -611,17 +606,27 @@ actor JSONLinesPipeHandler {
     }
     
     private func readData() async throws -> Data {
+        guard !isClosed else { return Data() }
         return try await withCheckedThrowingContinuation { continuation in
-            
-            fileHandle.readabilityHandler = { handle in
+            pendingRead = continuation
+            fileHandle.readabilityHandler = { [weak self] handle in
                 let data = handle.availableData
                 handle.readabilityHandler = nil
-                continuation.resume(returning: data)
+                Task { await self?.finishRead(data) }
             }
         }
     }
+
+    private func finishRead(_ data: Data) {
+        let continuation = pendingRead
+        pendingRead = nil
+        continuation?.resume(returning: data)
+    }
     
     func close() async {
+        guard !isClosed else { return }
+        isClosed = true
+        finishRead(Data())
         do {
             fileHandle.readabilityHandler = nil
             try fileHandle.close()
