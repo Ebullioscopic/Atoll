@@ -254,14 +254,18 @@ struct NotchLLMUsageView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(.white.opacity(0.15))
-                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: max(4, geo.size.width * (!enableUsageRemainingDisplay ? limit.fraction : 1 - limit.fraction)))
+                    // sets a min fill width of 4 unless no/full usage, depending on display mode
+                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: (enableUsageRemainingDisplay && limit.fraction == 1) || (!enableUsageRemainingDisplay && limit.fraction == 0) ? 0
+                                                                    : max(4, geo.size.width * (enableUsageRemainingDisplay ? 1 - limit.fraction : limit.fraction))
+                    )
+//                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: !enableUsageRemainingDisplay ? max(4, geo.size.width * limit.fraction) : geo.size.width * (1 - limit.fraction))
                 }
             }
             .frame(height: 6)
             HStack {
                 Text(!enableUsageRemainingDisplay ? "\(usedPct)% used" : "\(leftPct)% left").font(.caption2).monospacedDigit()
                 Spacer()
-                Text(!enableUsageRemainingDisplay ? "\(leftPct)% left" : "\(usedPct)% Used").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                Text(!enableUsageRemainingDisplay ? "\(leftPct)% left" : "\(usedPct)% used").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             }
         }
     }
