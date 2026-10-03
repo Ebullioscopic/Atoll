@@ -551,6 +551,10 @@ struct BatteryTemporaryActivityView: View {
     @Default(.lowBatteryHUDStyle) var lowBatteryHUDStyle
     @Default(.fullBatteryHUDStyle) var fullBatteryHUDStyle
     var styleOverride: BatteryNotificationStyle? = nil
+    /// Whether clicking this HUD turns Low Power Mode on. The click itself is
+    /// handled by `ContentView`, which owns every gesture on the closed notch;
+    /// this only decides whether the HUD says so.
+    var showsLowPowerModeAction: Bool = false
 
     @State private var pulse = false
     @State private var showBatteryIndicator = false
@@ -686,6 +690,10 @@ struct BatteryTemporaryActivityView: View {
                         .foregroundColor(.gray.opacity(0.6))
                         .font(.system(size: 10, weight: .medium))
                 )
+            } else if showsLowPowerModeAction {
+                Text(lowPowerModeActionDescription)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(2)
             } else {
                 Text(verbatim: String(localized: "Turn on Low Power Mode or it\nis recommended to charge it."))
                     .font(.system(size: 10, weight: .medium))
@@ -699,6 +707,18 @@ struct BatteryTemporaryActivityView: View {
                 .fontWeight(.medium)
                 .lineLimit(1)
         }
+    }
+
+    /// The call to action, with the mode's name in the yellow macOS gives Low
+    /// Power Mode everywhere else. The sentence is localized whole so it can be
+    /// reordered; a translation that inflects the name simply goes unhighlighted.
+    private var lowPowerModeActionDescription: AttributedString {
+        var text = AttributedString(String(localized: "Click to turn on Low Power Mode,\nor charge your Mac."))
+        text.swiftUI.foregroundColor = Color.gray.opacity(0.6)
+        if let range = text.range(of: String(localized: "Low Power Mode")) {
+            text[range].swiftUI.foregroundColor = Color.yellow
+        }
+        return text
     }
 
     @ViewBuilder

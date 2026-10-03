@@ -1182,6 +1182,7 @@ extension Defaults.Keys {
     static let lowBatteryHUDDuration = Key<Int>("lowBatteryHUDDuration", default: 3)
     static let fullBatteryHUDDuration = Key<Int>("fullBatteryHUDDuration", default: 3)
     static let lowBatteryHUDThreshold = Key<Int>("lowBatteryHUDThreshold", default: 20)
+    static let lowBatteryHUDTapEnablesLowPowerMode = Key<Bool>("lowBatteryHUDTapEnablesLowPowerMode", default: true)
     static let fullBatteryHUDThreshold = Key<Int>("fullBatteryHUDThreshold", default: 100)
     static let lowBatteryHUDStyle = Key<BatteryNotificationStyle>("lowBatteryHUDStyle", default: .standard)
     static let fullBatteryHUDStyle = Key<BatteryNotificationStyle>("fullBatteryHUDStyle", default: .standard)
