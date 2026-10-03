@@ -19,6 +19,8 @@
 import SwiftUI
 import Defaults
 
+let ALT_MODE = true;
+
 enum AntigravityPool: String, CaseIterable {
     case gemini = "Gemini"
     case claude = "Claude"
@@ -253,14 +255,14 @@ struct NotchLLMUsageView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(.white.opacity(0.15))
-                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: max(4, geo.size.width * limit.fraction))
+                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: max(4, geo.size.width * (!ALT_MODE ? limit.fraction : 1 - limit.fraction)))
                 }
             }
             .frame(height: 6)
             HStack {
-                Text("\(usedPct)% used").font(.caption2).monospacedDigit()
+                Text(!ALT_MODE ? "\(usedPct)% used" : "\(leftPct)% left").font(.caption2).monospacedDigit()
                 Spacer()
-                Text("\(leftPct)% left").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                Text(!ALT_MODE ? "\(leftPct)% left" : "\(usedPct)% Used").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             }
         }
     }
