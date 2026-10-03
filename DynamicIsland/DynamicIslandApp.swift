@@ -338,6 +338,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @MainActor
     private func restoreWindowsAfterLock() {
         guard windowsHiddenForLock else { return }
         windowsHiddenForLock = false
@@ -351,6 +352,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.orderFrontRegardless()
             window.alphaValue = 1
         }
+
+        reassertDynamicIslandWindowSpacePresence()
     }
     
     private func cleanupWindows(shouldInvert: Bool = false) {
@@ -397,12 +400,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func reassertDynamicIslandWindowSpacePresence() {
         guard !windowsHiddenForLock else { return }
 
-        syncNotchSpaceMembership()
-
+        // Membership must be applied after collectionBehavior/orderFront, which can
+        // move the window back onto the current user Space.
         for window in currentDynamicIslandWindows() {
             window.collectionBehavior = DynamicIslandWindow.pinnedCollectionBehavior
             window.orderFrontRegardless()
         }
+
+        syncNotchSpaceMembership()
+        NotchSpaceManager.shared.notchSpace.reassertMembership()
     }
 
     private func createDynamicIslandWindow(for screen: NSScreen, with viewModel: DynamicIslandViewModel)
