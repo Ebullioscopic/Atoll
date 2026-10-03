@@ -27,7 +27,8 @@ enum AntigravityPool: String, CaseIterable {
 struct NotchLLMUsageView: View {
     @ObservedObject private var manager = LLMUsageManager.shared
     @State private var antigravityPool: AntigravityPool = .gemini
-
+    @Default(.enableUsageRemainingDisplay) private var enableUsageRemainingDisplay
+    
     private func isEnabled(_ provider: ProviderID) -> Bool { Defaults[provider.enabledKey] }
 
     private var enabledProviders: [ProviderID] {
@@ -253,14 +254,18 @@ struct NotchLLMUsageView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(.white.opacity(0.15))
-                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: max(4, geo.size.width * limit.fraction))
+                    // sets a min fill width of 4 unless no/full usage, depending on display mode
+                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: (enableUsageRemainingDisplay && limit.fraction == 1) || (!enableUsageRemainingDisplay && limit.fraction == 0)
+                                                                    ? 0
+                                                                    : max(4, geo.size.width * (enableUsageRemainingDisplay ? 1 - limit.fraction : limit.fraction))
+                    )
                 }
             }
             .frame(height: 6)
             HStack {
-                Text("\(usedPct)% used").font(.caption2).monospacedDigit()
+                Text(!enableUsageRemainingDisplay ? "\(usedPct)% used" : "\(leftPct)% left").font(.caption2).monospacedDigit()
                 Spacer()
-                Text("\(leftPct)% left").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                Text(!enableUsageRemainingDisplay ? "\(leftPct)% left" : "\(usedPct)% used").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             }
         }
     }
