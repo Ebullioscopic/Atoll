@@ -482,9 +482,9 @@ struct StandaloneCalendarView: View {
     @ObservedObject private var calendarManager = CalendarManager.shared
     @State private var selectedDate = Date()
     @State private var displayedMonth = Date()
-    @State private var datePickerScrollTarget: Date?
     @Default(.hideAllDayEvents) private var hideAllDayEvents
     @Default(.hideCompletedReminders) private var hideCompletedReminders
+    @Default(.calendarViewMode) private var mode
 
     private let calendar = Calendar.current
 
@@ -498,12 +498,66 @@ struct StandaloneCalendarView: View {
         return ordered
     }
 
+    /// Column headers above the grid. Week and month always start on the
+    /// locale's first weekday so the fixed S-M-T-W-T-F-S row lines up, but a
+    /// three-day range starts wherever the selection is, so its headers are
+    /// read off the visible days instead.
+    private var columnHeaderSymbols: [String] {
+        switch mode {
+        case .month, .week:
+            return weekdaySymbols
+        case .threeDay:
+            let symbols = calendar.veryShortStandaloneWeekdaySymbols
+            return visibleDays.map { day in
+                let index = calendar.component(.weekday, from: day) - 1
+                return symbols.indices.contains(index) ? symbols[index] : ""
+            }
+        }
+    }
+
     private var monthTitle: String {
         displayedMonth.formatted(.dateTime.month(.wide))
     }
 
     private var yearTitle: String {
         displayedMonth.formatted(.dateTime.year())
+    }
+
+    /// Title for the visible range: a month name for the month grid, and the
+    /// span itself for the shorter modes, where naming the month would not say
+    /// which days are on screen.
+    private var rangeTitle: String {
+        switch mode {
+        case .month:
+            return monthTitle
+        case .week, .threeDay:
+            guard let first = visibleDays.first, let last = visibleDays.last else { return monthTitle }
+            let start = first.formatted(.dateTime.month(.abbreviated).day())
+            let end = last.formatted(.dateTime.month(.abbreviated).day())
+            return "\(start) – \(end)"
+        }
+    }
+
+    /// Days the grid draws, which is the only thing that differs between modes.
+    private var visibleDays: [Date] {
+        switch mode {
+        case .month:
+            return monthDays
+        case .week:
+            return weekDays
+        case .threeDay:
+            return threeDayDays
+        }
+    }
+
+    private var weekDays: [Date] {
+        guard let interval = calendar.dateInterval(of: .weekOfMonth, for: selectedDate) else { return [] }
+        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: interval.start) }
+    }
+
+    private var threeDayDays: [Date] {
+        let start = calendar.startOfDay(for: selectedDate)
+        return (0..<3).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
     }
 
     private var monthDays: [Date] {
@@ -521,6 +575,13 @@ struct StandaloneCalendarView: View {
             current = next
         }
         return days
+    }
+
+    /// Rows the grid divides its height by: one for the shorter modes, and 5 or
+    /// 6 for a month depending on where the 1st falls.
+    private var weekRowCount: Int {
+        let columns = max(1, mode.dayCount)
+        return max(1, Int(ceil(Double(visibleDays.count) / Double(columns))))
     }
 
     private var filteredEvents: [EventModel] {
@@ -570,7 +631,6 @@ struct StandaloneCalendarView: View {
         .onAppear {
             selectedDate = Date.now
             displayedMonth = selectedDate.startOfMonth
-            requestDatePickerCenterOnCurrentDate()
             Task {
                 await calendarManager.updateCurrentDate(selectedDate)
             }
@@ -587,7 +647,6 @@ struct StandaloneCalendarView: View {
             guard newState == .open else { return }
             selectedDate = Date.now
             displayedMonth = selectedDate.startOfMonth
-            requestDatePickerCenterOnCurrentDate()
             Task {
                 await calendarManager.updateCurrentDate(selectedDate)
             }
@@ -599,79 +658,93 @@ struct StandaloneCalendarView: View {
             let pickerViewportHeight = max(96, geometry.size.height - 56)
 
             VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .center) {
+                HStack(alignment: .center, spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(monthTitle)
-                            .font(.title3)
+                        Text(rangeTitle)
+                            .font(mode == .month ? .title3 : .subheadline)
                             .fontWeight(.semibold)
                             .foregroundStyle(.white)
-                        Text(yearTitle)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(Color(white: 0.65))
+                            .lineLimit(1)
+                        // The shorter modes already name their months in the
+                        // range, and the pane has no width to spare for a year
+                        // that repeats it.
+                        if mode == .month {
+                            Text(yearTitle)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color(white: 0.65))
+                        }
                     }
-                    Spacer()
-                    HStack(spacing: 6) {
-                        Button(action: showPreviousMonth) {
+                    .layoutPriority(1)
+
+                    Spacer(minLength: 4)
+
+                    modePicker
+
+                    HStack(spacing: 2) {
+                        Button { page(by: -1) } label: {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 11, weight: .bold))
-                                .frame(width: 24, height: 24)
+                                .frame(width: 20, height: 22)
                         }
                         .buttonStyle(.plain)
 
-                        Button(action: showNextMonth) {
+                        Button { page(by: 1) } label: {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 11, weight: .bold))
-                                .frame(width: 24, height: 24)
+                                .frame(width: 20, height: 22)
                         }
                         .buttonStyle(.plain)
                     }
                     .foregroundStyle(.white)
                 }
 
-                ScrollViewReader { proxy in
-                    VStack(spacing: 6) {
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 14), spacing: 6), count: 7), spacing: 6) {
-                            ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
-                                Text(symbol.prefix(1))
-                                    .font(.caption2)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(Color(white: 0.55))
-                                    .frame(maxWidth: .infinity)
-                            }
+                VStack(spacing: 6) {
+                    let columns = Array(
+                        repeating: GridItem(.flexible(minimum: 14), spacing: 6),
+                        count: max(1, mode.dayCount)
+                    )
+
+                    LazyVGrid(columns: columns, spacing: 6) {
+                        ForEach(Array(columnHeaderSymbols.enumerated()), id: \.offset) { _, symbol in
+                            Text(symbol.prefix(1))
+                                .font(mode == .month ? .caption2 : .caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color(white: 0.55))
+                                .frame(maxWidth: .infinity)
                         }
-
-                        ZStack {
-                            ScrollView(.vertical, showsIndicators: false) {
-                                LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 14), spacing: 6), count: 7), spacing: 6) {
-                                    ForEach(monthDays, id: \.self) { day in
-                                        dayCell(for: day)
-                                            .id(calendar.startOfDay(for: day))
-                                    }
-                                }
-                                .padding(.bottom, 2)
-                            }
-                            .onChange(of: datePickerScrollTarget) { _, target in
-                                guard let target else { return }
-                                centerDatePicker(on: target, proxy: proxy)
-                            }
-
-                            LinearGradient(colors: [Color.black.opacity(0.65), .clear], startPoint: .top, endPoint: .bottom)
-                                .frame(height: 16)
-                                .allowsHitTesting(false)
-                                .frame(maxHeight: .infinity, alignment: .top)
-
-                            LinearGradient(colors: [.clear, Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom)
-                                .frame(height: 16)
-                                .allowsHitTesting(false)
-                                .frame(maxHeight: .infinity, alignment: .bottom)
-                        }
-                        .frame(height: max(0, pickerViewportHeight - 22))
-                        .clipped()
                     }
-                    .frame(height: pickerViewportHeight)
+
+                    // The whole range is on screen at once, so the grid divides
+                    // the available height between its rows instead of
+                    // scrolling a keyhole. Rows are sized here rather than left
+                    // to the cells' old 30pt minimum so a 6-row month, a 5-row
+                    // month and a single-row week all fill the pane.
+                    let gridHeight = max(0, pickerViewportHeight - 22)
+                    let rowSpacing: CGFloat = 6
+                    // Uncapped: the single-row views spend the whole pane on
+                    // their one row and size their dates to match, and the
+                    // month's rows come out under any cap worth setting anyway
+                    // -- 27pt across six rows, 34pt across five.
+                    let rowHeight = max(
+                        10,
+                        (gridHeight - rowSpacing * CGFloat(weekRowCount - 1)) / CGFloat(weekRowCount)
+                    )
+
+                    LazyVGrid(columns: columns, spacing: rowSpacing) {
+                        ForEach(visibleDays, id: \.self) { day in
+                            dayCell(for: day, rowHeight: rowHeight)
+                        }
+                    }
+                    // Identified by mode so a change replaces the grid outright
+                    // rather than diffing 42 date cells down to 3, which animated
+                    // the removals and let them outlive the layout they belonged
+                    // to. Clipped so nothing mid-change can paint outside.
+                    .id(mode)
+                    .frame(height: gridHeight, alignment: .top)
+                    .clipped()
                 }
-                .frame(height: pickerViewportHeight)
+                .frame(height: pickerViewportHeight, alignment: .top)
                 .clipped()
             }
             .frame(maxHeight: .infinity, alignment: .top)
@@ -704,69 +777,103 @@ struct StandaloneCalendarView: View {
         .clipped()
     }
 
-    private func dayCell(for day: Date) -> some View {
-        let isCurrentMonth = calendar.isDate(day, equalTo: displayedMonth, toGranularity: .month)
+    private func dayCell(for day: Date, rowHeight: CGFloat) -> some View {
+        // Only the month grid pads its range out to whole weeks, so only it has
+        // days that are on screen without being part of what was asked for. A
+        // week or three-day range that straddles a month boundary is showing
+        // every day deliberately, and dimming half of them would read as those
+        // days falling outside the range.
+        let isInVisibleRange = mode != .month
+            || calendar.isDate(day, equalTo: displayedMonth, toGranularity: .month)
         let isSelected = calendar.isDate(day, inSameDayAs: selectedDate)
         let isToday = calendar.isDateInToday(day)
+        // The selection marker is bounded by the row's height but sized by the
+        // date's width, because a two-digit date is wider than it is tall. Fixing
+        // a circle's diameter to the row height made "25" overflow its own
+        // highlight once month rows got short, while the cell it sits in is far
+        // wider than it needs to be. Laying the shape out as the text's
+        // background instead lets it hug the date: a Capsule at equal width and
+        // height is a circle, so single digits and the roomier week and three-day
+        // rows keep the round marker they had.
+        let markerHeight = min(28, max(12, rowHeight - 1))
 
         return Button {
             withAnimation(.smooth(duration: 0.18)) {
                 selectedDate = day
             }
         } label: {
-            ZStack {
-                if isSelected {
-                    Circle()
-                        .fill(Color.effectiveAccent)
-                        .frame(width: 28, height: 28)
+            Text(day.formatted(.dateTime.day()))
+                .font(.system(size: mode.dayFontSize, weight: isSelected ? .semibold : .medium))
+                .foregroundStyle(dayTextColor(isInVisibleRange: isInVisibleRange, isSelected: isSelected, isToday: isToday))
+                .padding(.horizontal, 4)
+                .frame(minWidth: markerHeight, minHeight: markerHeight)
+                .background {
+                    if isSelected {
+                        Capsule(style: .circular).fill(Color.effectiveAccent)
+                    }
                 }
-
-                Text(day.formatted(.dateTime.day()))
-                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
-                    .foregroundStyle(dayTextColor(isCurrentMonth: isCurrentMonth, isSelected: isSelected, isToday: isToday))
-            }
-            .frame(maxWidth: .infinity, minHeight: 30)
-            .contentShape(Rectangle())
+                .frame(maxWidth: .infinity, minHeight: rowHeight)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    private func dayTextColor(isCurrentMonth: Bool, isSelected: Bool, isToday: Bool) -> Color {
+    private func dayTextColor(isInVisibleRange: Bool, isSelected: Bool, isToday: Bool) -> Color {
         if isSelected { return .white }
-        if !isCurrentMonth { return Color(white: 0.35) }
+        if !isInVisibleRange { return Color(white: 0.35) }
         if isToday { return Color.effectiveAccent }
         return .white
     }
 
-    private func showPreviousMonth() {
-        guard let newMonth = calendar.date(byAdding: .month, value: -1, to: displayedMonth) else { return }
-        withAnimation(.smooth(duration: 0.22)) {
-            displayedMonth = newMonth.startOfMonth
-            selectedDate = newMonth.startOfMonth
-        }
-    }
-
-    private func showNextMonth() {
-        guard let newMonth = calendar.date(byAdding: .month, value: 1, to: displayedMonth) else { return }
-        withAnimation(.smooth(duration: 0.22)) {
-            displayedMonth = newMonth.startOfMonth
-            selectedDate = newMonth.startOfMonth
-        }
-    }
-
-    private func requestDatePickerCenterOnCurrentDate() {
-        datePickerScrollTarget = calendar.startOfDay(for: selectedDate)
-    }
-
-    private func centerDatePicker(on target: Date, proxy: ScrollViewProxy) {
-        let normalizedTarget = calendar.startOfDay(for: target)
-        DispatchQueue.main.async {
-            withAnimation(.smooth(duration: 0.24)) {
-                proxy.scrollTo(normalizedTarget, anchor: .center)
+    /// Compact mode switch. Built from buttons rather than a segmented `Picker`
+    /// because the pane is roughly half the notch wide and the stock control
+    /// neither fits that budget nor matches the notch's chrome.
+    private var modePicker: some View {
+        HStack(spacing: 2) {
+            ForEach(CalendarViewMode.allCases) { option in
+                Button {
+                    guard option != mode else { return }
+                    // Not animated: switching mode swaps the grid's shape, the
+                    // pane's height and the notch's height at once, and tweening
+                    // the content while the other two land immediately is what
+                    // left the previous mode's grid on screen under the new one.
+                    mode = option
+                } label: {
+                    Text(option.shortName)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(option == mode ? .white : Color(white: 0.6))
+                        .padding(.horizontal, 6)
+                        .frame(height: 18)
+                        .background {
+                            if option == mode {
+                                Capsule().fill(Color.white.opacity(0.16))
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .help(option.displayName)
             }
-            if datePickerScrollTarget == normalizedTarget {
-                datePickerScrollTarget = nil
-            }
+        }
+        .padding(2)
+        .background(Capsule().fill(Color.white.opacity(0.06)))
+        .fixedSize()
+    }
+
+    /// Step the visible range by the mode's own unit, so the buttons move a
+    /// month, a week or three days rather than always jumping a month.
+    private func page(by direction: Int) {
+        let mode = self.mode
+        let base = mode == .month ? displayedMonth : selectedDate
+        guard let newDate = calendar.date(
+            byAdding: mode.pagingComponent,
+            value: direction * mode.pagingStride,
+            to: base
+        ) else { return }
+
+        withAnimation(.smooth(duration: 0.22)) {
+            selectedDate = mode == .month ? newDate.startOfMonth : newDate
+            displayedMonth = selectedDate.startOfMonth
         }
     }
 }
