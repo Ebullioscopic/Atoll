@@ -131,6 +131,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
+    private var waveformAutoDisabledByBluetooth = false
 
     // Block-based AudioTap observers, kept with their center so they can be removed by token
     private var audioTapObserverTokens: [(center: NotificationCenter, token: NSObjectProtocol)] = []
@@ -773,9 +774,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             networkConnectivityManager.startMonitoring()
         }
         
-        // Setup Real-time Audio Waveform capture if enabled
-        if Defaults[.enableRealTimeWaveform] {
-            Task {
+        // Setup Real-time Audio Waveform capture if enabled and no Bluetooth
+        if Defaults[.enableRealTimeWaveform] && !bluetoothAudioManager.isBluetoothAudioConnected {
+            Task { @MainActor in
                 await AudioTap.shared.startCapture()
             }
             setupAudioTapMusicObservers()
@@ -785,8 +786,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.publisher(.enableRealTimeWaveform, options: [])
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
-                if change.newValue {
-                    Task {
+                if change.newValue && !(self?.bluetoothAudioManager.isBluetoothAudioConnected ?? false) {
+                    Task { @MainActor in
                         await AudioTap.shared.startCapture()
                     }
                     self?.setupAudioTapMusicObservers()
@@ -833,6 +834,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .removeDuplicates()
             .sink { [weak self] _ in
                 self?.updateWindowSizeIfNeeded()
+            }
+            .store(in: &cancellables)
+        
+        // Observe Bluetooth audio connection - disable real-time waveform on Bluetooth connect
+        bluetoothAudioManager.$isBluetoothAudioConnected
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isConnected in
+                if isConnected {
+                    print("🎧 [DynamicIslandApp] Bluetooth connected — suppressing real-time waveform (unsupported on Bluetooth)")
+                    AudioTap.shared.stopCapture()
+                    self?.tearDownAudioTapMusicObservers()
+                    self?.waveformAutoDisabledByBluetooth = true
+                } else if !isConnected && self?.waveformAutoDisabledByBluetooth == true {
+                    // Clear suppression flag first
+                    self?.waveformAutoDisabledByBluetooth = false
+                    // Check if user actually has the feature enabled
+                    guard Defaults[.enableRealTimeWaveform] else {
+                        print("🎧 [DynamicIslandApp] Bluetooth disconnected — real-time waveform was disabled by user, not restoring")
+                        return
+                    }
+                    print("🎧 [DynamicIslandApp] Bluetooth disconnected — restoring real-time waveform")
+                    Task { @MainActor in
+                        await AudioTap.shared.startCapture()
+                    }
+                    self?.setupAudioTapMusicObservers()
+                }
             }
             .store(in: &cancellables)
         
@@ -1116,6 +1144,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func installTopMenuItemsIfNeeded() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.installTopMenuItemsIfNeeded()
+            }
+            return
+        }
         guard let mainMenu = NSApp.mainMenu else { return }
         if mainMenu.items.contains(where: { $0.identifier?.rawValue == "Atoll.Focus.Menu" }) {
             updateFocusMenuState()
@@ -1255,6 +1289,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateFocusMenuState() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.updateFocusMenuState()
+            }
+            return
+        }
         let mode = Defaults[.focusMonitoringMode]
         focusWithoutDevToolsMenuItem?.state = mode == .withoutDevTools ? .on : .off
         focusUseDevToolsMenuItem?.state = mode == .useDevTools ? .on : .off
@@ -1301,6 +1341,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func setLogLevel(_ sender: NSMenuItem) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.setLogLevel(sender)
+            }
+            return
+        }
         guard let level = LogLevel(rawValue: sender.tag) else { return }
         Defaults[.logLevel] = level
         

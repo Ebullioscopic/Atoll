@@ -21,9 +21,11 @@ import Defaults
 struct AudioVisualizerView: View {
     @Binding var isPlaying: Bool
     @Default(.enableRealTimeWaveform) private var enableRealTimeWaveform
-    
+    @ObservedObject private var bluetoothAudioManager = BluetoothAudioManager.shared
+
     var body: some View {
-        if enableRealTimeWaveform {
+        // Bluetooth output can't be tapped, so capture is stopped and the animated spectrum stands in.
+        if enableRealTimeWaveform && !bluetoothAudioManager.isBluetoothAudioConnected {
             RealTimeAudioSpectrumView(isPlaying: $isPlaying)
         } else {
             AudioSpectrumView(isPlaying: $isPlaying)
