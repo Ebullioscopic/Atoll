@@ -191,6 +191,9 @@ final class MenuBarLayout: ObservableObject {
         return rightEdge
     }
 
+    /// Whether the focused window of `app` is in native fullscreen, where the
+    /// menu bar is hidden. `false` if the window or its `AXFullScreen`
+    /// attribute cannot be read, so the existing measurement still applies.
     nonisolated private static func isFocusedWindowFullscreen(_ app: AXUIElement) -> Bool {
         var windowValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowValue) == .success,
