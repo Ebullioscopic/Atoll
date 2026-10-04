@@ -17,6 +17,7 @@
  */
 
 import Foundation
+import IOKit
 import IOKit.ps
 
 /// Lightweight helper for querying macOS battery charging status and ETA.
@@ -64,6 +65,55 @@ final class MacBatteryManager {
         }
 
         return BatteryStatus(timeRemainingMinutes: nil, isCharging: false, percentage: nil)
+    }
+
+    /// Power flowing through the battery and the connected adapter's rating.
+    struct PowerReading: Equatable {
+        /// The connected adapter's rated power, e.g. 96. `nil` on battery or
+        /// when macOS does not report it.
+        let adapterWatts: Int?
+        /// Instantaneous battery power: positive while charging, negative
+        /// while the battery is discharging. `nil` if it cannot be read.
+        let batteryWatts: Double?
+    }
+
+    func currentPower() -> PowerReading {
+        PowerReading(adapterWatts: Self.adapterWatts(), batteryWatts: Self.batteryWatts())
+    }
+
+    private static func adapterWatts() -> Int? {
+        guard let details = IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any],
+              let watts = details[kIOPSPowerAdapterWattsKey] as? Int, watts > 0 else {
+            return nil
+        }
+        return watts
+    }
+
+    private static func batteryWatts() -> Double? {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
+        guard service != IO_OBJECT_NULL else { return nil }
+        defer { IOObjectRelease(service) }
+
+        func number(_ key: String) -> NSNumber? {
+            IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?
+                .takeRetainedValue() as? NSNumber
+        }
+        guard let voltage = number("Voltage"), let amperage = number("Amperage") else { return nil }
+        return watts(millivolts: voltage.int64Value, milliamps: amperage.int64Value)
+    }
+
+    /// `Amperage` is a signed value that IOKit may hand back as its unsigned
+    /// bit pattern (e.g. 18446744073709550376 for -1240 mA); `int64Value`
+    /// restores the sign either way.
+    static func watts(millivolts: Int64, milliamps: Int64) -> Double? {
+        guard millivolts > 0 else { return nil }
+        return Double(millivolts) * Double(milliamps) / 1_000_000
+    }
+
+    /// "96W", or `nil` when there is nothing meaningful to show.
+    static func formattedWatts(_ watts: Double?) -> String? {
+        guard let watts, abs(watts) >= 0.5 else { return nil }
+        return "\(Int(abs(watts).rounded()))W"
     }
 
     func formattedTimeToFullCharge() -> String? {

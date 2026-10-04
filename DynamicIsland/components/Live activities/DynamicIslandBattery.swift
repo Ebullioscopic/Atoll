@@ -289,6 +289,7 @@ struct BatteryMenuView: View {
     var onDismiss: () -> Void
 
     @Environment(\.openURL) private var openURL
+    @Default(.showBatteryWattage) private var showBatteryWattage
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -327,6 +328,9 @@ struct BatteryMenuView: View {
                         .font(.subheadline)
                         .fontWeight(.regular)
                 }
+                if showBatteryWattage {
+                    BatteryPowerRows()
+                }
                 if !isCharging && isPluggedIn && levelBattery >= 80 {
                     Label("Charging on Hold: Desktop Mode", systemImage: "desktopcomputer")
                         .font(.subheadline)
@@ -361,6 +365,30 @@ struct BatteryMenuView: View {
 
 
 /// A view that displays the battery status and allows interaction to show detailed information.
+/// Adapter rating and live battery power, refreshed every two seconds while
+/// the battery menu is open.
+private struct BatteryPowerRows: View {
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 2)) { _ in
+            let power = MacBatteryManager.shared.currentPower()
+            VStack(alignment: .leading, spacing: 8) {
+                if let adapter = power.adapterWatts {
+                    Label("Adapter: \(adapter)W", systemImage: "powerplug")
+                        .font(.subheadline)
+                        .fontWeight(.regular)
+                }
+                if let watts = power.batteryWatts, let text = MacBatteryManager.formattedWatts(watts) {
+                    Label(watts > 0 ? "Charging at \(text)" : "Using \(text)",
+                          systemImage: watts > 0 ? "bolt.fill" : "gauge.with.dots.needle.33percent")
+                        .font(.subheadline)
+                        .fontWeight(.regular)
+                        .monospacedDigit()
+                }
+            }
+        }
+    }
+}
+
 struct DynamicIslandBatteryView: View {
     
     @Default(.showBatteryPercentage) var showBatteryPercentage
@@ -550,7 +578,11 @@ struct BatteryTemporaryActivityView: View {
     let topCornerRadius: CGFloat
     @Default(.lowBatteryHUDStyle) var lowBatteryHUDStyle
     @Default(.fullBatteryHUDStyle) var fullBatteryHUDStyle
+    @Default(.showBatteryWattage) var showBatteryWattage
     var styleOverride: BatteryNotificationStyle? = nil
+    /// Read once when the HUD appears — the adapter's rating does not change
+    /// while it stays plugged in.
+    @State private var adapterWatts: Int?
 
     @State private var pulse = false
     @State private var showBatteryIndicator = false
@@ -612,7 +644,12 @@ struct BatteryTemporaryActivityView: View {
         }
         .frame(width: metrics.width, height: metrics.height, alignment: .bottom)
         .clipShape(surfaceShape)
-        .onAppear(perform: prepareAnimations)
+        .onAppear {
+            prepareAnimations()
+            if kind == .charging {
+                adapterWatts = MacBatteryManager.shared.currentPower().adapterWatts
+            }
+        }
     }
 
     @ViewBuilder
@@ -648,7 +685,9 @@ struct BatteryTemporaryActivityView: View {
     private var compactTitle: String {
         switch kind {
         case .charging:
-            return String(localized: "Charging")
+            let title = String(localized: "Charging")
+            guard showBatteryWattage, let adapterWatts else { return title }
+            return "\(title) · \(adapterWatts)W"
         case .lowBattery:
             return String(localized: "Low Battery")
         case .fullBattery:

@@ -1174,6 +1174,7 @@ extension Defaults.Keys {
     static let showBatteryPercentInside = Key<Bool>("showBatteryPercentInside", default: true)
     static let showMinimalisticBatteryIndicator = Key<Bool>("showMinimalisticBatteryIndicator", default: true)
     static let showPowerStatusIcons = Key<Bool>("showPowerStatusIcons", default: true)
+    static let showBatteryWattage = Key<Bool>("showBatteryWattage", default: true)
     static let playLowBatteryAlertSound = Key<Bool>("playLowBatteryAlertSound", default: true)
     static let showChargingBatteryHUD = Key<Bool>("showChargingBatteryHUD", default: true)
     static let showLowBatteryHUD = Key<Bool>("showLowBatteryHUD", default: true)
