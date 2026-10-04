@@ -348,7 +348,10 @@ struct BatteryMenuView: View {
         }
         .padding()
         .frame(width: 280)
-        .foregroundStyle(.primary)
+        // The popover inherits the notch header's gray foreground. A
+        // hierarchical `.primary` resolves against that gray, so pin the
+        // semantic label color to keep the menu readable in light mode.
+        .foregroundStyle(Color.primary)
     }
 
     private func openBatteryPreferences() {
