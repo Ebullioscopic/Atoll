@@ -171,6 +171,24 @@ final class JSONLUsageParserTests: XCTestCase {
         XCTAssertTrue(JSONLUsageParser.mayContainUsage(Data(#"{"type":"event_msg","payload":{"type":"token_count"}}"#.utf8)))
         XCTAssertTrue(JSONLUsageParser.mayContainUsage(Data(#"{"type":"turn_context","payload":{"model":"gpt-5"}}"#.utf8)))
         XCTAssertFalse(JSONLUsageParser.mayContainUsage(Data(#"{"type":"user","message":{"content":"tool output"}}"#.utf8)))
+        XCTAssertTrue(JSONLUsageParser.mayContainUsage(Data(#"{"message":{"\u0075sage":{"input_tokens":1}}}"#.utf8)))
+    }
+
+    func testUsageKeySpelledWithUnicodeEscapeIsCounted() throws {
+        let now = Date()
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let ts = iso.string(from: now.addingTimeInterval(-600))
+
+        let content = #"{"timestamp": "\#(ts)", "message": {"id": "esc1", "model": "claude-3-opus", "\u0075sage": {"input_tokens": 7, "output_tokens": 3}}}"#
+
+        let file = try makeTempFile(content: content)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let snapshot = parseFile(file, now: now)
+
+        XCTAssertEqual(snapshot.session.inputTokens, 7)
+        XCTAssertEqual(snapshot.session.outputTokens, 3)
     }
 
     func testRecordsSpreadAcrossChunksAmongLargeNonUsageLines() throws {

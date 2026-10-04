@@ -47,10 +47,14 @@ struct JSONLUsageParser {
 
     private static let usageMarkers: [Data] = ["\"usage\"", "token_count", "turn_context"].map { Data($0.utf8) }
 
+    private static let unicodeEscape = Data(#"\u"#.utf8)
+
     /// Cheap byte-level pre-filter: a line that mentions none of the markers
-    /// `parseLine` keys on cannot produce a record.
+    /// `parseLine` keys on cannot produce a record. JSON may spell a key with
+    /// Unicode escapes (`"\u0075sage"`), which a raw byte scan cannot see, so
+    /// any line carrying an escape still goes to the JSON parser.
     static func mayContainUsage(_ line: Data) -> Bool {
-        usageMarkers.contains { line.range(of: $0) != nil }
+        usageMarkers.contains { line.range(of: $0) != nil } || line.range(of: unicodeEscape) != nil
     }
 
     static func parseLine(_ line: String) -> UsageRecord? {
