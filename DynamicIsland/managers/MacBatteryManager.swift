@@ -72,13 +72,39 @@ final class MacBatteryManager {
         /// The connected adapter's rated power, e.g. 96. `nil` on battery or
         /// when macOS does not report it.
         let adapterWatts: Int?
-        /// Instantaneous battery power: positive while charging, negative
-        /// while the battery is discharging. `nil` if it cannot be read.
+        /// Battery power: positive while charging, negative while the battery
+        /// is discharging. `nil` if it cannot be read.
         let batteryWatts: Double?
+        let isCharging: Bool
+        let isPluggedIn: Bool
+
+        /// What the battery menu should show, or `nil` to show nothing.
+        ///
+        /// `AppleSmartBattery` refreshes Voltage/Amperage on its own slow cycle,
+        /// so for tens of seconds after the cable is plugged in or pulled out
+        /// it still describes the previous state (e.g. "using 18W" while
+        /// plugged in). The figure is only shown when its sign agrees with
+        /// the power source state macOS reports right now.
+        var displayed: (charging: Bool, watts: Double)? {
+            guard let watts = batteryWatts else { return nil }
+            if isCharging, watts > 0 { return (true, watts) }
+            if !isPluggedIn, watts < 0 { return (false, -watts) }
+            return nil
+        }
     }
 
     func currentPower() -> PowerReading {
-        PowerReading(adapterWatts: Self.adapterWatts(), batteryWatts: Self.batteryWatts())
+        let status = currentStatus()
+        return PowerReading(adapterWatts: Self.adapterWatts(), batteryWatts: Self.batteryWatts(),
+                            isCharging: status.isCharging, isPluggedIn: Self.isOnACPower())
+    }
+
+    private static func isOnACPower() -> Bool {
+        guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+              let type = IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue() else {
+            return false
+        }
+        return (type as String) == kIOPSACPowerValue
     }
 
     static func adapterWatts() -> Int? {

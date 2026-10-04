@@ -377,10 +377,10 @@ private struct BatteryPowerRows: View {
                         .font(.subheadline)
                         .fontWeight(.regular)
                 }
-                if let watts = power.batteryWatts, let text = MacBatteryManager.formattedWatts(watts) {
+                if let shown = power.displayed, let text = MacBatteryManager.formattedWatts(shown.watts) {
                     // Two separate literals so each stays a localized key.
                     Group {
-                        if watts > 0 {
+                        if shown.charging {
                             Label("Charging at \(text)", systemImage: "bolt.fill")
                         } else {
                             Label("Using \(text)", systemImage: "gauge.with.dots.needle.33percent")
