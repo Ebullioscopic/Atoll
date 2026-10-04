@@ -45,6 +45,14 @@ struct JSONLUsageParser {
         return isoPlain.date(from: s)
     }
 
+    private static let usageMarkers: [Data] = ["\"usage\"", "token_count", "turn_context"].map { Data($0.utf8) }
+
+    /// Cheap byte-level pre-filter: a line that mentions none of the markers
+    /// `parseLine` keys on cannot produce a record.
+    static func mayContainUsage(_ line: Data) -> Bool {
+        usageMarkers.contains { line.range(of: $0) != nil }
+    }
+
     static func parseLine(_ line: String) -> UsageRecord? {
         var codexModel: String? = nil
         return parseLine(line, codexModel: &codexModel)
@@ -174,9 +182,14 @@ struct JSONLUsageParser {
             processRecord(rec)
         }
 
-        while true {
+        // `readData` and JSONSerialization both hand back autoreleased Foundation
+        // objects; on a background thread they pile up for the whole scan unless
+        // drained per chunk (peaked at 2.6 GB over ~1 GB of weekly Claude logs).
+        var reachedEnd = false
+        while !reachedEnd {
+            autoreleasepool {
             let chunk = handle.readData(ofLength: chunkSize)
-            if chunk.isEmpty { break }
+            if chunk.isEmpty { reachedEnd = true; return }
             buffer.append(chunk)
 
             // Process complete lines from buffer
@@ -195,6 +208,10 @@ struct JSONLUsageParser {
                     continue
                 }
 
+                // Most lines are tool output with no token counts; skip them before
+                // paying for a String copy and a JSON parse.
+                guard mayContainUsage(lineData) else { continue }
+
                 guard let line = String(data: lineData, encoding: .utf8) else { continue }
                 processLine(line)
             }
@@ -204,6 +221,7 @@ struct JSONLUsageParser {
             if buffer.count > maxRecordSize {
                 discardingOversized = true
                 buffer.removeFirst(buffer.count - maxRecordSize)
+            }
             }
         }
 
