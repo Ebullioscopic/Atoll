@@ -378,11 +378,17 @@ private struct BatteryPowerRows: View {
                         .fontWeight(.regular)
                 }
                 if let watts = power.batteryWatts, let text = MacBatteryManager.formattedWatts(watts) {
-                    Label(watts > 0 ? "Charging at \(text)" : "Using \(text)",
-                          systemImage: watts > 0 ? "bolt.fill" : "gauge.with.dots.needle.33percent")
-                        .font(.subheadline)
-                        .fontWeight(.regular)
-                        .monospacedDigit()
+                    // Two separate literals so each stays a localized key.
+                    Group {
+                        if watts > 0 {
+                            Label("Charging at \(text)", systemImage: "bolt.fill")
+                        } else {
+                            Label("Using \(text)", systemImage: "gauge.with.dots.needle.33percent")
+                        }
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.regular)
+                    .monospacedDigit()
                 }
             }
         }
@@ -493,7 +499,8 @@ private extension BatteryTemporaryHUDKind {
     func metrics(
         style: BatteryNotificationStyle,
         closedNotchWidth: CGFloat,
-        baseHeight: CGFloat
+        baseHeight: CGFloat,
+        extraWidth: CGFloat = 0
     ) -> BatteryTemporaryHUDMetrics {
         let compactBaseRadius = max(baseHeight / 2, 16)
         let compactTopRadius = max(12, compactBaseRadius - 4)
@@ -501,7 +508,7 @@ private extension BatteryTemporaryHUDKind {
         switch (self, style) {
         case (.charging, _), (.lowBattery, .compact), (.fullBattery, .compact):
             return BatteryTemporaryHUDMetrics(
-                width: closedNotchWidth + 180,
+                width: closedNotchWidth + 180 + extraWidth,
                 height: baseHeight,
                 topRadius: compactTopRadius,
                 bottomRadius: compactBaseRadius
@@ -528,6 +535,7 @@ private struct BatteryCompactStatusRow: View {
     let title: String
     let batteryLevel: Int
     let tint: Color
+    var detail: String? = nil
 
     var body: some View {
         HStack {
@@ -538,6 +546,12 @@ private struct BatteryCompactStatusRow: View {
             Spacer()
 
             HStack(spacing: 6) {
+                if let detail {
+                    Text(verbatim: detail)
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.55))
+                        .monospacedDigit()
+                }
                 Text("\(batteryLevel)%")
                     .font(.system(size: 14))
                     .foregroundColor(tint)
@@ -580,9 +594,15 @@ struct BatteryTemporaryActivityView: View {
     @Default(.fullBatteryHUDStyle) var fullBatteryHUDStyle
     @Default(.showBatteryWattage) var showBatteryWattage
     var styleOverride: BatteryNotificationStyle? = nil
-    /// Read once when the HUD appears — the adapter's rating does not change
-    /// while it stays plugged in.
-    @State private var adapterWatts: Int?
+
+    /// "60W" next to the percentage while charging. It sits on the trailing
+    /// side because the title's leading wing is too narrow: a longer title
+    /// slides under the physical notch and gets hidden.
+    private var wattageDetail: String? {
+        guard kind == .charging, showBatteryWattage,
+              let watts = MacBatteryManager.adapterWatts() else { return nil }
+        return "\(watts)W"
+    }
 
     @State private var pulse = false
     @State private var showBatteryIndicator = false
@@ -609,7 +629,9 @@ struct BatteryTemporaryActivityView: View {
         kind.metrics(
             style: style,
             closedNotchWidth: closedNotchWidth,
-            baseHeight: baseHeight
+            baseHeight: baseHeight,
+            // Room for the trailing "60W" without crowding the percentage.
+            extraWidth: wattageDetail == nil ? 0 : 60
         )
     }
 
@@ -644,12 +666,7 @@ struct BatteryTemporaryActivityView: View {
         }
         .frame(width: metrics.width, height: metrics.height, alignment: .bottom)
         .clipShape(surfaceShape)
-        .onAppear {
-            prepareAnimations()
-            if kind == .charging {
-                adapterWatts = MacBatteryManager.shared.currentPower().adapterWatts
-            }
-        }
+        .onAppear(perform: prepareAnimations)
     }
 
     @ViewBuilder
@@ -658,7 +675,8 @@ struct BatteryTemporaryActivityView: View {
             BatteryCompactStatusRow(
                 title: compactTitle,
                 batteryLevel: batteryLevel,
-                tint: batteryTint
+                tint: batteryTint,
+                detail: wattageDetail
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else {
@@ -685,9 +703,7 @@ struct BatteryTemporaryActivityView: View {
     private var compactTitle: String {
         switch kind {
         case .charging:
-            let title = String(localized: "Charging")
-            guard showBatteryWattage, let adapterWatts else { return title }
-            return "\(title) · \(adapterWatts)W"
+            return String(localized: "Charging")
         case .lowBattery:
             return String(localized: "Low Battery")
         case .fullBattery:

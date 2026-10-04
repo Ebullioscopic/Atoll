@@ -81,7 +81,7 @@ final class MacBatteryManager {
         PowerReading(adapterWatts: Self.adapterWatts(), batteryWatts: Self.batteryWatts())
     }
 
-    private static func adapterWatts() -> Int? {
+    static func adapterWatts() -> Int? {
         guard let details = IOPSCopyExternalPowerAdapterDetails()?.takeRetainedValue() as? [String: Any],
               let watts = details[kIOPSPowerAdapterWattsKey] as? Int, watts > 0 else {
             return nil
