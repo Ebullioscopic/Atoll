@@ -149,6 +149,11 @@ final class MenuBarLayout: ObservableObject {
         // never something worth waiting on.
         AXUIElementSetMessagingTimeout(app, elementTimeout)
 
+        // In native fullscreen the menu bar is hidden, but AX still reports the
+        // menus at their usual positions. Clearing them would push the closed
+        // notch content right for nothing and clip its trailing edge.
+        if isFocusedWindowFullscreen(app) { return nil }
+
         var menuBarValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXMenuBarAttribute as CFString, &menuBarValue) == .success,
               CFGetTypeID(menuBarValue) == AXUIElementGetTypeID()
@@ -184,5 +189,21 @@ final class MenuBarLayout: ObservableObject {
             rightEdge = max(rightEdge ?? 0, origin.x + size.width)
         }
         return rightEdge
+    }
+
+    nonisolated private static func isFocusedWindowFullscreen(_ app: AXUIElement) -> Bool {
+        var windowValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowValue) == .success,
+              CFGetTypeID(windowValue) == AXUIElementGetTypeID()
+        else { return false }
+        let window = unsafeBitCast(windowValue, to: AXUIElement.self)
+        AXUIElementSetMessagingTimeout(window, elementTimeout)
+
+        // "AXFullScreen" is undocumented but stable; it is true only in native fullscreen.
+        var fullscreenValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &fullscreenValue) == .success else {
+            return false
+        }
+        return (fullscreenValue as? Bool) ?? false
     }
 }
