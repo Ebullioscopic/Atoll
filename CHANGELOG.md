@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- **Notch content no longer shifts in full-screen apps**: when the focused window is full screen the menu bar is hidden, but accessibility still reports its menus in place, so the menu-bar clearance pushed the notch content sideways and clipped it. The clearance is skipped while the focused window is full screen. (#871)
 - A tab count in the notch settings could not be formatted. `%lld tab%@ enabled · min %lld px` was translated using `%1lld` — missing the `$` — so it was never parsed as a positional specifier, and the separator was U+22C5 (dot operator) rather than the U+00B7 the source uses. (#789)
 - The microphone privacy indicator description showed an unrelated sentence about a meeting start time, which also introduced a `%@` that the source string does not have — reading an argument that was never passed. (#789)
 - A shipped string began with `추천 번역 ⭐️: `, an AI suggestion prefix that had been committed along with the translation it labelled. (#789)
