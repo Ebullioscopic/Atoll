@@ -754,10 +754,10 @@
       "id": "openai/gpt-5.6-sol-pro",
       "name": "OpenAI: GPT-5.6 Sol Pro",
       "pricing": {
-        "prompt": "0.000004",
-        "completion": "0.00002",
-        "cache_read": "0.0000004",
-        "cache_write": "0.000005"
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000002",
+        "cache_write": "0.0000025"
       }
     },
     {
@@ -981,5 +981,5 @@
       }
     }
   ],
-  "last_updated": "2026-10-04T00:51:38Z"
+  "last_updated": "2026-10-05T00:08:00Z"
 }
