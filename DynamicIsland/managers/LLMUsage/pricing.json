@@ -31,6 +31,16 @@
       }
     },
     {
+      "id": "anthropic/claude-haiku-5.5",
+      "name": "Anthropic: Claude Haiku 5.5",
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000005",
+        "cache_read": "0.00000001",
+        "cache_write": "0.000000125"
+      }
+    },
+    {
       "id": "anthropic/claude-opus-4.1",
       "name": "Anthropic: Claude Opus 4.1",
       "pricing": {
@@ -146,7 +156,7 @@
       "pricing": {
         "prompt": "0.000002",
         "completion": "0.00001",
-        "cache_read": "0.0000002",
+        "cache_read": "0.0000001",
         "cache_write": "0.0000025"
       }
     },
@@ -991,5 +1001,5 @@
       }
     }
   ],
-  "last_updated": "2026-10-07T00:07:39Z"
+  "last_updated": "2026-10-08T00:07:06Z"
 }
