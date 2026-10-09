@@ -1171,7 +1171,8 @@ struct MusicSliderView: View {
                 onValueChange: onValueChange,
                 restingTrackHeight: restingTrackHeight,
                 draggingTrackHeight: draggingTrackHeight,
-                desaturatesWhenIdle: desaturatesWhenIdle
+                desaturatesWhenIdle: desaturatesWhenIdle,
+                showsWaveform: true
             )
         } else {
             // Non-interactive fallback matching CustomSlider's idle appearance:
@@ -1307,10 +1308,13 @@ struct CustomSlider: View {
     var draggingTrackHeight: CGFloat = 14
     /// See `MusicSliderView.desaturatesWhenIdle`.
     var desaturatesWhenIdle: Bool = false
+    /// When true, shows the real-time waveform scrubber instead of the standard track.
+    var showsWaveform: Bool = false
     
     @State private var isHovering: Bool = false
     @Default(.enableRealTimeWaveform) var enableRealTimeWaveform
     @Default(.enableWaveformScrubber) var enableWaveformScrubber
+    @ObservedObject private var bluetoothAudioManager = BluetoothAudioManager.shared
 
     private var isEngaged: Bool { dragging || isHovering }
 
@@ -1332,15 +1336,16 @@ struct CustomSlider: View {
             let progress = rangeSpan == .zero ? 0 : (value - range.lowerBound) / rangeSpan
             let filledTrackWidth = min(max(progress, 0), 1) * max(1, width)
             
-            let showScrubber = isHovering && enableRealTimeWaveform && enableWaveformScrubber
+            let showWaveform = showsWaveform && enableRealTimeWaveform && !bluetoothAudioManager.isBluetoothAudioConnected
+            let showScrubber = showWaveform && enableWaveformScrubber
 
             ZStack(alignment: .bottomLeading) {
                 // Background track
-                if showScrubber {
+                if showWaveform {
                     RealTimeWaveformScrubberView(
                         color: color,
                         secondaryColor: Defaults[.coloredSpectrogram] ? Color(nsColor: MusicManager.shared.secondaryColor) : nil,
-                        progress: progress,
+                        progress: showScrubber ? progress : 1.0,
                         minHeight: trackHeight
                     )
                     .frame(height: trackHeight * 3.5)
@@ -1352,10 +1357,8 @@ struct CustomSlider: View {
                         .frame(height: trackHeight)
                         .cornerRadius(trackHeight / 2)
                         .transaction { $0.disablesAnimations = true }
-                }
 
-                // Filled track
-                if !showScrubber {
+                    // Filled track
                     Rectangle()
                         .fill(color)
                         .frame(width: filledTrackWidth, height: trackHeight)
@@ -1370,7 +1373,7 @@ struct CustomSlider: View {
             // is drawn to rise out of the bar, so it stays bottom-anchored.
             .frame(
                 height: max(restingTrackHeight, draggingTrackHeight),
-                alignment: showScrubber ? .bottom : .center
+                alignment: showWaveform ? .bottom : .center
             )
             .contentShape(Rectangle())
             .highPriorityGesture(
