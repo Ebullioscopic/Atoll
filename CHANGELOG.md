@@ -73,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshing the LLM Usage card now skips session logs whose last write predates the seven-day window instead of re-reading the whole log history, and counts a repeated record when the copy inside the window would previously have been suppressed by a copy outside it (#691).
 - Completed the Simplified Chinese (zh-Hans) localization, filling in all remaining untranslated strings.
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
+- Display selection ("Show on a specific display") now identifies displays by their stable `CGDirectDisplayID` instead of their localized name, so identical monitors can be told apart and the choice survives display renames; duplicate names are suffixed in the picker.
 
 ### Fixed
 - A tab count in the notch settings could not be formatted. `%lld tab%@ enabled · min %lld px` was translated using `%1lld` — missing the `$` — so it was never parsed as a positional specifier, and the separator was U+22C5 (dot operator) rather than the U+00B7 the source uses. (#789)
