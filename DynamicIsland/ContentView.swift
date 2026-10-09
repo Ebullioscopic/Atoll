@@ -721,6 +721,9 @@ struct ContentView: View {
                         if handleClosedMusicWaveformTapIfNeeded() {
                             return
                         }
+                        if handleLowBatteryHUDTapIfNeeded() {
+                            return
+                        }
                         if vm.notchState == .closed && Defaults[.enableHaptics] {
                             triggerHapticIfAllowed()
                         }
@@ -1119,7 +1122,8 @@ struct ContentView: View {
                             baseHeight: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0),
                             isDynamicIslandMode: isDynamicIslandMode,
                             topCornerRadius: activeCornerRadiusInsets.closed.top,
-                            styleOverride: batteryModel.activeTemporaryHUDKind.map { resolvedBatteryNotificationStyle(for: $0) }
+                            styleOverride: batteryModel.activeTemporaryHUDKind.map { resolvedBatteryNotificationStyle(for: $0) },
+                            showsLowPowerModeAction: isLowBatteryHUDActionable
                         )
                         .id(batteryModel.activeTemporaryHUDToken)
                       } else if isSneakPeekVisibleOnCurrentScreen && (Defaults[.inlineHUD] || isAirPodsListeningModeSneak) && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && !coordinator.sneakPeek.type.isExtensionPayload && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
@@ -2126,6 +2130,28 @@ struct ContentView: View {
         return true
     }
 
+    /// Whether a click on the closed notch belongs to the low battery HUD
+    /// instead of opening the notch. Only while the HUD is on this screen and
+    /// Low Power Mode is still off: once it is on, the HUD has nothing left to
+    /// offer and a click opens the notch as usual.
+    private var isLowBatteryHUDActionable: Bool {
+        guard Defaults[.lowBatteryHUDTapEnablesLowPowerMode] else { return false }
+        guard vm.notchState == .closed, !lockScreenManager.isLocked else { return false }
+        guard isBatteryHUDVisibleOnCurrentScreen,
+              batteryModel.activeTemporaryHUDKind == .lowBattery else { return false }
+        return !displayedBatteryHUDUsesLowPowerMode
+    }
+
+    private func handleLowBatteryHUDTapIfNeeded() -> Bool {
+        guard isLowBatteryHUDActionable else { return false }
+
+        if Defaults[.enableHaptics] {
+            triggerHapticIfAllowed()
+        }
+        LowPowerModeController.shared.enableLowPowerMode()
+        return true
+    }
+
     private func hiddenHoverActivationContainsMouse(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
         guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
             return false
@@ -2223,6 +2249,7 @@ struct ContentView: View {
                 guard !self.coordinator.isHoverOpenSuppressed else { return }
                 guard self.isHovering else { return }
                 guard !self.handleClosedMusicWaveformTapIfNeeded() else { return }
+                guard !self.handleLowBatteryHUDTapIfNeeded() else { return }
                 if Defaults[.enableHaptics] {
                     self.triggerHapticIfAllowed()
                 }
@@ -2333,6 +2360,15 @@ struct ContentView: View {
 
             let shouldFocusTimerTab = enableTimerFeature && timerDisplayMode == .tab && timerManager.isTimerActive && !enableMinimalisticUI
 
+            // The pointer has to reach the low battery HUD before it can click
+            // it. Opening the notch on the way there would replace the HUD
+            // with the open notch, and the default three seconds is not long
+            // to get there, so hovering holds the HUD instead.
+            if isLowBatteryHUDActionable {
+                batteryModel.holdLowBatteryHUDForInteraction()
+                return
+            }
+
             guard vm.notchState == .closed,
                 !isSneakPeekVisibleOnCurrentScreen,
                 !isConnectivityHUDVisible,
@@ -2350,6 +2386,7 @@ struct ContentView: View {
                           !self.recordingLiveActivityVisibleOnClosedNotch,
                           !self.isSneakPeekVisibleOnCurrentScreen,
                           !self.isConnectivityHUDVisible,
+                          !self.isLowBatteryHUDActionable,
                           !self.coordinator.isHoverOpenSuppressed else { return }
 
                     if shouldFocusTimerTab {

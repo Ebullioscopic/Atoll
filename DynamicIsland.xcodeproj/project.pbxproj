@@ -40,6 +40,7 @@
 		A1C0FFEE0002000000000001 /* PerAppVolumeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0002000000000002 /* PerAppVolumeTests.swift */; };
 		A1C0FFEE0003000000000001 /* PinnedLyricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0003000000000002 /* PinnedLyricsTests.swift */; };
 		A1C0FFEE0004000000000001 /* UnsyncedLyricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0004000000000002 /* UnsyncedLyricsTests.swift */; };
+		A1C0FFEE0005000000000001 /* LowPowerModeControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE0005000000000002 /* LowPowerModeControllerTests.swift */; };
 		A3C83CAF84544DCE386C3BB8 /* DynamicIslandUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54078F29304A9DBBEFBDF932 /* DynamicIslandUITests.swift */; };
 		A4B5C6D7E8F90123456789AB /* AppleMusicControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */; };
 		A70F1A012F90000100F1A001 /* FingerprintScan.json in Resources */ = {isa = PBXBuildFile; fileRef = A70F1A022F90000100F1A001 /* FingerprintScan.json */; };
@@ -109,6 +110,7 @@
 		A1C0FFEE0002000000000002 /* PerAppVolumeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PerAppVolumeTests.swift; sourceTree = "<group>"; };
 		A1C0FFEE0003000000000002 /* PinnedLyricsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PinnedLyricsTests.swift; sourceTree = "<group>"; };
 		A1C0FFEE0004000000000002 /* UnsyncedLyricsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UnsyncedLyricsTests.swift; sourceTree = "<group>"; };
+		A1C0FFEE0005000000000002 /* LowPowerModeControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LowPowerModeControllerTests.swift; sourceTree = "<group>"; };
 		A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleMusicControllerTests.swift; sourceTree = "<group>"; };
 		A70F1A022F90000100F1A001 /* FingerprintScan.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = FingerprintScan.json; sourceTree = "<group>"; };
 		B1C2D3E4F5061728394A5B6D /* PartialDownloadTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PartialDownloadTests.swift; sourceTree = "<group>"; };
@@ -227,6 +229,7 @@
 				A1C0FFEE0002000000000002 /* PerAppVolumeTests.swift */,
 				A1C0FFEE0001000000000002 /* CaffeinateManagerTests.swift */,
 				A1C0FFEE0004000000000002 /* UnsyncedLyricsTests.swift */,
+				A1C0FFEE0005000000000002 /* LowPowerModeControllerTests.swift */,
 				C1DE0FAV0001000000000002 /* CiderFavoritingTests.swift */,
 				2EB37667F763422E97DEEB49 /* MenuBarClearanceTests.swift */,
 				A1B2C3D40000000000000002 /* LyricsMetadataTests.swift */,
@@ -515,6 +518,7 @@
 				A1C0FFEE0002000000000001 /* PerAppVolumeTests.swift in Sources */,
 				A1C0FFEE0001000000000001 /* CaffeinateManagerTests.swift in Sources */,
 				A1C0FFEE0004000000000001 /* UnsyncedLyricsTests.swift in Sources */,
+				A1C0FFEE0005000000000001 /* LowPowerModeControllerTests.swift in Sources */,
 				C1DE0FAV0001000000000001 /* CiderFavoritingTests.swift in Sources */,
 				738C4EBB63E3449B923997D0 /* MenuBarClearanceTests.swift in Sources */,
 				A1B2C3D40000000000000001 /* LyricsMetadataTests.swift in Sources */,
