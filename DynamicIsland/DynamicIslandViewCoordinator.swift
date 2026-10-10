@@ -99,7 +99,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var hoverOpenSuppressedUntil: Date = .distantPast
     
-    private static let tabOrder: [NotchViews] = [.home, .shelf, .timer, .stats, .llmUsage, .colorPicker, .notes, .clipboard, .terminal, .extensionExperience]
+    private static let tabOrder: [NotchViews] = [.home, .shelf, .timer, .stats, .fanControl, .llmUsage, .colorPicker, .notes, .clipboard, .terminal, .extensionExperience]
     
     /// Direction of the most recent tab switch (true = forward/right, false = backward/left)
     @Published var tabSwitchForward: Bool = true
@@ -217,6 +217,16 @@ class DynamicIslandViewCoordinator: ObservableObject {
 
         handleExtensionExperienceSnapshot(extensionNotchExperienceManager.activeExperiences)
 
+        Defaults.publisher(.enableFanControl, options: [])
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] change in
+                if !change.newValue {
+                    FanControlService.shared.shutdown()
+                    if self?.currentView == .fanControl { self?.currentView = .home }
+                }
+            }
+            .store(in: &cancellables)
+
         // Observe all tab-affecting settings to enforce minimum notch width
         Publishers.MergeMany(
             Defaults.publisher(.showStandardMediaControls).map { _ in () }.eraseToAnyPublisher(),
@@ -225,6 +235,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
             Defaults.publisher(.dynamicShelf).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableTimerFeature).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.timerDisplayMode).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.enableFanControl).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableStatsFeature).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableNotes).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableClipboardManager).map { _ in () }.eraseToAnyPublisher(),

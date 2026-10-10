@@ -62,6 +62,7 @@ struct DualGraphData: GraphData {
 struct NotchStatsView: View {
     @ObservedObject var statsManager = StatsManager.shared
     @Default(.enableStatsFeature) var enableStatsFeature
+    @Default(.enableFanControl) private var enableFanControl
     @Default(.showCpuGraph) var showCpuGraph
     @Default(.showMemoryGraph) var showMemoryGraph
     @Default(.showGpuGraph) var showGpuGraph
@@ -313,6 +314,17 @@ struct NotchStatsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if enableFanControl {
+                HStack {
+                    Spacer()
+                    Button { coordinator.currentView = .fanControl } label: {
+                        Label("Cooling", systemImage: "fan")
+                    }
+                    .buttonStyle(.borderless)
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+            }
             if !enableStatsFeature {
                 // Disabled state
                 VStack(spacing: 12) {
