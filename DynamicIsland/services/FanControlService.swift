@@ -8,7 +8,9 @@ import Defaults
 private final class CoolingCommandGate: @unchecked Sendable {
     private let lock = NSLock()
     private var permittedGeneration: Int?
+    /// Updates the generation permitted to apply commands, or cancels all pending generations.
     func allow(_ generation: Int?) { lock.lock(); permittedGeneration = generation; lock.unlock() }
+    /// Checks cancellation across queues without exposing unsynchronized mutable state.
     func allows(_ generation: Int) -> Bool {
         lock.lock(); defer { lock.unlock() }
         return permittedGeneration == generation
@@ -46,6 +48,7 @@ final class FanControlService: ObservableObject {
     private var sleepObserver: NSObjectProtocol?
     private var wakeObserver: NSObjectProtocol?
 
+    /// Registers sleep cleanup and resumes read-only polling when a visible panel wakes.
     private init() {
         sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
@@ -60,6 +63,7 @@ final class FanControlService: ObservableObject {
         }
     }
 
+    /// Begins polling when Cooling is enabled and its panel becomes visible.
     func start() {
         guard Defaults[.enableFanControl] else { return }
         visible = true
@@ -67,6 +71,7 @@ final class FanControlService: ObservableObject {
         refresh()
     }
 
+    /// Hides the panel while preserving heartbeats for an active or authorizing control session.
     func stop() {
         visible = false
         // Continue heartbeats while a manual preset is active, even when the
@@ -74,13 +79,17 @@ final class FanControlService: ObservableObject {
         if !hasSession && !isApplying { timer?.invalidate(); timer = nil }
     }
 
+    /// Starts two-second polling in common run-loop modes so menus do not suspend the helper lease.
     private func ensureTimer() {
         guard timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
     }
 
+    /// Collects read-only readings and renews authorization off the UI thread, ignoring stale generations.
     func refresh() {
         guard Defaults[.enableFanControl], (visible || hasSession), !refreshing, !isApplying else { return }
         refreshing = true
@@ -119,6 +128,7 @@ final class FanControlService: ObservableObject {
         }
     }
 
+    /// Applies one preset or Auto command through the worker, publishing confirmed success or errors.
     func apply(_ fraction: Double?, to fanID: Int) {
         guard Defaults[.enableFanControl], !isApplying, !needsReconnect else { return }
         isApplying = true; controlError = nil
@@ -143,6 +153,7 @@ final class FanControlService: ObservableObject {
         }
     }
 
+    /// Allows an explicit retry after failed setup without automatically prompting for credentials.
     func retryConnection() {
         worker.queue.async { [self, worker] in
             worker.helper.resetAuthorizationFailure()
@@ -150,6 +161,7 @@ final class FanControlService: ObservableObject {
         }
     }
 
+    /// Cancels pending work, stops polling, and closes the helper so its fans return to Auto.
     func shutdown() {
         generation += 1
         worker.gate.allow(nil)

@@ -7984,6 +7984,7 @@ private struct TimerPresetComponentControl: View {
 }
 
 private struct CoolingSettings: View {
+    /// Presents the opt-in Cooling toggle and explains preset and authorization behavior.
     var body: some View {
         Form {
             Section {

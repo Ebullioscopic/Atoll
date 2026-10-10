@@ -6,7 +6,7 @@ Presets use the hardware-reported range: `minimumRPM + (maximumRPM - minimumRPM)
 
 The first command starts a bundled helper through macOS administrator authorization. Commands share the approved connection until Atoll exits, sleeps, or loses that connection. Closing the notch and rejected commands preserve the session. No password is stored and no persistent launch daemon is installed. Authorization cancellation or connection failure requires an explicit Retry connection action rather than repeated automatic prompts.
 
-Turning the feature off closes the helper and returns fans controlled by Atoll to Auto. A command still waiting for authorization is cancelled before it can write. The helper also attempts to restore Auto on disconnect, app exit, a 15-second heartbeat expiry, and high (95°C) or unreadable temperatures. Firmware-controlled fan-stop behavior is allowed in Auto.
+Turning the feature off closes the helper and returns fans controlled by Atoll to Auto. A command still waiting for authorization is cancelled before it can write. The helper also attempts to restore Auto on disconnect, app exit, a 15-second heartbeat expiry, and high (95°C) or unreadable temperatures. Atoll intentionally falls back to firmware Auto for every manual preset, including 100%, while temperature readings are high or unavailable. Auto and heartbeat commands still succeed during this guard. Firmware-controlled fan-stop behavior is allowed in Auto.
 
 ## Hardware validation
 

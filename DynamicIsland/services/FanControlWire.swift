@@ -14,6 +14,7 @@ struct CoolingReply: Codable {
 }
 
 enum CoolingSocket {
+    /// Builds a null-terminated Unix socket address, rejecting paths longer than the native buffer.
     static func address(_ path: String) throws -> sockaddr_un {
         guard path.utf8.count < 104 else { throw CoolingSMC.Error.invalidData }
         var address = sockaddr_un()
@@ -26,6 +27,7 @@ enum CoolingSocket {
         return address
     }
 
+    /// Opens a Unix stream socket, connects to the app’s private endpoint, and suppresses SIGPIPE.
     static func connect(_ path: String) throws -> Int32 {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw CoolingSMC.Error.unavailable }
@@ -40,11 +42,13 @@ enum CoolingSocket {
         return fd
     }
 
+    /// Makes writes to a closed peer return an error instead of terminating the process.
     static func suppressSIGPIPE(_ fd: Int32) {
         var on: Int32 = 1
         _ = setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
     }
 
+    /// Encodes and writes one bounded JSON line, handling partial socket writes.
     static func send<T: Encodable>(_ value: T, to fd: Int32) throws {
         let bytes = Array(try JSONEncoder().encode(value)) + [10]
         guard bytes.count <= 4096 else { throw CoolingSMC.Error.invalidData }
@@ -58,6 +62,7 @@ enum CoolingSocket {
         }
     }
 
+    /// Receives one bounded JSON line before the deadline; rejects EOF, malformed data, and oversized messages.
     static func receive<T: Decodable>(_ type: T.Type, from fd: Int32, timeout: TimeInterval = 15) throws -> T {
         let deadline = Date().addingTimeInterval(timeout)
         var bytes: [UInt8] = []

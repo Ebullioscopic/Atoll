@@ -278,6 +278,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         audioTapObserverTokens.removeAll()
     }
 
+    /// Restores app-owned cooling sessions and releases feature resources before termination.
     func applicationWillTerminate(_ notification: Notification) {
         FanControlService.shared.shutdown()
         let userInfo: [String: Any] = [

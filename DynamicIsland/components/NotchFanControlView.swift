@@ -5,6 +5,7 @@ struct NotchFanControlView: View {
     private let fractions = [0.3, 0.5, 0.7, 1.0]
     private let columns = [GridItem(.adaptive(minimum: 260), spacing: 10, alignment: .top)]
 
+    /// Renders adaptive fan cards inside the standard notch panel with scrolling for overflow.
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
@@ -36,6 +37,7 @@ struct NotchFanControlView: View {
         .onDisappear { service.stop() }
     }
 
+    /// Displays one fan’s readings, control mode, and restricted preset buttons.
     private func fanCard(_ fan: CoolingFan) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -67,6 +69,7 @@ struct NotchFanControlView: View {
     }
 
     @ViewBuilder
+    /// Shows pending commands, actionable connection errors, or the preset-range explanation.
     private var commandStatus: some View {
         if service.isApplying {
             HStack(spacing: 6) { ProgressView().controlSize(.mini); Text("Applying…") }
@@ -85,6 +88,7 @@ struct NotchFanControlView: View {
         }
     }
 
+    /// Builds an accessible per-fan command button, disabled while commands cannot be applied.
     private func presetButton(_ title: String, fan: CoolingFan, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title).font(.caption.weight(.medium)).frame(maxWidth: .infinity).padding(.vertical, 5)
@@ -95,10 +99,12 @@ struct NotchFanControlView: View {
         .disabled(service.isApplying || service.needsReconnect || service.status != .ready)
     }
 
+    /// Maps firmware control modes to the visible Cooling label.
     private func modeText(_ mode: CoolingFan.Mode) -> String {
         switch mode { case .automatic, .system: return "macOS Auto"; case .manual: return "Manual"; case .unknown: return "Mode unavailable" }
     }
 
+    /// Describes discovery progress or unavailable hardware when no fan cards can be shown.
     private var statusText: String {
         switch service.status {
         case .ready: return "Live"
