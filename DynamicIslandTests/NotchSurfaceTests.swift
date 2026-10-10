@@ -21,6 +21,18 @@ private struct NotchSurfaceTests {
         precondition(alpha(elapsed, 0, 35) < 0.01, "The rounded corner must remain transparent")
         precondition(alpha(elapsed, 291, 35) < 0.01, "Both outer corners must use the shared shape")
 
+        // The bare collapsed surface (menu-bar expansion, ViewThatFits
+        // fallback) must paint the same silhouette as the closed notch.
+        // A plain rectangle here regresses to square bottom corners.
+        let collapsed = renderCollapsed(width: 292)
+        for y in 0..<40 {
+            for x in 0..<292 {
+                precondition(abs(alpha(elapsed, x, y) - alpha(collapsed, x, y)) < 0.02,
+                             "Collapsed surface must match the closed silhouette")
+            }
+        }
+        precondition(alpha(collapsed, 0, 35) < 0.01, "The collapsed surface must keep the rounded corner transparent")
+
         let state = ProbeState()
         let host = NSHostingView(rootView: AnimationProbe(state: state, shape: shape))
         host.frame = CGRect(x: 0, y: 0, width: 300, height: 40)
@@ -56,6 +68,15 @@ private struct NotchSurfaceTests {
         let host = NSHostingView(rootView: Color.clear.frame(width: width, height: 40)
             .modifier(NotchSurface(shape: shape, selection: false, animateSelectionChanges: true)))
         host.frame = CGRect(x: 0, y: 0, width: width, height: 40)
+        host.layoutSubtreeIfNeeded()
+        let image = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
+        host.cacheDisplay(in: host.bounds, to: image)
+        return image
+    }
+
+    static func renderCollapsed(width: CGFloat, height: CGFloat = 40) -> NSBitmapImageRep {
+        let host = NSHostingView(rootView: AtollCollapsedSurface(width: width, height: height))
+        host.frame = CGRect(x: 0, y: 0, width: width, height: height)
         host.layoutSubtreeIfNeeded()
         let image = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
         host.cacheDisplay(in: host.bounds, to: image)

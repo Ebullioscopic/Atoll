@@ -14,6 +14,23 @@ enum ClosedLiveActivityMotion {
     )
 }
 
+/// Bare notch-sized black surface shared by every code path that paints
+/// outside `mainLayoutBase` (menu-bar expansion, `ViewThatFits` fallback).
+/// The shape must always be the collapsed silhouette so the bottom fillet
+/// stays identical to the closed notch. Physical-notch callers use the
+/// default closed notch; island screens pass the closed pill explicitly.
+struct AtollCollapsedSurface: View {
+    var width: CGFloat
+    var height: CGFloat
+    var shape: AnyShape = AnyShape(NotchShape())
+
+    var body: some View {
+        Color.black
+            .frame(width: width, height: height)
+            .clipShape(shape)
+    }
+}
+
 /// Paint and clip one continuous surface, regardless of the activity inside it.
 /// Selection changes can resize it without replaying that motion on every tick.
 struct NotchSurface<Selection: Equatable>: ViewModifier {

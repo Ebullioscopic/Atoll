@@ -523,6 +523,23 @@ struct ContentView: View {
         return AnyShape(currentNotchShape)
     }
 
+    /// Collapsed silhouette for bare black surfaces painted outside
+    /// `mainLayoutBase` (menu-bar expansion, `ViewThatFits` fallback).
+    /// Physical-notch screens always use the closed notch; island screens
+    /// use the closed pill so external displays keep their capsule look.
+    private var collapsedBlackSurfaceShape: AnyShape {
+        if isDynamicIslandMode {
+            return AnyShape(DynamicIslandPillShape(cornerRadius: max(
+                vm.closedNotchSize.height / 2,
+                dynamicIslandPillCornerRadiusInsets.closed.standard
+            )))
+        }
+        return AnyShape(NotchShape(
+            topCornerRadius: activeCornerRadiusInsets.closed.top,
+            bottomCornerRadius: activeCornerRadiusInsets.closed.bottom
+        ))
+    }
+
     var body: some View {
         installRootLifecycleHandlers(on: rootBodyView)
     }
@@ -721,10 +738,13 @@ struct ContentView: View {
     private var rootBodyView: some View {
         ZStack(alignment: .top) {
             if vm.isMenuBarExpanded, let physical = vm.physicalNotchFrame {
-                Color.black
-                    .frame(width: physical.width, height: physical.height)
-                    .allowsHitTesting(false)
-                    .accessibilityIdentifier("AtollMenuBarCollapsed")
+                AtollCollapsedSurface(
+                    width: physical.width,
+                    height: physical.height,
+                    shape: collapsedBlackSurfaceShape
+                )
+                .allowsHitTesting(false)
+                .accessibilityIdentifier("AtollMenuBarCollapsed")
             } else {
                 // Keep one view hierarchy so existing content and shape animations
                 // survive the transition between compact and expanded presentation.
@@ -732,10 +752,12 @@ struct ContentView: View {
                                         leftAligned: vm.usesLeftSideLayout ? 1 : 0) {
                     ViewThatFits(in: .horizontal) {
                         configuredMainLayout.fixedSize(horizontal: vm.usesLeftSideLayout, vertical: false)
-                        Color.black
-                            .frame(width: vm.physicalNotchFrame?.width ?? vm.closedNotchSize.width,
-                                   height: vm.effectiveClosedNotchHeight)
-                            .background(NotchMouseRegion(shape: AnyShape(Rectangle())))
+                        AtollCollapsedSurface(
+                            width: vm.physicalNotchFrame?.width ?? vm.closedNotchSize.width,
+                            height: vm.effectiveClosedNotchHeight,
+                            shape: collapsedBlackSurfaceShape
+                        )
+                        .background(NotchMouseRegion(shape: collapsedBlackSurfaceShape))
                     }
                     .frame(maxWidth: vm.usesLeftSideLayout
                            ? min((dynamicNotchSize.width + (vm.physicalNotchFrame?.width ?? 0)) / 2,
