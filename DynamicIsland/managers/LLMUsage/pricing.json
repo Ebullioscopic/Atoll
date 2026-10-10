@@ -31,6 +31,16 @@
       }
     },
     {
+      "id": "anthropic/claude-haiku-5.5",
+      "name": "Anthropic: Claude Haiku 5.5",
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000005",
+        "cache_read": "0.00000001",
+        "cache_write": "0.000000125"
+      }
+    },
+    {
       "id": "anthropic/claude-opus-4.1",
       "name": "Anthropic: Claude Opus 4.1",
       "pricing": {
@@ -137,6 +147,16 @@
         "prompt": "0.000002",
         "completion": "0.00001",
         "cache_read": "0.0000002",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "anthropic/claude-sonnet-5.5",
+      "name": "Anthropic: Claude Sonnet 5.5",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000001",
         "cache_write": "0.0000025"
       }
     },
@@ -338,6 +358,16 @@
         "completion": "0.00000375",
         "cache_read": "0.000000075",
         "cache_write": "0.0000000416666666666667"
+      }
+    },
+    {
+      "id": "google/gemini-nano-banana-2.1",
+      "name": "Google: Nano Banana 2.1",
+      "pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.0000075",
+        "cache_read": "",
+        "cache_write": ""
       }
     },
     {
@@ -831,6 +861,26 @@
       }
     },
     {
+      "id": "openai/gpt-6.1-sol",
+      "name": "OpenAI: GPT-6.1 Sol",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000001",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/gpt-6.1-sol-pro",
+      "name": "OpenAI: GPT-6.1 Sol Pro",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000001",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
       "id": "openai/gpt-audio",
       "name": "OpenAI: GPT Audio",
       "pricing": {
@@ -864,9 +914,9 @@
       "id": "openai/gpt-oss-120b",
       "name": "OpenAI: gpt-oss-120b",
       "pricing": {
-        "prompt": "0.00000015",
-        "completion": "0.0000006",
-        "cache_read": "0.000000075",
+        "prompt": "0.000000037",
+        "completion": "0.00000017",
+        "cache_read": "",
         "cache_write": ""
       }
     },
@@ -876,7 +926,7 @@
       "pricing": {
         "prompt": "0.000000018",
         "completion": "0.00000009",
-        "cache_read": "",
+        "cache_read": "0.000000009",
         "cache_write": ""
       }
     },
@@ -951,5 +1001,5 @@
       }
     }
   ],
-  "last_updated": "2026-09-28T00:08:01Z"
+  "last_updated": "2026-10-10T00:07:17Z"
 }
