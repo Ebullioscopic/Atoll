@@ -11,6 +11,7 @@ final class CoolingHelperSession {
     private var stage = "idle"
     private var setupFailure: Error?
 
+    /// Configures the bundled production helper or an explicit unprivileged test fixture.
     init(helperOverride: String? = nil, readOnlyProbe: Bool = false) {
         self.helperOverride = helperOverride
         self.readOnlyProbe = readOnlyProbe
@@ -19,10 +20,14 @@ final class CoolingHelperSession {
     private var fd: Int32 = -1
     private var authorizer: Process?
     private var directory: URL?
+    /// Reports whether this session currently owns an authenticated helper socket.
     var isConnected: Bool { fd >= 0 }
 
+    /// Closes the connection so the helper restores its owned fans before exiting.
     deinit { close() }
 
+    /// Authorizes if needed, checks cancellation, and executes a restricted cooling request.
+    /// Structured command errors preserve authorization; transport errors close the session.
     func command(_ request: CoolingRequest, shouldProceed: (() -> Bool)? = nil) throws -> CoolingReply {
         if fd < 0 {
             if let setupFailure { throw setupFailure }
@@ -53,13 +58,16 @@ final class CoolingHelperSession {
         return reply
     }
 
+    /// Clears a cached setup failure after the user explicitly requests another connection attempt.
     func resetAuthorizationFailure() { setupFailure = nil }
 
+    /// Renews an existing helper lease without opening a new authorization session.
     func heartbeat() throws {
         guard fd >= 0 else { return }
         _ = try command(CoolingRequest(command: "ping"))
     }
 
+    /// Closes the authenticated socket and removes its private endpoint; EOF triggers helper cleanup.
     func close() {
         if fd >= 0 {
             _ = shutdown(fd, SHUT_RDWR)
@@ -73,6 +81,8 @@ final class CoolingHelperSession {
         authorizer = nil
     }
 
+    /// Creates a private socket, launches the helper through administrator authorization,
+    /// and verifies peer credentials and the random session token before accepting commands.
     private func authorize() throws {
         stage = "locate helper"
         let helper = helperOverride ?? Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/AtollFanHelper").path

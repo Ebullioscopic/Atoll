@@ -96,7 +96,7 @@ func maxAllowedNotchWidth() -> CGFloat {
 
 // MARK: - Tab-Based Notch Width
 
-/// Counts the number of currently enabled standard notch tabs.
+/// Counts enabled standard notch tabs, including opt-in Cooling, for minimum-width enforcement.
 /// Mirrors the tab-building logic in ``TabSelectionView``.
 func enabledStandardTabCount() -> Int {
     var count = 0

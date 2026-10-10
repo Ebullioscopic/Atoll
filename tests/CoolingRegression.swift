@@ -3,8 +3,10 @@ import Darwin
 
 @main
 struct CoolingRegression {
+    /// Fails the standalone regression process when a protocol or encoding invariant is violated.
     static func require(_ condition: Bool, _ message: String) { precondition(condition, message) }
 
+    /// Verifies SMC encodings and bounds, socket framing, session reuse, and pre-command cancellation.
     static func main() throws {
         require(try CoolingSMC.fourCC("F0Ac") == 0x46304163, "SMC key byte order")
         let rpm = 7826.0

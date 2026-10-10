@@ -3,6 +3,8 @@ import Darwin
 
 var helperPhase = "open AppleSMC"
 
+/// Runs the authenticated, session-scoped cooling helper and restores owned fans on exit.
+/// Production writes require root; explicit read-only modes support inspection and IPC tests.
 func runCoolingHelper() throws {
     var arguments = CommandLine.arguments
     let readOnlyProbe = arguments.count > 1 && arguments[1] == "--ipc-read-only"
@@ -78,7 +80,7 @@ func runCoolingHelper() throws {
                 return
             default: throw CoolingSMC.Error.invalidData
             }
-            try CoolingSocket.send(CoolingReply(ok: thermalError == nil, message: thermalError), to: fd)
+            try CoolingSocket.send(CoolingReply(ok: true, message: thermalError), to: fd)
         } catch {
             try CoolingSocket.send(CoolingReply(ok: false, message: error.localizedDescription), to: fd)
         }

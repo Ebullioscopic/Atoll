@@ -5,6 +5,7 @@ import Darwin
 
 @main
 struct CoolingSessionHelper {
+    /// Authenticates an unprivileged IPC fixture that accepts heartbeats and rejects all fan writes.
     static func main() throws {
         let args = CommandLine.arguments
         guard args.count == 6, args[1] == "--ipc-read-only" else { exit(1) }

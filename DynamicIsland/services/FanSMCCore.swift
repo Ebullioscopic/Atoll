@@ -13,6 +13,7 @@ struct CoolingFan: Identifiable, Equatable, Codable {
     let maximumRPM: Double
     let mode: Mode
 
+    /// Maps a finite preset fraction into this fan’s validated hardware RPM range.
     func rpm(at fraction: Double) throws -> Double {
         guard fraction.isFinite, (0...1).contains(fraction), minimumRPM.isFinite,
               maximumRPM.isFinite, minimumRPM >= 0, maximumRPM > minimumRPM else {
@@ -25,6 +26,7 @@ struct CoolingFan: Identifiable, Equatable, Codable {
 final class CoolingSMC {
     enum Error: LocalizedError {
         case unavailable, kernel(Int32), result(UInt8), invalidData, permission, verification(String)
+        /// Describes sensor, privilege, or write-verification failures for the Cooling UI.
         var errorDescription: String? {
             switch self {
             case .unavailable: return "Fan sensors are unavailable on this Mac."
@@ -40,6 +42,7 @@ final class CoolingSMC {
     struct Value {
         let type: String
         let bytes: [UInt8]
+        /// Decodes the supported SMC integer, fixed-point, or little-endian float payload.
         var number: Double? {
             switch type {
             case "flt " where bytes.count == 4:
@@ -61,6 +64,7 @@ final class CoolingSMC {
     private var controlled: Set<Int> = []
     private var unlocked = false
 
+    /// Opens an AppleSMC IOKit connection; throws when the service cannot be accessed.
     init() throws {
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSMC"))
         guard service != 0 else { throw Error.unavailable }
@@ -71,23 +75,28 @@ final class CoolingSMC {
         connection = port
     }
 
+    /// Releases the IOKit connection owned by this transport.
     deinit { IOServiceClose(connection) }
 
+    /// Encodes exactly four UTF-8 bytes as the SMC key’s big-endian numeric identifier.
     static func fourCC(_ name: String) throws -> UInt32 {
         guard name.utf8.count == 4 else { throw Error.invalidData }
         return name.utf8.reduce(0) { ($0 << 8) | UInt32($1) }
     }
 
+    /// Converts a numeric SMC key or data-type identifier back into four ASCII bytes.
     private static func string(_ value: UInt32) -> String {
         String(bytes: (0..<4).reversed().map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) }, encoding: .ascii) ?? ""
     }
 
     // The 80-byte IOKit structure contains HOST-endian fields. Its result is
     // at offset 40, command at 42, data32 at 44, and byte payload at 48.
+    /// Exchanges the 80-byte host-endian SMC structure and validates kernel and firmware results.
     private func call(key: UInt32 = 0, command: UInt8, size: Int = 0, index: UInt32 = 0,
                       bytes: [UInt8] = []) throws -> [UInt8] {
         guard (0...32).contains(size), bytes.count <= 32 else { throw Error.invalidData }
         var input = [UInt8](repeating: 0, count: 80)
+        /// Stores a 32-bit structure field in host byte order on supported little-endian Macs.
         func put(_ value: UInt32, _ offset: Int) {
             for n in 0..<4 { input[offset + n] = UInt8(truncatingIfNeeded: value >> (8 * n)) }
         }
@@ -107,10 +116,12 @@ final class CoolingSMC {
         return output
     }
 
+    /// Reads a little-endian 32-bit field from a validated SMC response structure.
     private func host32(_ bytes: [UInt8], at offset: Int) -> UInt32 {
         (0..<4).reduce(UInt32(0)) { $0 | UInt32(bytes[offset + $1]) << (8 * $1) }
     }
 
+    /// Loads and caches a key’s payload length and native data type.
     private func info(_ name: String) throws -> (size: Int, type: String) {
         if let value = cache[name] { return value }
         let response = try call(key: Self.fourCC(name), command: 9)
@@ -121,17 +132,20 @@ final class CoolingSMC {
         return (size, type)
     }
 
+    /// Reads one SMC key without changing firmware state.
     func read(_ name: String) throws -> Value {
         let metadata = try info(name)
         let response = try call(key: Self.fourCC(name), command: 5, size: metadata.size)
         return Value(type: metadata.type, bytes: Array(response[48..<(48 + metadata.size)]))
     }
 
+    /// Reads a supported numeric key and rejects non-finite sensor values.
     private func number(_ key: String) throws -> Double {
         guard let number = try read(key).number, number.isFinite else { throw Error.invalidData }
         return number
     }
 
+    /// Discovers fan count, hardware limits, actual and target RPM, and per-fan control mode.
     func fans() throws -> [CoolingFan] {
         let count = try number("FNum")
         guard count.rounded() == count, (0...8).contains(count) else { throw Error.invalidData }
@@ -149,6 +163,7 @@ final class CoolingSMC {
         }
     }
 
+    /// Returns the maximum valid readable temperature, caching discovered temperature keys.
     func hottestTemperature() throws -> Double? {
         if temperatureKeys == nil {
             let count = try number("#KEY")
@@ -169,17 +184,20 @@ final class CoolingSMC {
         }.max()
     }
 
+    /// Finds the available per-fan manual-mode key, preferring newer lowercase `md` firmware.
     private func modeKey(_ index: Int) throws -> String {
         for key in ["F\(index)md", "F\(index)Md"] where (try? info(key)) != nil { return key }
         throw Error.unavailable
     }
 
+    /// Writes a size-checked SMC payload only when the helper is running as root.
     private func write(_ key: String, _ bytes: [UInt8]) throws {
         guard geteuid() == 0 else { throw Error.permission }
         guard try info(key).size == bytes.count else { throw Error.invalidData }
         _ = try call(key: Self.fourCC(key), command: 6, size: bytes.count, bytes: bytes)
     }
 
+    /// Encodes a bounded RPM target in the key’s native `flt ` or `fpe2` format.
     static func rpmBytes(_ rpm: Double, type: String) throws -> [UInt8] {
         guard rpm.isFinite, (0...16383).contains(rpm) else { throw Error.invalidData }
         switch type {
@@ -193,11 +211,14 @@ final class CoolingSMC {
         }
     }
 
+    /// Writes the requested fan target using its reported SMC data type.
     private func writeRPM(_ rpm: Double, index: Int) throws {
         let key = "F\(index)Tg"
         try write(key, Self.rpmBytes(rpm, type: info(key).type))
     }
 
+    /// Enters manual control, writes a range-based target, and verifies mode and RPM before success.
+    /// Attempts Auto rollback if firmware rejects or ignores the request.
     func setPreset(_ fraction: Double, index: Int) throws {
         guard let fan = try fans().first(where: { $0.id == index }) else { throw Error.invalidData }
         let rpm = try fan.rpm(at: fraction)
@@ -243,6 +264,7 @@ final class CoolingSMC {
         }
     }
 
+    /// Returns a validated fan to firmware control and releases the manual unlock when possible.
     func setAutomatic(index: Int) throws {
         let count = try number("FNum")
         guard (1...8).contains(count), count.rounded() == count, (0..<Int(count)).contains(index) else { throw Error.invalidData }
@@ -256,6 +278,7 @@ final class CoolingSMC {
            (try? number("Ftst")) == 1 { try write("Ftst", [0]); unlocked = false }
     }
 
+    /// Retries Auto restoration for fans this connection changed, then clears its firmware unlock.
     func restoreOwnedFans() {
         for _ in 0..<3 {
             for index in Array(controlled) { try? setAutomatic(index: index) }
