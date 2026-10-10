@@ -366,6 +366,7 @@
 				F54406E42CD4987A00C7AFD9 /* Frameworks */,
 				F54406E52CD4987A00C7AFD9 /* Resources */,
 				7EA69B1B2F5AE13500EB2D16 /* CopyFiles */,
+				FA0011223344556677889900 /* Build Cooling Helper */,
 				7EFAA8AA2F6F12F3000A99E8 /* ShellScript */,
 			);
 			buildRules = (
@@ -500,6 +501,18 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "if [ \"$CONFIGURATION\" != \"Release\" ] || [ \"$ACTION\" != \"install\" ]; then\n\texit 0\nfi\n\nAPP=\"$CODESIGNING_FOLDER_PATH\"\nSPARKLE=\"$APP/Contents/Frameworks/Sparkle.framework\"\nXPC_DIR=\"$SPARKLE/Versions/Current/XPCServices\"\n\nif [ ! -d \"$XPC_DIR\" ]; then\n\texit 0\nfi\n\nfor xpc in \"$XPC_DIR\"/*.xpc; do\n\t/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$xpc\"\ndone\n\n/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$SPARKLE\"\n";
+		};
+		FA0011223344556677889900 /* Build Cooling Helper */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ("$(SRCROOT)/FanHelper/main.swift", "$(SRCROOT)/FanHelper/build.sh", "$(SRCROOT)/THIRD_PARTY_FAN_CONTROL.md", "$(SRCROOT)/DynamicIsland/services/FanSMCCore.swift", "$(SRCROOT)/DynamicIsland/services/FanControlWire.swift");
+			outputPaths = ("$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/AtollFanHelper", "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/THIRD_PARTY_FAN_CONTROL.md");
+			name = "Build Cooling Helper";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$SRCROOT/FanHelper/build.sh\"";
 		};
 /* End PBXShellScriptBuildPhase section */
 

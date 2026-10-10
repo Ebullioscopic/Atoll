@@ -51,6 +51,7 @@ struct TabSelectionView: View {
     @State private var showQuickSharePopover = false
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.enableStatsFeature) var enableStatsFeature
+    @Default(.enableFanControl) private var enableFanControl
     @Default(.enableColorPickerFeature) var enableColorPickerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.enableThirdPartyExtensions) private var enableThirdPartyExtensions
@@ -80,6 +81,10 @@ struct TabSelectionView: View {
         // Stats tab only shown when stats feature is enabled
         if Defaults[.enableStatsFeature] {
             tabsArray.append(TabModel(label: "Stats", icon: "chart.xyaxis.line", view: .stats))
+        }
+
+        if enableFanControl {
+            tabsArray.append(TabModel(label: "Cooling", icon: "fan", view: .fanControl))
         }
 
         // Usage tab only shown when LLM usage feature is enabled
@@ -147,6 +152,9 @@ struct TabSelectionView: View {
         }
         .clipShape(Capsule())
         .onAppear {
+            ensureValidSelection(with: tabs)
+        }
+        .onChange(of: enableFanControl) { _, _ in
             ensureValidSelection(with: tabs)
         }
     }
