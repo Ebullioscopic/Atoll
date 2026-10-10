@@ -1278,6 +1278,9 @@ extension Defaults.Keys {
     static let useBluetoothHUD3DIcon = Key<Bool>("useBluetoothHUD3DIcon", default: true)
     static let showAirPodsListeningModeChanges = Key<Bool>("showAirPodsListeningModeChanges", default: true)
     
+    // MARK: Cooling
+    static let enableFanControl = Key<Bool>("enableFanControl", default: false)
+
     // MARK: Stats Feature
     static let enableStatsFeature = Key<Bool>("enableStatsFeature", default: false)
     static let enableLLMUsageFeature = Key<Bool>("enableLLMUsageFeature", default: false)
