@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- **LLM usage no longer balloons memory on large logs**: parsing a big week of Claude Code JSONL logs (~1 GB) could push Atoll past 2.5 GB and trigger the high memory usage warning, because temporary objects piled up until the whole scan finished. Each read chunk is now drained in its own autorelease pool, which keeps the same scan around 20 MB. (#870)
 - A tab count in the notch settings could not be formatted. `%lld tab%@ enabled · min %lld px` was translated using `%1lld` — missing the `$` — so it was never parsed as a positional specifier, and the separator was U+22C5 (dot operator) rather than the U+00B7 the source uses. (#789)
 - The microphone privacy indicator description showed an unrelated sentence about a meeting start time, which also introduced a `%@` that the source string does not have — reading an argument that was never passed. (#789)
 - A shipped string began with `추천 번역 ⭐️: `, an AI suggestion prefix that had been committed along with the translation it labelled. (#789)
