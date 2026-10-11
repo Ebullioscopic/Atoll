@@ -131,6 +131,12 @@ final class FanControlService: ObservableObject {
     /// Applies one preset or Auto command through the worker, publishing confirmed success or errors.
     func apply(_ fraction: Double?, to fanID: Int) {
         guard Defaults[.enableFanControl], !isApplying, !needsReconnect else { return }
+        guard CoolingHelperRegistration.shared.prepareForCommand() else {
+            controlError = CoolingHelperRegistration.shared.error ?? "Approve Atoll’s fan helper in the macOS window, then select your fan speed again."
+            return
+        }
+        // A native setup prompt runs a nested event loop; recheck feature cancellation afterward.
+        guard Defaults[.enableFanControl] else { return }
         isApplying = true; controlError = nil
         let commandGeneration = generation
         worker.gate.allow(commandGeneration)

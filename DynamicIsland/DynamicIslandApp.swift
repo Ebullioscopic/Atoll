@@ -164,6 +164,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         installTopMenuItemsIfNeeded()
+        Task { @MainActor in CoolingHelperRegistration.shared.refresh() }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -696,6 +697,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Task { @MainActor in CoolingHelperRegistration.shared.offerAutomaticSetupIfNeeded() }
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]

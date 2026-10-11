@@ -8002,8 +8002,8 @@ private struct CoolingSettings: View {
 
             Section {
                 LabeledContent("Presets", value: "Percentage of each fan’s minimum-to-maximum RPM range")
-                LabeledContent("Authorization", value: "One-time approval with the optional helper")
-                Text("Install the helper below to use fan controls after restarting Atoll or your Mac without another password. Without it, each session requires administrator access.")
+                LabeledContent("Authorization", value: "One-time macOS approval")
+                Text("Atoll offers fan-control setup automatically when you enable Cooling or first use a fan control. Approve it once to avoid password prompts after restarts. Choosing Not Now keeps authorization for each session.")
                     .font(.caption).foregroundStyle(.secondary)
                 Text("Atoll returns its fans to Auto when it exits or loses the cooling connection, or when temperatures are high or unavailable. Manual fan control has been tested on Apple M5 Pro; availability depends on the Mac’s fan controller.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -8011,30 +8011,16 @@ private struct CoolingSettings: View {
                 Text("Fan control")
             }
 
-            Section {
-                switch helper.status {
-                case .enabled:
-                    LabeledContent("Fan helper", value: "Installed and approved")
-                    Button("Remove helper") { helper.remove() }
-                case .requiresApproval:
-                    LabeledContent("Fan helper", value: "Awaiting macOS approval")
-                    Button("Open System Settings") { helper.openApproval() }
-                    Button("Remove helper") { helper.remove() }
-                case .notRegistered, .notFound:
-                    Button("Install helper") { helper.install() }
-                default:
-                    Text("The fan helper is unavailable. Remove it before reinstalling.")
-                    Button("Remove helper") { helper.remove() }
+            if helper.status == .enabled || helper.status == .requiresApproval {
+                Section {
+                    LabeledContent("Fan helper", value: helper.status == .enabled ? "Approved" : "Awaiting macOS approval")
+                    Button("Remove fan helper") { helper.remove() }
+                    if let error = helper.error {
+                        Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                    }
                 }
-                if let error = helper.error {
-                    Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
-                }
-            } header: {
-                Text("Keep fan control authorized")
-            } footer: {
-                Text("macOS asks you to approve this background helper once. It accepts only fan controls and returns Atoll-controlled fans to Auto when Atoll disconnects. Removing the helper restores authorization for each session.")
+                .disabled(helper.busy)
             }
-            .disabled(helper.busy)
         }
         .navigationTitle("Cooling")
         .onAppear { helper.refresh() }
