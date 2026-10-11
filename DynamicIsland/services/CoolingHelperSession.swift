@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 import os
 
-/// Session-scoped helper. No launch daemon or permanent root service is installed.
+/// Uses the approved persistent helper when installed, or administrator authorization for this session.
 /// Commands are restricted to the four presets, Auto, and the watchdog heartbeat.
 final class CoolingHelperSession {
     private let helperOverride: String?
@@ -17,11 +17,12 @@ final class CoolingHelperSession {
         self.readOnlyProbe = readOnlyProbe
     }
 
+    private var persistent: CoolingPersistentConnection?
     private var fd: Int32 = -1
     private var authorizer: Process?
     private var directory: URL?
     /// Reports whether this session currently owns an authenticated helper socket.
-    var isConnected: Bool { fd >= 0 }
+    var isConnected: Bool { fd >= 0 || persistent?.isConnected == true }
 
     /// Closes the connection so the helper restores its owned fans before exiting.
     deinit { close() }
@@ -29,7 +30,8 @@ final class CoolingHelperSession {
     /// Authorizes if needed, checks cancellation, and executes a restricted cooling request.
     /// Structured command errors preserve authorization; transport errors close the session.
     func command(_ request: CoolingRequest, shouldProceed: (() -> Bool)? = nil) throws -> CoolingReply {
-        if fd < 0 {
+        if !isConnected {
+            persistent?.close(); persistent = nil
             if let setupFailure { throw setupFailure }
             do { try authorize() }
             catch { setupFailure = error; throw error }
@@ -41,8 +43,11 @@ final class CoolingHelperSession {
         }
         let reply: CoolingReply
         do {
-            try CoolingSocket.send(request, to: fd)
-            reply = try CoolingSocket.receive(CoolingReply.self, from: fd)
+            if let persistent { reply = try persistent.command(request) }
+            else {
+                try CoolingSocket.send(request, to: fd)
+                reply = try CoolingSocket.receive(CoolingReply.self, from: fd)
+            }
         } catch {
             logger.error("Cooling connection failed: \(error.localizedDescription, privacy: .public)")
             close()
@@ -63,12 +68,13 @@ final class CoolingHelperSession {
 
     /// Renews an existing helper lease without opening a new authorization session.
     func heartbeat() throws {
-        guard fd >= 0 else { return }
+        guard isConnected else { return }
         _ = try command(CoolingRequest(command: "ping"))
     }
 
     /// Closes the authenticated socket and removes its private endpoint; EOF triggers helper cleanup.
     func close() {
+        persistent?.close(); persistent = nil
         if fd >= 0 {
             _ = shutdown(fd, SHUT_RDWR)
             Darwin.close(fd)
@@ -84,6 +90,10 @@ final class CoolingHelperSession {
     /// Creates a private socket, launches the helper through administrator authorization,
     /// and verifies peer credentials and the random session token before accepting commands.
     private func authorize() throws {
+        if helperOverride == nil, !readOnlyProbe, let connection = try CoolingPersistentSupport.connectionIfRegistered() {
+            persistent = connection
+            return
+        }
         stage = "locate helper"
         let helper = helperOverride ?? Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/AtollFanHelper").path
         guard FileManager.default.isExecutableFile(atPath: helper) else {
