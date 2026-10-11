@@ -24,7 +24,13 @@ jobs:
     strategy:
       matrix:
         # macos-14 runners cap at Xcode 16.2 (Swift 6.0); the app source needs Swift 6.1+.
-        macos_version: [macos-15, macos-26]
+        include:
+          - macos_version: macos-15
+            xcode_version: latest-stable
+          - macos_version: macos-26
+            xcode_version: latest-stable
+          - macos_version: xcode-27
+            xcode_version: latest
       fail-fast: false
     runs-on: ${{ matrix.macos_version }}
 
@@ -37,7 +43,7 @@ jobs:
       - name: Select Xcode Version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: ${{ matrix.xcode_version }}
 
       - name: Validate privacy configuration
         run: python3 -m unittest tests.test_privacy_configuration
