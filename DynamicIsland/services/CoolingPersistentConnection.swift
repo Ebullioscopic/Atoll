@@ -97,7 +97,7 @@ enum CoolingPersistentSupport {
         case .notRegistered, .notFound: return nil
         default:
             throw NSError(domain: "AtollCooling", code: 12, userInfo: [NSLocalizedDescriptionKey:
-                "The installed fan helper is unavailable. Remove it and install it again in Atoll’s Cooling settings."])
+                "The fan helper is unavailable. Remove it in Cooling settings, then select a fan speed to run setup again."])
         }
     }
 }
