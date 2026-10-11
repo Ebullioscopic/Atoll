@@ -87,5 +87,8 @@ func runCoolingHelper() throws {
     }
 }
 
-do { try runCoolingHelper() }
+do {
+    if CommandLine.arguments == [CommandLine.arguments[0], "--daemon"] { try runCoolingDaemon() }
+    else { try runCoolingHelper() }
+}
 catch { fputs("Atoll cooling (\(helperPhase)): \(error.localizedDescription)\n", stderr); exit(1) }

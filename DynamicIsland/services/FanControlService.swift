@@ -161,6 +161,14 @@ final class FanControlService: ObservableObject {
         }
     }
 
+    /// Waits for queued cleanup before changing the registered helper installation.
+    func disconnectForHelperChange() async {
+        shutdown()
+        await withCheckedContinuation { continuation in
+            worker.queue.async { continuation.resume() }
+        }
+    }
+
     /// Cancels pending work, stops polling, and closes the helper so its fans return to Auto.
     func shutdown() {
         generation += 1
