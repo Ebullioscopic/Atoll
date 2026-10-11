@@ -20,7 +20,11 @@ final class CoolingPersistentConnection: @unchecked Sendable {
         connection.interruptionHandler = { [weak self] in self?.markDisconnected() }
         connection.resume()
         do { let reply = try command(CoolingRequest(command: "ping")); guard reply.ok else { throw CoolingSMC.Error.permission } }
-        catch { close(); throw error }
+        catch {
+            close()
+            throw NSError(domain: "AtollCooling", code: 13, userInfo: [NSLocalizedDescriptionKey:
+                "Atoll could not connect to its fan helper. Open Cooling Settings to reconnect or repair it. " + error.localizedDescription])
+        }
     }
 
     /// Marks an interrupted transport unavailable so the UI can explicitly retry without a password.

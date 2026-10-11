@@ -61,6 +61,24 @@ struct CoolingRegression {
             require(error.localizedDescription == "Fan control was disabled before the command was applied.", "command reached helper after cancellation")
             require(!cancelled.isConnected, "cancelled authorization kept its helper alive")
         }
-        print("PASS: SMC encoding, preset limits, bounded IPC, rejected-command session reuse, and authorization cancellation")
+        // Reproduce a failed authorization followed by disable/re-enable. A
+        // cached failure must prevent automatic retries, then clear on close.
+        let marker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data().write(to: marker)
+        setenv("ATOLL_COOLING_TEST_FAILURE_FILE", marker.path, 1)
+        defer { unsetenv("ATOLL_COOLING_TEST_FAILURE_FILE"); try? FileManager.default.removeItem(at: marker) }
+        let recoverable = CoolingHelperSession(helperOverride: helper, readOnlyProbe: true)
+        do { _ = try recoverable.command(CoolingRequest(command: "ping")); fatalError("fixture did not fail") }
+        catch { require(error.localizedDescription.contains("Fixture setup failed once."), "unexpected fixture failure") }
+        do { _ = try recoverable.command(CoolingRequest(command: "ping")); fatalError("cached failure retried automatically") }
+        catch { require(!recoverable.isConnected, "cached setup failure was bypassed") }
+        recoverable.close()
+        _ = try recoverable.command(CoolingRequest(command: "ping"))
+        require(recoverable.isConnected, "disable/re-enable retained the old setup failure")
+        recoverable.close()
+        _ = try recoverable.command(CoolingRequest(command: "ping"))
+        require(recoverable.isConnected, "a second toggle cycle failed")
+        recoverable.close()
+        print("PASS: SMC encoding, preset limits, bounded IPC, rejected-command session reuse, authorization cancellation, and recovery after failed setup/toggle cycles")
     }
 }

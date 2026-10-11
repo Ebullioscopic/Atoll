@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NotchFanControlView: View {
     @ObservedObject private var service = FanControlService.shared
+    @ObservedObject private var helper = CoolingHelperRegistration.shared
     private let fractions = [0.3, 0.5, 0.7, 1.0]
     private let columns = [GridItem(.adaptive(minimum: 260), spacing: 10, alignment: .top)]
 
@@ -74,13 +75,30 @@ struct NotchFanControlView: View {
         if service.isApplying {
             HStack(spacing: 6) { ProgressView().controlSize(.mini); Text("Applying…") }
                 .font(.caption).foregroundStyle(.secondary)
-        } else if let error = service.controlError {
+        } else if service.controlError != nil || helper.error != nil || helper.status != .enabled || service.status != .ready {
             VStack(alignment: .leading, spacing: 4) {
-                Text(error).font(.caption2).foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
-                if service.needsReconnect {
-                    Button("Retry connection") { service.retryConnection() }.buttonStyle(.plain).font(.caption)
+                if let error = service.controlError ?? helper.error {
+                    Text(error).font(.caption2).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if helper.status == .requiresApproval {
+                    Text("Fan control needs macOS approval.").font(.caption2).foregroundStyle(.orange)
+                } else if helper.status == .notRegistered || helper.status == .notFound {
+                    Text("Set up fan control for authorization after restarts.").font(.caption2).foregroundStyle(.secondary)
                 }
+                HStack(spacing: 12) {
+                    if helper.status == .requiresApproval {
+                        Button("Open macOS Approval") { helper.openApproval() }
+                    } else if helper.status == .notRegistered || helper.status == .notFound {
+                        Button("Set Up Fan Control") { helper.runSetup() }
+                    } else if service.needsReconnect {
+                        Button("Reconnect helper") { service.retryConnection() }
+                    }
+                    Button { SettingsWindowController.shared.showCoolingSettings() } label: {
+                        Label("Cooling Settings", systemImage: "arrow.up.right.square")
+                    }
+                }
+                .buttonStyle(.plain).font(.caption).foregroundStyle(.cyan)
+                .disabled(helper.busy)
             }
         } else {
             Text("Presets use each fan’s minimum-to-maximum range.")

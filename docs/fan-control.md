@@ -10,11 +10,17 @@ Choosing **Not Now** uses session authorization for this launch. Without the opt
 
 Turning the feature off closes the helper and returns fans controlled by Atoll to Auto. A command still waiting for authorization is cancelled before it can write. The helper also attempts to restore Auto on disconnect, app exit, a 15-second heartbeat expiry, and high (95°C) or unreadable temperatures. Atoll intentionally falls back to firmware Auto for every manual preset, including 100%, while temperature readings are high or unavailable. Auto and heartbeat commands still succeed during this guard. Firmware-controlled fan-stop behavior is allowed in Auto.
 
+## Recovery
+
+The notch shows a direct **Cooling Settings** link when setup, approval, connection, or sensor access needs attention. **Open macOS Approval** opens the OS consent pane; **Reconnect helper** closes the old connection, restores Auto, and checks a fresh connection without applying a saved preset. Cooling settings offer manual setup or helper repair only when needed. Turning Cooling off clears cached setup failures and read-only sensor connections so re-enabling it can recover.
+
+The app/helper identifiers are derived from their own code signatures, and the launchd plist is generated from the product bundle identifier. Locally signed forks must use a distinct bundle identifier instead of inheriting the original publisher’s background-task approval record. The helper identifier is the app identifier with `.cooling` appended. Preferences and macOS privacy approvals belong to the chosen app identity; migrating preferences between identities is a separate installation step.
+
 ## Hardware validation
 
 Session helper tested on `Mac17,9`, Apple M5 Pro: two fans with a 2,317–7,826 RPM range. The user confirmed speed changes and one password for successive preset commands. Native Swift sensor reads confirmed both fans in manual mode at a 7,826 RPM target, then both in automatic mode after Auto was selected.
 
-The persistent helper has passed deterministic safety tests and signature checks. Administrator approval, persistent XPC fan commands, app-restart reconnection, and Mac-restart behavior still need device validation.
+The persistent helper has passed deterministic safety tests and signature checks. On the local M5 Pro installation, macOS approval succeeded with matching local app/helper identities. Authenticated XPC fan commands accepted 50% for both fans without another password, and disconnect restored Auto. App restart reacquired the exclusive helper connection without reapplying a manual preset. Mac-restart behavior still needs device validation.
 
 Intel and other Apple Silicon models have not been hardware-tested. The helper is built for the same architectures as the app; missing SMC keys or invalid sensor limits produce an unavailable/error state. Forced app failure, sleep, and high-temperature restoration have not been exercised on the physical Mac.
 

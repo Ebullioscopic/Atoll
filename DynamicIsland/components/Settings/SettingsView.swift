@@ -613,6 +613,7 @@ private struct SettingsForm<Content: View>: View {
 }
 
 struct SettingsView: View {
+    @ObservedObject private var navigation = SettingsNavigation.shared
     @State private var selectedTab: SettingsTab = .general
     @State private var searchText: String = ""
     @StateObject private var highlightCoordinator = SettingsHighlightCoordinator()
@@ -671,6 +672,11 @@ struct SettingsView: View {
         .environmentObject(highlightCoordinator)
         .formStyle(.grouped)
         .frame(width: 700)
+        .onReceive(navigation.$requestedTab.compactMap { $0 }) { destination in
+            guard let tab = SettingsTab(rawValue: destination) else { return }
+            searchText = ""
+            selectedTab = tab
+        }
         .onChange(of: searchText) { _, newValue in
             let matches = tabsMatchingSearch(newValue)
             guard let firstMatch = matches.first else { return }
@@ -7984,6 +7990,7 @@ private struct TimerPresetComponentControl: View {
 }
 
 private struct CoolingSettings: View {
+    @ObservedObject private var fans = FanControlService.shared
     @ObservedObject private var helper = CoolingHelperRegistration.shared
     @Environment(\.scenePhase) private var scenePhase
     /// Presents the opt-in Cooling toggle and explains preset and authorization behavior.
@@ -8011,13 +8018,27 @@ private struct CoolingSettings: View {
                 Text("Fan control")
             }
 
+            if helper.status != .enabled || helper.error != nil || fans.controlError != nil || fans.needsReconnect {
+                Section {
+                    if let error = fans.controlError ?? helper.error {
+                        Text(error).font(.caption).foregroundStyle(.orange).textSelection(.enabled)
+                    }
+                    if helper.status == .requiresApproval {
+                        Text("macOS has not finished approving the fan helper.")
+                        Button("Open macOS Approval") { helper.openApproval() }
+                    } else if helper.status == .notRegistered || helper.status == .notFound {
+                        Button("Set Up Fan Control") { helper.runSetup() }
+                    } else {
+                        Button("Reconnect fan helper") { fans.retryConnection() }
+                        Button("Repair fan helper") { helper.repair() }
+                    }
+                } header: { Text("Resolve fan control") }
+                .disabled(helper.busy)
+            }
             if helper.status == .enabled || helper.status == .requiresApproval {
                 Section {
                     LabeledContent("Fan helper", value: helper.status == .enabled ? "Approved" : "Awaiting macOS approval")
                     Button("Remove fan helper") { helper.remove() }
-                    if let error = helper.error {
-                        Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
-                    }
                 }
                 .disabled(helper.busy)
             }

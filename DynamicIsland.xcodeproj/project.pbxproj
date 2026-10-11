@@ -508,7 +508,7 @@
 			buildActionMask = 2147483647;
 			files = ();
 			inputPaths = ("$(SRCROOT)/FanHelper/main.swift", "$(SRCROOT)/FanHelper/Daemon.swift", "$(SRCROOT)/FanHelper/com.Ebullioscopic.Atoll.cooling.plist", "$(SRCROOT)/DynamicIsland/services/CoolingXPC.swift", "$(SRCROOT)/DynamicIsland/services/CoolingDaemonEngine.swift", "$(SRCROOT)/FanHelper/build.sh", "$(SRCROOT)/THIRD_PARTY_FAN_CONTROL.md", "$(SRCROOT)/DynamicIsland/services/FanSMCCore.swift", "$(SRCROOT)/DynamicIsland/services/FanControlWire.swift");
-			outputPaths = ("$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchDaemons/com.Ebullioscopic.Atoll.cooling.plist", "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/AtollFanHelper", "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/THIRD_PARTY_FAN_CONTROL.md");
+			outputPaths = ("$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchDaemons/$(PRODUCT_BUNDLE_IDENTIFIER).cooling.plist", "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/AtollFanHelper", "$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/THIRD_PARTY_FAN_CONTROL.md");
 			name = "Build Cooling Helper";
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

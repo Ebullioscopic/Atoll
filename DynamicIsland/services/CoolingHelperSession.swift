@@ -63,6 +63,14 @@ final class CoolingHelperSession {
         return reply
     }
 
+    /// Probes an already approved persistent helper without prompting or changing fan speeds.
+    func connectIfPersistentEnabled() throws {
+        guard !isConnected, helperOverride == nil, !readOnlyProbe,
+              CoolingPersistentSupport.service.status == .enabled else { return }
+        persistent?.close(); persistent = nil
+        persistent = try CoolingPersistentConnection()
+    }
+
     /// Clears a cached setup failure after the user explicitly requests another connection attempt.
     func resetAuthorizationFailure() { setupFailure = nil }
 
@@ -74,6 +82,7 @@ final class CoolingHelperSession {
 
     /// Closes the authenticated socket and removes its private endpoint; EOF triggers helper cleanup.
     func close() {
+        setupFailure = nil
         persistent?.close(); persistent = nil
         if fd >= 0 {
             _ = shutdown(fd, SHUT_RDWR)

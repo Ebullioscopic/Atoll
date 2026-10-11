@@ -67,6 +67,7 @@ final class FanControlService: ObservableObject {
     func start() {
         guard Defaults[.enableFanControl] else { return }
         visible = true
+        CoolingHelperRegistration.shared.refresh()
         ensureTimer()
         refresh()
     }
@@ -94,9 +95,13 @@ final class FanControlService: ObservableObject {
         guard Defaults[.enableFanControl], (visible || hasSession), !refreshing, !isApplying else { return }
         refreshing = true
         let refreshGeneration = generation
+        let mayConnect = !needsReconnect
         worker.queue.async { [self, worker] in
             var controlFailure: String?
-            do { try worker.helper.heartbeat() }
+            do {
+                if mayConnect { try worker.helper.connectIfPersistentEnabled() }
+                try worker.helper.heartbeat()
+            }
             catch { controlFailure = error.localizedDescription }
             do {
                 if worker.transport == nil { worker.transport = try AppleSMCTransport() }
@@ -159,11 +164,25 @@ final class FanControlService: ObservableObject {
         }
     }
 
-    /// Allows an explicit retry after failed setup without automatically prompting for credentials.
+    /// Reconnects the approved helper after restoring Auto; never reapplies an old manual preset.
     func retryConnection() {
+        generation += 1
+        let retryGeneration = generation
+        worker.gate.allow(nil)
+        presets.removeAll(); isApplying = false; refreshing = true
         worker.queue.async { [self, worker] in
-            worker.helper.resetAuthorizationFailure()
-            Task { @MainActor in needsReconnect = false; controlError = nil }
+            worker.helper.close()
+            var failure: String?
+            do { try worker.helper.connectIfPersistentEnabled() }
+            catch { failure = error.localizedDescription }
+            let message = failure
+            let connected = worker.helper.isConnected
+            Task { @MainActor in
+                guard generation == retryGeneration else { return }
+                needsReconnect = message != nil; controlError = message
+                hasSession = connected; refreshing = false
+                if visible || connected { ensureTimer(); refresh() }
+            }
         }
     }
 
@@ -182,6 +201,7 @@ final class FanControlService: ObservableObject {
         isApplying = false; refreshing = false; controlError = nil; needsReconnect = false
         timer?.invalidate(); timer = nil
         hasSession = false; presets.removeAll()
-        worker.queue.async { [worker] in worker.helper.close() }
+        fans = []; hottestTemperature = nil; status = .discovering
+        worker.queue.async { [worker] in worker.helper.close(); worker.transport = nil }
     }
 }

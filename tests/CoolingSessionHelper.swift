@@ -9,6 +9,12 @@ struct CoolingSessionHelper {
     static func main() throws {
         let args = CommandLine.arguments
         guard args.count == 6, args[1] == "--ipc-read-only" else { exit(1) }
+        if let marker = ProcessInfo.processInfo.environment["ATOLL_COOLING_TEST_FAILURE_FILE"],
+           FileManager.default.fileExists(atPath: marker) {
+            try FileManager.default.removeItem(atPath: marker)
+            fputs("Fixture setup failed once.\n", stderr)
+            exit(1)
+        }
         let fd = try CoolingSocket.connect(args[2])
         defer { Darwin.close(fd) }
         try CoolingSocket.send(CoolingReply(ok: true), to: fd)

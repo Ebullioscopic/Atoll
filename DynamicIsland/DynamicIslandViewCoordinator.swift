@@ -221,7 +221,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 if change.newValue {
-                    Task { @MainActor in CoolingHelperRegistration.shared.offerAutomaticSetupIfNeeded() }
+                    Task { @MainActor in CoolingHelperRegistration.shared.featureEnabled() }
                 } else {
                     FanControlService.shared.shutdown()
                     if self?.currentView == .fanControl { self?.currentView = .home }
