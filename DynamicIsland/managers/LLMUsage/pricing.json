@@ -774,20 +774,20 @@
       "id": "openai/gpt-5.6-sol",
       "name": "OpenAI: GPT-5.6 Sol",
       "pricing": {
-        "prompt": "0.000002",
-        "completion": "0.00001",
-        "cache_read": "0.0000002",
-        "cache_write": "0.0000025"
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "cache_read": "0.0000004",
+        "cache_write": "0.000005"
       }
     },
     {
       "id": "openai/gpt-5.6-sol-pro",
       "name": "OpenAI: GPT-5.6 Sol Pro",
       "pricing": {
-        "prompt": "0.000002",
-        "completion": "0.00001",
-        "cache_read": "0.0000002",
-        "cache_write": "0.0000025"
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "cache_read": "0.0000004",
+        "cache_write": "0.000005"
       }
     },
     {
@@ -924,9 +924,9 @@
       "id": "openai/gpt-oss-120b",
       "name": "OpenAI: gpt-oss-120b",
       "pricing": {
-        "prompt": "0.00000015",
-        "completion": "0.0000006",
-        "cache_read": "0.000000075",
+        "prompt": "0.000000037",
+        "completion": "0.00000017",
+        "cache_read": "",
         "cache_write": ""
       }
     },
@@ -1011,5 +1011,5 @@
       }
     }
   ],
-  "last_updated": "2026-10-14T00:06:39Z"
+  "last_updated": "2026-10-15T00:06:33Z"
 }
