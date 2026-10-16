@@ -38,52 +38,22 @@ func runCoolingHelper() throws {
     helperPhase = "read temperatures"
     // Prime the sensor cache before accepting a preset; there is no write here.
     guard try smc.hottestTemperature() != nil else { throw CoolingSMC.Error.unavailable }
-    var leaseExpires = Date().addingTimeInterval(15)
-    var lastTemperatureCheck = Date.distantPast
-    var thermalError: String?
+    let engine = CoolingDaemonEngine(hardwareProvider: { smc })
+    defer { engine.close() }
     helperPhase = "process cooling requests"
-    while kill(parent, 0) == 0, Date() < leaseExpires {
-        if Date().timeIntervalSince(lastTemperatureCheck) >= 2 {
-            if let hottest = try? smc.hottestTemperature(), hottest < 95 {
-                thermalError = nil
-            } else {
-                smc.restoreOwnedFans()
-                thermalError = "Automatic cooling restored because temperatures are high or unavailable."
-            }
-            lastTemperatureCheck = Date()
-        }
+    while kill(parent, 0) == 0, engine.tick() {
         var event = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
         let available = poll(&event, 1, 1000)
         if available < 0, errno == EINTR { continue }
         guard available >= 0 else { break }
         if available == 0 { continue }
         let request = try CoolingSocket.receive(CoolingRequest.self, from: fd, timeout: 3)
-        leaseExpires = Date().addingTimeInterval(15)
-        do {
-            switch request.command {
-            case "ping": break
-            case "preset":
-                guard !readOnlyProbe else { throw CoolingSMC.Error.permission }
-                guard thermalError == nil else {
-                    throw NSError(domain: "AtollCooling", code: 1, userInfo: [NSLocalizedDescriptionKey: thermalError!])
-                }
-                guard let fan = request.fanID, let fraction = request.fraction,
-                      [0.3, 0.5, 0.7, 1.0].contains(fraction) else { throw CoolingSMC.Error.invalidData }
-                try smc.setPreset(fraction, index: fan)
-            case "auto":
-                guard !readOnlyProbe else { throw CoolingSMC.Error.permission }
-                guard let fan = request.fanID else { throw CoolingSMC.Error.invalidData }
-                try smc.setAutomatic(index: fan)
-            case "quit":
-                smc.restoreOwnedFans()
-                try CoolingSocket.send(CoolingReply(ok: true), to: fd)
-                return
-            default: throw CoolingSMC.Error.invalidData
-            }
-            try CoolingSocket.send(CoolingReply(ok: true, message: thermalError), to: fd)
-        } catch {
-            try CoolingSocket.send(CoolingReply(ok: false, message: error.localizedDescription), to: fd)
+        if readOnlyProbe, request.command == "preset" || request.command == "auto" {
+            try CoolingSocket.send(CoolingReply(ok: false, message: CoolingSMC.Error.permission.localizedDescription), to: fd)
+            continue
         }
+        try CoolingSocket.send(engine.execute(request), to: fd)
+        if request.command == "quit" { return }
     }
 }
 

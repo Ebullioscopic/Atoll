@@ -11,6 +11,8 @@ struct CoolingRequest: Codable {
 struct CoolingReply: Codable {
     let ok: Bool
     var message: String?
+    var controlNotice: String?
+    var effectivePresets: [Int: Double]?
 }
 
 enum CoolingSocket {

@@ -75,9 +75,10 @@ final class CoolingHelperSession {
     func resetAuthorizationFailure() { setupFailure = nil }
 
     /// Renews an existing helper lease without opening a new authorization session.
-    func heartbeat() throws {
-        guard isConnected else { return }
-        _ = try command(CoolingRequest(command: "ping"))
+    @discardableResult
+    func heartbeat() throws -> CoolingReply? {
+        guard isConnected else { return nil }
+        return try command(CoolingRequest(command: "ping"))
     }
 
     /// Closes the authenticated socket and removes its private endpoint; EOF triggers helper cleanup.

@@ -36,6 +36,7 @@ final class FanControlService: ObservableObject {
     @Published private(set) var status: Status = .discovering
     @Published private(set) var isApplying = false
     @Published private(set) var controlError: String?
+    @Published private(set) var controlNotice: String?
     @Published private(set) var needsReconnect = false
     @Published private(set) var presets: [Int: Double] = [:]
 
@@ -98,9 +99,10 @@ final class FanControlService: ObservableObject {
         let mayConnect = !needsReconnect
         worker.queue.async { [self, worker] in
             var controlFailure: String?
+            var heartbeatReply: CoolingReply?
             do {
                 if mayConnect { try worker.helper.connectIfPersistentEnabled() }
-                try worker.helper.heartbeat()
+                heartbeatReply = try worker.helper.heartbeat()
             }
             catch { controlFailure = error.localizedDescription }
             do {
@@ -109,12 +111,15 @@ final class FanControlService: ObservableObject {
                 let temperature = try worker.transport!.temperature()
                 let connected = worker.helper.isConnected
                 let failure = controlFailure
+                let reply = heartbeatReply
                 Task { @MainActor in
                     guard generation == refreshGeneration else { return }
                     fans = readings
                     hottestTemperature = temperature
                     status = readings.isEmpty ? .unavailable("This Mac has no fans.") : .ready
                     hasSession = connected
+                    controlNotice = reply?.controlNotice
+                    if let effectivePresets = reply?.effectivePresets { presets = effectivePresets }
                     if let failure { controlError = failure; needsReconnect = !connected; presets.removeAll() }
                     for fan in readings {
                         if fan.mode != .manual { presets[fan.id] = nil }
@@ -148,16 +153,22 @@ final class FanControlService: ObservableObject {
         let request = CoolingRequest(command: fraction == nil ? "auto" : "preset", fanID: fanID, fraction: fraction)
         worker.queue.async { [self, worker] in
             var failure: String?
-            do { _ = try worker.helper.command(request, shouldProceed: { worker.gate.allows(commandGeneration) }) }
+            var commandReply: CoolingReply?
+            do { commandReply = try worker.helper.command(request, shouldProceed: { worker.gate.allows(commandGeneration) }) }
             catch { failure = error.localizedDescription }
             let connected = worker.helper.isConnected
             let errorMessage = failure
+            let reply = commandReply
             Task { @MainActor in
                 guard generation == commandGeneration else { return }
                 hasSession = connected; isApplying = false; controlError = errorMessage
                 needsReconnect = errorMessage != nil && !connected
                 if connected { ensureTimer() }
-                if errorMessage == nil { presets[fanID] = fraction }
+                controlNotice = reply?.controlNotice
+                if errorMessage == nil {
+                    if let effectivePresets = reply?.effectivePresets { presets = effectivePresets }
+                    else { presets[fanID] = fraction }
+                }
                 else { presets.removeAll() }
                 refresh()
             }
@@ -170,6 +181,7 @@ final class FanControlService: ObservableObject {
         let retryGeneration = generation
         worker.gate.allow(nil)
         presets.removeAll(); isApplying = false; refreshing = true
+        controlNotice = nil
         worker.queue.async { [self, worker] in
             worker.helper.close()
             var failure: String?
@@ -198,7 +210,7 @@ final class FanControlService: ObservableObject {
     func shutdown() {
         generation += 1
         worker.gate.allow(nil)
-        isApplying = false; refreshing = false; controlError = nil; needsReconnect = false
+        isApplying = false; refreshing = false; controlError = nil; controlNotice = nil; needsReconnect = false
         timer?.invalidate(); timer = nil
         hasSession = false; presets.removeAll()
         fans = []; hottestTemperature = nil; status = .discovering

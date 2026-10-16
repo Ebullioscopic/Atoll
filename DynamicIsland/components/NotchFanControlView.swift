@@ -28,6 +28,11 @@ struct NotchFanControlView: View {
                         fanCard(fan)
                     }
                 }
+                if let notice = service.controlNotice {
+                    Label(notice, systemImage: "thermometer.high")
+                        .font(.caption2).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 commandStatus
             }
             .padding(.horizontal, 8)
@@ -75,7 +80,7 @@ struct NotchFanControlView: View {
         if service.isApplying {
             HStack(spacing: 6) { ProgressView().controlSize(.mini); Text("Applying…") }
                 .font(.caption).foregroundStyle(.secondary)
-        } else if service.controlError != nil || helper.error != nil || helper.status != .enabled || service.status != .ready {
+        } else if service.controlNotice != nil || service.controlError != nil || helper.error != nil || helper.status != .enabled || service.status != .ready {
             VStack(alignment: .leading, spacing: 4) {
                 if let error = service.controlError ?? helper.error {
                     Text(error).font(.caption2).foregroundStyle(.orange)
