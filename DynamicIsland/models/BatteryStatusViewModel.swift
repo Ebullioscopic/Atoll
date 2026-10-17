@@ -222,6 +222,27 @@ class BatteryStatusViewModel: ObservableObject {
         )
     }
 
+    /// Restarts the low battery HUD's auto-hide timer, giving the pointer time
+    /// to click it. The HUD's token is left alone, so the view stays the same
+    /// view and nothing re-animates.
+    func holdLowBatteryHUDForInteraction() {
+        guard activeTemporaryHUDKind == .lowBattery,
+              coordinator.expandingView.show,
+              coordinator.expandingView.type == .battery else { return }
+
+        coordinator.toggleExpandingView(
+            status: true,
+            type: .battery,
+            autoHideDuration: Self.lowBatteryHUDHoldDuration(configured: Defaults[.lowBatteryHUDDuration])
+        )
+    }
+
+    /// Never shorter than the duration the user chose, and never so short
+    /// that a HUD set to one second vanishes under the pointer.
+    static func lowBatteryHUDHoldDuration(configured: Int) -> TimeInterval {
+        TimeInterval(max(configured, 5))
+    }
+
     private func resolvedTemporaryHUDTargetScreenName() -> String? {
         if Defaults[.showOnAllDisplays] {
             return nil
