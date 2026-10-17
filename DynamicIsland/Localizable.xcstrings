@@ -1,6 +1,50 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Adapter: %lldW" : {
+      "comment" : "Battery menu row: the connected power adapter's rated wattage.",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adaptör: %lldW"
+          }
+        }
+      }
+    },
+    "Charging at %@" : {
+      "comment" : "Battery menu row: live power going into the battery, e.g. 42W.",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ile şarj oluyor"
+          }
+        }
+      }
+    },
+    "Using %@" : {
+      "comment" : "Battery menu row: live power drawn from the battery, e.g. 14W.",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ harcanıyor"
+          }
+        }
+      }
+    },
+    "Show charging wattage" : {
+      "comment" : "Battery settings toggle.",
+      "localizations" : {
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şarj gücünü göster"
+          }
+        }
+      }
+    },
     "Pinned lyric context" : {
       "comment" : "Pinned lyrics setting in Media settings.",
       "localizations" : {

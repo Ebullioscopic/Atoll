@@ -1544,6 +1544,10 @@ struct Charge: View {
                         Text("Show power status icons")
                     }
                     .settingsHighlight(id: highlightID("Show power status icons"))
+                    Defaults.Toggle(key: .showBatteryWattage) {
+                        Text("Show charging wattage")
+                    }
+                    .settingsHighlight(id: highlightID("Show charging wattage"))
                 } header: {
                     Text("Battery Information")
                 }
