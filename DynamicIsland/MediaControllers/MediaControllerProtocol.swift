@@ -27,6 +27,7 @@ import Combine
 protocol MediaControllerProtocol: ObservableObject {
     var playbackStatePublisher: AnyPublisher<PlaybackState, Never> { get }
     var isWorking: Bool { get }
+    @MainActor var supportsSeeking: Bool { get }
     func play() async
     func pause() async
     func seek(to time: Double) async
@@ -71,6 +72,7 @@ protocol MediaControllerProtocol: ObservableObject {
 }
 
 extension MediaControllerProtocol {
+    @MainActor var supportsSeeking: Bool { true }
     @MainActor var canEverFavorite: Bool { false }
     @MainActor var supportsFavoriting: Bool { false }
 

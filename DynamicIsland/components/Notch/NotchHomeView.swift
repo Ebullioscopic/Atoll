@@ -570,6 +570,7 @@ struct MusicControlsView: View {
                 guard !musicManager.isLiveStream else { return }
                 MusicManager.shared.seek(to: newValue)
             }
+            .allowsHitTesting(musicManager.activeSourceSupportsSeeking)
             .padding(.top, 5)
             .frame(height: 36)
         }

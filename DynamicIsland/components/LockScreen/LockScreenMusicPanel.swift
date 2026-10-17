@@ -745,6 +745,7 @@ struct LockScreenMusicPanel: View {
                 tintOverride: progressSliderTint,
                 desaturatesWhenIdle: true
             )
+            .allowsHitTesting(musicManager.activeSourceSupportsSeeking)
         }
         .onAppear {
             sliderValue = musicManager.elapsedTime
