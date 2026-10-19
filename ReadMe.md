@@ -52,6 +52,7 @@ Atoll turns the MacBook notch into a focused command surface for media, system i
 - Lock screen widgets for media, timers, charging, Bluetooth devices, and weather.
 - Lightweight system insight for CPU, GPU, memory, network, and disk usage.
 - Productivity tools including timers, clipboard history, color picker, and calendar previews.
+- Optional Dock app window previews inside the notch, with restore, minimize, and close controls.
 - Customization for layouts, animations, hover behavior, and shortcut remapping.
 
 ## Other Features
@@ -84,6 +85,13 @@ Atoll turns the MacBook notch into a focused command surface for media, system i
 - Choose appearance, animation style, and per‑feature toggles.
 - Remap global shortcuts and adjust hover behaviour.
 - Enable lock screen widgets and select data sources.
+
+## Dock Previews
+Enable **Settings → Dock Previews → Enable Dock previews**, then hover over a Dock application. Its windows appear temporarily inside the existing notch; your selected tab is preserved. Move into the preview to select, minimize, restore, or close a window. The close button dismisses the preview; moving away dismisses it after the configured delay.
+
+Accessibility is required to identify Dock apps and control windows. Screen Recording is optional: without it, cards show application icons and window titles instead of thumbnails. Grant permissions from this settings pane and relaunch if macOS requests it. Choose hover/dismiss delays, card size, and whether minimized windows appear. The feature is off by default and does not poll while disabled or without Accessibility permission.
+
+For reproducible checks, run `bash scripts/verify_dock_previews.sh`; add `--live` to test native actions on temporary Finder windows (requires Accessibility, with optional Screen Recording for capture checks). The script restores the previously active application and closes its fixture windows. Rendered examples: [wide preview](docs/images/dock-preview-wide.png) and [compact preview](docs/images/dock-preview-compact.png).
 
 ## Gesture Controls
 - Two-finger swipe down to open the notch when hover-to-open is disabled; swipe up to close.

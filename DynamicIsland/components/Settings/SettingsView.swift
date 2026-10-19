@@ -63,6 +63,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case colorPicker
     case downloads
     case shelf
+    case dockPreviews
     case shortcuts
     case notes
     case terminal
@@ -78,7 +79,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .hudAndOSD, .battery:                                           return .system
         case .timer, .calendar, .notes:                                      return .productivity
         case .clipboard, .screenAssistant, .colorPicker, .shelf,
-             .downloads, .shortcuts:                                         return .utilities
+             .downloads, .shortcuts, .dockPreviews:                                         return .utilities
         case .stats, .terminal:                                              return .developer
         case .extensions:                                                    return .integrations
         case .about:                                                         return .info
@@ -104,6 +105,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .colorPicker: return String(localized: "Color Picker")
         case .downloads: return String(localized: "Downloads")
         case .shelf: return String(localized: "Shelf")
+        case .dockPreviews: return String(localized: "Dock Previews")
         case .shortcuts: return String(localized: "Shortcuts")
         case .notes: return String(localized: "Notes")
         case .terminal: return String(localized: "Terminal")
@@ -130,6 +132,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .colorPicker: return "eyedropper"
         case .downloads: return "square.and.arrow.down"
         case .shelf: return "books.vertical"
+        case .dockPreviews: return "macwindow.on.rectangle"
         case .shortcuts: return "keyboard"
         case .notes: return "note.text"
         case .terminal: return "apple.terminal"
@@ -156,6 +159,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .colorPicker: return .accentColor
         case .downloads: return .gray
         case .shelf: return .brown
+        case .dockPreviews: return .blue
         case .shortcuts: return .orange
         case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
@@ -696,6 +700,9 @@ struct SettingsView: View {
     private var settingsSearchIndex: [SettingsSearchEntry] {
         [
             // General
+            SettingsSearchEntry(tab: .dockPreviews, title: "Enable Dock previews", keywords: ["dock", "window", "thumbnail", "hover", "preview"], highlightID: SettingsTab.dockPreviews.highlightID(for: "Enable Dock previews")),
+            SettingsSearchEntry(tab: .dockPreviews, title: "Hover delay", keywords: ["dock", "dwell", "delay"], highlightID: SettingsTab.dockPreviews.highlightID(for: "Hover delay")),
+            SettingsSearchEntry(tab: .dockPreviews, title: "Include minimized windows", keywords: ["dock", "minimized", "restore"], highlightID: SettingsTab.dockPreviews.highlightID(for: "Include minimized windows")),
             SettingsSearchEntry(tab: .general, title: "Enable Minimalistic UI", keywords: ["minimalistic", "ui mode", "general"], highlightID: SettingsTab.general.highlightID(for: "Enable Minimalistic UI")),
             SettingsSearchEntry(tab: .general, title: "Menubar icon", keywords: ["menu bar", "status bar", "icon"], highlightID: SettingsTab.general.highlightID(for: "Menubar icon")),
             SettingsSearchEntry(tab: .general, title: "Launch at login", keywords: ["autostart", "startup"], highlightID: SettingsTab.general.highlightID(for: "Launch at login")),
@@ -1008,6 +1015,8 @@ struct SettingsView: View {
             SettingsForm(tab: .downloads) {
                 Downloads()
             }
+        case .dockPreviews:
+            SettingsForm(tab: .dockPreviews) { DockPreviewSettings() }
         case .shelf:
             SettingsForm(tab: .shelf) {
                 Shelf()
@@ -8690,5 +8699,61 @@ private extension QuickShareProvider {
 
     var symbolFallbackName: String {
         id == "System Share Menu" ? "square.and.arrow.up.on.square" : "square.and.arrow.up"
+    }
+}
+
+
+struct DockPreviewSettings: View {
+    @Default(.dockPreviewHoverDelay) private var hoverDelay
+    @Default(.dockPreviewDismissDelay) private var dismissDelay
+    @Default(.dockPreviewCardWidth) private var cardWidth
+    @ObservedObject private var permission = AccessibilityPermissionStore.shared
+    @ObservedObject private var manager = DockPreviewManager.shared
+
+    var body: some View {
+        Form {
+            Section {
+                Defaults.Toggle(key: .dockPreviewEnabled) { Text("Enable Dock previews") }
+                    .settingsHighlight(id: SettingsTab.dockPreviews.highlightID(for: "Enable Dock previews"))
+                Text("Hover over an application in the Dock to preview its windows in Atoll. Select a window to bring it forward, or use its minimize and close controls.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: { Text("Dock Previews") }
+            Section {
+                if permission.isAuthorized {
+                    Label("Accessibility access granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                } else {
+                    Text("Accessibility is required to detect Dock applications and control their windows.").font(.callout)
+                    Button("Allow Accessibility Access") { permission.requestAuthorizationPrompt() }
+                    Button("Open Accessibility Settings") { permission.openSystemSettings() }
+                }
+                if manager.hasScreenRecording {
+                    Label("Screen Recording access granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                } else {
+                    Text("Screen Recording is optional. Without it, previews show app icons and window titles; activation, minimize, restore, and close still work.").font(.callout)
+                    Button("Allow Window Thumbnails") { manager.requestScreenRecording() }
+                    Button("Open Screen Recording Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") { NSWorkspace.shared.open(url) }
+                    }
+                }
+            } header: { Text("Permissions") }
+            Section {
+                LabeledContent("Hover delay") {
+                    Slider(value: $hoverDelay, in: 0.15...1.5, step: 0.05).frame(width: 150)
+                    Text(hoverDelay, format: .number.precision(.fractionLength(2))).monospacedDigit()
+                }.settingsHighlight(id: SettingsTab.dockPreviews.highlightID(for: "Hover delay"))
+                LabeledContent("Dismiss delay") {
+                    Slider(value: $dismissDelay, in: 0.5...2, step: 0.1).frame(width: 150)
+                    Text(dismissDelay, format: .number.precision(.fractionLength(1))).monospacedDigit()
+                }
+                Picker("Thumbnail size", selection: $cardWidth) {
+                    Text("Small").tag(160.0); Text("Medium").tag(200.0); Text("Large").tag(240.0)
+                }
+                Defaults.Toggle(key: .dockPreviewIncludeMinimized) { Text("Include minimized windows") }
+                    .settingsHighlight(id: SettingsTab.dockPreviews.highlightID(for: "Include minimized windows"))
+                Text("The dismiss delay gives you time to move from the Dock into the notch. Images refresh only while previews are being viewed. Atoll keeps your selected tab and restores it when the preview closes.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: { Text("Behavior") }
+        }
+        .onAppear { permission.refreshStatus(); manager.configure() }
     }
 }

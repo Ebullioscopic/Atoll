@@ -125,6 +125,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
     private var windowsHiddenForLock = false
     private var optionalShortcutHandlersRegistered = false
+    private weak var dockPreviewViewModel: DynamicIslandViewModel?
+    private var dockPreviewOpenedNotch = false
     private weak var focusWithoutDevToolsMenuItem: NSMenuItem?
     private weak var focusUseDevToolsMenuItem: NSMenuItem?
     
@@ -240,6 +242,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        DockPreviewManager.shared.stop()
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]
@@ -431,6 +434,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func calculateRequiredNotchSize() -> CGSize {
+        if DockPreviewManager.shared.session != nil {
+            return addShadowPadding(to: DockPreviewManager.shared.contentSize, isMinimalistic: Defaults[.enableMinimalisticUI])
+        }
         // Check if inline sneak peek is showing and notch is closed
         let airPodsListeningModeSneakActive = vm.notchState == .closed &&
                                       coordinator.sneakPeek.show &&
@@ -576,7 +582,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
     
+    /// Presents Dock previews through the existing per-display notch windows.
+    private func configureDockPreviews() {
+        let manager = DockPreviewManager.shared
+        manager.resolveScreen = { [weak self] hoveredScreen in
+            guard let self else { return nil }
+            if Defaults[.showOnAllDisplays] { return self.viewModels[hoveredScreen]?.screen }
+            return self.window == nil ? nil : self.vm.screen
+        }
+        manager.previewFrame = { [weak self] name in
+            guard let self else { return nil }
+            if Defaults[.showOnAllDisplays] {
+                return self.windows.first { $0.key.localizedName == name }?.value.frame
+            }
+            return self.window?.frame
+        }
+        manager.onPresent = { [weak self] name in
+            guard let self else { return }
+            let model = Defaults[.showOnAllDisplays]
+                ? self.viewModels.first { $0.key.localizedName == name }?.value : self.vm
+            guard let model else { return }
+            self.dockPreviewViewModel = model
+            self.dockPreviewOpenedNotch = model.notchState != .open
+            model.open()
+        }
+        manager.onDismiss = { [weak self] restoreCollapsed in
+            guard let self else { return }
+            if restoreCollapsed && self.dockPreviewOpenedNotch {
+                let previousTab = self.coordinator.currentView
+                self.dockPreviewViewModel?.close()
+                self.coordinator.currentView = previousTab
+            }
+            self.dockPreviewViewModel = nil
+            self.dockPreviewOpenedNotch = false
+        }
+        manager.$session.receive(on: RunLoop.main).sink { [weak self] _ in self?.updateWindowSizeIfNeeded() }.store(in: &cancellables)
+        manager.start()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        configureDockPreviews()
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]

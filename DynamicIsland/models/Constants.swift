@@ -843,6 +843,13 @@ extension Defaults.Keys {
         // MARK: Behavior
     static let minimumHoverDuration = Key<TimeInterval>("minimumHoverDuration", default: 0.3)
     static let enableHaptics = Key<Bool>("enableHaptics", default: true)
+    // Dock previews are opt-in and do not request permissions on launch.
+    static let dockPreviewEnabled = Key<Bool>("dockPreviewEnabled", default: false)
+    static let dockPreviewHoverDelay = Key<Double>("dockPreviewHoverDelay", default: 0.4)
+    static let dockPreviewDismissDelay = Key<Double>("dockPreviewDismissDelay", default: 0.9)
+    static let dockPreviewCardWidth = Key<Double>("dockPreviewCardWidth", default: 200)
+    static let dockPreviewIncludeMinimized = Key<Bool>("dockPreviewIncludeMinimized", default: true)
+
     static let openNotchOnHover = Key<Bool>("openNotchOnHover", default: true)
 	static let extendHoverArea = Key<Bool>("extendHoverArea", default: false)
     static let externalDisplayStyle = Key<ExternalDisplayStyle>(

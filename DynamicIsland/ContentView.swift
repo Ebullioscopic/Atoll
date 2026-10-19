@@ -36,6 +36,7 @@ import UIKit
 
 @MainActor
 struct ContentView: View {
+    @ObservedObject private var dockPreview = DockPreviewManager.shared
     @EnvironmentObject var vm: DynamicIslandViewModel
     @EnvironmentObject var webcamManager: WebcamManager
 
@@ -96,6 +97,7 @@ struct ContentView: View {
     
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
+        if dockPreview.isPresented(on: vm.screen) { return dockPreview.contentSize }
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: isDynamicIslandMode) : openNotchSize
         
         // When inline sneak peek is active in closed notch, use the wider inline width
@@ -627,6 +629,7 @@ struct ContentView: View {
                 }
 
                 // Reset hover state when notch state changes
+                if newState == .closed && dockPreview.isPresented(on: vm.screen) { dockPreview.dismiss() }
                 if newState == .closed && isHovering {
                     withAnimation {
                         isHovering = false
@@ -689,6 +692,7 @@ struct ContentView: View {
                 }
             }
             .onChange(of: coordinator.currentView) { _, newValue in
+                if dockPreview.isPresented(on: vm.screen) { dockPreview.dismiss(keepNotchOpen: true) }
                 if enableStatsFeature {
                     let currentViewString = newValue == .stats ? "stats" : "other"
                     statsManager.updateMonitoringState(
@@ -1081,6 +1085,9 @@ struct ContentView: View {
               ZStack {
                   if vm.notchState == .open {
                       Group {
+                          if dockPreview.isPresented(on: vm.screen) {
+                              DockPreviewView(manager: dockPreview)
+                          } else {
                           switch coordinator.currentView {
                               case .home:
                                   NotchHomeView(albumArtNamespace: albumArtNamespace)
@@ -1106,6 +1113,7 @@ struct ContentView: View {
                                 } else {
                                     NotchHomeView(albumArtNamespace: albumArtNamespace)
                                 }
+                          }
                           }
                       }
                       .id(coordinator.currentView)
@@ -2159,7 +2167,7 @@ struct ContentView: View {
     }
 
     private func shouldPreventAutoClose() -> Bool {
-        coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
+        dockPreview.isPresented(on: vm.screen) || coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
     }
     
     // Helper to prevent rapid haptic feedback

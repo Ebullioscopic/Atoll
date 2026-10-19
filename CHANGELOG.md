@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Opt-in Dock window previews inside the existing notch, with native window activation, restore, minimize, and close; configurable delays, card size, minimized windows, and permission guidance.
 
 ### Changed
 
