@@ -211,12 +211,15 @@ struct DockPreviewInstalledSmoke {
                 try await Task.sleep(for: .milliseconds(150))
                 post(48, flags: [.maskCommand, .maskShift]); post(48, flags: [.maskCommand, .maskShift], type: .keyUp)
                 try await Task.sleep(for: .milliseconds(800))
-                let chromeRoot = AXUIElementCreateApplication(chrome.processIdentifier)
-                var candidates = attribute(chromeRoot, kAXWindowsAttribute) as? [AXUIElement] ?? []
-                for key in [kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
-                    if let raw = attribute(chromeRoot, key), CFGetTypeID(raw) == AXUIElementGetTypeID() { candidates.append(raw as! AXUIElement) }
-                }
-                let expected = Set(candidates.filter { attribute($0, kAXSubroleAttribute) as? String == kAXStandardWindowSubrole }.compactMap { DockPreviewNativeWindowIdentity.windowID(for: $0) })
+                let entries = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+                let expected = Set(entries.filter { entry in
+                    guard entry[kCGWindowOwnerPID as String] as? pid_t == chrome.processIdentifier,
+                          entry[kCGWindowLayer as String] as? Int == 0,
+                          !(entry[kCGWindowName as String] as? String ?? "").isEmpty,
+                          let raw = entry[kCGWindowBounds as String] as? NSDictionary,
+                          let bounds = CGRect(dictionaryRepresentation: raw) else { return false }
+                    return bounds.width >= 120 && bounds.height >= 120
+                }.compactMap { $0[kCGWindowNumber as String] as? CGWindowID })
                 guard !expected.isEmpty, let preview = (attribute(root, kAXWindowsAttribute) as? [AXUIElement] ?? []).first(where: { find($0, text: "Dismiss Dock preview") != nil }) else { try fail("Chrome preview not available"); return }
                 var cards = 0
                 func countCards(_ element: AXUIElement, depth: Int = 0) {
@@ -226,9 +229,10 @@ struct DockPreviewInstalledSmoke {
                     for child in attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? [] { countCards(child, depth: depth + 1) }
                 }
                 countCards(preview)
-                // This live case intentionally targets Chrome's single real
-                // window plus its extra full-screen toolbar/menu surfaces.
-                guard expected.count != 1 || cards == 1 else { try fail("Chrome shows helper cards instead of its one native window: \(cards)"); return }
+                guard cards > 0, cards <= expected.count,
+                      cards == expected.count || find(preview, text: "Next windows") != nil else {
+                    try fail("Chrome omitted separate windows: \(cards) cards for \(expected.count) native windows without overflow paging"); return
+                }
                 post(53, flags: .maskCommand); post(53, flags: .maskCommand, type: .keyUp); post(55, type: .flagsChanged)
                 print("PASS installed Chrome preview: \(cards) visible cards for \(expected.count) native browser windows")
             }

@@ -15,9 +15,11 @@ swiftc -parse-as-library \
 
 # --installed opens Settings; --preview additionally enables the opt-in keyboard
 # flow and verifies it against the installed build (requires its permissions).
-if [[ " $* " == *" --installed "* ]]; then
+if [[ " $* " == *" --installed "* || " $* " == *" --installed-multiple "* ]]; then
     swiftc -parse-as-library DynamicIsland/managers/DockPreview/DockPreviewNativeWindowIdentity.swift tests/DockPreviewInstalledSmoke.swift -o .build/dock-preview-verification/installed-smoke
-    .build/dock-preview-verification/installed-smoke "$@"
+    if [[ " $* " == *" --installed "* ]]; then
+        .build/dock-preview-verification/installed-smoke "$@"
+    fi
 fi
 
 # Opt-in local QuickTime fixture; enters/exits full screen and restores app state.
@@ -39,5 +41,5 @@ if [[ " $* " == *" --identity "* ]]; then
         DynamicIsland/managers/DockPreview/DockPreviewService.swift \
         tests/DockPreviewIdentityRegression.swift \
         -o .build/dock-preview-verification/identity-regression
-    .build/dock-preview-verification/identity-regression
+    .build/dock-preview-verification/identity-regression "$@"
 fi

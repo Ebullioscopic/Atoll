@@ -11,6 +11,7 @@ actor DockPreviewService {
     private var cachedImages: [CGWindowID: (Date, CGImage)] = [:]
     private var knownTitles: [UInt: String] = [:]
     private var processID: pid_t?
+    private var serverOnlyWindows: [UInt: DockPreviewWindow] = [:]
 
     func target(at point: CGPoint, dockProcessID: pid_t) -> DockPreviewTarget? {
         let dock = AXUIElementCreateApplication(dockProcessID)
@@ -66,7 +67,10 @@ actor DockPreviewService {
             shareable = content.windows.filter { serverByID[$0.windowID] != nil && $0.windowLayer == 0 }
         }
         guard !Task.isCancelled else { return [] }
-        elements.removeAll()
+        // Chrome's AXWindows list can be scoped to the current Space. Keep
+        // known actionable proxies only while their native windows still exist.
+        elements = processID == pid ? elements.filter { serverByID[CGWindowID($0.key)] != nil } : [:]
+        serverOnlyWindows.removeAll()
         if processID != pid { knownTitles.removeAll(); cachedImages.removeAll() }
         processID = pid
         let previousWindows = captureWindows
@@ -127,13 +131,55 @@ actor DockPreviewService {
                 canMinimize: canMinimize, captureID: capture, isFullScreen: fullScreen))
             if result.count >= max(1, min(12, limit)) { break }
         }
-        cachedImages = cachedImages.filter { captureWindows[$0.key] != nil }
-        knownTitles = knownTitles.filter { elements[$0.key] != nil }
+        // Chromium may omit other-Space windows even when AXWindows succeeds.
+        // Supplement only named, live, substantial browser surfaces by native
+        // identity; anonymous toolbars/menus never become preview cards.
+        if chromium {
+            let menuTitles = browserWindowMenuItems(app).compactMap { string($0, kAXTitleAttribute) }
+            func menuTitle(for title: String) -> String? {
+                menuTitles.filter { title == $0 || title.hasPrefix($0 + " - ") }.max { $0.count < $1.count }
+            }
+            var remaining = Dictionary(menuTitles.map { ($0, 1) }, uniquingKeysWith: +)
+            for window in result {
+                if let key = menuTitle(for: window.title) { remaining[key, default: 0] -= 1 }
+            }
+            for metadata in serverWindows {
+                guard result.count < max(1, min(12, limit)),
+                      let windowID = metadata[kCGWindowNumber as String] as? CGWindowID,
+                      !seen.contains(windowID),
+                      let title = metadata[kCGWindowName as String] as? String,
+                      !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      (metadata[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                      let raw = metadata[kCGWindowBounds as String] as? NSDictionary,
+                      let frame = CGRect(dictionaryRepresentation: raw), frame.width >= 120, frame.height >= 120 else { continue }
+                let id = UInt(windowID)
+                let element = elements[id]
+                // A closed Chromium window can keep a backing surface on an
+                // inactive Space. Its invalid AX proxy and live menu membership
+                // distinguish it from an open window with the same page title.
+                if let element, string(element, kAXRoleAttribute) != kAXWindowRole { continue }
+                guard let menuKey = menuTitle(for: title), remaining[menuKey, default: 0] > 0 else { continue }
+                remaining[menuKey, default: 0] -= 1
+                let minimized = element.flatMap { attribute($0, kAXMinimizedAttribute) as? Bool } ?? false
+                if minimized && !includeMinimized { continue }
+                let window = DockPreviewWindow(id: id, title: title, frame: frame, isMinimized: minimized,
+                    canClose: element.flatMap { attribute($0, kAXCloseButtonAttribute) } != nil,
+                    canMinimize: element != nil, captureID: allowCapture ? windowID : nil,
+                    isFullScreen: DockPreviewGeometry.matchesFullScreen(frame, displays: displayBounds))
+                seen.insert(windowID)
+                result.append(window)
+                if element == nil { serverOnlyWindows[id] = window }
+                knownTitles[id] = title
+            }
+        }
+        cachedImages = cachedImages.filter { captureWindows[$0.key] != nil || serverOnlyWindows[UInt($0.key)] != nil }
+        knownTitles = knownTitles.filter { elements[$0.key] != nil || serverOnlyWindows[$0.key] != nil }
         return result
     }
 
     func thumbnail(for id: CGWindowID, width: Int) async -> CGImage? {
-        guard elements[UInt(id)] != nil, !Task.isCancelled, CGPreflightScreenCaptureAccess() else { return nil }
+        guard elements[UInt(id)] != nil || serverOnlyWindows[UInt(id)] != nil else { return nil }
+        guard !Task.isCancelled, CGPreflightScreenCaptureAccess() else { return nil }
         if let cached = cachedImages[id], Date().timeIntervalSince(cached.0) < 60 { return cached.1 }
         var image: CGImage?
         if let window = captureWindows[id] {
@@ -152,7 +198,12 @@ actor DockPreviewService {
     }
 
     func perform(_ action: DockPreviewAction, windowID: UInt, pid: pid_t) async -> Bool {
-        guard processID == pid, let window = elements[windowID] else { return false }
+        guard processID == pid else { return false }
+        if elements[windowID] == nil {
+            guard case .activate = action, let window = serverOnlyWindows[windowID] else { return false }
+            return await activateServerWindow(window, pid: pid)
+        }
+        guard let window = elements[windowID] else { return false }
         switch action {
         case .activate:
             let app = AXUIElementCreateApplication(pid)
@@ -198,10 +249,57 @@ actor DockPreviewService {
         }
     }
 
+    private func browserWindowMenuItems(_ app: AXUIElement) -> [AXUIElement] {
+        guard let raw = attribute(app, kAXMenuBarAttribute), CFGetTypeID(raw) == AXUIElementGetTypeID() else { return [] }
+        let menus = attribute(raw as! AXUIElement, kAXChildrenAttribute) as? [AXUIElement] ?? []
+        // Chromium puts Window immediately before Help. Never match History,
+        // which also contains page titles but would navigate a browser tab.
+        guard let menu = menus.first(where: { string($0, kAXTitleAttribute) == "Window" })
+            ?? (menus.count >= 3 ? menus[menus.count - 2] : nil) else { return [] }
+        var items: [AXUIElement] = []
+        func collect(_ element: AXUIElement, depth: Int) {
+            guard depth < 5 else { return }
+            if string(element, kAXRoleAttribute) == kAXMenuItemRole,
+               !(string(element, kAXTitleAttribute) ?? "").isEmpty,
+               (string(element, "AXMenuItemCmdChar") ?? "").isEmpty { items.append(element) }
+            for child in attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? [] { collect(child, depth: depth + 1) }
+        }
+        collect(menu, depth: 0)
+        return items
+    }
+
+    /// A browser may hide another Space's AX proxy. Its native Window menu can
+    /// reveal that window without guessing another window's action target.
+    private func activateServerWindow(_ window: DockPreviewWindow, pid: pid_t) async -> Bool {
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.2)
+        let matches = browserWindowMenuItems(app).filter {
+            guard let title = string($0, kAXTitleAttribute) else { return false }
+            return title == window.title || window.title.hasPrefix(title + " - ")
+        }
+        guard !matches.isEmpty, matches.count <= 12 else { return false }
+        _ = AXUIElementSetAttributeValue(app, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+        // Identically titled browser windows are separate menu entries. Reveal
+        // candidates and verify the native ID instead of choosing by title alone.
+        for item in matches {
+            guard AXUIElementPerformAction(item, kAXPressAction as CFString) == .success else { continue }
+            for _ in 0..<10 {
+                guard !Task.isCancelled, processID == pid else { return false }
+                let windows = attribute(app, kAXWindowsAttribute) as? [AXUIElement] ?? []
+                if let target = windows.first(where: { DockPreviewNativeWindowIdentity.windowID(for: $0) == CGWindowID(window.id) }) {
+                    elements[window.id] = target
+                    return AXUIElementPerformAction(target, kAXRaiseAction as CFString) == .success
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
+        return false
+    }
+
     func invalidateThumbnails() { cachedImages.removeAll() }
 
     func clear() {
-        elements.removeAll(); captureWindows.removeAll(); cachedImages.removeAll(); knownTitles.removeAll(); processID = nil
+        elements.removeAll(); serverOnlyWindows.removeAll(); captureWindows.removeAll(); cachedImages.removeAll(); knownTitles.removeAll(); processID = nil
     }
 
     private func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
