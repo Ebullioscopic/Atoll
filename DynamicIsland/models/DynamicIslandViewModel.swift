@@ -353,11 +353,14 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         notchState = .open
 
         // Force music information update when notch is opened
-        MusicManager.shared.forceUpdate()
-        focusClipboardTabIfNeeded()
+        if !DockPreviewManager.shared.isPresented(on: screen) {
+            MusicManager.shared.forceUpdate()
+            focusClipboardTabIfNeeded()
+        }
     }
     
     private func calculateDynamicNotchSize() -> CGSize {
+        if DockPreviewManager.shared.isPresented(on: screen) { return DockPreviewManager.shared.contentSize }
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
         var adjustedSize = baseSize
 

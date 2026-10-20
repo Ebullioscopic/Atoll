@@ -36,6 +36,7 @@ import UIKit
 
 @MainActor
 struct ContentView: View {
+    @ObservedObject private var dockPreview = DockPreviewManager.shared
     @EnvironmentObject var vm: DynamicIslandViewModel
     @EnvironmentObject var webcamManager: WebcamManager
 
@@ -96,6 +97,7 @@ struct ContentView: View {
     
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
+        if dockPreview.isPresented(on: vm.screen) { return dockPreview.contentSize }
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: isDynamicIslandMode) : openNotchSize
         
         // When inline sneak peek is active in closed notch, use the wider inline width
@@ -523,11 +525,19 @@ struct ContentView: View {
 
     private var mainLayoutBase: some View {
         NotchLayout()
+            // The native window already includes the shell width. Reserve its
+            // flare/padding here instead of growing content beyond the window.
+            .frame(width: dockPreview.isPresented(on: vm.screen) && vm.notchState == .open
+                ? max(1, dynamicNotchSize.width - 24 - 2 * notchHorizontalPadding) : nil, alignment: .top)
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
             .background(.black)
             .clipShape(resolvedClipShape)
+            // Window enumeration also resizes the native host. Animating this
+            // shell on count changes interpolates its old host-relative origin,
+            // making a centered AppKit resize look like a sideways expansion.
+            // The notch-state animation below owns the opening/collapse motion.
             .compositingGroup()
             .shadow(
                 color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
@@ -627,6 +637,7 @@ struct ContentView: View {
                 }
 
                 // Reset hover state when notch state changes
+                if newState == .closed && dockPreview.isPresented(on: vm.screen) { dockPreview.dismiss() }
                 if newState == .closed && isHovering {
                     withAnimation {
                         isHovering = false
@@ -689,6 +700,7 @@ struct ContentView: View {
                 }
             }
             .onChange(of: coordinator.currentView) { _, newValue in
+                if dockPreview.isPresented(on: vm.screen) { dockPreview.dismiss(keepNotchOpen: true) }
                 if enableStatsFeature {
                     let currentViewString = newValue == .stats ? "stats" : "other"
                     statsManager.updateMonitoringState(
@@ -980,8 +992,15 @@ struct ContentView: View {
                       } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
                           DynamicIslandFaceAnimation().animation(.interactiveSpring, value: musicManager.isPlayerIdle)
                       } else if vm.notchState == .open {
-                          DynamicIslandHeader()
-                              .frame(height: (Defaults[.enableMinimalisticUI] && isDynamicIslandMode) ? nil : max(24, vm.effectiveClosedNotchHeight))
+                          if dockPreview.isPresented(on: vm.screen) {
+                              // The normal tab/utility header has a fixed notch
+                              // spacer and cannot fit compact preview widths.
+                              // Preserve only the physical camera clearance.
+                              Color.clear.frame(height: max(24, vm.effectiveClosedNotchHeight))
+                          } else {
+                              DynamicIslandHeader()
+                                  .frame(height: (Defaults[.enableMinimalisticUI] && isDynamicIslandMode) ? nil : max(24, vm.effectiveClosedNotchHeight))
+                          }
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
@@ -1081,6 +1100,11 @@ struct ContentView: View {
               ZStack {
                   if vm.notchState == .open {
                       Group {
+                          if dockPreview.isPresented(on: vm.screen) {
+                              DockPreviewView(manager: dockPreview)
+                                  .frame(maxWidth: .infinity, alignment: .top)
+                                  .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                          } else {
                           switch coordinator.currentView {
                               case .home:
                                   NotchHomeView(albumArtNamespace: albumArtNamespace)
@@ -1106,6 +1130,7 @@ struct ContentView: View {
                                 } else {
                                     NotchHomeView(albumArtNamespace: albumArtNamespace)
                                 }
+                          }
                           }
                       }
                       .id(coordinator.currentView)
@@ -2159,7 +2184,7 @@ struct ContentView: View {
     }
 
     private func shouldPreventAutoClose() -> Bool {
-        coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
+        dockPreview.isPresented(on: vm.screen) || coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
     }
     
     // Helper to prevent rapid haptic feedback

@@ -52,6 +52,7 @@ Atoll turns the MacBook notch into a focused command surface for media, system i
 - Lock screen widgets for media, timers, charging, Bluetooth devices, and weather.
 - Lightweight system insight for CPU, GPU, memory, network, and disk usage.
 - Productivity tools including timers, clipboard history, color picker, and calendar previews.
+- Optional Dock app window previews inside the notch, with restore, minimize, and close controls.
 - Customization for layouts, animations, hover behavior, and shortcut remapping.
 
 ## Other Features
@@ -84,6 +85,17 @@ Atoll turns the MacBook notch into a focused command surface for media, system i
 - Choose appearance, animation style, and per‑feature toggles.
 - Remap global shortcuts and adjust hover behaviour.
 - Enable lock screen widgets and select data sources.
+
+## Dock Previews
+Enable **Settings → Utilities → Dock Previews → Enable Dock previews**, then hover over a Dock application. Centered, compact window cards appear inside the existing notch with hover controls for minimize/restore, close, and moving to the notch's display. The layout budgets the notch's flare and padding; overflow uses whole-card pages rather than cutting off windows. Separate Chromium windows on other Spaces are included using named native WindowServer entries confirmed against the live Window menu when the browser exposes a partial Accessibility list. Anonymous toolbar surfaces remain excluded. Selecting an unexposed window uses the browser's Window menu and verifies its native ID; cached Accessibility proxies retain direct window actions. Full-screen windows are included through main/focused-window fallbacks and labeled with their state and display. Your selected tab and preceding open/collapsed state are restored when dismissed. The notch grows down from its screen's top edge, and its native window stays large enough for the closing animation to complete.
+
+Enable **Use ⌘Tab in the notch** separately to replace macOS app switching: hold Command and press Tab, use Shift to reverse or Left/Right to navigate, Escape to cancel, and release Command (or press Return) to activate the selected app. It falls back to the system switcher if disabled or unable to present. The unified app strip switches previews without returning to the Dock; background app cards offer Open, Hide, and Quit. The active media application also exposes its existing playback controls, including seeking when duration is available.
+
+The settings pane includes hover/dismiss delays, compact/medium/large cards, minimized windows, unified app strip, move-to-focused-display on activation, background cards, snapshots, and permission re-checking. Accessibility is required for Dock detection and window control. Screen Recording is optional: without it, cards show icons and titles. Snapshot capture can be switched off independently. No new permission request is made automatically, and previews/keyboard interception are off by default.
+
+Run `bash scripts/verify_dock_previews.sh` for layout, keyboard-routing, and rendering checks. Add `--live` for native event-tap, window actions, and capture checks using temporary Finder fixtures. Add `--fullscreen` to enter/exit native full screen on a fixture and verify titles, snapshots across Spaces, and deduplication. Add `--video` for a generated local QuickTime movie fixture that tests full-screen titles/snapshots on current and other Spaces. After installing and launching Atoll, add `--installed` to verify sidebar navigation and all controls. Adding `--preview` **enables Dock previews and its Command-Tab setting** and verifies the installed keyboard workflow and visible card bounds with a temporary Finder window; it leaves those two options enabled. Add `--animation` with `--installed --preview` to capture opening frames and check that the notch center stays connected. `--chrome` checks the installed Chrome card count; `--identity` checks exact window IDs and snapshots in running apps without logging titles or saving images. Add `--identity --chrome-multiple` to create two temporary blank Chrome windows and verify all browser previews/snapshots across Spaces, including existing windows. `--activate-other-space` additionally selects off-Space windows by verified native ID; `--installed-multiple` checks visible cards and overflow paging in the installed app while the fixtures are open. These opt-in Chrome fixtures also require Automation access for the test runner's `osascript`; Atoll itself uses Accessibility. These checks require the relevant Accessibility/Screen Recording grants and never grant permissions themselves. Fixture windows/folders are cleaned up afterward.
+
+Rendered examples: [wide preview](docs/images/dock-preview-wide.png), [compact preview](docs/images/dock-preview-compact.png), and [installed settings](docs/images/dock-preview-settings.png).
 
 ## Gesture Controls
 - Two-finger swipe down to open the notch when hover-to-open is disabled; swipe up to close.
