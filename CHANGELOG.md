@@ -8,11 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Optional Command-Tab notch switching, unified Dock app strip, background app actions, media controls, and snapshot/display behavior settings.
 - Opt-in Dock window previews inside the existing notch, with native window activation, restore, minimize, and close; configurable delays, card size, minimized windows, and permission guidance.
 
 ### Changed
 
 ### Fixed
+- Dock Preview settings now appear in the Utilities sidebar. Preview sizing includes notch padding, shows whole-card pages, removes the oversized tab header at compact widths, and keeps the window top anchored during opening/collapse. Full-screen windows are discovered through main/focused-window fallback and labeled with their state. Missing Accessibility titles use capture/WindowServer metadata or a remembered title; full-screen/video snapshots can match by geometry when AX omits its title. Native hosting size is prepared before opening to avoid a detached origin.
 
 ### Removed
 

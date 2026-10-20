@@ -525,11 +525,16 @@ struct ContentView: View {
 
     private var mainLayoutBase: some View {
         NotchLayout()
+            // The native window already includes the shell width. Reserve its
+            // flare/padding here instead of growing content beyond the window.
+            .frame(width: dockPreview.isPresented(on: vm.screen)
+                ? max(1, dynamicNotchSize.width - 24 - 2 * notchHorizontalPadding) : nil, alignment: .top)
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
             .background(.black)
             .clipShape(resolvedClipShape)
+            .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.32, dampingFraction: 0.9), value: dockPreview.session?.windows.count)
             .compositingGroup()
             .shadow(
                 color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
@@ -984,8 +989,15 @@ struct ContentView: View {
                       } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
                           DynamicIslandFaceAnimation().animation(.interactiveSpring, value: musicManager.isPlayerIdle)
                       } else if vm.notchState == .open {
-                          DynamicIslandHeader()
-                              .frame(height: (Defaults[.enableMinimalisticUI] && isDynamicIslandMode) ? nil : max(24, vm.effectiveClosedNotchHeight))
+                          if dockPreview.isPresented(on: vm.screen) {
+                              // The normal tab/utility header has a fixed notch
+                              // spacer and cannot fit compact preview widths.
+                              // Preserve only the physical camera clearance.
+                              Color.clear.frame(height: max(24, vm.effectiveClosedNotchHeight))
+                          } else {
+                              DynamicIslandHeader()
+                                  .frame(height: (Defaults[.enableMinimalisticUI] && isDynamicIslandMode) ? nil : max(24, vm.effectiveClosedNotchHeight))
+                          }
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
@@ -1087,6 +1099,8 @@ struct ContentView: View {
                       Group {
                           if dockPreview.isPresented(on: vm.screen) {
                               DockPreviewView(manager: dockPreview)
+                                  .frame(maxWidth: .infinity, alignment: .top)
+                                  .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
                           } else {
                           switch coordinator.currentView {
                               case .home:

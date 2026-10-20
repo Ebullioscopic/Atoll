@@ -604,7 +604,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let model else { return }
             self.dockPreviewViewModel = model
             self.dockPreviewOpenedNotch = model.notchState != .open
-            model.open()
+            // Other Atoll tabs expand inside an already-sized hosting window.
+            // Prepare that envelope without animating its AppKit coordinates,
+            // then open on the next layout pass. Resizing inside the opening
+            // transaction makes SwiftUI animate from the window's old bottom.
+            var preparation = Transaction(animation: nil)
+            preparation.disablesAnimations = true
+            withTransaction(preparation) {
+                self.updateWindowSizeIfNeeded()
+                let targetWindow = Defaults[.showOnAllDisplays]
+                    ? self.windows.first { $0.key.localizedName == name }?.value : self.window
+                targetWindow?.contentView?.layoutSubtreeIfNeeded()
+            }
+            DispatchQueue.main.async { [weak model] in
+                guard manager.isPresented(on: name) else { return }
+                model?.open()
+            }
         }
         manager.onDismiss = { [weak self] restoreCollapsed in
             guard let self else { return }
@@ -616,7 +631,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.dockPreviewViewModel = nil
             self.dockPreviewOpenedNotch = false
         }
-        manager.$session.receive(on: RunLoop.main).sink { [weak self] _ in self?.updateWindowSizeIfNeeded() }.store(in: &cancellables)
+        manager.$session.receive(on: RunLoop.main).sink { [weak self] session in
+            guard let self else { return }
+            if session != nil { self.updateWindowSizeIfNeeded() }
+            else {
+                // Keep the native window envelope until the top-anchored
+                // SwiftUI collapse finishes; shrinking it first clips motion.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.updateWindowSizeIfNeeded() }
+            }
+        }.store(in: &cancellables)
         manager.start()
     }
 

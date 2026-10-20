@@ -506,6 +506,7 @@ struct SettingsView: View {
             .screenAssistant,
             .colorPicker,
             .shelf,
+            .dockPreviews,
             .downloads,
             .shortcuts,
             // Developer
@@ -700,6 +701,11 @@ struct SettingsView: View {
     private var settingsSearchIndex: [SettingsSearchEntry] {
         [
             // General
+            SettingsSearchEntry(tab: .dockPreviews, title: "Use ⌘Tab in the notch", keywords: ["dock", "keyboard"], highlightID: nil),
+            SettingsSearchEntry(tab: .dockPreviews, title: "Show unified app strip", keywords: ["dock", "apps"], highlightID: nil),
+            SettingsSearchEntry(tab: .dockPreviews, title: "Move window to focused screen on click", keywords: ["dock", "display"], highlightID: nil),
+            SettingsSearchEntry(tab: .dockPreviews, title: "Show background process activity card", keywords: ["dock", "background"], highlightID: nil),
+            SettingsSearchEntry(tab: .dockPreviews, title: "Window snapshots", keywords: ["dock", "thumbnails"], highlightID: nil),
             SettingsSearchEntry(tab: .dockPreviews, title: "Enable Dock previews", keywords: ["dock", "window", "thumbnail", "hover", "preview"], highlightID: SettingsTab.dockPreviews.highlightID(for: "Enable Dock previews")),
             SettingsSearchEntry(tab: .dockPreviews, title: "Hover delay", keywords: ["dock", "dwell", "delay"], highlightID: SettingsTab.dockPreviews.highlightID(for: "Hover delay")),
             SettingsSearchEntry(tab: .dockPreviews, title: "Include minimized windows", keywords: ["dock", "minimized", "restore"], highlightID: SettingsTab.dockPreviews.highlightID(for: "Include minimized windows")),
@@ -8735,8 +8741,22 @@ struct DockPreviewSettings: View {
                         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") { NSWorkspace.shared.open(url) }
                     }
                 }
+                Button("Re-check permissions") { permission.refreshStatus(); manager.configure() }
             } header: { Text("Permissions") }
             Section {
+                Defaults.Toggle(key: .dockPreviewCommandTab) { Text("Use ⌘Tab in the notch") }
+                Text("Hold Command and press Tab to preview apps. Shift reverses, arrows navigate, Escape cancels, and releasing Command activates the selected app. The macOS switcher remains available when this option is off.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if Defaults[.dockPreviewEnabled] && Defaults[.dockPreviewCommandTab] && !manager.keyboardAvailable {
+                    Text("The keyboard monitor is unavailable. Check Accessibility access, then re-check permissions. macOS Command-Tab is still available.")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+                Defaults.Toggle(key: .dockPreviewShowAppStrip) { Text("Show unified app strip") }
+                Defaults.Toggle(key: .dockPreviewMoveToActiveDisplay) { Text("Move window to focused screen on click") }
+                Defaults.Toggle(key: .dockPreviewShowBackgroundProcesses) { Text("Show background process activity card") }
+                Defaults.Toggle(key: .dockPreviewThumbnails) { Text("Window snapshots") }
+                Text("Snapshots stay in memory. Turn them off to use icons and titles without capturing windows. Background cards provide Open, Hide, and Quit controls; active music apps also show playback controls.")
+                    .font(.caption).foregroundStyle(.secondary)
                 LabeledContent("Hover delay") {
                     Slider(value: $hoverDelay, in: 0.15...1.5, step: 0.05).frame(width: 150)
                     Text(hoverDelay, format: .number.precision(.fractionLength(2))).monospacedDigit()
@@ -8746,7 +8766,7 @@ struct DockPreviewSettings: View {
                     Text(dismissDelay, format: .number.precision(.fractionLength(1))).monospacedDigit()
                 }
                 Picker("Thumbnail size", selection: $cardWidth) {
-                    Text("Small").tag(160.0); Text("Medium").tag(200.0); Text("Large").tag(240.0)
+                    Text("Compact").tag(156.0); Text("Medium").tag(200.0); Text("Large").tag(240.0)
                 }
                 Defaults.Toggle(key: .dockPreviewIncludeMinimized) { Text("Include minimized windows") }
                     .settingsHighlight(id: SettingsTab.dockPreviews.highlightID(for: "Include minimized windows"))
@@ -8754,6 +8774,7 @@ struct DockPreviewSettings: View {
                     .font(.caption).foregroundStyle(.secondary)
             } header: { Text("Behavior") }
         }
+        .navigationTitle("Dock Previews")
         .onAppear { permission.refreshStatus(); manager.configure() }
     }
 }

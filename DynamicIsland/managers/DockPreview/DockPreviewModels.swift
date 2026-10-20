@@ -15,6 +15,8 @@ struct DockPreviewWindow: Identifiable, Sendable {
     let canClose: Bool
     let canMinimize: Bool
     let captureID: CGWindowID?
+    var isFullScreen = false
+    var displayName = ""
 }
 
 struct DockPreviewSession: Identifiable {
@@ -26,7 +28,7 @@ struct DockPreviewSession: Identifiable {
     var windows: [DockPreviewWindow]
 }
 
-enum DockPreviewAction: Sendable { case activate, minimize, close }
+enum DockPreviewAction: Sendable { case activate, minimize, close, move(CGRect) }
 
 enum DockPreviewGeometry {
     /// Accessibility and ScreenCaptureKit use the primary screen's top-left origin.
@@ -46,7 +48,7 @@ enum DockPreviewGeometry {
     static func captureMatchScore(title: String, frame: CGRect, candidateTitle: String?, candidateFrame: CGRect) -> CGFloat {
         let distance = abs(frame.minX - candidateFrame.minX) + abs(frame.minY - candidateFrame.minY)
             + abs(frame.width - candidateFrame.width) + abs(frame.height - candidateFrame.height)
-        return distance + (candidateTitle == title ? 0 : 1000)
+        return distance + (title.isEmpty || candidateTitle?.isEmpty != false || candidateTitle == title ? 0 : 1000)
     }
 }
 
@@ -63,4 +65,36 @@ struct DockPreviewHoverState {
         applicationURL != nil && now - enteredAt >= max(0.15, min(1.5, delay))
     }
     mutating func reset() { applicationURL = nil; enteredAt = 0 }
+}
+
+struct DockPreviewApplication: Identifiable {
+    let id: pid_t
+    let url: URL
+    let name: String
+    var windowCount: Int
+}
+
+/// Shared shell/card sizing. A page contains whole cards, never half windows.
+enum DockPreviewLayout {
+    static let gap: CGFloat = 10
+    static let panelInset: CGFloat = 12
+    static let shellInset: CGFloat = 44
+    static func panelWidth(count: Int, cardWidth: CGFloat, maximum: CGFloat = 760) -> CGFloat {
+        let visible = CGFloat(min(4, max(1, count)))
+        return min(maximum, max(360, visible * cardWidth + max(0, visible - 1) * gap + 2 * (shellInset + panelInset)))
+    }
+    static func cardsPerPage(available: CGFloat, cardWidth: CGFloat) -> Int {
+        max(1, min(4, Int((max(0, available) + gap) / (cardWidth + gap))))
+    }
+    static func fittedCardWidth(available: CGFloat, preferred: CGFloat) -> CGFloat { min(preferred, max(1, available)) }
+}
+
+/// Full-screen video surfaces often omit AXTitle during a Space transition.
+enum DockPreviewWindowTitle {
+    static func resolve(accessibility: String?, capture: String?, document: String?, previous: String?, application: String) -> String {
+        for title in [accessibility, capture, document, previous] {
+            if let value = title?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty, value != "Untitled window" { return value }
+        }
+        return application
+    }
 }
