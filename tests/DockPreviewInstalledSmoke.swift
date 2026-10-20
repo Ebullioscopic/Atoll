@@ -186,6 +186,34 @@ struct DockPreviewInstalledSmoke {
             }
             guard NSWorkspace.shared.frontmostApplication?.processIdentifier == finder.processIdentifier else { try fail("Command release did not activate selected Finder app; active: \(NSWorkspace.shared.frontmostApplication?.localizedName ?? "none")"); return }
             print("PASS installed Command-Tab preview, card bounds, Escape, reverse selection, and release activation")
+            if CommandLine.arguments.contains("--chrome"), let chrome = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == "com.google.Chrome" }) {
+                chrome.activate()
+                try await Task.sleep(for: .milliseconds(300))
+                post(48, flags: .maskCommand); post(48, flags: .maskCommand, type: .keyUp)
+                try await Task.sleep(for: .milliseconds(150))
+                post(48, flags: [.maskCommand, .maskShift]); post(48, flags: [.maskCommand, .maskShift], type: .keyUp)
+                try await Task.sleep(for: .milliseconds(800))
+                let chromeRoot = AXUIElementCreateApplication(chrome.processIdentifier)
+                var candidates = attribute(chromeRoot, kAXWindowsAttribute) as? [AXUIElement] ?? []
+                for key in [kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
+                    if let raw = attribute(chromeRoot, key), CFGetTypeID(raw) == AXUIElementGetTypeID() { candidates.append(raw as! AXUIElement) }
+                }
+                let expected = Set(candidates.filter { attribute($0, kAXSubroleAttribute) as? String == kAXStandardWindowSubrole }.compactMap { DockPreviewNativeWindowIdentity.windowID(for: $0) })
+                guard !expected.isEmpty, let preview = (attribute(root, kAXWindowsAttribute) as? [AXUIElement] ?? []).first(where: { find($0, text: "Dismiss Dock preview") != nil }) else { try fail("Chrome preview not available"); return }
+                var cards = 0
+                func countCards(_ element: AXUIElement, depth: Int = 0) {
+                    guard depth < 20 else { return }
+                    let label = attribute(element, kAXTitleAttribute) as? String ?? attribute(element, kAXDescriptionAttribute) as? String ?? ""
+                    if attribute(element, kAXRoleAttribute) as? String == kAXButtonRole, label.hasPrefix("Activate ") { cards += 1 }
+                    for child in attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? [] { countCards(child, depth: depth + 1) }
+                }
+                countCards(preview)
+                // This live case intentionally targets Chrome's single real
+                // window plus its extra full-screen toolbar/menu surfaces.
+                guard expected.count != 1 || cards == 1 else { try fail("Chrome shows helper cards instead of its one native window: \(cards)"); return }
+                post(53, flags: .maskCommand); post(53, flags: .maskCommand, type: .keyUp); post(55, type: .flagsChanged)
+                print("PASS installed Chrome preview: \(cards) visible cards for \(expected.count) native browser windows")
+            }
         }
         if let outputIndex = CommandLine.arguments.firstIndex(of: "--output"), CommandLine.arguments.count > outputIndex + 1,
            let settings = (attribute(root, kAXWindowsAttribute) as? [AXUIElement])?.first(where: { attribute($0, kAXSubroleAttribute) as? String == kAXStandardWindowSubrole }) {

@@ -50,55 +50,71 @@ actor DockPreviewService {
         let serverWindows = (CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []).filter {
             $0[kCGWindowOwnerPID as String] as? pid_t == pid && $0[kCGWindowLayer as String] as? Int == 0
         }
-        let applicationName = NSRunningApplication(processIdentifier: pid)?.localizedName ?? "Application window"
+        let serverByID = Dictionary(serverWindows.compactMap { entry -> (CGWindowID, [String: Any])? in
+            guard let id = entry[kCGWindowNumber as String] as? CGWindowID else { return nil }
+            return (id, entry)
+        }, uniquingKeysWith: { first, _ in first })
+        let runningApplication = NSRunningApplication(processIdentifier: pid)
+        let applicationName = runningApplication?.localizedName ?? "Application window"
+        let chromium = ["com.google.Chrome", "com.google.Chrome.canary", "org.chromium.Chromium", "com.microsoft.edgemac", "com.brave.Browser"].contains(runningApplication?.bundleIdentifier ?? "")
+        var displayIDs = [CGDirectDisplayID](repeating: 0, count: 16)
+        var displayCount: UInt32 = 0
+        CGGetActiveDisplayList(16, &displayIDs, &displayCount)
+        let displayBounds = displayIDs.prefix(Int(displayCount)).map { CGDisplayBounds($0) }
         var shareable: [SCWindow] = []
         if allowCapture, let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false) {
-            shareable = content.windows.filter { $0.owningApplication?.processID == pid && $0.windowLayer == 0 }
+            shareable = content.windows.filter { serverByID[$0.windowID] != nil && $0.windowLayer == 0 }
         }
         guard !Task.isCancelled else { return [] }
         elements.removeAll()
+        if processID != pid { knownTitles.removeAll(); cachedImages.removeAll() }
         processID = pid
         let previousWindows = captureWindows
         cachedImages = cachedImages.filter { id, _ in
             guard let next = shareable.first(where: { $0.windowID == id }), let previous = previousWindows[id] else { return false }
-            return next.frame == previous.frame
+            return next.frame == previous.frame && next.title == previous.title && previous.owningApplication?.processID == pid
         }
         captureWindows = Dictionary(shareable.map { ($0.windowID, $0) }, uniquingKeysWith: { first, _ in first })
-        var usedCaptures = Set<CGWindowID>()
+        // Prefer the actionable standard proxy when an app exposes several
+        // AX objects for the same native window.
+        func rank(_ element: AXUIElement) -> Int {
+            (string(element, kAXSubroleAttribute) == kAXStandardWindowSubrole ? 8 : 0)
+                + ((string(element, kAXTitleAttribute) ?? "").isEmpty ? 0 : 4)
+                + (attribute(element, kAXCloseButtonAttribute) == nil ? 0 : 2)
+        }
+        all.sort { rank($0) > rank($1) }
         var result: [DockPreviewWindow] = []
+        var seen = Set<CGWindowID>()
         for element in all {
             guard !Task.isCancelled else { return [] }
             AXUIElementSetMessagingTimeout(element, 0.15)
             guard string(element, kAXRoleAttribute) == kAXWindowRole,
-                  let frame = rect(element), frame.width > 40, frame.height > 30 else { continue }
-            let minimized = attribute(element, kAXMinimizedAttribute) as? Bool ?? false
-            if minimized && !includeMinimized { continue }
+                  !["AXSystemDialog", "AXNotificationCenterWindow"].contains(string(element, kAXSubroleAttribute) ?? ""),
+                  let accessibleFrame = rect(element) else { continue }
             let title = (string(element, kAXTitleAttribute) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            let fullScreen = attribute(element, "AXFullScreen") as? Bool ?? false
-            let match = shareable.filter { !usedCaptures.contains($0.windowID) }.min {
-                DockPreviewGeometry.captureMatchScore(title: title, frame: frame, candidateTitle: $0.title, candidateFrame: $0.frame)
-                    < DockPreviewGeometry.captureMatchScore(title: title, frame: frame, candidateTitle: $1.title, candidateFrame: $1.frame)
-            }
-            let capture = match.flatMap { candidate -> CGWindowID? in
-                let score = DockPreviewGeometry.captureMatchScore(title: title, frame: frame, candidateTitle: candidate.title, candidateFrame: candidate.frame)
-                let uniqueFullScreenTitle = fullScreen && candidate.title == title && shareable.filter { $0.title == title }.count == 1
-                return score < 80 || uniqueFullScreenTitle ? candidate.windowID : nil
-            }
-            if let capture { usedCaptures.insert(capture) }
-            let id = UInt(CFHash(element))
-            let serverMatch = serverWindows.min { left, right in
-                func score(_ entry: [String: Any]) -> CGFloat {
-                    guard let raw = entry[kCGWindowBounds as String] as? NSDictionary, let bounds = CGRect(dictionaryRepresentation: raw) else { return .greatestFiniteMagnitude }
-                    return DockPreviewGeometry.captureMatchScore(title: title, frame: frame, candidateTitle: entry[kCGWindowName as String] as? String, candidateFrame: bounds)
-                }
-                return score(left) < score(right)
-            }
-            let serverTitle: String? = serverMatch.flatMap { entry in
-                guard let raw = entry[kCGWindowBounds as String] as? NSDictionary, let bounds = CGRect(dictionaryRepresentation: raw),
-                      DockPreviewGeometry.captureMatchScore(title: title, frame: frame, candidateTitle: entry[kCGWindowName as String] as? String, candidateFrame: bounds) < 80 else { return nil }
-                return entry[kCGWindowName as String] as? String
-            }
-            let captureTitle = [capture.flatMap { captureWindows[$0]?.title }, serverTitle].compactMap { $0 }.first { !$0.isEmpty }
+            let nativeID = DockPreviewNativeWindowIdentity.windowID(for: element)
+            // If the native resolver is present, a failed lookup means this is
+            // a stale/helper AX proxy, not a window to guess a snapshot for.
+            if DockPreviewNativeWindowIdentity.isAvailable && nativeID == nil { continue }
+            let fallbackMatches = nativeID == nil ? serverWindows.filter { entry in
+                guard !title.isEmpty, let raw = entry[kCGWindowBounds as String] as? NSDictionary,
+                      let bounds = CGRect(dictionaryRepresentation: raw) else { return false }
+                return DockPreviewGeometry.captureMatchScore(title: title, frame: accessibleFrame,
+                    candidateTitle: entry[kCGWindowName as String] as? String, candidateFrame: bounds) < 20
+            } : []
+            guard let windowID = nativeID ?? (fallbackMatches.count == 1 ? fallbackMatches[0][kCGWindowNumber as String] as? CGWindowID : nil),
+                  let metadata = serverByID[windowID], let bounds = metadata[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: bounds), frame.width >= 120, frame.height >= 80 else { continue }
+            let minimized = attribute(element, kAXMinimizedAttribute) as? Bool ?? false
+            guard minimized || (metadata[kCGWindowAlpha as String] as? Double ?? 1) > 0 else { continue }
+            if minimized && !includeMinimized { continue }
+            guard seen.insert(windowID).inserted else { continue }
+            let id = UInt(windowID)
+            let fullScreen = (attribute(element, "AXFullScreen") as? Bool ?? false) || DockPreviewGeometry.matchesFullScreen(frame, displays: displayBounds)
+            guard !chromium || DockPreviewWindowInclusion.includes(subrole: string(element, kAXSubroleAttribute), accessibilityTitle: title,
+                serverTitle: metadata[kCGWindowName as String] as? String, fullScreen: fullScreen) else { continue }
+            let capture = allowCapture ? windowID : nil
+            let captureTitle = [captureWindows[windowID]?.title, metadata[kCGWindowName as String] as? String].compactMap { $0 }.first { !$0.isEmpty }
             let document = (attribute(element, kAXDocumentAttribute) as? String).flatMap { URL(string: $0)?.lastPathComponent }
             let resolvedTitle = DockPreviewWindowTitle.resolve(accessibility: title, capture: captureTitle, document: document,
                 previous: knownTitles[id], application: applicationName)
@@ -117,14 +133,20 @@ actor DockPreviewService {
     }
 
     func thumbnail(for id: CGWindowID, width: Int) async -> CGImage? {
-        guard let window = captureWindows[id], !Task.isCancelled else { return nil }
+        guard elements[UInt(id)] != nil, !Task.isCancelled, CGPreflightScreenCaptureAccess() else { return nil }
         if let cached = cachedImages[id], Date().timeIntervalSince(cached.0) < 60 { return cached.1 }
-        let configuration = SCStreamConfiguration()
-        configuration.width = max(160, min(640, width))
-        configuration.height = max(80, min(420, Int(CGFloat(configuration.width) * window.frame.height / max(1, window.frame.width))))
-        configuration.showsCursor = false
-        let filter = SCContentFilter(desktopIndependentWindow: window)
-        guard let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration), !Task.isCancelled else { return nil }
+        var image: CGImage?
+        if let window = captureWindows[id] {
+            let configuration = SCStreamConfiguration()
+            configuration.width = max(160, min(640, width))
+            configuration.height = max(80, min(420, Int(CGFloat(configuration.width) * window.frame.height / max(1, window.frame.width))))
+            configuration.showsCursor = false
+            let filter = SCContentFilter(desktopIndependentWindow: window)
+            image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+        }
+        guard !Task.isCancelled else { return nil }
+        if image == nil { image = DockPreviewNativeWindowIdentity.snapshot(windowID: id, width: width) }
+        guard let image else { return nil }
         cachedImages[id] = (Date(), image)
         return image
     }

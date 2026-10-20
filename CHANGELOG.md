@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- Dock previews use native window IDs to deduplicate Accessibility proxies and exclude anonymous Chrome toolbar/menu surfaces. Snapshots now match the exact window, use a backing-store fallback when ScreenCaptureKit fails, and refresh on reopening/title changes.
 - Dock Preview settings now appear in the Utilities sidebar. Preview sizing includes notch padding, shows whole-card pages, removes the oversized tab header at compact widths, and keeps the window top anchored during opening/collapse. Full-screen windows are discovered through main/focused-window fallback and labeled with their state. Missing Accessibility titles use capture/WindowServer metadata or a remembered title; full-screen/video snapshots can match by geometry when AX omits its title. Native hosting size is prepared before opening to avoid a detached origin.
 
 ### Removed

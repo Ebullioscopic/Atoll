@@ -76,6 +76,12 @@ struct DockPreviewRegression {
         try check(DockPreviewWindowTitle.resolve(accessibility: nil, capture: nil, document: nil, previous: "Video.mp4", application: "Player") == "Video.mp4", "Title survives an empty full-screen transition")
         try check(DockPreviewWindowTitle.resolve(accessibility: " ", capture: "", document: nil, previous: nil, application: "Player") == "Player", "App name replaces Untitled window")
         try check(DockPreviewGeometry.captureMatchScore(title: "", frame: bounds, candidateTitle: "Video", candidateFrame: bounds) == 0, "Missing AX title still maps exact capture geometry")
+        try check(!DockPreviewWindowInclusion.includes(subrole: "AXUnknown", accessibilityTitle: "", serverTitle: nil, fullScreen: false), "Anonymous Chrome toolbar surface is not a window")
+        try check(DockPreviewWindowInclusion.includes(subrole: "AXStandardWindow", accessibilityTitle: "Browser window", serverTitle: "Browser window", fullScreen: true), "Real full-screen Chrome window remains included")
+        try check(DockPreviewWindowInclusion.includes(subrole: "AXUnknown", accessibilityTitle: "", serverTitle: nil, fullScreen: true), "Anonymous full-screen video remains included")
+        try check(DockPreviewWindowInclusion.includes(subrole: "AXUnknown", accessibilityTitle: "Player", serverTitle: nil, fullScreen: false), "Named custom app window remains included")
+        try check(DockPreviewGeometry.matchesFullScreen(primary, displays: [primary]), "Full-screen video surfaces without AXFullScreen are recognized")
+        try check(!DockPreviewGeometry.matchesFullScreen(CGRect(x: 0, y: 74, width: 1440, height: 81), displays: [primary]), "Chrome toolbar is not inferred as full screen")
         print("PASS \(checks) Dock preview policy checks")
 
         _ = NSApplication.shared
@@ -190,6 +196,7 @@ struct DockPreviewRegression {
         let windows = await service.windows(for: pid, includeMinimized: true, limit: 12, allowCapture: CGPreflightScreenCaptureAccess())
         guard let a = windows.first(where: { $0.title == firstFolder.lastPathComponent }), let b = windows.first(where: { $0.title == secondFolder.lastPathComponent }) else { throw NSError(domain: "DockPreviewRegression", code: 3, userInfo: [NSLocalizedDescriptionKey: "AX fixture enumeration: \(windows.map(\.title))"]) }
         try check(a.id != b.id, "Separate action identities")
+        if let capture = a.captureID { try check(a.id == UInt(capture), "Action and snapshot share the same native window ID") }
         try check(a.canClose && a.canMinimize, "Supported window actions exposed")
         let minimized = await service.perform(.minimize, windowID: a.id, pid: pid)
         try check(minimized, "Native minimize action")

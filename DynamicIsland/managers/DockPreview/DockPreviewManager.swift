@@ -240,6 +240,10 @@ final class DockPreviewManager: ObservableObject {
         let info = CGWindowListCopyWindowInfo([.excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
         var counts: [pid_t: Int] = [:]
         for item in info where item[kCGWindowLayer as String] as? Int == 0 {
+            guard let raw = item[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: raw), frame.width >= 120, frame.height >= 80,
+                  (item[kCGWindowAlpha as String] as? Double ?? 1) > 0,
+                  !(item[kCGWindowName as String] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
             if let pid = item[kCGWindowOwnerPID as String] as? pid_t { counts[pid, default: 0] += 1 }
         }
         return NSWorkspace.shared.runningApplications.filter {
@@ -263,7 +267,7 @@ final class DockPreviewManager: ObservableObject {
         applications = runningApps()
         if first { onPresent?(screenName) }
         lastInside = ProcessInfo.processInfo.systemUptime
-        load(sessionID: next.id)
+        load(sessionID: next.id, resetSnapshots: true)
     }
 
     func selectApplication(_ app: DockPreviewApplication) {
@@ -319,7 +323,7 @@ final class DockPreviewManager: ObservableObject {
         else { activateApplication() }
     }
 
-    private func load(sessionID: UUID) {
+    private func load(sessionID: UUID, resetSnapshots: Bool = false) {
         loadTask?.cancel()
         guard let session, session.id == sessionID else { return }
         lastRefresh = ProcessInfo.processInfo.systemUptime
@@ -331,6 +335,7 @@ final class DockPreviewManager: ObservableObject {
         let width = Int(cardWidth * 2)
         loadTask = Task { [weak self] in
             guard let self else { return }
+            if resetSnapshots { await service.invalidateThumbnails() }
             let windows = await service.windows(for: pid, includeMinimized: includeMinimized, limit: 12, allowCapture: allowCapture)
             guard !Task.isCancelled, self.session?.id == sessionID else { return }
             let primaryTop = NSScreen.screens.first?.frame.maxY ?? 0

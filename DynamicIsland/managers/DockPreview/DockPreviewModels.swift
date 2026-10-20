@@ -45,6 +45,11 @@ enum DockPreviewGeometry {
         }
     }
 
+    static func matchesFullScreen(_ frame: CGRect, displays: [CGRect]) -> Bool {
+        displays.contains { abs(frame.minX - $0.minX) < 25 && abs(frame.minY - $0.minY) < 25
+            && abs(frame.width - $0.width) < 25 && frame.height >= $0.height * 0.95 }
+    }
+
     static func captureMatchScore(title: String, frame: CGRect, candidateTitle: String?, candidateFrame: CGRect) -> CGFloat {
         let distance = abs(frame.minX - candidateFrame.minX) + abs(frame.minY - candidateFrame.minY)
             + abs(frame.width - candidateFrame.width) + abs(frame.height - candidateFrame.height)
@@ -96,5 +101,17 @@ enum DockPreviewWindowTitle {
             if let value = title?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty, value != "Untitled window" { return value }
         }
         return application
+    }
+}
+
+/// Chrome exposes its full-screen toolbar/menu surfaces as AXUnknown windows.
+/// Keep real named/custom/full-screen content, but not anonymous UI chrome.
+enum DockPreviewWindowInclusion {
+    static func includes(subrole: String?, accessibilityTitle: String, serverTitle: String?, fullScreen: Bool) -> Bool {
+        if ["AXSystemDialog", "AXNotificationCenterWindow"].contains(subrole ?? "") { return false }
+        if subrole == "AXUnknown", !fullScreen,
+           accessibilityTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           (serverTitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return false }
+        return true
     }
 }
