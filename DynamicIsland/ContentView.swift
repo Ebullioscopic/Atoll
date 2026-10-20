@@ -527,14 +527,17 @@ struct ContentView: View {
         NotchLayout()
             // The native window already includes the shell width. Reserve its
             // flare/padding here instead of growing content beyond the window.
-            .frame(width: dockPreview.isPresented(on: vm.screen)
+            .frame(width: dockPreview.isPresented(on: vm.screen) && vm.notchState == .open
                 ? max(1, dynamicNotchSize.width - 24 - 2 * notchHorizontalPadding) : nil, alignment: .top)
             .frame(alignment: .top)
             .padding(.horizontal, notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
             .background(.black)
             .clipShape(resolvedClipShape)
-            .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.32, dampingFraction: 0.9), value: dockPreview.session?.windows.count)
+            // Window enumeration also resizes the native host. Animating this
+            // shell on count changes interpolates its old host-relative origin,
+            // making a centered AppKit resize look like a sideways expansion.
+            // The notch-state animation below owns the opening/collapse motion.
             .compositingGroup()
             .shadow(
                 color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])

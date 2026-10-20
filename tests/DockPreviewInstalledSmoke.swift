@@ -24,6 +24,8 @@ struct DockPreviewInstalledSmoke {
         let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".build/dock-preview-verification/animation")
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         var checked = 0
+        var centeredRows = 0
+        var maximumDrift: CGFloat = 0
         for index in 0..<6 {
             let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
             let notch = windows.first { item in
@@ -48,6 +50,20 @@ struct DockPreviewInstalledSmoke {
                 context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
                 return (0..<height).filter { y in storage[y * width * 4 + (width / 2) * 4 + 3] > 160 }
             }
+            // Check the animated shell, not just its final card positions. A
+            // translated/clipped shell can remain attached while opening sideways.
+            for y in stride(from: 8, to: max(9, height - 16), by: 12) {
+                let opaque = (0..<width).filter { x in
+                    let offset = (y * width + x) * 4
+                    return bytes[offset + 3] > 245 && bytes[offset] < 25 && bytes[offset + 1] < 25 && bytes[offset + 2] < 25
+                }
+                if let left = opaque.first, let right = opaque.last, right - left > 100 {
+                    let drift = abs(CGFloat(left + right) / 2 - CGFloat(width - 1) / 2)
+                    centeredRows += 1
+                    maximumDrift = max(maximumDrift, drift)
+                    guard drift < 6 else { try fail("Sideways notch opening: shell center drift \(drift)px in frame \(index), row \(y)"); return }
+                }
+            }
             if let first = rows.first, let last = rows.last, last > first + 8 {
                 let occupied = Set(rows)
                 var gap = 0
@@ -59,6 +75,8 @@ struct DockPreviewInstalledSmoke {
             }
             try await Task.sleep(for: .milliseconds(20))
         }
+        guard centeredRows > 0 else { try fail("No opaque shell edges were checked for centered opening"); return }
+        print("PASS opening shell stays centered: \(centeredRows) rows, maximum drift \(maximumDrift)px")
         guard checked > 0 else { try fail("No opaque notch animation frames were checked"); return }
         print("PASS \(checked) captured opening frames stay connected through the notch center")
     }
