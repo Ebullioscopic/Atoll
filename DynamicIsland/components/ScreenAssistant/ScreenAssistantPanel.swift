@@ -235,19 +235,41 @@ struct RecordingButton: View {
 
 struct ApiKeyAlertView: View {
     @State private var apiKey = ""
-    
+    /// Shown when the Keychain refuses the write. The typed key is kept so the
+    /// user can retry rather than having to find it again.
+    @State private var saveError: String?
+
     var body: some View {
         VStack(spacing: 12) {
             TextField("Enter your Gemini API Key", text: $apiKey)
                 .textFieldStyle(.roundedBorder)
-            
+
+            if let saveError {
+                Label(saveError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack {
                 Button("Cancel") {
                     // Dialog will close automatically
                 }
-                
+
                 Button("Save") {
-                    Defaults[.geminiApiKey] = apiKey
+                    let status = KeychainAIKeyStore.shared.save(apiKey, account: .gemini)
+                    guard status == errSecSuccess else {
+                        Logger.log(
+                            "Could not save the Gemini key to the Keychain (OSStatus \(status)).",
+                            category: .warning
+                        )
+                        saveError = String(localized: "The key could not be saved to the Keychain.")
+                        return
+                    }
+                    saveError = nil
+                    // Settings views already on screen read the key once, so they
+                    // need telling that it changed.
+                    NotificationCenter.default.post(name: .aiModelConfigurationChanged, object: nil)
                 }
                 .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
