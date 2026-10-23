@@ -23,6 +23,13 @@
 import AppKit
 import SwiftUI
 import Sparkle
+import Combine
+
+/// Shares a settings destination without losing a request when the window is first created.
+final class SettingsNavigation: ObservableObject {
+    static let shared = SettingsNavigation()
+    @Published var requestedTab: String?
+}
 
 class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
@@ -83,6 +90,12 @@ class SettingsWindowController: NSWindowController {
         ScreenCaptureVisibilityManager.shared.register(window, scope: .panelsOnly)
     }
     
+    /// Opens Cooling directly from the notch's error recovery link.
+    func showCoolingSettings() {
+        SettingsNavigation.shared.requestedTab = "cooling"
+        showWindow()
+    }
+
     func showWindow() {
         // Ensure window exists
         _ = window
