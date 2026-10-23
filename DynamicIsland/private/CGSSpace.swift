@@ -41,6 +41,16 @@ public final class CGSSpace {
         }
     }
 
+    /// Re-adds every tracked window to this space, bypassing the diff in `windows`.
+    /// WindowServer can drop a window from the space (e.g. after `orderOut` or a
+    /// `collectionBehavior` change) while `windows` still lists it.
+    public func reassertMembership() {
+        guard !windows.isEmpty else { return }
+        CGSAddWindowsToSpaces(_CGSDefaultConnection(),
+                              windows.map { $0.windowNumber } as NSArray,
+                              [self.identifier])
+    }
+
     /// Initialized `CGSSpace`s *MUST* be de-initialized upon app exit!
     public init(level: Int = 0) {
         let flag = 0x1 // this value MUST be 1, otherwise, Finder decides to draw desktop icons
