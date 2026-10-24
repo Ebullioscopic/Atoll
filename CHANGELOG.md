@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Charging wattage**: the charging HUD shows the adapter wattage next to the charge level, and the battery menu shows the adapter and the live power flowing into or out of the battery. Controlled by the Show charging wattage setting. (#872)
 - **Connection status HUDs**: Atoll now shows a Dynamic Island HUD when the Mac goes offline, and a compact inline HUD when it connects to Wi-Fi or Personal Hotspot, using the matching Wi-Fi or hotspot symbol and the connected network name. (#827)
 - **Pin lyrics under the closed notch**: a pin button in the Lyrics panel keeps the line being sung visible after the notch closes, so a song can be followed without holding the pointer over the notch. The strip is drawn as an overlay on padding rather than as a row in the notch stack, so it never widens the panel or shifts the music row. Off by default, and inert unless lyrics are enabled.
 - **Per-app volume and mute**: a mixer in the notch header gives every app currently playing audio its own volume slider and mute button, with levels remembered per app. Built on the CoreAudio process taps already used for the waveform, and a tap is only created for an app that is actually muted or turned down. Off by default; needs audio capture permission.
