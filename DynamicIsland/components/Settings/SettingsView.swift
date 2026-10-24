@@ -435,6 +435,7 @@ private enum SettingsSearchIndex {
         // Stats
         SettingsSearchEntry(tab: .stats, title: "Enable system stats monitoring", keywords: ["stats", "monitoring"], highlightID: SettingsTab.stats.highlightID(for: "Enable system stats monitoring")),
         SettingsSearchEntry(tab: .stats, title: "Enable LLM Usage Monitor", keywords: ["llm", "usage", "ai", "monitor"], highlightID: SettingsTab.stats.highlightID(for: "Enable LLM Usage Monitor")),
+        SettingsSearchEntry(tab: .stats, title: "Enable Usage Remaining Display Mode", keywords: ["llm", "usage", "ai", "monitor", "view", "remaining"], highlightID: SettingsTab.stats.highlightID(for: "Enable Usage Remaining Display Mode")),
         SettingsSearchEntry(tab: .stats, title: "Claude Provider", keywords: ["llm", "claude", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Claude Provider")),
         SettingsSearchEntry(tab: .stats, title: "Codex Provider", keywords: ["llm", "codex", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Codex Provider")),
         SettingsSearchEntry(tab: .stats, title: "Cursor Provider", keywords: ["llm", "cursor", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Cursor Provider")),
@@ -7975,6 +7976,7 @@ struct StatsSettings: View {
     @ObservedObject var statsManager = StatsManager.shared
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.enableLLMUsageFeature) var enableLLMUsageFeature
+    @Default(.enableUsageRemainingDisplay) var enableUsageRemainingDisplay
     @Default(.enableNewAPIProvider) var enableNewAPIProvider
     @Default(.statsStopWhenNotchCloses) var statsStopWhenNotchCloses
     @Default(.statsUpdateInterval) var statsUpdateInterval
@@ -8031,6 +8033,7 @@ struct StatsSettings: View {
                     Text("Enable LLM Usage Monitor")
                 }
                 .settingsHighlight(id: highlightID("Enable LLM Usage Monitor"))
+                
 
             } header: {
                 Text("General")
@@ -8042,6 +8045,20 @@ struct StatsSettings: View {
             }
 
             if enableLLMUsageFeature {
+                Section {
+                    Defaults.Toggle(key: .enableUsageRemainingDisplay) {
+                        Text("Enable Usage Remaining Display Mode")
+                    }
+                    .settingsHighlight(id: highlightID("Enable Usage Remaining Display Mode"))
+                } header: {
+                    Text("LLM Usage Options")
+                } footer: {
+                    Text("When enabled, the usage display flips to represent the amount of usage remaining.")
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                    .font(.caption)
+                }
+                    
                 Section {
                     Defaults.Toggle(key: .enableClaudeProvider) {
                         Text("Claude")
