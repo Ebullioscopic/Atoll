@@ -165,3 +165,6 @@ implementation_plan.md
 walkthrough.md
 TemporaryAssets/
 *.profraw
+
+# Timer alert regression runner
+!tests/run_timer_alert_regression.sh
