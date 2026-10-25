@@ -3157,6 +3157,7 @@ struct Media: View {
     @Default(.waitInterval) var waitInterval
     @Default(.mediaController) var mediaController
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
+    @ObservedObject private var bluetoothManager = BluetoothAudioManager.shared
     @Default(.hideNotchOption) var hideNotchOption
     @Default(.enableSneakPeek) private var enableSneakPeek
     @Default(.sneakPeekStyles) var sneakPeekStyles
@@ -3532,7 +3533,14 @@ struct Media: View {
             } header: {
                 Text("Music Visualizer")
             } footer: {
-                Text("When enabled, the music visualizer displays real-time audio spectrum data synced to your music. Requires macOS 14.2+ and uses minimal CPU/GPU resources via the Accelerate framework.")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("When enabled, the music visualizer displays real-time audio spectrum data synced to your music. Requires macOS 14.2+ and uses minimal CPU/GPU resources via the Accelerate framework.")
+                    if bluetoothManager.isBluetoothAudioConnected {
+                        Text("macOS can't capture Bluetooth output, so the standard visualizer is shown while a Bluetooth audio device is connected. The real-time waveform returns on internal speakers and wired headphones.")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                }
             }
 
             Section {
