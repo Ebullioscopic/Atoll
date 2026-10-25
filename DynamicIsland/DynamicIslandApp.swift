@@ -164,6 +164,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         installTopMenuItemsIfNeeded()
+        Task { @MainActor in CoolingHelperRegistration.shared.refresh() }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -278,7 +279,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         audioTapObserverTokens.removeAll()
     }
 
+    /// Restores app-owned cooling sessions and releases feature resources before termination.
     func applicationWillTerminate(_ notification: Notification) {
+        FanControlService.shared.shutdown()
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]
@@ -694,6 +697,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Task { @MainActor in CoolingHelperRegistration.shared.offerAutomaticSetupIfNeeded() }
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
         ]

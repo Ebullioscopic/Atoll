@@ -57,6 +57,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case calendar
     case hudAndOSD
     case battery
+    case cooling
     case stats
     case clipboard
     case screenAssistant
@@ -75,7 +76,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general, .appearance:                                          return .core
         case .media, .liveActivities, .lockScreen, .devices:                 return .mediaAndDisplay
-        case .hudAndOSD, .battery:                                           return .system
+        case .hudAndOSD, .battery, .cooling:                                 return .system
         case .timer, .calendar, .notes:                                      return .productivity
         case .clipboard, .screenAssistant, .colorPicker, .shelf,
              .downloads, .shortcuts:                                         return .utilities
@@ -98,6 +99,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .calendar: return String(localized: "Calendar")
         case .hudAndOSD: return String(localized: "Controls")
         case .battery: return String(localized: "Battery")
+        case .cooling: return String(localized: "Cooling")
         case .stats: return String(localized: "Stats")
         case .clipboard: return String(localized: "Clipboard")
         case .screenAssistant: return String(localized: "Screen Assistant")
@@ -124,6 +126,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .calendar: return "calendar"
         case .hudAndOSD: return "dial.medium.fill"
         case .battery: return "battery.100.bolt"
+        case .cooling: return "fan"
         case .stats: return "chart.xyaxis.line"
         case .clipboard: return "clipboard"
         case .screenAssistant: return "brain.head.profile"
@@ -150,6 +153,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .calendar: return .cyan
         case .hudAndOSD: return .indigo
         case .battery: return Color(red: 0.202, green: 0.783, blue: 0.348, opacity: 1.000)
+        case .cooling: return .cyan
         case .stats: return .teal
         case .clipboard: return .mint
         case .screenAssistant: return .pink
@@ -432,6 +436,9 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .timer, title: "Progress style", keywords: ["progress", "bar", "ring"], highlightID: SettingsTab.timer.highlightID(for: "Progress style")),
         SettingsSearchEntry(tab: .timer, title: "Accent colour", keywords: ["accent", "timer"], highlightID: SettingsTab.timer.highlightID(for: "Accent colour")),
 
+        // Cooling
+        SettingsSearchEntry(tab: .cooling, title: "Enable fan controls", keywords: ["fan", "cooling", "rpm", "speed", "temperature", "auto"], highlightID: SettingsTab.cooling.highlightID(for: "Enable fan controls")),
+
         // Stats
         SettingsSearchEntry(tab: .stats, title: "Enable system stats monitoring", keywords: ["stats", "monitoring"], highlightID: SettingsTab.stats.highlightID(for: "Enable system stats monitoring")),
         SettingsSearchEntry(tab: .stats, title: "Enable LLM Usage Monitor", keywords: ["llm", "usage", "ai", "monitor"], highlightID: SettingsTab.stats.highlightID(for: "Enable LLM Usage Monitor")),
@@ -606,6 +613,7 @@ private struct SettingsForm<Content: View>: View {
 }
 
 struct SettingsView: View {
+    @ObservedObject private var navigation = SettingsNavigation.shared
     @State private var selectedTab: SettingsTab = .general
     @State private var searchText: String = ""
     @StateObject private var highlightCoordinator = SettingsHighlightCoordinator()
@@ -664,6 +672,11 @@ struct SettingsView: View {
         .environmentObject(highlightCoordinator)
         .formStyle(.grouped)
         .frame(width: 700)
+        .onReceive(navigation.$requestedTab.compactMap { $0 }) { destination in
+            guard let tab = SettingsTab(rawValue: destination) else { return }
+            searchText = ""
+            selectedTab = tab
+        }
         .onChange(of: searchText) { _, newValue in
             let matches = tabsMatchingSearch(newValue)
             guard let firstMatch = matches.first else { return }
@@ -806,6 +819,7 @@ struct SettingsView: View {
             // System
             .hudAndOSD,
             .battery,
+            .cooling,
             // Productivity
             .timer,
             .calendar,
@@ -1065,6 +1079,10 @@ struct SettingsView: View {
         case .battery:
             SettingsForm(tab: .battery) {
                 Charge()
+            }
+        case .cooling:
+            SettingsForm(tab: .cooling) {
+                CoolingSettings()
             }
         case .stats:
             SettingsForm(tab: .stats) {
@@ -7968,6 +7986,66 @@ private struct TimerPresetComponentControl: View {
             }
         }
         .frame(width: 110, alignment: .leading)
+    }
+}
+
+private struct CoolingSettings: View {
+    @ObservedObject private var fans = FanControlService.shared
+    @ObservedObject private var helper = CoolingHelperRegistration.shared
+    @Environment(\.scenePhase) private var scenePhase
+    /// Presents the opt-in Cooling toggle and explains preset and authorization behavior.
+    var body: some View {
+        Form {
+            Section {
+                Defaults.Toggle(key: .enableFanControl) {
+                    Text("Enable fan controls")
+                }
+                .settingsHighlight(id: SettingsTab.cooling.highlightID(for: "Enable fan controls"))
+            } header: {
+                Text("Cooling")
+            } footer: {
+                Text("Show fan speeds, temperature, and 30%, 50%, 70%, 100%, and Auto controls in the Cooling tab. Turning this off returns fans controlled by Atoll to macOS Auto.")
+            }
+
+            Section {
+                LabeledContent("Presets", value: "Percentage of each fan’s minimum-to-maximum RPM range")
+                LabeledContent("Authorization", value: "One-time macOS approval")
+                Text("Atoll offers fan-control setup automatically when you enable Cooling or first use a fan control. Approve it once to avoid password prompts after restarts. Choosing Not Now keeps authorization for each session.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("Atoll returns its fans to Auto when it exits or loses the cooling connection, or when temperatures are high or unavailable. Manual fan control has been tested on Apple M5 Pro; availability depends on the Mac’s fan controller.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Fan control")
+            }
+
+            if helper.status != .enabled || helper.error != nil || fans.controlError != nil || fans.needsReconnect {
+                Section {
+                    if let error = fans.controlError ?? helper.error {
+                        Text(error).font(.caption).foregroundStyle(.orange).textSelection(.enabled)
+                    }
+                    if helper.status == .requiresApproval {
+                        Text("macOS has not finished approving the fan helper.")
+                        Button("Open macOS Approval") { helper.openApproval() }
+                    } else if helper.status == .notRegistered || helper.status == .notFound {
+                        Button("Set Up Fan Control") { helper.runSetup() }
+                    } else {
+                        Button("Reconnect fan helper") { fans.retryConnection() }
+                        Button("Repair fan helper") { helper.repair() }
+                    }
+                } header: { Text("Resolve fan control") }
+                .disabled(helper.busy)
+            }
+            if helper.status == .enabled || helper.status == .requiresApproval {
+                Section {
+                    LabeledContent("Fan helper", value: helper.status == .enabled ? "Approved" : "Awaiting macOS approval")
+                    Button("Remove fan helper") { helper.remove() }
+                }
+                .disabled(helper.busy)
+            }
+        }
+        .navigationTitle("Cooling")
+        .onAppear { helper.refresh() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { helper.refresh() } }
     }
 }
 

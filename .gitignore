@@ -165,3 +165,7 @@ implementation_plan.md
 walkthrough.md
 TemporaryAssets/
 *.profraw
+
+# Bundled cooling helper and standalone regression runner
+!FanHelper/build.sh
+!tests/test_cooling.sh

@@ -75,6 +75,7 @@ public enum NotchViews {
     case shelf
     case timer
     case stats
+    case fanControl
     case llmUsage
     case colorPicker
     case notes
