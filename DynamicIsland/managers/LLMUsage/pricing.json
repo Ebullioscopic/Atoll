@@ -371,16 +371,6 @@
       }
     },
     {
-      "id": "openai/gpt-3.5-turbo",
-      "name": "OpenAI: GPT-3.5 Turbo",
-      "pricing": {
-        "prompt": "0.0000005",
-        "completion": "0.0000015",
-        "cache_read": "",
-        "cache_write": ""
-      }
-    },
-    {
       "id": "openai/gpt-3.5-turbo-0613",
       "name": "OpenAI: GPT-3.5 Turbo (older v0613)",
       "pricing": {
@@ -396,16 +386,6 @@
       "pricing": {
         "prompt": "0.000003",
         "completion": "0.000004",
-        "cache_read": "",
-        "cache_write": ""
-      }
-    },
-    {
-      "id": "openai/gpt-3.5-turbo-instruct",
-      "name": "OpenAI: GPT-3.5 Turbo Instruct",
-      "pricing": {
-        "prompt": "0.0000015",
-        "completion": "0.000002",
         "cache_read": "",
         "cache_write": ""
       }
@@ -1001,5 +981,5 @@
       }
     }
   ],
-  "last_updated": "2026-10-16T00:06:14Z"
+  "last_updated": "2026-10-26T00:07:00Z"
 }
