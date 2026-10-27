@@ -288,6 +288,8 @@ struct BatteryMenuView: View {
     var isInLowPowerMode: Bool
     var onDismiss: () -> Void
 
+    @State private var power = BatteryPowerReading(properties: [:])
+
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -322,6 +324,18 @@ struct BatteryMenuView: View {
                         .font(.subheadline)
                         .fontWeight(.regular)
                 }
+                if isPluggedIn {
+                    if isCharging, let watts = power.chargingWatts {
+                        Label("Battery charging: \(watts, specifier: "%.1f") W", systemImage: "bolt.fill")
+                            .font(.subheadline)
+                            .monospacedDigit()
+                    }
+                    if let watts = power.inputWatts {
+                        Label("Power input: \(watts, specifier: "%.1f") W", systemImage: "powerplug.fill")
+                            .font(.subheadline)
+                            .monospacedDigit()
+                    }
+                }
                 if timeToFullCharge > 0 {
                     Label("Time to Full Charge: \(timeToFullCharge) min", systemImage: "clock")
                         .font(.subheadline)
@@ -349,6 +363,9 @@ struct BatteryMenuView: View {
         .padding()
         .frame(width: 280)
         .foregroundStyle(.primary)
+        .task(id: isPluggedIn) {
+            await sampleBatteryPower { power = $0 }
+        }
     }
 
     private func openBatteryPreferences() {
@@ -500,12 +517,20 @@ private struct BatteryCompactStatusRow: View {
     let title: String
     let batteryLevel: Int
     let tint: Color
+    var chargingWatts: Double? = nil
 
     var body: some View {
         HStack {
-            Text(verbatim: title)
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.8))
+            VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: title)
+                    .font(.system(size: 14))
+                if let watts = chargingWatts {
+                    Text("\(watts, specifier: "%.0f") W")
+                        .font(.system(size: 11))
+                        .monospacedDigit()
+                }
+            }
+            .foregroundColor(.white.opacity(0.8))
 
             Spacer()
 
@@ -552,6 +577,7 @@ struct BatteryTemporaryActivityView: View {
     @Default(.fullBatteryHUDStyle) var fullBatteryHUDStyle
     var styleOverride: BatteryNotificationStyle? = nil
 
+    @State private var power = BatteryPowerReading(properties: [:])
     @State private var pulse = false
     @State private var showBatteryIndicator = false
     @State private var changeBatteryIndicator = true
@@ -613,6 +639,10 @@ struct BatteryTemporaryActivityView: View {
         .frame(width: metrics.width, height: metrics.height, alignment: .bottom)
         .clipShape(surfaceShape)
         .onAppear(perform: prepareAnimations)
+        .task {
+            guard kind == .charging else { return }
+            await sampleBatteryPower { power = $0 }
+        }
     }
 
     @ViewBuilder
@@ -621,7 +651,8 @@ struct BatteryTemporaryActivityView: View {
             BatteryCompactStatusRow(
                 title: compactTitle,
                 batteryLevel: batteryLevel,
-                tint: batteryTint
+                tint: batteryTint,
+                chargingWatts: kind == .charging ? power.chargingWatts : nil
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else {
@@ -901,4 +932,17 @@ struct BatteryTemporaryActivityView: View {
         timeToFullCharge: 10,
         isForNotification: false
     ).frame(width: 200, height: 200)
+}
+
+/// SwiftUI cancels the task when the HUD or popover disappears.
+@MainActor
+private func sampleBatteryPower(update: (BatteryPowerReading) -> Void) async {
+    while !Task.isCancelled {
+        update(BatteryPowerReading.current())
+        do {
+            try await Task.sleep(for: .seconds(5))
+        } catch {
+            return
+        }
+    }
 }
