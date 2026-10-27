@@ -1,6 +1,40 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Battery charging: %.1f W" : {
+      "comment" : "Actual measured power; adapter capacity is not used as a substitute.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Battery charging: %.1f W"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池充电：%.1f W"
+          }
+        }
+      }
+    },
+    "Power input: %.1f W" : {
+      "comment" : "Actual measured power; adapter capacity is not used as a substitute.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Power input: %.1f W"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电源输入：%.1f W"
+          }
+        }
+      }
+    },
     "Pinned lyric context" : {
       "comment" : "Pinned lyrics setting in Media settings.",
       "localizations" : {
