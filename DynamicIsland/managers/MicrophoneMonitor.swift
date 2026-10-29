@@ -51,6 +51,7 @@ class MicrophoneMonitor: ObservableObject {
     private var defaultInputDevice: AudioDeviceID = 0
     private var isListenerRegistered: Bool = false
     private var cancellables = Set<AnyCancellable>()
+    private var deactivationTask: Task<Void, Never>?
     
     // MARK: - Configuration
     // Pure event-driven - no polling
@@ -258,24 +259,29 @@ class MicrophoneMonitor: ObservableObject {
         
         let isRunning = isDeviceRunning(defaultInputDevice)
         
-        // Debug logging
-        print("MicrophoneMonitor: 🔍 Checking... current=\(isMicActive), detected=\(isRunning)")
-        
-        // Update state if changed
-        if isRunning != isMicActive {
-            print("MicrophoneMonitor: 🔄 State change detected (\(isMicActive) -> \(isRunning))")
-            
-            withAnimation(.smooth) {
-                isMicActive = isRunning
-            }
-            
-            if isRunning {
-                print("MicrophoneMonitor: 🎤 Microphone ACTIVE")
-                // Could try to identify app here (TODO: investigate)
+        if isRunning {
+            deactivationTask?.cancel()
+            deactivationTask = nil
+            if !isMicActive {
+                print("MicrophoneMonitor: 🔄 Microphone became ACTIVE")
+                withAnimation(.smooth) {
+                    isMicActive = true
+                }
                 activeApp = "Unknown App"
-            } else {
-                print("MicrophoneMonitor: ⚪ Microphone INACTIVE")
-                activeApp = nil
+            }
+        } else if isMicActive {
+            guard deactivationTask == nil else { return }
+            deactivationTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                guard !Task.isCancelled, let self else { return }
+                self.deactivationTask = nil
+                if !self.isDeviceRunning(self.defaultInputDevice) {
+                    print("MicrophoneMonitor: ⚪ Microphone INACTIVE (debounced)")
+                    withAnimation(.smooth) {
+                        self.isMicActive = false
+                    }
+                    self.activeApp = nil
+                }
             }
         }
     }
