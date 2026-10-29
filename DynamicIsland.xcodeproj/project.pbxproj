@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A70F1A012F90001000F1A001 /* qobuz_engine.py in Resources */ = {isa = PBXBuildFile; fileRef = A70F1A022F90001000F1A001 /* qobuz_engine.py */; };
 		63A78415C5726BE9C806EFAF /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 47C39E67B09152F6665ED683 /* Cocoa.framework */; };
 		6B8DE5BE065E4BFE9E531A74 /* MarqueeTextMeasurementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC2ACF06B40405DB1A8F99E /* MarqueeTextMeasurementTests.swift */; };
 		738C4EBB63E3449B923997D0 /* MenuBarClearanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EB37667F763422E97DEEB49 /* MenuBarClearanceTests.swift */; };
@@ -81,6 +82,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A70F1A022F90001000F1A001 /* qobuz_engine.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = qobuz_engine.py; sourceTree = "<group>"; };
 		0796C681D7B557C0110EC381 /* DynamicIslandTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicIslandTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2137D0F9431A495AA62ACE96 /* NowPlayingPayloadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingPayloadTests.swift; sourceTree = "<group>"; };
 		2EB37667F763422E97DEEB49 /* MenuBarClearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarClearanceTests.swift; sourceTree = "<group>"; };
@@ -246,6 +248,7 @@
 			isa = PBXGroup;
 			children = (
 				7E81303D2E3FB40500E08F3F /* mediaremote-adapter.pl */,
+				A70F1A022F90001000F1A001 /* qobuz_engine.py */,
 				F4C1DD09EC134302938E84F6 /* MediaRemoteAdapter.framework */,
 			);
 			path = "mediaremote-adapter";
@@ -365,6 +368,7 @@
 				F54406E32CD4987A00C7AFD9 /* Sources */,
 				F54406E42CD4987A00C7AFD9 /* Frameworks */,
 				F54406E52CD4987A00C7AFD9 /* Resources */,
+				A70F1A032F90001000F1A001 /* Build Qobuz Controls */,
 				7EA69B1B2F5AE13500EB2D16 /* CopyFiles */,
 				7EFAA8AA2F6F12F3000A99E8 /* ShellScript */,
 			);
@@ -471,6 +475,7 @@
 			files = (
 				7E9918722EFDAE5B002EDFD5 /* MediaRemoteAdapter.framework in Resources */,
 				7E8130402E3FB40500E08F3F /* mediaremote-adapter.pl in Resources */,
+				A70F1A012F90001000F1A001 /* qobuz_engine.py in Resources */,
 				7E6856482EA963FD00D261F5 /* Lock.json in Resources */,
 				A70F1A012F90000100F1A001 /* FingerprintScan.json in Resources */,
 				7E8840D92E9A347000C5CB8C /* Moody Dog.json in Resources */,
@@ -502,6 +507,20 @@
 			shellScript = "if [ \"$CONFIGURATION\" != \"Release\" ] || [ \"$ACTION\" != \"install\" ]; then\n\texit 0\nfi\n\nAPP=\"$CODESIGNING_FOLDER_PATH\"\nSPARKLE=\"$APP/Contents/Frameworks/Sparkle.framework\"\nXPC_DIR=\"$SPARKLE/Versions/Current/XPCServices\"\n\nif [ ! -d \"$XPC_DIR\" ]; then\n\texit 0\nfi\n\nfor xpc in \"$XPC_DIR\"/*.xpc; do\n\t/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$xpc\"\ndone\n\n/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$SPARKLE\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
+
+/* Begin Qobuz PBXShellScriptBuildPhase section */
+        A70F1A032F90001000F1A001 /* Build Qobuz Controls */ = {
+            isa = PBXShellScriptBuildPhase;
+            buildActionMask = 2147483647;
+            files = ();
+            inputPaths = ("$(SRCROOT)/mediaremote-adapter/qobuz_controls.swift", "$(SRCROOT)/mediaremote-adapter/build-qobuz-controls.sh",);
+            name = "Build Qobuz Controls";
+            outputPaths = ("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/qobuz_controls",);
+            runOnlyForDeploymentPostprocessing = 0;
+            shellPath = /bin/bash;
+            shellScript = "bash \"$SRCROOT/mediaremote-adapter/build-qobuz-controls.sh\"";
+        };
+/* End Qobuz PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		838F3057E237C722BA8D6CA6 /* Sources */ = {

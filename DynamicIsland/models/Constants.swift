@@ -455,6 +455,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     case amazonMusic = "Amazon Music"
     case tidal = "TIDAL"
     case cider = "Cider"
+    case qobuz = "Qobuz"
     
     var id: String { self.rawValue }
     
@@ -467,6 +468,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
         case .amazonMusic: return String(localized: "Amazon Music")
         case .tidal: return String(localized: "TIDAL")
         case .cider: return String(localized: "Cider")
+        case .qobuz: return "Qobuz"
         }
     }
 }
