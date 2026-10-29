@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- **Terminal drag-selection scrolls at the edge**: holding the pointer past the top or bottom of the notch terminal while selecting text now keeps scrolling through the scrollback, instead of stopping after the first few lines. SwiftTerm is updated from 1.13.0 to 1.14.0, which adds the auto-scroll timer; 1.14.0 rather than the newest 1.x because later releases remove `LocalProcessTerminalView.getTerminal`, which the terminal manager still uses.
 - A tab count in the notch settings could not be formatted. `%lld tab%@ enabled · min %lld px` was translated using `%1lld` — missing the `$` — so it was never parsed as a positional specifier, and the separator was U+22C5 (dot operator) rather than the U+00B7 the source uses. (#789)
 - The microphone privacy indicator description showed an unrelated sentence about a meeting start time, which also introduced a `%@` that the source string does not have — reading an argument that was never passed. (#789)
 - A shipped string began with `추천 번역 ⭐️: `, an AI suggestion prefix that had been committed along with the translation it labelled. (#789)
