@@ -914,9 +914,9 @@
       "id": "openai/gpt-oss-20b",
       "name": "OpenAI: gpt-oss-20b",
       "pricing": {
-        "prompt": "0.000000018",
-        "completion": "0.00000009",
-        "cache_read": "0.000000009",
+        "prompt": "0.00000003",
+        "completion": "0.00000013",
+        "cache_read": "0.00000003",
         "cache_write": ""
       }
     },
@@ -951,5 +951,5 @@
       }
     }
   ],
-  "last_updated": "2026-11-01T00:05:45Z"
+  "last_updated": "2026-11-02T00:04:36Z"
 }
