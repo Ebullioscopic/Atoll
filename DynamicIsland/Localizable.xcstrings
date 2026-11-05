@@ -4,6 +4,12 @@
     "Battery charging: %.1f W" : {
       "comment" : "Actual measured power; adapter capacity is not used as a substitute.",
       "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "배터리 충전 전력: %.1f W"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
@@ -21,6 +27,12 @@
     "Power input: %.1f W" : {
       "comment" : "Actual measured power; adapter capacity is not used as a substitute.",
       "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "입력 전력: %.1f W"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
@@ -94,8 +106,8 @@
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "고정된 가사 문맥"
+            "state" : "translated",
+            "value" : "고정 가사 표시 줄 수"
           }
         },
         "nl" : {
@@ -213,8 +225,8 @@
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "현재 줄"
+            "state" : "translated",
+            "value" : "현재 줄만"
           }
         },
         "nl" : {
@@ -332,7 +344,7 @@
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "3줄"
           }
         },
@@ -451,7 +463,7 @@
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "5줄"
           }
         },
@@ -570,8 +582,8 @@
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "선택한 문맥과 함께 닫힌 노치 아래에 동기화된 가사를 표시합니다. 간주 중에도 공간을 유지하며, 화면에 HUD가 표시되는 동안 가사를 숨깁니다. 가사 패널의 고정 버튼으로도 켜거나 끌 수 있습니다."
+            "state" : "translated",
+            "value" : "선택한 줄 수에 맞춰 재생 시점과 동기화된 가사를 닫힌 노치 아래에 표시합니다. 간주 중에도 표시 공간을 유지하고, HUD가 표시되는 동안에는 가사를 숨깁니다. 가사 패널의 고정 버튼으로도 켜거나 끌 수 있습니다."
           }
         },
         "nl" : {
@@ -2049,7 +2061,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld애니메이션"
+            "value" : "애니메이션 %lld개"
           }
         },
         "nl" : {
@@ -2162,7 +2174,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld색상"
+            "value" : "색상 %lld개"
           }
         },
         "nl" : {
@@ -2222,7 +2234,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld 일%2$@ 전"
+            "value" : "%1$lld일 전"
           }
         },
         "nl" : {
@@ -2276,7 +2288,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld시간%2$@전"
+            "value" : "%1$lld시간 전"
           }
         },
         "nl" : {
@@ -2373,7 +2385,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld분%2$@전"
+            "value" : "%1$lld분 전"
           }
         },
         "nl" : {
@@ -3497,7 +3509,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "+%lld 더보기"
+            "value" : "외 %lld개"
           }
         },
         "nl" : {
@@ -6679,7 +6691,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "활동중"
+            "value" : "활동 중"
           }
         },
         "nl" : {
@@ -7093,7 +7105,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "URL로 부터 애니메이션 추가"
+            "value" : "URL에서 애니메이션 추가"
           }
         },
         "nl" : {
@@ -7331,7 +7343,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "URL로 부터 추가…"
+            "value" : "URL에서 추가…"
           }
         },
         "nl" : {
@@ -8998,7 +9010,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "잠금 화면 위젯 확장 허용"
+            "value" : "확장 프로그램의 잠금 화면 위젯 허용"
           }
         },
         "nl" : {
@@ -9046,7 +9058,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "노치 경험 확장 허용"
+            "value" : "확장 프로그램의 노치 기능 허용"
           }
         },
         "nl" : {
@@ -9142,7 +9154,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "미니멀리즘 레이아웃 덮어쓰기 허용"
+            "value" : "간결한 UI 재정의 허용"
           }
         },
         "nl" : {
@@ -10252,7 +10264,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "상태 위젯 전체에 적용됩니다. 날씨, 배터리, 집중 모드, 위치, 다음 일정 행이 모두 선택한 모양과 레이아웃으로 그려집니다. 배경화면이 밝을 때는 제목과 레이블이 잘 보이도록 '밝게'를 사용하세요."
+            "value" : "상태 위젯 전체에 적용됩니다. 날씨, 배터리, 집중 모드, 위치, 다음 일정 행이 모두 선택한 모양과 레이아웃으로 그려집니다. 배경화면이 밝을 때는 제목과 레이블이 잘 보이도록 '라이트'를 사용하세요."
           }
         }
       }
@@ -12672,7 +12684,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "배터리 충전중"
+            "value" : "배터리 충전 중"
           }
         },
         "nl" : {
@@ -12725,7 +12737,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "배터리 충전중, %@ 남음"
+            "value" : "배터리 충전 중, %@ 남음"
           }
         },
         "nl" : {
@@ -14634,7 +14646,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "캘린더 또는 미리 알림 접근 권한이 거부되었습니다. 시스템 설정에서 접근 권한을 활성화 해주세요."
+            "value" : "캘린더 또는 미리 알림 접근 권한이 거부되었습니다. 시스템 설정에서 접근 권한을 허용해 주세요."
           }
         },
         "nl" : {
@@ -15664,7 +15676,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "배터리 충전중"
+            "value" : "배터리 충전 중"
           }
         },
         "nl" : {
@@ -18156,7 +18168,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "눌려서 자세히 보기"
+            "value" : "클릭하여 자세히 보기"
           }
         },
         "nl" : {
@@ -18408,7 +18420,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "클립보드 매니저"
+            "value" : "클립보드 관리자"
           }
         },
         "nl" : {
@@ -18694,7 +18706,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "닫기 제스쳐"
+            "value" : "닫기 제스처"
           }
         },
         "nl" : {
@@ -18782,7 +18794,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "색상 선택기, 상태 모니터링 및 화면 어시스턴트로 코딩하고 디버깅하세요."
+            "value" : "색상 선택기, 통계 모니터링 및 스크린 어시스턴트로 코딩하고 디버깅하세요."
           }
         },
         "nl" : {
@@ -20303,7 +20315,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "화면 표시 탭에서 잠금 화면 머티리얼을 설정하세요. '리퀴드 글래스'를 선택하면 두 위젯 모두에서 '사용자 설정 리퀴드' 스타일 슬라이더를 사용할 수 있습니다."
+            "value" : "외관 탭에서 잠금 화면 머티리얼을 설정하세요. '리퀴드 글래스'를 선택하면 두 위젯 모두에서 '사용자 설정 리퀴드' 스타일 슬라이더를 사용할 수 있습니다."
           }
         },
         "nl" : {
@@ -21882,7 +21894,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "클립보드로 부터 생성"
+            "value" : "클립보드에서 생성"
           }
         },
         "nl" : {
@@ -22307,7 +22319,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "현재 활동"
+            "value" : "현재 사용 중"
           }
         },
         "nl" : {
@@ -23401,7 +23413,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사용자 설정 음악 실시간 활동 애니메이션"
+            "value" : "사용자 설정 음악 실시간 현황 애니메이션"
           }
         },
         "nl" : {
@@ -25122,7 +25134,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "모두 선택해제"
+            "value" : "모두 선택 해제"
           }
         },
         "nl" : {
@@ -25710,7 +25722,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "표준 노치 미디어 제어기를 설정하려면 '미니멀리즘 UI'를 비활성화하세요."
+            "value" : "표준 노치 미디어 제어기를 설정하려면 '간결한 UI'를 비활성화하세요."
           }
         },
         "nl" : {
@@ -25767,7 +25779,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "가사를 표시하려면 '미니멀리즘 UI'를 비활성화하세요."
+            "value" : "가사를 표시하려면 '간결한 UI'를 비활성화하세요."
           }
         }
       }
@@ -25777,7 +25789,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "가사를 사용하려면 '미니멀리즘 UI'를 비활성화하세요."
+            "value" : "가사를 사용하려면 '간결한 UI'를 비활성화하세요."
           }
         }
       }
@@ -26852,7 +26864,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "방해금지 모드"
+            "value" : "방해 금지 모드"
           }
         },
         "nl" : {
@@ -28982,7 +28994,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "클립보드 매니저 확설화"
+            "value" : "클립보드 관리자 활성화"
           }
         },
         "nl" : {
@@ -29178,7 +29190,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "클립보드로 부터 생성 활성화"
+            "value" : "클립보드에서 생성 활성화"
           }
         },
         "nl" : {
@@ -30444,7 +30456,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "진단 기록 확장 활성화"
+            "value" : "확장 프로그램 진단 로그 활성화"
           }
         },
         "nl" : {
@@ -30546,7 +30558,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "추가 볼륨 조작 리스너 활성화"
+            "value" : "외부 음량 제어 감지 활성화"
           }
         },
         "nl" : {
@@ -30592,7 +30604,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "제스쳐 활성화"
+            "value" : "제스처 활성화"
           }
         },
         "nl" : {
@@ -30638,7 +30650,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "전역 키보드 간축키 활성화"
+            "value" : "전역 키보드 단축키 활성화"
           }
         },
         "nl" : {
@@ -30684,7 +30696,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "위의 글로벌 키보드 단축키를 활성화하여 단축키를 사용자화하세요."
+            "value" : "위의 전역 키보드 단축키를 활성화하여 단축키를 사용자화하세요."
           }
         },
         "nl" : {
@@ -30784,7 +30796,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "성능 데이터를 확인하려면 '설정 → 상태'에서 그래프 표시를 활성화하세요."
+            "value" : "성능 데이터를 확인하려면 '설정 → 통계'에서 그래프 표시를 활성화하세요."
           }
         },
         "nl" : {
@@ -31201,7 +31213,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "음악 실시간 활동 활성화"
+            "value" : "음악 실시간 현황 활성화"
           }
         },
         "nl" : {
@@ -31513,7 +31525,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "시스템 성능 데이터를 확인하려면 설정에서 상태 모니터링을 활성화하세요."
+            "value" : "시스템 성능 데이터를 확인하려면 설정에서 통계 모니터링을 활성화하세요."
           }
         },
         "nl" : {
@@ -31565,7 +31577,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "시스템 상태 모니터링 활성화"
+            "value" : "시스템 통계 모니터링 활성화"
           }
         },
         "nl" : {
@@ -33129,7 +33141,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "확장 너비 조정은 표준 노치 레이아웃에만 적용됩니다. 이 값을 변경하려면 '미니멀리즘 UI'를 비활성화하세요."
+            "value" : "확장 너비 조정은 표준 노치 레이아웃에만 적용됩니다. 이 값을 변경하려면 '간결한 UI'를 비활성화하세요."
           }
         },
         "nl" : {
@@ -38086,7 +38098,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "노치가 없는 디스플레이 에서는 포인터를 올릴 때까지 숨기기"
+            "value" : "노치가 없는 디스플레이에서는 포인터를 올릴 때까지 숨기기"
           }
         },
         "nl" : {
@@ -38752,7 +38764,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "아이콘 & 진행도 색상"
+            "value" : "아이콘 & 진행률 색상"
           }
         },
         "nl" : {
@@ -39393,7 +39405,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "'표시기만'은 녹화 실시간 활동을 수동적으로 유지합니다. '정지 버튼 포함'은 기본 녹화 제어기를 활성화합니다."
+            "value" : "'표시기만'은 녹화 실시간 현황을 수동적으로 유지합니다. '정지 버튼 포함'은 기본 녹화 제어기를 활성화합니다."
           }
         }
       }
@@ -39949,7 +39961,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "반응형 (드래그해서 변경)"
+            "value" : "드래그로 조절"
           }
         },
         "nl" : {
@@ -41621,7 +41633,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "실시간 활동"
+            "value" : "실시간 현황"
           }
         },
         "nl" : {
@@ -41892,7 +41904,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "실시간 활동 아이콘"
+            "value" : "실시간 현황 아이콘"
           }
         }
       }
@@ -43397,7 +43409,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "배터리 부족: %@"
+            "value" : "저전력 모드: %@"
           }
         },
         "nl" : {
@@ -45027,7 +45039,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "미디어 패널 넓이"
+            "value" : "미디어 패널 너비"
           }
         },
         "nl" : {
@@ -45658,7 +45670,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "미디어 재생 실시간 활동"
+            "value" : "미디어 재생 실시간 현황"
           }
         },
         "nl" : {
@@ -46982,7 +46994,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "미니멀리즘 모드는 미디어 제어기와 시스템 HUD에 집중하며, 깔끔하고 몰입감 있는 경험을 위해 모든 추가 기능을 숨깁니다. 활성화 시 애니메이션도 자동으로 간소화됩니다."
+            "value" : "간결한 UI 모드는 미디어 제어기와 시스템 HUD에 집중하며, 깔끔하고 몰입감 있는 경험을 위해 모든 추가 기능을 숨깁니다. 활성화 시 애니메이션도 자동으로 간소화됩니다."
           }
         },
         "nl" : {
@@ -47656,8 +47668,8 @@
       "localizations" : {
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "파일을 다운로드하는 동안 Dynamic Island에 실시간 현황을 표시합니다. Safari, Firefox, Chrome 및 Chrome을 기반으로 만들어진 브라우저(Edge, Brave, Arc, Vivaldi, Opera)에서 작동합니다. 다운로드 폴더만 감시하므로 다른 위치에 저장된 파일은 표시되지 않습니다."
+            "state" : "translated",
+            "value" : "파일을 다운로드하는 동안 Dynamic Island에 실시간 현황을 표시합니다. Safari, Firefox, Chrome 및 Chrome 기반 브라우저인 Edge, Brave, Arc, Vivaldi, Opera를 지원합니다. 다운로드 폴더에 저장하는 파일만 감지하므로 다른 위치에 저장하는 파일은 표시되지 않습니다."
           }
         },
         "nl" : {
@@ -50737,7 +50749,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "결과 발견 안됨"
+            "value" : "검색 결과 없음"
           }
         },
         "nl" : {
@@ -52025,7 +52037,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "재생중인 항목 없음"
+            "value" : "재생 중인 항목 없음"
           }
         },
         "nl" : {
@@ -53381,7 +53393,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "파일 분석 및 대화를 위한 AI 어시스턴트 패널을 엽니다. 기본 단축키는 Cmd+Shift+A이며, 화면 어시스턴트 기능이 활성화된 경우에만 작동합니다."
+            "value" : "파일 분석 및 대화를 위한 AI 어시스턴트 패널을 엽니다. 기본 단축키는 Cmd+Shift+A이며, 스크린 어시스턴트 기능이 활성화된 경우에만 작동합니다."
           }
         },
         "nl" : {
@@ -53787,7 +53799,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "출력 볼륨"
+            "value" : "출력 음량"
           }
         },
         "nl" : {
@@ -56725,7 +56737,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "진행도 스타일"
+            "value" : "진행률 스타일"
           }
         },
         "nl" : {
@@ -57903,7 +57915,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "녹화중"
+            "value" : "녹화 중"
           }
         },
         "nl" : {
@@ -58211,7 +58223,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "새로고침 감지"
+            "value" : "감지 상태 새로 고침"
           }
         },
         "nl" : {
@@ -59461,7 +59473,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "미리 알림 실시간 활동이 필요하지만 '실시간 활동' 설정에서 꺼져 있습니다."
+            "value" : "미리 알림 실시간 현황이 필요하지만 '실시간 현황' 설정에서 꺼져 있습니다."
           }
         }
       }
@@ -60494,7 +60506,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shell 재시작"
+            "value" : "셸 재시작"
           }
         },
         "nl" : {
@@ -60542,7 +60554,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shell 재시작"
+            "value" : "셸 재시작"
           }
         },
         "nl" : {
@@ -60638,7 +60650,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "qhrrn"
+            "value" : "복원"
           }
         },
         "nl" : {
@@ -62132,7 +62144,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "스크린 어시스턴트 기능 비활성화 됨"
+            "value" : "스크린 어시스턴트 기능 비활성화됨"
           }
         },
         "nl" : {
@@ -62190,7 +62202,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "스크린 어이스턴트:"
+            "value" : "스크린 어시스턴트:"
           }
         },
         "nl" : {
@@ -62690,7 +62702,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "검색 설정"
+            "value" : "설정 검색"
           }
         },
         "nl" : {
@@ -63400,7 +63412,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "자물쇠, 지문 또는 두 아이콘을 모두 선택합니다. 지문을 선택하면 잠금 해제 애니메이션이 끝날 때까지 실시간 활동이 열려 있습니다."
+            "value" : "자물쇠, 지문 또는 두 아이콘을 모두 선택합니다. 지문을 선택하면 잠금 해제 애니메이션이 끝날 때까지 실시간 현황이 열려 있습니다."
           }
         }
       }
@@ -64482,7 +64494,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shell 경로"
+            "value" : "셸 경로"
           }
         },
         "nl" : {
@@ -66801,7 +66813,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "잠금 화면 미리알림 표시"
+            "value" : "잠금 화면 미리 알림 표시"
           }
         },
         "nl" : {
@@ -67676,7 +67688,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "진행도 표시"
+            "value" : "진행률 표시"
           }
         },
         "nl" : {
@@ -69768,7 +69780,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "든삭"
+            "value" : "단색"
           }
         },
         "nl" : {
@@ -71226,7 +71238,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "상태 비활성화됨"
+            "value" : "통계 모니터링 비활성화됨"
           }
         },
         "nl" : {
@@ -71502,7 +71514,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "상태 업데이트 주기"
+            "value" : "통계 업데이트 주기"
           }
         },
         "nl" : {
@@ -73435,7 +73447,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "터미널 투명도"
+            "value" : "터미널 배경 불투명도"
           }
         },
         "nl" : {
@@ -73782,7 +73794,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "잠금 화면 미리 알림은 미리 알림 실시간 활동에서 생성되는데, 위에서 꺼져 있습니다."
+            "value" : "잠금 화면 미리 알림은 미리 알림 실시간 현황에서 생성되는데, 위에서 꺼져 있습니다."
           }
         }
       }
@@ -73792,7 +73804,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "잠금 화면 미리 알림은 미리 알림 실시간 활동에서 생성되는데, '실시간 활동' 설정에서 꺼져 있습니다."
+            "value" : "잠금 화면 미리 알림은 미리 알림 실시간 현황에서 생성되는데, '실시간 현황' 설정에서 꺼져 있습니다."
           }
         }
       }
@@ -75025,7 +75037,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "타이머 비활성화 됨"
+            "value" : "타이머 기능 비활성화됨"
           }
         },
         "nl" : {
@@ -75755,7 +75767,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "상위 프로세서"
+            "value" : "상위 프로세스"
           }
         },
         "nl" : {
@@ -76834,7 +76846,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "알수없음"
+            "value" : "알 수 없음"
           }
         },
         "nl" : {
@@ -80961,7 +80973,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "활성화 시, 노치가 닫히고 몇 초 후에 상태 모니터링이 중지됩니다."
+            "value" : "활성화 시, 노치가 닫히고 몇 초 후에 통계 모니터링이 중지됩니다."
           }
         },
         "nl" : {
@@ -84433,7 +84445,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• 생각중"
+            "value" : "• 생각 중"
           }
         },
         "nl" : {
