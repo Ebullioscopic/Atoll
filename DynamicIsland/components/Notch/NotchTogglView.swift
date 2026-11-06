@@ -52,6 +52,20 @@ struct NotchTogglView: View {
         }
     }
 
+    /// Sums value × factor pairs without trapping on overflow. An overflowing input is far beyond
+    /// 24 hours, so it returns the 24-hour ceiling that the caller clamps to anyway.
+    private static func safeSeconds(_ terms: [(value: Int, factor: Int)]) -> Int {
+        var total = 0
+        for term in terms {
+            let (product, productOverflow) = term.value.multipliedReportingOverflow(by: term.factor)
+            guard !productOverflow else { return 86_400 }
+            let (sum, sumOverflow) = total.addingReportingOverflow(product)
+            guard !sumOverflow else { return 86_400 }
+            total = sum
+        }
+        return total
+    }
+
     /// Parses the draft ("H:MM:SS", "M:SS", or plain seconds) into the manager's elapsed.
     private func applyElapsedDraft() {
         let parts = elapsedDraft.split(separator: ":").map {
@@ -59,8 +73,8 @@ struct NotchTogglView: View {
         }
         let seconds: Int
         switch parts.count {
-        case 3: seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
-        case 2: seconds = parts[0] * 60 + parts[1]
+        case 3: seconds = Self.safeSeconds([(parts[0], 3600), (parts[1], 60), (parts[2], 1)])
+        case 2: seconds = Self.safeSeconds([(parts[0], 60), (parts[1], 1)])
         case 1: seconds = parts[0]
         default: seconds = 0
         }
@@ -117,7 +131,7 @@ struct NotchTogglView: View {
                 ) {
                     Task { await togglManager.fetchProjects() }
                 }
-                .disabled(togglManager.isRunning || togglManager.isFetchingProjects)
+                .disabled(!togglEnabled || togglManager.isRunning || togglManager.isFetchingProjects)
 
                 circleIconButton(
                     systemName: "arrow.triangle.2.circlepath",

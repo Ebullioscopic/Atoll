@@ -98,6 +98,8 @@ final class TogglManager: ObservableObject {
     // MARK: - Non-published state
 
     @Published private(set) var workspaceId: Int? = nil
+    /// Toggl user the saved token belongs to. Account changes are detected by user, not by workspace.
+    private var userId: Int? = nil
     /// Set when syncing a running Toggl entry; used as the POST `start` instead of the local timer start.
     private(set) var syncedOriginalStart: Date? = nil
     /// ID of the running Toggl entry this timer was synced from. Stop/save must stop
@@ -111,6 +113,8 @@ final class TogglManager: ObservableObject {
 
     private struct PendingEntry: Identifiable, Codable {
         var id = UUID()
+        /// Workspace the entry was recorded for, so a retry never posts it to another one. Nil for older saved entries.
+        var workspaceId: Int? = nil
         let description: String
         let projectId: Int?
         let start: Date
@@ -146,6 +150,9 @@ final class TogglManager: ObservableObject {
     private var inFlightSaves = 0
     /// Project fetches currently running, so an older one cannot re-enable Refresh while a newer one waits.
     private var inFlightProjectFetches = 0
+    /// Description and project of the running custom or preset timer, captured when it started.
+    private var manualTimerDescription = ""
+    private var manualTimerProjectId: Int? = nil
     /// True while any failed entry or stop is waiting for a retry.
     @Published private(set) var hasPendingRetry = false
     /// Why the last token change was refused or failed, while the existing connection stays in place.
@@ -156,6 +163,7 @@ final class TogglManager: ObservableObject {
     /// A failed entry as shown to the user.
     struct PendingEntrySummary: Identifiable {
         let id: UUID
+        /// Description, start time and duration, with a number added when two entries would look identical.
         let title: String
         let duration: TimeInterval
     }
@@ -170,12 +178,21 @@ final class TogglManager: ObservableObject {
     private func refreshPendingFlag() {
         let pending = !pendingRetryEntries.isEmpty || !pendingRemoteStops.isEmpty
         if hasPendingRetry != pending { hasPendingRetry = pending }
-        pendingEntrySummaries = pendingRetryEntries.map {
-            PendingEntrySummary(
-                id: $0.id,
-                title: $0.description.isEmpty ? String(localized: "No description") : $0.description,
-                duration: $0.stop.timeIntervalSince($0.start)
-            )
+        var labels = pendingRetryEntries.map { entry -> String in
+            let name = entry.description.isEmpty ? String(localized: "No description") : entry.description
+            let started = entry.start.formatted(date: .abbreviated, time: .shortened)
+            let length = TogglSupplementMetrics.formattedElapsed(for: entry.stop.timeIntervalSince(entry.start))
+            return "\(name) · \(started) · \(length)"
+        }
+        // Entries that still look identical get a number, so each one can be picked on its own.
+        let totals = Dictionary(labels.map { ($0, 1) }, uniquingKeysWith: +)
+        var seen: [String: Int] = [:]
+        for index in labels.indices where (totals[labels[index]] ?? 0) > 1 {
+            seen[labels[index], default: 0] += 1
+            labels[index] += " (#\(seen[labels[index]] ?? 1))"
+        }
+        pendingEntrySummaries = zip(pendingRetryEntries, labels).map { entry, label in
+            PendingEntrySummary(id: entry.id, title: label, duration: entry.stop.timeIntervalSince(entry.start))
         }
     }
 
@@ -191,6 +208,7 @@ final class TogglManager: ObservableObject {
 
     private let keychainAccount = "com.atoll.toggl.apiToken"
     private let workspaceIdKey  = "togglWorkspaceId"
+    private let userIdKey       = "togglUserId"
     private let projectsKey     = "togglProjectsJSON"
     private let recentEntriesKey = "togglRecentEntriesJSON"
     private let pendingEntriesKey = "togglPendingEntriesJSON"
@@ -230,9 +248,11 @@ final class TogglManager: ObservableObject {
 
         do {
             // Validate first: a bad replacement must not overwrite the working token.
-            let wsId = try await fetchWorkspaceId(token: trimmed)
+            let account = try await fetchAccount(token: trimmed)
+            let wsId = account.workspaceId
             guard generation == authGeneration else { return }
-            let accountChanged = workspaceId != nil && workspaceId != wsId
+            // The user ID tells accounts apart; older installs without one fall back to the workspace.
+            let accountChanged = userId.map { $0 != account.userId } ?? (workspaceId != nil && workspaceId != wsId)
             if accountChanged && hasPendingRetry {
                 // Queued entries belong to the current account and must not be sent to another one.
                 connectionStatus = previousStatus
@@ -240,8 +260,13 @@ final class TogglManager: ObservableObject {
                 return
             }
             guard writeKeychain(trimmed) else {
-                connectionStatus = previousStatus == .connected ? .connected : .error("Could not save token to Keychain")
-                if previousStatus == .connected { tokenError = "Could not save the token to the Keychain." }
+                if hasToken && previousStatus == .connected {
+                    // The previous token is still stored, so the connection stays usable.
+                    connectionStatus = .connected
+                    tokenError = "Could not save the token to the Keychain."
+                } else {
+                    connectionStatus = .error("Could not save token to Keychain")
+                }
                 return
             }
             if accountChanged {
@@ -255,7 +280,9 @@ final class TogglManager: ObservableObject {
                 }
             }
             workspaceId = wsId
+            userId = account.userId
             UserDefaults.standard.set(wsId, forKey: workspaceIdKey)
+            UserDefaults.standard.set(account.userId, forKey: userIdKey)
             connectionStatus = .connected
             Task { await self.fetchProjects() }
             Task { await self.fetchRecentEntries() }
@@ -284,12 +311,13 @@ final class TogglManager: ObservableObject {
         clearSaveError()
         deleteKeychain()
         workspaceId = nil
+        userId = nil
         projects = []
         recentEntries = []
         pendingDescription = ""
         pendingProjectId = nil
         connectionStatus = .disconnected
-        for key in [workspaceIdKey, projectsKey, recentEntriesKey] {
+        for key in [workspaceIdKey, userIdKey, projectsKey, recentEntriesKey] {
             UserDefaults.standard.removeObject(forKey: key)
         }
     }
@@ -365,7 +393,7 @@ final class TogglManager: ObservableObject {
     func saveEntry(description: String, projectId: Int?, start: Date, stop: Date) async {
         guard hasToken, let wsId = workspaceId else { return }
 
-        let entry = PendingEntry(description: description, projectId: projectId, start: start, stop: stop)
+        let entry = PendingEntry(workspaceId: wsId, description: description, projectId: projectId, start: start, stop: stop)
         let account = accountGeneration
         beginSaving()
         // Keep an existing error visible while earlier work is still waiting for Retry.
@@ -425,9 +453,10 @@ final class TogglManager: ObservableObject {
         for entry in pendingRetryEntries {
             guard generation == authGeneration else { return }
             do {
-                try await postTimeEntry(entry: entry, workspaceId: wsId)
-                guard generation == authGeneration else { return }
+                try await postTimeEntry(entry: entry, workspaceId: entry.workspaceId ?? wsId)
+                // The POST succeeded, so the entry is done even if the token changed meanwhile.
                 pendingRetryEntries.removeAll { $0.id == entry.id }
+                guard generation == authGeneration else { return }
                 prependRecentEntry(TogglRecentEntry(
                     description: entry.description,
                     projectId: entry.projectId,
@@ -549,10 +578,16 @@ final class TogglManager: ObservableObject {
                 projectId: stop.projectId,
                 projectName: projects.first { $0.id == stop.projectId }?.name
             ))
-        } catch let TogglError.httpError(code, _) where (400..<500).contains(code) && ![401, 403, 429].contains(code) {
-            // Toggl rejected the stop because the entry is already stopped. Nothing left to retry.
+        } catch let TogglError.httpError(code, _) where code == 409 {
+            // Toggl says the entry is already stopped. Nothing left to retry.
             guard generation == authGeneration else { return }
             removePendingStop(stop)
+        } catch let TogglError.httpError(code, _) where code == 404 {
+            // The entry no longer exists (for example it was deleted), so there is nothing to stop.
+            // Drop the stop instead of retrying forever, but tell the user no time was saved for it.
+            guard generation == authGeneration else { return }
+            removePendingStop(stop)
+            saveError = "That Toggl entry no longer exists, so no time was saved for it."
         } catch {
             guard generation == authGeneration else { return }
             if !pendingRemoteStops.contains(where: { $0.entryId == stop.entryId }) {
@@ -626,12 +661,19 @@ final class TogglManager: ObservableObject {
     /// Records that a local timer or stopwatch started or stopped, invalidating sync requests still in flight.
     func markLocalActivity() { localActionGeneration += 1 }
 
+    /// Remembers the description and project a custom or preset timer starts with, so editing the
+    /// stopwatch's fields later does not change what that timer saves.
+    func captureManualTimerMetadata() {
+        manualTimerDescription = pendingDescription
+        manualTimerProjectId = pendingProjectId
+    }
+
     /// Saves the spans a custom or preset timer actually ran as Toggl entries, one per span, using the
-    /// pending description and project. Does nothing when Toggl is disabled or not connected.
+    /// description and project captured when it started. Does nothing when Toggl is disabled or not connected.
     func saveLocalTimerIntervals(_ intervals: [DateInterval]) {
         guard Defaults[.togglEnabled], isReady, !intervals.isEmpty else { return }
-        let description = pendingDescription
-        let projectId = pendingProjectId
+        let description = manualTimerDescription
+        let projectId = manualTimerProjectId
         Task {
             for interval in intervals {
                 await saveEntry(description: description, projectId: projectId, start: interval.start, stop: interval.end)
@@ -700,13 +742,18 @@ final class TogglManager: ObservableObject {
     // MARK: - Networking
 
     /// Returns the default workspace ID for the account that owns the token.
-    private func fetchWorkspaceId(token: String) async throws -> Int {
+    /// Returns the Toggl user ID and default workspace ID for the account that owns the token.
+    private func fetchAccount(token: String) async throws -> (userId: Int, workspaceId: Int) {
         struct Me: Codable {
+            let id: Int
             let defaultWorkspaceId: Int
-            enum CodingKeys: String, CodingKey { case defaultWorkspaceId = "default_workspace_id" }
+            enum CodingKeys: String, CodingKey {
+                case id
+                case defaultWorkspaceId = "default_workspace_id"
+            }
         }
         let me: Me = try await apiGET("/api/v9/me", token: token)
-        return me.defaultWorkspaceId
+        return (me.id, me.defaultWorkspaceId)
     }
 
     /// Posts a completed time entry to the given workspace. The duration is at least one second.
@@ -786,6 +833,8 @@ final class TogglManager: ObservableObject {
     private func loadLocalData() {
         let wsId = UserDefaults.standard.integer(forKey: workspaceIdKey)
         workspaceId = wsId == 0 ? nil : wsId
+        let storedUser = UserDefaults.standard.integer(forKey: userIdKey)
+        userId = storedUser == 0 ? nil : storedUser
 
         if let data = UserDefaults.standard.data(forKey: projectsKey),
            let decoded = try? JSONDecoder().decode([TogglProject].self, from: data) {
@@ -835,18 +884,21 @@ final class TogglManager: ObservableObject {
     /// Replaces the API token in the Keychain. Returns whether it was saved.
     private func writeKeychain(_ token: String) -> Bool {
         let data = Data(token.utf8)
-        let del: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: keychainAccount
         ]
-        SecItemDelete(del as CFDictionary)
-        let add: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: keychainAccount,
+        // Update in place so a failed write leaves the existing token untouched; add only when none exists.
+        var status = SecItemUpdate(query as CFDictionary, [
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
-        ]
-        let status = SecItemAdd(add as CFDictionary, nil)
+        ] as CFDictionary)
+        if status == errSecItemNotFound {
+            var add = query
+            add[kSecValueData as String] = data
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+            status = SecItemAdd(add as CFDictionary, nil)
+        }
         if status != errSecSuccess {
             print("[Toggl] Keychain write failed (OSStatus \(status))")
         }

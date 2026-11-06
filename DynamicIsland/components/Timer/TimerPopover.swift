@@ -300,6 +300,8 @@ private struct TogglInputSection: View {
             TextField("Description (optional)", text: $togglManager.pendingDescription)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 13))
+                // The running stopwatch saves these on stop, so they are fixed while it runs.
+                .disabled(togglManager.isRunning)
 
             // Project picker + refresh
             HStack(spacing: 6) {
@@ -310,6 +312,7 @@ private struct TogglInputSection: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
+                .disabled(togglManager.isRunning)
 
                 Button(action: { Task { await togglManager.fetchProjects() } }) {
                     if togglManager.isFetchingProjects {
@@ -409,6 +412,7 @@ private struct TogglRecentSection: View {
                             togglManager.pendingDescription = entry.description
                             togglManager.pendingProjectId   = entry.projectId
                         }
+                        .disabled(togglManager.isRunning)
                     }
                 }
             }

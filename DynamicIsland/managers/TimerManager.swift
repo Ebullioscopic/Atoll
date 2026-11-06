@@ -188,6 +188,17 @@ class TimerManager: ObservableObject {
                 self?.objectWillChange.send()
             }
             .store(in: &cancellables)
+
+        // Time the Mac spends asleep is not tracked time: close the run span on sleep and reopen it on wake.
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.closeRunInterval()
+        }
+        center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self, self.activeSource == .manual, self.isTimerActive, !self.isPaused,
+                  !self.isAdoptedFromToggl, !self.isDemoTimer, self.runStart == nil else { return }
+            self.runStart = Date()
+        }
     }
     
     deinit {
@@ -233,6 +244,8 @@ class TimerManager: ObservableObject {
         sessionID = UUID()
         runIntervals = []
         runStart = Date()
+        // Keep this timer's Toggl description and project with it, apart from the stopwatch's fields.
+        Task { @MainActor in TogglManager.shared.captureManualTimerMetadata() }
 
         // Start countdown timer
         timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
