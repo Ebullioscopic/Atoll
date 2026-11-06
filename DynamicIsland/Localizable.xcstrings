@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Animation speed applies when Reduce Motion is off." : {
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关闭系统的“减少动态效果”后，动画速度设置才会生效。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "關閉系統的「減少動態效果」後，動畫速度設定才會生效。" } }
+      }
+    },
     "Notch animation speed" : {
       "localizations" : {
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "灵动岛动画速度" } },

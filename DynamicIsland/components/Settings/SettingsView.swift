@@ -240,7 +240,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "Extend hover area", keywords: ["hover", "cursor"], highlightID: SettingsTab.general.highlightID(for: "Extend hover area")),
         SettingsSearchEntry(tab: .general, title: "Enable haptics", keywords: ["haptic", "feedback"], highlightID: SettingsTab.general.highlightID(for: "Enable haptics")),
         SettingsSearchEntry(tab: .general, title: "Open notch on hover", keywords: ["hover to open", "auto open"], highlightID: SettingsTab.general.highlightID(for: "Open notch on hover")),
-        SettingsSearchEntry(tab: .general, title: "Notch animation speed", keywords: ["animation", "speed", "notch"], highlightID: SettingsTab.general.highlightID(for: "Notch animation speed")),
+        SettingsSearchEntry(tab: .general, title: "Notch animation speed", keywords: ["animation", "speed", "notch", "灵动岛动画速度", "動畫速度", "動態島"], highlightID: SettingsTab.general.highlightID(for: "Notch animation speed")),
         SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
         SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
         SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
@@ -1120,6 +1120,7 @@ struct SettingsView: View {
 struct GeneralSettings: View {
     @State private var screens: [String] = NSScreen.screens.compactMap { $0.localizedName }
     @EnvironmentObject var vm: DynamicIslandViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @Default(.mirrorShape) var mirrorShape
     @Default(.showEmojis) var showEmojis
@@ -1435,6 +1436,11 @@ struct GeneralSettings: View {
                 }
             }
             .settingsHighlight(id: highlightID("Notch animation speed"))
+            if reduceMotion {
+                Text("Animation speed applies when Reduce Motion is off.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if openNotchOnHover {
                 Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
                     HStack {
