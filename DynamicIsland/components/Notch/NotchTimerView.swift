@@ -521,6 +521,7 @@ struct NotchTimerView: View {
     }
 
     private func startCustomTimer() {
+        TogglManager.shared.localTimerChanged()
         withAnimation(.smooth) {
             timerManager.startTimer(duration: customDurationInSeconds, name: String(localized: "Custom Timer"))
             if !enableMinimalisticUI {

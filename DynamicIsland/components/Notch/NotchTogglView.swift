@@ -212,6 +212,19 @@ struct NotchTogglView: View {
                         Spacer(minLength: 0)
                         Button("Retry") { Task { await togglManager.retryPendingEntry() } }
                             .font(.system(size: 11, weight: .semibold)).foregroundStyle(.red).buttonStyle(.plain)
+                        if !togglManager.pendingEntrySummaries.isEmpty {
+                            // Discard one rejected entry without losing the others.
+                            Menu("Discard") {
+                                ForEach(togglManager.pendingEntrySummaries) { entry in
+                                    Button(entry.title, role: .destructive) {
+                                        togglManager.discardPendingEntry(id: entry.id)
+                                    }
+                                }
+                            }
+                            .menuStyle(.borderlessButton)
+                            .fixedSize()
+                            .font(.system(size: 11, weight: .semibold))
+                        }
                     }
                 } else if noActiveTimerMessage {
                     Text("No active timer on Toggl")

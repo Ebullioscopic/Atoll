@@ -46,6 +46,21 @@ class TimerManager: ObservableObject {
     private var runIntervals: [DateInterval] = []
     private var runStart: Date?
 
+    /// Saves the spans the current manual timer ran to Toggl and clears them. Adopted and demo timers are skipped.
+    /// Call before a stop or before another timer replaces this one.
+    private func saveRunIntervalsToToggl() {
+        defer {
+            runIntervals = []
+            runStart = nil
+        }
+        guard activeSource == .manual, isTimerActive, !isAdoptedFromToggl, !isDemoTimer else { return }
+        closeRunInterval()
+        let intervals = runIntervals
+        Task { @MainActor in
+            TogglManager.shared.saveLocalTimerIntervals(intervals)
+        }
+    }
+
     /// Ends the current run span, keeping it if it lasted at least a second.
     private func closeRunInterval() {
         guard let start = runStart else { return }
@@ -189,6 +204,9 @@ class TimerManager: ObservableObject {
             endExternalTimer(triggerSmoothClose: false)
         }
 
+        // A manual timer being replaced keeps its tracked time.
+        saveRunIntervalsToToggl()
+
         // Stop any existing timer
         timerInstance?.invalidate()
         soundPlayer?.stop()
@@ -268,13 +286,7 @@ class TimerManager: ObservableObject {
 
         // A custom or preset timer stopped by the user is saved to Toggl, one entry per span it actually
         // ran (pauses excluded). Adopted entries are stopped remotely instead, and demo timers are never saved.
-        if activeSource == .manual && !isAdoptedFromToggl && !isDemoTimer {
-            closeRunInterval()
-            let intervals = runIntervals
-            Task { @MainActor in
-                TogglManager.shared.saveLocalTimerIntervals(intervals)
-            }
-        }
+        saveRunIntervalsToToggl()
 
         timerInstance?.invalidate()
         timerInstance = nil
@@ -456,6 +468,8 @@ class TimerManager: ObservableObject {
     /// separately in TogglManager.syncedOriginalStart for the eventual stop or POST.
     func startTimerFromOffset(_ elapsed: TimeInterval, name: String) {
         if activeSource == .external { endExternalTimer(triggerSmoothClose: false) }
+        // A manual timer being replaced keeps its tracked time.
+        saveRunIntervalsToToggl()
         timerInstance?.invalidate()
         // A previous timer may already be in overtime and looping its alarm.
         soundPlayer?.stop()

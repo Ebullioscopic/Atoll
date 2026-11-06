@@ -7736,6 +7736,13 @@ struct TimerSettings: View {
                     }
 
                     togglStatusRow
+
+                    if let tokenError = togglManager.tokenError {
+                        Text(tokenError)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .padding(.vertical, 4)
 

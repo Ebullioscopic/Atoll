@@ -144,13 +144,39 @@ final class TogglManager: ObservableObject {
     private var isRetryInFlight = false
     /// Saves and retries currently posting, so the saving indicator clears only after the last one.
     private var inFlightSaves = 0
+    /// Project fetches currently running, so an older one cannot re-enable Refresh while a newer one waits.
+    private var inFlightProjectFetches = 0
     /// True while any failed entry or stop is waiting for a retry.
     @Published private(set) var hasPendingRetry = false
+    /// Why the last token change was refused or failed, while the existing connection stays in place.
+    @Published var tokenError: String? = nil
+    /// Failed entries as the UI shows them, so one can be discarded without losing the others.
+    @Published private(set) var pendingEntrySummaries: [PendingEntrySummary] = []
+
+    /// A failed entry as shown to the user.
+    struct PendingEntrySummary: Identifiable {
+        let id: UUID
+        let title: String
+        let duration: TimeInterval
+    }
+
+    /// Drops one failed entry, leaving every other pending entry and stop untouched.
+    func discardPendingEntry(id: UUID) {
+        pendingRetryEntries.removeAll { $0.id == id }
+        if !hasPendingRetry { saveError = nil }
+    }
 
     /// Updates `hasPendingRetry` from the queued entries and stops.
     private func refreshPendingFlag() {
         let pending = !pendingRetryEntries.isEmpty || !pendingRemoteStops.isEmpty
         if hasPendingRetry != pending { hasPendingRetry = pending }
+        pendingEntrySummaries = pendingRetryEntries.map {
+            PendingEntrySummary(
+                id: $0.id,
+                title: $0.description.isEmpty ? String(localized: "No description") : $0.description,
+                duration: $0.stop.timeIntervalSince($0.start)
+            )
+        }
     }
 
     /// Bumped on every auth change, so results from an older Save or Disconnect are ignored.
@@ -195,15 +221,35 @@ final class TogglManager: ObservableObject {
         guard !trimmed.isEmpty else { return }
         authGeneration += 1
         let generation = authGeneration
-        guard writeKeychain(trimmed) else {
-            connectionStatus = .error("Could not save token to Keychain")
-            return
-        }
+        let previousStatus = connectionStatus
+        tokenError = nil
         connectionStatus = .connecting
 
         do {
+            // Validate first: a bad replacement must not overwrite the working token.
             let wsId = try await fetchWorkspaceId(token: trimmed)
             guard generation == authGeneration else { return }
+            let accountChanged = workspaceId != nil && workspaceId != wsId
+            if accountChanged && hasPendingRetry {
+                // Queued entries belong to the current account and must not be sent to another one.
+                connectionStatus = previousStatus
+                tokenError = "Unsaved Toggl entries belong to the current account. Retry or discard them before switching accounts."
+                return
+            }
+            guard writeKeychain(trimmed) else {
+                connectionStatus = previousStatus == .connected ? .connected : .error("Could not save token to Keychain")
+                if previousStatus == .connected { tokenError = "Could not save the token to the Keychain." }
+                return
+            }
+            if accountChanged {
+                // Another account: drop the previous account's cached projects, recents and selection.
+                projects = []
+                recentEntries = []
+                pendingProjectId = nil
+                for key in [projectsKey, recentEntriesKey] {
+                    UserDefaults.standard.removeObject(forKey: key)
+                }
+            }
             workspaceId = wsId
             UserDefaults.standard.set(wsId, forKey: workspaceIdKey)
             connectionStatus = .connected
@@ -211,7 +257,13 @@ final class TogglManager: ObservableObject {
             Task { await self.fetchRecentEntries() }
         } catch {
             guard generation == authGeneration else { return }
-            connectionStatus = .error(error.localizedDescription)
+            if previousStatus == .connected {
+                // Keep the existing connection and token; only report why the new one was refused.
+                connectionStatus = .connected
+                tokenError = error.localizedDescription
+            } else {
+                connectionStatus = .error(error.localizedDescription)
+            }
         }
     }
 
@@ -242,8 +294,12 @@ final class TogglManager: ObservableObject {
     func fetchProjects() async {
         guard hasToken else { return }
         let generation = authGeneration
+        inFlightProjectFetches += 1
         isFetchingProjects = true
-        defer { isFetchingProjects = false }
+        defer {
+            inFlightProjectFetches = max(0, inFlightProjectFetches - 1)
+            isFetchingProjects = inFlightProjectFetches > 0
+        }
 
         do {
             let fetched: [TogglProject] = try await apiGET("/api/v9/me/projects")
@@ -332,6 +388,12 @@ final class TogglManager: ObservableObject {
         let generation = authGeneration
         let previousError = saveError
         saveError = nil
+        // An interrupted retry (for example a token change) must not leave pending work without an error.
+        defer {
+            if hasPendingRetry && saveError == nil {
+                saveError = previousError ?? "Some Toggl entries were not saved."
+            }
+        }
         for stop in pendingRemoteStops {
             guard generation == authGeneration else { return }
             // Another request may have stopped this entry while an earlier one was waiting.
