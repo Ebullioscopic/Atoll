@@ -7,18 +7,6 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "動態島動畫速度" } }
       }
     },
-    "Fast" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "快速" } },
-        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "快速" } }
-      }
-    },
-    "Faster" : {
-      "localizations" : {
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更快" } },
-        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "更快" } }
-      }
-    },
     "Battery charging: %.1f W" : {
       "comment" : "Actual measured power; adapter capacity is not used as a substitute.",
       "localizations" : {

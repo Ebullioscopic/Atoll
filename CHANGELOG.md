@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Notch animation speed**: choose a faster expand and collapse animation independently of the hover delay.
+- **Notch animation speed**: adjust expand and collapse animation speed from 1× to 2× independently of the hover delay.
 - **Charging power readings**: the charging HUD now shows actual battery charging watts, and the battery details popover separately shows battery charging power and total power input. Unavailable readings are hidden, and power is sampled only while the HUD or popover is visible. (#894)
 - **Connection status HUDs**: Atoll now shows a Dynamic Island HUD when the Mac goes offline, and a compact inline HUD when it connects to Wi-Fi or Personal Hotspot, using the matching Wi-Fi or hotspot symbol and the connected network name. (#827)
 - **Pin lyrics under the closed notch**: a pin button in the Lyrics panel keeps the line being sung visible after the notch closes, so a song can be followed without holding the pointer over the notch. The strip is drawn as an overlay on padding rather than as a row in the notch stack, so it never widens the panel or shifts the music row. Off by default, and inert unless lyrics are enabled.

@@ -1125,7 +1125,8 @@ struct GeneralSettings: View {
     @Default(.showEmojis) var showEmojis
     @Default(.gestureSensitivity) var gestureSensitivity
     @Default(.minimumHoverDuration) var minimumHoverDuration
-    @AppStorage("notchAnimationSpeed") private var notchAnimationSpeed = "default"
+    @AppStorage("notchAnimationSpeed") private var legacyNotchAnimationSpeed = "default"
+    @AppStorage("notchAnimationSpeedMultiplier") private var notchAnimationSpeedMultiplier = 0.0
     @Default(.nonNotchHeight) var nonNotchHeight
     @Default(.nonNotchHeightMode) var nonNotchHeightMode
     @Default(.notchHeight) var notchHeight
@@ -1422,10 +1423,16 @@ struct GeneralSettings: View {
             }
             .settingsHighlight(id: highlightID("Open notch on hover"))
             Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
-            Picker("Notch animation speed", selection: $notchAnimationSpeed) {
-                Text("Default").tag("default")
-                Text("Fast").tag("fast")
-                Text("Faster").tag("faster")
+            Slider(value: Binding(
+                get: { NotchAnimationSpeed.resolved(notchAnimationSpeedMultiplier, legacy: legacyNotchAnimationSpeed) },
+                set: { notchAnimationSpeedMultiplier = $0 }
+            ), in: 1...2, step: 0.1) {
+                HStack {
+                    Text("Notch animation speed")
+                    Spacer()
+                    Text("\(NotchAnimationSpeed.resolved(notchAnimationSpeedMultiplier, legacy: legacyNotchAnimationSpeed), specifier: "%.1f")×")
+                        .foregroundStyle(.secondary)
+                }
             }
             .settingsHighlight(id: highlightID("Notch animation speed"))
             if openNotchOnHover {
