@@ -160,6 +160,7 @@ struct TimerPopover: View {
 
 /// A new local timer replaces any timer synced from Toggl, so its entry must not be stopped later.
 /// The Toggl stopwatch keeps its own synced entry while it runs.
+@MainActor
 private func forgetSyncedEntryUnlessStopwatchRuns() {
     guard !TogglManager.shared.isRunning else { return }
     TogglManager.shared.clearSyncedStart()
