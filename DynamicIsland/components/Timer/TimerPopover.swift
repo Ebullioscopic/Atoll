@@ -164,6 +164,7 @@ struct TimerPopover: View {
 /// The Toggl stopwatch keeps its own synced entry while it runs.
 @MainActor
 private func forgetSyncedEntryUnlessStopwatchRuns() {
+    TogglManager.shared.markLocalActivity()
     guard !TogglManager.shared.isRunning else { return }
     TogglManager.shared.clearSyncedStart()
 }
@@ -264,7 +265,9 @@ private struct ActiveTimerSection: View {
             return
         }
         withAnimation(.smooth) { timerManager.stopTimer() }
-        // A timer synced from a running Toggl entry must stop that entry too.
+        togglManager.markLocalActivity()
+        // Only a timer that adopted a Toggl entry stops it. While the stopwatch runs, its entry is the stopwatch's.
+        guard !togglManager.isRunning else { return }
         Task { await togglManager.stopSyncedEntry() }
     }
 
@@ -353,15 +356,18 @@ private struct TogglInputSection: View {
     /// Adopts the running Toggl entry into the local timer, or shows a short "no active timer" message.
     private func syncFromToggl() {
         Task {
-            guard let elapsed = await togglManager.adoptRunningEntry() else {
+            switch await togglManager.adoptRunningEntry() {
+            case .superseded:
+                return  // A local timer or stopwatch started meanwhile; keep it.
+            case .nothingRunning:
                 withAnimation { noActiveTimerVisible = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                     withAnimation { noActiveTimerVisible = false }
                 }
-                return
-            }
-            withAnimation(.smooth) {
-                timerManager.startTimerFromOffset(elapsed, name: togglManager.pendingDescription.isEmpty ? "Timer" : togglManager.pendingDescription)
+            case .adopted(let elapsed):
+                withAnimation(.smooth) {
+                    timerManager.startTimerFromOffset(elapsed, name: togglManager.pendingDescription.isEmpty ? "Timer" : togglManager.pendingDescription)
+                }
             }
         }
     }

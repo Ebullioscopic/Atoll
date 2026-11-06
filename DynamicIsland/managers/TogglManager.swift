@@ -41,6 +41,7 @@ struct TogglRunningEntry: Codable {
     let projectId: Int?
     let start: String
     let duration: Int
+    let workspaceId: Int?
 
     var isRunning: Bool { duration < 0 }
     var parsedStart: Date? { TogglManager.parseDate(start) }
@@ -48,6 +49,7 @@ struct TogglRunningEntry: Codable {
     enum CodingKeys: String, CodingKey {
         case id, description, start, duration
         case projectId = "project_id"
+        case workspaceId = "workspace_id"
     }
 }
 
@@ -100,15 +102,34 @@ final class TogglManager: ObservableObject {
     /// ID of the running Toggl entry this timer was synced from. Stop/save must stop
     /// that entry instead of creating a second one.
     private(set) var syncedEntryId: Int? = nil
+    /// Workspace of the synced entry, so it is stopped in the workspace it was started in.
+    private(set) var syncedWorkspaceId: Int? = nil
 
-    private struct PendingEntry {
+    private struct PendingEntry: Identifiable {
+        let id = UUID()
         let description: String
         let projectId: Int?
         let start: Date
         let stop: Date
     }
-    private var pendingRetryEntry: PendingEntry? = nil
-    var hasPendingRetry: Bool { pendingRetryEntry != nil }
+
+    /// A remote stop that failed and must be retried. Kept apart from new stopwatch entries.
+    private struct RemoteStop {
+        let workspaceId: Int
+        let entryId: Int
+        let description: String
+        let projectId: Int?
+    }
+
+    /// Completed entries whose POST failed, each retried independently.
+    private var pendingRetryEntries: [PendingEntry] = []
+    private var pendingRemoteStop: RemoteStop? = nil
+    var hasPendingRetry: Bool { !pendingRetryEntries.isEmpty || pendingRemoteStop != nil }
+
+    /// Bumped on every auth change, so results from an older Save or Disconnect are ignored.
+    private var authGeneration = 0
+    /// Bumped on every local start or stop, so a sync that finishes after one is discarded.
+    private var localActionGeneration = 0
 
     // MARK: - Persistence keys
 
@@ -143,6 +164,8 @@ final class TogglManager: ObservableObject {
     func saveToken(_ token: String) async {
         let trimmed = token.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
+        authGeneration += 1
+        let generation = authGeneration
         guard writeKeychain(trimmed) else {
             connectionStatus = .error("Could not save token to Keychain")
             return
@@ -151,18 +174,22 @@ final class TogglManager: ObservableObject {
 
         do {
             let wsId = try await fetchWorkspaceId(token: trimmed)
+            guard generation == authGeneration else { return }
             workspaceId = wsId
             UserDefaults.standard.set(wsId, forKey: workspaceIdKey)
             connectionStatus = .connected
             Task { await self.fetchProjects() }
             Task { await self.fetchRecentEntries() }
         } catch {
+            guard generation == authGeneration else { return }
             connectionStatus = .error(error.localizedDescription)
         }
     }
 
     /// Clears the token, workspace, cached projects and any stopwatch state, returning the manager to its disconnected state.
     func disconnect() {
+        // Invalidate any Save that is still waiting for Toggl, so it cannot restore a connection.
+        authGeneration += 1
         // Stop any in-flight stopwatch first so no elapsed interval survives to a
         // later stopStopwatch() save once auth state is gone.
         resetStopwatch()
@@ -200,7 +227,10 @@ final class TogglManager: ObservableObject {
     private func fetchRecentEntries() async {
         guard hasToken else { return }
 
-        let since = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-7 * 86400))
+        let fmt = ISO8601DateFormatter()
+        let now = Date()
+        let startDate = fmt.string(from: now.addingTimeInterval(-7 * 86400))
+        let endDate = fmt.string(from: now)
 
         struct RawEntry: Codable {
             let description: String?
@@ -212,7 +242,7 @@ final class TogglManager: ObservableObject {
         }
 
         do {
-            let entries: [RawEntry] = try await apiGET("/api/v9/me/time_entries?since=\(since)")
+            let entries: [RawEntry] = try await apiGET("/api/v9/me/time_entries?start_date=\(startDate)&end_date=\(endDate)")
             var seen = Set<String>()
             var deduped: [TogglRecentEntry] = []
             for entry in Array(entries.prefix(20)).reversed() {
@@ -243,7 +273,6 @@ final class TogglManager: ObservableObject {
         do {
             try await postTimeEntry(entry: entry, workspaceId: wsId)
             isSavingEntry = false
-            pendingRetryEntry = nil
             prependRecentEntry(TogglRecentEntry(
                 description: description,
                 projectId: projectId,
@@ -251,35 +280,41 @@ final class TogglManager: ObservableObject {
             ))
         } catch {
             isSavingEntry = false
-            pendingRetryEntry = entry
+            // Keep this entry alongside any earlier unsaved ones; each is retried on its own.
+            pendingRetryEntries.append(entry)
             saveError = error.localizedDescription
         }
     }
 
-    /// Retries the last entry whose save failed.
+    /// Retries the failed remote stop and each failed entry, removing each one only after its own save succeeds.
     func retryPendingEntry() async {
-        guard let entry = pendingRetryEntry, let wsId = workspaceId else { return }
+        if let stop = pendingRemoteStop {
+            await performRemoteStop(stop)
+        }
+        guard let wsId = workspaceId else { return }
         isSavingEntry = true
         saveError = nil
 
-        do {
-            try await postTimeEntry(entry: entry, workspaceId: wsId)
-            isSavingEntry = false
-            pendingRetryEntry = nil
-            prependRecentEntry(TogglRecentEntry(
-                description: entry.description,
-                projectId: entry.projectId,
-                projectName: projects.first { $0.id == entry.projectId }?.name
-            ))
-        } catch {
-            isSavingEntry = false
-            saveError = error.localizedDescription
+        var lastError: Error?
+        for entry in pendingRetryEntries {
+            do {
+                try await postTimeEntry(entry: entry, workspaceId: wsId)
+                pendingRetryEntries.removeAll { $0.id == entry.id }
+                prependRecentEntry(TogglRecentEntry(
+                    description: entry.description,
+                    projectId: entry.projectId,
+                    projectName: projects.first { $0.id == entry.projectId }?.name
+                ))
+            } catch {
+                lastError = error
+            }
         }
+        isSavingEntry = false
+        saveError = lastError?.localizedDescription
     }
 
     // MARK: - Sync running timer
 
-    /// Returns the currently running Toggl entry, or nil when none is running or the request fails.
     func fetchCurrentTimer() async -> TogglRunningEntry? {
         guard hasToken else { return nil }
         isFetchingCurrentTimer = true
@@ -293,10 +328,64 @@ final class TogglManager: ObservableObject {
         }
     }
 
+    /// Fetches the running Toggl entry and adopts its description, project, start and ID.
+    /// Returns `.superseded` if a local timer or stopwatch started or stopped while the request was pending.
+    func adoptRunningEntry() async -> AdoptResult {
+        let generation = localActionGeneration
+        guard let entry = await fetchCurrentTimer(), let parsedStart = entry.parsedStart else {
+            return .nothingRunning
+        }
+        guard generation == localActionGeneration else { return .superseded }
+        pendingDescription = entry.description ?? ""
+        pendingProjectId = entry.projectId
+        setSyncedStart(parsedStart, entryId: entry.id, workspaceId: entry.workspaceId)
+        return .adopted(elapsed: max(0, Date().timeIntervalSince(parsedStart)))
+    }
+
+    enum AdoptResult {
+        case adopted(elapsed: TimeInterval)
+        case nothingRunning
+        case superseded
+    }
+
+    /// Stops the Toggl entry this timer was synced from, so it does not keep running remotely.
+    /// The entry is detached first, so a new stopwatch can never be routed to it. A failed stop is kept for retry.
+    func stopSyncedEntry() async {
+        guard let entryId = syncedEntryId, let wsId = syncedWorkspaceId ?? workspaceId else {
+            clearSyncedStart()
+            return
+        }
+        let stop = RemoteStop(workspaceId: wsId, entryId: entryId, description: pendingDescription, projectId: pendingProjectId)
+        clearSyncedStart()
+        await performRemoteStop(stop)
+    }
+
+    private func performRemoteStop(_ stop: RemoteStop) async {
+        guard hasToken else {
+            pendingRemoteStop = nil
+            return
+        }
+        do {
+            try await apiPATCH("/api/v9/workspaces/\(stop.workspaceId)/time_entries/\(stop.entryId)/stop")
+            pendingRemoteStop = nil
+            prependRecentEntry(TogglRecentEntry(
+                description: stop.description,
+                projectId: stop.projectId,
+                projectName: projects.first { $0.id == stop.projectId }?.name
+            ))
+        } catch let TogglError.httpError(code, _) where (400..<500).contains(code) && ![401, 403, 429].contains(code) {
+            // Toggl rejected the stop because the entry is already stopped. Nothing left to retry.
+            pendingRemoteStop = nil
+        } catch {
+            pendingRemoteStop = stop
+            saveError = "Couldn't stop the Toggl timer: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Stopwatch
 
-    /// Starts the stopwatch from the current elapsed value, ticking once per second.
     func startStopwatch() {
+        markLocalActivity()
         stopwatchTimer?.invalidate()
         // stopwatchStartedAt is the wall-clock moment when elapsed was 0.
         // Pre-seeding elapsed (e.g. from a Toggl sync) shifts this backwards.
@@ -313,6 +402,7 @@ final class TogglManager: ObservableObject {
 
     /// Stops the stopwatch. A synced entry is stopped remotely; otherwise the elapsed interval is saved as a new entry.
     func stopStopwatch() async {
+        markLocalActivity()
         stopwatchTimer?.invalidate()
         stopwatchTimer = nil
         isRunning = false
@@ -335,6 +425,7 @@ final class TogglManager: ObservableObject {
 
     /// Stops the stopwatch and clears its elapsed time, synced entry and save error without saving anything.
     func resetStopwatch() {
+        markLocalActivity()
         stopwatchTimer?.invalidate()
         stopwatchTimer = nil
         isRunning = false
@@ -346,49 +437,21 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Helpers
 
-    /// Fetches the running Toggl entry and adopts its description, project, start and ID.
-    /// Returns the seconds elapsed since its start, or nil when nothing is running.
-    func adoptRunningEntry() async -> TimeInterval? {
-        guard let entry = await fetchCurrentTimer(), let parsedStart = entry.parsedStart else { return nil }
-        pendingDescription = entry.description ?? ""
-        pendingProjectId = entry.projectId
-        setSyncedStart(parsedStart, entryId: entry.id)
-        return max(0, Date().timeIntervalSince(parsedStart))
-    }
+    /// Records that a local timer or stopwatch started or stopped, invalidating sync requests still in flight.
+    func markLocalActivity() { localActionGeneration += 1 }
 
-    /// Stops the Toggl entry this timer was synced from, so it does not keep running remotely.
-    func stopSyncedEntry() async {
-        guard let entryId = syncedEntryId else { return }
-        guard let wsId = workspaceId, hasToken else {
-            clearSyncedStart()
-            return
-        }
-        let desc = pendingDescription
-        let pid = pendingProjectId
-        do {
-            try await apiPATCH("/api/v9/workspaces/\(wsId)/time_entries/\(entryId)/stop")
-            clearSyncedStart()
-            prependRecentEntry(TogglRecentEntry(
-                description: desc,
-                projectId: pid,
-                projectName: projects.first { $0.id == pid }?.name
-            ))
-        } catch {
-            // The remote entry is still running; keep the ID so a later sync or stop can find it.
-            saveError = "Couldn't stop the Toggl timer: \(error.localizedDescription)"
-        }
-    }
-
-    func setSyncedStart(_ date: Date, entryId: Int? = nil) {
+    func setSyncedStart(_ date: Date, entryId: Int? = nil, workspaceId: Int? = nil) {
         syncedOriginalStart = date
         syncedEntryId = entryId
+        syncedWorkspaceId = workspaceId
     }
     func clearSyncedStart() {
         syncedOriginalStart = nil
         syncedEntryId = nil
+        syncedWorkspaceId = nil
     }
-    /// Drops the save error and the entry waiting to be retried.
-    func clearSaveError() { saveError = nil; pendingRetryEntry = nil }
+    /// Drops the save error and every entry waiting to be retried.
+    func clearSaveError() { saveError = nil; pendingRetryEntries.removeAll(); pendingRemoteStop = nil }
 
     // MARK: - Sleep detection
 

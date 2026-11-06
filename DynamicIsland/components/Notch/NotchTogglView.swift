@@ -304,15 +304,18 @@ struct NotchTogglView: View {
     /// Adopts the running Toggl entry into the stopwatch, or shows a short "no active timer" message.
     private func syncFromToggl() {
         Task {
-            guard let elapsed = await togglManager.adoptRunningEntry() else {
+            switch await togglManager.adoptRunningEntry() {
+            case .superseded:
+                return  // The stopwatch or a timer was started or stopped meanwhile; keep that state.
+            case .nothingRunning:
                 withAnimation { noActiveTimerMessage = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                     withAnimation { self.noActiveTimerMessage = false }
                 }
-                return
+            case .adopted(let elapsed):
+                togglManager.elapsed = elapsed
+                togglManager.startStopwatch()
             }
-            togglManager.elapsed = elapsed
-            togglManager.startStopwatch()
         }
     }
 }

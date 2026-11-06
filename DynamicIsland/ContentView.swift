@@ -887,7 +887,11 @@ struct ContentView: View {
                 // Disabling Toggl hides its tab and closed-notch activity, so end a running
                 // stopwatch (saving it) rather than leaving it running out of sight.
                 if !isEnabled && togglManager.isRunning {
-                    Task { await togglManager.stopStopwatch() }
+                    Task { @MainActor in
+                        // Re-check inside the task: each open ContentView (one per display) queues this.
+                        guard togglManager.isRunning else { return }
+                        await togglManager.stopStopwatch()
+                    }
                 }
             }
             .onAppear {

@@ -414,6 +414,8 @@ class TimerManager: ObservableObject {
     func startTimerFromOffset(_ elapsed: TimeInterval, name: String) {
         if activeSource == .external { endExternalTimer(triggerSmoothClose: false) }
         timerInstance?.invalidate()
+        // A previous timer may already be in overtime and looping its alarm.
+        soundPlayer?.stop()
 
         let duration: TimeInterval = 86400
         withAnimation(.smooth) { isTimerActive = true }
