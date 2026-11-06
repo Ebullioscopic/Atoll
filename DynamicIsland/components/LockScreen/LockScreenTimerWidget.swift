@@ -281,6 +281,7 @@ struct LockScreenTimerWidget: View {
             await MainActor.run {
                 if allowsManualInteraction {
                     TimerManager.shared.stopTimer()
+                    TogglManager.shared.localTimerChanged()
                 } else {
                     TimerManager.shared.endExternalTimer(triggerSmoothClose: false)
                 }

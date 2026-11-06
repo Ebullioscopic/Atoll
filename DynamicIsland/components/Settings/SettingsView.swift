@@ -7395,6 +7395,7 @@ struct TimerSettings: View {
     @Default(.lockScreenTimerGlassCustomizationMode) private var lockScreenTimerGlassCustomizationMode
     @Default(.lockScreenTimerLiquidGlassVariant) private var lockScreenTimerLiquidGlassVariant
     @Default(.togglEnabled) private var togglEnabled
+    @State private var showDiscardPendingAlert = false
     @ObservedObject private var togglManager = TogglManager.shared
     @AppStorage("customTimerDuration") private var customTimerDuration: Double = 600
     @State private var customHours: Int = 0
@@ -7740,8 +7741,21 @@ struct TimerSettings: View {
 
                 if case .connected = togglManager.connectionStatus {
                     Button("Disconnect") {
-                        togglManager.disconnect()
-                        togglTokenInput = ""
+                        if togglManager.hasPendingRetry {
+                            showDiscardPendingAlert = true
+                        } else {
+                            togglManager.disconnect()
+                            togglTokenInput = ""
+                        }
+                    }
+                    .alert("Discard unsaved Toggl entries?", isPresented: $showDiscardPendingAlert) {
+                        Button("Discard and Disconnect", role: .destructive) {
+                            togglManager.disconnect()
+                            togglTokenInput = ""
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("Some time entries could not be saved to Toggl. Disconnecting discards them.")
                     }
                     .foregroundStyle(.red)
                     .buttonStyle(.bordered)

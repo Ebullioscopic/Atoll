@@ -119,6 +119,7 @@ struct NotchTimerView: View {
                     List {
                         ForEach(timerPresets) { preset in
                             TimerPresetCard(preset: preset, isActive: timerManager.activePresetId == preset.id) {
+                                TogglManager.shared.localTimerChanged()
                                 timerManager.startTimer(duration: preset.duration, name: preset.name, preset: preset)
                                 if !enableMinimalisticUI {
                                     coordinator.currentView = .timer
@@ -291,6 +292,7 @@ struct NotchTimerView: View {
     private func stopTimerAction() {
         if timerManager.allowsManualInteraction {
             timerManager.stopTimer()
+            TogglManager.shared.localTimerChanged()
         } else {
             timerManager.endExternalTimer(triggerSmoothClose: false)
         }

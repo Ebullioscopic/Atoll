@@ -885,6 +885,8 @@ struct ContentView: View {
     private func installPrimaryRootLifecycleHandlers<Content: View>(on view: Content) -> some View {
         view
             .onChange(of: togglEnabled) { _, isEnabled in
+                // A sync still in flight must not adopt an entry once Toggl is off.
+                if !isEnabled { togglManager.markLocalActivity() }
                 // Disabling Toggl hides its tab and closed-notch activity, so end a running
                 // stopwatch (saving it) rather than leaving it running out of sight.
                 if !isEnabled && togglManager.isRunning {
@@ -2461,7 +2463,16 @@ struct ContentView: View {
         let height = max(closedHeight, recordingSize?.height ?? 0) + 6
             + PinnedLyricsView.reservedHeight(isEligible: pinnedLyricsVisible,
                 availability: musicManager.lyricsAvailability, context: pinnedLyricContext)
-        let width = max(closedWidth, recordingSize?.width ?? 0) + 24
+        // The Toggl wings sit on both sides of the notch while the stopwatch runs.
+        var togglWidth: CGFloat = 0
+        if togglManager.isRunning {
+            let wingPadding: CGFloat = 22
+            let leftWing = max(0, vm.effectiveClosedNotchHeight - 12) + wingPadding / 2
+            let elapsedText = TogglSupplementMetrics.formattedElapsed(for: togglManager.elapsed)
+            let rightWing = TogglSupplementMetrics.elapsedFrameWidth(for: elapsedText) + wingPadding
+            togglWidth = vm.closedNotchSize.width + 2 * max(leftWing, rightWing)
+        }
+        let width = max(closedWidth, recordingSize?.width ?? 0, togglWidth) + 24
         // Same shift the content is drawn with, so the hit area stays under it.
         let minX = screen.frame.midX - width / 2 + menuBarClearanceOffset
         let minY = screen.frame.maxY - height

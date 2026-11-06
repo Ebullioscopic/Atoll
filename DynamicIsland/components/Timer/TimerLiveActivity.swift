@@ -507,6 +507,7 @@ struct TimerLiveActivity: View {
             return
         }
         timerManager.stopTimer()
+        TogglManager.shared.localTimerChanged()
     }
 
     private func triggerTransientLabel() {

@@ -79,7 +79,8 @@ struct TabSelectionView: View {
             tabsArray.append(TabModel(label: "Timer", icon: "timer", view: .timer))
         }
 
-        if togglEnabled && togglManager.isReady {
+        // Stays visible while failed saves are pending, so Retry is reachable after Toggl is disabled.
+        if (togglEnabled || togglManager.hasPendingRetry) && togglManager.isReady {
             tabsArray.append(TabModel(label: "Toggl", icon: "clock.arrow.trianglehead.counterclockwise.rotate.90", view: .toggl))
         }
 
@@ -158,6 +159,9 @@ struct TabSelectionView: View {
         // Re-validate when Toggl availability changes so a selected .toggl tab
         // moves to a remaining tab the moment it disappears from the tab list.
         .onChange(of: togglEnabled) { _, _ in
+            ensureValidSelection(with: tabs)
+        }
+        .onChange(of: togglManager.hasPendingRetry) { _, _ in
             ensureValidSelection(with: tabs)
         }
         .onChange(of: togglManager.isReady) { _, _ in
