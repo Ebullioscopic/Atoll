@@ -36,6 +36,40 @@ class TimerManager: ObservableObject {
     @Published var isPaused: Bool = false
     @Published var isFinished: Bool = false
     @Published var isOvertime: Bool = false // Timer has gone past 0 and is counting negative
+    /// True while the timer tracks a running Toggl entry. Pausing would leave that entry running, so it is disabled.
+    @Published private(set) var isAdoptedFromToggl: Bool = false
+    /// True for the demo timer used by previews and shortcuts. Demo timers are never saved to Toggl.
+    private(set) var isDemoTimer: Bool = false
+    /// Changes whenever a different timer starts, so delayed work can tell it still targets the original one.
+    private(set) var sessionID = UUID()
+    /// Spans in which the manual timer actually ran, pauses excluded, for saving to Toggl.
+    private var runIntervals: [DateInterval] = []
+    private var runStart: Date?
+
+    /// Saves the spans the current manual timer ran to Toggl and clears them. Adopted and demo timers are skipped.
+    /// Call before a stop or before another timer replaces this one.
+    private func saveRunIntervalsToToggl() {
+        defer {
+            runIntervals = []
+            runStart = nil
+        }
+        guard activeSource == .manual, isTimerActive, !isAdoptedFromToggl, !isDemoTimer else { return }
+        closeRunInterval()
+        let intervals = runIntervals
+        Task { @MainActor in
+            TogglManager.shared.saveLocalTimerIntervals(intervals)
+        }
+    }
+
+    /// Ends the current run span, keeping it if it lasted at least a second.
+    private func closeRunInterval() {
+        guard let start = runStart else { return }
+        let end = Date()
+        if end.timeIntervalSince(start) >= 1 {
+            runIntervals.append(DateInterval(start: start, end: end))
+        }
+        runStart = nil
+    }
     @Published var lastUpdated: Date = .distantPast
     @Published var activePresetId: UUID?
     @Published private(set) var activeSource: TimerSource = .none
@@ -123,6 +157,9 @@ class TimerManager: ObservableObject {
         }
     }
     
+    /// Wall-clock time when the current manual timer started (cleared on reset).
+    private(set) var startedAt: Date? = nil
+
     private var timerInstance: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var soundPlayer: AVAudioPlayer?
@@ -151,6 +188,17 @@ class TimerManager: ObservableObject {
                 self?.objectWillChange.send()
             }
             .store(in: &cancellables)
+
+        // Time the Mac spends asleep is not tracked time: close the run span on sleep and reopen it on wake.
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.closeRunInterval()
+        }
+        center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self, self.activeSource == .manual, self.isTimerActive, !self.isPaused,
+                  !self.isAdoptedFromToggl, !self.isDemoTimer, self.runStart == nil else { return }
+            self.runStart = Date()
+        }
     }
     
     deinit {
@@ -161,14 +209,20 @@ class TimerManager: ObservableObject {
     }
     
     // MARK: - Timer Methods
+    /// Starts a countdown timer of the given duration, replacing any timer already running.
     func startTimer(duration: TimeInterval, name: String = "Timer", preset: TimerPreset? = nil) {
         if activeSource == .external {
             endExternalTimer(triggerSmoothClose: false)
         }
 
+        // A manual timer being replaced keeps its tracked time.
+        saveRunIntervalsToToggl()
+
         // Stop any existing timer
         timerInstance?.invalidate()
         soundPlayer?.stop()
+        isAdoptedFromToggl = false
+        isDemoTimer = false
         beginTimerSession()
         
         // Start new timer
@@ -186,7 +240,13 @@ class TimerManager: ObservableObject {
         lastUpdated = Date()
 
         activePresetId = preset?.id
-        
+        startedAt = Date()
+        sessionID = UUID()
+        runIntervals = []
+        runStart = Date()
+        // Keep this timer's Toggl description and project with it, apart from the stopwatch's fields.
+        Task { @MainActor in TogglManager.shared.captureManualTimerMetadata() }
+
         // Start countdown timer
         timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
@@ -216,7 +276,10 @@ class TimerManager: ObservableObject {
     }
     
     func startDemoTimer(duration: TimeInterval) {
+        // A demo replaces any timer synced from Toggl, so that entry must stop too.
+        Task { @MainActor in TogglManager.shared.localTimerChanged() }
         startTimer(duration: duration, name: "Demo Timer")
+        isDemoTimer = true
     }
     
     func stopTimer() {
@@ -233,6 +296,10 @@ class TimerManager: ObservableObject {
             }
             return
         }
+
+        // A custom or preset timer stopped by the user is saved to Toggl, one entry per span it actually
+        // ran (pauses excluded). Adopted entries are stopped remotely instead, and demo timers are never saved.
+        saveRunIntervalsToToggl()
 
         timerInstance?.invalidate()
         timerInstance = nil
@@ -272,8 +339,10 @@ class TimerManager: ObservableObject {
             return
         }
         guard activeSource == .manual else { return }
+        guard !isAdoptedFromToggl else { return }
         guard isTimerActive && !isPaused else { return }
         isPaused = true
+        closeRunInterval()
         timerInstance?.invalidate()
         timerInstance = nil
     }
@@ -288,8 +357,10 @@ class TimerManager: ObservableObject {
             return
         }
         guard activeSource == .manual else { return }
+        guard !isAdoptedFromToggl else { return }
         guard isTimerActive && isPaused else { return }
         isPaused = false
+        runStart = Date()
         lastUpdated = Date()
         
         // Resume countdown timer with same logic as start timer
@@ -327,6 +398,7 @@ class TimerManager: ObservableObject {
         timerInstance = nil
         soundPlayer?.stop()
         beginTimerSession()
+        sessionID = UUID()
 
         activeSource = .external
 
@@ -404,6 +476,67 @@ class TimerManager: ObservableObject {
         resetTimer()
     }
     
+    /// Starts a 24-hour stopwatch pre-seeded with `elapsed` seconds already counted.
+    /// Used when syncing a running Toggl entry — the original Toggl start is stored
+    /// separately in TogglManager.syncedOriginalStart for the eventual stop or POST.
+    func startTimerFromOffset(_ elapsed: TimeInterval, name: String) {
+        if activeSource == .external { endExternalTimer(triggerSmoothClose: false) }
+        // A manual timer being replaced keeps its tracked time.
+        saveRunIntervalsToToggl()
+        timerInstance?.invalidate()
+        // A previous timer may already be in overtime and looping its alarm.
+        soundPlayer?.stop()
+        isAdoptedFromToggl = true
+        isDemoTimer = false
+        sessionID = UUID()
+        runIntervals = []
+        runStart = nil
+
+        let duration: TimeInterval = 86400
+        withAnimation(.smooth) { isTimerActive = true }
+        activeSource = .manual
+        isFinished = false
+        // Offsets at or past the 24h ceiling start directly in overtime.
+        isOvertime = elapsed >= duration
+        timerName = name.isEmpty ? "Timer" : name
+        totalDuration = duration
+        remainingTime = duration - elapsed
+        elapsedTime = elapsed
+        isPaused = false
+        startedAt = Date()
+        lastUpdated = Date()
+        activePresetId = nil
+
+        timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                if !self.isPaused {
+                    if self.remainingTime > 0 {
+                        self.remainingTime -= 1
+                        self.elapsedTime = self.totalDuration - self.remainingTime
+                        self.lastUpdated = Date()
+                    } else if self.remainingTime == 0 {
+                        self.isFinished = true
+                        self.isOvertime = true
+                        self.playTimerSound()
+                        self.remainingTime = -1
+                        self.lastUpdated = Date()
+                    } else {
+                        if !self.isOvertime {
+                            // A fractional offset can step past zero without ever equalling it.
+                            self.isFinished = true
+                            self.isOvertime = true
+                            self.playTimerSound()
+                        }
+                        self.remainingTime -= 1
+                        self.lastUpdated = Date()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Clears the timer state and ends its session.
     private func resetTimer() {
         endTimerSession()
         withAnimation(.smooth) {
@@ -417,7 +550,12 @@ class TimerManager: ObservableObject {
         isFinished = false
         isOvertime = false
         activePresetId = nil
+        isAdoptedFromToggl = false
+        isDemoTimer = false
+        runIntervals = []
+        runStart = nil
         activeSource = .none
+        startedAt = nil
     }
 
     // MARK: - Derived State
@@ -433,6 +571,9 @@ class TimerManager: ObservableObject {
     var hasManualTimerRunning: Bool {
         activeSource == .manual && isTimerActive
     }
+
+    /// Whether to offer the pause control: not in overtime, and not for a timer tracking a Toggl entry.
+    var showsPauseControl: Bool { !isOvertime && !isAdoptedFromToggl }
 
     var allowsManualInteraction: Bool {
         switch activeSource {
