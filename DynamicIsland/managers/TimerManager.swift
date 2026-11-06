@@ -454,6 +454,12 @@ class TimerManager: ObservableObject {
                         self.remainingTime = -1
                         self.lastUpdated = Date()
                     } else {
+                        if !self.isOvertime {
+                            // A fractional offset can step past zero without ever equalling it.
+                            self.isFinished = true
+                            self.isOvertime = true
+                            self.playTimerSound()
+                        }
                         self.remainingTime -= 1
                         self.lastUpdated = Date()
                     }

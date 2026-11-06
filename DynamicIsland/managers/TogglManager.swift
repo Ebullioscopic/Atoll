@@ -105,6 +105,9 @@ final class TogglManager: ObservableObject {
     private(set) var syncedEntryId: Int? = nil
     /// Workspace of the synced entry, so it is stopped in the workspace it was started in.
     private(set) var syncedWorkspaceId: Int? = nil
+    /// Description and project of the synced entry as Toggl has them, kept apart from the editable pending fields.
+    private var syncedEntryDescription = ""
+    private var syncedEntryProjectId: Int? = nil
 
     private struct PendingEntry: Identifiable, Codable {
         var id = UUID()
@@ -139,6 +142,8 @@ final class TogglManager: ObservableObject {
     }
     /// Set while a retry runs, so a second Retry cannot post the same entry twice.
     private var isRetryInFlight = false
+    /// Saves and retries currently posting, so the saving indicator clears only after the last one.
+    private var inFlightSaves = 0
     /// True while any failed entry or stop is waiting for a retry.
     @Published private(set) var hasPendingRetry = false
 
@@ -299,19 +304,19 @@ final class TogglManager: ObservableObject {
         guard hasToken, let wsId = workspaceId else { return }
 
         let entry = PendingEntry(description: description, projectId: projectId, start: start, stop: stop)
-        isSavingEntry = true
-        saveError = nil
+        beginSaving()
+        // Keep an existing error visible while earlier work is still waiting for Retry.
+        if !hasPendingRetry { saveError = nil }
+        defer { endSaving() }
 
         do {
             try await postTimeEntry(entry: entry, workspaceId: wsId)
-            isSavingEntry = false
             prependRecentEntry(TogglRecentEntry(
                 description: description,
                 projectId: projectId,
                 projectName: projects.first { $0.id == projectId }?.name
             ))
         } catch {
-            isSavingEntry = false
             // Keep this entry alongside any earlier unsaved ones; each is retried on its own.
             pendingRetryEntries.append(entry)
             saveError = error.localizedDescription
@@ -334,8 +339,8 @@ final class TogglManager: ObservableObject {
             saveError = stopError ?? previousError
             return
         }
-        isSavingEntry = true
-        saveError = nil
+        beginSaving()
+        defer { endSaving() }
 
         var lastError: Error?
         for entry in pendingRetryEntries {
@@ -351,8 +356,26 @@ final class TogglManager: ObservableObject {
                 lastError = error
             }
         }
-        isSavingEntry = false
-        saveError = lastError?.localizedDescription ?? stopError
+        // Clear the error only when nothing is left to retry. A save that failed while this
+        // retry was posting keeps its own error, so the Retry button stays visible.
+        if hasPendingRetry {
+            saveError = lastError?.localizedDescription ?? stopError ?? saveError
+                ?? "Some Toggl entries were not saved."
+        } else {
+            saveError = nil
+        }
+    }
+
+    /// Marks a save or retry as started and shows the saving indicator.
+    private func beginSaving() {
+        inFlightSaves += 1
+        isSavingEntry = true
+    }
+
+    /// Marks a save or retry as finished; the indicator clears after the last one.
+    private func endSaving() {
+        inFlightSaves = max(0, inFlightSaves - 1)
+        isSavingEntry = inFlightSaves > 0
     }
 
     // MARK: - Sync running timer
@@ -384,7 +407,8 @@ final class TogglManager: ObservableObject {
         }
         pendingDescription = entry.description ?? ""
         pendingProjectId = entry.projectId
-        setSyncedStart(parsedStart, entryId: entry.id, workspaceId: entry.workspaceId)
+        setSyncedStart(parsedStart, entryId: entry.id, workspaceId: entry.workspaceId,
+                       description: entry.description ?? "", projectId: entry.projectId)
         return .adopted(elapsed: max(0, Date().timeIntervalSince(parsedStart)))
     }
 
@@ -403,7 +427,7 @@ final class TogglManager: ObservableObject {
             clearSyncedStart()
             return nil
         }
-        let stop = RemoteStop(workspaceId: wsId, entryId: entryId, description: pendingDescription, projectId: pendingProjectId)
+        let stop = RemoteStop(workspaceId: wsId, entryId: entryId, description: syncedEntryDescription, projectId: syncedEntryProjectId)
         clearSyncedStart()
         return stop
     }
@@ -519,16 +543,21 @@ final class TogglManager: ObservableObject {
     }
 
     /// Records the start, entry ID and workspace of a Toggl entry the timer was synced from.
-    func setSyncedStart(_ date: Date, entryId: Int? = nil, workspaceId: Int? = nil) {
+    func setSyncedStart(_ date: Date, entryId: Int? = nil, workspaceId: Int? = nil,
+                        description: String = "", projectId: Int? = nil) {
         syncedOriginalStart = date
         syncedEntryId = entryId
         syncedWorkspaceId = workspaceId
+        syncedEntryDescription = description
+        syncedEntryProjectId = projectId
     }
     /// Forgets the synced Toggl entry.
     func clearSyncedStart() {
         syncedOriginalStart = nil
         syncedEntryId = nil
         syncedWorkspaceId = nil
+        syncedEntryDescription = ""
+        syncedEntryProjectId = nil
     }
     /// Drops the save error and every entry waiting to be retried.
     func clearSaveError() { saveError = nil; pendingRetryEntries.removeAll(); pendingRemoteStops.removeAll() }

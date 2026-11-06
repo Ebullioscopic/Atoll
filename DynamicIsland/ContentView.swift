@@ -1157,7 +1157,7 @@ struct ContentView: View {
                               .transition(closedLiveActivitySwapTransition)
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .timer) && vm.notchState == .closed && timerManager.isTimerActive && coordinator.timerLiveActivityEnabled && !vm.hideOnClosed {
                           TimerLiveActivity()
-                      } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && togglManager.isRunning && !vm.hideOnClosed {
+                      } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && togglEnabled && togglManager.isRunning && !vm.hideOnClosed {
                           TogglLiveActivity()
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .reminder) && vm.notchState == .closed && reminderManager.isActive && enableReminderLiveActivity && !vm.hideOnClosed {
                           ReminderLiveActivity()
@@ -1546,7 +1546,7 @@ struct ContentView: View {
             return .timer
         }
 
-        if togglManager.isRunning {
+        if togglEnabled && togglManager.isRunning {
             return .toggl
         }
 

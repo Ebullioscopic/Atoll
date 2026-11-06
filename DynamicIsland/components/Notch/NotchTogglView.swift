@@ -22,6 +22,7 @@ import Defaults
 struct NotchTogglView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject private var togglManager = TogglManager.shared
+    @Default(.togglEnabled) private var togglEnabled
     @State private var noActiveTimerMessage = false
     @State private var syncFailureMessage: String?
     @State private var elapsedDraft = ""
@@ -188,6 +189,9 @@ struct NotchTogglView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                // Stop stays available for existing work; Start is off while Toggl is disabled.
+                .disabled(!togglManager.isRunning && !togglEnabled)
+                .opacity(!togglManager.isRunning && !togglEnabled ? 0.4 : 1)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(Color.white.opacity(0.12), lineWidth: 1)
