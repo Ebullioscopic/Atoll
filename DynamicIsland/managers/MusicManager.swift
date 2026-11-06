@@ -608,6 +608,9 @@ class MusicManager: ObservableObject {
     /// whether the control is offered in settings and kept in the layout, so
     /// it must not change with playback or connection state.
     @MainActor
+    var activeSourceSupportsSeeking: Bool { activeController?.supportsSeeking ?? false }
+
+    @MainActor
     var activeSourceCanEverFavorite: Bool { activeController?.canEverFavorite ?? false }
 
     /// Whether favouriting would work right now -- the app is playing, the
@@ -852,6 +855,8 @@ class MusicManager: ObservableObject {
             newController = TidalController()
         case .cider:
             newController = CiderController()
+        case .qobuz:
+            newController = QobuzMediaController()
         }
 
         // Set up state observation for the new controller
@@ -870,6 +875,10 @@ class MusicManager: ObservableObject {
     }
 
     private func setActiveControllerBasedOnPreference() {
+        if UserDefaults.standard.bool(forKey: "atollQobuzLegacyProviderSlot") {
+            UserDefaults.standard.removeObject(forKey: "atollQobuzLegacyProviderSlot")
+            if Defaults[.mediaController] == .amazonMusic { Defaults[.mediaController] = .qobuz }
+        }
         let preferredType = Defaults[.mediaController]
         print("Preferred Media Controller: \(preferredType)")
 
@@ -1675,14 +1684,17 @@ class MusicManager: ObservableObject {
         }
     }
 
+    @MainActor
     func seek(to position: TimeInterval) {
+        guard activeSourceSupportsSeeking else { return }
         Task {
             await activeController?.seek(to: position)
         }
     }
 
+    @MainActor
     func seek(by offset: TimeInterval) {
-        guard !isLiveStream else { return }
+        guard !isLiveStream, activeSourceSupportsSeeking else { return }
         let duration = songDuration
         guard duration > 0 else { return }
 
@@ -2269,7 +2281,7 @@ extension MusicManager {
             return spotifyGreen
         case .amazonMusic:
             return amazonOrange
-        case .tidal, .cider:
+        case .tidal, .cider, .qobuz:
             return .accentColor
         case .nowPlaying:
             if let bundleIdentifier,

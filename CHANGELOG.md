@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Dedicated Qobuz playback now reads only Qobuz local state and directs commands to Qobuz. Browser and messenger media cannot replace this provider or receive its commands. Corrected provider capability cases, bundled helpers and source-change cleanup; seeking and favoriting are explicitly unavailable.
+
 ### Added
 - **Charging power readings**: the charging HUD now shows actual battery charging watts, and the battery details popover separately shows battery charging power and total power input. Unavailable readings are hidden, and power is sampled only while the HUD or popover is visible. (#894)
 - **Connection status HUDs**: Atoll now shows a Dynamic Island HUD when the Mac goes offline, and a compact inline HUD when it connects to Wi-Fi or Personal Hotspot, using the matching Wi-Fi or hotspot symbol and the connected network name. (#827)

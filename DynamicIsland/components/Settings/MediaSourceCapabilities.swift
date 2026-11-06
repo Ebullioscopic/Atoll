@@ -87,6 +87,9 @@ enum MediaSourceCapabilities {
             return .init(name: String(localized: "Amazon Music"),
                          favoriting: .none, shuffle: .full, repeatMode: .full,
                          note: String(localized: "Amazon Music ships no scripting dictionary, and the system media interface has no way to favourite."))
+        case .qobuz:
+            return .init(name: "Qobuz", favoriting: .none, shuffle: .full, repeatMode: .full,
+                         note: String(localized: "Dedicated local playback controls. Seeking and favoriting are unavailable."))
         }
     }
 
