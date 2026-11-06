@@ -1424,8 +1424,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             case .separateTab:
                 if vm.notchState == .closed {
-                    vm.open()
-                    coordinator.currentView = .notes
+                    vm.open(target: .notes)
                 } else {
                     if coordinator.currentView == .notes {
                         vm.close()
@@ -1451,8 +1450,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // and close the notch a few seconds after this shortcut opens/switches to it.
                 cancelPendingNotchAutoClose()
                 if activeVM.notchState == .closed {
-                    activeVM.open()
-                    coordinator.currentView = .clipboard
+                    activeVM.open(target: .clipboard)
                 } else {
                     if coordinator.currentView == .clipboard {
                         activeVM.close()
@@ -1480,8 +1478,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if vm.notchState == .closed {
                 closeNotchWorkItem?.cancel()
                 closeNotchWorkItem = nil
-                vm.open()
-                coordinator.currentView = .terminal
+                vm.open(target: .terminal)
                 TerminalManager.shared.refreshTerminalAppearanceIfNeeded()
                 TerminalManager.shared.focusTerminalIfPossible()
                 TerminalManager.shared.refreshTerminalAppearanceIfNeeded()

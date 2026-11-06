@@ -1,6 +1,54 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Open to": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open to"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开时显示"
+          }
+        }
+      }
+    },
+    "Minimalistic mode always opens Home.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minimalistic mode always opens Home."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "极简模式始终打开首页。"
+          }
+        }
+      }
+    },
+    "Unavailable — %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable — %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用 — %@"
+          }
+        }
+      }
+    },
     "Battery charging: %.1f W" : {
       "comment" : "Actual measured power; adapter capacity is not used as a substitute.",
       "localizations" : {

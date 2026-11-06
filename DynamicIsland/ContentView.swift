@@ -2072,8 +2072,7 @@ struct ContentView: View {
                 .onDrop(of: [.data], isTargeted: $vm.dragDetectorTargeting) { _ in true }
                 .onChange(of: vm.anyDropZoneTargeting) { _, isTargeted in
                     if isTargeted, vm.notchState == .closed {
-                        coordinator.currentView = .shelf
-                        openNotch()
+                        openNotch(target: .shelf)
                     } else if !isTargeted {
                         if vm.dropEvent {
                             vm.dropEvent = false
@@ -2092,8 +2091,8 @@ struct ContentView: View {
     }
 
     // MARK: - Private Methods
-    private func openNotch() {
-        vm.open()
+    private func openNotch(target: NotchViews? = nil) {
+        vm.open(target: target)
     }
 
     private func shouldShowClosedMusicWaveformPlayPauseOverlay(for secondary: MusicSecondaryLiveActivity?) -> Bool {
@@ -2352,12 +2351,7 @@ struct ContentView: View {
                           !self.isConnectivityHUDVisible,
                           !self.coordinator.isHoverOpenSuppressed else { return }
 
-                    if shouldFocusTimerTab {
-                        withAnimation(.smooth) {
-                            self.coordinator.currentView = .timer
-                        }
-                    }
-                    self.openNotch()
+                    self.openNotch(target: shouldFocusTimerTab ? .timer : nil)
                 }
             }
         } else {
