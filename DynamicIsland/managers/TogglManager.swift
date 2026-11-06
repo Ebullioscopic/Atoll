@@ -119,6 +119,8 @@ final class TogglManager: ObservableObject {
         let projectId: Int?
         let start: Date
         let stop: Date
+        /// Tags to send, for workspaces that reject entries without them. Nil for older saved entries.
+        var tags: [String]? = nil
     }
 
     /// A remote stop that failed and must be retried. Kept apart from new stopwatch entries.
@@ -179,6 +181,18 @@ final class TogglManager: ObservableObject {
             pendingRetryEntries.removeAll { $0.id == summary.id }
         }
         if !hasPendingRetry { saveError = nil }
+    }
+
+    /// Tags currently set on a failed entry, for the tag editor.
+    func pendingEntryTags(id: UUID) -> [String] {
+        pendingRetryEntries.first { $0.id == id }?.tags ?? []
+    }
+
+    /// Replaces the tags on one failed entry so a workspace that requires tags accepts it on the next retry.
+    func setPendingEntryTags(id: UUID, tags: [String]) {
+        guard let index = pendingRetryEntries.firstIndex(where: { $0.id == id }) else { return }
+        let cleaned = tags.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        pendingRetryEntries[index].tags = cleaned
     }
 
     /// Updates `hasPendingRetry` from the queued entries and stops.
@@ -801,7 +815,7 @@ final class TogglManager: ObservableObject {
             "duration": duration,
             "workspace_id": workspaceId,
             "created_with": "Atoll",
-            "tags": [String]()
+            "tags": entry.tags ?? [String]()
         ]
         if let pid = entry.projectId { body["project_id"] = pid }
         try await apiPOST("/api/v9/workspaces/\(workspaceId)/time_entries", body: body)

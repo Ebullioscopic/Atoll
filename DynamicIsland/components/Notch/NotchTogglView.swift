@@ -226,6 +226,7 @@ struct NotchTogglView: View {
                         Spacer(minLength: 0)
                         Button("Retry") { Task { await togglManager.retryPendingEntry() } }
                             .font(.system(size: 11, weight: .semibold)).foregroundStyle(.red).buttonStyle(.plain)
+                        TogglPendingTagsEditor(togglManager: togglManager)
                         if !togglManager.pendingEntrySummaries.isEmpty {
                             // Discard one rejected entry without losing the others.
                             Menu("Discard") {

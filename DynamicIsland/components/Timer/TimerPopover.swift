@@ -476,6 +476,7 @@ private struct TogglErrorBanner: View {
                     .font(.system(size: 11, weight: .medium))
                     .buttonStyle(.bordered)
                 if !pendingEntries.isEmpty {
+                    TogglPendingTagsEditor(togglManager: TogglManager.shared)
                     Menu("Discard") {
                         ForEach(pendingEntries) { entry in
                             Button(entry.title, role: .destructive) { onDiscard(entry) }
@@ -646,4 +647,45 @@ private struct TimerPresetRow: View {
         .frame(width: 300)
         .padding()
         .background(Color.black)
+}
+
+/// Lets the user add tags to one failed Toggl entry, for workspaces that reject entries without them.
+struct TogglPendingTagsEditor: View {
+    @ObservedObject var togglManager: TogglManager
+    @State private var isPresented = false
+    @State private var selectedId: UUID?
+    @State private var draft = ""
+
+    var body: some View {
+        let entries = togglManager.pendingEntrySummaries.filter { $0.stopEntryId == nil }
+        if !entries.isEmpty {
+            Button("Tags") {
+                selectedId = entries.first?.id
+                draft = entries.first.map { togglManager.pendingEntryTags(id: $0.id).joined(separator: ", ") } ?? ""
+                isPresented = true
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 11, weight: .semibold))
+            .popover(isPresented: $isPresented) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Entry", selection: $selectedId) {
+                        ForEach(entries) { entry in Text(entry.title).tag(Optional(entry.id)) }
+                    }
+                    .onChange(of: selectedId) { _, id in
+                        draft = id.map { togglManager.pendingEntryTags(id: $0).joined(separator: ", ") } ?? ""
+                    }
+                    TextField("Tags, separated by commas", text: $draft)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Apply") {
+                        if let id = selectedId {
+                            togglManager.setPendingEntryTags(id: id, tags: draft.split(separator: ",").map(String.init))
+                        }
+                        isPresented = false
+                    }
+                }
+                .padding(12)
+                .frame(width: 280)
+            }
+        }
+    }
 }
