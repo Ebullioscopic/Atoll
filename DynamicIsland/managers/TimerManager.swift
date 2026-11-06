@@ -250,7 +250,9 @@ class TimerManager: ObservableObject {
         // remotely instead, and demo timers are never saved. Overtime counts as tracked time.
         if activeSource == .manual && !isAdoptedFromToggl && !isDemoTimer {
             let tracked = isOvertime ? totalDuration - remainingTime : elapsedTime
-            TogglManager.shared.saveLocalTimerInterval(seconds: tracked)
+            Task { @MainActor in
+                TogglManager.shared.saveLocalTimerInterval(seconds: tracked)
+            }
         }
 
         timerInstance?.invalidate()
