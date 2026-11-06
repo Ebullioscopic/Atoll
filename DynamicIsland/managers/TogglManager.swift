@@ -105,8 +105,8 @@ final class TogglManager: ObservableObject {
     /// Workspace of the synced entry, so it is stopped in the workspace it was started in.
     private(set) var syncedWorkspaceId: Int? = nil
 
-    private struct PendingEntry: Identifiable {
-        let id = UUID()
+    private struct PendingEntry: Identifiable, Codable {
+        var id = UUID()
         let description: String
         let projectId: Int?
         let start: Date
@@ -114,7 +114,7 @@ final class TogglManager: ObservableObject {
     }
 
     /// A remote stop that failed and must be retried. Kept apart from new stopwatch entries.
-    private struct RemoteStop {
+    private struct RemoteStop: Codable {
         let workspaceId: Int
         let entryId: Int
         let description: String
@@ -122,8 +122,15 @@ final class TogglManager: ObservableObject {
     }
 
     /// Completed entries whose POST failed, each retried independently.
-    private var pendingRetryEntries: [PendingEntry] = []
-    private var pendingRemoteStop: RemoteStop? = nil
+    /// Pending work is saved to disk on every change, so it survives a restart.
+    private var pendingRetryEntries: [PendingEntry] = [] {
+        didSet { persist(pendingRetryEntries, key: pendingEntriesKey) }
+    }
+    private var pendingRemoteStop: RemoteStop? = nil {
+        didSet { persist(pendingRemoteStop, key: pendingStopKey) }
+    }
+    /// Set while a retry runs, so a second Retry cannot post the same entry twice.
+    private var isRetryInFlight = false
     var hasPendingRetry: Bool { !pendingRetryEntries.isEmpty || pendingRemoteStop != nil }
 
     /// Bumped on every auth change, so results from an older Save or Disconnect are ignored.
@@ -137,6 +144,8 @@ final class TogglManager: ObservableObject {
     private let workspaceIdKey  = "togglWorkspaceId"
     private let projectsKey     = "togglProjectsJSON"
     private let recentEntriesKey = "togglRecentEntriesJSON"
+    private let pendingEntriesKey = "togglPendingEntriesJSON"
+    private let pendingStopKey = "togglPendingStopJSON"
 
     // MARK: - Connection status
 
@@ -289,6 +298,9 @@ final class TogglManager: ObservableObject {
 
     /// Retries the failed remote stop and each failed entry, removing each one only after its own save succeeds.
     func retryPendingEntry() async {
+        guard !isRetryInFlight else { return }
+        isRetryInFlight = true
+        defer { isRetryInFlight = false }
         if let stop = pendingRemoteStop {
             await performRemoteStop(stop)
         }
@@ -317,27 +329,30 @@ final class TogglManager: ObservableObject {
     // MARK: - Sync running timer
 
     /// Returns the currently running Toggl entry, or nil if none is running or the request fails.
-    func fetchCurrentTimer() async -> TogglRunningEntry? {
-        guard hasToken else { return nil }
+    func fetchCurrentTimer() async throws -> TogglRunningEntry? {
+        guard hasToken else { throw URLError(.userAuthenticationRequired) }
         isFetchingCurrentTimer = true
         defer { isFetchingCurrentTimer = false }
 
-        do {
-            let entry: TogglRunningEntry? = try await apiGETNullable("/api/v9/me/time_entries/current")
-            return entry?.isRunning == true ? entry : nil
-        } catch {
-            return nil
-        }
+        let entry: TogglRunningEntry? = try await apiGETNullable("/api/v9/me/time_entries/current")
+        return entry?.isRunning == true ? entry : nil
     }
 
     /// Fetches the running Toggl entry and adopts its description, project, start and ID.
     /// Returns `.superseded` if a local timer or stopwatch started or stopped while the request was pending.
     func adoptRunningEntry() async -> AdoptResult {
         let generation = localActionGeneration
-        guard let entry = await fetchCurrentTimer(), let parsedStart = entry.parsedStart else {
-            return .nothingRunning
+        let fetched: TogglRunningEntry?
+        do {
+            fetched = try await fetchCurrentTimer()
+        } catch {
+            guard generation == localActionGeneration else { return .superseded }
+            return .failed(message: error.localizedDescription)
         }
         guard generation == localActionGeneration else { return .superseded }
+        guard let entry = fetched, let parsedStart = entry.parsedStart else {
+            return .nothingRunning
+        }
         pendingDescription = entry.description ?? ""
         pendingProjectId = entry.projectId
         setSyncedStart(parsedStart, entryId: entry.id, workspaceId: entry.workspaceId)
@@ -347,6 +362,8 @@ final class TogglManager: ObservableObject {
     enum AdoptResult {
         case adopted(elapsed: TimeInterval)
         case nothingRunning
+        /// The request failed, so it is unknown whether an entry is running.
+        case failed(message: String)
         case superseded
     }
 
@@ -599,6 +616,17 @@ final class TogglManager: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: recentEntriesKey),
            let decoded = try? JSONDecoder().decode([TogglRecentEntry].self, from: data) {
             recentEntries = decoded
+        }
+        if let data = UserDefaults.standard.data(forKey: pendingEntriesKey),
+           let decoded = try? JSONDecoder().decode([PendingEntry].self, from: data) {
+            pendingRetryEntries = decoded
+        }
+        if let data = UserDefaults.standard.data(forKey: pendingStopKey),
+           let decoded = try? JSONDecoder().decode(RemoteStop.self, from: data) {
+            pendingRemoteStop = decoded
+        }
+        if hasPendingRetry {
+            saveError = "Some Toggl entries from your last session were not saved."
         }
         if hasToken {
             connectionStatus = workspaceId != nil ? .connected : .disconnected

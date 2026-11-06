@@ -74,7 +74,7 @@ struct TimerPopover: View {
             }
 
             // Persistent Toggl error banner (shown in both active and idle states)
-            if togglEnabled, let error = togglManager.saveError {
+            if let error = togglManager.saveError, togglEnabled || togglManager.hasPendingRetry {
                 TogglErrorBanner(
                     error: error,
                     isRetrying: togglManager.isSavingEntry
@@ -228,7 +228,7 @@ private struct ActiveTimerSection: View {
             }
 
             HStack(spacing: 8) {
-                if !timerManager.isOvertime {
+                if timerManager.showsPauseControl {
                     Button(action: togglePause) {
                         Label(timerManager.isPaused ? String(localized: "Resume") : String(localized: "Pause"), systemImage: timerManager.isPaused ? "play.fill" : "pause.fill")
                             .font(.system(size: 12, weight: .medium))
@@ -294,6 +294,7 @@ private struct TogglInputSection: View {
     @ObservedObject var togglManager: TogglManager
     @ObservedObject var timerManager: TimerManager
     @State private var noActiveTimerVisible = false
+    @State private var syncFailureMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -348,9 +349,16 @@ private struct TogglInputSection: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .transition(.opacity)
+                } else if let message = syncFailureMessage {
+                    Text(message)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                        .transition(.opacity)
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: noActiveTimerVisible)
+            .animation(.easeInOut(duration: 0.2), value: syncFailureMessage)
         }
         .padding(10)
         .background(Color.white.opacity(0.05))
@@ -367,6 +375,11 @@ private struct TogglInputSection: View {
                 withAnimation { noActiveTimerVisible = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                     withAnimation { noActiveTimerVisible = false }
+                }
+            case .failed(let message):
+                withAnimation { syncFailureMessage = String(localized: "Couldn't sync from Toggl: \(message)") }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                    withAnimation { syncFailureMessage = nil }
                 }
             case .adopted(let elapsed):
                 withAnimation(.smooth) {

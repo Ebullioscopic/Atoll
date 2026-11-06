@@ -450,7 +450,7 @@ struct TimerLiveActivity: View {
     @ViewBuilder
     private var inlineControlsSection: some View {
         HStack(spacing: inlineControlSpacing) {
-            if !timerManager.isOvertime {
+            if timerManager.showsPauseControl {
                 inlineControlButton(
                     icon: timerManager.isPaused ? "play.fill" : "pause.fill",
                     foreground: .white,

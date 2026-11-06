@@ -23,6 +23,7 @@ struct NotchTogglView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject private var togglManager = TogglManager.shared
     @State private var noActiveTimerMessage = false
+    @State private var syncFailureMessage: String?
     @State private var elapsedDraft = ""
     @FocusState private var elapsedFieldFocused: Bool
 
@@ -211,12 +212,16 @@ struct NotchTogglView: View {
                 } else if noActiveTimerMessage {
                     Text("No active timer on Toggl")
                         .font(.system(size: 11)).foregroundStyle(.white.opacity(0.45))
+                } else if let message = syncFailureMessage {
+                    Text(message)
+                        .font(.system(size: 11)).foregroundStyle(.red).lineLimit(2)
                 }
             }
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.2), value: togglManager.isSavingEntry)
             .animation(.easeInOut(duration: 0.2), value: togglManager.saveError != nil)
             .animation(.easeInOut(duration: 0.2), value: noActiveTimerMessage)
+            .animation(.easeInOut(duration: 0.2), value: syncFailureMessage)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(maxHeight: maxTabContentHeight, alignment: .top)
@@ -312,6 +317,11 @@ struct NotchTogglView: View {
                 withAnimation { noActiveTimerMessage = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                     withAnimation { self.noActiveTimerMessage = false }
+                }
+            case .failed(let message):
+                withAnimation { syncFailureMessage = String(localized: "Couldn't sync from Toggl: \(message)") }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                    withAnimation { self.syncFailureMessage = nil }
                 }
             case .adopted(let elapsed):
                 togglManager.elapsed = elapsed

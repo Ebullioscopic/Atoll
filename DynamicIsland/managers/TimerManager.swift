@@ -36,6 +36,8 @@ class TimerManager: ObservableObject {
     @Published var isPaused: Bool = false
     @Published var isFinished: Bool = false
     @Published var isOvertime: Bool = false // Timer has gone past 0 and is counting negative
+    /// True while the timer tracks a running Toggl entry. Pausing would leave that entry running, so it is disabled.
+    @Published private(set) var isAdoptedFromToggl: Bool = false
     @Published var lastUpdated: Date = .distantPast
     @Published var activePresetId: UUID?
     @Published private(set) var activeSource: TimerSource = .none
@@ -173,6 +175,7 @@ class TimerManager: ObservableObject {
         // Stop any existing timer
         timerInstance?.invalidate()
         soundPlayer?.stop()
+        isAdoptedFromToggl = false
         beginTimerSession()
         
         // Start new timer
@@ -277,6 +280,7 @@ class TimerManager: ObservableObject {
             return
         }
         guard activeSource == .manual else { return }
+        guard !isAdoptedFromToggl else { return }
         guard isTimerActive && !isPaused else { return }
         isPaused = true
         timerInstance?.invalidate()
@@ -293,6 +297,7 @@ class TimerManager: ObservableObject {
             return
         }
         guard activeSource == .manual else { return }
+        guard !isAdoptedFromToggl else { return }
         guard isTimerActive && isPaused else { return }
         isPaused = false
         lastUpdated = Date()
@@ -417,6 +422,7 @@ class TimerManager: ObservableObject {
         timerInstance?.invalidate()
         // A previous timer may already be in overtime and looping its alarm.
         soundPlayer?.stop()
+        isAdoptedFromToggl = true
 
         let duration: TimeInterval = 86400
         withAnimation(.smooth) { isTimerActive = true }
@@ -470,6 +476,7 @@ class TimerManager: ObservableObject {
         isFinished = false
         isOvertime = false
         activePresetId = nil
+        isAdoptedFromToggl = false
         activeSource = .none
         startedAt = nil
     }
@@ -487,6 +494,9 @@ class TimerManager: ObservableObject {
     var hasManualTimerRunning: Bool {
         activeSource == .manual && isTimerActive
     }
+
+    /// Whether to offer the pause control: not in overtime, and not for a timer tracking a Toggl entry.
+    var showsPauseControl: Bool { !isOvertime && !isAdoptedFromToggl }
 
     var allowsManualInteraction: Bool {
         switch activeSource {

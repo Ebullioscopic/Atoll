@@ -174,13 +174,15 @@ struct NotchTimerView: View {
         if timerManager.allowsManualInteraction {
             HStack(spacing: 10) {
                 if !timerManager.isOvertime {
-                    TimerControlButton(
-                        icon: pauseIconName,
-                        foreground: .white.opacity(0.95),
-                        background: timerAccentColor.opacity(0.32),
-                        accessibilityLabel: pauseAccessibilityLabel,
-                        action: togglePauseAction
-                    )
+                    if timerManager.showsPauseControl {
+                        TimerControlButton(
+                            icon: pauseIconName,
+                            foreground: .white.opacity(0.95),
+                            background: timerAccentColor.opacity(0.32),
+                            accessibilityLabel: pauseAccessibilityLabel,
+                            action: togglePauseAction
+                        )
+                    }
 
                     TimerControlButton(
                         icon: "xmark",

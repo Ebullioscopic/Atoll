@@ -211,7 +211,7 @@ struct LockScreenTimerWidget: View {
 
     private var controlButtons: some View {
         HStack(spacing: 10) {
-            if !timerManager.isOvertime {
+            if timerManager.showsPauseControl {
                 CircleButton(
                     icon: pauseIcon,
                     foreground: appearance.primary(opacity: 0.95),
