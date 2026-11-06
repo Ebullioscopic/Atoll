@@ -181,6 +181,9 @@ final class TogglManager: ObservableObject {
 
     /// Bumped on every auth change, so results from an older Save or Disconnect are ignored.
     private var authGeneration = 0
+    /// Bumped only when the connected account goes away (Disconnect or a switch to another account).
+    /// Unlike `authGeneration`, a rejected token replacement leaves it alone, so a failed save stays retryable.
+    private var accountGeneration = 0
     /// Bumped on every local start or stop, so a sync that finishes after one is discarded.
     private var localActionGeneration = 0
 
@@ -242,6 +245,7 @@ final class TogglManager: ObservableObject {
                 return
             }
             if accountChanged {
+                accountGeneration += 1
                 // Another account: drop the previous account's cached projects, recents and selection.
                 projects = []
                 recentEntries = []
@@ -271,6 +275,8 @@ final class TogglManager: ObservableObject {
     func disconnect() {
         // Invalidate any Save that is still waiting for Toggl, so it cannot restore a connection.
         authGeneration += 1
+        // Saves still posting for this account must not restore their entry or recents afterwards.
+        accountGeneration += 1
         // Stop any in-flight stopwatch first so no elapsed interval survives to a
         // later stopStopwatch() save once auth state is gone.
         resetStopwatch()
@@ -360,6 +366,7 @@ final class TogglManager: ObservableObject {
         guard hasToken, let wsId = workspaceId else { return }
 
         let entry = PendingEntry(description: description, projectId: projectId, start: start, stop: stop)
+        let account = accountGeneration
         beginSaving()
         // Keep an existing error visible while earlier work is still waiting for Retry.
         if !hasPendingRetry { saveError = nil }
@@ -367,12 +374,16 @@ final class TogglManager: ObservableObject {
 
         do {
             try await postTimeEntry(entry: entry, workspaceId: wsId)
+            // The account was disconnected or switched meanwhile; do not restore its recents.
+            guard account == accountGeneration else { return }
             prependRecentEntry(TogglRecentEntry(
                 description: description,
                 projectId: projectId,
                 projectName: projects.first { $0.id == projectId }?.name
             ))
         } catch {
+            // After a disconnect or account switch the entry belongs to a connection that is gone.
+            guard account == accountGeneration else { return }
             // Keep this entry alongside any earlier unsaved ones; each is retried on its own.
             pendingRetryEntries.append(entry)
             saveError = error.localizedDescription
