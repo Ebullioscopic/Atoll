@@ -80,10 +80,10 @@ final class MemoryUsageMonitor {
     private func presentRestartAlert(currentUsage: UInt64) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "DynamicIsland memory usage is high"
-        alert.informativeText = "The app is currently using \(formatMegabytes(currentUsage)) MB, which exceeds the safe limit of \(formatMegabytes(thresholdBytes)) MB. Restart now to free memory?"
-        alert.addButton(withTitle: "Restart Now")
-        alert.addButton(withTitle: "Later")
+        alert.messageText = String(localized: "DynamicIsland memory usage is high")
+        alert.informativeText = String(localized: "The app is currently using \(formatMegabytes(currentUsage)) MB, which exceeds the safe limit of \(formatMegabytes(thresholdBytes)) MB. Restart now to free memory?")
+        alert.addButton(withTitle: String(localized: "Restart Now"))
+        alert.addButton(withTitle: String(localized: "Later"))
 
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {

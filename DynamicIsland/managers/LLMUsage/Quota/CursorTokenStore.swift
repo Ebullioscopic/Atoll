@@ -7,7 +7,7 @@ enum CursorTokenStore {
         return readTokenFromStateDB()
     }
 
-    // Cookie for cursor.com/api/usage: WorkosCursorSessionToken value is "<userId>::<jwt>", userId is the JWT sub.
+    // Cursor dashboard cookie: WorkosCursorSessionToken value is "<userId>::<jwt>", userId is the JWT sub.
     static func sessionCookie() -> (userId: String, cookieToken: String)? {
         guard let jwt = accessToken(), let userId = userId(fromJWT: jwt) else { return nil }
         return (userId, "\(userId)%3A%3A\(jwt)")

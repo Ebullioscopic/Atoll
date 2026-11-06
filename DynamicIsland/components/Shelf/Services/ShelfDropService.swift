@@ -49,54 +49,56 @@ struct ShelfDropService {
                 continue
             }
 
-            if let bookmark = createBookmark(for: resolvedURL) {
-                results.append(await ShelfItem(kind: .file(bookmark: bookmark), isTemporary: false))
+            if let item = await fileItem(for: resolvedURL, isTemporary: false) {
+                results.append(item)
             }
         }
 
         return results
     }
-    
+
     private static func processProvider(_ provider: NSItemProvider) async -> ShelfItem? {
         if let actualFileURL = await provider.extractFileURL() {
-            if let bookmark = createBookmark(for: actualFileURL) {
-                return await ShelfItem(kind: .file(bookmark: bookmark), isTemporary: false)
-            }
-            return nil
+            return await fileItem(for: actualFileURL, isTemporary: false)
         }
-        
+
         if let url = await provider.extractURL() {
             if url.isFileURL {
-                if let bookmark = createBookmark(for: url) {
-                    return await ShelfItem(kind: .file(bookmark: bookmark), isTemporary: false)
-                }
-            } else {
-                return await ShelfItem(kind: .link(url: url), isTemporary: false)
+                return await fileItem(for: url, isTemporary: false)
             }
-            return nil
+            return await ShelfItem(kind: .link(url: url), isTemporary: false)
         }
-        
+
         if let text = await provider.extractText() {
             return await ShelfItem(kind: .text(string: text), isTemporary: false)
         }
-        
+
         if let data = await provider.loadData() {
-            if let tempDataURL = await TemporaryFileStorageService.shared.createTempFile(for: .data(data, suggestedName: provider.suggestedName)),
-               let bookmark = createBookmark(for: tempDataURL) {
-                return await ShelfItem(kind: .file(bookmark: bookmark), isTemporary: true)
+            guard let tempDataURL = await TemporaryFileStorageService.shared.createTempFile(for: .data(data, suggestedName: provider.suggestedName)) else {
+                return nil
             }
-            return nil
+            return await fileItem(for: tempDataURL, isTemporary: true)
         }
-        
+
         if let fileURL = await provider.extractItem() {
-            if let bookmark = createBookmark(for: fileURL) {
-                return await ShelfItem(kind: .file(bookmark: bookmark), isTemporary: false)
-            }
+            return await fileItem(for: fileURL, isTemporary: false)
         }
-        
+
         return nil
     }
-    
+
+    /// Builds a `.file` item, recording the path alongside the bookmark so that
+    /// dedup, drag-out and the context menu never have to resolve the bookmark
+    /// on the main actor.
+    private static func fileItem(for url: URL, isTemporary: Bool) async -> ShelfItem? {
+        guard let bookmark = createBookmark(for: url) else { return nil }
+        return await ShelfItem(
+            kind: .file(bookmark: bookmark),
+            isTemporary: isTemporary,
+            cachedPath: url.standardizedFileURL.path
+        )
+    }
+
     private static func createBookmark(for url: URL) -> Data? {
         return (try? Bookmark(url: url))?.data
     }

@@ -41,6 +41,8 @@ struct ExtensionsSettingsView: View {
     
     var body: some View {
         Form {
+            marketplaceSection
+
             globalTogglesSection
             
             if authManager.isExtensionsFeatureEnabled {
@@ -59,6 +61,47 @@ struct ExtensionsSettingsView: View {
         }
     }
     
+    /// Where extensions come from.
+    ///
+    /// The rest of this page manages extensions that are already installed,
+    /// which is no use to somebody who has none: nothing here says they exist
+    /// as a thing to go and get, or where. First, then, rather than as a
+    /// footnote under the permissions.
+    private var marketplaceSection: some View {
+        Section {
+            Link(destination: URL(string: "https://getatoll.app/marketplace")!) {
+                HStack(spacing: 10) {
+                    Image(systemName: "bag.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.tint)
+                        .frame(width: 22)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Browse the Marketplace")
+                        Text("getatoll.app/marketplace")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .settingsHighlight(id: highlightID("Browse the Marketplace"))
+        } header: {
+            Text("Get Extensions")
+        } footer: {
+            Text("Apps built with AtollExtensionKit, collected in one place. Opens in your browser.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
     private var globalTogglesSection: some View {
         Section {
             Defaults.Toggle(String(localized:"Enable third-party extensions"), key: .enableThirdPartyExtensions)

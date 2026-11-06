@@ -50,11 +50,11 @@ enum ProcessRankingType {
     
     var title: String {
         switch self {
-        case .cpu: return "CPU Usage"
-        case .memory: return "Memory Usage"
-        case .gpu: return "GPU Usage"
-        case .network: return "Network Activity"
-        case .disk: return "Disk Activity"
+        case .cpu: return String(localized: "CPU Usage")
+        case .memory: return String(localized: "Memory Usage")
+        case .gpu: return String(localized: "GPU Usage")
+        case .network: return String(localized: "Network Activity")
+        case .disk: return String(localized: "Disk Activity")
         }
     }
     

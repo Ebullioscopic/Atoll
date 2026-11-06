@@ -35,18 +35,18 @@ enum PrivacyIndicatorType {
     var label: String {
         switch self {
         case .camera:
-            return "Camera Active"
+            return String(localized: "Camera Active")
         case .microphone:
-            return "Microphone Active"
+            return String(localized: "Microphone Active")
         }
     }
     
     var accessibilityLabel: String {
         switch self {
         case .camera:
-            return "Camera is being used by an application"
+            return String(localized: "Camera is being used by an application")
         case .microphone:
-            return "Microphone is being used by an application"
+            return String(localized: "Microphone is being used by an application")
         }
     }
 }

@@ -27,6 +27,9 @@ class SystemHUDManager {
     private weak var coordinator: DynamicIslandViewCoordinator?
     private var isSetupComplete = false
     private var isSystemOperationInProgress = false
+    /// The lock state the native HUD has actually been handed over for, so a
+    /// handover that restarts OSDUIHelper only happens when it changes.
+    private var lastNativeHUDLockState: Bool?
     
     private init() {
         // Set up observer for settings changes
@@ -314,6 +317,11 @@ class SystemHUDManager {
             keyboardBacklightEnabled: flags.backlight
         )
         
+        // A fresh observer has none of the old one's suppression applied to it,
+        // so what was handed over before this restart says nothing about what
+        // is in force now.
+        lastNativeHUDLockState = nil
+
         // Force disable system HUD to ensure no duplicates
         SystemOSDManager.disableSystemHUD()
         
@@ -321,6 +329,39 @@ class SystemHUDManager {
         isSystemOperationInProgress = false
     }
     
+    /// Hands the HUD to macOS while the Mac is locked, and takes it back on
+    /// unlock.
+    ///
+    /// None of this app's HUD styles can be seen over the lock screen — the
+    /// inline one lives in the notch, the others sit below the lock screen
+    /// shield — so suppressing the system HUD there left the volume keys with
+    /// no feedback at all. The exception is the lock screen music panel, which
+    /// carries its own slider; unsuppressing then would put two indicators on
+    /// screen at once.
+    @MainActor
+    func updateNativeHUDSuppressionForLockState(isLocked: Bool) {
+        // Readiness first, then the record of what has been applied. The other
+        // order marked a request applied that this guard had in fact dropped,
+        // and every later request for the same state returned early on the
+        // strength of it -- so a lock that arrived before setup finished left
+        // the HUD in the wrong hands for the rest of the session.
+        guard isSetupComplete, changesObserver != nil else { return }
+
+        // Handing the HUD over restarts OSDUIHelper, so only act on a change.
+        guard isLocked != lastNativeHUDLockState else { return }
+        lastNativeHUDLockState = isLocked
+
+        if SystemHUDPlacement.yieldsToNativeHUD(isLocked: isLocked) {
+            SystemOSDManager.enableSystemHUD()
+        } else {
+            SystemOSDManager.disableSystemHUD()
+            // disableSystemHUD arms the watcher, which polls; on unlock the
+            // helper is already awake and can draw one more HUD before the
+            // first poll lands. Freeze it now as well.
+            SystemOSDManager.suppressNativeOSDNow()
+        }
+    }
+
     @MainActor
     private func stopSystemObserver() async {
         guard !isSystemOperationInProgress else { return }

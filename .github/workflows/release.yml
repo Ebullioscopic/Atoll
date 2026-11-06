@@ -87,9 +87,25 @@ jobs:
           BASE_VERSION=$(cat VERSION | tr -d '[:space:]')
           CHANNEL="${{ steps.channel.outputs.channel }}"
           DATE_STAMP=$(date -u +%Y%m%d)
-          # Use the total commit count for a perfectly monotonically increasing build number
-          BUILD_NUMBER=$(git rev-list HEAD --count)
 
+          # ── Monotonic build number allocator ──
+          # Use the maximum of (commit count, highest published build number + 1)
+          # so the value can never decrease even across history rewrites or
+          # divergent branches.
+          COMMIT_COUNT=$(git rev-list HEAD --count)
+          HIGHEST_PUBLISHED=$(grep -h 'sparkle:version' Updates/appcast*.xml 2>/dev/null \
+            | grep -oE '[0-9]+' | sort -rn | head -1)
+          HIGHEST_PUBLISHED=${HIGHEST_PUBLISHED:-0}
+          if [ "$COMMIT_COUNT" -gt "$HIGHEST_PUBLISHED" ]; then
+            BUILD_NUMBER=$COMMIT_COUNT
+          else
+            BUILD_NUMBER=$((HIGHEST_PUBLISHED + 1))
+          fi
+
+          # ── Auto-patch for stable releases ──
+          # If v<BASE_VERSION> already exists, find the next unused patch.N tag
+          # without modifying the VERSION file. This keeps VERSION as the
+          # "base" (e.g. 2.3.2) while releases become 2.3.2-patch.1, .2, etc.
           case "$CHANNEL" in
             nightly)
               COUNT=$(git tag -l "v${BASE_VERSION}-nightly.*" 2>/dev/null | wc -l | tr -d ' ')
@@ -107,11 +123,23 @@ jobs:
               COUNT=$(git tag -l "v${BASE_VERSION}-beta.*" 2>/dev/null | wc -l | tr -d ' ')
               NEXT=$((COUNT + 1))
               VERSION="${BASE_VERSION}-beta.${NEXT}"
-              BUILD_NUMBER="${DATE_STAMP}003"
               PRERELEASE="true"
               ;;
             stable)
-              VERSION="${BASE_VERSION}"
+              if git tag -l "v${BASE_VERSION}" | grep -q .; then
+                # Base tag exists — find the next unused X.Y.Z version
+                MAJOR=$(echo "$BASE_VERSION" | cut -d. -f1)
+                MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
+                PATCH=$(echo "$BASE_VERSION" | cut -d. -f3)
+                PATCH=$((PATCH + 1))
+                while git tag -l "v${MAJOR}.${MINOR}.${PATCH}" | grep -q .; do
+                  PATCH=$((PATCH + 1))
+                done
+                VERSION="${MAJOR}.${MINOR}.${PATCH}"
+                echo "⚠️  Tag v${BASE_VERSION} exists — releasing as ${VERSION}"
+              else
+                VERSION="${BASE_VERSION}"
+              fi
               PRERELEASE="false"
               ;;
           esac
@@ -287,6 +315,35 @@ jobs:
             -exportOptionsPlist ExportOptions.plist
 
       # ─────────────────────────────────────────────────────────────────
+      # 12b. Ensure BluetoothHUDAnimations are in the app bundle
+      # ─────────────────────────────────────────────────────────────────
+      - name: Copy BluetoothHUD Animations
+        run: |
+          APP_RESOURCES="build/export/${APP_NAME}.app/Contents/Resources"
+          SRC_DIR="DynamicIsland/BluetoothHUDAnimations"
+          if [ ! -d "$SRC_DIR" ]; then
+            echo "::error::BluetoothHUDAnimations source directory not found at $SRC_DIR"
+            exit 1
+          fi
+
+          MOV_COUNT=$(find "$SRC_DIR" -maxdepth 1 -name '*.mov' | wc -l | tr -d ' ')
+          if [ "$MOV_COUNT" -eq 0 ]; then
+            echo "::error::No .mov files found in $SRC_DIR"
+            exit 1
+          fi
+
+          DEST="$APP_RESOURCES/BluetoothHUDAnimations"
+          mkdir -p "$DEST"
+          cp -n "$SRC_DIR"/*.mov "$DEST/"
+
+          COPIED=$(find "$DEST" -maxdepth 1 -name '*.mov' | wc -l | tr -d ' ')
+          if [ "$COPIED" -eq 0 ]; then
+            echo "::error::Copy succeeded but no .mov files found in destination"
+            exit 1
+          fi
+          echo "✅ BluetoothHUDAnimations: $COPIED .mov files copied"
+
+      # ─────────────────────────────────────────────────────────────────
       # 13. Code sign Sparkle XPC services
       # ─────────────────────────────────────────────────────────────────
       - name: Sign Sparkle XPC Services
@@ -331,9 +388,6 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :com.apple.security.device.camera" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"
           /usr/libexec/PlistBuddy -c "Print :com.apple.security.automation.apple-events" "$FINAL_ENTITLEMENTS_PATH" | grep -qx "true"
 
-      # ─────────────────────────────────────────────────────────────────
-      # 14. Create DMG
-      # ─────────────────────────────────────────────────────────────────
       # ─────────────────────────────────────────────────────────────────
       # 14. Create DMG
       # ─────────────────────────────────────────────────────────────────

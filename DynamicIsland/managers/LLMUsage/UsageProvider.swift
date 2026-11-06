@@ -2,13 +2,15 @@ import Foundation
 import Defaults
 
 enum ProviderID: String, CaseIterable, Identifiable {
-    case claude, codex, cursor
+    case claude, codex, cursor, antigravity, newAPI
     var id: String { rawValue }
     var displayName: String {
         switch self {
         case .claude: return "Claude"
         case .codex: return "Codex"
         case .cursor: return "Cursor"
+        case .antigravity: return "Antigravity"
+        case .newAPI: return "New API"
         }
     }
     var enabledKey: Defaults.Key<Bool> {
@@ -16,6 +18,8 @@ enum ProviderID: String, CaseIterable, Identifiable {
         case .claude: return .enableClaudeProvider
         case .codex: return .enableCodexProvider
         case .cursor: return .enableCursorProvider
+        case .antigravity: return .enableAntigravityProvider
+        case .newAPI: return .enableNewAPIProvider
         }
     }
 }
@@ -25,13 +29,23 @@ struct UsageTotals: Equatable {
     var outputTokens: Int = 0
     var costUSD: Double = 0
     var hasUnpricedModel: Bool = false
+    var isPercentage: Bool = false
     var totalTokens: Int { inputTokens + outputTokens }
 }
 
 struct ModelUsage: Equatable, Identifiable {
     let model: String
     let totals: UsageTotals
+    let pool: String? // "gemini" or "claude" for Antigravity
+    let resetsAt: Date? // quota reset time for percentage-based providers
     var id: String { model }
+
+    init(model: String, totals: UsageTotals, pool: String? = nil, resetsAt: Date? = nil) {
+        self.model = model
+        self.totals = totals
+        self.pool = pool
+        self.resetsAt = resetsAt
+    }
 }
 
 struct UsageLimit: Equatable {
@@ -48,6 +62,8 @@ struct UsageSnapshot: Equatable {
     var sessionLimit: UsageLimit? = nil // 5h window quota
     var weekLimit: UsageLimit? = nil // 7d window quota
     var models: [ModelUsage] = []
+    var plan: String? = nil // Subscription plan label (e.g. "Max 5x"); provided by Claude only, nil otherwise.
+    var newAPIAccounts: [NewAPIAccountSnapshot] = []
     var lastUpdated: Date = .distantPast
 }
 
