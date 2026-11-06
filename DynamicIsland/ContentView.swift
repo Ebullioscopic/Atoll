@@ -881,6 +881,7 @@ struct ContentView: View {
         )
     }
 
+    /// Attaches the primary root view's lifecycle handlers, including ending a running Toggl stopwatch when Toggl is disabled.
     private func installPrimaryRootLifecycleHandlers<Content: View>(on view: Content) -> some View {
         view
             .onChange(of: togglEnabled) { _, isEnabled in
@@ -1064,6 +1065,7 @@ struct ContentView: View {
         )
     }
 
+    /// Builds the notch's main layout, including the connectivity HUD when it is visible.
     @ViewBuilder
       func NotchLayout() -> some View {
           VStack(alignment: .leading) {
@@ -1536,6 +1538,7 @@ struct ContentView: View {
         .animation(.smooth(duration: 0.25), value: secondary?.id)
     }
 
+    /// Chooses the secondary live activity shown beside the music, in priority order: timer, Toggl, reminder, recording, then Do Not Disturb.
     private func resolveMusicSecondaryLiveActivity(isMusicPairingEligible: Bool = true) -> MusicSecondaryLiveActivity? {
         if coordinator.timerLiveActivityEnabled && timerManager.isTimerActive {
             return .timer
@@ -1574,6 +1577,7 @@ struct ContentView: View {
         return nil
     }
 
+    /// Returns the right-wing width for the given secondary live activity, sized to its content.
     private func resolvedRightWingWidth(for secondary: MusicSecondaryLiveActivity?, baseWidth: CGFloat, centerBaseWidth: CGFloat, notchHeight: CGFloat) -> CGFloat {
         guard let secondary else { return baseWidth }
 
@@ -1663,6 +1667,7 @@ struct ContentView: View {
         max(baseWidth, max(centerBaseWidth * factor, baseWidth + extra))
     }
 
+    /// Renders the secondary live activity's badge over the album art.
     @ViewBuilder
     private func albumArtBadge(for secondary: MusicSecondaryLiveActivity?, badgeSize: CGFloat) -> some View {
         if let secondary, badgeSize > 0 {
@@ -1734,6 +1739,7 @@ struct ContentView: View {
         }
     }
 
+    /// Builds the right wing shown beside the music view for the given secondary live activity.
     @ViewBuilder
     private func musicRightWing(for secondary: MusicSecondaryLiveActivity?, notchHeight: CGFloat, trailingWidth: CGFloat) -> some View {
         switch secondary {
@@ -3030,6 +3036,7 @@ struct ContentView: View {
         return isMusicSneak || isTimerSneak || isReminderSneak || isOtherSneak
     }
 
+    /// Returns the sneak-peek style: standard for extension live activities, otherwise the override or the user's setting.
     private func resolvedSneakPeekStyle() -> SneakPeekStyle {
         if case .extensionLiveActivity = coordinator.sneakPeek.type {
             return .standard
@@ -3173,6 +3180,7 @@ private struct MusicTimerSupplementView: View {
             .frame(width: timerNameFrameWidth, alignment: .trailing)
     }
 
+    /// Draws a thin progress bar of the given width, filled to the clamped progress.
     private func barView(width: CGFloat) -> some View {
         Capsule()
             .fill(Color.white.opacity(0.15))
@@ -3326,6 +3334,7 @@ private enum TimerSupplementMetrics {
         max(countdownTextWidth(for: text) + 16, 72)
     }
 
+    /// Returns the frame width for a timer name: its measured width plus padding, with a 64 pt minimum.
     static func timerNameFrameWidth(for text: String) -> CGFloat {
         guard !text.isEmpty else { return 64 }
         let width = musicMeasureText(text, font: MusicSupplementFont.systemFont(ofSize: 12, weight: .medium))
@@ -3334,6 +3343,7 @@ private enum TimerSupplementMetrics {
 }
 
 enum TogglSupplementMetrics {
+    /// Formats an elapsed time as m:ss, or h:mm:ss once an hour has passed.
     static func formattedElapsed(for elapsed: TimeInterval) -> String {
         let total = Int(elapsed)
         let h = total / 3600
@@ -3344,11 +3354,13 @@ enum TogglSupplementMetrics {
             : String(format: "%d:%02d", m, s)
     }
 
+    /// Measures elapsed text in the monospaced font, so hour-format times are not clipped.
     static func elapsedTextWidth(for text: String) -> CGFloat {
         // Fully monospaced to match the `.monospaced` render so hour-format elapsed isn't clipped.
         musicMeasureText(text, font: MusicSupplementFont.monospacedSystemFont(ofSize: 13, weight: .semibold))
     }
 
+    /// Returns the frame width for elapsed text: its measured width plus padding, with a 72 pt minimum.
     static func elapsedFrameWidth(for text: String) -> CGFloat {
         max(elapsedTextWidth(for: text) + 16, 72)
     }

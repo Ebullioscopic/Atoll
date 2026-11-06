@@ -261,6 +261,7 @@ struct NotchTogglView: View {
 
     // MARK: - Helpers
 
+    /// A circular icon button that shows a spinner while its action is loading.
     private func circleIconButton(systemName: String, isLoading: Bool, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Group {

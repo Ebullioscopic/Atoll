@@ -164,6 +164,7 @@ class TimerManager: ObservableObject {
     }
     
     // MARK: - Timer Methods
+    /// Starts a countdown timer of the given duration, replacing any timer already running.
     func startTimer(duration: TimeInterval, name: String = "Timer", preset: TimerPreset? = nil) {
         if activeSource == .external {
             endExternalTimer(triggerSmoothClose: false)
@@ -455,6 +456,7 @@ class TimerManager: ObservableObject {
         }
     }
 
+    /// Clears the timer state and ends its session.
     private func resetTimer() {
         endTimerSession()
         withAnimation(.smooth) {

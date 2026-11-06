@@ -128,6 +128,7 @@ struct TimerPopover: View {
         }
     }
 
+    /// Splits a duration in seconds into the custom hour, minute and second fields.
     private func syncCustomDuration(with value: Double) {
         let components = TimerPreset.components(for: value)
         customHours   = components.hours
@@ -135,6 +136,7 @@ struct TimerPopover: View {
         customSeconds = components.seconds
     }
 
+    /// Stores the current custom duration.
     private func updateStoredCustomDuration() {
         customTimerDuration = customDurationInSeconds
     }
@@ -251,6 +253,7 @@ private struct ActiveTimerSection: View {
         .animation(.smooth, value: timerManager.isPaused)
     }
 
+    /// Pauses the running timer, or resumes it if paused.
     private func togglePause() {
         guard timerManager.allowsManualInteraction else { return }
         withAnimation(.smooth) {

@@ -224,6 +224,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Recent entries
 
+    /// Loads the last 7 days of time entries and keeps the three most recent distinct ones.
     private func fetchRecentEntries() async {
         guard hasToken else { return }
 
@@ -315,6 +316,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Sync running timer
 
+    /// Returns the currently running Toggl entry, or nil if none is running or the request fails.
     func fetchCurrentTimer() async -> TogglRunningEntry? {
         guard hasToken else { return nil }
         isFetchingCurrentTimer = true
@@ -360,6 +362,7 @@ final class TogglManager: ObservableObject {
         await performRemoteStop(stop)
     }
 
+    /// Sends the stop request for a remote entry. A failed stop is kept for retry.
     private func performRemoteStop(_ stop: RemoteStop) async {
         guard hasToken else {
             pendingRemoteStop = nil
@@ -384,6 +387,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Stopwatch
 
+    /// Starts the stopwatch from its current elapsed value, ticking once per second.
     func startStopwatch() {
         markLocalActivity()
         stopwatchTimer?.invalidate()
@@ -440,11 +444,13 @@ final class TogglManager: ObservableObject {
     /// Records that a local timer or stopwatch started or stopped, invalidating sync requests still in flight.
     func markLocalActivity() { localActionGeneration += 1 }
 
+    /// Records the start, entry ID and workspace of a Toggl entry the timer was synced from.
     func setSyncedStart(_ date: Date, entryId: Int? = nil, workspaceId: Int? = nil) {
         syncedOriginalStart = date
         syncedEntryId = entryId
         syncedWorkspaceId = workspaceId
     }
+    /// Forgets the synced Toggl entry.
     func clearSyncedStart() {
         syncedOriginalStart = nil
         syncedEntryId = nil
@@ -455,6 +461,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Sleep detection
 
+    /// Saves a running stopwatch when the Mac goes to sleep.
     private func setupSleepObserver() {
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.willSleepNotification,
@@ -484,6 +491,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Networking
 
+    /// Returns the default workspace ID for the account that owns the token.
     private func fetchWorkspaceId(token: String) async throws -> Int {
         struct Me: Codable {
             let defaultWorkspaceId: Int
@@ -493,6 +501,7 @@ final class TogglManager: ObservableObject {
         return me.defaultWorkspaceId
     }
 
+    /// Posts a completed time entry to the given workspace. The duration is at least one second.
     private func postTimeEntry(entry: PendingEntry, workspaceId: Int) async throws {
         let fmt = ISO8601DateFormatter()
         fmt.formatOptions = [.withInternetDateTime]
@@ -511,25 +520,30 @@ final class TogglManager: ObservableObject {
         try await apiPOST("/api/v9/workspaces/\(workspaceId)/time_entries", body: body)
     }
 
+    /// Sends a GET request and decodes the JSON response.
     private func apiGET<T: Decodable>(_ path: String, token: String? = nil) async throws -> T {
         let data = try await networkRequest(path: path, method: "GET", body: nil, token: token)
         return try JSONDecoder().decode(T.self, from: data)
     }
 
+    /// Sends a GET request whose response may be null.
     private func apiGETNullable<T: Decodable>(_ path: String) async throws -> T? {
         let data = try await networkRequest(path: path, method: "GET", body: nil, token: nil)
         return try JSONDecoder().decode(T?.self, from: data)
     }
 
+    /// Sends a PATCH request with no body.
     private func apiPATCH(_ path: String) async throws {
         _ = try await networkRequest(path: path, method: "PATCH", body: nil, token: nil)
     }
 
+    /// Sends a POST request with a JSON body.
     private func apiPOST(_ path: String, body: [String: Any]) async throws {
         let bodyData = try JSONSerialization.data(withJSONObject: body)
         _ = try await networkRequest(path: path, method: "POST", body: bodyData, token: nil)
     }
 
+    /// Sends an authenticated request to the Toggl API and returns the response body. Throws on a non-2xx status.
     private func networkRequest(path: String, method: String, body: Data?, token: String?) async throws -> Data {
         guard let url = URL(string: "https://api.track.toggl.com\(path)") else {
             throw URLError(.badURL)
@@ -552,6 +566,7 @@ final class TogglManager: ObservableObject {
         return data
     }
 
+    /// Builds the Basic authorization header for an API token.
     private func authHeader(token: String) -> String {
         let encoded = Data("\(token):api_token".utf8).base64EncodedString()
         return "Basic \(encoded)"
@@ -559,6 +574,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Persistence
 
+    /// Restores the workspace, projects and recent entries saved on disk.
     private func loadLocalData() {
         let wsId = UserDefaults.standard.integer(forKey: workspaceIdKey)
         workspaceId = wsId == 0 ? nil : wsId
@@ -576,12 +592,14 @@ final class TogglManager: ObservableObject {
         }
     }
 
+    /// Encodes a value and saves it in UserDefaults under the given key.
     private func persist<T: Encodable>(_ value: T, key: String) {
         if let data = try? JSONEncoder().encode(value) {
             UserDefaults.standard.set(data, forKey: key)
         }
     }
 
+    /// Moves an entry to the front of the recent list, keeping three.
     private func prependRecentEntry(_ entry: TogglRecentEntry) {
         var updated = recentEntries.filter { $0.id != entry.id }
         updated.insert(entry, at: 0)
@@ -591,6 +609,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Keychain
 
+    /// Replaces the API token in the Keychain. Returns whether it was saved.
     private func writeKeychain(_ token: String) -> Bool {
         let data = Data(token.utf8)
         let del: [String: Any] = [
@@ -611,6 +630,7 @@ final class TogglManager: ObservableObject {
         return status == errSecSuccess
     }
 
+    /// Reads the API token from the Keychain, or nil if none is stored.
     private func readKeychain() -> String? {
         let q: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -624,6 +644,7 @@ final class TogglManager: ObservableObject {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Removes the API token from the Keychain.
     private func deleteKeychain() {
         let q: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
