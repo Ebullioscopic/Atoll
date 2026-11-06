@@ -371,6 +371,26 @@
       }
     },
     {
+      "id": "google/gemini-omni-1.1-flash",
+      "name": "Google: Gemini Omni 1.1 Flash",
+      "pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.000009",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
+      "id": "google/gemini-omni-1.2-flash",
+      "name": "Google: Gemini Omni 1.2 Flash",
+      "pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.000009",
+        "cache_read": "",
+        "cache_write": ""
+      }
+    },
+    {
       "id": "openai/gpt-3.5-turbo-0613",
       "name": "OpenAI: GPT-3.5 Turbo (older v0613)",
       "pricing": {
@@ -905,8 +925,8 @@
       "name": "OpenAI: gpt-oss-120b",
       "pricing": {
         "prompt": "0.000000023",
-        "completion": "0.000000083",
-        "cache_read": "0.00000002",
+        "completion": "0.000000084",
+        "cache_read": "0.000000021",
         "cache_write": ""
       }
     },
@@ -951,5 +971,5 @@
       }
     }
   ],
-  "last_updated": "2026-11-05T00:04:20Z"
+  "last_updated": "2026-11-06T00:04:13Z"
 }
