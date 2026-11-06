@@ -166,11 +166,18 @@ final class TogglManager: ObservableObject {
         /// Description, start time and duration, with a number added when two entries would look identical.
         let title: String
         let duration: TimeInterval
+        /// Set when this is a failed remote stop rather than an unsaved entry.
+        var stopEntryId: Int? = nil
     }
 
-    /// Drops one failed entry, leaving every other pending entry and stop untouched.
-    func discardPendingEntry(id: UUID) {
-        pendingRetryEntries.removeAll { $0.id == id }
+    /// Drops one failed entry or remote stop, leaving every other pending item untouched.
+    /// Discarding a stop means the Toggl timer may still be running remotely.
+    func discardPending(_ summary: PendingEntrySummary) {
+        if let stopId = summary.stopEntryId {
+            pendingRemoteStops.removeAll { $0.entryId == stopId }
+        } else {
+            pendingRetryEntries.removeAll { $0.id == summary.id }
+        }
         if !hasPendingRetry { saveError = nil }
     }
 
@@ -191,9 +198,19 @@ final class TogglManager: ObservableObject {
             seen[labels[index], default: 0] += 1
             labels[index] += " (#\(seen[labels[index]] ?? 1))"
         }
-        pendingEntrySummaries = zip(pendingRetryEntries, labels).map { entry, label in
+        var summaries = zip(pendingRetryEntries, labels).map { entry, label in
             PendingEntrySummary(id: entry.id, title: label, duration: entry.stop.timeIntervalSince(entry.start))
         }
+        // Failed remote stops can be discarded too; the title warns the Toggl timer may keep running.
+        for stop in pendingRemoteStops {
+            let name = stop.description.isEmpty ? String(localized: "No description") : stop.description
+            summaries.append(PendingEntrySummary(
+                id: UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", stop.entryId)) ?? UUID(),
+                title: String(localized: "Stop of “\(name)” (timer may still run on Toggl)"),
+                duration: 0,
+                stopEntryId: stop.entryId))
+        }
+        pendingEntrySummaries = summaries
     }
 
     /// Bumped on every auth change, so results from an older Save or Disconnect are ignored.
@@ -253,6 +270,12 @@ final class TogglManager: ObservableObject {
             guard generation == authGeneration else { return }
             // The user ID tells accounts apart; older installs without one fall back to the workspace.
             let accountChanged = userId.map { $0 != account.userId } ?? (workspaceId != nil && workspaceId != wsId)
+            if accountChanged && (isRunning || TimerManager.shared.isTimerActive || syncedEntryId != nil) {
+                // Running timer work would be saved or stopped under the new account.
+                connectionStatus = previousStatus
+                tokenError = "Stop and save your running timer before switching Toggl accounts."
+                return
+            }
             if accountChanged && hasPendingRetry {
                 // Queued entries belong to the current account and must not be sent to another one.
                 connectionStatus = previousStatus
@@ -671,9 +694,18 @@ final class TogglManager: ObservableObject {
     /// Saves the spans a custom or preset timer actually ran as Toggl entries, one per span, using the
     /// description and project captured when it started. Does nothing when Toggl is disabled or not connected.
     func saveLocalTimerIntervals(_ intervals: [DateInterval]) {
-        guard Defaults[.togglEnabled], isReady, !intervals.isEmpty else { return }
+        guard Defaults[.togglEnabled], hasToken, let wsId = workspaceId, !intervals.isEmpty else { return }
         let description = manualTimerDescription
         let projectId = manualTimerProjectId
+        guard isReady else {
+            // Token validation or a connection error is in progress; queue the spans for the existing account.
+            for interval in intervals {
+                pendingRetryEntries.append(PendingEntry(workspaceId: wsId, description: description,
+                                                        projectId: projectId, start: interval.start, stop: interval.end))
+            }
+            saveError = "Toggl is not connected right now. The time was kept and can be retried."
+            return
+        }
         Task {
             for interval in intervals {
                 await saveEntry(description: description, projectId: projectId, start: interval.start, stop: interval.end)

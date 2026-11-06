@@ -231,7 +231,7 @@ struct NotchTogglView: View {
                             Menu("Discard") {
                                 ForEach(togglManager.pendingEntrySummaries) { entry in
                                     Button(entry.title, role: .destructive) {
-                                        togglManager.discardPendingEntry(id: entry.id)
+                                        togglManager.discardPending(entry)
                                     }
                                 }
                             }

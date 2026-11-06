@@ -79,7 +79,7 @@ struct TimerPopover: View {
                     error: error,
                     isRetrying: togglManager.isSavingEntry,
                     pendingEntries: togglManager.pendingEntrySummaries,
-                    onDiscard: { togglManager.discardPendingEntry(id: $0) }
+                    onDiscard: { togglManager.discardPending($0) }
                 ) {
                     Task { await togglManager.retryPendingEntry() }
                 }
@@ -454,7 +454,7 @@ private struct TogglErrorBanner: View {
     let error: String
     let isRetrying: Bool
     let pendingEntries: [TogglManager.PendingEntrySummary]
-    let onDiscard: (UUID) -> Void
+    let onDiscard: (TogglManager.PendingEntrySummary) -> Void
     let onRetry: () -> Void
 
     var body: some View {
@@ -478,7 +478,7 @@ private struct TogglErrorBanner: View {
                 if !pendingEntries.isEmpty {
                     Menu("Discard") {
                         ForEach(pendingEntries) { entry in
-                            Button(entry.title, role: .destructive) { onDiscard(entry.id) }
+                            Button(entry.title, role: .destructive) { onDiscard(entry) }
                         }
                     }
                     .menuStyle(.borderlessButton)
