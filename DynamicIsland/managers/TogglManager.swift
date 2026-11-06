@@ -350,16 +350,29 @@ final class TogglManager: ObservableObject {
         case superseded
     }
 
-    /// Stops the Toggl entry this timer was synced from, so it does not keep running remotely.
-    /// The entry is detached first, so a new stopwatch can never be routed to it. A failed stop is kept for retry.
-    func stopSyncedEntry() async {
+    /// Detaches the synced entry and returns the stop to send for it. Runs synchronously, so the
+    /// ID is captured before any later timer start can clear it. Returns nil when nothing is synced.
+    private func detachSyncedStop() -> RemoteStop? {
         guard let entryId = syncedEntryId, let wsId = syncedWorkspaceId ?? workspaceId else {
             clearSyncedStart()
-            return
+            return nil
         }
         let stop = RemoteStop(workspaceId: wsId, entryId: entryId, description: pendingDescription, projectId: pendingProjectId)
         clearSyncedStart()
+        return stop
+    }
+
+    /// Stops the Toggl entry this timer was synced from, so it does not keep running remotely.
+    /// A failed stop is kept for retry.
+    func stopSyncedEntry() async {
+        guard let stop = detachSyncedStop() else { return }
         await performRemoteStop(stop)
+    }
+
+    /// Stops the synced Toggl entry without waiting, capturing its ID immediately.
+    func stopSyncedEntryInBackground() {
+        guard let stop = detachSyncedStop() else { return }
+        Task { await performRemoteStop(stop) }
     }
 
     /// Sends the stop request for a remote entry. A failed stop is kept for retry.

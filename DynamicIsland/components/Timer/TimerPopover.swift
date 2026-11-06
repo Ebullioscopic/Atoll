@@ -168,7 +168,8 @@ struct TimerPopover: View {
 private func forgetSyncedEntryUnlessStopwatchRuns() {
     TogglManager.shared.markLocalActivity()
     guard !TogglManager.shared.isRunning else { return }
-    TogglManager.shared.clearSyncedStart()
+    // The synced timer is being replaced, so its remote entry must stop too, not just be forgotten.
+    TogglManager.shared.stopSyncedEntryInBackground()
 }
 
 // MARK: - Header
@@ -271,7 +272,7 @@ private struct ActiveTimerSection: View {
         togglManager.markLocalActivity()
         // Only a timer that adopted a Toggl entry stops it. While the stopwatch runs, its entry is the stopwatch's.
         guard !togglManager.isRunning else { return }
-        Task { await togglManager.stopSyncedEntry() }
+        togglManager.stopSyncedEntryInBackground()
     }
 
     private var progressTint: Color {
