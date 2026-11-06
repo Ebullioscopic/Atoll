@@ -410,7 +410,7 @@ class TimerManager: ObservableObject {
     
     /// Starts a 24-hour stopwatch pre-seeded with `elapsed` seconds already counted.
     /// Used when syncing a running Toggl entry — the original Toggl start is stored
-    /// separately in TogglManager.syncedOriginalStart for the eventual POST.
+    /// separately in TogglManager.syncedOriginalStart for the eventual stop or POST.
     func startTimerFromOffset(_ elapsed: TimeInterval, name: String) {
         if activeSource == .external { endExternalTimer(triggerSmoothClose: false) }
         timerInstance?.invalidate()

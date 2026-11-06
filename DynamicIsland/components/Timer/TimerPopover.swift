@@ -142,6 +142,7 @@ struct TimerPopover: View {
     private func startCustomTimer() {
         let duration = customDurationInSeconds
         guard duration > 0 else { return }
+        forgetSyncedEntryUnlessStopwatchRuns()
         withAnimation(.smooth) {
             timerManager.startTimer(duration: duration, name: String(localized: "Custom Timer"))
         }
@@ -149,11 +150,19 @@ struct TimerPopover: View {
     }
 
     private func startPreset(_ preset: TimerPreset) {
+        forgetSyncedEntryUnlessStopwatchRuns()
         withAnimation(.smooth) {
             timerManager.startTimer(duration: preset.duration, name: preset.name, preset: preset)
         }
         dismiss()
     }
+}
+
+/// A new local timer replaces any timer synced from Toggl, so its entry must not be stopped later.
+/// The Toggl stopwatch keeps its own synced entry while it runs.
+private func forgetSyncedEntryUnlessStopwatchRuns() {
+    guard !TogglManager.shared.isRunning else { return }
+    TogglManager.shared.clearSyncedStart()
 }
 
 // MARK: - Header
@@ -251,6 +260,8 @@ private struct ActiveTimerSection: View {
             return
         }
         withAnimation(.smooth) { timerManager.stopTimer() }
+        // A timer synced from a running Toggl entry must stop that entry too.
+        Task { await togglManager.stopSyncedEntry() }
     }
 
     private var progressTint: Color {
@@ -337,22 +348,15 @@ private struct TogglInputSection: View {
 
     private func syncFromToggl() {
         Task {
-            guard let entry = await togglManager.fetchCurrentTimer(),
-                  let parsedStart = entry.parsedStart else {
+            guard let elapsed = await togglManager.adoptRunningEntry() else {
                 withAnimation { noActiveTimerVisible = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                     withAnimation { noActiveTimerVisible = false }
                 }
                 return
             }
-
-            let elapsed = max(0, Date().timeIntervalSince(parsedStart))
-            togglManager.pendingDescription = entry.description ?? ""
-            togglManager.pendingProjectId   = entry.projectId
-            togglManager.setSyncedStart(parsedStart)
-
             withAnimation(.smooth) {
-                timerManager.startTimerFromOffset(elapsed, name: entry.description ?? "Timer")
+                timerManager.startTimerFromOffset(elapsed, name: togglManager.pendingDescription.isEmpty ? "Timer" : togglManager.pendingDescription)
             }
         }
     }

@@ -63,6 +63,7 @@ struct ContentView: View {
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @ObservedObject var localSendService = LocalSendService.shared
     @ObservedObject var togglManager = TogglManager.shared
+    @Default(.togglEnabled) private var togglEnabled
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     
@@ -882,6 +883,13 @@ struct ContentView: View {
 
     private func installPrimaryRootLifecycleHandlers<Content: View>(on view: Content) -> some View {
         view
+            .onChange(of: togglEnabled) { _, isEnabled in
+                // Disabling Toggl hides its tab and closed-notch activity, so end a running
+                // stopwatch (saving it) rather than leaving it running out of sight.
+                if !isEnabled && togglManager.isRunning {
+                    Task { await togglManager.stopStopwatch() }
+                }
+            }
             .onAppear {
                 isMusicControlWindowSuppressed = vm.notchState != .closed
                     || lockScreenManager.isLocked

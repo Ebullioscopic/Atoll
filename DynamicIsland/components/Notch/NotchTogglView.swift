@@ -62,7 +62,8 @@ struct NotchTogglView: View {
         case 1: seconds = parts[0]
         default: seconds = 0
         }
-        togglManager.elapsed = TimeInterval(max(0, seconds))
+        // Capped at 24h, the same ceiling the timer uses.
+        togglManager.elapsed = TimeInterval(min(86_400, max(0, seconds)))
         elapsedDraft = formattedElapsed
     }
 
@@ -302,18 +303,14 @@ struct NotchTogglView: View {
 
     private func syncFromToggl() {
         Task {
-            guard let entry = await togglManager.fetchCurrentTimer(),
-                  let parsedStart = entry.parsedStart else {
+            guard let elapsed = await togglManager.adoptRunningEntry() else {
                 withAnimation { noActiveTimerMessage = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                     withAnimation { self.noActiveTimerMessage = false }
                 }
                 return
             }
-            togglManager.elapsed = max(0, Date().timeIntervalSince(parsedStart))
-            togglManager.setSyncedStart(parsedStart)
-            togglManager.pendingDescription = entry.description ?? ""
-            togglManager.pendingProjectId   = entry.projectId
+            togglManager.elapsed = elapsed
             togglManager.startStopwatch()
         }
     }
