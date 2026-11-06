@@ -61,7 +61,9 @@ final class CoreBrightnessDisplayClient {
 
         var resolvedClass: NSObject.Type?
         for name in Self.candidateClassNames {
-            if let cls = NSClassFromString(name) as? NSObject.Type {
+            if let cls = NSClassFromString(name) as? NSObject.Type,
+               cls.instancesRespond(to: getSelector),
+               cls.instancesRespond(to: setSelector) {
                 resolvedClass = cls
                 NSLog("✅ CoreBrightnessDisplayClient: Resolved class '%@' (macOS %@)", name, osVersion)
                 break
