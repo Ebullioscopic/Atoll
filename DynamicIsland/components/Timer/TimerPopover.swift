@@ -338,7 +338,7 @@ private struct TogglInputSection: View {
                     }
                 }
                 .buttonStyle(.bordered)
-                .disabled(togglManager.isFetchingCurrentTimer)
+                .disabled(togglManager.isRunning || togglManager.isFetchingCurrentTimer)
 
                 if noActiveTimerVisible {
                     Text("No active timer on Toggl")
@@ -363,6 +363,8 @@ private struct TogglInputSection: View {
 
     /// Adopts the running Toggl entry into the local timer, or shows a short "no active timer" message.
     private func syncFromToggl() {
+        // The stopwatch owns the Toggl entry while it runs; adopting another would conflict.
+        guard !togglManager.isRunning else { return }
         Task {
             switch await togglManager.adoptRunningEntry() {
             case .superseded:

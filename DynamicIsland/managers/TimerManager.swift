@@ -38,6 +38,8 @@ class TimerManager: ObservableObject {
     @Published var isOvertime: Bool = false // Timer has gone past 0 and is counting negative
     /// True while the timer tracks a running Toggl entry. Pausing would leave that entry running, so it is disabled.
     @Published private(set) var isAdoptedFromToggl: Bool = false
+    /// True for the demo timer used by previews and shortcuts. Demo timers are never saved to Toggl.
+    private(set) var isDemoTimer: Bool = false
     @Published var lastUpdated: Date = .distantPast
     @Published var activePresetId: UUID?
     @Published private(set) var activeSource: TimerSource = .none
@@ -176,6 +178,7 @@ class TimerManager: ObservableObject {
         timerInstance?.invalidate()
         soundPlayer?.stop()
         isAdoptedFromToggl = false
+        isDemoTimer = false
         beginTimerSession()
         
         // Start new timer
@@ -225,6 +228,7 @@ class TimerManager: ObservableObject {
     
     func startDemoTimer(duration: TimeInterval) {
         startTimer(duration: duration, name: "Demo Timer")
+        isDemoTimer = true
     }
     
     func stopTimer() {
@@ -240,6 +244,13 @@ class TimerManager: ObservableObject {
                 }
             }
             return
+        }
+
+        // A custom or preset timer stopped by the user is saved to Toggl. Adopted entries are stopped
+        // remotely instead, and demo timers are never saved. Overtime counts as tracked time.
+        if activeSource == .manual && !isAdoptedFromToggl && !isDemoTimer {
+            let tracked = isOvertime ? totalDuration - remainingTime : elapsedTime
+            TogglManager.shared.saveLocalTimerInterval(seconds: tracked)
         }
 
         timerInstance?.invalidate()
@@ -483,6 +494,7 @@ class TimerManager: ObservableObject {
         isOvertime = false
         activePresetId = nil
         isAdoptedFromToggl = false
+        isDemoTimer = false
         activeSource = .none
         startedAt = nil
     }

@@ -328,11 +328,15 @@ final class TogglManager: ObservableObject {
         guard !isRetryInFlight else { return }
         isRetryInFlight = true
         defer { isRetryInFlight = false }
+        // A Disconnect or new Save during the retry invalidates the rest of it.
+        let generation = authGeneration
         let previousError = saveError
         saveError = nil
         for stop in pendingRemoteStops {
+            guard generation == authGeneration else { return }
             await performRemoteStop(stop)
         }
+        guard generation == authGeneration else { return }
         // Keep the stop error until the stop succeeds, even when no entry retry fails.
         let stopError = pendingRemoteStops.isEmpty ? nil : saveError
         guard let wsId = workspaceId else {
@@ -344,8 +348,10 @@ final class TogglManager: ObservableObject {
 
         var lastError: Error?
         for entry in pendingRetryEntries {
+            guard generation == authGeneration else { return }
             do {
                 try await postTimeEntry(entry: entry, workspaceId: wsId)
+                guard generation == authGeneration else { return }
                 pendingRetryEntries.removeAll { $0.id == entry.id }
                 prependRecentEntry(TogglRecentEntry(
                     description: entry.description,
@@ -451,8 +457,11 @@ final class TogglManager: ObservableObject {
             removePendingStop(stop)
             return
         }
+        let generation = authGeneration
         do {
             try await apiPATCH("/api/v9/workspaces/\(stop.workspaceId)/time_entries/\(stop.entryId)/stop")
+            // Disconnect cleared the queue meanwhile; do not restore recents or stops from the old account.
+            guard generation == authGeneration else { return }
             removePendingStop(stop)
             prependRecentEntry(TogglRecentEntry(
                 description: stop.description,
@@ -461,8 +470,10 @@ final class TogglManager: ObservableObject {
             ))
         } catch let TogglError.httpError(code, _) where (400..<500).contains(code) && ![401, 403, 429].contains(code) {
             // Toggl rejected the stop because the entry is already stopped. Nothing left to retry.
+            guard generation == authGeneration else { return }
             removePendingStop(stop)
         } catch {
+            guard generation == authGeneration else { return }
             if !pendingRemoteStops.contains(where: { $0.entryId == stop.entryId }) {
                 pendingRemoteStops.append(stop)
             }
@@ -533,6 +544,17 @@ final class TogglManager: ObservableObject {
 
     /// Records that a local timer or stopwatch started or stopped, invalidating sync requests still in flight.
     func markLocalActivity() { localActionGeneration += 1 }
+
+    /// Saves a custom or preset timer the user stopped as a Toggl entry, using the pending description and project.
+    /// Does nothing when Toggl is disabled or not connected, or for intervals under a second.
+    func saveLocalTimerInterval(seconds: TimeInterval) {
+        guard Defaults[.togglEnabled], isReady, seconds >= 1 else { return }
+        let stop = Date()
+        let start = stop.addingTimeInterval(-seconds)
+        let description = pendingDescription
+        let projectId = pendingProjectId
+        Task { await saveEntry(description: description, projectId: projectId, start: start, stop: stop) }
+    }
 
     /// Call whenever the local timer is started, replaced or stopped, from any control. Invalidates in-flight
     /// syncs and stops the Toggl entry the replaced timer was synced from, unless the stopwatch owns it.

@@ -189,9 +189,9 @@ struct NotchTogglView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                // Stop stays available for existing work; Start is off while Toggl is disabled.
-                .disabled(!togglManager.isRunning && !togglEnabled)
-                .opacity(!togglManager.isRunning && !togglEnabled ? 0.4 : 1)
+                // Stop stays available for existing work; Start needs Toggl enabled and connected.
+                .disabled(!togglManager.isRunning && !(togglEnabled && togglManager.isReady))
+                .opacity(!togglManager.isRunning && !(togglEnabled && togglManager.isReady) ? 0.4 : 1)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(Color.white.opacity(0.12), lineWidth: 1)

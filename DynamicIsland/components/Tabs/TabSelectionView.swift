@@ -80,7 +80,7 @@ struct TabSelectionView: View {
         }
 
         // Stays visible while failed saves are pending, so Retry is reachable after Toggl is disabled.
-        if (togglEnabled || togglManager.hasPendingRetry) && togglManager.isReady {
+        if (togglEnabled && togglManager.isReady) || togglManager.hasPendingRetry {
             tabsArray.append(TabModel(label: "Toggl", icon: "clock.arrow.trianglehead.counterclockwise.rotate.90", view: .toggl))
         }
 
