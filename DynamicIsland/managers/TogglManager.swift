@@ -553,15 +553,17 @@ final class TogglManager: ObservableObject {
     /// Records that a local timer or stopwatch started or stopped, invalidating sync requests still in flight.
     func markLocalActivity() { localActionGeneration += 1 }
 
-    /// Saves a custom or preset timer the user stopped as a Toggl entry, using the pending description and project.
-    /// Does nothing when Toggl is disabled or not connected, or for intervals under a second.
-    func saveLocalTimerInterval(seconds: TimeInterval) {
-        guard Defaults[.togglEnabled], isReady, seconds >= 1 else { return }
-        let stop = Date()
-        let start = stop.addingTimeInterval(-seconds)
+    /// Saves the spans a custom or preset timer actually ran as Toggl entries, one per span, using the
+    /// pending description and project. Does nothing when Toggl is disabled or not connected.
+    func saveLocalTimerIntervals(_ intervals: [DateInterval]) {
+        guard Defaults[.togglEnabled], isReady, !intervals.isEmpty else { return }
         let description = pendingDescription
         let projectId = pendingProjectId
-        Task { await saveEntry(description: description, projectId: projectId, start: start, stop: stop) }
+        Task {
+            for interval in intervals {
+                await saveEntry(description: description, projectId: projectId, start: interval.start, stop: interval.end)
+            }
+        }
     }
 
     /// Call whenever the local timer is started, replaced or stopped, from any control. Invalidates in-flight

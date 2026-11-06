@@ -40,6 +40,21 @@ class TimerManager: ObservableObject {
     @Published private(set) var isAdoptedFromToggl: Bool = false
     /// True for the demo timer used by previews and shortcuts. Demo timers are never saved to Toggl.
     private(set) var isDemoTimer: Bool = false
+    /// Changes whenever a different timer starts, so delayed work can tell it still targets the original one.
+    private(set) var sessionID = UUID()
+    /// Spans in which the manual timer actually ran, pauses excluded, for saving to Toggl.
+    private var runIntervals: [DateInterval] = []
+    private var runStart: Date?
+
+    /// Ends the current run span, keeping it if it lasted at least a second.
+    private func closeRunInterval() {
+        guard let start = runStart else { return }
+        let end = Date()
+        if end.timeIntervalSince(start) >= 1 {
+            runIntervals.append(DateInterval(start: start, end: end))
+        }
+        runStart = nil
+    }
     @Published var lastUpdated: Date = .distantPast
     @Published var activePresetId: UUID?
     @Published private(set) var activeSource: TimerSource = .none
@@ -197,6 +212,9 @@ class TimerManager: ObservableObject {
 
         activePresetId = preset?.id
         startedAt = Date()
+        sessionID = UUID()
+        runIntervals = []
+        runStart = Date()
 
         // Start countdown timer
         timerInstance = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -227,6 +245,8 @@ class TimerManager: ObservableObject {
     }
     
     func startDemoTimer(duration: TimeInterval) {
+        // A demo replaces any timer synced from Toggl, so that entry must stop too.
+        Task { @MainActor in TogglManager.shared.localTimerChanged() }
         startTimer(duration: duration, name: "Demo Timer")
         isDemoTimer = true
     }
@@ -246,12 +266,13 @@ class TimerManager: ObservableObject {
             return
         }
 
-        // A custom or preset timer stopped by the user is saved to Toggl. Adopted entries are stopped
-        // remotely instead, and demo timers are never saved. Overtime counts as tracked time.
+        // A custom or preset timer stopped by the user is saved to Toggl, one entry per span it actually
+        // ran (pauses excluded). Adopted entries are stopped remotely instead, and demo timers are never saved.
         if activeSource == .manual && !isAdoptedFromToggl && !isDemoTimer {
-            let tracked = isOvertime ? totalDuration - remainingTime : elapsedTime
+            closeRunInterval()
+            let intervals = runIntervals
             Task { @MainActor in
-                TogglManager.shared.saveLocalTimerInterval(seconds: tracked)
+                TogglManager.shared.saveLocalTimerIntervals(intervals)
             }
         }
 
@@ -296,6 +317,7 @@ class TimerManager: ObservableObject {
         guard !isAdoptedFromToggl else { return }
         guard isTimerActive && !isPaused else { return }
         isPaused = true
+        closeRunInterval()
         timerInstance?.invalidate()
         timerInstance = nil
     }
@@ -313,6 +335,7 @@ class TimerManager: ObservableObject {
         guard !isAdoptedFromToggl else { return }
         guard isTimerActive && isPaused else { return }
         isPaused = false
+        runStart = Date()
         lastUpdated = Date()
         
         // Resume countdown timer with same logic as start timer
@@ -350,6 +373,7 @@ class TimerManager: ObservableObject {
         timerInstance = nil
         soundPlayer?.stop()
         beginTimerSession()
+        sessionID = UUID()
 
         activeSource = .external
 
@@ -437,6 +461,9 @@ class TimerManager: ObservableObject {
         soundPlayer?.stop()
         isAdoptedFromToggl = true
         isDemoTimer = false
+        sessionID = UUID()
+        runIntervals = []
+        runStart = nil
 
         let duration: TimeInterval = 86400
         withAnimation(.smooth) { isTimerActive = true }
@@ -498,6 +525,8 @@ class TimerManager: ObservableObject {
         activePresetId = nil
         isAdoptedFromToggl = false
         isDemoTimer = false
+        runIntervals = []
+        runStart = nil
         activeSource = .none
         startedAt = nil
     }
