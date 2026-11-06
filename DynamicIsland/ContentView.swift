@@ -2466,11 +2466,10 @@ struct ContentView: View {
         // The Toggl wings sit on both sides of the notch while the stopwatch runs.
         var togglWidth: CGFloat = 0
         // Only when the Toggl activity is what renders: not hidden, not replaced by the timer or music.
-        let hasActiveMusicSnapshot = musicManager.isPlaying || !musicManager.isPlayerIdle
         let togglRendered = togglEnabled && togglManager.isRunning
             && vm.notchState == .closed && !vm.hideOnClosed && !isCurrentScreenExpansionVisible
             && !(coordinator.timerLiveActivityEnabled && timerManager.isTimerActive)
-            && !closedMusicPairingEligible(hasActiveMusicSnapshot: hasActiveMusicSnapshot)
+            && !closedMusicPairingEligible(hasActiveMusicSnapshot: hasActiveMusicSnapshotForClosedPairing)
         if togglRendered {
             let wingPadding: CGFloat = 22
             let leftWing = max(0, vm.effectiveClosedNotchHeight - 12) + wingPadding / 2

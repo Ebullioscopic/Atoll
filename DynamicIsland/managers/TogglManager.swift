@@ -334,6 +334,8 @@ final class TogglManager: ObservableObject {
         saveError = nil
         for stop in pendingRemoteStops {
             guard generation == authGeneration else { return }
+            // Another request may have stopped this entry while an earlier one was waiting.
+            guard pendingRemoteStops.contains(where: { $0.entryId == stop.entryId }) else { continue }
             await performRemoteStop(stop)
         }
         guard generation == authGeneration else { return }
@@ -400,17 +402,23 @@ final class TogglManager: ObservableObject {
     /// Returns `.superseded` if a local timer or stopwatch started or stopped while the request was pending.
     func adoptRunningEntry() async -> AdoptResult {
         let generation = localActionGeneration
+        // A token change while the request waits means the response belongs to another account.
+        let authAtStart = authGeneration
         let fetched: TogglRunningEntry?
         do {
             fetched = try await fetchCurrentTimer()
         } catch {
-            guard generation == localActionGeneration else { return .superseded }
+            guard generation == localActionGeneration, authAtStart == authGeneration else { return .superseded }
             return .failed(message: error.localizedDescription)
         }
-        guard generation == localActionGeneration, Defaults[.togglEnabled] else { return .superseded }
+        guard generation == localActionGeneration, authAtStart == authGeneration, Defaults[.togglEnabled] else {
+            return .superseded
+        }
         guard let entry = fetched, let parsedStart = entry.parsedStart else {
             return .nothingRunning
         }
+        // The running timer already tracks this entry; a second stopwatch would stop it behind that timer's back.
+        guard entry.id != syncedEntryId else { return .superseded }
         pendingDescription = entry.description ?? ""
         pendingProjectId = entry.projectId
         setSyncedStart(parsedStart, entryId: entry.id, workspaceId: entry.workspaceId,

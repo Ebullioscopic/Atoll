@@ -436,6 +436,7 @@ class TimerManager: ObservableObject {
         // A previous timer may already be in overtime and looping its alarm.
         soundPlayer?.stop()
         isAdoptedFromToggl = true
+        isDemoTimer = false
 
         let duration: TimeInterval = 86400
         withAnimation(.smooth) { isTimerActive = true }
