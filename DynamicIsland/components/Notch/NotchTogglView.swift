@@ -301,6 +301,7 @@ struct NotchTogglView: View {
         max(130, resolvedNotchHeight - max(24, vm.effectiveClosedNotchHeight) - 36)
     }
 
+    /// Adopts the running Toggl entry into the stopwatch, or shows a short "no active timer" message.
     private func syncFromToggl() {
         Task {
             guard let elapsed = await togglManager.adoptRunningEntry() else {

@@ -139,6 +139,7 @@ struct TimerPopover: View {
         customTimerDuration = customDurationInSeconds
     }
 
+    /// Starts a timer with the custom duration and dismisses the popover.
     private func startCustomTimer() {
         let duration = customDurationInSeconds
         guard duration > 0 else { return }
@@ -149,6 +150,7 @@ struct TimerPopover: View {
         dismiss()
     }
 
+    /// Starts a timer from a preset and dismisses the popover.
     private func startPreset(_ preset: TimerPreset) {
         forgetSyncedEntryUnlessStopwatchRuns()
         withAnimation(.smooth) {
@@ -255,6 +257,7 @@ private struct ActiveTimerSection: View {
         }
     }
 
+    /// Stops the local timer and, if it was synced from Toggl, stops the remote entry too.
     private func stopTimer() {
         guard timerManager.allowsManualInteraction else {
             timerManager.endExternalTimer(triggerSmoothClose: false)
@@ -347,6 +350,7 @@ private struct TogglInputSection: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
+    /// Adopts the running Toggl entry into the local timer, or shows a short "no active timer" message.
     private func syncFromToggl() {
         Task {
             guard let elapsed = await togglManager.adoptRunningEntry() else {

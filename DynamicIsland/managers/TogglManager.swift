@@ -139,6 +139,7 @@ final class TogglManager: ObservableObject {
     var hasToken: Bool { !apiToken.isEmpty }
     var isReady: Bool { connectionStatus == .connected && workspaceId != nil }
 
+    /// Validates and stores the API token in the Keychain, then resolves the default workspace and loads projects and recent entries.
     func saveToken(_ token: String) async {
         let trimmed = token.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
@@ -160,6 +161,7 @@ final class TogglManager: ObservableObject {
         }
     }
 
+    /// Clears the token, workspace, cached projects and any stopwatch state, returning the manager to its disconnected state.
     func disconnect() {
         // Stop any in-flight stopwatch first so no elapsed interval survives to a
         // later stopStopwatch() save once auth state is gone.
@@ -178,6 +180,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Projects
 
+    /// Fetches the workspace projects, sorted by name, and caches them. Keeps the cached list on failure.
     func fetchProjects() async {
         guard hasToken else { return }
         isFetchingProjects = true
@@ -229,6 +232,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Save entry
 
+    /// Posts a completed time entry to Toggl. On failure the entry is kept for retry.
     func saveEntry(description: String, projectId: Int?, start: Date, stop: Date) async {
         guard hasToken, let wsId = workspaceId else { return }
 
@@ -252,6 +256,7 @@ final class TogglManager: ObservableObject {
         }
     }
 
+    /// Retries the last entry whose save failed.
     func retryPendingEntry() async {
         guard let entry = pendingRetryEntry, let wsId = workspaceId else { return }
         isSavingEntry = true
@@ -274,6 +279,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Sync running timer
 
+    /// Returns the currently running Toggl entry, or nil when none is running or the request fails.
     func fetchCurrentTimer() async -> TogglRunningEntry? {
         guard hasToken else { return nil }
         isFetchingCurrentTimer = true
@@ -289,6 +295,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Stopwatch
 
+    /// Starts the stopwatch from the current elapsed value, ticking once per second.
     func startStopwatch() {
         stopwatchTimer?.invalidate()
         // stopwatchStartedAt is the wall-clock moment when elapsed was 0.
@@ -304,6 +311,7 @@ final class TogglManager: ObservableObject {
         }
     }
 
+    /// Stops the stopwatch. A synced entry is stopped remotely; otherwise the elapsed interval is saved as a new entry.
     func stopStopwatch() async {
         stopwatchTimer?.invalidate()
         stopwatchTimer = nil
@@ -325,6 +333,7 @@ final class TogglManager: ObservableObject {
         await saveEntry(description: desc, projectId: pid, start: start, stop: stop)
     }
 
+    /// Stops the stopwatch and clears its elapsed time, synced entry and save error without saving anything.
     func resetStopwatch() {
         stopwatchTimer?.invalidate()
         stopwatchTimer = nil
@@ -378,6 +387,7 @@ final class TogglManager: ObservableObject {
         syncedOriginalStart = nil
         syncedEntryId = nil
     }
+    /// Drops the save error and the entry waiting to be retried.
     func clearSaveError() { saveError = nil; pendingRetryEntry = nil }
 
     // MARK: - Sleep detection
@@ -399,6 +409,7 @@ final class TogglManager: ObservableObject {
 
     // MARK: - Date helpers
 
+    /// Parses an ISO 8601 timestamp with or without fractional seconds.
     nonisolated static func parseDate(_ s: String) -> Date? {
         let full = ISO8601DateFormatter()
         full.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
