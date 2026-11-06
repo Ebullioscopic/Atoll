@@ -269,6 +269,8 @@ struct ContentView: View {
     @Default(.musicControlWindowEnabled) var musicControlWindowEnabled
     @Default(.showNotHumanFace) var showNotHumanFace
     @Default(.useModernCloseAnimation) var useModernCloseAnimation
+    @AppStorage("notchAnimationSpeed") private var notchAnimationSpeed = "default"
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
 
     private static let musicControlLogFormatter: DateFormatter = {
@@ -689,20 +691,21 @@ struct ContentView: View {
     }
 
     private var configuredMainLayout: some View {
-        mainLayoutBase
+        let speed: Double = notchAnimationSpeed == "fast" ? 1.5 : (notchAnimationSpeed == "faster" ? 2 : 1)
+        return mainLayoutBase
             .conditionalModifier(!useModernCloseAnimation) { view in
-                let hoverAnimation = Animation.bouncy.speed(1.2)
-                let notchStateAnimation = Animation.spring(response: 0.42, dampingFraction: 1.0, blendDuration: 0)
+                let hoverAnimation = reduceMotion ? Animation.easeOut(duration: 0.15) : Animation.bouncy.speed(1.2 * speed)
+                let notchStateAnimation = reduceMotion ? Animation.easeOut(duration: 0.15) : Animation.spring(response: 0.42, dampingFraction: 1.0, blendDuration: 0).speed(speed)
                 return view
                     .animation(hoverAnimation, value: isHovering)
                     .animation(notchStateAnimation, value: vm.notchState)
                     .animation(.smooth, value: gestureProgress)
-                    .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
+                    .transition(.blurReplace.animation(reduceMotion ? .easeOut(duration: 0.15) : .interactiveSpring(dampingFraction: 1.2).speed(speed)))
             }
             .conditionalModifier(useModernCloseAnimation) { view in
-                let hoverAnimation = Animation.bouncy.speed(1.2)
-                let openAnimation = Animation.spring(response: 0.42, dampingFraction: 1.0, blendDuration: 0)
-                let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
+                let hoverAnimation = reduceMotion ? Animation.easeOut(duration: 0.15) : Animation.bouncy.speed(1.2 * speed)
+                let openAnimation = reduceMotion ? Animation.easeOut(duration: 0.15) : Animation.spring(response: 0.42, dampingFraction: 1.0, blendDuration: 0).speed(speed)
+                let closeAnimation = reduceMotion ? Animation.easeOut(duration: 0.15) : Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0).speed(speed)
                 let notchAnimation = vm.notchState == .open ? openAnimation : closeAnimation
                 return view
                     .animation(hoverAnimation, value: isHovering)
