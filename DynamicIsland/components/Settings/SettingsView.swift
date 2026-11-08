@@ -4155,7 +4155,7 @@ struct About: View {
                             Text("(\(Bundle.main.buildVersionNumber ?? ""))")
                                 .foregroundStyle(.secondary)
                         }
-                        Text(Bundle.main.releaseVersionNumber ?? "unkown")
+                        Text(Bundle.main.releaseVersionNumber ?? String(localized: "Unknown"))
                             .foregroundStyle(.secondary)
                     }
                     .onTapGesture {
@@ -4730,7 +4730,7 @@ struct LiveActivitiesSettings: View {
                                 Circle()
                                     .fill(Color.purple)
                                     .frame(width: 8, height: 8)
-                                Text(doNotDisturbManager.currentFocusModeName.isEmpty ? "Focus Enabled" : doNotDisturbManager.currentFocusModeName)
+                                Text(doNotDisturbManager.currentFocusModeName.isEmpty ? String(localized: "Focus Enabled") : doNotDisturbManager.currentFocusModeName)
                                     .foregroundColor(.purple)
                             }
                         } else {
