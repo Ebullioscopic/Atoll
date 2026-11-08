@@ -649,6 +649,17 @@ struct ContentView: View {
                 }
                 #endif
             }
+            .onChange(of: musicManager.isSkipTransitionActive) { _, active in
+                guard !active else { return }
+                runAfter(0.16) {
+                    guard vm.notchState == .open,
+                          !isHovering,
+                          !shouldPreventAutoClose() else { return }
+                    withAnimation(.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)) {
+                        vm.close()
+                    }
+                }
+            }
             .onChange(of: vm.isBatteryPopoverActive) { _, newPopoverState in
                 runAfter(0.1) {
                     if !newPopoverState && !isHovering && vm.notchState == .open && !shouldPreventAutoClose() {
@@ -1222,7 +1233,7 @@ struct ContentView: View {
                     )
                     .clipped()
                     .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-                    .albumArtFlip(angle: musicManager.flipAngle)
+                    .albumArtFlip(angle: musicManager.flipAngle, blurRadius: musicManager.albumArtBlurRadius)
                 albumArtBadge(for: secondary, badgeSize: badgeDisplaySize)
                     .offset(x: badgeOffset.width, y: badgeOffset.height)
                     .id(secondary?.id ?? "music-badge")
@@ -1880,7 +1891,7 @@ struct ContentView: View {
 
     // MARK: - Private Methods
     private func openNotch() {
-        withAnimation(.bouncy.speed(1.2)) {
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)) {
             vm.open()
         }
     }
@@ -2078,19 +2089,26 @@ struct ContentView: View {
         }
 
         if hovering {
-            withAnimation(.bouncy.speed(1.2)) {
+            let shouldFocusTimerTab = enableTimerFeature && timerDisplayMode == .tab && timerManager.isTimerActive && !enableMinimalisticUI
+            let opensOnHover = vm.notchState == .closed
+                && !isSneakPeekVisibleOnCurrentScreen
+                && (Defaults[.openNotchOnHover] || shouldFocusTimerTab)
+
+            if opensOnHover {
+                // The notch opens after the hover delay. Avoid starting a
+                // second size animation just before the opening spring.
                 isHovering = true
+            } else {
+                withAnimation(.smooth(duration: 0.16)) {
+                    isHovering = true
+                }
             }
 
             if vm.notchState == .closed && Defaults[.enableHaptics] {
                 triggerHapticIfAllowed()
             }
 
-            let shouldFocusTimerTab = enableTimerFeature && timerDisplayMode == .tab && timerManager.isTimerActive && !enableMinimalisticUI
-
-            guard vm.notchState == .closed,
-                !isSneakPeekVisibleOnCurrentScreen,
-                (Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
+            guard opensOnHover else { return }
 
             hoverTask = Task {
                 try? await Task.sleep(for: .seconds(Defaults[.minimumHoverDuration]))
@@ -2116,7 +2134,7 @@ struct ContentView: View {
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    withAnimation(.bouncy.speed(1.2)) {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)) {
                         self.isHovering = false
                     }
 
@@ -2159,7 +2177,7 @@ struct ContentView: View {
     }
 
     private func shouldPreventAutoClose() -> Bool {
-        coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
+        coordinator.firstLaunch || musicManager.isSkipTransitionActive || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
     }
     
     // Helper to prevent rapid haptic feedback

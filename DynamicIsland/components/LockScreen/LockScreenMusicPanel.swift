@@ -409,7 +409,10 @@ struct LockScreenMusicPanel: View {
                 }
             }
         }
-        .albumArtFlip(angle: isArtworkFullscreen && !keepAlbumArtVisibleDuringFullscreenArtwork ? 0 : musicManager.flipAngle)
+        .albumArtFlip(
+            angle: isArtworkFullscreen && !keepAlbumArtVisibleDuringFullscreenArtwork ? 0 : musicManager.flipAngle,
+            blurRadius: isArtworkFullscreen && !keepAlbumArtVisibleDuringFullscreenArtwork ? 0 : musicManager.albumArtBlurRadius
+        )
         .parallax3D(
             enableOverride: lockScreenParallaxEnabled && (!isArtworkFullscreen || keepAlbumArtVisibleDuringFullscreenArtwork),
             suspended: isParallaxSuspended

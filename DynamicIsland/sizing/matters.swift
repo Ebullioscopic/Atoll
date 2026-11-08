@@ -32,7 +32,7 @@ var openNotchSize: CGSize {
     let minWidth = currentRecommendedMinimumNotchWidth()
     let maxWidth = maxAllowedNotchWidth()
     let width = min(max(storedWidth, minWidth), maxWidth)
-    return .init(width: width, height: 200)
+    return .init(width: width, height: 224)
 }
 
 /// Maximum notch width based on the current screen's point width.
