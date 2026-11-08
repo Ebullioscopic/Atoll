@@ -6482,7 +6482,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "손쉬운 사용 권한이 있으면 Dynamic Island가 기본 음량, 밝기, 키보드 HUD를 대체할 수 있습니다."
+            "value" : "손쉬운 사용 권한이 있으면 다이나믹 아일랜드가 기본 음량, 밝기, 키보드 HUD를 대체할 수 있습니다."
           }
         },
         "nl" : {
@@ -20107,7 +20107,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "'세그먼트' 모드에서는 색상별 채우기를 사용할 수 없습니다. 고급 옵션을 조정하려면 '제어기 › Dynamic Island'에서 '계층형' 또는 '그라데이션'으로 전환하세요."
+            "value" : "'세그먼트' 모드에서는 색상별 채우기를 사용할 수 없습니다. 고급 옵션을 조정하려면 '제어기 › 다이나믹 아일랜드'에서 '계층형' 또는 '그라데이션'으로 전환하세요."
           }
         },
         "nl" : {
@@ -21671,7 +21671,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island가 자체 실시간 현황 및 효과음과 함께 잠금/잠금 해제 이벤트를 연동할지 여부를 제어합니다."
+            "value" : "다이나믹 아일랜드가 자체 실시간 현황 및 효과음과 함께 잠금/잠금 해제 이벤트를 연동할지 여부를 제어합니다."
           }
         },
         "nl" : {
@@ -27468,7 +27468,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "날씨 캡슐의 위 또는 아래에 예정된 다음 일정을 표시합니다. 여기서 선택한 캘린더는 Dynamic Island의 캘린더 필터와 별개로 적용됩니다."
+            "value" : "날씨 캡슐의 위 또는 아래에 예정된 다음 일정을 표시합니다. 여기서 선택한 캘린더는 다이나믹 아일랜드의 캘린더 필터와 별개로 적용됩니다."
           }
         },
         "nl" : {
@@ -28606,7 +28606,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island"
+            "value" : "다이나믹 아일랜드"
           }
         },
         "nl" : {
@@ -28654,7 +28654,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island 진행 표시줄"
+            "value" : "다이나믹 아일랜드 진행 표시줄"
           }
         },
         "nl" : {
@@ -28706,7 +28706,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island 표시"
+            "value" : "다이나믹 아일랜드 표시"
           }
         },
         "nl" : {
@@ -28762,7 +28762,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DynamicIsland의 메모리 사용량이 높습니다"
+            "value" : "Atoll의 메모리 사용량이 높습니다"
           }
         }
       }
@@ -29916,7 +29916,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island 미디어 제어기를 활성화하여 잠금 화면 패널을 관리합니다."
+            "value" : "다이나믹 아일랜드 미디어 제어기를 활성화하여 잠금 화면 패널을 관리합니다."
           }
         },
         "nl" : {
@@ -29963,7 +29963,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사이드 패널에 가사를 표시하려면 Dynamic Island 미디어 제어기를 활성화하세요."
+            "value" : "사이드 패널에 가사를 표시하려면 다이나믹 아일랜드 미디어 제어기를 활성화하세요."
           }
         }
       }
@@ -29973,7 +29973,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "가사를 표시하려면 Dynamic Island 미디어 제어기를 활성화하세요."
+            "value" : "가사를 표시하려면 다이나믹 아일랜드 미디어 제어기를 활성화하세요."
           }
         }
       }
@@ -29983,7 +29983,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "가사를 사용하려면 Dynamic Island 미디어 제어기를 활성화하세요."
+            "value" : "가사를 사용하려면 다이나믹 아일랜드 미디어 제어기를 활성화하세요."
           }
         }
       }
@@ -29994,7 +29994,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사이드 가사를 사용하려면 Dynamic Island 미디어 제어기를 활성화하세요."
+            "value" : "사이드 가사를 사용하려면 다이나믹 아일랜드 미디어 제어기를 활성화하세요."
           }
         }
       }
@@ -38520,7 +38520,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "스크린샷 및 화면 기록 시 Dynamic Island 숨기기"
+            "value" : "스크린샷 및 화면 기록 시 다이나믹 아일랜드 숨기기"
           }
         },
         "nl" : {
@@ -38572,7 +38572,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island 숨기기 옵션"
+            "value" : "다이나믹 아일랜드 숨기기 옵션"
           }
         },
         "nl" : {
@@ -48834,7 +48834,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "파일을 다운로드하는 동안 Dynamic Island에 실시간 현황을 표시합니다. Safari, Firefox, Chrome 및 Chrome 기반 브라우저인 Edge, Brave, Arc, Vivaldi, Opera를 지원합니다. 다운로드 폴더에 저장하는 파일만 감지하므로 다른 위치에 저장하는 파일은 표시되지 않습니다."
+            "value" : "파일을 다운로드하는 동안 다이나믹 아일랜드에 실시간 현황을 표시합니다. Safari, Firefox, Chrome 및 Chrome 기반 브라우저인 Edge, Brave, Arc, Vivaldi, Opera를 지원합니다. 다운로드 폴더에 저장하는 파일만 감지하므로 다른 위치에 저장하는 파일은 표시되지 않습니다."
           }
         },
         "nl" : {
@@ -50995,7 +50995,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DynamicIsland의 충돌 보고서를 찾을 수 없습니다"
+            "value" : "Atoll의 충돌 보고서를 찾을 수 없습니다"
           }
         }
       }
@@ -56422,7 +56422,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iPhone의 Dynamic Island와 유사한, 모서리가 둥근 알약 모양의 아일랜드"
+            "value" : "iPhone의 다이나믹 아일랜드와 유사한, 모서리가 둥근 알약 모양의 아일랜드"
           }
         },
         "nl" : {
@@ -60993,7 +60993,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island가 하드웨어 음량 키를 제어할 수 있도록 접근성 권한이 필요합니다."
+            "value" : "다이나믹 아일랜드가 하드웨어 음량 키를 제어할 수 있도록 접근성 권한이 필요합니다."
           }
         },
         "nl" : {
@@ -63178,7 +63178,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "현재 대상 디스플레이에서 실제 노치 애니메이션을 실행합니다. 외부 화면이 Dynamic Island 모드를 사용 중이면 배터리 HUD가 해당 화면에 먼저 표시됩니다."
+            "value" : "현재 대상 디스플레이에서 실제 노치 애니메이션을 실행합니다. 외부 화면이 다이나믹 아일랜드 모드를 사용 중이면 배터리 HUD가 해당 화면에 먼저 표시됩니다."
           }
         },
         "nl" : {
@@ -68465,7 +68465,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island에 라이브 캔버스 표시"
+            "value" : "다이나믹 아일랜드에 라이브 캔버스 표시"
           }
         },
         "nl" : {
@@ -68854,7 +68854,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island에 미디어 제어기 표시"
+            "value" : "다이나믹 아일랜드에 미디어 제어기 표시"
           }
         },
         "nl" : {
@@ -71073,7 +71073,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "전체 채우기 영역에서 초록색(0~60%), 노란색(60~85%), 빨간색(85~100%)이 부드럽게 혼합되어 표시됩니다. '제어기 › Dynamic Island'에서 그라데이션 동작을 조정할 수 있습니다."
+            "value" : "전체 채우기 영역에서 초록색(0~60%), 노란색(60~85%), 빨간색(85~100%)이 부드럽게 혼합되어 표시됩니다. '제어기 › 다이나믹 아일랜드'에서 그라데이션 동작을 조정할 수 있습니다."
           }
         },
         "nl" : {
@@ -77650,7 +77650,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "어디서나 Dynamic Island를 열거나 닫을 수 있습니다."
+            "value" : "어디서나 다이나믹 아일랜드를 열거나 닫을 수 있습니다."
           }
         },
         "nl" : {
@@ -83757,7 +83757,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "그래프 %lld개가 활성화되면 모든 그래프를 한 줄에 표시할 수 있도록 Dynamic Island가 가로로 확장됩니다."
+            "value" : "그래프 %lld개가 활성화되면 모든 그래프를 한 줄에 표시할 수 있도록 다이나믹 아일랜드가 가로로 확장됩니다."
           }
         },
         "nl" : {
