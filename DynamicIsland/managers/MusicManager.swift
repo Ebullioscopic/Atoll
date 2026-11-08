@@ -447,6 +447,7 @@ class MusicManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var controllerCancellables = Set<AnyCancellable>()
     private var debounceIdleTask: Task<Void, Never>?
+    private var deferredSkipPauseTask: Task<Void, Never>?
     @MainActor private var pendingOptimisticPlayState: Bool?
 
     // Helper to check if macOS has removed support for NowPlayingController
@@ -565,6 +566,7 @@ class MusicManager: ObservableObject {
     private var locallyAnimatedSkipUntil: TimeInterval = 0
     private var queuedSkipDirections: [SkipDirection] = []
     private var skipBurstTask: Task<Void, Never>?
+    private var skipArtworkReady = false
 
     @Published var isTransitioning: Bool = false
     private var transitionWorkItem: DispatchWorkItem?
@@ -655,6 +657,7 @@ class MusicManager: ObservableObject {
     
     public func destroy() {
         debounceIdleTask?.cancel()
+        deferredSkipPauseTask?.cancel()
         skipBurstTask?.cancel()
         queuedSkipDirections.removeAll()
         lyricsFetchTask?.cancel()
@@ -761,7 +764,24 @@ class MusicManager: ObservableObject {
         let expectedState = pendingOptimisticPlayState
         pendingOptimisticPlayState = nil
 
-        if eventIsPlaying != self.isPlaying {
+        if eventIsPlaying {
+            deferredSkipPauseTask?.cancel()
+            deferredSkipPauseTask = nil
+        }
+
+        if !eventIsPlaying && self.isPlaying && hasActiveSession {
+            // MediaRemote briefly reports a pause while advancing to the next
+            // item, including skips from hardware media keys. Keep the music
+            // activity and visualizer stable until the state settles.
+            if deferredSkipPauseTask == nil {
+                deferredSkipPauseTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    guard !Task.isCancelled, let self else { return }
+                    self.deferredSkipPauseTask = nil
+                    self.applyPlayState(false, animation: .smooth(duration: 0.18))
+                }
+            }
+        } else if eventIsPlaying != self.isPlaying {
             let animation: Animation? = (expectedState == eventIsPlaying) ? .smooth(duration: 0.18) : .smooth
             applyPlayState(eventIsPlaying, animation: animation)
 
@@ -829,8 +849,13 @@ class MusicManager: ObservableObject {
                 self.updateArtwork(artwork)
             } else if state.artwork == nil && (trackChanged || artworkChanged) {
                 artworkGeneration &+= 1
-                // Try to use app icon if no artwork but track changed
-                if let appIconImage = AppIconAsNSImage(for: state.bundleIdentifier) {
+                let generation = artworkGeneration
+                // A new title commonly arrives one event before its cover.
+                // Keep the previous cover under the flip rather than flashing
+                // the player app icon for that brief gap.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) { [weak self] in
+                    guard let self, self.artworkGeneration == generation,
+                          let appIconImage = AppIconAsNSImage(for: state.bundleIdentifier) else { return }
                     self.usingAppIconForArtwork = true
                     self.updateAlbumArt(newAlbumArt: appIconImage)
                 }
@@ -1185,6 +1210,9 @@ class MusicManager: ObservableObject {
         let item = DispatchWorkItem { [weak self] in
             guard let self, self.artworkGeneration == generation else { return }
             self.albumArt = newAlbumArt
+            if self.isSkipTransitionActive {
+                self.skipArtworkReady = true
+            }
             if Defaults[.coloredSpectrogram] {
                 self.calculateAverageColor(for: newAlbumArt, generation: generation)
             }
@@ -1298,6 +1326,7 @@ class MusicManager: ObservableObject {
             guard self.skipBurstTask == nil else { return }
 
             self.isSkipTransitionActive = true
+            self.skipArtworkReady = false
             self.lastFlipDirection = direction
             self.triggerFlipAnimation(force: true)
             let firstCommandDelay = self.flipPreparationDuration + self.flipAnimationDuration / 2
@@ -1337,18 +1366,22 @@ class MusicManager: ObservableObject {
         }
 
         var settleUntil = initialSettleTime
+        var artworkDeadline = initialSettleTime + 1.5
         while !Task.isCancelled {
             guard activeController === controller else { return }
 
             if !queuedSkipDirections.isEmpty {
                 let direction = queuedSkipDirections.removeFirst()
+                skipArtworkReady = false
                 if direction == .forward {
                     await controller.nextTrack()
                 } else {
                     await controller.previousTrack()
                 }
                 locallyAnimatedSkipUntil = Date.timeIntervalSinceReferenceDate + 2
-                settleUntil = max(settleUntil, Date.timeIntervalSinceReferenceDate + 0.25)
+                let commandTime = Date.timeIntervalSinceReferenceDate
+                settleUntil = max(settleUntil, commandTime + 0.25)
+                artworkDeadline = commandTime + 1.5
 
                 do {
                     try await Task.sleep(for: .milliseconds(120))
@@ -1356,7 +1389,11 @@ class MusicManager: ObservableObject {
                     return
                 }
             } else {
-                let remaining = settleUntil - Date.timeIntervalSinceReferenceDate
+                let now = Date.timeIntervalSinceReferenceDate
+                let remaining = max(
+                    settleUntil - now,
+                    skipArtworkReady ? 0 : artworkDeadline - now
+                )
                 guard remaining > 0 else { return }
                 do {
                     try await Task.sleep(for: .seconds(min(remaining, 0.04)))
