@@ -196,10 +196,10 @@ struct AlbumArtView: View {
         Color.clear
             .aspectRatio(1, contentMode: .fit)
             .background(
-                DynamicIslandArtworkSourceView(
-                    cornerRadius: albumArtCornerRadius,
-                    contentMode: .fill
-                )
+                Image(nsImage: musicManager.albumArt)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .clipShape(RoundedRectangle(cornerRadius: albumArtCornerRadius, style: .continuous))
             )
             .clipped()
             .scaleEffect(x: 1.3, y: 1.4)
@@ -227,7 +227,7 @@ struct AlbumArtView: View {
                     albumArtImage
                     appIconOverlay
                 }
-                .albumArtFlip(angle: musicManager.flipAngle)
+                .albumArtFlip(angle: musicManager.flipAngle, blurRadius: musicManager.albumArtBlurRadius)
                 .parallax3D()
                 .padding(.bottom, -5)
 
@@ -316,6 +316,7 @@ struct MusicControlsView: View {
         }
         .padding(.top, 10)
         .padding(.leading, 5)
+        .frame(minHeight: enableLyrics && !musicManager.currentLyrics.isEmpty ? 120 : 104)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -395,17 +396,19 @@ struct MusicControlsView: View {
                 MusicManager.shared.seek(to: newValue)
             }
             .padding(.top, 5)
-            .frame(height: 36)
+            .frame(height: 40)
         }
     }
 
     private var playbackControls: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
             ForEach(Array(displayedSlots.enumerated()), id: \.offset) { _, slot in
                 slotView(for: slot)
             }
         }
+        .frame(height: 44, alignment: .center)
         .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.top, 12)
     }
 
     private var shouldShowControlHUDRow: Bool {
@@ -704,7 +707,7 @@ struct NotchHomeView: View {
                 mainContent
             }
         }
-        .transition(.opacity.combined(with: .blurReplace))
+        .transition(.opacity)
     }
 
     private var mainContent: some View {
@@ -750,10 +753,7 @@ struct NotchHomeView: View {
                 }
             }
         }
-        .transition(.opacity.animation(.smooth.speed(0.9))
-            .combined(with: .blurReplace.animation(.smooth.speed(0.9)))
-            .combined(with: .move(edge: .top)))
-        .blur(radius: vm.notchState == .closed ? 30 : 0)
+        .transition(.opacity.combined(with: .offset(y: -8)))
         .padding(Defaults[.enableMinimalisticUI] ? 0 : 8) //Putting the main padding for home view here for consistency
     }
 

@@ -101,7 +101,7 @@ struct MinimalisticMusicView: View {
 
                 )
                 .clipped()
-                .albumArtFlip(angle: musicManager.flipAngle)
+                .albumArtFlip(angle: musicManager.flipAngle, blurRadius: musicManager.albumArtBlurRadius)
                 .frame(width: max(0, vm.effectiveClosedNotchHeight - 12), height: max(0, vm.effectiveClosedNotchHeight - 12))
         }
         .frame(width: max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)), height: max(0, vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)))

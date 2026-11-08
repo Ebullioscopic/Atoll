@@ -234,11 +234,16 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             newPlaybackState.repeatMode = self.playbackState.repeatMode
         }
 
-        if let artworkDataString = payload.artworkData {
-            newPlaybackState.artwork = Data(
-                base64Encoded: artworkDataString.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-        } else if !diff {
+        let incomingArtwork = payload.artworkData
+            .flatMap { Data(base64Encoded: $0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            .flatMap { $0.isEmpty ? nil : $0 }
+        if let incomingArtwork {
+            newPlaybackState.artwork = incomingArtwork
+        } else if diff, newPlaybackState.title == self.playbackState.title {
+            // Time-only diffs omit the artwork; a new title without artwork
+            // must clear the old cover while the new image is pending.
+            newPlaybackState.artwork = self.playbackState.artwork
+        } else {
             newPlaybackState.artwork = nil
         }
 

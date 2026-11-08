@@ -1245,10 +1245,10 @@ struct MinimalisticAlbumArtView: View {
         Color.clear
             .aspectRatio(1, contentMode: .fit)
             .background(
-                DynamicIslandArtworkSourceView(
-                    cornerRadius: albumArtCornerRadius,
-                    contentMode: .fill
-                )
+                Image(nsImage: musicManager.albumArt)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .clipShape(RoundedRectangle(cornerRadius: albumArtCornerRadius, style: .continuous))
             )
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: albumArtCornerRadius))
@@ -1282,7 +1282,7 @@ struct MinimalisticAlbumArtView: View {
                     )
                     .clipped()
                     .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-                    .albumArtFlip(angle: musicManager.flipAngle)
+                    .albumArtFlip(angle: musicManager.flipAngle, blurRadius: musicManager.albumArtBlurRadius)
                     .parallax3D()
         }
         .buttonStyle(PlainButtonStyle())

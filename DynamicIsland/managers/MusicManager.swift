@@ -24,6 +24,7 @@ import AppKit
 import Combine
 import Defaults
 import Foundation
+import ImageIO
 import SwiftUI
 
 // MARK: - Lyric Data Structures
@@ -552,9 +553,18 @@ class MusicManager: ObservableObject {
     private var lastArtworkContentURL: String? = nil
 
     @Published var flipAngle: Double = 0
-    @Published var lastFlipDirection: SkipDirection = .forward
+    @Published var albumArtBlurRadius: CGFloat = 0
+    @Published private(set) var isSkipTransitionActive = false
+    private var lastFlipDirection: SkipDirection = .forward
+    private let flipPreparationDuration: TimeInterval = 0.12
     private let flipAnimationDuration: TimeInterval = 0.45
     private var flipCooldownActive: Bool = false
+    private var flipGeneration = 0
+    private var artworkRevealTime: TimeInterval = 0
+    private var artworkGeneration = 0
+    private var locallyAnimatedSkipUntil: TimeInterval = 0
+    private var queuedSkipDirections: [SkipDirection] = []
+    private var skipBurstTask: Task<Void, Never>?
 
     @Published var isTransitioning: Bool = false
     private var transitionWorkItem: DispatchWorkItem?
@@ -645,6 +655,8 @@ class MusicManager: ObservableObject {
     
     public func destroy() {
         debounceIdleTask?.cancel()
+        skipBurstTask?.cancel()
+        queuedSkipDirections.removeAll()
         lyricsFetchTask?.cancel()
         lyricSyncTask?.cancel()
         explicitLookupTask?.cancel()
@@ -753,7 +765,9 @@ class MusicManager: ObservableObject {
             let animation: Animation? = (expectedState == eventIsPlaying) ? .smooth(duration: 0.18) : .smooth
             applyPlayState(eventIsPlaying, animation: animation)
 
-            if eventIsPlaying && !state.title.isEmpty && !state.artist.isEmpty {
+            if eventIsPlaying
+                && Date.timeIntervalSinceReferenceDate >= locallyAnimatedSkipUntil
+                && !state.title.isEmpty && !state.artist.isEmpty {
                 self.updateSneakPeek()
             }
         } else {
@@ -769,16 +783,16 @@ class MusicManager: ObservableObject {
         let contentURLChanged = state.contentURL != self.lastArtworkContentURL
 
         // Check for artwork changes
-        let artworkChanged = state.artwork != nil && state.artwork != self.artworkData
+        let artworkChanged = state.artwork != self.artworkData
 
-        let hasContentChange =
+        let trackChanged =
             titleChanged
             || artistChanged
             || albumChanged
-            || artworkChanged
             || bundleChanged
             || contentIdentifierChanged
             || contentURLChanged
+        let hasContentChange = trackChanged || artworkChanged
         let liveArtworkChanged = state.liveArtworkURL != self.videoArtworkURL
 
         if liveArtworkChanged {
@@ -801,11 +815,20 @@ class MusicManager: ObservableObject {
         let shouldAutoPeekOnTrackChange = Defaults[.showSneakPeekOnTrackChange]
 
         if hasContentChange {
-            self.triggerFlipAnimation()
+            let trackIdentityChanged = titleChanged || bundleChanged || contentIdentifierChanged || contentURLChanged
+            if trackIdentityChanged && !state.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // A skip started inside Atoll has already turned the cover.
+                // MediaRemote may deliver metadata in several later updates.
+                if Date.timeIntervalSinceReferenceDate >= locallyAnimatedSkipUntil {
+                    self.lastFlipDirection = .forward
+                    self.triggerFlipAnimation()
+                }
+            }
 
             if artworkChanged, let artwork = state.artwork {
                 self.updateArtwork(artwork)
-            } else if state.artwork == nil {
+            } else if state.artwork == nil && (trackChanged || artworkChanged) {
+                artworkGeneration &+= 1
                 // Try to use app icon if no artwork but track changed
                 if let appIconImage = AppIconAsNSImage(for: state.bundleIdentifier) {
                     self.usingAppIconForArtwork = true
@@ -822,19 +845,23 @@ class MusicManager: ObservableObject {
             self.lastArtworkContentIdentifier = state.contentIdentifier
             self.lastArtworkContentURL = state.contentURL
 
-            self.prepareLyricsForCurrentTrack()
-            if let liveArtworkURL = state.liveArtworkURL {
-                self.videoArtworkURL = liveArtworkURL
-            } else {
-                self.fetchVideoArtwork()
-            }
+            if trackChanged {
+                self.prepareLyricsForCurrentTrack()
+                if let liveArtworkURL = state.liveArtworkURL {
+                    self.videoArtworkURL = liveArtworkURL
+                } else {
+                    self.fetchVideoArtwork()
+                }
 
-            self.refreshExplicitFlag(for: state)
+                self.refreshExplicitFlag(for: state)
 
-
-            // Only update sneak peek if there's actual content and something changed
-            if shouldAutoPeekOnTrackChange && !state.title.isEmpty && !state.artist.isEmpty && state.isPlaying {
-                self.updateSneakPeek()
+                if shouldAutoPeekOnTrackChange
+                    && Date.timeIntervalSinceReferenceDate >= locallyAnimatedSkipUntil
+                    && !state.title.isEmpty && !state.artist.isEmpty && state.isPlaying {
+                    self.updateSneakPeek()
+                }
+            } else if state.isExplicit != nil {
+                self.refreshExplicitFlag(for: state)
             }
         } else if state.isExplicit != nil {
             self.refreshExplicitFlag(for: state)
@@ -1000,23 +1027,43 @@ class MusicManager: ObservableObject {
         }
     }
 
-    private func triggerFlipAnimation() {
+    private func triggerFlipAnimation(force: Bool = false) {
         // Debounce: rapid metadata updates (title, artwork, bundle arriving
         // separately for one track change) should only produce a single flip.
-        guard !flipCooldownActive else { return }
+        guard force || !flipCooldownActive else { return }
         flipCooldownActive = true
+        flipGeneration &+= 1
+        let generation = flipGeneration
+        artworkRevealTime = Date.timeIntervalSinceReferenceDate
+            + flipPreparationDuration + flipAnimationDuration / 2
 
         // Direction: positive rotation = next (page turn forward),
         //            negative rotation = previous (page turn backward).
         let delta: Double = lastFlipDirection == .forward ? 180 : -180
-        withAnimation(.easeInOut(duration: flipAnimationDuration)) {
-            flipAngle += delta
+        withAnimation(.easeIn(duration: flipPreparationDuration)) {
+            albumArtBlurRadius = 8
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + flipPreparationDuration) { [weak self] in
+            guard let self, self.flipGeneration == generation else { return }
+            withAnimation(.easeInOut(duration: self.flipAnimationDuration)) {
+                self.flipAngle += delta
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + flipPreparationDuration + flipAnimationDuration * 0.65) { [weak self] in
+            guard let self, self.flipGeneration == generation else { return }
+            guard self.skipBurstTask == nil else { return }
+            withAnimation(.easeOut(duration: 0.16)) {
+                self.albumArtBlurRadius = 0
+            }
         }
 
         // Reset cooldown after the animation completes so the next
         // genuine track change can flip again.
-        DispatchQueue.main.asyncAfter(deadline: .now() + flipAnimationDuration + 0.15) { [weak self] in
-            self?.flipCooldownActive = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + flipPreparationDuration + flipAnimationDuration + 0.15) { [weak self] in
+            guard let self, self.flipGeneration == generation else { return }
+            self.flipCooldownActive = false
         }
     }
 
@@ -1087,13 +1134,28 @@ class MusicManager: ObservableObject {
     }
 
     private func updateArtwork(_ artworkData: Data) {
+        artworkGeneration &+= 1
+        let generation = artworkGeneration
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
 
-            if let artworkImage = NSImage(data: artworkData) {
+            let imageSource = CGImageSourceCreateWithData(artworkData as CFData, nil)
+            let thumbnailOptions: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                // Keep the shared image sharp in the full-screen artwork view.
+                kCGImageSourceThumbnailMaxPixelSize: 2048,
+                kCGImageSourceShouldCacheImmediately: true
+            ]
+            let artworkImage = imageSource
+                .flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, thumbnailOptions as CFDictionary) }
+                .map { NSImage(cgImage: $0, size: NSSize(width: CGFloat($0.width), height: CGFloat($0.height))) }
+                ?? NSImage(data: artworkData)
+
+            if let artworkImage {
                 DispatchQueue.main.async { [weak self] in
-                    self?.usingAppIconForArtwork = false
-                    self?.updateAlbumArt(newAlbumArt: artworkImage)
+                    guard let self, self.artworkGeneration == generation else { return }
+                    self.usingAppIconForArtwork = false
+                    self.updateAlbumArt(newAlbumArt: artworkImage)
                 }
             }
         }
@@ -1119,15 +1181,17 @@ class MusicManager: ObservableObject {
 
     func updateAlbumArt(newAlbumArt: NSImage) {
         workItem?.cancel()
-        workItem = DispatchWorkItem { [weak self] in
-            withAnimation(.smooth) {
-                self?.albumArt = newAlbumArt
-                if Defaults[.coloredSpectrogram] {
-                    self?.calculateAverageColor()
-                }
+        let generation = artworkGeneration
+        let item = DispatchWorkItem { [weak self] in
+            guard let self, self.artworkGeneration == generation else { return }
+            self.albumArt = newAlbumArt
+            if Defaults[.coloredSpectrogram] {
+                self.calculateAverageColor(for: newAlbumArt, generation: generation)
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: workItem!)
+        workItem = item
+        let delay = max(0, artworkRevealTime - Date.timeIntervalSinceReferenceDate)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
     // MARK: - Playback Position Estimation
@@ -1140,12 +1204,15 @@ class MusicManager: ObservableObject {
     }
 
     func calculateAverageColor() {
-        albumArt.prominentOpposingColors { [weak self] primary, secondary in
+        calculateAverageColor(for: albumArt, generation: artworkGeneration)
+    }
+
+    private func calculateAverageColor(for artwork: NSImage, generation: Int) {
+        artwork.prominentOpposingColors { [weak self] primary, secondary in
             DispatchQueue.main.async {
-                withAnimation(.smooth) {
-                    self?.avgColor = primary
-                    self?.secondaryColor = secondary
-                }
+                guard let self, self.artworkGeneration == generation else { return }
+                self.avgColor = primary
+                self.secondaryColor = secondary
             }
         }
     }
@@ -1215,14 +1282,88 @@ class MusicManager: ObservableObject {
     }
 
     func nextTrack() {
-        Task {
-            await activeController?.nextTrack()
-        }
+        skipTrack(.forward)
     }
 
     func previousTrack() {
-        Task {
-            await activeController?.previousTrack()
+        skipTrack(.backward)
+    }
+
+    private func skipTrack(_ direction: SkipDirection) {
+        Task { @MainActor [weak self] in
+            guard let self, let controller = self.activeController else { return }
+
+            self.queuedSkipDirections.append(direction)
+            self.locallyAnimatedSkipUntil = Date.timeIntervalSinceReferenceDate + 2
+            guard self.skipBurstTask == nil else { return }
+
+            self.isSkipTransitionActive = true
+            self.lastFlipDirection = direction
+            self.triggerFlipAnimation(force: true)
+            let firstCommandDelay = self.flipPreparationDuration + self.flipAnimationDuration / 2
+            let animationEnd = Date.timeIntervalSinceReferenceDate
+                + self.flipPreparationDuration + self.flipAnimationDuration + 0.15
+            self.skipBurstTask = Task { @MainActor [weak self] in
+                await self?.runSkipBurst(
+                    controller: controller,
+                    firstCommandDelay: firstCommandDelay,
+                    initialSettleTime: animationEnd
+                )
+            }
+        }
+    }
+
+    @MainActor
+    private func runSkipBurst(
+        controller: any MediaControllerProtocol,
+        firstCommandDelay: TimeInterval,
+        initialSettleTime: TimeInterval
+    ) async {
+        defer {
+            queuedSkipDirections.removeAll()
+            skipBurstTask = nil
+            withAnimation(.easeOut(duration: 0.16)) {
+                albumArtBlurRadius = 0
+            }
+            isSkipTransitionActive = false
+        }
+
+        // The first command waits until the cover is edge-on. Further taps
+        // share this visual transition and keep their original command order.
+        do {
+            try await Task.sleep(for: .seconds(firstCommandDelay))
+        } catch {
+            return
+        }
+
+        var settleUntil = initialSettleTime
+        while !Task.isCancelled {
+            guard activeController === controller else { return }
+
+            if !queuedSkipDirections.isEmpty {
+                let direction = queuedSkipDirections.removeFirst()
+                if direction == .forward {
+                    await controller.nextTrack()
+                } else {
+                    await controller.previousTrack()
+                }
+                locallyAnimatedSkipUntil = Date.timeIntervalSinceReferenceDate + 2
+                settleUntil = max(settleUntil, Date.timeIntervalSinceReferenceDate + 0.25)
+
+                do {
+                    try await Task.sleep(for: .milliseconds(120))
+                } catch {
+                    return
+                }
+            } else {
+                let remaining = settleUntil - Date.timeIntervalSinceReferenceDate
+                guard remaining > 0 else { return }
+                do {
+                    try await Task.sleep(for: .seconds(min(remaining, 0.04)))
+                } catch {
+                    return
+                }
+            }
         }
     }
 
@@ -1264,10 +1405,8 @@ class MusicManager: ObservableObject {
         switch behavior {
         case .track:
             if direction == .forward {
-                lastFlipDirection = .forward
                 nextTrack()
             } else {
-                lastFlipDirection = .backward
                 previousTrack()
             }
         case .tenSecond:
@@ -1763,8 +1902,13 @@ extension MusicManager {
 
 // MARK: - Album Art Flip Helper
 
-private struct AlbumArtFlipModifier: ViewModifier {
-    let angle: Double
+private struct AlbumArtFlipModifier: AnimatableModifier {
+    var angle: Double
+
+    var animatableData: Double {
+        get { angle }
+        set { angle = newValue }
+    }
 
     func body(content: Content) -> some View {
         content
@@ -1792,7 +1936,8 @@ private struct AlbumArtFlipModifier: ViewModifier {
 }
 
 extension View {
-    func albumArtFlip(angle: Double) -> some View {
+    func albumArtFlip(angle: Double, blurRadius: CGFloat) -> some View {
         modifier(AlbumArtFlipModifier(angle: angle))
+            .blur(radius: blurRadius)
     }
 }
