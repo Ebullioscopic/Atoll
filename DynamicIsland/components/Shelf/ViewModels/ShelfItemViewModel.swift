@@ -812,7 +812,10 @@ final class ShelfItemViewModel: ObservableObject {
             enableLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
             
             let popup = NSPopUpButton(frame: .zero, pullsDown: false)
-            popup.addItems(withTitles: ["Recommended Applications", "All Applications"])
+            popup.addItems(withTitles: [
+                String(localized: "Recommended Applications"),
+                String(localized: "All Applications"),
+            ])
             popup.font = .systemFont(ofSize: NSFont.systemFontSize)
             popup.selectItem(at: 0)
             

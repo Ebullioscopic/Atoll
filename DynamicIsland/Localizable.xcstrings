@@ -8798,6 +8798,16 @@
         }
       }
     },
+    "All Applications" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 응용 프로그램"
+          }
+        }
+      }
+    },
     "All time" : {
       "localizations" : {
         "ko" : {
@@ -59394,6 +59404,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最近顏色"
+          }
+        }
+      }
+    },
+    "Recommended Applications" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추천 응용 프로그램"
           }
         }
       }
