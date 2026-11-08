@@ -6482,7 +6482,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "손쉬운 사용 권한이 있으면 다이나믹 아일랜드가 기본 음량, 밝기, 키보드 HUD를 대체할 수 있습니다."
+            "value" : "손쉬운 사용 권한이 있으면 Dynamic Island가 기본 음량, 밝기, 키보드 HUD를 대체할 수 있습니다."
           }
         },
         "nl" : {
@@ -28451,7 +28451,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "다이나믹 아일랜드"
+            "value" : "Dynamic Island"
           }
         },
         "nl" : {
@@ -28597,7 +28597,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사용자 설정 집중 모드 표시기를 감지하고 서랍을 사용하려면 '전체 디스크 접근 권한'이 필요합니다. '계속'을 클릭해 전체 디스크 접근 권한 설정을 열고, + 버튼을 눌러 Dynamic Island를 선택하세요(Finder에서 위치를 열어 드립니다)."
+            "value" : "사용자 설정 집중 모드 표시기를 감지하고 서랍을 사용하려면 '전체 디스크 접근 권한'이 필요합니다. '계속'을 클릭해 전체 디스크 접근 권한 설정을 열고, + 버튼을 눌러 Atoll을 선택하세요(Finder에서 위치를 열어 드립니다)."
           }
         }
       }
@@ -29798,7 +29798,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사이드 패널에 가사를 표시하려면 다이나믹 아일랜드 미디어 제어기를 활성화하세요."
+            "value" : "사이드 패널에 가사를 표시하려면 Dynamic Island 미디어 제어기를 활성화하세요."
           }
         }
       }
@@ -29808,7 +29808,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "가사를 표시하려면 다이나믹 아일랜드 미디어 제어기를 활성화하세요."
+            "value" : "가사를 표시하려면 Dynamic Island 미디어 제어기를 활성화하세요."
           }
         }
       }
@@ -29818,7 +29818,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "가사를 사용하려면 다이나믹 아일랜드 미디어 제어기를 활성화하세요."
+            "value" : "가사를 사용하려면 Dynamic Island 미디어 제어기를 활성화하세요."
           }
         }
       }
@@ -29829,7 +29829,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사이드 가사를 사용하려면 다이나믹 아일랜드 미디어 제어기를 활성화하세요."
+            "value" : "사이드 가사를 사용하려면 Dynamic Island 미디어 제어기를 활성화하세요."
           }
         }
       }
@@ -38357,7 +38357,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "다이나믹 아일랜드 옵션 숨기기"
+            "value" : "Dynamic Island 숨기기 옵션"
           }
         },
         "nl" : {
@@ -62698,7 +62698,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "현재 대상 디스플레이에서 실제 노치 애니메이션을 실행합니다. 외부 화면이 다이나믹 아일랜드 모드를 사용 중이면 배터리 HUD가 해당 화면에 먼저 표시됩니다."
+            "value" : "현재 대상 디스플레이에서 실제 노치 애니메이션을 실행합니다. 외부 화면이 Dynamic Island 모드를 사용 중이면 배터리 HUD가 해당 화면에 먼저 표시됩니다."
           }
         },
         "nl" : {
@@ -67935,7 +67935,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "다이나믹 아일랜드에 라이브 캔버스 표시"
+            "value" : "Dynamic Island에 라이브 캔버스 표시"
           }
         },
         "nl" : {
