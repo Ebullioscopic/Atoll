@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Favorite support depends on the active app; TIDAL favorites are read-only." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收藏功能取决于当前应用；TIDAL 仅支持读取收藏状态。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收藏功能取決於目前應用程式；TIDAL 僅支援讀取收藏狀態。"
+          }
+        }
+      }
+    },
     "Auto Detect" : {
       "localizations" : {
         "zh-Hans" : {

@@ -57,6 +57,8 @@ struct MediaSourceCapability: Identifiable {
 }
 
 enum MediaSourceCapabilities {
+    /// Returns the source's control capabilities and localized explanation.
+    /// Automatic sources still depend on the active application's capabilities.
     static func entry(for type: MediaControllerType) -> MediaSourceCapability {
         switch type {
         case .nowPlaying:
@@ -66,7 +68,8 @@ enum MediaSourceCapabilities {
         case .autoDetect:
             return .init(name: String(localized: "Auto Detect"),
                          favoriting: .full, shuffle: .full, repeatMode: .full,
-                         note: String(localized: "Follows the current macOS Now Playing source automatically, regardless of startup detection status."))
+                         note: String(localized: "Follows the current macOS Now Playing source automatically, regardless of startup detection status.")
+                            + " " + String(localized: "Favorite support depends on the active app; TIDAL favorites are read-only."))
         case .netEaseCloudMusic:
             return .init(name: String(localized: "NetEase Cloud Music"),
                          favoriting: .none, shuffle: .full, repeatMode: .full,
