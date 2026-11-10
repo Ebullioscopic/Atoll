@@ -6,3 +6,26 @@ Unless otherwise noted, the original assets created specifically for Atoll
 This includes original media, artwork, animations, and other creative assets
 unique to Atoll. Third-party assets retain their original licenses and
 copyrights; see NOTICE and any THIRD_PARTY_LICENSES files for details.
+
+Third-party music application icons
+
+- NetEaseCloudMusicLogo.imageset/netease-cloud-music.png: NetEase Cloud Music
+  macOS app icon, published by Hangzhou Netease Cloud Music Technology Co., Ltd.
+  Source: https://apps.apple.com/app/id944848654
+- QQMusicLogo.imageset/qq-music.png: QQ Music macOS app icon, published by
+  Tencent Technology (Shanghai) Company Limited.
+  Source: https://apps.apple.com/app/id595615424
+
+These icons were retrieved from the publishers' Mac App Store listings on
+2026-11-10 and are displayed only to identify the corresponding media sources.
+They are not original Atoll artwork; their copyrights and trademarks remain
+with the respective rights holders. Public availability is not a grant of
+permission to redistribute them. This attribution does not establish a
+third-party license or endorsement; confirm permission or an applicable legal
+basis before distributing these assets. See TRADEMARKS.
+
+Publisher terms:
+- NetEase Cloud Music, section 10 (content and trademarks):
+  https://y.music.163.com/g/yida/6f6572a0d6cb4254b2d445507158e11f
+- QQ Music, sections 6.3-6.4 (intellectual property):
+  https://y.qq.com/i/history/user_terms/20240118.html
