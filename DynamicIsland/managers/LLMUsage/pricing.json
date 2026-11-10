@@ -21,6 +21,16 @@
       }
     },
     {
+      "id": "anthropic/claude-fable-5.2",
+      "name": "Anthropic: Claude Fable 5.2",
+      "pricing": {
+        "prompt": "0.000008",
+        "completion": "0.00004",
+        "cache_read": "0.0000002",
+        "cache_write": "0.00001"
+      }
+    },
+    {
       "id": "anthropic/claude-haiku-4.5",
       "name": "Anthropic: Claude Haiku 4.5",
       "pricing": {
@@ -971,5 +981,5 @@
       }
     }
   ],
-  "last_updated": "2026-11-09T00:04:55Z"
+  "last_updated": "2026-11-10T00:04:09Z"
 }
