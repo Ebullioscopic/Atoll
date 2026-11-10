@@ -63,6 +63,18 @@ enum MediaSourceCapabilities {
             return .init(name: String(localized: "Now Playing"),
                          favoriting: .full, shuffle: .full, repeatMode: .full,
                          note: String(localized: "Follows whichever app is playing, so it can do whatever that app can."))
+        case .autoDetect:
+            return .init(name: String(localized: "Auto Detect"),
+                         favoriting: .full, shuffle: .full, repeatMode: .full,
+                         note: String(localized: "Follows the current macOS Now Playing source automatically, regardless of startup detection status."))
+        case .netEaseCloudMusic:
+            return .init(name: String(localized: "NetEase Cloud Music"),
+                         favoriting: .none, shuffle: .full, repeatMode: .full,
+                         note: String(localized: "Uses macOS Now Playing when the NetEase Cloud Music desktop app is the active media source."))
+        case .qqMusic:
+            return .init(name: String(localized: "QQ Music"),
+                         favoriting: .none, shuffle: .full, repeatMode: .full,
+                         note: String(localized: "Uses macOS Now Playing when the QQ Music desktop app is the active media source."))
         case .appleMusic:
             return .init(name: String(localized: "Apple Music"),
                          favoriting: .full, shuffle: .full, repeatMode: .full,

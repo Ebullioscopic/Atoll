@@ -1,6 +1,118 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Auto Detect" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动检测"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動偵測"
+          }
+        }
+      }
+    },
+    "NetEase Cloud Music" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网易云音乐"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "網易雲音樂"
+          }
+        }
+      }
+    },
+    "QQ Music" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QQ 音乐"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QQ 音樂"
+          }
+        }
+      }
+    },
+    "Follows the current macOS Now Playing source automatically." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动跟随当前 macOS 正在播放的媒体来源。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動跟隨目前 macOS 正在播放的媒體來源。"
+          }
+        }
+      }
+    },
+    "Follows the current macOS Now Playing source automatically, regardless of startup detection status." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无论启动自检状态如何，均自动跟随当前 macOS 正在播放的媒体来源。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無論啟動自我檢測狀態為何，皆自動跟隨目前 macOS 正在播放的媒體來源。"
+          }
+        }
+      }
+    },
+    "Uses macOS Now Playing when the NetEase Cloud Music desktop app is the active media source." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当网易云音乐桌面端为活动媒体源时，使用 macOS 正在播放通道。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當網易雲音樂桌面版為作用中媒體來源時，使用 macOS 正在播放通道。"
+          }
+        }
+      }
+    },
+    "Uses macOS Now Playing when the QQ Music desktop app is the active media source." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当 QQ 音乐桌面端为活动媒体源时，使用 macOS 正在播放通道。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當 QQ 音樂桌面版為作用中媒體來源時，使用 macOS 正在播放通道。"
+          }
+        }
+      }
+    },
     "Battery charging: %.1f W" : {
       "comment" : "Actual measured power; adapter capacity is not used as a substitute.",
       "localizations" : {

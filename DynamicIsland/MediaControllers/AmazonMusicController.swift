@@ -367,5 +367,27 @@ final class AmazonMusicController: FilteredNowPlayingController {
     }
 }
 
+final class NetEaseCloudMusicController: FilteredNowPlayingController {
+    static let bundleIdentifier = "com.netease.163music"
+
+    init?() {
+        super.init(
+            bundleIdentifier: Self.bundleIdentifier,
+            controllerName: "NetEaseCloudMusicController"
+        )
+    }
+}
+
+final class QQMusicController: FilteredNowPlayingController {
+    static let bundleIdentifier = "com.tencent.QQMusicMac"
+
+    init?() {
+        super.init(
+            bundleIdentifier: Self.bundleIdentifier,
+            controllerName: "QQMusicController"
+        )
+    }
+}
+
 // CiderController now lives in CiderController.swift, where its
 // favouriting support sits alongside it.

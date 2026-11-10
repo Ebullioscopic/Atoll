@@ -3111,7 +3111,7 @@ private extension MediaControllerType {
 
     var applicationBundleIdentifiers: [String] {
         switch self {
-        case .nowPlaying:
+        case .nowPlaying, .autoDetect:
             return []
         case .appleMusic:
             return ["com.apple.Music"]
@@ -3121,6 +3121,10 @@ private extension MediaControllerType {
             return ["com.github.th-ch.youtube-music"]
         case .amazonMusic:
             return ["com.amazon.music"]
+        case .netEaseCloudMusic:
+            return [NetEaseCloudMusicController.bundleIdentifier]
+        case .qqMusic:
+            return [QQMusicController.bundleIdentifier]
         case .tidal:
             return [TidalController.bundleIdentifier]
         case .cider:
@@ -3131,10 +3135,13 @@ private extension MediaControllerType {
     var fallbackSymbol: String {
         switch self {
         case .nowPlaying: return "waveform"
+        case .autoDetect: return "waveform.badge.magnifyingglass"
         case .appleMusic: return "music.note"
         case .spotify: return "dot.radiowaves.left.and.right"
         case .youtubeMusic: return "play.rectangle.fill"
         case .amazonMusic: return "music.note.list"
+        case .netEaseCloudMusic: return "music.quarternote.3"
+        case .qqMusic: return "music.mic"
         case .tidal: return "waveform.path"
         case .cider: return "cup.and.saucer.fill"
         }
@@ -3142,11 +3149,13 @@ private extension MediaControllerType {
 
     var fallbackColor: Color {
         switch self {
-        case .nowPlaying: return .accentColor
+        case .nowPlaying, .autoDetect: return .accentColor
         case .appleMusic: return .pink
         case .spotify: return .green
         case .youtubeMusic: return .red
         case .amazonMusic: return .cyan
+        case .netEaseCloudMusic: return .red
+        case .qqMusic: return .green
         case .tidal: return .primary
         case .cider: return .orange
         }
@@ -3239,7 +3248,7 @@ struct Media: View {
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(String(localized: "'Now Playing' was the only option on previous versions and works with all media apps."))
-                        if mediaController == .amazonMusic || mediaController == .tidal || mediaController == .cider {
+                        if mediaController == .amazonMusic || mediaController == .netEaseCloudMusic || mediaController == .qqMusic || mediaController == .autoDetect || mediaController == .tidal || mediaController == .cider {
                             Text(mediaController.description)
                         }
                     }
