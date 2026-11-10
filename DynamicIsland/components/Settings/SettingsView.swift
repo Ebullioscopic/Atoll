@@ -3103,8 +3103,6 @@ private extension MediaControllerType {
         switch self {
         case .youtubeMusic: return "YouTubeMusicLogo"
         case .amazonMusic: return "AmazonMusicLogo"
-        case .netEaseCloudMusic: return "NetEaseCloudMusicLogo"
-        case .qqMusic: return "QQMusicLogo"
         case .tidal: return "TidalLogo"
         case .cider: return "CiderLogo"
         default: return nil
