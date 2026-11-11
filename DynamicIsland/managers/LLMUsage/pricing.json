@@ -371,6 +371,16 @@
       }
     },
     {
+      "id": "google/gemini-4-carbon",
+      "name": "Google: Gemini 4 Carbon",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000001",
+        "cache_write": "0.0000001875"
+      }
+    },
+    {
       "id": "google/gemini-nano-banana-2.1",
       "name": "Google: Nano Banana 2.1",
       "pricing": {
@@ -981,5 +991,5 @@
       }
     }
   ],
-  "last_updated": "2026-11-10T00:04:09Z"
+  "last_updated": "2026-11-11T00:04:18Z"
 }
