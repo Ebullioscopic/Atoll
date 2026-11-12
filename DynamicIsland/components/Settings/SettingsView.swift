@@ -3728,44 +3728,16 @@ struct CalendarSettings: View {
 
     var body: some View {
         Form {
-            if !calendarManager.hasCalendarAccess || !calendarManager.hasReminderAccess {
-                Text("Calendar or Reminder access is denied. Please enable it in System Settings.")
-                    .foregroundColor(.red)
-                    .multilineTextAlignment(.center)
-                    .padding()
-
-                HStack {
-                    Button("Request Access") {
-                        Task {
-                            await calendarManager.checkCalendarAuthorization()
-                            await calendarManager.checkReminderAuthorization()
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    Button("Open System Settings") {
-                        if let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
-                            NSWorkspace.shared.open(settingsURL)
-                        }
-                    }
+            Section(header: Text("Permissions")) {
+                CalendarPermissionRow(entity: .event, status: calendarManager.calendarAuthorizationStatus) {
+                    await calendarManager.checkCalendarAuthorization()
                 }
-            } else {
-                // Permissions status
-                Section(header: Text("Permissions")) {
-                    HStack {
-                        Text("Calendars")
-                        Spacer()
-                        Text(statusText(for: calendarManager.calendarAuthorizationStatus))
-                            .foregroundColor(color(for: calendarManager.calendarAuthorizationStatus))
-                    }
-                    HStack {
-                        Text("Reminders")
-                        Spacer()
-                        Text(statusText(for: calendarManager.reminderAuthorizationStatus))
-                            .foregroundColor(color(for: calendarManager.reminderAuthorizationStatus))
-                    }
+                CalendarPermissionRow(entity: .reminder, status: calendarManager.reminderAuthorizationStatus) {
+                    await calendarManager.checkReminderAuthorization()
                 }
+            }
 
+            if calendarManager.access.canShowSettings {
                 Defaults.Toggle(key: .showCalendar) {
                     Text("Show calendar")
                 }
@@ -3780,6 +3752,7 @@ struct CalendarSettings: View {
                 Section(header: Text("Event List")) {
                     Toggle("Hide completed reminders", isOn: $hideCompletedReminders)
                         .settingsHighlight(id: highlightID("Hide completed reminders"))
+                        .disabled(!calendarManager.hasReminderAccess)
                     Toggle("Show full event titles", isOn: $showFullEventTitles)
                         .settingsHighlight(id: highlightID("Show full event titles"))
                     Toggle("Auto-scroll to next event", isOn: $autoScrollToNextEvent)
@@ -4001,6 +3974,8 @@ struct CalendarSettings: View {
                     .settingsHighlight(id: highlightID("Show start time after event begins"))
                 }
                 
+                .disabled(!calendarManager.hasCalendarAccess)
+
                 // MARK: - Third-party Calendar Integration
                 Section {
                     Defaults.Toggle(key: .enableThirdPartyCalendarApp) {
@@ -4091,35 +4066,15 @@ struct CalendarSettings: View {
                 }
             }
         }
-        .onAppear {
-            Task {
-                await calendarManager.checkCalendarAuthorization()
-                await calendarManager.checkReminderAuthorization()
-            }
+        .task {
+            await calendarManager.refreshAuthorization()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await calendarManager.refreshAuthorization() }
         }
         .navigationTitle("Calendar")
     }
 
-    private func statusText(for status: EKAuthorizationStatus) -> String {
-        switch status {
-        case .fullAccess, .authorized: return String(localized: "Full Access")
-        case .writeOnly: return String(localized: "Write Only")
-        case .denied: return String(localized: "Denied")
-        case .restricted: return String(localized: "Restricted")
-        case .notDetermined: return String(localized: "Not Determined")
-        @unknown default: return String(localized: "Unknown")
-        }
-    }
-
-    private func color(for status: EKAuthorizationStatus) -> Color {
-        switch status {
-        case .fullAccess, .authorized: return .green
-        case .writeOnly: return .yellow
-        case .denied, .restricted: return .red
-        case .notDetermined: return .secondary
-        @unknown default: return .secondary
-        }
-    }
 }
 
 struct About: View {
