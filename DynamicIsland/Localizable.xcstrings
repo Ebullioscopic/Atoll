@@ -1641,6 +1641,12 @@
             "state" : "translated",
             "value" : "%@%lld px"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$lld px"
+          }
         }
       }
     },
@@ -1764,6 +1770,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：%2$@"
           }
         }
       }
@@ -3551,6 +3563,12 @@
             "state" : "translated",
             "value" : ", 충전하는 것이 좋습니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "，建议为其充电。"
+          }
         }
       }
     },
@@ -4139,6 +4157,12 @@
             "state" : "translated",
             "value" : "12시간"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "12 小时"
+          }
         }
       }
     },
@@ -4599,6 +4623,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "3시간"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 小时"
           }
         }
       }
@@ -5166,6 +5196,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "6시간"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6 小时"
           }
         }
       }
@@ -6899,6 +6935,12 @@
             "state" : "translated",
             "value" : "적응형 오디오"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自适应音频"
+          }
         }
       }
     },
@@ -7945,6 +7987,12 @@
             "state" : "translated",
             "value" : "AirPlay/경로 선택기 버튼을 사용자화 가능한 제어기 팔레트에 다시 추가합니다. 잠금 화면 패널도 이 버튼을 음량 슬라이더로 사용하므로, 끄면 해당 패널에 음량 제어기가 없어집니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将隔空播放/路由选择按钮添加回可自定义的控制面板。锁屏面板的音量滑块也使用此按钮，因此关闭后该面板将没有音量控制。"
+          }
         }
       }
     },
@@ -8608,6 +8656,12 @@
             "state" : "translated",
             "value" : "전체 기간"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有时间"
+          }
         }
       }
     },
@@ -9236,6 +9290,12 @@
             "state" : "translated",
             "value" : "드래그해서 꺼낼 때 파일 이동 허용"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许在拖出时移动文件"
+          }
         }
       }
     },
@@ -9299,6 +9359,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "알파"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alpha"
           }
         }
       }
@@ -10191,6 +10257,12 @@
             "state" : "translated",
             "value" : "재생 제어기가 표시되는 모든 곳에 적용됩니다. 노치 플레이어, 잠금 화면 패널, 떠 있는 윈도우가 해당합니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "适用于播放控制出现的所有位置：刘海播放器、锁屏面板和浮动窗口。"
+          }
         }
       }
     },
@@ -10253,6 +10325,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "상태 위젯 전체에 적용됩니다. 날씨, 배터리, 집중 모드, 위치, 다음 일정 행이 모두 선택한 모양과 레이아웃으로 그려집니다. 배경화면이 밝을 때는 제목과 레이블이 잘 보이도록 '밝게'를 사용하세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "适用于整个状态小组件——天气、电池、专注模式、位置和下一个事件行都会按所选外观与布局绘制。当壁纸较亮时使用浅色，以保证标题和标签清晰可读。"
           }
         }
       }
@@ -10440,6 +10518,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "영역"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "区域"
           }
         }
       }
@@ -11029,6 +11113,12 @@
             "state" : "translated",
             "value" : "오디오"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频"
+          }
         }
       }
     },
@@ -11594,6 +11684,12 @@
             "state" : "translated",
             "value" : "인라인 레이아웃에서만 사용할 수 있습니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅在内联布局中可用。"
+          }
         }
       }
     },
@@ -11913,6 +12009,12 @@
             "state" : "translated",
             "value" : "막대(깜박임)"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "条形（闪烁）"
+          }
         }
       }
     },
@@ -11922,6 +12024,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "막대(고정)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "条形（常亮）"
           }
         }
       }
@@ -12274,6 +12382,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "배터리 부족"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池电量低"
           }
         }
       }
@@ -12936,6 +13050,12 @@
             "state" : "translated",
             "value" : "베타"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beta"
+          }
         }
       }
     },
@@ -12945,6 +13065,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "dev 브랜치에서 매일 빌드되는 최신 버전"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最前沿，每天从开发分支构建"
           }
         }
       }
@@ -12956,6 +13082,12 @@
             "state" : "translated",
             "value" : "블록(깜박임)"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "色块（闪烁）"
+          }
         }
       }
     },
@@ -12965,6 +13097,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "블록(고정)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "色块（常亮）"
           }
         }
       }
@@ -13148,6 +13286,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bluetooth 기기"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "蓝牙设备"
           }
         }
       }
@@ -14818,6 +14962,12 @@
             "state" : "translated",
             "value" : "카메라 + 마이크"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相机 + 麦克风"
+          }
         }
       }
     },
@@ -14827,6 +14977,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "카메라 접근 권한 필요"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要相机访问权限"
           }
         }
       }
@@ -15017,6 +15173,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "앱에서 카메라를 사용 중입니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相机正被某个应用使用"
           }
         }
       }
@@ -18210,6 +18372,12 @@
             "state" : "translated",
             "value" : "클라이언트 ID"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "客户端 ID"
+          }
         }
       }
     },
@@ -18219,6 +18387,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "클라이언트 ID가 저장되었습니다. Spotify 계정을 연결하세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "客户端 ID 已保存。请连接您的 Spotify 账号。"
           }
         }
       }
@@ -20032,6 +20206,12 @@
             "state" : "translated",
             "value" : "압축"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "压缩"
+          }
         }
       }
     },
@@ -20513,6 +20693,12 @@
             "state" : "translated",
             "value" : "Spotify 계정 연결"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接 Spotify 账号"
+          }
         }
       }
     },
@@ -20570,6 +20756,12 @@
             "state" : "translated",
             "value" : "연결됨 — 좋아요 버튼을 사용할 수 있습니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已连接——喜欢按钮就绪。"
+          }
         }
       }
     },
@@ -20579,6 +20771,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "연결 중…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接中..."
           }
         }
       }
@@ -21168,6 +21366,12 @@
             "state" : "translated",
             "value" : "대화 인식"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对话感知"
+          }
         }
       }
     },
@@ -21177,6 +21381,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "변환"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转换"
           }
         }
       }
@@ -21188,6 +21398,12 @@
             "state" : "translated",
             "value" : "이미지 변환"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转换图片"
+          }
         }
       }
     },
@@ -21197,6 +21413,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "이미지 변환…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转换图片…"
           }
         }
       }
@@ -21265,6 +21487,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "경로 복사"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制路径"
           }
         }
       }
@@ -21441,6 +21669,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "무언가를 복사하면 여기에 표시됩니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制内容即可在此查看"
           }
         }
       }
@@ -21806,6 +22040,12 @@
             "state" : "translated",
             "value" : "충돌 보고서 복사됨"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "崩溃报告已复制"
+          }
         }
       }
     },
@@ -21816,6 +22056,12 @@
             "state" : "translated",
             "value" : "충돌 보고서 '%@'을(를) 클립보드에 복사했습니다"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "崩溃报告“%@”已复制到剪贴板"
+          }
         }
       }
     },
@@ -21825,6 +22071,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "PDF 생성"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建 PDF"
           }
         }
       }
@@ -24257,6 +24509,12 @@
             "state" : "translated",
             "value" : "디버그"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调试"
+          }
         }
       }
     },
@@ -24544,6 +24802,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "'기본'은 확장된 녹화 HUD를 사용합니다. '인라인'은 정지 제어기를 노치 높이 안에 유지합니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认使用展开的录制 HUD。内联会将停止控件保持在刘海高度之内。"
           }
         }
       }
@@ -24840,6 +25104,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "이 항목 삭제"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除此项"
           }
         }
       }
@@ -25277,6 +25547,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "개발"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dev"
           }
         }
       }
@@ -25769,6 +26045,12 @@
             "state" : "translated",
             "value" : "가사를 표시하려면 '미니멀리즘 UI'를 비활성화하세요."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "禁用简约界面以显示歌词。"
+          }
         }
       }
     },
@@ -25778,6 +26060,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "가사를 사용하려면 '미니멀리즘 UI'를 비활성화하세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "禁用简约界面以使用歌词。"
           }
         }
       }
@@ -25962,6 +26250,12 @@
             "state" : "translated",
             "value" : "'외부 디스플레이 연동'에서 '외부 음량 제어 감지 활성화'가 켜져 있는 동안에는 사용할 수 없습니다. 해당 앱이 음량 키를 제어합니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当外部显示器集成中启用“外部音量控制监听”时已禁用——音量键由该应用接管。"
+          }
         }
       }
     },
@@ -26065,6 +26359,12 @@
             "state" : "translated",
             "value" : "외부 디스플레이 연동이 켜져 있는 동안에는 사용할 수 없습니다. 해당 앱이 밝기 키를 제어합니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外部显示器集成开启时已禁用——亮度键由该应用接管。"
+          }
         }
       }
     },
@@ -26120,6 +26420,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "연결 해제"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "断开连接"
           }
         }
       }
@@ -26232,6 +26538,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "디스크 활동"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "磁盘活动"
           }
         }
       }
@@ -26906,6 +27218,12 @@
             "state" : "translated",
             "value" : "문서"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文档"
+          }
         }
       }
     },
@@ -27488,6 +27806,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "다운로드 중…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载中…"
           }
         }
       }
@@ -28092,6 +28416,12 @@
             "state" : "translated",
             "value" : "사용자 설정 집중 모드 표시기를 감지하고 서랍을 사용하려면 '전체 디스크 접근 권한'이 필요합니다. '계속'을 클릭해 전체 디스크 접근 권한 설정을 열고, + 버튼을 눌러 Dynamic Island를 선택하세요(Finder에서 위치를 열어 드립니다)."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dynamic Island 需要完全磁盘访问权限来检测自定义专注模式指示器并支持架子功能。点按“继续”打开完全磁盘访问设置，然后按 + 按钮并选择 Dynamic Island（我们会在 Finder 中为您定位它）。"
+          }
         }
       }
     },
@@ -28101,6 +28431,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "DynamicIsland의 메모리 사용량이 높습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DynamicIsland 内存占用过高"
           }
         }
       }
@@ -28217,6 +28553,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "초기 테스트 빌드로, 문제가 있을 수 있습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "早期测试构建，可能存在问题"
           }
         }
       }
@@ -29283,6 +29625,12 @@
             "state" : "translated",
             "value" : "가사를 표시하려면 다이나믹 아일랜드 미디어 제어기를 활성화하세요."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用 Dynamic Island 媒体控制以显示歌词。"
+          }
         }
       }
     },
@@ -29292,6 +29640,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "가사를 사용하려면 다이나믹 아일랜드 미디어 제어기를 활성화하세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用 Dynamic Island 媒体控制以使用歌词。"
           }
         }
       }
@@ -31820,6 +32174,12 @@
             "state" : "translated",
             "value" : "날씨 캡슐을 활성화하고 제공업체, 단위, 선택적 AQI 표시기를 설정합니다. 레이아웃은 '외관'의 '위젯 레이아웃'에서 설정되며 상태 위젯 전체에 적용됩니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用天气胶囊并配置其数据源、单位和可选的 AQI 指示器。其布局由“外观”下的“小组件布局”设置，后者作用于整个状态小组件。"
+          }
         }
       }
     },
@@ -33171,6 +33531,12 @@
             "state" : "translated",
             "value" : "내보내기 실패"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出失败"
+          }
         }
       }
     },
@@ -33180,6 +33546,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "로그 내보내기"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出日志"
           }
         }
       }
@@ -33518,6 +33890,12 @@
             "state" : "translated",
             "value" : "압축 해제 중…"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解压中…"
+          }
         }
       }
     },
@@ -33527,6 +33905,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "극히 나쁨"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "极差"
           }
         }
       }
@@ -33578,6 +33962,12 @@
             "state" : "translated",
             "value" : "실패"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失败"
+          }
         }
       }
     },
@@ -33587,6 +33977,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "로그 내보내기 실패: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导出日志失败：%@"
           }
         }
       }
@@ -33598,6 +33994,12 @@
             "state" : "translated",
             "value" : "충돌 보고서를 읽지 못했습니다: %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读取崩溃报告失败：%@"
+          }
         }
       }
     },
@@ -33607,6 +34009,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "양호"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "良"
           }
         }
       }
@@ -33972,6 +34380,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "지문 잠금 해제"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指纹解锁"
           }
         }
       }
@@ -34952,6 +35366,12 @@
             "state" : "translated",
             "value" : "전체 디스크 접근 권한 필요"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要完全磁盘访问权限"
+          }
         }
       }
     },
@@ -35060,6 +35480,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "전체 화면"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏"
           }
         }
       }
@@ -36536,6 +36962,12 @@
             "state" : "translated",
             "value" : "좋음"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "优"
+          }
         }
       }
     },
@@ -37388,6 +37820,12 @@
             "state" : "translated",
             "value" : "위험"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有害"
+          }
         }
       }
     },
@@ -37397,6 +37835,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "헤드폰"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "耳机"
           }
         }
       }
@@ -38434,6 +38878,12 @@
             "state" : "translated",
             "value" : "속도를 높이면 Siri가 실행될 때 위젯이 거의 즉시 숨겨지지만, 배터리로 구동할 때 배터리 사용 시간에 영향을 줄 수 있습니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "速度越快，小组件在唤起 Siri 时越能几乎立即隐藏，但在使用电池供电时可能影响续航。"
+          }
         }
       }
     },
@@ -38443,6 +38893,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "하이라이트"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高亮"
           }
         }
       }
@@ -39020,6 +39476,12 @@
             "state" : "translated",
             "value" : "이미지 동작"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片操作"
+          }
         }
       }
     },
@@ -39395,6 +39857,12 @@
             "state" : "translated",
             "value" : "'표시기만'은 녹화 실시간 활동을 수동적으로 유지합니다. '정지 버튼 포함'은 기본 녹화 제어기를 활성화합니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“仅指示器”会让录制实时活动保持被动。“带停止按钮”则启用原生录制控制。"
+          }
         }
       }
     },
@@ -39404,6 +39872,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "정보"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "信息"
           }
         }
       }
@@ -39763,6 +40237,12 @@
             "state" : "translated",
             "value" : "설치됨"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装"
+          }
         }
       }
     },
@@ -39892,6 +40372,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "설치 중…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装中…"
           }
         }
       }
@@ -40240,6 +40726,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "탭을 추가하는 대신 현재 팝오버 버튼을 노치 옆에 유지합니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将当前的弹出按钮保留在刘海旁边，而不是添加一个标签页。"
           }
         }
       }
@@ -41304,6 +41796,12 @@
             "state" : "translated",
             "value" : "노래 좋아요"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "喜欢歌曲"
+          }
         }
       }
     },
@@ -41894,6 +42392,12 @@
             "state" : "translated",
             "value" : "실시간 활동 아이콘"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时活动图标"
+          }
         }
       }
     },
@@ -41903,6 +42407,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "라이브 스트림"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直播"
           }
         }
       }
@@ -42225,6 +42735,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Xcode에서 빌드한 로컬 개발 버전"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自 Xcode 的本地开发构建"
           }
         }
       }
@@ -42822,6 +43338,12 @@
             "state" : "translated",
             "value" : "로그 수준"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日志级别"
+          }
         }
       }
     },
@@ -42878,6 +43400,12 @@
             "state" : "translated",
             "value" : "로그 내보내기 완료"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日志已导出"
+          }
         }
       }
     },
@@ -42887,6 +43415,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "로그와 충돌 보고서를 %@(으)로 내보냈습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日志和崩溃报告已成功导出到 %@。"
           }
         }
       }
@@ -43387,6 +43921,12 @@
             "state" : "translated",
             "value" : "저전력 모드가 켜져 있습니다"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已启用低电量模式"
+          }
         }
       }
     },
@@ -43723,6 +44263,12 @@
             "state" : "translated",
             "value" : "가사도 켜져 있어 둘이 노치를 나눠 쓰며, 가사는 아티스트 이름 아래 한 줄로 표시됩니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歌词也已开启，因此两者共用刘海，歌词会缩到艺人名称下方的一行。"
+          }
         }
       }
     },
@@ -43733,6 +44279,12 @@
             "state" : "translated",
             "value" : "가사가 플레이어 옆에 별도 패널로 표시됩니다. 캘린더를 켜면 아티스트 이름 아래로 옮겨집니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歌词在播放器旁拥有独立面板。打开日历可改为将歌词移到艺人名称下方。"
+          }
         }
       }
     },
@@ -43742,6 +44294,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "캘린더가 노치의 나머지를 사용하고 있어 가사는 아티스트 이름 아래 한 줄로 표시됩니다. 캘린더를 끄면 플레이어 옆에 전체 패널로 표시됩니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由于日历占用了刘海的其余空间，歌词只显示在艺人名称下方的一行。关闭日历可让歌词在播放器旁获得完整面板。"
           }
         }
       }
@@ -46909,6 +47467,12 @@
             "state" : "translated",
             "value" : "앱에서 마이크를 사용 중입니다"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麦克风正被某个应用使用"
+          }
         }
       }
     },
@@ -47594,6 +48158,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "보통"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中等"
           }
         }
       }
@@ -49136,6 +49706,12 @@
             "state" : "translated",
             "value" : "나이틀리"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nightly"
+          }
         }
       }
     },
@@ -49352,6 +49928,12 @@
             "state" : "translated",
             "value" : "호환되는 앱 없음"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到兼容的应用"
+          }
         }
       }
     },
@@ -49361,6 +49943,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "충돌 보고서 없음"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到崩溃报告"
           }
         }
       }
@@ -49425,6 +50013,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "로그 없음"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不记录日志"
           }
         }
       }
@@ -49719,6 +50313,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "DynamicIsland의 충돌 보고서를 찾을 수 없습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未找到 DynamicIsland 的崩溃报告"
           }
         }
       }
@@ -50845,6 +51445,12 @@
             "state" : "translated",
             "value" : "노이즈 캔슬링"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "降噪"
+          }
         }
       }
     },
@@ -50972,6 +51578,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "없음"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无"
           }
         }
       }
@@ -51405,6 +52017,12 @@
             "state" : "translated",
             "value" : "연결되지 않음."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未连接。"
+          }
         }
       }
     },
@@ -51586,6 +52204,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "노치 탭 모드는 노치 안의 별도 탭에 클립보드를 표시합니다. 텍스트, 이미지 또는 단일 파일 항목을 Finder나 다른 앱으로 바로 드래그할 수 있습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刘海标签页模式会在刘海内以独立标签页显示剪贴板。可将文本、图片或单个文件项直接拖到 Finder 或其他应用。"
           }
         }
       }
@@ -52816,6 +53440,12 @@
             "state" : "translated",
             "value" : "개발자 대시보드 열기"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开开发者控制台"
+          }
         }
       }
     },
@@ -53121,6 +53751,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "다음으로 열기"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开方式"
           }
         }
       }
@@ -53723,6 +54359,12 @@
             "state" : "translated",
             "value" : "기타…"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他…"
+          }
         }
       }
     },
@@ -54243,6 +54885,12 @@
             "state" : "translated",
             "value" : "먼저 Spotify 개발자 앱의 클라이언트 ID를 붙여넣으세요."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先粘贴您的 Spotify 开发者应用的客户端 ID。"
+          }
         }
       }
     },
@@ -54295,6 +54943,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "타이머가 실행되는 동안 노치 안에 일시 정지 및 정지 버튼이 인라인으로 표시됩니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计时器运行时，暂停和停止按钮以内联方式显示在刘海内。"
           }
         }
       }
@@ -55221,6 +55875,12 @@
             "state" : "translated",
             "value" : "재생"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放"
+          }
         }
       }
     },
@@ -55469,6 +56129,12 @@
             "state" : "translated",
             "value" : "거울 기능을 사용하려면 시스템 설정에서 카메라 접근을 허용하십시오."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在系统设置中允许相机访问，以使用镜像功能。"
+          }
         }
       }
     },
@@ -55478,6 +56144,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "시스템 설정에서 카메라 접근을 허용하십시오."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在系统设置中允许相机访问。"
           }
         }
       }
@@ -55658,6 +56330,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "나쁨"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "差"
           }
         }
       }
@@ -55943,6 +56621,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "대체로 안정적인 사전 릴리스 빌드"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预发布构建，基本稳定"
           }
         }
       }
@@ -56580,6 +57264,12 @@
             "state" : "translated",
             "value" : "충분히 검증된 정식 릴리스"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正式发布版本，经过充分测试"
+          }
         }
       }
     },
@@ -57002,6 +57692,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "훑어보기"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速查看"
           }
         }
       }
@@ -57673,6 +58369,12 @@
             "state" : "translated",
             "value" : "설치 준비됨"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "准备安装"
+          }
         }
       }
     },
@@ -57957,6 +58659,12 @@
             "state" : "translated",
             "value" : "녹화 + 카메라"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制 + 相机"
+          }
         }
       }
     },
@@ -57967,6 +58675,12 @@
             "state" : "translated",
             "value" : "녹화 + 카메라 + 마이크"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制 + 相机 + 麦克风"
+          }
         }
       }
     },
@@ -57976,6 +58690,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "녹화 + 마이크"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制 + 麦克风"
           }
         }
       }
@@ -58099,6 +58819,12 @@
             "state" : "translated",
             "value" : "녹화만"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅录制"
+          }
         }
       }
     },
@@ -58169,6 +58895,12 @@
             "state" : "translated",
             "value" : "녹화 제어기"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制控件"
+          }
         }
       }
     },
@@ -58181,6 +58913,12 @@
             "state" : "translated",
             "value" : "녹화 포인터 올리기 스타일"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制悬停样式"
+          }
         }
       }
     },
@@ -58191,6 +58929,12 @@
             "state" : "translated",
             "value" : "녹화 중입니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在录制。"
+          }
         }
       }
     },
@@ -58200,6 +58944,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "리디렉션 URI:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重定向 URI："
           }
         }
       }
@@ -58891,6 +59641,12 @@
             "state" : "translated",
             "value" : "배경 제거"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除背景"
+          }
         }
       }
     },
@@ -59462,6 +60218,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "미리 알림 실시간 활동이 필요하지만 '실시간 활동' 설정에서 꺼져 있습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要提醒实时活动，但它已在实时活动设置中关闭。"
           }
         }
       }
@@ -60297,6 +61059,12 @@
             "state" : "translated",
             "value" : "오늘 남은 시간"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天余下的时间"
+          }
         }
       }
     },
@@ -60483,6 +61251,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "지금 재시작"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即重启"
           }
         }
       }
@@ -63402,6 +64176,12 @@
             "state" : "translated",
             "value" : "자물쇠, 지문 또는 두 아이콘을 모두 선택합니다. 지문을 선택하면 잠금 해제 애니메이션이 끝날 때까지 실시간 활동이 열려 있습니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择锁、指纹或同时选择两者。选中指纹时，实时活动会保持打开足够长的时间以完成解锁动画。"
+          }
         }
       }
     },
@@ -63707,6 +64487,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "민감군 주의"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "敏感人群注意"
           }
         }
       }
@@ -64425,6 +65211,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "서랍 항목"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "架子项目"
           }
         }
       }
@@ -66987,6 +67779,12 @@
             "state" : "translated",
             "value" : "가사 표시"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示歌词"
+          }
         }
       }
     },
@@ -67475,6 +68273,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "노치에 일시 정지/정지 제어기 표시"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在刘海中显示暂停/停止控件"
           }
         }
       }
@@ -68476,6 +69280,12 @@
             "state" : "translated",
             "value" : "열린 노치 안에 타이머 제어기를 전용 탭으로 표시합니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将计时器控件作为独立标签页显示在展开的刘海内。"
+          }
         }
       }
     },
@@ -68578,6 +69388,12 @@
             "state" : "translated",
             "value" : "사이드 가사 가로 오프셋"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "侧边歌词水平偏移"
+          }
         }
       }
     },
@@ -68587,6 +69403,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "사이드 가사 너비"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "侧边歌词宽度"
           }
         }
       }
@@ -68740,6 +69562,12 @@
             "state" : "translated",
             "value" : "Siri 감지"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri 检测"
+          }
         }
       }
     },
@@ -68749,6 +69577,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Siri 감지 속도"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri 检测速度"
           }
         }
       }
@@ -68900,6 +69734,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "건너뛰기 버튼 동작"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过按钮行为"
           }
         }
       }
@@ -69822,6 +70662,12 @@
             "state" : "translated",
             "value" : "스피커"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扬声器"
+          }
         }
       }
     },
@@ -70100,6 +70946,12 @@
             "state" : "translated",
             "value" : "Spotify 좋아요 버튼"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify 喜欢按钮"
+          }
         }
       }
     },
@@ -70110,6 +70962,12 @@
             "state" : "translated",
             "value" : "Spotify가 인증 코드를 반환하지 않았습니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify 未返回授权码。"
+          }
         }
       }
     },
@@ -70119,6 +70977,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spotify 로그인 실패: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify 登录失败：%@"
           }
         }
       }
@@ -70177,6 +71041,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spotify가 접근 권한을 취소했습니다. 계정을 다시 연결하세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify 已撤销访问权限。请重新连接您的账号。"
           }
         }
       }
@@ -70305,6 +71175,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "안정"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stable"
           }
         }
       }
@@ -73721,6 +74597,12 @@
             "state" : "translated",
             "value" : "현재 앱이 %@MB를 사용 중이며 안전 한도인 %@MB를 초과했습니다. 지금 재시작하여 메모리를 확보할까요?"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用当前占用 %1$@ MB，超过 %2$@ MB 的安全上限。是否立即重启以释放内存？"
+          }
         }
       }
     },
@@ -73730,6 +74612,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "원형 레이아웃에는 위치 레이블이나 일출 시간을 표시할 공간이 없으며, 배터리 게이지는 고리 형태로 그려집니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "圆形布局没有空间显示位置标签或日出时间，并将电池量表绘制为圆环。"
           }
         }
       }
@@ -73774,6 +74662,12 @@
             "state" : "translated",
             "value" : "좋아요 버튼에는 별도의 Spotify 앱 등록이 필요합니다(Canvas 쿠키 세션으로는 보관함을 변경할 수 없습니다). developer.spotify.com에서 무료 앱을 생성하고 아래 리디렉션 URI를 추가한 다음, 해당 앱의 클라이언트 ID를 여기에 붙여넣으세요."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "喜欢按钮需要单独注册 Spotify 应用（Canvas cookie 会话无法修改您的音乐库）。请在 developer.spotify.com 创建免费应用，添加下方的重定向 URI，然后将该应用的客户端 ID 粘贴到这里。"
+          }
         }
       }
     },
@@ -73784,6 +74678,12 @@
             "state" : "translated",
             "value" : "잠금 화면 미리 알림은 미리 알림 실시간 활동에서 생성되는데, 위에서 꺼져 있습니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "锁屏提醒由提醒实时活动生成，而它在上方当前处于关闭状态。"
+          }
         }
       }
     },
@@ -73793,6 +74693,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "잠금 화면 미리 알림은 미리 알림 실시간 활동에서 생성되는데, '실시간 활동' 설정에서 꺼져 있습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "锁屏提醒由提醒实时活动生成，而它在实时活动设置中当前处于关闭状态。"
           }
         }
       }
@@ -73844,6 +74750,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "이 제어기는 캘린더가 비활성화되어 있을 때 적용됩니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些控件在日历被禁用时生效。"
           }
         }
       }
@@ -75737,6 +76649,12 @@
             "state" : "translated",
             "value" : "토큰 교환 실패: %@"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "令牌交换失败：%@"
+          }
         }
       }
     },
@@ -75746,6 +76664,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "도구"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具"
           }
         }
       }
@@ -76059,6 +76983,12 @@
             "state" : "translated",
             "value" : "주변음 허용"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通透模式"
+          }
         }
       }
     },
@@ -76266,6 +77196,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "저전력 모드를 켜거나\n충전하는 것이 좋습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请开启低电量模式，否则\n建议为其充电。"
           }
         }
       }
@@ -76664,6 +77600,12 @@
             "state" : "translated",
             "value" : "로그인에 필요한 보안 난수 데이터를 생성할 수 없습니다."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法为登录生成安全的随机数据。"
+          }
         }
       }
     },
@@ -76673,6 +77615,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "녹화를 중지할 수 없습니다. Command-Control-Esc 또는 macOS 녹화 메뉴를 사용하세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法停止录制。请使用 Command-Control-Escape 或 macOS 的录制菜单。"
           }
         }
       }
@@ -76684,6 +77632,12 @@
             "state" : "translated",
             "value" : "밑줄(깜박임)"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下划线（闪烁）"
+          }
         }
       }
     },
@@ -76694,6 +77648,12 @@
             "state" : "translated",
             "value" : "밑줄(고정)"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下划线（常亮）"
+          }
         }
       }
     },
@@ -76703,6 +77663,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "건강에 해로움"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不健康"
           }
         }
       }
@@ -77001,6 +77967,12 @@
             "state" : "translated",
             "value" : "잠금 해제 중"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在解锁"
+          }
         }
       }
     },
@@ -77147,6 +78119,12 @@
             "state" : "translated",
             "value" : "최신 상태"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已是最新"
+          }
         }
       }
     },
@@ -77156,6 +78134,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "업데이트 사용 가능"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有可用更新"
           }
         }
       }
@@ -78680,6 +79664,12 @@
             "state" : "translated",
             "value" : "Spotify 공식 Web API(OAuth)를 사용하며, 접근 범위는 좋아요 표시한 곡을 읽고 변경하는 것으로 제한됩니다. 버튼을 표시하려면 미디어 슬롯에 '노래 좋아요' 제어기를 추가하세요."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Spotify 官方 Web API（OAuth），访问权限仅限于读取和更改您的“喜欢的歌曲”。将“喜欢歌曲”控件添加到媒体槽位即可显示该按钮。"
+          }
         }
       }
     },
@@ -78825,6 +79815,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "TIDAL 앱이 활성 미디어 소스일 때 macOS의 '재생 중'을 사용합니다. 재생 제어는 시스템 '재생 중' 대상을 따릅니다. TIDAL이 해당 원격 명령을 지원하지 않으면 탐색, 임의 재생, 반복이 동작하지 않을 수 있습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当 TIDAL 应用为当前媒体来源时，使用 macOS 的“正在播放”。播放控制将跟随系统的“正在播放”目标。如果 TIDAL 不支持对应的远程命令，可能无法进行进度拖动、随机播放或重复播放。"
           }
         }
       }
@@ -79524,6 +80520,12 @@
             "state" : "translated",
             "value" : "매우 나쁨"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "很差"
+          }
         }
       }
     },
@@ -79533,6 +80535,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "매우 해로움"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "非常不健康"
           }
         }
       }
@@ -81378,6 +82386,12 @@
             "state" : "translated",
             "value" : "위젯 레이아웃"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小组件布局"
+          }
         }
       }
     },
@@ -81545,6 +82559,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "윈도우"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "窗口"
           }
         }
       }
@@ -82313,6 +83333,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mac이 완전히 충전되었습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "您的 Mac 已充满电。"
           }
         }
       }
