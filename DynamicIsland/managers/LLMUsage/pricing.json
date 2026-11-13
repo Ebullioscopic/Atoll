@@ -381,6 +381,16 @@
       }
     },
     {
+      "id": "google/gemini-4-hydrogen",
+      "name": "Google: Gemini 4 Hydrogen",
+      "pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.0000075",
+        "cache_read": "0.000000075",
+        "cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
       "id": "google/gemini-nano-banana-2.1",
       "name": "Google: Nano Banana 2.1",
       "pricing": {
@@ -774,10 +784,10 @@
       "id": "openai/gpt-5.6-sol",
       "name": "OpenAI: GPT-5.6 Sol",
       "pricing": {
-        "prompt": "0.000004",
-        "completion": "0.00002",
-        "cache_read": "0.0000004",
-        "cache_write": "0.000005"
+        "prompt": "0.0000044",
+        "completion": "0.000022",
+        "cache_read": "0.00000044",
+        "cache_write": "0.0000055"
       }
     },
     {
@@ -991,5 +1001,5 @@
       }
     }
   ],
-  "last_updated": "2026-11-12T00:04:22Z"
+  "last_updated": "2026-11-13T00:04:32Z"
 }
