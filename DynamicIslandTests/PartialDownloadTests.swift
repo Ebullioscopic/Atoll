@@ -256,6 +256,31 @@ final class DownloadScanSequenceTests: XCTestCase {
         XCTAssertTrue(manager.isDownloading)
     }
 
+    func testResumedExistingDownloadCancelledOverUnchangedDestinationIsNotCompleted() {
+        let manager = makeManager()
+        manager.processScanForTesting(["old.zip.crdownload"], stamps: ["old.zip": started])
+        manager.processScanForTesting(["old.zip.crdownload"], stamps: ["old.zip": started])
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        manager.recordSpeedSampleForTesting(.init(bytes: 1_000, files: ["old.zip.crdownload"], takenAt: start, sizes: ["old.zip.crdownload": 1_000]))
+        manager.recordSpeedSampleForTesting(.init(bytes: 2_000, files: ["old.zip.crdownload"], takenAt: start.addingTimeInterval(1), sizes: ["old.zip.crdownload": 2_000]))
+        XCTAssertTrue(manager.isDownloading)
+        manager.processScanForTesting([], stamps: ["old.zip": started])
+        XCTAssertFalse(manager.isDownloadCompleted)
+        XCTAssertFalse(manager.isDownloading)
+    }
+
+    func testSamplingStopsWhenLastIgnoredFileDisappearsDuringCompletion() {
+        let manager = makeManager()
+        manager.processScanForTesting(["old.zip.crdownload"])
+        manager.processScanForTesting(["old.zip.crdownload", "new.zip.crdownload"])
+        manager.processScanForTesting(["old.zip.crdownload"], stamps: ["new.zip": written])
+        XCTAssertTrue(manager.isDownloadCompleted)
+        XCTAssertTrue(manager.isSpeedSamplingForTesting)
+        manager.processScanForTesting([], stamps: ["new.zip": written])
+        XCTAssertTrue(manager.isDownloadCompleted)
+        XCTAssertFalse(manager.isSpeedSamplingForTesting)
+    }
+
     /// ...but once that file is gone the name is free again, so a later
     /// download reusing it is a new download rather than one ignored forever.
     func testNameIsFreeAgainAfterTheIgnoredFileGoes() {
@@ -383,8 +408,8 @@ final class DownloadStallTests: XCTestCase {
         var stall = DownloadStall()
 
         XCTAssertFalse(stall.record(rate: 0, at: at(1)), "the first idle reading starts the clock")
-        XCTAssertFalse(stall.record(rate: 0, at: at(3)))
-        XCTAssertTrue(stall.record(rate: 0, at: at(5)))
+        XCTAssertFalse(stall.record(rate: 0, at: at(2)))
+        XCTAssertTrue(stall.record(rate: 0, at: at(3)))
     }
 
     /// The gap a slow transfer leaves between flushes is not a pause.
@@ -392,7 +417,7 @@ final class DownloadStallTests: XCTestCase {
         var stall = DownloadStall()
 
         XCTAssertFalse(stall.record(rate: 0, at: at(1)))
-        XCTAssertFalse(stall.record(rate: 0, at: at(4.9)))
+        XCTAssertFalse(stall.record(rate: 0, at: at(2.9)))
     }
 
     /// Bytes arriving again -- the browser was resumed -- clear the state

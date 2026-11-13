@@ -120,7 +120,7 @@ struct DownloadLiveActivity: View {
                                 // and the activity says so instead of
                                 // disappearing.
                                 Image(systemName: "pause.circle.fill")
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.white.opacity(0.9))
                                     .font(.system(size: 16, weight: .semibold))
                                     .padding(.trailing, 6)
                                     .accessibilityLabel(Text("Paused"))

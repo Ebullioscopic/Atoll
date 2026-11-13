@@ -96,7 +96,7 @@ struct DownloadStall {
     /// paused. Longer than the gap a slow transfer can leave between buffered
     /// writes, short enough that a pause is noticed while the download is
     /// still in front of the person who paused it.
-    static let threshold: TimeInterval = 4
+    static let threshold: TimeInterval = 2
 
     private(set) var isStalled = false
     private var lastGrowthAt: Date?
@@ -518,6 +518,10 @@ class DownloadManager {
             hasPerformedInitialScan = true
             previousInProgressFiles = inProgressFiles
             ignoredFiles = inProgressFiles
+            for name in inProgressFiles {
+                let target = PartialDownload.destination(of: name)
+                destinationStampsWhenStarted[target] = stamps[target]
+            }
             isDownloading = false
             if !ignoredFiles.isEmpty { startSpeedSampling() }
             return
@@ -557,7 +561,7 @@ class DownloadManager {
         guard isDownloading else {
             if ignoredFiles.isEmpty { stopSpeedSampling() }
             vanishedSinceActive.removeAll()
-            destinationStampsWhenStarted.removeAll()
+            retainIgnoredDestinationStamps()
             return
         }
 
@@ -567,6 +571,8 @@ class DownloadManager {
         // nothing left to have completed, and would close the view mid-animation.
         guard !isDownloadCompleted else {
             vanishedSinceActive.removeAll()
+            if ignoredFiles.isEmpty { stopSpeedSampling() }
+            retainIgnoredDestinationStamps()
             return
         }
 
@@ -581,7 +587,7 @@ class DownloadManager {
             stampsWhenStarted: destinationStampsWhenStarted
         )
         vanishedSinceActive.removeAll()
-        destinationStampsWhenStarted.removeAll()
+        retainIgnoredDestinationStamps()
 
         if completedFiles.isEmpty {
             closeDownloadViewImmediately()
@@ -591,6 +597,11 @@ class DownloadManager {
         if !ignoredFiles.isEmpty { startSpeedSampling() }
     }
     
+    private func retainIgnoredDestinationStamps() {
+        let targets = Set(ignoredFiles.map { PartialDownload.destination(of: $0) })
+        destinationStampsWhenStarted = destinationStampsWhenStarted.filter { targets.contains($0.key) }
+    }
+
 #if DEBUG
     /// A manager that watches nothing, for tests.
     ///
@@ -614,6 +625,8 @@ class DownloadManager {
     func processScanForTesting(_ inProgressFiles: Set<String>, stamps: [String: Date] = [:]) {
         processDownloadFiles(inProgressFiles, stamps: stamps)
     }
+
+    var isSpeedSamplingForTesting: Bool { speedTimer != nil }
 
     /// One speed reading, in the shape the sampler delivers them.
     ///
