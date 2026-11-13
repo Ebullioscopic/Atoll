@@ -122,14 +122,18 @@ struct ModelSelectionView: View {
     @State private var selectedModel: AIModel? = Defaults[.selectedAIModel]
     @State private var enableThinking: Bool = Defaults[.enableThinkingMode]
     
-    // API Keys
-    @State private var geminiApiKey: String = Defaults[.geminiApiKey]
-    @State private var openaiApiKey: String = Defaults[.openaiApiKey]
-    @State private var claudeApiKey: String = Defaults[.claudeApiKey]
+    // API Keys — held in the Keychain, read into local state only while editing
+    private let keyStore: AIKeyStoring = KeychainAIKeyStore.shared
+    @State private var geminiApiKey: String = KeychainAIKeyStore.shared.value(.gemini)
+    @State private var openaiApiKey: String = KeychainAIKeyStore.shared.value(.openai)
+    @State private var claudeApiKey: String = KeychainAIKeyStore.shared.value(.claude)
     @State private var localEndpoint: String = Defaults[.localModelEndpoint]
-    @State private var groqApiKey: String = Defaults[.groqApiKey]
+    @State private var groqApiKey: String = KeychainAIKeyStore.shared.value(.groq)
     
     @State private var showingApiKeyAlert = false
+    /// Set when a Keychain write fails, which keeps the panel open — see
+    /// `saveConfiguration()`.
+    @State private var keychainSaveError: String?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -271,9 +275,16 @@ struct ModelSelectionView: View {
                     closePanel()
                 }
                 .buttonStyle(PlainButtonStyle())
-                
+
                 Spacer()
-                
+
+                if let keychainSaveError {
+                    Label(keychainSaveError, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 Button("Save Configuration") {
                     saveConfiguration()
                 }
@@ -312,28 +323,67 @@ struct ModelSelectionView: View {
         ensureValidModelSelection()
         enableThinking = Defaults[.enableThinkingMode]
         
-        geminiApiKey = Defaults[.geminiApiKey]
-        openaiApiKey = Defaults[.openaiApiKey]
-        claudeApiKey = Defaults[.claudeApiKey]
+        geminiApiKey = keyStore.value(.gemini)
+        openaiApiKey = keyStore.value(.openai)
+        claudeApiKey = keyStore.value(.claude)
         localEndpoint = Defaults[.localModelEndpoint]
-        groqApiKey = Defaults[.groqApiKey]
+        groqApiKey = keyStore.value(.groq)
     }
     
     private func saveConfiguration() {
         ensureValidModelSelection()
 
+        // Snapshot what is there before writing anything, so a failure partway
+        // through the four accounts can be rolled back instead of leaving some
+        // accounts on the new value and others still on the old one.
+        let previousValues: [AIKeyAccount: String] = Dictionary(
+            uniqueKeysWithValues: AIKeyAccount.allCases.map { ($0, keyStore.value($0)) }
+        )
+        let pending: [(AIKeyAccount, String)] = [
+            (.gemini, geminiApiKey),
+            (.openai, openaiApiKey),
+            (.claude, claudeApiKey),
+            (.groq, groqApiKey)
+        ]
+
+        var succeeded: [AIKeyAccount] = []
+        var failed: [(AIKeyAccount, OSStatus)] = []
+        for (account, value) in pending {
+            let status = keyStore.save(value, account: account)
+            if status == errSecSuccess {
+                succeeded.append(account)
+            } else {
+                failed.append((account, status))
+            }
+        }
+
+        guard failed.isEmpty else {
+            // Best-effort rollback: restore every account that did succeed to
+            // what it held before this save, so the failure does not leave a
+            // partial mix of new and old credentials.
+            for account in succeeded {
+                keyStore.save(previousValues[account] ?? "", account: account)
+            }
+            for (account, status) in failed {
+                Logger.log(
+                    "Could not save the \(account.rawValue) key to the Keychain (OSStatus \(status)).",
+                    category: .warning
+                )
+            }
+            keychainSaveError = failed.count == 1
+                ? String(localized: "The \(failed[0].0.rawValue) key could not be saved to the Keychain.")
+                : String(localized: "\(failed.count) keys could not be saved to the Keychain.")
+            return
+        }
+
+        keychainSaveError = nil
         Defaults[.selectedAIProvider] = selectedProvider
         Defaults[.selectedAIModel] = selectedModel
         Defaults[.enableThinkingMode] = enableThinking
-        
-        Defaults[.geminiApiKey] = geminiApiKey
-        Defaults[.openaiApiKey] = openaiApiKey
-        Defaults[.claudeApiKey] = claudeApiKey
         Defaults[.localModelEndpoint] = localEndpoint
-        Defaults[.groqApiKey] = groqApiKey
-        
+
         closePanel()
-        
+
         // Notify that configuration changed
         NotificationCenter.default.post(name: .aiModelConfigurationChanged, object: nil)
     }
