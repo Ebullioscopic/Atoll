@@ -189,7 +189,9 @@ struct NetworkConnectivityHUD: View {
             )
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(isHotspot ? "Hotspot" : "Wi-Fi") connected, \(name)")
+        .accessibilityLabel(isHotspot
+            ? "Hotspot connected, \(name)"
+            : "Wi-Fi connected, \(name)")
         .accessibilityIdentifier(isHotspot ? "ConnectivityHUD.Hotspot" : "ConnectivityHUD.WiFi")
     }
 

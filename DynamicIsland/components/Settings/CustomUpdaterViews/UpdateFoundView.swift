@@ -33,11 +33,11 @@ struct UpdateFoundView: View {
     }
 
     private var newVersion: String {
-        state.appcastItem?.displayVersionString ?? "Unknown"
+        state.appcastItem?.displayVersionString ?? String(localized: "Unknown")
     }
 
     private var currentVersion: String {
-        Bundle.main.releaseVersionNumber ?? "Unknown"
+        Bundle.main.releaseVersionNumber ?? String(localized: "Unknown")
     }
 
     var body: some View {

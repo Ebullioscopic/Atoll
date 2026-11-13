@@ -70,7 +70,7 @@ struct UpdateErrorView: View {
                 .foregroundStyle(.primary)
 
             // Error message
-            Text(state.errorMessage ?? "An unknown error occurred while updating Atoll.")
+            Text(state.errorMessage ?? String(localized: "An unknown error occurred while updating Atoll."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

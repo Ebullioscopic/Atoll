@@ -4,6 +4,12 @@
     "Battery charging: %.1f W" : {
       "comment" : "Actual measured power; adapter capacity is not used as a substitute.",
       "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "배터리 충전 전력: %.1f W"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
@@ -18,9 +24,25 @@
         }
       }
     },
+    "Position & Padding" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위치 및 여백"
+          }
+        }
+      }
+    },
     "Power input: %.1f W" : {
       "comment" : "Actual measured power; adapter capacity is not used as a substitute.",
       "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "입력 전력: %.1f W"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
@@ -94,8 +116,8 @@
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "고정된 가사 문맥"
+            "state" : "translated",
+            "value" : "고정 가사 표시 줄 수"
           }
         },
         "nl" : {
@@ -213,8 +235,8 @@
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "현재 줄"
+            "state" : "translated",
+            "value" : "현재 줄만"
           }
         },
         "nl" : {
@@ -332,7 +354,7 @@
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "3줄"
           }
         },
@@ -451,7 +473,7 @@
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "5줄"
           }
         },
@@ -570,8 +592,8 @@
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "선택한 문맥과 함께 닫힌 노치 아래에 동기화된 가사를 표시합니다. 간주 중에도 공간을 유지하며, 화면에 HUD가 표시되는 동안 가사를 숨깁니다. 가사 패널의 고정 버튼으로도 켜거나 끌 수 있습니다."
+            "state" : "translated",
+            "value" : "선택한 줄 수에 맞춰 재생 시점과 동기화된 가사를 닫힌 노치 아래에 표시합니다. 간주 중에도 표시 공간을 유지하고, HUD가 표시되는 동안에는 가사를 숨깁니다. 가사 패널의 고정 버튼으로도 켜거나 끌 수 있습니다."
           }
         },
         "nl" : {
@@ -1329,7 +1351,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@모델"
+            "value" : "%@ 모델"
           }
         },
         "nl" : {
@@ -2049,7 +2071,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld애니메이션"
+            "value" : "애니메이션 %lld개"
           }
         },
         "nl" : {
@@ -2092,6 +2114,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 個動畫"
+          }
+        }
+      }
+    },
+    "%lld apps" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 %lld개"
           }
         }
       }
@@ -2162,7 +2194,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld색상"
+            "value" : "색상 %lld개"
           }
         },
         "nl" : {
@@ -2222,7 +2254,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld 일%2$@ 전"
+            "value" : "%1$lld일 전"
           }
         },
         "nl" : {
@@ -2276,7 +2308,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld시간%2$@전"
+            "value" : "%1$lld시간 전"
           }
         },
         "nl" : {
@@ -2356,9 +2388,14 @@
             "state" : "translated",
             "value" : "%lld 分鐘"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld분"
+          }
         }
-      },
-      "shouldTranslate" : false
+      }
     },
     "%lld minute%@ ago" : {
       "comment" : "A string describing how long ago a particular event occurred, based on the number of minutes that have passed. | A string describing how long ago a particular event occurred, based on the number of minutes that have passed. | merge:ko:alt='%1$lld분%2$@ 전'",
@@ -2373,7 +2410,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld분%2$@전"
+            "value" : "%1$lld분 전"
           }
         },
         "nl" : {
@@ -3497,7 +3534,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "+%lld 더보기"
+            "value" : "외 %lld개"
           }
         },
         "nl" : {
@@ -3737,6 +3774,16 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "1 app" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 1개"
+          }
+        }
+      }
     },
     "1 hour" : {
       "localizations" : {
@@ -4243,6 +4290,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "15 分鐘"
+          }
+        }
+      }
+    },
+    "15 minutes" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "15분"
           }
         }
       }
@@ -4804,6 +4861,16 @@
         }
       }
     },
+    "30 minutes" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30분"
+          }
+        }
+      }
+    },
     "3D" : {
       "localizations" : {
         "en" : {
@@ -4856,6 +4923,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "4"
+          }
+        }
+      }
+    },
+    "4 hours" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4시간"
           }
         }
       }
@@ -5283,6 +5360,16 @@
         }
       }
     },
+    "A bar that fills as the download runs, or a ring around the notch's corner." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드 진행률을 채워지는 막대나 노치 모서리의 원형 표시기로 보여 줍니다."
+          }
+        }
+      }
+    },
     "A new version of Atoll is available!" : {
       "comment" : "A title for a view that displays an update is available.",
       "isCommentAutoGenerated" : true,
@@ -5658,6 +5745,16 @@
       },
       "shouldTranslate" : false
     },
+    "Antigravity Provider" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antigravity 제공자"
+          }
+        }
+      }
+    },
     "API Configuration" : {
       "localizations" : {
         "fr" : {
@@ -5712,6 +5809,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "API 配置"
+          }
+        }
+      }
+    },
+    "API key" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 키"
           }
         }
       }
@@ -6333,6 +6440,36 @@
         }
       }
     },
+    "Accessibility permission is needed to intercept system controls for the Circular HUD." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원형 HUD에서 시스템 제어 키 입력을 처리하려면 손쉬운 사용 권한이 필요합니다."
+          }
+        }
+      }
+    },
+    "Accessibility permission is needed to intercept system controls for the Custom OSD." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용자 지정 OSD에서 시스템 제어 키 입력을 처리하려면 손쉬운 사용 권한이 필요합니다."
+          }
+        }
+      }
+    },
+    "Accessibility permission is needed to intercept system controls for the Vertical HUD." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세로 HUD에서 시스템 제어 키 입력을 처리하려면 손쉬운 사용 권한이 필요합니다."
+          }
+        }
+      }
+    },
     "Accessibility permission lets Dynamic Island replace the native volume, brightness, and keyboard HUDs." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6423,6 +6560,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要輔助使用權限"
+          }
+        }
+      }
+    },
+    "Account name" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정 이름"
           }
         }
       }
@@ -6679,7 +6826,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "활동중"
+            "value" : "활동 중"
           }
         },
         "nl" : {
@@ -6892,6 +7039,16 @@
         }
       }
     },
+    "Actual Size" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "실제 크기"
+          }
+        }
+      }
+    },
     "Adaptive Audio" : {
       "localizations" : {
         "ko" : {
@@ -7093,7 +7250,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "URL로 부터 애니메이션 추가"
+            "value" : "URL에서 애니메이션 추가"
           }
         },
         "nl" : {
@@ -7196,6 +7353,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新增"
+          }
+        }
+      }
+    },
+    "Add one or more New API accounts to monitor their balance and usage." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New API 계정을 추가하면 잔액과 사용량을 확인할 수 있습니다."
           }
         }
       }
@@ -7331,7 +7498,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "URL로 부터 추가…"
+            "value" : "URL에서 추가…"
           }
         },
         "nl" : {
@@ -7539,6 +7706,16 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "手動新增"
+          }
+        }
+      }
+    },
+    "Add New API Account" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New API 계정 추가"
           }
         }
       }
@@ -7781,6 +7958,16 @@
         }
       }
     },
+    "Additional folder access required" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더 접근 권한이 필요합니다"
+          }
+        }
+      }
+    },
     "Adds a Guake-style dropdown terminal tab. The terminal session persists across notch open/close cycles." : {
       "localizations" : {
         "ko" : {
@@ -7944,6 +8131,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AirPlay/경로 선택기 버튼을 사용자화 가능한 제어기 팔레트에 다시 추가합니다. 잠금 화면 패널도 이 버튼을 음량 슬라이더로 사용하므로, 끄면 해당 패널에 음량 제어기가 없어집니다."
+          }
+        }
+      }
+    },
+    "Adds the current rate beside the indicator, measured from how fast the files in your Downloads folder are growing." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드 폴더에 있는 파일의 크기 변화를 바탕으로 속도를 계산해 진행률 옆에 표시합니다."
           }
         }
       }
@@ -8601,6 +8798,16 @@
         }
       }
     },
+    "All Applications" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 응용 프로그램"
+          }
+        }
+      }
+    },
     "All time" : {
       "localizations" : {
         "ko" : {
@@ -8998,7 +9205,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "잠금 화면 위젯 확장 허용"
+            "value" : "확장 프로그램의 잠금 화면 위젯 허용"
           }
         },
         "nl" : {
@@ -9046,7 +9253,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "노치 경험 확장 허용"
+            "value" : "확장 프로그램의 노치 기능 허용"
           }
         },
         "nl" : {
@@ -9142,7 +9349,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "미니멀리즘 레이아웃 덮어쓰기 허용"
+            "value" : "간결한 UI 재정의 허용"
           }
         },
         "nl" : {
@@ -9188,7 +9395,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "마우스 보고 활성화"
+            "value" : "마우스 입력 전달 허용"
           }
         },
         "nl" : {
@@ -9299,6 +9506,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "알파"
+          }
+        }
+      }
+    },
+    "Also keep the display awake" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디스플레이도 켜 두기"
           }
         }
       }
@@ -9417,6 +9634,16 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "總是隱藏在全螢幕"
+          }
+        }
+      }
+    },
+    "Always Open With" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "항상 이 앱으로 열기"
           }
         }
       }
@@ -9540,6 +9767,16 @@
         }
       }
     },
+    "Always show volume control" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "음량 조절 막대 항상 표시"
+          }
+        }
+      }
+    },
     "Amazon Music" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -9577,6 +9814,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Amazon Music"
+          }
+        }
+      }
+    },
+    "Amazon Music ships no scripting dictionary, and the system media interface has no way to favourite." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amazon Music은 스크립팅을 지원하지 않으며, 시스템 미디어 제어로는 곡을 즐겨찾기에 추가할 수 없습니다."
+          }
+        }
+      }
+    },
+    "An unknown error occurred while updating Atoll." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll을 업데이트하는 중 알 수 없는 오류가 발생했습니다."
+          }
+        }
+      }
+    },
+    "An unknown error occurred." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알 수 없는 오류가 발생했습니다."
           }
         }
       }
@@ -9636,6 +9903,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "動畫"
+          }
+        }
+      }
+    },
+    "Animation Details" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "애니메이션 세부 정보"
           }
         }
       }
@@ -9753,6 +10030,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "反重力"
+          }
+        }
+      }
+    },
+    "API keys are stored in the macOS Keychain. Balance and usage are shown in the quota units reported by your New API server." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 키는 macOS 키체인에 저장됩니다. 잔액과 사용량은 New API 서버가 제공하는 할당량 단위로 표시됩니다."
+          }
+        }
+      }
+    },
+    "API token" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 토큰"
           }
         }
       }
@@ -9975,6 +10272,16 @@
         }
       }
     },
+    "App Volume" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱별 음량"
+          }
+        }
+      }
+    },
     "Appearance" : {
       "localizations" : {
         "ar" : {
@@ -10184,6 +10491,16 @@
         }
       }
     },
+    "AppleScript on Music.app. No subscription needed." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "음악 앱을 AppleScript로 제어합니다. 구독은 필요하지 않습니다."
+          }
+        }
+      }
+    },
     "Applies everywhere the transport controls appear: the notch player, the lock screen panel, and the floating window." : {
       "localizations" : {
         "ko" : {
@@ -10252,7 +10569,17 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "상태 위젯 전체에 적용됩니다. 날씨, 배터리, 집중 모드, 위치, 다음 일정 행이 모두 선택한 모양과 레이아웃으로 그려집니다. 배경화면이 밝을 때는 제목과 레이블이 잘 보이도록 '밝게'를 사용하세요."
+            "value" : "상태 위젯 전체에 적용됩니다. 날씨, 배터리, 집중 모드, 위치, 다음 일정 행이 모두 선택한 모양과 레이아웃으로 그려집니다. 배경화면이 밝을 때는 제목과 레이블이 잘 보이도록 '라이트'를 사용하세요."
+          }
+        }
+      }
+    },
+    "Apps built with AtollExtensionKit, collected in one place. Opens in your browser." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AtollExtensionKit으로 만든 앱을 한곳에서 찾아볼 수 있습니다. 브라우저에서 열립니다."
           }
         }
       }
@@ -10684,7 +11011,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Atoll에는 노치에서 바로 카메라를 통해 외모를 빠르게 확인할 수 있는 거울 기능이 포함되어 있습니다. 카메라 접근 권한은 이 실시간 미리보기를 표시하는 용도로만 사용됩니다. 거울 기능은 앱 설정에서 언제든지 켜거나 끌 수 있습니다."
+            "value" : "노치에서 카메라 미리보기로 내 모습을 빠르게 확인할 수 있습니다. 카메라 접근 권한은 실시간 미리보기를 표시하는 데만 사용합니다. 앱 설정에서 언제든 미리보기를 켜거나 끌 수 있습니다."
           }
         },
         "nl" : {
@@ -10779,6 +11106,16 @@
         }
       }
     },
+    "Atoll needs audio recording permission to change app volumes." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱별 음량을 조절하려면 Atoll에 오디오 녹음 권한이 필요합니다."
+          }
+        }
+      }
+    },
     "Atoll needs Full Disk Access to read the system notification database. If Atoll does not appear in the list, use 'Reveal App in Finder' and drag it into the settings window." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -10828,6 +11165,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atoll 需要完整磁碟取用權來讀取系統通知資料庫。如果 Atoll 未出現在列表中，請使用「在 Finder 中顯示 App」並將其拖入設定視窗。"
+          }
+        }
+      }
+    },
+    "Atoll Settings" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll 설정"
+          }
+        }
+      }
+    },
+    "Atoll Update" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll 업데이트"
           }
         }
       }
@@ -11093,7 +11450,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "인증"
+            "value" : "허용"
           }
         },
         "nl" : {
@@ -11147,7 +11504,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "인증됨"
+            "value" : "허용됨"
           }
         },
         "nl" : {
@@ -11190,6 +11547,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已授權"
+          }
+        }
+      }
+    },
+    "Auto" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동"
+          }
+        }
+      }
+    },
+    "Auto (Transparent)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동 (투명)"
+          }
+        }
+      }
+    },
+    "Auto Reverse" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앞뒤로 번갈아 재생"
           }
         }
       }
@@ -11792,6 +12179,26 @@
         }
       }
     },
+    "Background color" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "배경색"
+          }
+        }
+      }
+    },
+    "Background Removal Failed" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "배경 제거 실패"
+          }
+        }
+      }
+    },
     "Backlight" : {
       "comment" : "A control for adjusting the keyboard backlight intensity.",
       "isCommentAutoGenerated" : true,
@@ -11922,6 +12329,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "막대(고정)"
+          }
+        }
+      }
+    },
+    "Base URL" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기본 URL"
           }
         }
       }
@@ -12672,7 +13089,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "배터리 충전중"
+            "value" : "배터리 충전 중"
           }
         },
         "nl" : {
@@ -12725,7 +13142,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "배터리 충전중, %@ 남음"
+            "value" : "배터리 충전 중, %@ 남음"
           }
         },
         "nl" : {
@@ -12935,6 +13352,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "베타"
+          }
+        }
+      }
+    },
+    "Black" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "검은색"
+          }
+        }
+      }
+    },
+    "Black (Transparent)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "검은색 (투명)"
           }
         }
       }
@@ -13207,6 +13644,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "藍牙裝置 %1$@ 電量 %2$d%%"
+          }
+        }
+      }
+    },
+    "Bold as bright" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "굵은 글씨를 밝은 색으로 표시"
           }
         }
       }
@@ -13488,6 +13935,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "兩者皆使用中"
+          }
+        }
+      }
+    },
+    "Bottom Padding" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아래쪽 여백"
           }
         }
       }
@@ -13860,6 +14317,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "亮度步長"
+          }
+        }
+      }
+    },
+    "Browse the Marketplace" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마켓플레이스 둘러보기"
           }
         }
       }
@@ -14634,7 +15101,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "캘린더 또는 미리 알림 접근 권한이 거부되었습니다. 시스템 설정에서 접근 권한을 활성화 해주세요."
+            "value" : "캘린더 또는 미리 알림 접근 권한이 거부되었습니다. 시스템 설정에서 접근 권한을 허용해 주세요."
           }
         },
         "nl" : {
@@ -15664,7 +16131,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "배터리 충전중"
+            "value" : "배터리 충전 중"
           }
         },
         "nl" : {
@@ -15710,7 +16177,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "충전 지속 시간"
+            "value" : "충전 알림 표시 시간"
           }
         },
         "nl" : {
@@ -16483,6 +16950,16 @@
         }
       }
     },
+    "Choose an application to open the document \"%@\"." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‘%@’ 문서를 열 응용 프로그램을 선택하세요."
+          }
+        }
+      }
+    },
     "Choose animation to display when Atoll is idle. Tap to select, hold to delete custom animations." : {
       "comment" : "A footer label under the section that lists their idle animations.",
       "isCommentAutoGenerated" : true,
@@ -16508,7 +16985,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Atoll이 유휴 상태일 때 표시할 애니메이션을 선택하세요. 탭하여 선택하고, 길게 눌러 사용자 설정 애니메이션을 삭제할 수 있습니다."
+            "value" : "Atoll이 대기 중일 때 표시할 애니메이션을 고르세요. 클릭해 선택하고, 길게 눌러 사용자 설정 애니메이션을 삭제할 수 있습니다."
           }
         },
         "nl" : {
@@ -16551,6 +17028,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選擇 Atoll 閒置時顯示的動畫。點按選擇，長按刪除自訂動畫。"
+          }
+        }
+      }
+    },
+    "Choose Application" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "응용 프로그램 선택"
           }
         }
       }
@@ -16603,6 +17090,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直接選擇垂直條在螢幕的哪一側顯示。"
+          }
+        }
+      }
+    },
+    "Choose files to share via %@" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@를 통해 공유할 파일을 선택하세요."
           }
         }
       }
@@ -16933,6 +17430,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cider"
+          }
+        }
+      }
+    },
+    "Cider's own local API, which needs the app token entered below." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cider의 로컬 API를 사용하려면 아래에 앱 토큰을 입력하세요."
           }
         }
       }
@@ -17281,6 +17788,16 @@
         }
       }
     },
+    "Claude Provider" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude 제공자"
+          }
+        }
+      }
+    },
     "Clear" : {
       "localizations" : {
         "fr" : {
@@ -17625,6 +18142,16 @@
         }
       }
     },
+    "Clear favorites" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기 지우기"
+          }
+        }
+      }
+    },
     "Clear History" : {
       "comment" : "The text on a button that clears the clipboard history.",
       "isCommentAutoGenerated" : true,
@@ -17675,6 +18202,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除歷史"
+          }
+        }
+      }
+    },
+    "Clear history" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기록 지우기"
           }
         }
       }
@@ -18156,7 +18693,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "눌려서 자세히 보기"
+            "value" : "클릭하여 자세히 보기"
           }
         },
         "nl" : {
@@ -18408,7 +18945,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "클립보드 매니저"
+            "value" : "클립보드 관리자"
           }
         },
         "nl" : {
@@ -18694,7 +19231,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "닫기 제스쳐"
+            "value" : "닫기 제스처"
           }
         },
         "nl" : {
@@ -18740,7 +19277,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "닫힌 노치 / 알약 너비"
+            "value" : "닫힌 노치 / 캡슐 너비"
           }
         },
         "nl" : {
@@ -18782,7 +19319,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "색상 선택기, 상태 모니터링 및 화면 어시스턴트로 코딩하고 디버깅하세요."
+            "value" : "색상 선택기, 통계 모니터링 및 스크린 어시스턴트로 코딩하고 디버깅하세요."
           }
         },
         "nl" : {
@@ -18847,6 +19384,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Codex"
+          }
+        }
+      }
+    },
+    "Codex Provider" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex 제공자"
           }
         }
       }
@@ -19570,7 +20117,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "'세그먼트' 모드에서는 색상별 채우기를 사용할 수 없습니다. 고급 옵션을 조정하려면 '제어기 › Dynamic Island'에서 '계층형' 또는 '그라데이션'으로 전환하세요."
+            "value" : "'세그먼트' 모드에서는 색상별 채우기를 사용할 수 없습니다. 고급 옵션을 조정하려면 '제어기 › 다이나믹 아일랜드'에서 '계층형' 또는 '그라데이션'으로 전환하세요."
           }
         },
         "nl" : {
@@ -20081,6 +20628,16 @@
         }
       }
     },
+    "Compression:" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "압축:"
+          }
+        }
+      }
+    },
     "Compute" : {
       "localizations" : {
         "ko" : {
@@ -20303,7 +20860,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "화면 표시 탭에서 잠금 화면 머티리얼을 설정하세요. '리퀴드 글래스'를 선택하면 두 위젯 모두에서 '사용자 설정 리퀴드' 스타일 슬라이더를 사용할 수 있습니다."
+            "value" : "외관 탭에서 잠금 화면 머티리얼을 설정하세요. '리퀴드 글래스'를 선택하면 두 위젯 모두에서 '사용자 설정 리퀴드' 스타일 슬라이더를 사용할 수 있습니다."
           }
         },
         "nl" : {
@@ -20512,6 +21069,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spotify 계정 연결"
+          }
+        }
+      }
+    },
+    "Connect to Wi-Fi, Ethernet, or Personal Hotspot." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi, 이더넷 또는 개인용 핫스팟에 연결하세요."
           }
         }
       }
@@ -21114,7 +21681,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island가 자체 실시간 현황 및 효과음과 함께 잠금/잠금 해제 이벤트를 연동할지 여부를 제어합니다."
+            "value" : "다이나믹 아일랜드가 자체 실시간 현황 및 효과음과 함께 잠금/잠금 해제 이벤트를 연동할지 여부를 제어합니다."
           }
         },
         "nl" : {
@@ -21265,6 +21832,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "경로 복사"
+          }
+        }
+      }
+    },
+    "Copy" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "복사"
           }
         }
       }
@@ -21603,9 +22180,14 @@
             "state" : "translated",
             "value" : "核心 %lld"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "코어 %lld"
+          }
         }
-      },
-      "shouldTranslate" : false
+      }
     },
     "Core Clock" : {
       "localizations" : {
@@ -21836,7 +22418,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "색상 선택기, 거울 및 시각 효과를 사용하여 제작하고 디자인해 보세요."
+            "value" : "색상 선택기, 카메라 미리보기, 시각 효과로 창작과 디자인 작업을 해 보세요."
           }
         },
         "nl" : {
@@ -21882,7 +22464,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "클립보드로 부터 생성"
+            "value" : "클립보드에서 생성"
           }
         },
         "nl" : {
@@ -22307,7 +22889,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "현재 활동"
+            "value" : "현재 사용 중"
           }
         },
         "nl" : {
@@ -22498,6 +23080,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cursor"
+          }
+        }
+      }
+    },
+    "Cursor color" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "커서 색상"
+          }
+        }
+      }
+    },
+    "Cursor Provider" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cursor 제공자"
           }
         }
       }
@@ -23401,7 +24003,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사용자 설정 음악 실시간 활동 애니메이션"
+            "value" : "사용자 설정 음악 실시간 현황 애니메이션"
           }
         },
         "nl" : {
@@ -23734,6 +24336,16 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "自訂視覺化器（Lottie）"
+          }
+        }
+      }
+    },
+    "Custom..." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용자 설정…"
           }
         }
       }
@@ -24196,6 +24808,16 @@
         }
       }
     },
+    "Dark Gray" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "어두운 회색"
+          }
+        }
+      }
+    },
     "Dash outline equals the exact notch bounds." : {
       "comment" : "A description under the live preview section of the animation editor.",
       "isCommentAutoGenerated" : true,
@@ -24538,6 +25160,16 @@
         }
       }
     },
+    "Default duration" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기본 지속 시간"
+          }
+        }
+      }
+    },
     "Default uses the expanded recording HUD. Inline keeps the stop control inside the notch height." : {
       "localizations" : {
         "ko" : {
@@ -24660,6 +25292,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪除"
+          }
+        }
+      }
+    },
+    "Delete %@" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 삭제"
           }
         }
       }
@@ -24830,6 +25472,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪除顏色"
+          }
+        }
+      }
+    },
+    "Delete New API account" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New API 계정 삭제"
+          }
+        }
+      }
+    },
+    "Delete New API account?" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New API 계정을 삭제할까요?"
           }
         }
       }
@@ -25122,7 +25784,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "모두 선택해제"
+            "value" : "모두 선택 해제"
           }
         },
         "nl" : {
@@ -25485,6 +26147,16 @@
         }
       }
     },
+    "Dial in the final polish." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "회전 각도와 투명도를 세부 조정하세요."
+          }
+        }
+      }
+    },
     "Digital" : {
       "comment" : "The display name for the \"Digital\" reminder presentation style.",
       "extractionState" : "stale",
@@ -25710,7 +26382,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "표준 노치 미디어 제어기를 설정하려면 '미니멀리즘 UI'를 비활성화하세요."
+            "value" : "표준 노치 미디어 제어기를 설정하려면 '간결한 UI'를 비활성화하세요."
           }
         },
         "nl" : {
@@ -25767,7 +26439,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "가사를 표시하려면 '미니멀리즘 UI'를 비활성화하세요."
+            "value" : "가사를 표시하려면 '간결한 UI'를 비활성화하세요."
           }
         }
       }
@@ -25777,7 +26449,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "가사를 사용하려면 '미니멀리즘 UI'를 비활성화하세요."
+            "value" : "가사를 사용하려면 '간결한 UI'를 비활성화하세요."
           }
         }
       }
@@ -26806,7 +27478,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "날씨 캡슐의 위 또는 아래에 예정된 다음 일정을 표시합니다. 여기서 선택한 캘린더는 Dynamic Island의 캘린더 필터와 별개로 적용됩니다."
+            "value" : "날씨 캡슐의 위 또는 아래에 예정된 다음 일정을 표시합니다. 여기서 선택한 캘린더는 다이나믹 아일랜드의 캘린더 필터와 별개로 적용됩니다."
           }
         },
         "nl" : {
@@ -26852,7 +27524,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "방해금지 모드"
+            "value" : "방해 금지 모드"
           }
         },
         "nl" : {
@@ -27992,7 +28664,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island 진행 표시줄"
+            "value" : "다이나믹 아일랜드 진행 표시줄"
           }
         },
         "nl" : {
@@ -28044,7 +28716,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island 표시"
+            "value" : "다이나믹 아일랜드 표시"
           }
         },
         "nl" : {
@@ -28090,7 +28762,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "사용자 설정 집중 모드 표시기를 감지하고 서랍을 사용하려면 '전체 디스크 접근 권한'이 필요합니다. '계속'을 클릭해 전체 디스크 접근 권한 설정을 열고, + 버튼을 눌러 Dynamic Island를 선택하세요(Finder에서 위치를 열어 드립니다)."
+            "value" : "사용자 설정 집중 모드 표시기를 감지하고 서랍을 사용하려면 '전체 디스크 접근 권한'이 필요합니다. '계속'을 클릭해 전체 디스크 접근 권한 설정을 열고, + 버튼을 눌러 Atoll을 선택하세요(Finder에서 위치를 열어 드립니다)."
           }
         }
       }
@@ -28100,7 +28772,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DynamicIsland의 메모리 사용량이 높습니다"
+            "value" : "Atoll의 메모리 사용량이 높습니다"
           }
         }
       }
@@ -28149,6 +28821,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "歐洲空氣品質指數"
+          }
+        }
+      }
+    },
+    "e.g., 1920" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예: 1920"
           }
         }
       }
@@ -28568,6 +29250,26 @@
         }
       }
     },
+    "Edit New API account" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New API 계정 편집"
+          }
+        }
+      }
+    },
+    "Edit New API Account" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New API 계정 편집"
+          }
+        }
+      }
+    },
     "Email address" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -28678,7 +29380,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "애니메이션을 사용자화하려면 '유휴 상태 애니메이션'을 활성화하세요."
+            "value" : "애니메이션을 사용자화하려면 '대기 애니메이션'을 켜세요."
           }
         },
         "nl" : {
@@ -28982,7 +29684,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "클립보드 매니저 확설화"
+            "value" : "클립보드 관리자 활성화"
           }
         },
         "nl" : {
@@ -29178,7 +29880,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "클립보드로 부터 생성 활성화"
+            "value" : "클립보드에서 생성 활성화"
           }
         },
         "nl" : {
@@ -29224,7 +29926,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island 미디어 제어기를 활성화하여 잠금 화면 패널을 관리합니다."
+            "value" : "다이나믹 아일랜드 미디어 제어기를 활성화하여 잠금 화면 패널을 관리합니다."
           }
         },
         "nl" : {
@@ -29312,7 +30014,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "다이내믹 미러 활성화"
+            "value" : "카메라 미리보기 켜기"
           }
         },
         "nl" : {
@@ -29514,6 +30216,16 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "啟用 HUD 替換"
+          }
+        }
+      }
+    },
+    "Enable Keep Awake" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "절전 방지 활성화"
           }
         }
       }
@@ -30337,6 +31049,16 @@
         }
       }
     },
+    "Enable Custom OSD" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용자 지정 OSD 활성화"
+          }
+        }
+      }
+    },
     "Enable customizable controls" : {
       "comment" : "A toggle that allows users to enable or disable customizable controls for media playback.",
       "isCommentAutoGenerated" : true,
@@ -30444,7 +31166,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "진단 기록 확장 활성화"
+            "value" : "확장 프로그램 진단 로그 활성화"
           }
         },
         "nl" : {
@@ -30546,7 +31268,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "추가 볼륨 조작 리스너 활성화"
+            "value" : "외부 음량 제어 감지 활성화"
           }
         },
         "nl" : {
@@ -30587,12 +31309,22 @@
         }
       }
     },
+    "Enable Full Disk Access, or grant access to both Documents and Downloads folders to use Shelf." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서랍을 사용하려면 전체 디스크 접근 권한을 켜거나 문서 및 다운로드 폴더에 모두 접근할 수 있도록 허용하세요."
+          }
+        }
+      }
+    },
     "Enable gestures" : {
       "localizations" : {
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "제스쳐 활성화"
+            "value" : "제스처 활성화"
           }
         },
         "nl" : {
@@ -30638,7 +31370,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "전역 키보드 간축키 활성화"
+            "value" : "전역 키보드 단축키 활성화"
           }
         },
         "nl" : {
@@ -30684,7 +31416,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "위의 글로벌 키보드 단축키를 활성화하여 단축키를 사용자화하세요."
+            "value" : "위의 전역 키보드 단축키를 활성화하여 단축키를 사용자화하세요."
           }
         },
         "nl" : {
@@ -30784,7 +31516,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "성능 데이터를 확인하려면 '설정 → 상태'에서 그래프 표시를 활성화하세요."
+            "value" : "성능 데이터를 확인하려면 '설정 → 통계'에서 그래프 표시를 활성화하세요."
           }
         },
         "nl" : {
@@ -31201,7 +31933,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "음악 실시간 활동 활성화"
+            "value" : "음악 실시간 현황 활성화"
           }
         },
         "nl" : {
@@ -31256,6 +31988,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "啟用音樂即時動態"
+          }
+        }
+      }
+    },
+    "Enable per-app volume" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱별 음량 조절 활성화"
           }
         }
       }
@@ -31513,7 +32255,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "시스템 성능 데이터를 확인하려면 설정에서 상태 모니터링을 활성화하세요."
+            "value" : "시스템 성능 데이터를 확인하려면 설정에서 통계 모니터링을 활성화하세요."
           }
         },
         "nl" : {
@@ -31565,7 +32307,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "시스템 상태 모니터링 활성화"
+            "value" : "시스템 통계 모니터링 활성화"
           }
         },
         "nl" : {
@@ -32209,6 +32951,16 @@
         }
       }
     },
+    "Enable:" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "활성화:"
+          }
+        }
+      }
+    },
     "Engine Utilization" : {
       "comment" : "A label describing the utilization of the GPU's engine components.",
       "isCommentAutoGenerated" : true,
@@ -32328,7 +33080,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "HUD로 사용 경험을 향상하세요"
+            "value" : "HUD로 상태 변화 확인하기"
           }
         },
         "nl" : {
@@ -33129,7 +33881,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "확장 너비 조정은 표준 노치 레이아웃에만 적용됩니다. 이 값을 변경하려면 '미니멀리즘 UI'를 비활성화하세요."
+            "value" : "확장 너비 조정은 표준 노치 레이아웃에만 적용됩니다. 이 값을 변경하려면 '간결한 UI'를 비활성화하세요."
           }
         },
         "nl" : {
@@ -33180,6 +33932,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "로그 내보내기"
+          }
+        }
+      }
+    },
+    "Export Logs & Crash Reports" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로그 및 충돌 보고서 내보내기"
           }
         }
       }
@@ -33581,6 +34343,16 @@
         }
       }
     },
+    "Failed to delete %@: %@" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 계정을 삭제하지 못했습니다. %2$@"
+          }
+        }
+      }
+    },
     "Failed to export logs: %@" : {
       "localizations" : {
         "ko" : {
@@ -33657,6 +34429,36 @@
         }
       }
     },
+    "Favorite" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기"
+          }
+        }
+      }
+    },
+    "Favorite Song" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "곡 즐겨찾기"
+          }
+        }
+      }
+    },
+    "Favorite Song in Cider" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cider 곡 즐겨찾기"
+          }
+        }
+      }
+    },
     "Favorites" : {
       "comment" : "Localized name of the \"Favorites\" tab in the clipboard.",
       "isCommentAutoGenerated" : true,
@@ -33701,6 +34503,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收藏"
+          }
+        }
+      }
+    },
+    "Favouriting uses the Spotify account connected in settings; Spotify's own app offers no local way to do it." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify 앱에서 즐겨찾기를 직접 제어할 수 없어 설정에 연결된 Spotify 계정을 사용합니다."
           }
         }
       }
@@ -33962,6 +34774,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "填充瀏海"
+          }
+        }
+      }
+    },
+    "Fingerprint" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지문"
           }
         }
       }
@@ -34249,6 +35071,16 @@
         }
       }
     },
+    "Focus Enabled" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "집중 모드 켜짐"
+          }
+        }
+      }
+    },
     "Focus Status" : {
       "localizations" : {
         "ko" : {
@@ -34455,6 +35287,16 @@
         }
       }
     },
+    "Follows whichever app is playing, so it can do whatever that app can." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 재생 중인 앱이 지원하는 기능을 사용할 수 있습니다."
+          }
+        }
+      }
+    },
     "Font family" : {
       "comment" : "merge:ko:alt='서체'",
       "localizations" : {
@@ -34592,6 +35434,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "前景"
+          }
+        }
+      }
+    },
+    "Foreground color" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "글자색"
+          }
+        }
+      }
+    },
+    "Format:" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "포맷:"
           }
         }
       }
@@ -34945,6 +35807,16 @@
         }
       }
     },
+    "Full Disk Access for global mode" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 폴더에서 서랍을 사용하려면 전체 디스크 접근 권한이 필요합니다"
+          }
+        }
+      }
+    },
     "Full Disk Access Required" : {
       "localizations" : {
         "ko" : {
@@ -35069,7 +35941,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "충전 완료 지속 시간"
+            "value" : "충전 완료 알림 표시 시간"
           }
         },
         "nl" : {
@@ -36031,6 +36903,16 @@
         }
       }
     },
+    "Get Extensions" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확장 프로그램 받기"
+          }
+        }
+      }
+    },
     "Get started" : {
       "localizations" : {
         "ar" : {
@@ -36373,6 +37255,26 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Give it a friendly name and control playback speed." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "애니메이션 이름과 재생 속도를 설정하세요."
+          }
+        }
+      }
+    },
+    "Gives each app its own volume and mute, independent of the system volume. macOS will ask for audio recording permission the first time an app's level is changed: routing an app's audio through Atoll is the only way it can be adjusted, and nothing is ever recorded or written to disk. Apps left at 100% and unmuted keep their normal, untouched path to the speakers." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 음량과 별도로 각 앱의 음량을 조절하거나 소리를 끌 수 있습니다. 처음으로 앱 음량을 바꿀 때 macOS가 오디오 녹음 권한을 요청합니다. 음량을 조절하려면 앱의 소리가 Atoll을 거쳐야 하며, 오디오는 녹음되거나 디스크에 저장되지 않습니다. 음량이 100%이고 음소거하지 않은 앱의 소리는 평소처럼 스피커로 출력됩니다."
+          }
+        }
+      }
     },
     "Glass" : {
       "comment" : "Name of the timer surface mode that uses a glass effect. | Name of the timer surface mode that uses a glass effect. | merge:ko:alt='Glass'",
@@ -36956,7 +37858,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "HUD 지속 시간"
+            "value" : "HUD 표시 시간"
           }
         },
         "nl" : {
@@ -37320,8 +38222,8 @@
         },
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "HUD들"
+            "state" : "translated",
+            "value" : "HUD"
           }
         },
         "nl" : {
@@ -37628,7 +38530,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "스크린샷 및 화면 기록 시 Dynamic Island 숨기기"
+            "value" : "스크린샷 및 화면 기록 시 다이나믹 아일랜드 숨기기"
           }
         },
         "nl" : {
@@ -37680,7 +38582,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "다이나믹 아일랜드 옵션 숨기기"
+            "value" : "다이나믹 아일랜드 숨기기 옵션"
           }
         },
         "nl" : {
@@ -38081,12 +38983,22 @@
         }
       }
     },
+    "Hide until hovered" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "포인터를 올릴 때까지 숨기기"
+          }
+        }
+      }
+    },
     "Hide until hovered on non-notch displays" : {
       "localizations" : {
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "노치가 없는 디스플레이 에서는 포인터를 올릴 때까지 숨기기"
+            "value" : "노치가 없는 디스플레이에서는 포인터를 올릴 때까지 숨기기"
           }
         },
         "nl" : {
@@ -38553,6 +39465,26 @@
         }
       }
     },
+    "Holds a power assertion so the Mac will not sleep, the way the caffeinate command does. Turning this off also ends a session that is already running. With the display option off, the screen can still sleep while the system stays up." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "caffeinate 명령처럼 Mac이 잠자기 모드로 전환되지 않도록 합니다. 이 기능을 끄면 진행 중인 절전 방지도 종료됩니다. 디스플레이를 켜 두는 옵션을 끄면 Mac은 깨어 있는 상태에서 화면만 꺼질 수 있습니다."
+          }
+        }
+      }
+    },
+    "Horizontal Offset" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가로 위치 보정"
+          }
+        }
+      }
+    },
     "Horizontal:" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -38600,6 +39532,26 @@
         }
       },
       "shouldTranslate" : false
+    },
+    "Hotspot connected" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "핫스팟 연결됨"
+          }
+        }
+      }
+    },
+    "Hotspot connected, %@" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "핫스팟 연결됨, %@"
+          }
+        }
+      }
     },
     "Hours" : {
       "localizations" : {
@@ -38752,7 +39704,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "아이콘 & 진행도 색상"
+            "value" : "아이콘 & 진행률 색상"
           }
         },
         "nl" : {
@@ -38799,6 +39751,16 @@
         }
       }
     },
+    "Icon import was canceled or failed." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아이콘 가져오기가 취소되었거나 실패했습니다."
+          }
+        }
+      }
+    },
     "Idle" : {
       "comment" : "A label displayed alongside the status of a GPU device.",
       "isCommentAutoGenerated" : true,
@@ -38812,7 +39774,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "유휴"
+            "value" : "대기 중"
           }
         },
         "nl" : {
@@ -38864,7 +39826,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "유휴 애니메이션"
+            "value" : "대기 애니메이션"
           }
         },
         "nl" : {
@@ -38918,7 +39880,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "유휴 애니메이션 스타일"
+            "value" : "대기 애니메이션 스타일"
           }
         },
         "nl" : {
@@ -39019,6 +39981,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "이미지 동작"
+          }
+        }
+      }
+    },
+    "Image Conversion Failed" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 변환 실패"
+          }
+        }
+      }
+    },
+    "Image Size:" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 크기:"
           }
         }
       }
@@ -39197,6 +40179,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "匯入檔案..."
+          }
+        }
+      }
+    },
+    "In Cider, open Settings > Connectivity > Manage External Application Access, switch the API on, and paste the token it generates here. If you turn its authentication off instead, leave this empty." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cider에서 Settings > Connectivity > Manage External Application Access를 열고 API를 켠 다음 생성된 토큰을 여기에 붙여넣으세요. 인증을 끈 경우에는 비워 두세요."
           }
         }
       }
@@ -39393,7 +40385,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "'표시기만'은 녹화 실시간 활동을 수동적으로 유지합니다. '정지 버튼 포함'은 기본 녹화 제어기를 활성화합니다."
+            "value" : "'표시기만'은 녹화 실시간 현황을 수동적으로 유지합니다. '정지 버튼 포함'은 기본 녹화 제어기를 활성화합니다."
           }
         }
       }
@@ -39949,7 +40941,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "반응형 (드래그해서 변경)"
+            "value" : "드래그로 조절"
           }
         },
         "nl" : {
@@ -40188,6 +41180,46 @@
         }
       }
     },
+    "Keep Awake" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "절전 방지"
+          }
+        }
+      }
+    },
+    "Keep Awake is disabled" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "절전 방지가 꺼져 있습니다"
+          }
+        }
+      }
+    },
+    "Keep lyrics under the closed notch" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "노치가 닫혀 있을 때도 아래에 가사 표시"
+          }
+        }
+      }
+    },
+    "Keep showing lyrics under the closed notch" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "노치가 닫혀 있을 때도 아래에 가사 표시"
+          }
+        }
+      }
+    },
     "Keep terminal open until clicked outside" : {
       "localizations" : {
         "ko" : {
@@ -40230,6 +41262,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保持終端機開啟直到點按外部"
+          }
+        }
+      }
+    },
+    "Keeps a volume slider under the playback controls on the lock screen, instead of leaving it behind the output button. The volume keys move it while the Mac is locked, where the notch cannot draw." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "미디어 출력 버튼을 열지 않아도 음량을 조절할 수 있도록 잠금 화면의 재생 버튼 아래에 음량 조절 막대를 표시합니다. Mac이 잠겨 있을 때는 음량 키로 이 막대를 조절할 수 있습니다."
+          }
+        }
+      }
+    },
+    "Keeps a volume slider under the playback controls on the lock screen, instead of leaving it behind the output button. The volume keys move it while the Mac is locked, where the notch cannot draw. Also on the Lock Screen tab." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "미디어 출력 버튼을 열지 않아도 음량을 조절할 수 있도록 잠금 화면의 재생 버튼 아래에 음량 조절 막대를 표시합니다. Mac이 잠겨 있을 때는 음량 키로 이 막대를 조절할 수 있습니다. 잠금 화면 탭에서도 설정할 수 있습니다."
           }
         }
       }
@@ -40552,6 +41604,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "啟用簡短提示模式時，標籤將強制為緊湊開/關文字。"
+          }
+        }
+      }
+    },
+    "Large" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "큼"
           }
         }
       }
@@ -41249,6 +42311,16 @@
         }
       }
     },
+    "Light Gray" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "밝은 회색"
+          }
+        }
+      }
+    },
     "Light Use" : {
       "comment" : "Name of the \"Light Use\" user profile.",
       "isCommentAutoGenerated" : true,
@@ -41302,7 +42374,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "노래 좋아요"
+            "value" : "곡 즐겨찾기"
           }
         }
       }
@@ -41621,7 +42693,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "실시간 활동"
+            "value" : "실시간 현황"
           }
         },
         "nl" : {
@@ -41892,7 +42964,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "실시간 활동 아이콘"
+            "value" : "실시간 현황 아이콘"
           }
         }
       }
@@ -42229,6 +43301,16 @@
         }
       }
     },
+    "Local Model" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로컬 모델"
+          }
+        }
+      }
+    },
     "LocalSend Device Picker" : {
       "comment" : "A section header for the LocalSend device picker settings.",
       "isCommentAutoGenerated" : true,
@@ -42273,6 +43355,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LocalSend 裝置選擇器"
+          }
+        }
+      }
+    },
+    "LocalSend Device Picker Style" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LocalSend 기기 선택 화면 스타일"
+          }
+        }
+      }
+    },
+    "Lock" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자물쇠"
           }
         }
       }
@@ -42600,6 +43702,16 @@
         }
       }
     },
+    "Lock Screen Preview" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잠금 화면 미리보기"
+          }
+        }
+      }
+    },
     "Lock Screen Reminder Widget" : {
       "comment" : "A section header for the lock screen reminder widget settings.",
       "isCommentAutoGenerated" : true,
@@ -42650,6 +43762,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "鎖定畫面提醒小工具"
+          }
+        }
+      }
+    },
+    "Lock screen settings section" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잠금 화면 설정 섹션"
           }
         }
       }
@@ -42923,6 +44045,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在尋找 Atoll 新版本"
+          }
+        }
+      }
+    },
+    "Loop" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "반복 재생"
           }
         }
       }
@@ -43397,7 +44529,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "배터리 부족: %@"
+            "value" : "저전력 모드: %@"
           }
         },
         "nl" : {
@@ -43537,7 +44669,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "배터리 부족 지속 시간"
+            "value" : "배터리 부족 알림 표시 시간"
           }
         },
         "nl" : {
@@ -43666,6 +44798,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "低電量閾值"
+          }
+        }
+      }
+    },
+    "Lyric highlight" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가사 강조"
           }
         }
       }
@@ -43990,6 +45132,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請確保 LocalSend 在其他裝置上執行"
+          }
+        }
+      }
+    },
+    "Manage app permissions" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 권한 관리"
           }
         }
       }
@@ -44474,6 +45626,16 @@
         }
       }
     },
+    "Match the notch footprint or intentionally exceed it." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "애니메이션 크기를 노치에 맞추거나 노치보다 크게 표시할 수 있습니다."
+          }
+        }
+      }
+    },
     "Material" : {
       "comment" : "A picker that lets the user select the material of the lock screen glass.",
       "isCommentAutoGenerated" : true,
@@ -44513,9 +45675,14 @@
             "state" : "translated",
             "value" : "材質"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재질"
+          }
         }
-      },
-      "shouldTranslate" : false
+      }
     },
     "Material Options:" : {
       "comment" : "A label describing the material options for the custom OSD.",
@@ -45027,7 +46194,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "미디어 패널 넓이"
+            "value" : "미디어 패널 너비"
           }
         },
         "nl" : {
@@ -45658,7 +46825,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "미디어 재생 실시간 활동"
+            "value" : "미디어 재생 실시간 현황"
           }
         },
         "nl" : {
@@ -46982,7 +48149,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "미니멀리즘 모드는 미디어 제어기와 시스템 HUD에 집중하며, 깔끔하고 몰입감 있는 경험을 위해 모든 추가 기능을 숨깁니다. 활성화 시 애니메이션도 자동으로 간소화됩니다."
+            "value" : "간결한 UI 모드는 미디어 제어기와 시스템 HUD에 집중하며, 깔끔하고 몰입감 있는 경험을 위해 모든 추가 기능을 숨깁니다. 활성화 시 애니메이션도 자동으로 간소화됩니다."
           }
         },
         "nl" : {
@@ -47259,7 +48426,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "거울"
+            "value" : "카메라"
           }
         },
         "nl" : {
@@ -47323,7 +48490,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "거울 카메라"
+            "value" : "사용할 카메라"
           }
         },
         "nl" : {
@@ -47477,7 +48644,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "거울 모양"
+            "value" : "카메라 미리보기 모양"
           }
         },
         "nl" : {
@@ -47598,6 +48765,26 @@
         }
       }
     },
+    "Monitor clipboard changes and keep a history of recent copies. Press %@ to open clipboard history." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근에 복사한 항목을 기록합니다. %@ 키를 눌러 클립보드 기록을 열 수 있습니다."
+          }
+        }
+      }
+    },
+    "Monitor clipboard changes and keep a history of recent copies. Set a shortcut under Shortcuts to open clipboard history." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근에 복사한 항목을 기록합니다. 단축키 탭에서 클립보드 기록을 여는 키를 설정할 수 있습니다."
+          }
+        }
+      }
+    },
     "Monitor clipboard changes and keep a history of recent copies. Use Cmd+Shift+V to quickly access clipboard history." : {
       "localizations" : {
         "ko" : {
@@ -47656,8 +48843,8 @@
       "localizations" : {
         "ko" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "파일을 다운로드하는 동안 Dynamic Island에 실시간 현황을 표시합니다. Safari, Firefox, Chrome 및 Chrome을 기반으로 만들어진 브라우저(Edge, Brave, Arc, Vivaldi, Opera)에서 작동합니다. 다운로드 폴더만 감시하므로 다른 위치에 저장된 파일은 표시되지 않습니다."
+            "state" : "translated",
+            "value" : "파일을 다운로드하는 동안 다이나믹 아일랜드에 실시간 현황을 표시합니다. Safari, Firefox, Chrome 및 Chrome 기반 브라우저인 Edge, Brave, Arc, Vivaldi, Opera를 지원합니다. 다운로드 폴더에 저장하는 파일만 감지하므로 다른 위치에 저장하는 파일은 표시되지 않습니다."
           }
         },
         "nl" : {
@@ -47981,6 +49168,16 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "更多"
+          }
+        }
+      }
+    },
+    "Mouse reporting" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마우스 입력 전달"
           }
         }
       }
@@ -48709,6 +49906,26 @@
         }
       }
     },
+    "Needs the \"Change Media Output\" control above, which the lock screen panel takes its volume slider from." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잠금 화면에서 음량 조절 막대를 사용하려면 위의 “미디어 출력 변경” 제어기 표시를 켜세요."
+          }
+        }
+      }
+    },
+    "Needs the \"Show Change Media Output control\" setting on the Media tab, which the lock screen panel takes its volume slider from." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잠금 화면에서 음량 조절 막대를 사용하려면 미디어 탭에서 “미디어 출력 변경” 제어기 표시를 켜세요."
+          }
+        }
+      }
+    },
     "Network" : {
       "comment" : "Title for the \"Network\" section in the stats view.",
       "isCommentAutoGenerated" : true,
@@ -49083,6 +50300,36 @@
         }
       }
     },
+    "New API Account Error" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New API 계정 오류"
+          }
+        }
+      }
+    },
+    "New API Accounts" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New API 계정"
+          }
+        }
+      }
+    },
+    "New API Provider" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New API 제공자"
+          }
+        }
+      }
+    },
     "Next Track" : {
       "localizations" : {
         "ko" : {
@@ -49246,7 +50493,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "색상 발견 안됨"
+            "value" : "표시할 색상이 없습니다"
           }
         },
         "nl" : {
@@ -49419,12 +50666,32 @@
         }
       }
     },
+    "No Internet Connection" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "인터넷에 연결되어 있지 않습니다"
+          }
+        }
+      }
+    },
     "No Logging" : {
       "localizations" : {
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "로그 없음"
+          }
+        }
+      }
+    },
+    "No" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "미지원"
           }
         }
       }
@@ -49485,6 +50752,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚未偵測到活躍網路介面。"
+          }
+        }
+      }
+    },
+    "No apps are playing audio." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오를 재생 중인 앱이 없습니다."
           }
         }
       }
@@ -49659,6 +50936,16 @@
         }
       }
     },
+    "No content" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "내용 없음"
+          }
+        }
+      }
+    },
     "No copies yet" : {
       "comment" : "A message displayed when the clipboard is empty, indicating that there are no copied items.",
       "isCommentAutoGenerated" : true,
@@ -49718,7 +51005,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DynamicIsland의 충돌 보고서를 찾을 수 없습니다"
+            "value" : "Atoll의 충돌 보고서를 찾을 수 없습니다"
           }
         }
       }
@@ -50737,7 +52024,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "결과 발견 안됨"
+            "value" : "검색 결과 없음"
           }
         },
         "nl" : {
@@ -51350,6 +52637,16 @@
         }
       }
     },
+    "Not available" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용할 수 없음"
+          }
+        }
+      }
+    },
     "Not charging" : {
       "comment" : "Text displayed in the status text when the battery is not charging.",
       "isCommentAutoGenerated" : true,
@@ -51447,9 +52744,14 @@
             "state" : "translated",
             "value" : "瀏海體驗"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "노치 기능"
+          }
         }
-      },
-      "shouldTranslate" : false
+      }
     },
     "Notch Height" : {
       "localizations" : {
@@ -52025,7 +53327,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "재생중인 항목 없음"
+            "value" : "재생 중인 항목 없음"
           }
         },
         "nl" : {
@@ -52128,7 +53430,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "지금 재쟁 중"
+            "value" : "지금 재생 중"
           }
         },
         "nl" : {
@@ -52165,6 +53467,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在播放"
+          }
+        }
+      }
+    },
+    "Nudge the animation inside the notch." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "노치 안에서 애니메이션의 위치를 조정하세요."
           }
         }
       }
@@ -52211,6 +53523,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "回滾緩衝區保留的行數。較高的值會佔用更多記憶體。"
+          }
+        }
+      }
+    },
+    "Offset" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위치 보정"
           }
         }
       }
@@ -52473,6 +53795,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暫停中"
+          }
+        }
+      }
+    },
+    "On until turned off" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "직접 끌 때까지 켜짐"
+          }
+        }
+      }
+    },
+    "Onboarding" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "초기 설정"
           }
         }
       }
@@ -52809,12 +54151,62 @@
         }
       }
     },
+    "Opacity" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불투명도"
+          }
+        }
+      }
+    },
+    "Open" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열기"
+          }
+        }
+      }
+    },
+    "Open Accessibility Settings" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "손쉬운 사용 설정 열기"
+          }
+        }
+      }
+    },
     "Open Developer Dashboard" : {
       "localizations" : {
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "개발자 대시보드 열기"
+          }
+        }
+      }
+    },
+    "Open Developer Tools Settings" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개발자 도구 설정 열기"
+          }
+        }
+      }
+    },
+    "Open Full Disk Access Settings" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전체 디스크 접근 설정 열기"
           }
         }
       }
@@ -52965,6 +54357,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開啟隱私與安全性"
+          }
+        }
+      }
+    },
+    "Open Privacy Settings" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개인정보 보호 설정 열기"
           }
         }
       }
@@ -53381,7 +54783,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "파일 분석 및 대화를 위한 AI 어시스턴트 패널을 엽니다. 기본 단축키는 Cmd+Shift+A이며, 화면 어시스턴트 기능이 활성화된 경우에만 작동합니다."
+            "value" : "파일 분석 및 대화를 위한 AI 어시스턴트 패널을 엽니다. 기본 단축키는 Cmd+Shift+A이며, 스크린 어시스턴트 기능이 활성화된 경우에만 작동합니다."
           }
         },
         "nl" : {
@@ -53424,6 +54826,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開啟 AI 助理面板，進行檔案分析與對話。預設為 Cmd+Shift+A。僅在啟用螢幕助理功能時有效。"
+          }
+        }
+      }
+    },
+    "Opens the clipboard history panel, currently %@. Only works when clipboard feature is enabled." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "클립보드 기록 패널을 엽니다. 현재 단축키는 %@입니다. 클립보드 기능이 켜져 있어야 사용할 수 있습니다."
           }
         }
       }
@@ -53476,6 +54888,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開啟剪貼簿歷史記錄面板。預設為 Cmd+Shift+V（類似於 PC 上的 Windows+V）。僅在啟用剪貼簿功能時有效。"
+          }
+        }
+      }
+    },
+    "Opens the clipboard history panel. No shortcut is set. Only works when clipboard feature is enabled." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "클립보드 기록 패널을 엽니다. 설정된 단축키가 없습니다. 클립보드 기능이 켜져 있어야 사용할 수 있습니다."
           }
         }
       }
@@ -53578,6 +55000,16 @@
         }
       }
     },
+    "Option as Meta" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Option을 Meta 키로 사용"
+          }
+        }
+      }
+    },
     "Option as Meta key" : {
       "localizations" : {
         "ko" : {
@@ -53629,7 +55061,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "'Option을 Meta 키로 사용'을 선택하면 macOS 특수 문자 대신 Esc+키를 전송합니다. '마우스 리포팅'은 마우스 이벤트를 vim이나 tmux 같은 터미널 애플리케이션으로 전달합니다."
+            "value" : "'Option을 Meta 키로 사용'을 선택하면 macOS 특수 문자 대신 Esc+키를 전송합니다. '마우스 입력 전달 허용'을 켜면 vim이나 tmux 같은 터미널 앱에 마우스 입력을 전달합니다."
           }
         },
         "nl" : {
@@ -53726,6 +55158,16 @@
         }
       }
     },
+    "Output" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "출력 크기"
+          }
+        }
+      }
+    },
     "Output devices" : {
       "comment" : "Section title for the list of available audio output devices in the media output selector.",
       "isCommentAutoGenerated" : true,
@@ -53787,7 +55229,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "출력 볼륨"
+            "value" : "출력 음량"
           }
         },
         "nl" : {
@@ -54283,9 +55725,14 @@
             "state" : "translated",
             "value" : "暫停"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일시 정지"
+          }
         }
-      },
-      "shouldTranslate" : false
+      }
     },
     "Pause and stop buttons appear inline inside the notch while a timer runs." : {
       "comment" : "A description of the pause and stop buttons in the timer notch.",
@@ -54343,6 +55790,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已暫停"
+          }
+        }
+      }
+    },
+    "PDF Creation Failed" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF 생성 실패"
           }
         }
       }
@@ -54697,6 +56154,16 @@
         }
       }
     },
+    "Personal Hotspot" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개인용 핫스팟"
+          }
+        }
+      }
+    },
     "Pick Color" : {
       "localizations" : {
         "ko" : {
@@ -54965,7 +56432,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iPhone의 Dynamic Island와 유사한, 모서리가 둥근 알약 모양의 아일랜드"
+            "value" : "iPhone의 다이나믹 아일랜드와 유사한, 모서리가 둥근 알약 모양의 아일랜드"
           }
         },
         "nl" : {
@@ -55158,6 +56625,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "固定項目以將它們新增到收藏夾"
+          }
+        }
+      }
+    },
+    "Pin items to keep them here" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "항목을 여기에 보관하려면 고정하세요"
+          }
+        }
+      }
+    },
+    "Pin lyrics to closed notch" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "닫힌 노치 아래에 가사 고정"
           }
         }
       }
@@ -55408,6 +56895,36 @@
         }
       }
     },
+    "Play Once" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 번 재생"
+          }
+        }
+      }
+    },
+    "Playback needs none of this. The Favorite Song control does, because favouriting is not something macOS Now Playing can carry -- Atoll has to ask Cider itself." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생은 별도 설정 없이 제어할 수 있습니다. 곡 즐겨찾기를 사용하려면 Atoll이 Cider에 직접 연결해야 합니다."
+          }
+        }
+      }
+    },
+    "Playback Speed" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생 속도"
+          }
+        }
+      }
+    },
     "Plays the supplied feedback clip whenever you press the hardware volume keys." : {
       "comment" : "A help text describing the audio feedback feature.",
       "isCommentAutoGenerated" : true,
@@ -55467,7 +56984,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "거울 기능을 사용하려면 시스템 설정에서 카메라 접근을 허용하십시오."
+            "value" : "카메라 미리보기를 사용하려면 시스템 설정에서 카메라 접근을 허용해 주세요."
           }
         }
       }
@@ -55947,6 +57464,16 @@
         }
       }
     },
+    "Preserve Metadata" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "메타데이터 유지"
+          }
+        }
+      }
+    },
     "Preset name" : {
       "comment" : "A label for the name of a timer preset.",
       "isCommentAutoGenerated" : true,
@@ -56174,7 +57701,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "압력 및 스왑"
+            "value" : "메모리 압력 및 스왑"
           }
         },
         "nl" : {
@@ -56465,6 +57992,16 @@
         }
       }
     },
+    "Privacy" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개인정보 보호"
+          }
+        }
+      }
+    },
     "Privacy Indicators" : {
       "comment" : "A heading for the section that lists privacy indicators.",
       "isCommentAutoGenerated" : true,
@@ -56725,7 +58262,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "진행도 스타일"
+            "value" : "진행률 스타일"
           }
         },
         "nl" : {
@@ -57006,6 +58543,16 @@
         }
       }
     },
+    "Quick Presets" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빠른 프리셋"
+          }
+        }
+      }
+    },
     "Quick Share" : {
       "comment" : "A section header that says \"Quick Share\".",
       "isCommentAutoGenerated" : true,
@@ -57045,9 +58592,14 @@
             "state" : "translated",
             "value" : "快速共享"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빠른 공유"
+          }
         }
-      },
-      "shouldTranslate" : false
+      }
     },
     "Quick Share Service" : {
       "comment" : "A picker that lets the user select a quick share service to use when sharing files from the shelf.",
@@ -57608,6 +59160,16 @@
         }
       }
     },
+    "Read only" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽기 전용"
+          }
+        }
+      }
+    },
     "Ready" : {
       "localizations" : {
         "fr" : {
@@ -57846,6 +59408,16 @@
         }
       }
     },
+    "Recommended Applications" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추천 응용 프로그램"
+          }
+        }
+      }
+    },
     "Recommended minimum width adjusts automatically based on the number of enabled tabs." : {
       "localizations" : {
         "ko" : {
@@ -57903,7 +59475,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "녹화중"
+            "value" : "녹화 중"
           }
         },
         "nl" : {
@@ -58028,6 +59600,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "錄製中"
+          }
+        }
+      }
+    },
+    "Recording Controls" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "녹화 제어기"
           }
         }
       }
@@ -58184,6 +59766,16 @@
         }
       }
     },
+    "Recording Hover Style" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "포인터를 올렸을 때 녹화 표시 방식"
+          }
+        }
+      }
+    },
     "Recording in progress." : {
       "localizations" : {
         "ko" : {
@@ -58211,7 +59803,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "새로고침 감지"
+            "value" : "감지 상태 새로 고침"
           }
         },
         "nl" : {
@@ -58618,6 +60210,16 @@
         }
       }
     },
+    "Reminder alignment" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "미리 알림 정렬"
+          }
+        }
+      }
+    },
     "Reminder Live Activity" : {
       "comment" : "A section header that lists the options related to live activity notifications for reminders.",
       "isCommentAutoGenerated" : true,
@@ -58668,6 +60270,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提醒即時動態"
+          }
+        }
+      }
+    },
+    "Reminder vertical offset" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "미리 알림 세로 위치 보정"
           }
         }
       }
@@ -59068,6 +60680,26 @@
         }
       }
     },
+    "Rename" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 변경"
+          }
+        }
+      }
+    },
+    "Rename File" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파일 이름 변경"
+          }
+        }
+      }
+    },
     "Render" : {
       "localizations" : {
         "ko" : {
@@ -59310,6 +60942,26 @@
         }
       }
     },
+    "Request Accessibility Access" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "손쉬운 사용 권한 요청"
+          }
+        }
+      }
+    },
+    "Request Folder Access" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더 접근 권한 요청"
+          }
+        }
+      }
+    },
     "Request Full Disk Access" : {
       "localizations" : {
         "ko" : {
@@ -59361,7 +61013,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island가 하드웨어 음량 키를 제어할 수 있도록 접근성 권한이 필요합니다."
+            "value" : "다이나믹 아일랜드가 하드웨어 음량 키를 제어할 수 있도록 접근성 권한이 필요합니다."
           }
         },
         "nl" : {
@@ -59461,7 +61113,17 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "미리 알림 실시간 활동이 필요하지만 '실시간 활동' 설정에서 꺼져 있습니다."
+            "value" : "미리 알림 실시간 현황이 필요하지만 '실시간 현황' 설정에서 꺼져 있습니다."
+          }
+        }
+      }
+    },
+    "Requires the reminder live activity, which is off in the section above." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용하려면 위에서 미리 알림 실시간 현황을 켜세요."
           }
         }
       }
@@ -59578,6 +61240,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全部重置"
+          }
+        }
+      }
+    },
+    "Reset all app volumes" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 앱의 음량 초기화"
           }
         }
       }
@@ -60494,7 +62166,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shell 재시작"
+            "value" : "셸 재시작"
           }
         },
         "nl" : {
@@ -60542,7 +62214,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shell 재시작"
+            "value" : "셸 재시작"
           }
         },
         "nl" : {
@@ -60638,7 +62310,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "qhrrn"
+            "value" : "복원"
           }
         },
         "nl" : {
@@ -60943,6 +62615,16 @@
         }
       }
     },
+    "Reverse scroll gestures" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스크롤 제스처 방향 반전"
+          }
+        }
+      }
+    },
     "Reverse swipe gestures" : {
       "localizations" : {
         "ko" : {
@@ -61039,6 +62721,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "撤銷存取"
+          }
+        }
+      }
+    },
+    "Revoked" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "권한 취소됨"
           }
         }
       }
@@ -61280,6 +62972,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "圓環"
+          }
+        }
+      }
+    },
+    "Rotation" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "회전"
           }
         }
       }
@@ -61810,6 +63512,26 @@
         }
       }
     },
+    "Save History Across Restarts" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱을 다시 열어도 기록 유지"
+          }
+        }
+      }
+    },
+    "Scale" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "배율"
+          }
+        }
+      }
+    },
     "Scale Down" : {
       "localizations" : {
         "fr" : {
@@ -62132,7 +63854,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "스크린 어시스턴트 기능 비활성화 됨"
+            "value" : "스크린 어시스턴트 기능 비활성화됨"
           }
         },
         "nl" : {
@@ -62190,7 +63912,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "스크린 어이스턴트:"
+            "value" : "스크린 어시스턴트:"
           }
         },
         "nl" : {
@@ -62690,7 +64412,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "검색 설정"
+            "value" : "설정 검색"
           }
         },
         "nl" : {
@@ -62733,6 +64455,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "搜尋設定"
+          }
+        }
+      }
+    },
+    "Search clipboard" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "클립보드 검색"
           }
         }
       }
@@ -63341,6 +65073,26 @@
         }
       }
     },
+    "Select Files for %@" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@로 공유할 파일 선택"
+          }
+        }
+      }
+    },
+    "Select files to share" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "공유할 파일 선택"
+          }
+        }
+      }
+    },
     "Select one or more profiles to customize your experience" : {
       "comment" : "A description below the header that instructs users to select one or more profiles to customize their experience.",
       "isCommentAutoGenerated" : true,
@@ -63400,7 +65152,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "자물쇠, 지문 또는 두 아이콘을 모두 선택합니다. 지문을 선택하면 잠금 해제 애니메이션이 끝날 때까지 실시간 활동이 열려 있습니다."
+            "value" : "자물쇠, 지문 또는 두 아이콘을 모두 선택합니다. 지문을 선택하면 잠금 해제 애니메이션이 끝날 때까지 실시간 현황이 열려 있습니다."
           }
         }
       }
@@ -63519,6 +65271,16 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "選擇你想要使用的音樂源。你可以稍後在 App 設定中更改此項。"
+          }
+        }
+      }
+    },
+    "Select Timer Sound" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "타이머 소리 선택"
           }
         }
       }
@@ -64301,6 +66063,16 @@
         }
       }
     },
+    "Share…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "공유…"
+          }
+        }
+      }
+    },
     "Shelf" : {
       "localizations" : {
         "ar" : {
@@ -64482,7 +66254,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shell 경로"
+            "value" : "셸 경로"
           }
         },
         "nl" : {
@@ -64690,6 +66462,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示「更改媒體輸出」控制"
+          }
+        }
+      }
+    },
+    "Show app volume icon in the notch" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "노치에 앱별 음량 아이콘 표시"
           }
         }
       }
@@ -65012,6 +66794,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示 Caps Lock 標籤"
+          }
+        }
+      }
+    },
+    "Show Change Media Output control" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“미디어 출력 변경” 제어기 표시"
           }
         }
       }
@@ -66227,6 +68019,16 @@
         }
       }
     },
+    "Show download speed" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드 속도 표시"
+          }
+        }
+      }
+    },
     "Show event after it starts" : {
       "localizations" : {
         "ko" : {
@@ -66658,6 +68460,26 @@
         }
       }
     },
+    "Show in Finder" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder에서 보기"
+          }
+        }
+      }
+    },
+    "Show Keep Awake icon in the notch" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "노치에 절전 방지 아이콘 표시"
+          }
+        }
+      }
+    },
     "Show live canvas in Dynamic Island" : {
       "localizations" : {
         "ko" : {
@@ -66801,7 +68623,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "잠금 화면 미리알림 표시"
+            "value" : "잠금 화면 미리 알림 표시"
           }
         },
         "nl" : {
@@ -67052,7 +68874,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dynamic Island에 미디어 제어기 표시"
+            "value" : "다이나믹 아일랜드에 미디어 제어기 표시"
           }
         },
         "nl" : {
@@ -67676,7 +69498,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "진행도 표시"
+            "value" : "진행률 표시"
           }
         },
         "nl" : {
@@ -68359,6 +70181,16 @@
         }
       }
     },
+    "Shows state, cannot change it" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "상태만 표시"
+          }
+        }
+      }
+    },
     "Shows the model's reasoning process before the final answer" : {
       "localizations" : {
         "fr" : {
@@ -68753,6 +70585,16 @@
         }
       }
     },
+    "Size & Crop" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "크기 및 자르기"
+          }
+        }
+      }
+    },
     "Size & Scale" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -69136,6 +70978,16 @@
         }
       }
     },
+    "Small" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "작음"
+          }
+        }
+      }
+    },
     "Smooth color transitions" : {
       "localizations" : {
         "ko" : {
@@ -69241,7 +71093,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "전체 채우기 영역에서 초록색(0~60%), 노란색(60~85%), 빨간색(85~100%)이 부드럽게 혼합되어 표시됩니다. '제어기 › Dynamic Island'에서 그라데이션 동작을 조정할 수 있습니다."
+            "value" : "전체 채우기 영역에서 초록색(0~60%), 노란색(60~85%), 빨간색(85~100%)이 부드럽게 혼합되어 표시됩니다. '제어기 › 다이나믹 아일랜드'에서 그라데이션 동작을 조정할 수 있습니다."
           }
         },
         "nl" : {
@@ -69762,13 +71614,23 @@
         }
       }
     },
+    "Solid Auto" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불투명 자동"
+          }
+        }
+      }
+    },
     "Solid colour" : {
       "comment" : "merge:ko:alt='단색'",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "든삭"
+            "value" : "단색"
           }
         },
         "nl" : {
@@ -70004,7 +71866,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sportify"
+            "value" : "Spotify"
           }
         },
         "nl" : {
@@ -70783,6 +72645,16 @@
         }
       }
     },
+    "Start from a popular layout and tweak from there." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자주 쓰는 배치를 선택한 다음 원하는 대로 조정하세요."
+          }
+        }
+      }
+    },
     "Start Monitoring" : {
       "localizations" : {
         "fr" : {
@@ -71157,6 +73029,16 @@
         }
       }
     },
+    "Starts the default duration set in General, or ends a running session." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일반 탭에서 설정한 기본 시간만큼 절전 방지를 켭니다. 이미 켜져 있으면 종료합니다."
+          }
+        }
+      }
+    },
     "Stats" : {
       "localizations" : {
         "fr" : {
@@ -71226,7 +73108,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "상태 비활성화됨"
+            "value" : "통계 모니터링 비활성화됨"
           }
         },
         "nl" : {
@@ -71502,7 +73384,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "상태 업데이트 주기"
+            "value" : "통계 업데이트 주기"
           }
         },
         "nl" : {
@@ -71694,9 +73576,14 @@
             "state" : "translated",
             "value" : "狀態："
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "상태:"
+          }
         }
-      },
-      "shouldTranslate" : false
+      }
     },
     "Stay organized with calendar, timer, and battery monitoring." : {
       "localizations" : {
@@ -72006,6 +73893,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "停止錄製"
+          }
+        }
+      }
+    },
+    "Stop showing lyrics under the closed notch" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "노치가 닫혀 있을 때 가사 숨기기"
           }
         }
       }
@@ -72447,6 +74344,16 @@
         }
       }
     },
+    "Supported" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지원"
+          }
+        }
+      }
+    },
     "Supports reasoning mode" : {
       "localizations" : {
         "fr" : {
@@ -72550,9 +74457,14 @@
             "state" : "translated",
             "value" : "交換空間"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스왑 메모리"
+          }
         }
-      },
-      "shouldTranslate" : false
+      }
     },
     "Swap is disabled on this system." : {
       "comment" : "A message indicating that swap memory is disabled on the user's system.",
@@ -72567,7 +74479,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "이 시스템에서는 Swap이 비활성화되어 있습니다."
+            "value" : "이 Mac에서는 스왑 메모리가 비활성화되어 있습니다."
           }
         },
         "nl" : {
@@ -73330,9 +75242,14 @@
             "state" : "translated",
             "value" : "終端機"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "터미널"
+          }
         }
-      },
-      "shouldTranslate" : false
+      }
     },
     "Terminal feature is disabled" : {
       "localizations" : {
@@ -73435,7 +75352,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "터미널 투명도"
+            "value" : "터미널 배경 불투명도"
           }
         },
         "nl" : {
@@ -73708,6 +75625,16 @@
         }
       }
     },
+    "That file could not be loaded as an image." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 파일을 이미지로 불러올 수 없습니다."
+          }
+        }
+      }
+    },
     "The app is currently using %@ MB, which exceeds the safe limit of %@ MB. Restart now to free memory?" : {
       "localizations" : {
         "en" : {
@@ -73782,7 +75709,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "잠금 화면 미리 알림은 미리 알림 실시간 활동에서 생성되는데, 위에서 꺼져 있습니다."
+            "value" : "잠금 화면 미리 알림은 미리 알림 실시간 현황에서 생성되는데, 위에서 꺼져 있습니다."
           }
         }
       }
@@ -73792,7 +75719,17 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "잠금 화면 미리 알림은 미리 알림 실시간 활동에서 생성되는데, '실시간 활동' 설정에서 꺼져 있습니다."
+            "value" : "잠금 화면 미리 알림은 미리 알림 실시간 현황에서 생성되는데, '실시간 현황' 설정에서 꺼져 있습니다."
+          }
+        }
+      }
+    },
+    "The th-ch desktop app's local API server, which Atoll is already authenticated with." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll이 이미 인증을 마친 th-ch 데스크톱 앱의 로컬 API 서버를 사용합니다."
           }
         }
       }
@@ -74145,6 +76082,26 @@
         }
       }
     },
+    "Third-party DDC app integration" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "외부 DDC 앱 연동"
+          }
+        }
+      }
+    },
+    "Third-party DDC provider" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "외부 DDC 제공 앱"
+          }
+        }
+      }
+    },
     "This duration powers the \"Custom\" option inside the timer popover for quick access." : {
       "comment" : "A footer description for the custom timer settings, explaining their purpose.",
       "isCommentAutoGenerated" : true,
@@ -74303,6 +76260,16 @@
         }
       }
     },
+    "This removes %@ and its stored API key from Atoll." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atoll에서 %@ 계정과 저장된 API 키가 삭제됩니다."
+          }
+        }
+      }
+    },
     "This removes every saved clipboard item from the notch tab." : {
       "comment" : "A message displayed when they clear their clipboard history.",
       "isCommentAutoGenerated" : true,
@@ -74353,6 +76320,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這將從瀏海分頁中移除所有已儲存的剪貼簿項目。"
+          }
+        }
+      }
+    },
+    "TIDAL exposes no way to set a favourite, so the heart shows the state but cannot be clicked. Shuffle and repeat go through the Playback menu." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TIDAL에서는 하트로 즐겨찾기 상태를 확인할 수 있습니다. 임의 재생과 반복 재생은 재생 메뉴에서 제어합니다."
           }
         }
       }
@@ -75025,7 +77002,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "타이머 비활성화 됨"
+            "value" : "타이머 기능 비활성화됨"
           }
         },
         "nl" : {
@@ -75392,6 +77369,16 @@
         }
       }
     },
+    "Toggle Keep Awake:" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "절전 방지 켜기/끄기:"
+          }
+        }
+      }
+    },
     "Toggle Notch Open:" : {
       "localizations" : {
         "ar" : {
@@ -75635,7 +77622,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "토글 Terminal 탭:"
+            "value" : "터미널 탭 열기/닫기:"
           }
         },
         "nl" : {
@@ -75683,7 +77670,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "어디서나 Dynamic Island를 열거나 닫을 수 있습니다."
+            "value" : "어디서나 다이나믹 아일랜드를 열거나 닫을 수 있습니다."
           }
         },
         "nl" : {
@@ -75755,7 +77742,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "상위 프로세서"
+            "value" : "상위 프로세스"
           }
         },
         "nl" : {
@@ -75893,9 +77880,14 @@
             "state" : "translated",
             "value" : "總計 · %@"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전체 · %@"
+          }
         }
-      },
-      "shouldTranslate" : false
+      }
     },
     "Track Skip" : {
       "comment" : "Display name for the \"Track Skip\" music skip behavior.",
@@ -75999,6 +77991,16 @@
         }
       }
     },
+    "Transform & Display" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "변형 및 표시"
+          }
+        }
+      }
+    },
     "Transform your notch truly yours" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -76094,6 +78096,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "再試一次"
+          }
+        }
+      }
+    },
+    "Try a different search term" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 검색어를 입력해 보세요"
           }
         }
       }
@@ -76210,6 +78222,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請嘗試不同的搜尋詞"
+          }
+        }
+      }
+    },
+    "Turn Off" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "끄기"
           }
         }
       }
@@ -76667,6 +78689,16 @@
         }
       }
     },
+    "Unable to save the icon file." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아이콘 파일을 저장할 수 없습니다."
+          }
+        }
+      }
+    },
     "Unable to stop recording. Use Command-Control-Escape or the macOS recording menu." : {
       "localizations" : {
         "ko" : {
@@ -76834,7 +78866,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "알수없음"
+            "value" : "알 수 없음"
           }
         },
         "nl" : {
@@ -76871,6 +78903,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未知"
+          }
+        }
+      }
+    },
+    "Unknown Artist" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알 수 없는 아티스트"
           }
         }
       }
@@ -77004,6 +79046,16 @@
         }
       }
     },
+    "Unpin lyrics from closed notch" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "닫힌 노치 아래 가사 고정 해제"
+          }
+        }
+      }
+    },
     "Unplugged" : {
       "comment" : "Text displayed in a notification when the device is plugged in.",
       "isCommentAutoGenerated" : true,
@@ -77048,6 +79100,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未充電"
+          }
+        }
+      }
+    },
+    "Until turned off" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "직접 끌 때까지"
           }
         }
       }
@@ -77512,9 +79574,14 @@
             "state" : "translated",
             "value" : "上傳"
           }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업로드"
+          }
         }
-      },
-      "shouldTranslate" : false
+      }
     },
     "Uploaded" : {
       "localizations" : {
@@ -77724,6 +79791,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用詳情"
+          }
+        }
+      }
+    },
+    "Use 3D Bluetooth HUD icon" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bluetooth HUD에 3D 아이콘 사용"
           }
         }
       }
@@ -78678,7 +80755,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Spotify 공식 Web API(OAuth)를 사용하며, 접근 범위는 좋아요 표시한 곡을 읽고 변경하는 것으로 제한됩니다. 버튼을 표시하려면 미디어 슬롯에 '노래 좋아요' 제어기를 추가하세요."
+            "value" : "Spotify 공식 Web API(OAuth)를 사용합니다. 접근 권한은 좋아요 표시한 곡을 읽고 변경하는 데만 쓰입니다. 버튼을 표시하려면 미디어 슬롯에 ‘곡 즐겨찾기’를 추가하세요."
           }
         }
       }
@@ -79463,6 +81540,16 @@
         }
       }
     },
+    "Vertical Offset" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세로 위치 보정"
+          }
+        }
+      }
+    },
     "Vertical:" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -79743,6 +81830,26 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "在 GitHub 上檢視：th-ch/youtube-music"
+          }
+        }
+      }
+    },
+    "Visible Height" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "표시 높이"
+          }
+        }
+      }
+    },
+    "Visible Width" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "표시 너비"
           }
         }
       }
@@ -80594,6 +82701,16 @@
         }
       }
     },
+    "What each source supports" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "미디어 소스별 지원 기능"
+          }
+        }
+      }
+    },
     "What's New" : {
       "localizations" : {
         "ar" : {
@@ -80961,7 +83078,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "활성화 시, 노치가 닫히고 몇 초 후에 상태 모니터링이 중지됩니다."
+            "value" : "활성화 시, 노치가 닫히고 몇 초 후에 통계 모니터링이 중지됩니다."
           }
         },
         "nl" : {
@@ -81189,6 +83306,16 @@
         }
       }
     },
+    "When off, clipboard history is kept in memory for this session only and is never written to disk. Turning it off also erases history that was already saved. Pinned items are kept either way." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 옵션을 끄면 클립보드 기록이 앱을 종료할 때까지만 메모리에 남으며, 이전에 디스크에 저장된 기록도 지워집니다. 고정한 항목은 이 설정과 관계없이 유지됩니다."
+          }
+        }
+      }
+    },
     "White" : {
       "localizations" : {
         "ko" : {
@@ -81289,6 +83416,46 @@
         }
       }
     },
+    "White (Transparent)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "흰색 (투명)"
+          }
+        }
+      }
+    },
+    "Wi-Fi connected" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi 연결됨"
+          }
+        }
+      }
+    },
+    "Wi-Fi connected, %@" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi 연결됨, %@"
+          }
+        }
+      }
+    },
+    "Wi-Fi Network" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi 네트워크"
+          }
+        }
+      }
+    },
     "Widget appearance" : {
       "localizations" : {
         "de" : {
@@ -81377,6 +83544,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "위젯 레이아웃"
+          }
+        }
+      }
+    },
+    "Widgets" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위젯"
           }
         }
       }
@@ -81600,7 +83777,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "그래프 %lld개가 활성화되면 모든 그래프를 한 줄에 표시할 수 있도록 Dynamic Island가 가로로 확장됩니다."
+            "value" : "그래프 %lld개가 활성화되면 모든 그래프를 한 줄에 표시할 수 있도록 다이나믹 아일랜드가 가로로 확장됩니다."
           }
         },
         "nl" : {
@@ -81654,6 +83831,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "정지 버튼 포함"
+          }
+        }
+      }
+    },
+    "Without Full Disk Access, Shelf can only read files from Documents and Downloads. Grant Full Disk Access to make Shelf work globally." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 서랍은 문서 및 다운로드 폴더의 파일만 읽을 수 있습니다. 모든 폴더에서 사용하려면 전체 디스크 접근을 허용하세요."
           }
         }
       }
@@ -81854,6 +84041,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已寫入"
+          }
+        }
+      }
+    },
+    "Yes" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지원"
           }
         }
       }
@@ -82477,7 +84674,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Youtube Music"
+            "value" : "YouTube Music"
           }
         },
         "nl" : {
@@ -83462,6 +85659,36 @@
         }
       }
     },
+    "Solid Dark" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불투명 다크"
+          }
+        }
+      }
+    },
+    "Solid Light" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불투명 라이트"
+          }
+        }
+      }
+    },
+    "Source" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소스"
+          }
+        }
+      }
+    },
     "sp_dc cookie" : {
       "comment" : "A label for the Spotify `sp_dc` cookie.",
       "isCommentAutoGenerated" : true,
@@ -84433,7 +86660,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• 생각중"
+            "value" : "• 생각 중"
           }
         },
         "nl" : {
