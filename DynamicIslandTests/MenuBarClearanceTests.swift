@@ -70,4 +70,124 @@ final class MenuBarClearanceTests: XCTestCase {
         XCTAssertEqual(offset(contentWidth: 300, menusEnd: 2850, screen: external), 18)
         XCTAssertEqual(offset(contentWidth: 300, menusEnd: 2000, screen: external), 0)
     }
+
+    // MARK: - Symmetrical HUD Centering (TDD)
+
+    func testIsSymmetricalHUDIdentification() {
+        let symmetricalTypes: [SneakContentType] = [
+            .volume,
+            .brightness,
+            .backlight,
+            .mic,
+            .bluetoothAudio
+        ]
+        for type in symmetricalTypes {
+            XCTAssertTrue(MenuBarLayout.isSymmetricalHUD(type: type), "\(type) should be identified as symmetrical HUD")
+        }
+
+        let nonSymmetricalTypes: [SneakContentType] = [
+            .music,
+            .timer,
+            .reminder,
+            .capsLock,
+            .extensionLiveActivity(bundleID: "com.example.test", activityID: "1")
+        ]
+        for type in nonSymmetricalTypes {
+            XCTAssertFalse(MenuBarLayout.isSymmetricalHUD(type: type), "\(type) should not be identified as symmetrical HUD")
+        }
+    }
+
+    func testClearanceAllowedWhenClosedWithoutHUD() {
+        XCTAssertTrue(MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: true,
+            isHideOnClosed: false,
+            isConnectivityHUDVisible: false,
+            sneakPeekType: nil,
+            isSneakPeekVisible: false
+        ))
+    }
+
+    func testClearanceSuppressedWhenSymmetricalHUDIsVisible() {
+        // Volume / brightness / backlight / mic / bluetoothAudio Sneak Peeks are symmetrical HUDs
+        // wrapping around the physical camera notch. Applying clearance offset
+        // displaces the notch spacer and clips the slider wing.
+        let symmetricalTypes: [SneakContentType] = [
+            .volume,
+            .brightness,
+            .backlight,
+            .mic,
+            .bluetoothAudio
+        ]
+        for type in symmetricalTypes {
+            XCTAssertFalse(MenuBarLayout.shouldApplyClearance(
+                isNotchClosed: true,
+                isHideOnClosed: false,
+                isConnectivityHUDVisible: false,
+                sneakPeekType: type,
+                isSneakPeekVisible: true
+            ), "Clearance should be suppressed when \(type) is visible")
+        }
+    }
+
+    func testClearanceAllowedForNonSymmetricalSneakPeek() {
+        // Non-symmetrical Sneak Peeks (like Music track changes or Timer) preserve
+        // clearance so the live activity can step aside from application menus.
+        let nonSymmetricalTypes: [SneakContentType] = [
+            .music,
+            .timer,
+            .reminder
+        ]
+        for type in nonSymmetricalTypes {
+            XCTAssertTrue(MenuBarLayout.shouldApplyClearance(
+                isNotchClosed: true,
+                isHideOnClosed: false,
+                isConnectivityHUDVisible: false,
+                sneakPeekType: type,
+                isSneakPeekVisible: true
+            ), "Clearance should be allowed when \(type) is visible")
+        }
+    }
+
+    func testClearanceAllowedWhenSymmetricalHUDIsNotVisible() {
+        // Even if sneakPeekType is a symmetrical HUD, if isSneakPeekVisible is false,
+        // clearance should remain active.
+        XCTAssertTrue(MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: true,
+            isHideOnClosed: false,
+            isConnectivityHUDVisible: false,
+            sneakPeekType: .volume,
+            isSneakPeekVisible: false
+        ))
+    }
+
+    func testClearanceSuppressedWhenConnectivityHUDIsVisible() {
+        XCTAssertFalse(MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: true,
+            isHideOnClosed: false,
+            isConnectivityHUDVisible: true,
+            sneakPeekType: nil,
+            isSneakPeekVisible: false
+        ))
+    }
+
+    func testClearanceSuppressedWhenNotchIsOpen() {
+        XCTAssertFalse(MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: false,
+            isHideOnClosed: false,
+            isConnectivityHUDVisible: false,
+            sneakPeekType: nil,
+            isSneakPeekVisible: false
+        ))
+    }
+
+    func testClearanceSuppressedWhenHiddenOnClosed() {
+        XCTAssertFalse(MenuBarLayout.shouldApplyClearance(
+            isNotchClosed: true,
+            isHideOnClosed: true,
+            isConnectivityHUDVisible: false,
+            sneakPeekType: nil,
+            isSneakPeekVisible: false
+        ))
+    }
 }
+
