@@ -124,8 +124,8 @@ struct MinimalisticMusicPlayerView: View {
                     }
                     .frame(height: 50)
                 } else {
-                    // ── Battery OFF (notch mode): U-shaped notch-hugging layout ──
-                    notchHuggingHeader
+                    // Battery hidden: keep the artwork below the notch.
+                    batteryFreeHeader
                 }
 
                 // Compact progress bar
@@ -302,10 +302,10 @@ struct MinimalisticMusicPlayerView: View {
             return height
         }
 
-        // ── Battery OFF (notch mode): tighter height for U-shaped layout ──
-        // The album art is pulled UP into the notch header area, so the
-        // visible header in-flow is only the title + artist text (~26pt).
-        var height: CGFloat = 26 // reduced header (text only; art overlaps upward)
+        // Battery hidden in notch mode.
+        // Keep the full artwork height in the layout so it stays below the
+        // physical notch even when the battery indicator is hidden.
+        var height: CGFloat = 50
         height += 4 + 4          // progress bar top padding + bar
         height += 54 + 2         // controls + top padding
 
@@ -324,20 +324,15 @@ struct MinimalisticMusicPlayerView: View {
         return height
     }
 
-    // MARK: - U-Shaped Notch-Hugging Header
+    // MARK: - Battery-Free Header
 
-    /// Layout that wraps content around the physical notch cutout.
-    /// Album art sits to the left of the notch, the visualizer to the right,
-    /// and the song title + artist are centered below the notch — producing a
-    /// "U" shape.
-    private var notchHuggingHeader: some View {
+    /// Align artwork, title and visualizer below the physical notch when the
+    /// battery indicator is hidden.
+    private var batteryFreeHeader: some View {
         GeometryReader { geo in
             let totalWidth = geo.size.width
             let albumArtSize: CGFloat = 50
             let visualizerWidth: CGFloat = useMusicVisualizer ? 24 : 0
-            // How far to pull the album art and waveform up alongside the notch.
-            let notchHeight = vm.effectiveClosedNotchHeight
-            let pullUp = max(notchHeight - 4, 20)
             
             ZStack(alignment: .top) {
                 // ── Left: Album art ──
@@ -346,7 +341,6 @@ struct MinimalisticMusicPlayerView: View {
                         .frame(width: albumArtSize, height: albumArtSize)
                     Spacer()
                 }
-                .offset(y: -pullUp)
                 .frame(width: totalWidth)
 
                 // ── Right: Waveform ──
@@ -358,15 +352,14 @@ struct MinimalisticMusicPlayerView: View {
                         Spacer()
                             .frame(width: 12)
                     }
-                    .offset(y: -pullUp + (albumArtSize - 16) / 2)
+                    .offset(y: (albumArtSize - 16) / 2)
                     .frame(width: totalWidth)
                 }
 
                 // ── Center: Title + Artist (below the notch) ──
                 VStack(alignment: .leading, spacing: 1) {
                     if !musicManager.songTitle.isEmpty {
-                        // In the U-shaped layout the visualizer sits in a 48-pt wide zone
-                        // (matching the time text) and has a 12-pt right spacer inside it.
+                        // Reserve space for the artwork and visualizer beside the title.
                         let textAreaWidth = max(0, totalWidth - albumArtSize - 10 - (useMusicVisualizer ? (visualizerWidth + 12 + 10) : 0))
                         MusicTitleMarqueeView(
                             text: musicManager.songTitle,
@@ -386,12 +379,11 @@ struct MinimalisticMusicPlayerView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, albumArtSize + 10)
-                // Position so the bottom of the artist text aligns with the
-                // bottom of the album art (which was pulled up by pullUp).
-                .offset(y: albumArtSize - pullUp - 28)
+                // Align the bottom of the artist text with the artwork.
+                .offset(y: albumArtSize - 28)
             }
         }
-        .frame(height: 26) // Only the text portion is in-flow; album art overlaps upward
+        .frame(height: 50)
     }
 
     private var timerCountdownSection: some View {
