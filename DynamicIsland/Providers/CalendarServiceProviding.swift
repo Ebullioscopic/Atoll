@@ -64,7 +64,7 @@ class CalendarService: CalendarServiceProviding {
     
     private func hasAccess(to entityType: EKEntityType) -> Bool {
         let status = EKEventStore.authorizationStatus(for: entityType)
-        return status == .fullAccess
+        return CalendarAccess.canRead(status)
     }
     
     func calendars() async -> [CalendarModel] {
