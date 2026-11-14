@@ -80,13 +80,64 @@ enum PartialDownload {
 }
 
 
+/// Whether the partial files are still growing, judged from the speed samples.
+///
+/// A browser that has paused a download leaves its temporary file exactly
+/// where it was, so the folder still says "downloading" and the only thing
+/// that changes is that no more bytes arrive. The sampler already measures
+/// that once a second; this turns a run of readings that show no movement
+/// into a state the live activity can display.
+///
+/// A paused download and a stalled connection look the same on disk, so both
+/// are reported the same way -- nothing outside the browser can tell them
+/// apart.
+struct DownloadStall {
+    /// How long the files have to hold still before the activity reads as
+    /// paused. Longer than the gap a slow transfer can leave between buffered
+    /// writes, short enough that a pause is noticed while the download is
+    /// still in front of the person who paused it.
+    static let threshold: TimeInterval = 2
+
+    private(set) var isStalled = false
+    private var lastGrowthAt: Date?
+
+    /// Feeds one sample-rate reading in and returns whether the files are now
+    /// considered paused.
+    ///
+    /// A `nil` rate means the pair could not be compared -- a file joined or
+    /// left -- which says nothing either way and leaves the state alone.
+    mutating func record(rate: Double?, at date: Date) -> Bool {
+        guard let rate else { return isStalled }
+
+        if rate > 0 {
+            lastGrowthAt = date
+            isStalled = false
+        } else if let lastGrowthAt {
+            isStalled = date.timeIntervalSince(lastGrowthAt) >= Self.threshold
+        } else {
+            // The first pair that shows no movement starts the clock.
+            self.lastGrowthAt = date
+        }
+        return isStalled
+    }
+
+    mutating func reset() {
+        isStalled = false
+        lastGrowthAt = nil
+    }
+}
+
 @Observable
 @MainActor
 class DownloadManager {
     static let shared = DownloadManager()
-    
+
     private(set) var isDownloading: Bool = false
     private(set) var isDownloadCompleted: Bool = false
+    /// No bytes have arrived for a few seconds. The download is still there --
+    /// the browser has either paused it or the connection has stalled -- so
+    /// the live activity stays up, but it stops pretending to make progress.
+    private(set) var isDownloadStalled: Bool = false
 
     /// Bytes per second across everything currently downloading, or `nil`
     /// before there are two samples to measure between.
@@ -94,6 +145,7 @@ class DownloadManager {
 
     private var speedTimer: Timer?
     private var lastSpeedSample: DownloadsSample?
+    private var stall = DownloadStall()
     /// Changes whenever sampling starts or stops.
     ///
     /// Invalidating the timer does not reach work already queued on `queue`,
@@ -175,6 +227,7 @@ class DownloadManager {
         vanishedSinceActive.removeAll()
         destinationStampsWhenStarted.removeAll()
         isDownloading = false
+        resetStall()
 
         let path = downloadsDirectory.path
         let fd = open(path, O_EVTONLY)
@@ -223,6 +276,13 @@ class DownloadManager {
         stopSpeedSampling()
     }
 
+    /// Sampling is the only thing that can see a download stop moving: the
+    /// temporary file stays on disk, so no directory event arrives.
+    private func resetStall() {
+        stall.reset()
+        isDownloadStalled = false
+    }
+
     // MARK: - Download speed
 
     /// Sampled on a timer rather than off the directory's change events: those
@@ -237,6 +297,7 @@ class DownloadManager {
         lastSpeedSample = nil
         smoothedSpeed = nil
         downloadSpeed = nil
+        resetStall()
 
         let timer = Timer(timeInterval: Self.speedSampleInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.sampleSpeed() }
@@ -253,6 +314,7 @@ class DownloadManager {
         lastSpeedSample = nil
         smoothedSpeed = nil
         downloadSpeed = nil
+        resetStall()
     }
 
     private func sampleSpeed() {
@@ -277,13 +339,29 @@ class DownloadManager {
         defer { lastSpeedSample = reading }
 
         guard let previous = lastSpeedSample else { return }
+
+        // Files present at launch may be paused downloads. Promote only the
+        // files that have subsequently grown, including when they resume.
+        let resumed = ignoredFiles.filter { name in
+            guard let before = previous.sizes[name], let now = reading.sizes[name] else { return false }
+            return now > before
+        }
+        if !resumed.isEmpty {
+            ignoredFiles.subtract(resumed)
+            updateDownloadingState(isActive: true)
+        }
+        guard isDownloading else { return }
         guard let sample = reading.rate(since: previous) else {
             // Nothing measurable across this pair. Drop the displayed rate
-            // rather than carrying a stale one over the gap.
+            // rather than carrying a stale one over the gap. The files that
+            // were compared changed, so this is no evidence either way about
+            // whether the ones still there are growing -- leave the stall
+            // state where it is.
             smoothedSpeed = nil
             downloadSpeed = nil
             return
         }
+        isDownloadStalled = stall.record(rate: sample, at: reading.takenAt)
         let smoothed = smoothedSpeed.map { $0 + (sample - $0) * Self.speedSmoothing } ?? sample
         smoothedSpeed = smoothed
         // Below a byte a second there is nothing worth showing, and a paused or
@@ -297,6 +375,7 @@ class DownloadManager {
         /// The in-progress names the total was taken across.
         let files: Set<String>
         let takenAt: Date
+        var sizes: [String: Int64] = [:]
 
         /// The rate since an earlier reading, or nil when the pair cannot carry
         /// one.
@@ -343,13 +422,16 @@ class DownloadManager {
 
         var bytes: Int64 = 0
         var files: Set<String> = []
+        var sizes: [String: Int64] = [:]
         for url in contents {
             let name = url.lastPathComponent
             guard PartialDownload.isInProgress(name) else { continue }
             files.insert(name)
-            bytes += allocatedBytes(of: url)
+            let size = allocatedBytes(of: url)
+            sizes[name] = size
+            bytes += size
         }
-        return DownloadsSample(bytes: bytes, files: files, takenAt: now)
+        return DownloadsSample(bytes: bytes, files: files, takenAt: now, sizes: sizes)
     }
 
     /// The bytes one in-progress download is holding.
@@ -436,7 +518,12 @@ class DownloadManager {
             hasPerformedInitialScan = true
             previousInProgressFiles = inProgressFiles
             ignoredFiles = inProgressFiles
+            for name in inProgressFiles {
+                let target = PartialDownload.destination(of: name)
+                destinationStampsWhenStarted[target] = stamps[target]
+            }
             isDownloading = false
+            if !ignoredFiles.isEmpty { startSpeedSampling() }
             return
         }
 
@@ -472,8 +559,9 @@ class DownloadManager {
 
         // completion logic
         guard isDownloading else {
+            if ignoredFiles.isEmpty { stopSpeedSampling() }
             vanishedSinceActive.removeAll()
-            destinationStampsWhenStarted.removeAll()
+            retainIgnoredDestinationStamps()
             return
         }
 
@@ -483,6 +571,8 @@ class DownloadManager {
         // nothing left to have completed, and would close the view mid-animation.
         guard !isDownloadCompleted else {
             vanishedSinceActive.removeAll()
+            if ignoredFiles.isEmpty { stopSpeedSampling() }
+            retainIgnoredDestinationStamps()
             return
         }
 
@@ -497,15 +587,21 @@ class DownloadManager {
             stampsWhenStarted: destinationStampsWhenStarted
         )
         vanishedSinceActive.removeAll()
-        destinationStampsWhenStarted.removeAll()
+        retainIgnoredDestinationStamps()
 
         if completedFiles.isEmpty {
             closeDownloadViewImmediately()
         } else {
             updateDownloadingState(isActive: false)
         }
+        if !ignoredFiles.isEmpty { startSpeedSampling() }
     }
     
+    private func retainIgnoredDestinationStamps() {
+        let targets = Set(ignoredFiles.map { PartialDownload.destination(of: $0) })
+        destinationStampsWhenStarted = destinationStampsWhenStarted.filter { targets.contains($0.key) }
+    }
+
 #if DEBUG
     /// A manager that watches nothing, for tests.
     ///
@@ -528,6 +624,17 @@ class DownloadManager {
     ///     destination is told apart from one that has been written.
     func processScanForTesting(_ inProgressFiles: Set<String>, stamps: [String: Date] = [:]) {
         processDownloadFiles(inProgressFiles, stamps: stamps)
+    }
+
+    var isSpeedSamplingForTesting: Bool { speedTimer != nil }
+
+    /// One speed reading, in the shape the sampler delivers them.
+    ///
+    /// The timer that normally drives this is started by the live activity, so
+    /// the stalled state it feeds would otherwise only be reachable by pausing
+    /// a real download in a real browser.
+    func recordSpeedSampleForTesting(_ reading: DownloadsSample, session: Int? = nil) {
+        recordSpeedSample(reading, session: session ?? speedSession)
     }
 #endif
 

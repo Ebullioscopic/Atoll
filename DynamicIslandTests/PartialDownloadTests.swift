@@ -247,6 +247,40 @@ final class DownloadScanSequenceTests: XCTestCase {
         XCTAssertFalse(manager.isDownloading)
     }
 
+    func testExistingPartialBecomesActiveWhenItStartsGrowing() {
+        let manager = makeManager()
+        manager.processScanForTesting(["old.zip.crdownload"])
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        manager.recordSpeedSampleForTesting(.init(bytes: 1_000, files: ["old.zip.crdownload"], takenAt: start, sizes: ["old.zip.crdownload": 1_000]))
+        manager.recordSpeedSampleForTesting(.init(bytes: 2_000, files: ["old.zip.crdownload"], takenAt: start.addingTimeInterval(1), sizes: ["old.zip.crdownload": 2_000]))
+        XCTAssertTrue(manager.isDownloading)
+    }
+
+    func testResumedExistingDownloadCancelledOverUnchangedDestinationIsNotCompleted() {
+        let manager = makeManager()
+        manager.processScanForTesting(["old.zip.crdownload"], stamps: ["old.zip": started])
+        manager.processScanForTesting(["old.zip.crdownload"], stamps: ["old.zip": started])
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        manager.recordSpeedSampleForTesting(.init(bytes: 1_000, files: ["old.zip.crdownload"], takenAt: start, sizes: ["old.zip.crdownload": 1_000]))
+        manager.recordSpeedSampleForTesting(.init(bytes: 2_000, files: ["old.zip.crdownload"], takenAt: start.addingTimeInterval(1), sizes: ["old.zip.crdownload": 2_000]))
+        XCTAssertTrue(manager.isDownloading)
+        manager.processScanForTesting([], stamps: ["old.zip": started])
+        XCTAssertFalse(manager.isDownloadCompleted)
+        XCTAssertFalse(manager.isDownloading)
+    }
+
+    func testSamplingStopsWhenLastIgnoredFileDisappearsDuringCompletion() {
+        let manager = makeManager()
+        manager.processScanForTesting(["old.zip.crdownload"])
+        manager.processScanForTesting(["old.zip.crdownload", "new.zip.crdownload"])
+        manager.processScanForTesting(["old.zip.crdownload"], stamps: ["new.zip": written])
+        XCTAssertTrue(manager.isDownloadCompleted)
+        XCTAssertTrue(manager.isSpeedSamplingForTesting)
+        manager.processScanForTesting([], stamps: ["new.zip": written])
+        XCTAssertTrue(manager.isDownloadCompleted)
+        XCTAssertFalse(manager.isSpeedSamplingForTesting)
+    }
+
     /// ...but once that file is gone the name is free again, so a later
     /// download reusing it is a new download rather than one ignored forever.
     func testNameIsFreeAgainAfterTheIgnoredFileGoes() {
@@ -356,6 +390,109 @@ final class DownloadBytesInProgressTests: XCTestCase {
 
     func testAnEmptyFolderMeasuresNothing() {
         XCTAssertEqual(DownloadManager.bytesInProgress(in: directory), 0)
+    }
+}
+
+/// A paused download keeps its temporary file, so the folder still says a
+/// download is running; only the absence of new bytes tells the two apart.
+final class DownloadStallTests: XCTestCase {
+    private let start = Date(timeIntervalSince1970: 1_000_000)
+
+    private func at(_ seconds: TimeInterval) -> Date {
+        start.addingTimeInterval(seconds)
+    }
+
+    /// A run of readings with no movement long enough to rule out buffered
+    /// writes is reported as paused.
+    func testHoldingStillForTheThresholdReportsPaused() {
+        var stall = DownloadStall()
+
+        XCTAssertFalse(stall.record(rate: 0, at: at(1)), "the first idle reading starts the clock")
+        XCTAssertFalse(stall.record(rate: 0, at: at(2)))
+        XCTAssertTrue(stall.record(rate: 0, at: at(3)))
+    }
+
+    /// The gap a slow transfer leaves between flushes is not a pause.
+    func testAShortGapIsNotPaused() {
+        var stall = DownloadStall()
+
+        XCTAssertFalse(stall.record(rate: 0, at: at(1)))
+        XCTAssertFalse(stall.record(rate: 0, at: at(2.9)))
+    }
+
+    /// Bytes arriving again -- the browser was resumed -- clear the state
+    /// immediately rather than after another threshold.
+    func testMovementClearsThePausedState() {
+        var stall = DownloadStall()
+
+        _ = stall.record(rate: 0, at: at(1))
+        XCTAssertTrue(stall.record(rate: 0, at: at(5)))
+        XCTAssertFalse(stall.record(rate: 1_000, at: at(6)))
+        XCTAssertFalse(stall.record(rate: 1_000, at: at(7)))
+    }
+
+    /// A pair that could not be compared -- a file joined or left -- says
+    /// nothing about whether the remaining ones are growing.
+    func testAnIncomparablePairLeavesTheStateAlone() {
+        var stall = DownloadStall()
+
+        _ = stall.record(rate: 0, at: at(1))
+        XCTAssertTrue(stall.record(rate: 0, at: at(5)))
+        XCTAssertTrue(stall.record(rate: nil, at: at(6)))
+    }
+
+    func testResetForgetsThePreviousRun() {
+        var stall = DownloadStall()
+
+        _ = stall.record(rate: 0, at: at(1))
+        _ = stall.record(rate: 0, at: at(5))
+        stall.reset()
+
+        XCTAssertFalse(stall.isStalled)
+        XCTAssertFalse(stall.record(rate: 0, at: at(6)), "the clock starts over")
+    }
+}
+
+/// The manager's own state, fed in the shape the speed sampler delivers.
+@MainActor
+final class DownloadStallStateTests: XCTestCase {
+    private let start = Date(timeIntervalSince1970: 1_000_000)
+
+    private func sample(_ bytes: Int64, _ files: Set<String>, after seconds: TimeInterval) -> DownloadManager.DownloadsSample {
+        DownloadManager.DownloadsSample(bytes: bytes, files: files, takenAt: start.addingTimeInterval(seconds))
+    }
+
+    func testFlatSamplesReportStalledAndGrowthClearsIt() {
+        let manager = DownloadManager(monitoringDisabledForTesting: true)
+        manager.processScanForTesting([])
+        manager.processScanForTesting(["a.crdownload"])
+
+        manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 0))
+        manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 1))
+        XCTAssertFalse(manager.isDownloadStalled)
+
+        manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 5))
+        XCTAssertTrue(manager.isDownloadStalled)
+
+        manager.recordSpeedSampleForTesting(sample(2_000, ["a.crdownload"], after: 6))
+        XCTAssertFalse(manager.isDownloadStalled)
+    }
+
+    /// The files changing between readings cannot be a pause signal: the one
+    /// that left may have finished, and the one that stayed may still be
+    /// writing.
+    func testAnIncomparableSampleDoesNotChangeTheState() {
+        let manager = DownloadManager(monitoringDisabledForTesting: true)
+        manager.processScanForTesting([])
+        manager.processScanForTesting(["a.crdownload"])
+
+        manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 0))
+        manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 1))
+        manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 5))
+        XCTAssertTrue(manager.isDownloadStalled)
+
+        manager.recordSpeedSampleForTesting(sample(1_000, ["b.crdownload"], after: 6))
+        XCTAssertTrue(manager.isDownloadStalled)
     }
 }
 
