@@ -823,6 +823,9 @@ class MusicManager: ObservableObject {
     }
 
     // MARK: - Setup Methods
+    /// Creates the requested controller and subscribes to its playback updates.
+    /// Legacy Now Playing respects startup deprecation detection, while Auto Detect
+    /// always attempts the system controller. Returns nil if initialization fails.
     private func createController(for type: MediaControllerType) -> (any MediaControllerProtocol)? {
         // Cleanup previous controller
         if activeController != nil {
@@ -840,6 +843,8 @@ class MusicManager: ObservableObject {
             } else {
                 return nil
             }
+        case .autoDetect:
+            newController = NowPlayingController()
         case .appleMusic:
             newController = AppleMusicController()
         case .spotify:
@@ -848,6 +853,10 @@ class MusicManager: ObservableObject {
             newController = YouTubeMusicController()
         case .amazonMusic:
             newController = AmazonMusicController()
+        case .netEaseCloudMusic:
+            newController = NetEaseCloudMusicController()
+        case .qqMusic:
+            newController = QQMusicController()
         case .tidal:
             newController = TidalController()
         case .cider:
@@ -2261,6 +2270,8 @@ extension MusicManager {
         Self.brandAccentColor(for: Defaults[.mediaController], bundleIdentifier: bundleIdentifier)
     }
 
+    /// Resolves the selected source's accent color, following the active app's
+    /// brand for automatic sources and falling back to the app accent as needed.
     private static func brandAccentColor(for controller: MediaControllerType, bundleIdentifier: String?) -> Color {
         switch controller {
         case .appleMusic:
@@ -2269,9 +2280,9 @@ extension MusicManager {
             return spotifyGreen
         case .amazonMusic:
             return amazonOrange
-        case .tidal, .cider:
+        case .tidal, .cider, .netEaseCloudMusic, .qqMusic:
             return .accentColor
-        case .nowPlaying:
+        case .nowPlaying, .autoDetect:
             if let bundleIdentifier,
                let bundleColor = brandAccentColor(forBundleIdentifier: bundleIdentifier) {
                 return bundleColor
@@ -2282,6 +2293,7 @@ extension MusicManager {
         }
     }
 
+    /// Returns a known application's brand accent, or nil for an unknown bundle.
     private static func brandAccentColor(forBundleIdentifier bundleIdentifier: String) -> Color? {
         switch bundleIdentifier {
         case "com.apple.Music":
@@ -2290,6 +2302,10 @@ extension MusicManager {
             return spotifyGreen
         case AmazonMusicController.bundleIdentifier:
             return amazonOrange
+        case NetEaseCloudMusicController.bundleIdentifier:
+            return .accentColor
+        case QQMusicController.bundleIdentifier:
+            return .accentColor
         case TidalController.bundleIdentifier:
             return .accentColor
         case CiderController.bundleIdentifier:

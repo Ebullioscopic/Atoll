@@ -130,6 +130,8 @@ class AudioTap: NSObject {
         "com.apple.Music",
         "com.spotify.client",
         "com.amazon.music",
+        "com.netease.163music",
+        "com.tencent.QQMusicMac",
         "sh.cider.genten.mac",
         "com.apple.Safari",
         "com.tidal.desktop",
