@@ -119,6 +119,7 @@ struct NotchTimerView: View {
                     List {
                         ForEach(timerPresets) { preset in
                             TimerPresetCard(preset: preset, isActive: timerManager.activePresetId == preset.id) {
+                                TogglManager.shared.localTimerChanged()
                                 timerManager.startTimer(duration: preset.duration, name: preset.name, preset: preset)
                                 if !enableMinimalisticUI {
                                     coordinator.currentView = .timer
@@ -174,13 +175,15 @@ struct NotchTimerView: View {
         if timerManager.allowsManualInteraction {
             HStack(spacing: 10) {
                 if !timerManager.isOvertime {
-                    TimerControlButton(
-                        icon: pauseIconName,
-                        foreground: .white.opacity(0.95),
-                        background: timerAccentColor.opacity(0.32),
-                        accessibilityLabel: pauseAccessibilityLabel,
-                        action: togglePauseAction
-                    )
+                    if timerManager.showsPauseControl {
+                        TimerControlButton(
+                            icon: pauseIconName,
+                            foreground: .white.opacity(0.95),
+                            background: timerAccentColor.opacity(0.32),
+                            accessibilityLabel: pauseAccessibilityLabel,
+                            action: togglePauseAction
+                        )
+                    }
 
                     TimerControlButton(
                         icon: "xmark",
@@ -289,6 +292,7 @@ struct NotchTimerView: View {
     private func stopTimerAction() {
         if timerManager.allowsManualInteraction {
             timerManager.stopTimer()
+            TogglManager.shared.localTimerChanged()
         } else {
             timerManager.endExternalTimer(triggerSmoothClose: false)
         }
@@ -517,6 +521,7 @@ struct NotchTimerView: View {
     }
 
     private func startCustomTimer() {
+        TogglManager.shared.localTimerChanged()
         withAnimation(.smooth) {
             timerManager.startTimer(duration: customDurationInSeconds, name: String(localized: "Custom Timer"))
             if !enableMinimalisticUI {

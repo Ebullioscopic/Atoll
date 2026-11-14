@@ -62,6 +62,8 @@ struct ContentView: View {
     @ObservedObject var extensionLiveActivityManager = ExtensionLiveActivityManager.shared
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @ObservedObject var localSendService = LocalSendService.shared
+    @ObservedObject var togglManager = TogglManager.shared
+    @Default(.togglEnabled) private var togglEnabled
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     
@@ -879,8 +881,22 @@ struct ContentView: View {
         )
     }
 
+    /// Attaches the primary root view's lifecycle handlers, including ending a running Toggl stopwatch when Toggl is disabled.
     private func installPrimaryRootLifecycleHandlers<Content: View>(on view: Content) -> some View {
         view
+            .onChange(of: togglEnabled) { _, isEnabled in
+                // A sync still in flight must not adopt an entry once Toggl is off.
+                if !isEnabled { togglManager.markLocalActivity() }
+                // Disabling Toggl hides its tab and closed-notch activity, so end a running
+                // stopwatch (saving it) rather than leaving it running out of sight.
+                if !isEnabled && togglManager.isRunning {
+                    Task { @MainActor in
+                        // Re-check inside the task: each open ContentView (one per display) queues this.
+                        guard togglManager.isRunning else { return }
+                        await togglManager.stopStopwatch()
+                    }
+                }
+            }
             .onAppear {
                 isMusicControlWindowSuppressed = vm.notchState != .closed
                     || lockScreenManager.isLocked
@@ -1051,6 +1067,7 @@ struct ContentView: View {
         )
     }
 
+    /// Builds the notch's main layout, including the connectivity HUD when it is visible.
     @ViewBuilder
       func NotchLayout() -> some View {
           VStack(alignment: .leading) {
@@ -1085,6 +1102,8 @@ struct ContentView: View {
                           switch musicSecondary {
                           case .timer:
                               return currentScreenExpansionType == .timer
+                          case .toggl:
+                              return false
                           case .reminder:
                               return currentScreenExpansionType == .reminder
                           case .recording:
@@ -1138,6 +1157,8 @@ struct ContentView: View {
                               .transition(closedLiveActivitySwapTransition)
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .timer) && vm.notchState == .closed && timerManager.isTimerActive && coordinator.timerLiveActivityEnabled && !vm.hideOnClosed {
                           TimerLiveActivity()
+                      } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && togglEnabled && togglManager.isRunning && !vm.hideOnClosed {
+                          TogglLiveActivity()
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .reminder) && vm.notchState == .closed && reminderManager.isActive && enableReminderLiveActivity && !vm.hideOnClosed {
                           ReminderLiveActivity()
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording) && vm.notchState == .closed && recordingManager.isRecording && Defaults[.enableScreenRecordingDetection] && Defaults[.showRecordingIndicator] && !vm.hideOnClosed && !musicPairingEligible {
@@ -1292,6 +1313,8 @@ struct ContentView: View {
                                   NotchShelfView()
                               case .timer:
                                   NotchTimerView()
+                              case .toggl:
+                                  NotchTogglView()
                               case .stats:
                                   NotchStatsView()
                               case .llmUsage:
@@ -1517,9 +1540,14 @@ struct ContentView: View {
         .animation(.smooth(duration: 0.25), value: secondary?.id)
     }
 
+    /// Chooses the secondary live activity shown beside the music, in priority order: timer, Toggl, reminder, recording, then Do Not Disturb.
     private func resolveMusicSecondaryLiveActivity(isMusicPairingEligible: Bool = true) -> MusicSecondaryLiveActivity? {
         if coordinator.timerLiveActivityEnabled && timerManager.isTimerActive {
             return .timer
+        }
+
+        if togglEnabled && togglManager.isRunning {
+            return .toggl
         }
 
         if enableReminderLiveActivity, reminderManager.isActive, let reminder = reminderManager.activeReminder {
@@ -1551,12 +1579,18 @@ struct ContentView: View {
         return nil
     }
 
+    /// Returns the right-wing width for the given secondary live activity, sized to its content.
     private func resolvedRightWingWidth(for secondary: MusicSecondaryLiveActivity?, baseWidth: CGFloat, centerBaseWidth: CGFloat, notchHeight: CGFloat) -> CGFloat {
         guard let secondary else { return baseWidth }
 
         switch secondary {
         case .timer:
             return timerRightWingWidth(baseWidth: baseWidth, centerBaseWidth: centerBaseWidth)
+        case .toggl:
+            let elapsedText = TogglSupplementMetrics.formattedElapsed(for: togglManager.elapsed)
+            let width = TogglSupplementMetrics.elapsedFrameWidth(for: elapsedText)
+            let padding: CGFloat = 18
+            return max(baseWidth, padding + width)
         case .reminder(let entry):
             return reminderRightWingWidth(for: entry, baseWidth: baseWidth, notchHeight: notchHeight, now: reminderManager.currentDate)
         case .capsLock(let showLabel):
@@ -1635,6 +1669,7 @@ struct ContentView: View {
         max(baseWidth, max(centerBaseWidth * factor, baseWidth + extra))
     }
 
+    /// Renders the secondary live activity's badge over the album art.
     @ViewBuilder
     private func albumArtBadge(for secondary: MusicSecondaryLiveActivity?, badgeSize: CGFloat) -> some View {
         if let secondary, badgeSize > 0 {
@@ -1647,6 +1682,10 @@ struct ContentView: View {
                     Image(systemName: "timer")
                         .font(.system(size: badgeSize * 0.55, weight: .semibold))
                         .foregroundStyle(timerAccentColor)
+                case .toggl:
+                    Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                        .font(.system(size: badgeSize * 0.55, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.87, green: 0.36, blue: 0.22))
                 case .reminder(let entry):
                     let accent = reminderColor(for: entry, now: reminderManager.currentDate)
                     Image(systemName: "clock")
@@ -1702,6 +1741,7 @@ struct ContentView: View {
         }
     }
 
+    /// Builds the right wing shown beside the music view for the given secondary live activity.
     @ViewBuilder
     private func musicRightWing(for secondary: MusicSecondaryLiveActivity?, notchHeight: CGFloat, trailingWidth: CGFloat) -> some View {
         switch secondary {
@@ -1712,6 +1752,11 @@ struct ContentView: View {
                 showsCountdown: timerShowsCountdown,
                 showsProgress: timerShowsProgress,
                 progressStyle: timerProgressStyle,
+                notchHeight: notchHeight
+            )
+        case .toggl:
+            MusicTogglSupplementView(
+                togglManager: togglManager,
                 notchHeight: notchHeight
             )
         case .reminder(let entry):
@@ -2418,7 +2463,21 @@ struct ContentView: View {
         let height = max(closedHeight, recordingSize?.height ?? 0) + 6
             + PinnedLyricsView.reservedHeight(isEligible: pinnedLyricsVisible,
                 availability: musicManager.lyricsAvailability, context: pinnedLyricContext)
-        let width = max(closedWidth, recordingSize?.width ?? 0) + 24
+        // The Toggl wings sit on both sides of the notch while the stopwatch runs.
+        var togglWidth: CGFloat = 0
+        // Only when the Toggl activity is what renders: not hidden, not replaced by the timer or music.
+        let togglRendered = togglEnabled && togglManager.isRunning
+            && vm.notchState == .closed && !vm.hideOnClosed && !isCurrentScreenExpansionVisible
+            && !(coordinator.timerLiveActivityEnabled && timerManager.isTimerActive)
+            && !closedMusicPairingEligible(hasActiveMusicSnapshot: hasActiveMusicSnapshotForClosedPairing)
+        if togglRendered {
+            let wingPadding: CGFloat = 22
+            let leftWing = max(0, vm.effectiveClosedNotchHeight - 12) + wingPadding / 2
+            let elapsedText = TogglSupplementMetrics.formattedElapsed(for: togglManager.elapsed)
+            let rightWing = TogglSupplementMetrics.elapsedFrameWidth(for: elapsedText) + wingPadding
+            togglWidth = vm.closedNotchSize.width + 2 * max(leftWing, rightWing)
+        }
+        let width = max(closedWidth, recordingSize?.width ?? 0, togglWidth) + 24
         // Same shift the content is drawn with, so the hit area stays under it.
         let minX = screen.frame.midX - width / 2 + menuBarClearanceOffset
         let minY = screen.frame.maxY - height
@@ -2993,6 +3052,7 @@ struct ContentView: View {
         return isMusicSneak || isTimerSneak || isReminderSneak || isOtherSneak
     }
 
+    /// Returns the sneak-peek style: standard for extension live activities, otherwise the override or the user's setting.
     private func resolvedSneakPeekStyle() -> SneakPeekStyle {
         if case .extensionLiveActivity = coordinator.sneakPeek.type {
             return .standard
@@ -3003,6 +3063,7 @@ struct ContentView: View {
 
 private enum MusicSecondaryLiveActivity: Equatable {
     case timer
+    case toggl
     case reminder(ReminderLiveActivityManager.ReminderEntry)
     case recording
     case focus(FocusModeType)
@@ -3014,6 +3075,8 @@ private enum MusicSecondaryLiveActivity: Equatable {
         switch self {
         case .timer:
             return "timer"
+        case .toggl:
+            return "toggl"
         case .reminder(let entry):
             return "reminder-\(entry.id)"
         case .recording:
@@ -3133,6 +3196,7 @@ private struct MusicTimerSupplementView: View {
             .frame(width: timerNameFrameWidth, alignment: .trailing)
     }
 
+    /// Draws a thin progress bar of the given width, filled to the clamped progress.
     private func barView(width: CGFloat) -> some View {
         Capsule()
             .fill(Color.white.opacity(0.15))
@@ -3145,6 +3209,34 @@ private struct MusicTimerSupplementView: View {
             }
     }
 
+}
+
+private struct MusicTogglSupplementView: View {
+    @ObservedObject var togglManager: TogglManager
+    let notchHeight: CGFloat
+
+    private var wingPadding: CGFloat { 22 }
+
+    private var formattedElapsed: String {
+        TogglSupplementMetrics.formattedElapsed(for: togglManager.elapsed)
+    }
+
+    private var elapsedFrameWidth: CGFloat {
+        TogglSupplementMetrics.elapsedFrameWidth(for: formattedElapsed)
+    }
+
+    var body: some View {
+        Text(formattedElapsed)
+            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            // Tight trailing (~2px) to match the timer supplement — hour-format
+            // elapsed stays flush-right when paired with music.
+            .padding(.trailing, 2)
+            .frame(width: elapsedFrameWidth, height: notchHeight, alignment: .trailing)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+    }
 }
 
 private struct MusicReminderSupplementView: View {
@@ -3258,10 +3350,35 @@ private enum TimerSupplementMetrics {
         max(countdownTextWidth(for: text) + 16, 72)
     }
 
+    /// Returns the frame width for a timer name: its measured width plus padding, with a 64 pt minimum.
     static func timerNameFrameWidth(for text: String) -> CGFloat {
         guard !text.isEmpty else { return 64 }
         let width = musicMeasureText(text, font: MusicSupplementFont.systemFont(ofSize: 12, weight: .medium))
         return max(width + 14, 64)
+    }
+}
+
+enum TogglSupplementMetrics {
+    /// Formats an elapsed time as m:ss, or h:mm:ss once an hour has passed.
+    static func formattedElapsed(for elapsed: TimeInterval) -> String {
+        let total = Int(elapsed)
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        return h > 0
+            ? String(format: "%d:%02d:%02d", h, m, s)
+            : String(format: "%d:%02d", m, s)
+    }
+
+    /// Measures elapsed text in the monospaced font, so hour-format times are not clipped.
+    static func elapsedTextWidth(for text: String) -> CGFloat {
+        // Fully monospaced to match the `.monospaced` render so hour-format elapsed isn't clipped.
+        musicMeasureText(text, font: MusicSupplementFont.monospacedSystemFont(ofSize: 13, weight: .semibold))
+    }
+
+    /// Returns the frame width for elapsed text: its measured width plus padding, with a 72 pt minimum.
+    static func elapsedFrameWidth(for text: String) -> CGFloat {
+        max(elapsedTextWidth(for: text) + 16, 72)
     }
 }
 

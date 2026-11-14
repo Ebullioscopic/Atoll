@@ -211,7 +211,7 @@ struct LockScreenTimerWidget: View {
 
     private var controlButtons: some View {
         HStack(spacing: 10) {
-            if !timerManager.isOvertime {
+            if timerManager.showsPauseControl {
                 CircleButton(
                     icon: pauseIcon,
                     foreground: appearance.primary(opacity: 0.95),
@@ -270,6 +270,9 @@ struct LockScreenTimerWidget: View {
 
     private func stopTimer() {
         let allowsManualInteraction = timerManager.allowsManualInteraction
+        // Pin the timer this tap targets, and drop any Toggl sync still in flight.
+        let targetSession = timerManager.sessionID
+        TogglManager.shared.markLocalActivity()
 
         LockScreenTimerWidgetPanelManager.shared.hide()
 
@@ -279,8 +282,11 @@ struct LockScreenTimerWidget: View {
             guard !Task.isCancelled else { return }
 
             await MainActor.run {
+                // Another timer (for example a synced Toggl entry) replaced it during the delay; leave that one.
+                guard TimerManager.shared.sessionID == targetSession else { return }
                 if allowsManualInteraction {
                     TimerManager.shared.stopTimer()
+                    TogglManager.shared.localTimerChanged()
                 } else {
                     TimerManager.shared.endExternalTimer(triggerSmoothClose: false)
                 }
