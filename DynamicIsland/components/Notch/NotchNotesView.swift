@@ -935,10 +935,12 @@ struct NoteEditorView: View {
             
             // Title & Color Picker Row
             HStack(alignment: .center, spacing: 12) {
-                TextField("Title", text: $title)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .textFieldStyle(.plain)
-                    .foregroundStyle(.white)
+                // SwiftUI's TextField ignores `.foregroundStyle` while the
+                // field editor is active, and in light mode that editor types
+                // in the window's label color. The editor background is black,
+                // so the title is invisible until editing ends.
+                NoteTitleField(text: $title, placeholder: String(localized: "Title"))
+                    .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
                 
                 Spacer()
                 
@@ -1068,5 +1070,114 @@ struct NoteEditorView: View {
         guard hovering != isSuppressing else { return }
         isSuppressing = hovering
         vm.setScrollGestureSuppression(hovering, token: suppressionToken)
+    }
+}
+
+/// Single-line title field that stays white on the note editor's black background.
+///
+/// A SwiftUI `TextField` draws its placeholder and its resting text with
+/// `.foregroundStyle`, but the shared field editor used while typing takes its
+/// color from the window appearance. In light mode that is black, which
+/// disappears on this editor. The list row is a `Text`, so the saved title
+/// looks fine the moment you leave the editor.
+private struct NoteTitleField: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+
+    func makeNSView(context: Context) -> NoteTitleNSTextField {
+        let textField = NoteTitleNSTextField(string: text)
+        textField.isBordered = false
+        textField.isBezeled = false
+        textField.drawsBackground = false
+        textField.backgroundColor = .clear
+        textField.focusRingType = .none
+        textField.font = Self.titleFont
+        textField.textColor = .white
+        textField.appearance = NSAppearance(named: .darkAqua)
+        textField.delegate = context.coordinator
+        textField.lineBreakMode = .byTruncatingTail
+        textField.maximumNumberOfLines = 1
+        textField.cell?.wraps = false
+        textField.cell?.isScrollable = true
+        textField.placeholderAttributedString = Self.placeholderString(placeholder)
+        textField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return textField
+    }
+
+    func updateNSView(_ textField: NoteTitleNSTextField, context: Context) {
+        if textField.stringValue != text, textField.currentEditor() == nil {
+            textField.stringValue = text
+        }
+        textField.textColor = .white
+        textField.appearance = NSAppearance(named: .darkAqua)
+        if textField.placeholderAttributedString?.string != placeholder {
+            textField.placeholderAttributedString = Self.placeholderString(placeholder)
+        }
+        textField.applyEditorStyle()
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NoteTitleNSTextField, context: Context) -> CGSize? {
+        let intrinsic = nsView.intrinsicContentSize
+        return CGSize(width: proposal.width ?? intrinsic.width, height: max(22, intrinsic.height))
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    private static var titleFont: NSFont {
+        let base = NSFont.systemFont(ofSize: 17, weight: .bold)
+        if let descriptor = base.fontDescriptor.withDesign(.rounded),
+           let rounded = NSFont(descriptor: descriptor, size: 17) {
+            return rounded
+        }
+        return base
+    }
+
+    private static func placeholderString(_ placeholder: String) -> NSAttributedString {
+        NSAttributedString(string: placeholder, attributes: [
+            .foregroundColor: NSColor.white.withAlphaComponent(0.35),
+            .font: titleFont
+        ])
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var text: Binding<String>
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let textField = notification.object as? NoteTitleNSTextField else { return }
+            text.wrappedValue = textField.stringValue
+            textField.applyEditorStyle()
+        }
+
+        func controlTextDidBeginEditing(_ notification: Notification) {
+            (notification.object as? NoteTitleNSTextField)?.applyEditorStyle()
+        }
+    }
+}
+
+private final class NoteTitleNSTextField: NSTextField {
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        applyEditorStyle()
+        return accepted
+    }
+
+    func applyEditorStyle() {
+        guard let editor = currentEditor() as? NSTextView else { return }
+        editor.textColor = .white
+        editor.drawsBackground = false
+        editor.backgroundColor = .clear
+        var typingAttributes = editor.typingAttributes
+        typingAttributes[.foregroundColor] = NSColor.white
+        if let font {
+            typingAttributes[.font] = font
+        }
+        editor.typingAttributes = typingAttributes
     }
 }
