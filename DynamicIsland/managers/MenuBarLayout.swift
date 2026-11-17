@@ -26,11 +26,25 @@ import Combine
 final class MenuBarLayout: ObservableObject {
     static let shared = MenuBarLayout()
 
-    /// Right edge of the last menu of the frontmost app, in screen coordinates.
+    /// Right edge of the last menu of the frontmost app, measured from the left
+    /// edge of the display whose menu bar it was read on.
     /// `nil` when it cannot be known -- no accessibility permission, an app that
     /// exposes no menu bar, or a process that did not answer in time. Callers
     /// treat that as "no constraint" rather than guessing.
-    @Published private(set) var appMenusRightEdge: CGFloat?
+    ///
+    /// Relative, not global: with several displays the frontmost app's menus are
+    /// drawn in every display's menu bar at the same offset, but the
+    /// accessibility API reports only one of them. Comparing a global x against
+    /// another display's frame made that display's island shove its content
+    /// hundreds of points sideways, out of the notch shape -- the background
+    /// animated with nothing visible on top.
+    @Published private(set) var appMenusRightInset: CGFloat?
+
+    /// Right edge of the frontmost app's menus in the menu bar of the display
+    /// with frame `screenFrame` (Cocoa coordinates), or `nil` when unknown.
+    func appMenusRightEdge(in screenFrame: CGRect) -> CGFloat? {
+        appMenusRightInset.map { screenFrame.minX + $0 }
+    }
 
     /// Menus change with the frontmost app, and within an app as its windows
     /// change, so a slow poll backs up the activation notice. It runs only
@@ -103,29 +117,32 @@ final class MenuBarLayout: ObservableObject {
         }
         pollTimer?.invalidate()
         pollTimer = nil
-        appMenusRightEdge = nil
+        appMenusRightInset = nil
     }
 
     func refresh() {
         guard !inFlight else { return }
         guard AXIsProcessTrusted() else {
-            appMenusRightEdge = nil
+            appMenusRightInset = nil
             return
         }
         guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else {
-            appMenusRightEdge = nil
+            appMenusRightInset = nil
             return
         }
+        // Display frames are read here, on the main actor, and handed to the scan.
+        let screenFrames = NSScreen.screens.map(\.frame)
+        let primaryMaxY = NSScreen.screens.first?.frame.maxY ?? 0
 
         // Off the main actor: these are cross-process calls, and an app that has
         // stopped answering would otherwise take the notch's UI down with it.
         inFlight = true
         Task.detached(priority: .utility) {
-            let edge = Self.menusRightEdge(pid: pid)
+            let inset = Self.menusRightInset(pid: pid, screenFrames: screenFrames, primaryMaxY: primaryMaxY)
             await MainActor.run {
                 self.inFlight = false
                 guard self.trackers > 0 else { return }
-                if self.appMenusRightEdge != edge { self.appMenusRightEdge = edge }
+                if self.appMenusRightInset != inset { self.appMenusRightInset = inset }
             }
         }
     }
@@ -141,8 +158,9 @@ final class MenuBarLayout: ObservableObject {
     /// own, or a hung app would still block on the ones that inherited nothing.
     nonisolated private static let elementTimeout: Float = 0.25
 
-    /// The right edge of the last menu, or `nil` if the menu bar cannot be read.
-    nonisolated private static func menusRightEdge(pid: pid_t) -> CGFloat? {
+    /// The right edge of the last menu relative to the left edge of the display it
+    /// sits on, or `nil` if the menu bar cannot be read.
+    nonisolated private static func menusRightInset(pid: pid_t, screenFrames: [CGRect], primaryMaxY: CGFloat) -> CGFloat? {
         let startedAt = Date()
         let app = AXUIElementCreateApplication(pid)
         // A hung app must not hold this up; the measurement is an optimisation,
@@ -162,6 +180,7 @@ final class MenuBarLayout: ObservableObject {
         else { return nil }
 
         var rightEdge: CGFloat?
+        var firstOrigin: CGPoint?
         for item in items {
             // Whatever has been measured so far is still usable; a scan that has
             // run long is one where the app is not answering, and waiting out
@@ -182,7 +201,30 @@ final class MenuBarLayout: ObservableObject {
             else { continue }
 
             rightEdge = max(rightEdge ?? 0, origin.x + size.width)
+            if firstOrigin == nil { firstOrigin = origin }
         }
-        return rightEdge
+        guard let rightEdge, let firstOrigin else { return nil }
+        return relativeInset(
+            rightEdge: rightEdge,
+            menuOrigin: firstOrigin,
+            screenFrames: screenFrames,
+            primaryMaxY: primaryMaxY
+        )
+    }
+
+    /// Converts a menu bar right edge read through accessibility (global,
+    /// top-left origin) into an offset from the left edge of the display whose
+    /// menu bar holds the menu at `menuOrigin`.
+    nonisolated static func relativeInset(
+        rightEdge: CGFloat,
+        menuOrigin: CGPoint,
+        screenFrames: [CGRect],
+        primaryMaxY: CGFloat
+    ) -> CGFloat {
+        // Accessibility uses a top-left origin; NSScreen frames a bottom-left one.
+        let cocoaPoint = CGPoint(x: menuOrigin.x + 1, y: primaryMaxY - menuOrigin.y - 1)
+        let screen = screenFrames.first { $0.contains(cocoaPoint) }
+            ?? screenFrames.first { menuOrigin.x >= $0.minX && menuOrigin.x < $0.maxX }
+        return rightEdge - (screen?.minX ?? 0)
     }
 }
