@@ -33,6 +33,7 @@ final class ShelfItemViewModel: ObservableObject {
     @Published var thumbnail: NSImage?
     @Published var displayName: String = ""
     @Published var icon: NSImage?
+    @Published private(set) var metadataRevision = 0
     @Published var isDropTargeted: Bool = false
     @Published var isRenaming: Bool = false
     @Published var draftTitle: String = ""
@@ -67,13 +68,16 @@ final class ShelfItemViewModel: ObservableObject {
             ShelfStateViewModel.shared.applyCachedPath(resolvedPath, for: itemID, resolvedFrom: bookmarkData)
         }
 
-        // Load display name
+        // Publish the display name as soon as it's available; wait until the
+        // icon is ready to signal one refresh for the combined preview metadata.
         let name = await loadDisplayNameFromURL(resolvedURL)
         await MainActor.run { self.displayName = name }
-        
-        // Load icon
+
         let image = await loadIconFromURL(resolvedURL)
-        await MainActor.run { self.icon = image }
+        await MainActor.run {
+            self.icon = image
+            self.metadataRevision += 1
+        }
         
         // Load thumbnail
         if let thumbnailImage = await ThumbnailService.shared.thumbnail(for: resolvedURL, size: CGSize(width: 56, height: 56)) {

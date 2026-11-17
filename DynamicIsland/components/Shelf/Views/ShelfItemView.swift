@@ -144,12 +144,7 @@ struct ShelfItemView: View {
                 cachedPreviewImage = await renderDragPreview()
             }
         }
-        .onChange(of: viewModel.icon) { _, _ in
-            Task {
-                cachedPreviewImage = await renderDragPreview()
-            }
-        }
-        .onChange(of: viewModel.displayName) { _, _ in
+        .onChange(of: viewModel.metadataRevision) { _, _ in
             Task {
                 cachedPreviewImage = await renderDragPreview()
             }
