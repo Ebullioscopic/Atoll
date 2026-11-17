@@ -144,6 +144,16 @@ struct ShelfItemView: View {
                 cachedPreviewImage = await renderDragPreview()
             }
         }
+        .onChange(of: viewModel.icon) { _, _ in
+            Task {
+                cachedPreviewImage = await renderDragPreview()
+            }
+        }
+        .onChange(of: viewModel.displayName) { _, _ in
+            Task {
+                cachedPreviewImage = await renderDragPreview()
+            }
+        }
         .quickLookPresenter(using: quickLookService)
     }
 
