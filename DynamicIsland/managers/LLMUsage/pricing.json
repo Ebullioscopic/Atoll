@@ -784,10 +784,10 @@
       "id": "openai/gpt-5.6-sol",
       "name": "OpenAI: GPT-5.6 Sol",
       "pricing": {
-        "prompt": "0.0000044",
-        "completion": "0.000022",
-        "cache_read": "0.00000044",
-        "cache_write": "0.0000055"
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "cache_read": "0.0000004",
+        "cache_write": "0.000005"
       }
     },
     {
@@ -964,9 +964,9 @@
       "id": "openai/gpt-oss-20b",
       "name": "OpenAI: gpt-oss-20b",
       "pricing": {
-        "prompt": "0.000000075",
-        "completion": "0.0000003",
-        "cache_read": "0.0000000375",
+        "prompt": "0.00000003",
+        "completion": "0.00000013",
+        "cache_read": "0.00000003",
         "cache_write": ""
       }
     },
@@ -1001,5 +1001,5 @@
       }
     }
   ],
-  "last_updated": "2026-11-16T00:04:54Z"
+  "last_updated": "2026-11-17T00:04:19Z"
 }
