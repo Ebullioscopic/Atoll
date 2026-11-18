@@ -219,19 +219,17 @@ class FullscreenMediaDetector: ObservableObject {
     private func isInNativeFullscreen(_ app: MacroVisionKit.FullscreenWindowInfo) -> Bool {
         guard AXIsProcessTrusted() else { return true }
 
+        let reader = BoundedAXReader(timeout: Self.accessibilityTimeout)
         let appElement = AXUIElementCreateApplication(app.processId)
-        // An unresponsive app would otherwise hold the main thread for the
-        // system default (about 6 s) on every attribute read.
-        AXUIElementSetMessagingTimeout(appElement, Self.accessibilityTimeout)
 
         // Prefer the focused window, then fall back to scanning all windows.
-        if let focused: AXUIElement = copyAttribute(kAXFocusedWindowAttribute as CFString, from: appElement),
-           isWindowFullscreen(focused) {
+        if let focused: AXUIElement = reader.copyAttribute(kAXFocusedWindowAttribute as CFString, from: appElement),
+           reader.isWindowFullscreen(focused) {
             return true
         }
 
-        if let windows: [AXUIElement] = copyAttribute(kAXWindowsAttribute as CFString, from: appElement) {
-            return windows.contains { isWindowFullscreen($0) }
+        if let windows: [AXUIElement] = reader.copyAttribute(kAXWindowsAttribute as CFString, from: appElement) {
+            return windows.contains { reader.isWindowFullscreen($0) }
         }
 
         return false
@@ -240,27 +238,45 @@ class FullscreenMediaDetector: ObservableObject {
     /// Upper bound, in seconds, for one Accessibility read of a fullscreen app.
     private static let accessibilityTimeout: Float = 0.25
 
-    private func isWindowFullscreen(_ window: AXUIElement) -> Bool {
-        // A timeout set on the application element does not carry over to its windows.
-        AXUIElementSetMessagingTimeout(window, Self.accessibilityTimeout)
-        // "AXFullScreen" is the (undocumented but stable) attribute set true only in native
-        // fullscreen; maximized/zoomed windows report false or omit it.
-        let value: Bool? = copyAttribute("AXFullScreen" as CFString, from: window)
-        return value ?? false
-    }
-
-    private func copyAttribute<T>(_ attribute: CFString, from element: AXUIElement) -> T? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute, &value) == .success,
-              let typed = value as? T else { return nil }
-        return typed
-    }
-
     private func cleanupNotificationObservers() {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
     deinit {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+}
+
+/// Accessibility reads for one fullscreen check, each bounded by `timeout`. The
+/// first read that times out marks the app as unresponsive and every later read
+/// returns nil at once, so a hung app costs at most one timeout per check rather
+/// than one per window.
+private final class BoundedAXReader {
+    private let timeout: Float
+    private var unresponsive = false
+
+    init(timeout: Float) {
+        self.timeout = timeout
+    }
+
+    func isWindowFullscreen(_ window: AXUIElement) -> Bool {
+        // "AXFullScreen" is the (undocumented but stable) attribute set true only in native
+        // fullscreen; maximized/zoomed windows report false or omit it.
+        let value: Bool? = copyAttribute("AXFullScreen" as CFString, from: window)
+        return value ?? false
+    }
+
+    func copyAttribute<T>(_ attribute: CFString, from element: AXUIElement) -> T? {
+        guard !unresponsive else { return nil }
+        // A timeout set on one element does not carry over to the elements it returns.
+        AXUIElementSetMessagingTimeout(element, timeout)
+        var value: CFTypeRef?
+        let error = AXUIElementCopyAttributeValue(element, attribute, &value)
+        if error == .cannotComplete {
+            unresponsive = true
+            return nil
+        }
+        guard error == .success, let typed = value as? T else { return nil }
+        return typed
     }
 }
