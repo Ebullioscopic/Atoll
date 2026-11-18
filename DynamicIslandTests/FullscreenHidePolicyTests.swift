@@ -62,37 +62,38 @@ final class FullscreenHidePolicyTests: XCTestCase {
     func testKeepsRecheckingWhileANowPlayingCandidateIsShown() {
         XCTAssertTrue(FullscreenHidePolicy.shouldKeepRechecking(
             option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: false,
-            identityFromProbe: false))
+            nowPlayingIsObserved: true))
     }
 
     func testStopsRecheckingWithoutCandidates() {
         XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
             option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: false, isHidden: false,
-            identityFromProbe: false))
+            nowPlayingIsObserved: true))
         XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
             option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: true,
-            identityFromProbe: false))
+            nowPlayingIsObserved: true))
     }
 
     func testNeverRechecksOutsideNowPlayingOnly() {
         XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
             option: .always, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: false,
-            identityFromProbe: false))
+            nowPlayingIsObserved: true))
         XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
             option: .never, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: false,
-            identityFromProbe: false))
+            nowPlayingIsObserved: true))
         XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
             option: .nowPlayingOnly, detectionEnabled: false, hasFullscreenCandidate: true, isHidden: false,
-            identityFromProbe: false))
+            nowPlayingIsObserved: true))
     }
 
     /// Under a fixed media source nothing announces that playback moved from
     /// the fullscreen app to another one, so a hidden island is re-checked too
-    /// when its "is Now Playing" answer came from the system probe.
-    func testKeepsCheckingAHiddenWindowWhenIdentityCameFromTheProbe() {
+    /// — whether the last answer came from the probe or, after a failed probe,
+    /// from the fixed player's own id.
+    func testKeepsCheckingAHiddenWindowWhenNowPlayingIsNotObserved() {
         XCTAssertTrue(FullscreenHidePolicy.shouldKeepRechecking(
             option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: true,
-            identityFromProbe: true))
+            nowPlayingIsObserved: false))
     }
 
     /// Under the Now Playing source, MusicManager reports every switch, so a
@@ -100,7 +101,7 @@ final class FullscreenHidePolicyTests: XCTestCase {
     func testStopsCheckingAHiddenWindowWhenNowPlayingIsObserved() {
         XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
             option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: true,
-            identityFromProbe: false))
+            nowPlayingIsObserved: true))
     }
 
     /// Playback can start long after the window went fullscreen (browsing a

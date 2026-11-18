@@ -45,18 +45,19 @@ enum FullscreenHidePolicy {
 
     /// Whether the detector should look again later. Either a fullscreen app is
     /// on screen but has not (yet) become the Now Playing app — the window went
-    /// fullscreen before playback started — or the island is hidden on the word
-    /// of the system probe (`identityFromProbe`), where nothing else would
-    /// notice playback moving to another app.
+    /// fullscreen before playback started — or the island is hidden while the
+    /// active media controller does not observe system Now Playing
+    /// (`nowPlayingIsObserved == false`), so nothing else would notice playback
+    /// moving to another app.
     static func shouldKeepRechecking(option: HideNotchOption,
                                      detectionEnabled: Bool,
                                      hasFullscreenCandidate: Bool,
                                      isHidden: Bool,
-                                     identityFromProbe: Bool) -> Bool {
+                                     nowPlayingIsObserved: Bool) -> Bool {
         option == .nowPlayingOnly
             && detectionEnabled
             && hasFullscreenCandidate
-            && (!isHidden || identityFromProbe)
+            && (!isHidden || !nowPlayingIsObserved)
     }
 
     /// Seconds to wait before the next follow-up check, given how many have run

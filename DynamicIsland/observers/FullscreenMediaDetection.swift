@@ -40,6 +40,8 @@ class FullscreenMediaDetector: ObservableObject {
     @MainActor private var rechecksDone = 0
     /// Bumped on every refresh so a slower, older refresh cannot overwrite a newer one.
     @MainActor private var refreshGeneration = 0
+    /// The 500 ms settle wait after a change; replaced by each newer change.
+    @MainActor private var settleTask: Task<Void, Never>?
 
     private init() {
         self.detector = MacroVisionKit.shared
@@ -60,7 +62,7 @@ class FullscreenMediaDetector: ObservableObject {
                     )
                     
                     for await _ in activeSpaceNotifications {
-                        await self?.handleChange()
+                        await self?.scheduleRefresh()
                     }
                 }
                 
@@ -70,7 +72,7 @@ class FullscreenMediaDetector: ObservableObject {
                     )
                     
                     for await _ in screenParameterNotifications {
-                        await  self?.handleChange()
+                        await self?.scheduleRefresh()
                     }
                 }
             }
@@ -79,31 +81,41 @@ class FullscreenMediaDetector: ObservableObject {
 
     /// Playback that starts (or moves to another app) after the window went
     /// fullscreen produces no Space change, so the Now Playing app is a trigger
-    /// of its own. Under the "Now Playing" media source this fires on every
-    /// switch between players; under a fixed source it rarely fires and the
-    /// bounded follow-up checks in `refresh` cover the gap.
+    /// of its own — and so is the active controller starting or stopping to
+    /// follow system Now Playing, which can happen without the id changing.
+    /// Under a controller that follows system Now Playing this fires on every
+    /// switch between players; otherwise the follow-up checks in `refresh`
+    /// cover the gap.
     private func observeNowPlayingApp() {
-        nowPlayingAppCancellable = musicManager.$bundleIdentifier
+        let bundleChanges = musicManager.$bundleIdentifier
             .removeDuplicates()
             .dropFirst()
+            .map { _ in () }
+        let trackingChanges = musicManager.$activeControllerFollowsSystemNowPlaying
+            .removeDuplicates()
+            .dropFirst()
+            .map { _ in () }
+        nowPlayingAppCancellable = bundleChanges.merge(with: trackingChanges)
             .sink { [weak self] _ in
-                Task { await self?.handleChange() }
+                self?.scheduleRefresh()
             }
     }
 
-    private func handleChange() async {
-        // Drop any refresh still waiting on the probe now: its answer describes the
-        // Space being left and must not be published during the settle delay.
-        invalidatePendingRefresh()
-        try? await Task.sleep(for: .milliseconds(500))
-        await refresh(resetRechecks: true)
-    }
-
+    /// Starts a refresh 500 ms after a change, without waiting for it. Any
+    /// refresh still in flight (for example, waiting on the probe) is dropped at
+    /// once, and a newer change replaces a pending settle wait, so a result for
+    /// the Space being left is never published.
     @MainActor
-    private func invalidatePendingRefresh() {
+    private func scheduleRefresh() {
         refreshGeneration += 1
         recheckTask?.cancel()
         recheckTask = nil
+        settleTask?.cancel()
+        settleTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            await self?.refresh(resetRechecks: true)
+        }
     }
 
     @MainActor
@@ -146,9 +158,10 @@ class FullscreenMediaDetector: ObservableObject {
         let hideOption = Defaults[.hideNotchOption]
 
         // Only worth asking when something could hide because of it.
-        let nowPlaying: (bundleID: String?, fromProbe: Bool) = (hideOption == .nowPlayingOnly && !apps.isEmpty)
+        let nowPlayingIsObserved = musicManager.activeControllerFollowsSystemNowPlaying
+        let nowPlayingBundleID: String? = (hideOption == .nowPlayingOnly && !apps.isEmpty)
             ? await resolveNowPlayingBundleID()
-            : (nil, false)
+            : nil
 
         var newStatus: [String: Bool] = [:]
         var keepRechecking = false
@@ -164,7 +177,7 @@ class FullscreenMediaDetector: ObservableObject {
                 FullscreenHidePolicy.shouldHide(
                     option: hideOption,
                     fullscreenBundleID: app.bundleIdentifier,
-                    nowPlayingBundleID: nowPlaying.bundleID,
+                    nowPlayingBundleID: nowPlayingBundleID,
                     isNativeFullscreen: true
                 ) && isInNativeFullscreen(app)
             }
@@ -177,28 +190,25 @@ class FullscreenMediaDetector: ObservableObject {
                 detectionEnabled: true,
                 hasFullscreenCandidate: !candidates.isEmpty,
                 isHidden: hidden,
-                identityFromProbe: nowPlaying.fromProbe
+                nowPlayingIsObserved: nowPlayingIsObserved
             )
         }
 
         return (newStatus, keepRechecking)
     }
 
-    /// The app macOS reports as Now Playing, and whether it came from the probe.
-    /// When `MusicManager`'s active controller follows system Now Playing it
-    /// already knows; any other controller pins `MusicManager` to its player
-    /// (also when Pear Desktop or a deprecated Now Playing API swapped the
-    /// controller under a "Now Playing" preference), so the system is asked
-    /// directly, falling back to the controller's app if the query fails.
+    /// The app macOS reports as Now Playing. When `MusicManager`'s active
+    /// controller follows system Now Playing it already knows; any other
+    /// controller pins `MusicManager` to its player (also when Pear Desktop or a
+    /// deprecated Now Playing API swapped the controller under a "Now Playing"
+    /// preference), so the system is asked directly, falling back to the
+    /// controller's app if the query fails.
     @MainActor
-    private func resolveNowPlayingBundleID() async -> (bundleID: String?, fromProbe: Bool) {
+    private func resolveNowPlayingBundleID() async -> String? {
         if musicManager.activeControllerFollowsSystemNowPlaying {
-            return (musicManager.bundleIdentifier, false)
+            return musicManager.bundleIdentifier
         }
-        if let probed = await SystemNowPlayingProbe.currentBundleIdentifier() {
-            return (probed, true)
-        }
-        return (musicManager.bundleIdentifier, false)
+        return await SystemNowPlayingProbe.currentBundleIdentifier() ?? musicManager.bundleIdentifier
     }
 
     /// Confirms an app the detector flagged as screen-filling is in *genuine* native
@@ -231,6 +241,8 @@ class FullscreenMediaDetector: ObservableObject {
     private static let accessibilityTimeout: Float = 0.25
 
     private func isWindowFullscreen(_ window: AXUIElement) -> Bool {
+        // A timeout set on the application element does not carry over to its windows.
+        AXUIElementSetMessagingTimeout(window, Self.accessibilityTimeout)
         // "AXFullScreen" is the (undocumented but stable) attribute set true only in native
         // fullscreen; maximized/zoomed windows report false or omit it.
         let value: Bool? = copyAttribute("AXFullScreen" as CFString, from: window)
