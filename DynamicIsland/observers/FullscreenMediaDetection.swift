@@ -219,7 +219,7 @@ class FullscreenMediaDetector: ObservableObject {
     private func isInNativeFullscreen(_ app: MacroVisionKit.FullscreenWindowInfo) -> Bool {
         guard AXIsProcessTrusted() else { return true }
 
-        let reader = BoundedAXReader(timeout: Self.accessibilityTimeout)
+        let reader = BoundedAXReader(timeout: Self.accessibilityTimeout, budget: Self.accessibilityBudget)
         let appElement = AXUIElementCreateApplication(app.processId)
 
         // Prefer the focused window, then fall back to scanning all windows.
@@ -237,6 +237,8 @@ class FullscreenMediaDetector: ObservableObject {
 
     /// Upper bound, in seconds, for one Accessibility read of a fullscreen app.
     private static let accessibilityTimeout: Float = 0.25
+    /// Upper bound, in seconds, for all Accessibility reads of one app in one check.
+    private static let accessibilityBudget: TimeInterval = 0.5
 
     private func cleanupNotificationObservers() {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
@@ -247,16 +249,20 @@ class FullscreenMediaDetector: ObservableObject {
     }
 }
 
-/// Accessibility reads for one fullscreen check, each bounded by `timeout`. The
-/// first read that times out marks the app as unresponsive and every later read
-/// returns nil at once, so a hung app costs at most one timeout per check rather
-/// than one per window.
+/// Accessibility reads for one fullscreen check of one app. Each read is bounded
+/// by `timeout` and by what is left of `budget`, so the whole check — however many
+/// windows the app has, and however close to the timeout each read comes — never
+/// holds the main actor longer than `budget`. The first read that times out, or
+/// one attempted after the budget is spent, marks the app as unresponsive and
+/// every later read returns nil at once.
 private final class BoundedAXReader {
     private let timeout: Float
+    private let deadline: Date
     private var unresponsive = false
 
-    init(timeout: Float) {
+    init(timeout: Float, budget: TimeInterval) {
         self.timeout = timeout
+        self.deadline = Date().addingTimeInterval(budget)
     }
 
     func isWindowFullscreen(_ window: AXUIElement) -> Bool {
@@ -268,8 +274,13 @@ private final class BoundedAXReader {
 
     func copyAttribute<T>(_ attribute: CFString, from element: AXUIElement) -> T? {
         guard !unresponsive else { return nil }
+        let remaining = deadline.timeIntervalSinceNow
+        guard remaining > 0 else {
+            unresponsive = true
+            return nil
+        }
         // A timeout set on one element does not carry over to the elements it returns.
-        AXUIElementSetMessagingTimeout(element, timeout)
+        AXUIElementSetMessagingTimeout(element, min(timeout, Float(remaining)))
         var value: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(element, attribute, &value)
         if error == .cannotComplete {
