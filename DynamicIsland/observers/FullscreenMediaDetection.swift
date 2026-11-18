@@ -21,6 +21,7 @@
  */
 
 import ApplicationServices
+import Combine
 import Defaults
 import MacroVisionKit
 import SwiftUI
@@ -31,12 +32,22 @@ class FullscreenMediaDetector: ObservableObject {
     @ObservedObject private var musicManager = MusicManager.shared
     @MainActor @Published private(set) var fullscreenStatus: [String: Bool] = [:]
     private var notificationTask: Task<Void, Never>?
+    private var nowPlayingAppCancellable: AnyCancellable?
+    /// Pending follow-up check while a fullscreen app waits to become Now Playing.
+    @MainActor private var recheckTask: Task<Void, Never>?
+    /// Follow-up checks made since the last Space, screen or Now Playing change.
+    @MainActor private var rechecksDone = 0
+    /// Bumped on every refresh so a slower, older refresh cannot overwrite a newer one.
+    @MainActor private var refreshGeneration = 0
 
     private init() {
         self.detector = MacroVisionKit.shared
         detector.configuration.includeSystemApps = true
         setupNotificationObservers()
-        updateFullScreenStatus()
+        observeNowPlayingApp()
+        Task { @MainActor [weak self] in
+            await self?.refresh(resetRechecks: true)
+        }
     }
 
     private func setupNotificationObservers() {
@@ -65,53 +76,112 @@ class FullscreenMediaDetector: ObservableObject {
         }
     }
 
-    private func handleChange() async {
-        try? await Task.sleep(for: .milliseconds(500))
-        self.updateFullScreenStatus()
+    /// Playback that starts (or moves to another app) after the window went
+    /// fullscreen produces no Space change, so the Now Playing app is a trigger
+    /// of its own. Under the "Now Playing" media source this fires on every
+    /// switch between players; under a fixed source it rarely fires and the
+    /// bounded follow-up checks in `refresh` cover the gap.
+    private func observeNowPlayingApp() {
+        nowPlayingAppCancellable = musicManager.$bundleIdentifier
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                Task { await self?.handleChange() }
+            }
     }
 
-    private func updateFullScreenStatus() {
-        guard Defaults[.enableFullscreenMediaDetection] else {
-            let reset = Dictionary(uniqueKeysWithValues: NSScreen.screens.map { ($0.localizedName, false) })
-            if reset != fullscreenStatus {
-                fullscreenStatus = reset
-            }
-            return
-        }
-        
+    private func handleChange() async {
+        try? await Task.sleep(for: .milliseconds(500))
+        await refresh(resetRechecks: true)
+    }
 
-        let apps = detector.detectFullscreenApps(debug: false)
-        let names = NSScreen.screens.map { $0.localizedName }
-        let hideOption = Defaults[.hideNotchOption]
+    @MainActor
+    private func refresh(resetRechecks: Bool) async {
+        if resetRechecks { rechecksDone = 0 }
+        recheckTask?.cancel()
+        recheckTask = nil
+        refreshGeneration += 1
+        let generation = refreshGeneration
 
-        var newStatus: [String: Bool] = [:]
-        for name in names {
-            newStatus[name] = apps.contains { app in
-                guard app.screen.localizedName == name,
-                      app.bundleIdentifier != "com.apple.finder" else { return false }
-
-                // The notch stays on display by default (the window's collectionBehavior
-                // rides along with fullscreen spaces). It only hides when the user's
-                // "Hide DynamicIsland" option asks for it.
-                switch hideOption {
-                case .always:
-                    // Hide for any app in genuine native fullscreen on this screen.
-                    return isInNativeFullscreen(app)
-                case .nowPlayingOnly:
-                    // Hide only when the currently playing media app is in fullscreen.
-                    return app.bundleIdentifier == musicManager.bundleIdentifier
-                        && isInNativeFullscreen(app)
-                case .never:
-                    // Always on display; never hide.
-                    return false
-                }
-            }
-        }
+        let (newStatus, keepRechecking) = await computeFullScreenStatus()
+        guard generation == refreshGeneration else { return }
 
         if newStatus != fullscreenStatus {
             fullscreenStatus = newStatus
             NSLog("✅ Fullscreen status: \(newStatus)")
         }
+
+        guard keepRechecking else { return }
+        rechecksDone += 1
+        recheckTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            await self?.refresh(resetRechecks: false)
+        }
+    }
+
+    /// Per-screen hide state, and whether a follow-up check is worth scheduling.
+    @MainActor
+    private func computeFullScreenStatus() async -> (status: [String: Bool], keepRechecking: Bool) {
+        guard Defaults[.enableFullscreenMediaDetection] else {
+            let reset = Dictionary(uniqueKeysWithValues: NSScreen.screens.map { ($0.localizedName, false) })
+            return (reset, false)
+        }
+
+        let apps = detector.detectFullscreenApps(debug: false)
+            .filter { $0.bundleIdentifier != "com.apple.finder" }
+        let names = NSScreen.screens.map { $0.localizedName }
+        let hideOption = Defaults[.hideNotchOption]
+
+        // Only worth asking when something could hide because of it.
+        let nowPlayingBundleID: String? = (hideOption == .nowPlayingOnly && !apps.isEmpty)
+            ? await resolveNowPlayingBundleID()
+            : nil
+
+        var newStatus: [String: Bool] = [:]
+        var keepRechecking = false
+        for name in names {
+            let candidates = apps.filter { $0.screen.localizedName == name }
+
+            // The notch stays on display by default (the window's collectionBehavior
+            // rides along with fullscreen spaces). It only hides when the user's
+            // "Hide DynamicIsland" option asks for it. The policy is asked first as if
+            // the window were native fullscreen, so the Accessibility check only runs
+            // for apps that would otherwise hide.
+            let hidden = candidates.contains { app in
+                FullscreenHidePolicy.shouldHide(
+                    option: hideOption,
+                    fullscreenBundleID: app.bundleIdentifier,
+                    nowPlayingBundleID: nowPlayingBundleID,
+                    isNativeFullscreen: true
+                ) && isInNativeFullscreen(app)
+            }
+            newStatus[name] = hidden
+
+            if !keepRechecking, hideOption == .nowPlayingOnly, !hidden {
+                keepRechecking = FullscreenHidePolicy.shouldKeepRechecking(
+                    option: hideOption,
+                    detectionEnabled: true,
+                    hasFullscreenCandidate: candidates.contains { isInNativeFullscreen($0) },
+                    isHidden: hidden,
+                    rechecksDone: rechecksDone
+                )
+            }
+        }
+
+        return (newStatus, keepRechecking)
+    }
+
+    /// The app macOS reports as Now Playing. Under the "Now Playing" source
+    /// `MusicManager` already follows it; any other source pins `MusicManager`
+    /// to that player, so the system is asked directly, falling back to the
+    /// source's app if the query fails.
+    @MainActor
+    private func resolveNowPlayingBundleID() async -> String? {
+        if Defaults[.mediaController] == .nowPlaying {
+            return musicManager.bundleIdentifier
+        }
+        return await SystemNowPlayingProbe.currentBundleIdentifier() ?? musicManager.bundleIdentifier
     }
 
     /// Confirms an app the detector flagged as screen-filling is in *genuine* native

@@ -43,14 +43,24 @@ enum FullscreenHidePolicy {
         }
     }
 
-    /// Whether the detector should look again shortly: a fullscreen app is on
-    /// screen but has not (yet) become the Now Playing app, e.g. the window went
-    /// fullscreen before playback started. Nothing else changes the outcome
-    /// without a Space change, so no other case needs a timer.
+    /// How many follow-up checks one Space, screen or Now Playing change may
+    /// trigger: at a 2 s interval, about 30 s to start playback after going
+    /// fullscreen. Bounded so a fullscreen app that never plays anything does
+    /// not cost a Now Playing query every two seconds for as long as it is open.
+    static let maxRechecksPerChange = 15
+
+    /// Whether the detector should look again shortly: a native-fullscreen app
+    /// is on screen but has not (yet) become the Now Playing app, e.g. the
+    /// window went fullscreen before playback started.
     static func shouldKeepRechecking(option: HideNotchOption,
                                      detectionEnabled: Bool,
                                      hasFullscreenCandidate: Bool,
-                                     isHidden: Bool) -> Bool {
-        option == .nowPlayingOnly && detectionEnabled && hasFullscreenCandidate && !isHidden
+                                     isHidden: Bool,
+                                     rechecksDone: Int) -> Bool {
+        option == .nowPlayingOnly
+            && detectionEnabled
+            && hasFullscreenCandidate
+            && !isHidden
+            && rechecksDone < maxRechecksPerChange
     }
 }
