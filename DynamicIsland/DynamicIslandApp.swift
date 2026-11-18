@@ -307,6 +307,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Restore Lunar's native OSD if integration was active
         LunarManager.shared.appWillTerminate()
+
+        terminateLogStreamChildren()
+    }
+
+    /// The Bluetooth, system timer and Focus managers each tail the unified log
+    /// with a `/usr/bin/log stream` child that nothing stops at quit, so it
+    /// keeps running after Atoll exits. End every such child we spawned.
+    private func terminateLogStreamChildren() {
+        let ownPID = getpid()
+        let capacity = proc_listchildpids(ownPID, nil, 0)
+        guard capacity > 0 else { return }
+
+        var childPIDs = [pid_t](repeating: 0, count: Int(capacity) + 8)
+        let bufferSize = Int32(childPIDs.count * MemoryLayout<pid_t>.stride)
+        let count = proc_listchildpids(ownPID, &childPIDs, bufferSize)
+        guard count > 0 else { return }
+
+        var pathBuffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        for pid in childPIDs.prefix(Int(count)) where pid > 0 {
+            guard proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count)) > 0,
+                  String(cString: pathBuffer) == "/usr/bin/log" else { continue }
+            kill(pid, SIGTERM)
+        }
     }
     
     @objc func onScreenLocked(_: Notification) {
