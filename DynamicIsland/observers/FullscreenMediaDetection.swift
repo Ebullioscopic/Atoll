@@ -92,8 +92,18 @@ class FullscreenMediaDetector: ObservableObject {
     }
 
     private func handleChange() async {
+        // Drop any refresh still waiting on the probe now: its answer describes the
+        // Space being left and must not be published during the settle delay.
+        invalidatePendingRefresh()
         try? await Task.sleep(for: .milliseconds(500))
         await refresh(resetRechecks: true)
+    }
+
+    @MainActor
+    private func invalidatePendingRefresh() {
+        refreshGeneration += 1
+        recheckTask?.cancel()
+        recheckTask = nil
     }
 
     @MainActor
@@ -136,9 +146,9 @@ class FullscreenMediaDetector: ObservableObject {
         let hideOption = Defaults[.hideNotchOption]
 
         // Only worth asking when something could hide because of it.
-        let nowPlayingBundleID: String? = (hideOption == .nowPlayingOnly && !apps.isEmpty)
+        let nowPlaying: (bundleID: String?, fromProbe: Bool) = (hideOption == .nowPlayingOnly && !apps.isEmpty)
             ? await resolveNowPlayingBundleID()
-            : nil
+            : (nil, false)
 
         var newStatus: [String: Bool] = [:]
         var keepRechecking = false
@@ -154,36 +164,41 @@ class FullscreenMediaDetector: ObservableObject {
                 FullscreenHidePolicy.shouldHide(
                     option: hideOption,
                     fullscreenBundleID: app.bundleIdentifier,
-                    nowPlayingBundleID: nowPlayingBundleID,
+                    nowPlayingBundleID: nowPlaying.bundleID,
                     isNativeFullscreen: true
                 ) && isInNativeFullscreen(app)
             }
             newStatus[name] = hidden
 
             // Frame-based candidates only: no Accessibility call here, so an app that
-            // is fullscreen but not Now Playing is never queried over AX (a hung app
-            // would block the main thread for the AX timeout on every check).
+            // is fullscreen but not Now Playing is never queried over AX.
             keepRechecking = keepRechecking || FullscreenHidePolicy.shouldKeepRechecking(
                 option: hideOption,
                 detectionEnabled: true,
                 hasFullscreenCandidate: !candidates.isEmpty,
-                isHidden: hidden
+                isHidden: hidden,
+                identityFromProbe: nowPlaying.fromProbe
             )
         }
 
         return (newStatus, keepRechecking)
     }
 
-    /// The app macOS reports as Now Playing. Under the "Now Playing" source
-    /// `MusicManager` already follows it; any other source pins `MusicManager`
-    /// to that player, so the system is asked directly, falling back to the
-    /// source's app if the query fails.
+    /// The app macOS reports as Now Playing, and whether it came from the probe.
+    /// When `MusicManager`'s active controller follows system Now Playing it
+    /// already knows; any other controller pins `MusicManager` to its player
+    /// (also when Pear Desktop or a deprecated Now Playing API swapped the
+    /// controller under a "Now Playing" preference), so the system is asked
+    /// directly, falling back to the controller's app if the query fails.
     @MainActor
-    private func resolveNowPlayingBundleID() async -> String? {
-        if Defaults[.mediaController] == .nowPlaying {
-            return musicManager.bundleIdentifier
+    private func resolveNowPlayingBundleID() async -> (bundleID: String?, fromProbe: Bool) {
+        if musicManager.activeControllerFollowsSystemNowPlaying {
+            return (musicManager.bundleIdentifier, false)
         }
-        return await SystemNowPlayingProbe.currentBundleIdentifier() ?? musicManager.bundleIdentifier
+        if let probed = await SystemNowPlayingProbe.currentBundleIdentifier() {
+            return (probed, true)
+        }
+        return (musicManager.bundleIdentifier, false)
     }
 
     /// Confirms an app the detector flagged as screen-filling is in *genuine* native
@@ -195,6 +210,9 @@ class FullscreenMediaDetector: ObservableObject {
         guard AXIsProcessTrusted() else { return true }
 
         let appElement = AXUIElementCreateApplication(app.processId)
+        // An unresponsive app would otherwise hold the main thread for the
+        // system default (about 6 s) on every attribute read.
+        AXUIElementSetMessagingTimeout(appElement, Self.accessibilityTimeout)
 
         // Prefer the focused window, then fall back to scanning all windows.
         if let focused: AXUIElement = copyAttribute(kAXFocusedWindowAttribute as CFString, from: appElement),
@@ -208,6 +226,9 @@ class FullscreenMediaDetector: ObservableObject {
 
         return false
     }
+
+    /// Upper bound, in seconds, for one Accessibility read of a fullscreen app.
+    private static let accessibilityTimeout: Float = 0.25
 
     private func isWindowFullscreen(_ window: AXUIElement) -> Bool {
         // "AXFullScreen" is the (undocumented but stable) attribute set true only in native
