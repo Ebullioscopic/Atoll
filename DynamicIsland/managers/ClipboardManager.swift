@@ -579,6 +579,9 @@ class ClipboardManager: ObservableObject {
         
         guard !Self.isExcludedFromHistory(NSPasteboard.general.types ?? []) else { return }
         guard let clipboardItem = getCurrentClipboardItem() else { return }
+        // The pasteboard may have changed owner while the item was read, so the
+        // marker check above would not cover it. The next poll checks the new content.
+        guard NSPasteboard.general.changeCount == currentChangeCount else { return }
         
         // Don't add duplicate items
         if !clipboardHistory.contains(where: { isSameContent($0, clipboardItem) }) {
