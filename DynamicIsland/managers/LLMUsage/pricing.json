@@ -921,6 +921,46 @@
       }
     },
     {
+      "id": "openai/gpt-6.2-astra",
+      "name": "OpenAI: GPT-6.2 Astra",
+      "pricing": {
+        "prompt": "0.000008",
+        "completion": "0.00004",
+        "cache_read": "0.0000004",
+        "cache_write": "0.00001"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-astra-pro",
+      "name": "OpenAI: GPT-6.2 Astra Pro",
+      "pricing": {
+        "prompt": "0.000008",
+        "completion": "0.00004",
+        "cache_read": "0.0000004",
+        "cache_write": "0.00001"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-sol",
+      "name": "OpenAI: GPT-6.2 Sol",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000001",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-sol-pro",
+      "name": "OpenAI: GPT-6.2 Sol Pro",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000001",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
       "id": "openai/gpt-audio",
       "name": "OpenAI: GPT Audio",
       "pricing": {
@@ -964,9 +1004,9 @@
       "id": "openai/gpt-oss-20b",
       "name": "OpenAI: gpt-oss-20b",
       "pricing": {
-        "prompt": "0.00000003",
-        "completion": "0.00000013",
-        "cache_read": "0.00000003",
+        "prompt": "0.000000075",
+        "completion": "0.0000003",
+        "cache_read": "0.0000000375",
         "cache_write": ""
       }
     },
@@ -1001,5 +1041,5 @@
       }
     }
   ],
-  "last_updated": "2026-11-17T00:04:19Z"
+  "last_updated": "2026-11-18T00:04:27Z"
 }
