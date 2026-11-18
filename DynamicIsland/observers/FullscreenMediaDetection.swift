@@ -35,7 +35,8 @@ class FullscreenMediaDetector: ObservableObject {
     private var nowPlayingAppCancellable: AnyCancellable?
     /// Pending follow-up check while a fullscreen app waits to become Now Playing.
     @MainActor private var recheckTask: Task<Void, Never>?
-    /// Follow-up checks made since the last Space, screen or Now Playing change.
+    /// Follow-up checks made since the last Space, screen or Now Playing change;
+    /// sets the back-off delay of the next one.
     @MainActor private var rechecksDone = 0
     /// Bumped on every refresh so a slower, older refresh cannot overwrite a newer one.
     @MainActor private var refreshGeneration = 0
@@ -112,9 +113,10 @@ class FullscreenMediaDetector: ObservableObject {
         }
 
         guard keepRechecking else { return }
+        let delay = FullscreenHidePolicy.recheckDelay(afterRechecks: rechecksDone)
         rechecksDone += 1
         recheckTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
             await self?.refresh(resetRechecks: false)
         }
@@ -158,15 +160,15 @@ class FullscreenMediaDetector: ObservableObject {
             }
             newStatus[name] = hidden
 
-            if !keepRechecking, hideOption == .nowPlayingOnly, !hidden {
-                keepRechecking = FullscreenHidePolicy.shouldKeepRechecking(
-                    option: hideOption,
-                    detectionEnabled: true,
-                    hasFullscreenCandidate: candidates.contains { isInNativeFullscreen($0) },
-                    isHidden: hidden,
-                    rechecksDone: rechecksDone
-                )
-            }
+            // Frame-based candidates only: no Accessibility call here, so an app that
+            // is fullscreen but not Now Playing is never queried over AX (a hung app
+            // would block the main thread for the AX timeout on every check).
+            keepRechecking = keepRechecking || FullscreenHidePolicy.shouldKeepRechecking(
+                option: hideOption,
+                detectionEnabled: true,
+                hasFullscreenCandidate: !candidates.isEmpty,
+                isHidden: hidden
+            )
         }
 
         return (newStatus, keepRechecking)

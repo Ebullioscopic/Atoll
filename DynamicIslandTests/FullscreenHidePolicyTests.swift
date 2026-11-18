@@ -61,41 +61,31 @@ final class FullscreenHidePolicyTests: XCTestCase {
 
     func testKeepsRecheckingWhileANowPlayingCandidateIsShown() {
         XCTAssertTrue(FullscreenHidePolicy.shouldKeepRechecking(
-            option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: false,
-            rechecksDone: 0))
+            option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: false))
     }
 
     func testStopsRecheckingWithoutCandidates() {
         XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
-            option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: false, isHidden: false,
-            rechecksDone: 0))
+            option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: false, isHidden: false))
         XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
-            option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: true,
-            rechecksDone: 0))
+            option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: true))
     }
 
     func testNeverRechecksOutsideNowPlayingOnly() {
         XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
-            option: .always, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: false,
-            rechecksDone: 0))
+            option: .always, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: false))
         XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
-            option: .never, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: false,
-            rechecksDone: 0))
+            option: .never, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: false))
         XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
-            option: .nowPlayingOnly, detectionEnabled: false, hasFullscreenCandidate: true, isHidden: false,
-            rechecksDone: 0))
+            option: .nowPlayingOnly, detectionEnabled: false, hasFullscreenCandidate: true, isHidden: false))
     }
 
-    /// Someone working in a fullscreen app that never plays anything must not
-    /// pay for a Now Playing query every two seconds for as long as it stays open.
-    func testStopsRecheckingOnceTheBudgetIsSpent() {
-        let budget = FullscreenHidePolicy.maxRechecksPerChange
-        XCTAssertEqual(budget, 15)
-        XCTAssertTrue(FullscreenHidePolicy.shouldKeepRechecking(
-            option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: false,
-            rechecksDone: budget - 1))
-        XCTAssertFalse(FullscreenHidePolicy.shouldKeepRechecking(
-            option: .nowPlayingOnly, detectionEnabled: true, hasFullscreenCandidate: true, isHidden: false,
-            rechecksDone: budget))
+    /// Playback can start long after the window went fullscreen (browsing a
+    /// library first), so checks continue for as long as the app stays
+    /// fullscreen, but back off so an app that never plays costs one Now Playing
+    /// query per 30 s rather than one every 2 s.
+    func testRecheckDelayBacksOffToThirtySeconds() {
+        let delays = (0..<7).map { FullscreenHidePolicy.recheckDelay(afterRechecks: $0) }
+        XCTAssertEqual(delays, [2, 4, 8, 16, 30, 30, 30])
     }
 }
