@@ -391,6 +391,16 @@
       }
     },
     {
+      "id": "google/gemini-4-neon",
+      "name": "Google: Gemini 4 Neon",
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015",
+        "cache_read": "0.00000015",
+        "cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
       "id": "google/gemini-nano-banana-2.1",
       "name": "Google: Nano Banana 2.1",
       "pricing": {
@@ -1004,9 +1014,9 @@
       "id": "openai/gpt-oss-20b",
       "name": "OpenAI: gpt-oss-20b",
       "pricing": {
-        "prompt": "0.000000075",
-        "completion": "0.0000003",
-        "cache_read": "0.0000000375",
+        "prompt": "0.000000018",
+        "completion": "0.00000009",
+        "cache_read": "0.000000009",
         "cache_write": ""
       }
     },
@@ -1041,5 +1051,5 @@
       }
     }
   ],
-  "last_updated": "2026-11-18T00:04:27Z"
+  "last_updated": "2026-11-19T00:04:33Z"
 }
