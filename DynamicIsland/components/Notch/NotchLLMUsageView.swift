@@ -81,7 +81,9 @@ struct NotchLLMUsageView: View {
             case .failure(let reason):
                 Text(reason).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             case .success(let snap):
-                if provider == .newAPI {
+                if provider == .copilot {
+                    copilotSuccess(snap)
+                } else if provider == .newAPI {
                     newAPISuccess(snap)
                 } else {
                     success(snap, provider: provider)
@@ -95,6 +97,26 @@ struct NotchLLMUsageView: View {
         // that either clips content or leaves blank space.
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func copilotSuccess(_ snap: UsageSnapshot) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(snap.copilotQuotas) { quota in
+                    if quota.unlimited {
+                        Text("\(quota.title): Unlimited").font(.caption)
+                    } else if let percent = quota.usedPercent {
+                        quotaGauge(quota.title, UsageLimit(used: percent, limit: 100, resetsAt: quota.resetsAt))
+                        if let remaining = quota.remaining, let entitlement = quota.entitlement {
+                            Text("\(remaining.formatted()) / \(entitlement.formatted()) remaining")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Text("\(quota.title): quota unavailable").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder

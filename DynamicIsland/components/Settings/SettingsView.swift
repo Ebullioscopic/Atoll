@@ -437,6 +437,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .stats, title: "Enable LLM Usage Monitor", keywords: ["llm", "usage", "ai", "monitor"], highlightID: SettingsTab.stats.highlightID(for: "Enable LLM Usage Monitor")),
         SettingsSearchEntry(tab: .stats, title: "Claude Provider", keywords: ["llm", "claude", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Claude Provider")),
         SettingsSearchEntry(tab: .stats, title: "Codex Provider", keywords: ["llm", "codex", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Codex Provider")),
+        SettingsSearchEntry(tab: .stats, title: "Copilot Provider", keywords: ["llm", "github", "copilot", "quota"], highlightID: SettingsTab.stats.highlightID(for: "Copilot Provider")),
         SettingsSearchEntry(tab: .stats, title: "Cursor Provider", keywords: ["llm", "cursor", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Cursor Provider")),
         SettingsSearchEntry(tab: .stats, title: "Antigravity Provider", keywords: ["llm", "antigravity", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Antigravity Provider")),
         SettingsSearchEntry(tab: .stats, title: "New API Provider", keywords: ["llm", "new api", "newapi", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "New API Provider")),
@@ -8052,6 +8053,9 @@ struct StatsSettings: View {
                         Text("Codex")
                     }
                     .settingsHighlight(id: highlightID("Codex Provider"))
+
+                    CopilotUsageSettings()
+                        .settingsHighlight(id: highlightID("Copilot Provider"))
 
                     Defaults.Toggle(key: .enableCursorProvider) {
                         Text("Cursor")
