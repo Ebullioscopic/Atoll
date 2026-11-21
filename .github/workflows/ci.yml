@@ -42,6 +42,11 @@ jobs:
       - name: Validate privacy configuration
         run: python3 -m unittest tests.test_privacy_configuration
 
+      - name: Validate dedicated Qobuz telemetry and lifecycle
+        run: |
+          python3 -m unittest tests.test_qobuz_engine
+          bash tests/run_qobuz_controller_regression.sh
+
       - name: Validate timer lifecycle cleanup
         run: python3 -m unittest tests.test_timer_lifecycle
 

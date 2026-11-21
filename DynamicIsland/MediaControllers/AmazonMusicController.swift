@@ -221,19 +221,13 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
 
         do {
             try process.run()
-            streamTask = Task { [weak self] in
-                await self?.processJSONStream()
+            streamTask = Task { [weak self, pipeHandler] in
+                await pipeHandler.readJSONLines(as: NowPlayingUpdate.self) { [weak self] update in
+                    await self?.handleAdapterUpdate(update)
+                }
             }
         } catch {
             assertionFailure("Failed to launch mediaremote-adapter.pl: \(error)")
-        }
-    }
-
-    private func processJSONStream() async {
-        guard let pipeHandler = self.pipeHandler else { return }
-
-        await pipeHandler.readJSONLines(as: NowPlayingUpdate.self) { [weak self] update in
-            await self?.handleAdapterUpdate(update)
         }
     }
 

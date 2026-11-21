@@ -3125,6 +3125,8 @@ private extension MediaControllerType {
             return [TidalController.bundleIdentifier]
         case .cider:
             return ["sh.cider.genten.mac"]
+        case .qobuz:
+            return [QobuzMediaController.bundleIdentifier]
         }
     }
 
@@ -3137,6 +3139,7 @@ private extension MediaControllerType {
         case .amazonMusic: return "music.note.list"
         case .tidal: return "waveform.path"
         case .cider: return "cup.and.saucer.fill"
+        case .qobuz: return "music.note"
         }
     }
 
@@ -3149,6 +3152,7 @@ private extension MediaControllerType {
         case .amazonMusic: return .cyan
         case .tidal: return .primary
         case .cider: return .orange
+        case .qobuz: return .blue
         }
     }
 }
@@ -4992,7 +4996,6 @@ struct Appearance: View {
                     "Use music visualizer spectrogram",
                     isOn: $useMusicVisualizer.animation()
                 )
-                .disabled(true)
                 if !useMusicVisualizer {
                     if customVisualizers.count > 0 {
                         Picker(
@@ -5047,10 +5050,7 @@ struct Appearance: View {
                         )
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if selectedListVisualizer == visualizer {
-                                selectedListVisualizer = nil
-                                return
-                            }
+                            selectedVisualizer = visualizer
                             selectedListVisualizer = visualizer
                         }
                     }
