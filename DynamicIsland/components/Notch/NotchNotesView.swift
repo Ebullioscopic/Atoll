@@ -756,7 +756,7 @@ struct NoteRow: View {
                             .lineLimit(1)
                     }
                     
-                    Text(note.content.isEmpty ? "No content" : note.content)
+                    Text(note.content.isEmpty ? String(localized: "No content") : note.content)
                         .font(.system(size: isCompact ? 10 : 12))
                         .foregroundStyle(.white.opacity(0.7))
                         .lineLimit(isCompact ? 1 : 2)

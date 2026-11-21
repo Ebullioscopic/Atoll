@@ -798,7 +798,7 @@ enum AIModelProvider: String, CaseIterable, Identifiable, Defaults.Serializable 
     var id: String { self.rawValue }
     
     var displayName: String {
-        return self.rawValue
+        self == .local ? String(localized: "Local Model") : rawValue
     }
     
     var description: String {

@@ -44,7 +44,7 @@ class ClipboardWindowManager: ObservableObject {
             defer: false
         )
         
-        window.title = "Clipboard Manager"
+        window.title = String(localized: "Clipboard Manager")
         window.isMovableByWindowBackground = true
         window.level = .screenSaver  // Use screenSaver level to appear above fullscreen apps
         window.isReleasedWhenClosed = false

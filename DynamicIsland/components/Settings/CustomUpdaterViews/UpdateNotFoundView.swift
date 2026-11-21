@@ -80,7 +80,7 @@ struct UpdateNotFoundView: View {
 
             // Version info
             VStack(spacing: 6) {
-                Text("Atoll \(Bundle.main.releaseVersionNumber ?? "Unknown")")
+                Text("Atoll \(Bundle.main.releaseVersionNumber ?? String(localized: "Unknown"))")
                     .font(.subheadline)
                     .foregroundStyle(.primary)
 
