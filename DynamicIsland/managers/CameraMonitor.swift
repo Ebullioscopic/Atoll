@@ -51,6 +51,7 @@ class CameraMonitor: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var isListenerRegistered: Bool = false
     private var cameraDeviceIDs: [CMIOObjectID] = []
+    private var deactivationTask: Task<Void, Never>?
     
     // MARK: - Configuration
     // Pure event-driven - no polling
@@ -336,27 +337,32 @@ class CameraMonitor: ObservableObject {
         let isCMIOActive = checkCameraStatusCMIO()
         let isAVActive = checkCameraStatusAVFoundation()
         
-        // Use OR logic - either method detects usage
         let isActive = isCMIOActive || isAVActive
         
-        // Debug logging
-        print("CameraMonitor: 🔍 Checking... current=\(isCameraActive), CMIO=\(isCMIOActive), AV=\(isAVActive), final=\(isActive)")
-        
-        // Update state if changed
-        if isActive != isCameraActive {
-            print("CameraMonitor: 🔄 State change detected (\(isCameraActive) -> \(isActive))")
-            
-            withAnimation(.smooth) {
-                isCameraActive = isActive
-            }
-            
-            if isActive {
-                print("CameraMonitor: 📷 Camera ACTIVE")
-                // Could try to identify app here (TODO: investigate)
+        if isActive {
+            deactivationTask?.cancel()
+            deactivationTask = nil
+            if !isCameraActive {
+                print("CameraMonitor: 📷 Camera became ACTIVE")
+                withAnimation(.smooth) {
+                    isCameraActive = true
+                }
                 activeApp = "Unknown App"
-            } else {
-                print("CameraMonitor: ⚪ Camera INACTIVE")
-                activeApp = nil
+            }
+        } else if isCameraActive {
+            guard deactivationTask == nil else { return }
+            deactivationTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                guard !Task.isCancelled, let self else { return }
+                self.deactivationTask = nil
+                let stillActive = self.checkCameraStatusCMIO() || self.checkCameraStatusAVFoundation()
+                if !stillActive {
+                    print("CameraMonitor: ⚪ Camera INACTIVE (debounced)")
+                    withAnimation(.smooth) {
+                        self.isCameraActive = false
+                    }
+                    self.activeApp = nil
+                }
             }
         }
     }

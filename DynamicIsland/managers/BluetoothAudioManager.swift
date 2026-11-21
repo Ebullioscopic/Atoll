@@ -202,13 +202,6 @@ class BluetoothAudioManager: ObservableObject {
             )
         }
 
-        dnc.addObserver(
-            self,
-            selector: #selector(handlePotentialAirPodsListeningModeNotification(_:)),
-            name: nil,
-            object: nil
-        )
-
         let darwinCenter = CFNotificationCenterGetDarwinNotifyCenter()
         for name in listeningModeNotificationNames {
             CFNotificationCenterAddObserver(
@@ -1984,7 +1977,8 @@ class BluetoothAudioManager: ObservableObject {
         guard Defaults[.showAirPodsListeningModeChanges] else { return }
         guard event.device.deviceType.isAirPods else { return }
 
-        let address = event.device.address
+        let address = normalizeBluetoothIdentifier(event.device.address)
+        guard !address.isEmpty else { return }
         guard lastListeningModeByAddress[address] != event.mode else { return }
 
         listeningModePresentationTask?.cancel()
@@ -1999,7 +1993,8 @@ class BluetoothAudioManager: ObservableObject {
         guard Defaults[.showAirPodsListeningModeChanges] else { return }
         guard event.device.deviceType.isAirPods else { return }
 
-        let address = event.device.address
+        let address = normalizeBluetoothIdentifier(event.device.address)
+        guard !address.isEmpty else { return }
         guard lastListeningModeByAddress[address] != event.mode else { return }
         lastListeningModeByAddress[address] = event.mode
         activeListeningModeEvent = event
