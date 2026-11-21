@@ -89,7 +89,10 @@ final class LockScreenWidgetPreviewManager: ObservableObject {
 
     private func stopDemoTimerIfNeeded() {
         guard startedDemoTimer else { return }
-        TimerManager.shared.forceStopTimer()
+        // The user may have replaced the demo timer (for example by syncing a Toggl entry); leave that one alone.
+        if TimerManager.shared.isDemoTimer {
+            TimerManager.shared.forceStopTimer()
+        }
         startedDemoTimer = false
     }
 
