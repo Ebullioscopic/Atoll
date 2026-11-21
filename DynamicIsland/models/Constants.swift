@@ -1315,6 +1315,8 @@ extension Defaults.Keys {
     static let terminalStickyMode = Key<Bool>("terminalStickyMode", default: false)
     
     // MARK: Timer Feature
+    static let timerAlertDurationSeconds = Key<Int>("timerAlertDurationSeconds", default: 30)
+    static let timerAlertRepeatIntervalMinutes = Key<Int>("timerAlertRepeatIntervalMinutes", default: 5)
     static let enableTimerFeature = Key<Bool>("enableTimerFeature", default: true)
     static let timerDisplayMode = Key<TimerDisplayMode>("timerDisplayMode", default: .tab)
     static let timerPresets = Key<[TimerPreset]>("timerPresets", default: TimerPreset.defaultPresets)
