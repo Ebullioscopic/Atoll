@@ -57,8 +57,11 @@ class CalendarManager: ObservableObject {
     private let lockScreenRefreshInterval: TimeInterval = 15
     private var lockScreenRefreshTask: Task<Void, Never>?
 
-    var hasCalendarAccess: Bool { isAuthorized(calendarAuthorizationStatus) }
-    var hasReminderAccess: Bool { isAuthorized(reminderAuthorizationStatus) }
+    var access: CalendarAccess {
+        CalendarAccess(calendarStatus: calendarAuthorizationStatus, reminderStatus: reminderAuthorizationStatus)
+    }
+    var hasCalendarAccess: Bool { access.hasCalendarAccess }
+    var hasReminderAccess: Bool { access.hasReminderAccess }
 
     private init() {
         currentWeekStartDate = CalendarManager.startOfDay(Date())
@@ -135,7 +138,7 @@ class CalendarManager: ObservableObject {
 
     @MainActor
     private func maybeRefreshEventsAfterReload() async {
-        guard hasCalendarAccess else { return }
+        guard access.canShowSettings else { return }
         let now = Date()
         if let lastFetch = lastEventsFetchDate, now.timeIntervalSince(lastFetch) < reloadRefreshInterval {
             return
@@ -143,61 +146,31 @@ class CalendarManager: ObservableObject {
         await updateEvents()
     }
 
-    private func isAuthorized(_ status: EKAuthorizationStatus) -> Bool {
-        switch status {
-        case .authorized, .fullAccess:
-            return true
-        default:
-            return false
-        }
+    /// Refresh without prompting when returning from System Settings.
+    func refreshAuthorization() async {
+        calendarAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
+        reminderAuthorizationStatus = EKEventStore.authorizationStatus(for: .reminder)
+        await reloadCalendarAndReminderLists()
+        await updateEvents(force: true)
+        await updateLockScreenEvents(force: true)
     }
 
     func checkCalendarAuthorization() async {
-        let status = EKEventStore.authorizationStatus(for: .event)
-        calendarAuthorizationStatus = status
-
-        switch status {
-        case .notDetermined:
-            let granted = await calendarService.requestAccess(to: .event)
-            calendarAuthorizationStatus = granted ? .fullAccess : .denied
-            if granted {
-                await reloadCalendarAndReminderLists()
-                await updateEvents(force: true)
-                await updateLockScreenEvents(force: true)
-            }
-        case .restricted, .denied:
-            NSLog("Calendar access denied or restricted")
-        case .authorized, .fullAccess:
-            await reloadCalendarAndReminderLists()
-            await updateEvents(force: true)
-            await updateLockScreenEvents(force: true)
-        case .writeOnly:
-            NSLog("Calendar write only")
-        @unknown default:
-            NSLog("Unknown calendar authorization status")
-        }
+        await checkAuthorization(for: .event)
     }
 
     func checkReminderAuthorization() async {
-        let status = EKEventStore.authorizationStatus(for: .reminder)
-        reminderAuthorizationStatus = status
+        await checkAuthorization(for: .reminder)
+    }
 
-        switch status {
-        case .notDetermined:
-            let granted = await calendarService.requestAccess(to: .reminder)
-            reminderAuthorizationStatus = granted ? .fullAccess : .denied
-            if granted {
-                await reloadCalendarAndReminderLists()
-            }
-        case .restricted, .denied:
-            NSLog("Reminder access denied or restricted")
-        case .authorized, .fullAccess:
-            await reloadCalendarAndReminderLists()
-        case .writeOnly:
-            NSLog("Reminder write only")
-        @unknown default:
-            NSLog("Unknown reminder authorization status")
+    private func checkAuthorization(for entity: EKEntityType) async {
+        let status = EKEventStore.authorizationStatus(for: entity)
+        // Calendar write-only permission still needs an explicit full-access
+        // request before calendars can be listed or read.
+        if CalendarAccess.canRequest(status) {
+            _ = await calendarService.requestAccess(to: entity)
         }
+        await refreshAuthorization()
     }
 
     func updateSelectedCalendars() {

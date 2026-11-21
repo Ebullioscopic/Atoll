@@ -34842,6 +34842,40 @@
         }
       }
     },
+    "Allow access to show events and choose calendars." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow access to show events and choose calendars."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许访问后，即可显示日程并选择日历。"
+          }
+        }
+      }
+    },
+    "Allow access to show reminders and choose lists." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow access to show reminders and choose lists."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许访问后，即可显示提醒事项并选择列表。"
+          }
+        }
+      }
+    },
     "Full Access" : {
       "localizations" : {
         "ko" : {
