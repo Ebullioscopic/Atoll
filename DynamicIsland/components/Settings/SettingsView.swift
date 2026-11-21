@@ -243,6 +243,8 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
         SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
         SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
+        SettingsSearchEntry(tab: .general, title: "Export Settings", keywords: ["export", "backup", "save settings", "share settings", "atollsettings"], highlightID: nil),
+        SettingsSearchEntry(tab: .general, title: "Import Settings", keywords: ["import", "restore", "load settings", "settings file", "atollsettings"], highlightID: nil),
 
         // Live Activities
         SettingsSearchEntry(tab: .liveActivities, title: "Enable Screen Recording Detection", keywords: ["screen recording", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Screen Recording Detection")),
@@ -1326,6 +1328,8 @@ struct GeneralSettings: View {
             NotchBehaviour()
 
             gestureControls()
+
+            SettingsPorterSection()
         }
         .toolbar {
             Button("Quit app") {
