@@ -392,7 +392,17 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         return false
     }
 
-    func open() {
+    func open(target: NotchViews? = nil) {
+        if notchState == .closed {
+            if let target {
+                coordinator.currentView = target
+            } else {
+                coordinator.selectOpenDestination()
+                if !coordinator.selectedOpenDestination.isFixed {
+                    focusClipboardTabIfNeeded()
+                }
+            }
+        }
         let targetSize = calculateDynamicNotchSize()
 
         let applyWindowResize: () -> Void = {
@@ -415,7 +425,6 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
         // Force music information update when notch is opened
         MusicManager.shared.forceUpdate()
-        focusClipboardTabIfNeeded()
     }
     
     private func calculateDynamicNotchSize() -> CGSize {
@@ -450,6 +459,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
         // Set the current view to shelf if it contains files and the user enables openShelfByDefault
         // Otherwise, if the user has not enabled openLastShelfByDefault, set the view to home
+        if coordinator.selectedOpenDestination.isFixed {
+            return
+        }
         if !ShelfStateViewModel.shared.isEmpty && Defaults[.openShelfByDefault] && !Defaults[.enableMinimalisticUI] {
             coordinator.currentView = .shelf
         } else if !coordinator.openLastTabByDefault {

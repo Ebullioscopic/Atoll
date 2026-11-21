@@ -134,8 +134,11 @@ class DynamicIslandViewCoordinator: ObservableObject {
     @AppStorage("alwaysShowTabs") var alwaysShowTabs: Bool = true {
         didSet {
             if !alwaysShowTabs {
+                if selectedOpenDestination == .lastUsed {
+                    notchOpenDestination = NotchOpenDestination.automatic.rawValue
+                }
                 openLastTabByDefault = false
-                if TrayDrop.shared.isEmpty || !Defaults[.openShelfByDefault] {
+                if !selectedOpenDestination.isFixed && (TrayDrop.shared.isEmpty || !Defaults[.openShelfByDefault]) {
                     currentView = .home
                 }
             }
@@ -150,6 +153,51 @@ class DynamicIslandViewCoordinator: ObservableObject {
         }
     }
     
+    @AppStorage("notchOpenDestination") var notchOpenDestination: String = ""
+
+    var selectedOpenDestination: NotchOpenDestination {
+        NotchOpenDestination.selected(notchOpenDestination, rememberLast: openLastTabByDefault)
+    }
+
+    func setOpenDestination(_ destination: NotchOpenDestination) {
+        notchOpenDestination = destination.rawValue
+        openLastTabByDefault = destination == .lastUsed
+        if destination.isFixed { alwaysShowTabs = true }
+    }
+
+    var availableStandardTabs: [NotchOpenDestination] {
+        StandardNotchTabAvailability(
+            home: Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls] || Defaults[.showCalendar] || Defaults[.showMirror],
+            shelf: Defaults[.dynamicShelf],
+            timer: Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] == .tab,
+            stats: Defaults[.enableStatsFeature],
+            llmUsage: Defaults[.enableLLMUsageFeature],
+            notes: Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab),
+            terminal: Defaults[.enableTerminalFeature]
+        ).available
+    }
+
+    func selectOpenDestination() {
+        guard !Defaults[.enableMinimalisticUI] else { currentView = .home; return }
+        let destination = selectedOpenDestination
+        guard destination.isFixed else { return }
+        guard let tab = destination.resolved(available: availableStandardTabs) else {
+            // TabSelectionView chooses the first available extension if one exists.
+            currentView = .home
+            return
+        }
+        switch tab {
+        case .home: currentView = .home
+        case .shelf: currentView = .shelf
+        case .timer: currentView = .timer
+        case .stats: currentView = .stats
+        case .llmUsage: currentView = .llmUsage
+        case .notes: currentView = .notes
+        case .terminal: currentView = .terminal
+        case .automatic, .lastUsed: break
+        }
+    }
+
     @AppStorage("hudReplacement") var hudReplacement: Bool = true
     
     @AppStorage("preferred_screen_name") var preferredScreen = NSScreen.main?.localizedName ?? "Unknown" {

@@ -239,6 +239,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "Reverse scroll gestures", keywords: ["reverse", "scroll", "open", "close"], highlightID: SettingsTab.general.highlightID(for: "Reverse scroll gestures")),
         SettingsSearchEntry(tab: .general, title: "Extend hover area", keywords: ["hover", "cursor"], highlightID: SettingsTab.general.highlightID(for: "Extend hover area")),
         SettingsSearchEntry(tab: .general, title: "Enable haptics", keywords: ["haptic", "feedback"], highlightID: SettingsTab.general.highlightID(for: "Enable haptics")),
+        SettingsSearchEntry(tab: .general, title: "Open to", keywords: ["default tab", "remember last tab", "startup"], highlightID: SettingsTab.general.highlightID(for: "Open to")),
         SettingsSearchEntry(tab: .general, title: "Open notch on hover", keywords: ["hover to open", "auto open"], highlightID: SettingsTab.general.highlightID(for: "Open notch on hover")),
         SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
         SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
@@ -1404,6 +1405,20 @@ struct GeneralSettings: View {
         }
     }
 
+    private func openDestinationName(_ destination: NotchOpenDestination) -> String {
+        switch destination {
+        case .automatic: return String(localized: "Automatic")
+        case .lastUsed: return String(localized: "Remember last tab")
+        case .home: return String(localized: "Home")
+        case .shelf: return String(localized: "Shelf")
+        case .timer: return String(localized: "Timer")
+        case .stats: return String(localized: "Stats")
+        case .llmUsage: return String(localized: "Usage")
+        case .notes: return Defaults[.enableNotes] ? String(localized: "Notes") : String(localized: "Clipboard")
+        case .terminal: return String(localized: "Terminal")
+        }
+    }
+
     @ViewBuilder
     func NotchBehaviour() -> some View {
         Section {
@@ -1419,7 +1434,27 @@ struct GeneralSettings: View {
                 Text("Open notch on hover")
             }
             .settingsHighlight(id: highlightID("Open notch on hover"))
-            Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
+            Picker("Open to", selection: Binding(
+                get: { coordinator.selectedOpenDestination },
+                set: { coordinator.setOpenDestination($0) }
+            )) {
+                Text("Automatic").tag(NotchOpenDestination.automatic)
+                Text("Remember last tab").tag(NotchOpenDestination.lastUsed)
+                ForEach(coordinator.availableStandardTabs, id: \.self) { destination in
+                    Text(openDestinationName(destination)).tag(destination)
+                }
+                if coordinator.selectedOpenDestination.isFixed && !coordinator.availableStandardTabs.contains(coordinator.selectedOpenDestination) {
+                    Text("Unavailable — \(openDestinationName(coordinator.selectedOpenDestination))")
+                        .tag(coordinator.selectedOpenDestination)
+                }
+            }
+            .disabled(enableMinimalisticUI)
+            .settingsHighlight(id: highlightID("Open to"))
+            if enableMinimalisticUI {
+                Text("Minimalistic mode always opens Home.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if openNotchOnHover {
                 Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
                     HStack {

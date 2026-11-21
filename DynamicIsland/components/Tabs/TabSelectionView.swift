@@ -65,34 +65,34 @@ struct TabSelectionView: View {
     private var tabs: [TabModel] {
         var tabsArray: [TabModel] = []
 
-        if homeTabVisible {
+        if coordinator.availableStandardTabs.contains(.home) {
             tabsArray.append(TabModel(label: "Home", icon: "house.fill", view: .home))
         }
 
-        if Defaults[.dynamicShelf] {
+        if coordinator.availableStandardTabs.contains(.shelf) {
             tabsArray.append(TabModel(label: "Shelf", icon: "tray.fill", view: .shelf))
         }
         
-        if enableTimerFeature && timerDisplayMode == .tab {
+        if coordinator.availableStandardTabs.contains(.timer) {
             tabsArray.append(TabModel(label: "Timer", icon: "timer", view: .timer))
         }
 
         // Stats tab only shown when stats feature is enabled
-        if Defaults[.enableStatsFeature] {
+        if coordinator.availableStandardTabs.contains(.stats) {
             tabsArray.append(TabModel(label: "Stats", icon: "chart.xyaxis.line", view: .stats))
         }
 
         // Usage tab only shown when LLM usage feature is enabled
-        if Defaults[.enableLLMUsageFeature] {
+        if coordinator.availableStandardTabs.contains(.llmUsage) {
             tabsArray.append(TabModel(label: "Usage", icon: "chart.bar.doc.horizontal", view: .llmUsage))
         }
 
-        if Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab) {
+        if coordinator.availableStandardTabs.contains(.notes) {
             let label = Defaults[.enableNotes] ? "Notes" : "Clipboard"
             let icon = Defaults[.enableNotes] ? "note.text" : "doc.on.clipboard"
             tabsArray.append(TabModel(label: label, icon: icon, view: .notes))
         }
-        if Defaults[.enableTerminalFeature] {
+        if coordinator.availableStandardTabs.contains(.terminal) {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
         if extensionTabsEnabled {
