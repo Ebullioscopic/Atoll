@@ -652,6 +652,10 @@ struct ContentView: View {
         installRootLifecycleHandlers(on: rootBodyView)
     }
 
+    private var isNotchShadowVisible: Bool {
+        (vm.notchState == .open || isHovering) && Defaults[.enableShadow]
+    }
+
     private var mainLayoutBase: some View {
         NotchLayout()
             .frame(alignment: .top)
@@ -675,10 +679,10 @@ struct ContentView: View {
             }
             .compositingGroup()
             .shadow(
-                color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
-                    ? .black.opacity(0.6)
-                    : .clear,
-                radius: Defaults[.cornerRadiusScaling] ? 10 : 5
+                color: isNotchShadowVisible ? .black.opacity(0.6) : .clear,
+                // A clear shadow still rasterizes and blurs the whole notch on
+                // every frame; zero radius lets SwiftUI skip the blur pass.
+                radius: isNotchShadowVisible ? (Defaults[.cornerRadiusScaling] ? 10 : 5) : 0
             )
             // Extra horizontal inset for Dynamic Island mode so the shadow
             // is not clipped by the outer frame constraint
@@ -3094,8 +3098,6 @@ private struct MusicTimerSupplementView: View {
                 .foregroundColor(timerManager.isOvertime ? .red : .white)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
-                .contentTransition(.numericText())
-                .animation(.smooth(duration: 0.25), value: timerManager.remainingTime)
                 .frame(width: countdownFrameWidth, alignment: .trailing)
 
             if showsBarProgress {
