@@ -1039,8 +1039,10 @@ struct ContentView: View {
         guard vm.notchState == .closed,
               !vm.hideOnClosed,
               closedContentWidth > 0,
-              let menusRightEdge = menuBarLayout.appMenusRightEdge,
-              let screenFrame = getScreenFrame(currentScreenName)
+              let screenFrame = getScreenFrame(currentScreenName),
+              // Menus are measured relative to the display they were read on and
+              // applied to this one; see `MenuBarLayout.appMenusRightInset`.
+              let menusRightEdge = menuBarLayout.appMenusRightEdge(in: screenFrame)
         else { return 0 }
 
         return MenuBarLayout.clearanceOffset(

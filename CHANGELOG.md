@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- **Live activities invisible on one of several displays**: with Show on all displays and a second monitor, the closed notch on one screen could animate its black background with nothing on top -- no album art, visualizer, HUD icons or sneak peeks. The menu bar clearance measured the frontmost app's menus as a global x coordinate and compared it with every display's own frame, so when the frontmost app was on the other screen the island pushed its content out of the notch shape. The measurement is now kept relative to its display and applied to each one.
 - A tab count in the notch settings could not be formatted. `%lld tab%@ enabled · min %lld px` was translated using `%1lld` — missing the `$` — so it was never parsed as a positional specifier, and the separator was U+22C5 (dot operator) rather than the U+00B7 the source uses. (#789)
 - The microphone privacy indicator description showed an unrelated sentence about a meeting start time, which also introduced a `%@` that the source string does not have — reading an argument that was never passed. (#789)
 - A shipped string began with `추천 번역 ⭐️: `, an AI suggestion prefix that had been committed along with the translation it labelled. (#789)
