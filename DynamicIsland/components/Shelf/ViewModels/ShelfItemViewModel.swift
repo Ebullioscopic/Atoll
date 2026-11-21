@@ -45,8 +45,11 @@ final class ShelfItemViewModel: ObservableObject {
 
     init(item: ShelfItem) {
         self.item = item
-        self.displayName = ""
-        self.icon = nil
+        // Non-file items do not go through bookmark metadata loading, so seed
+        // their presentation from the model immediately (links and text would
+        // otherwise remain blank for the lifetime of the view model).
+        self.displayName = item.displayName
+        self.icon = item.icon
         Task { await loadMetadata() }
     }
 
