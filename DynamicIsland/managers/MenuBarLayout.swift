@@ -9,15 +9,39 @@
 import AppKit
 import ApplicationServices
 import Combine
+import SwiftUI
 
-/// Tracks the right edge of the frontmost application's menu bar items.
+/// Where a closed live activity sits relative to the frontmost app's menus.
+enum ClosedActivityPlacement: Equatable {
+    /// Wings on both sides of the notch, as designed.
+    case centered
+    /// Both wings drawn to the right of the notch.
+    case trailing
+    /// Both wings drawn to the left of the notch.
+    case leading
+    /// Wings folded away: only the notch itself is drawn.
+    case retracted
+}
+
+/// Raised by a closed live activity that can draw both its wings on one side
+/// of the notch (see `ClosedActivityPlacement.trailing` / `.leading`).
+struct ClosedWingsGatherableKey: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) {
+        value = value || nextValue()
+    }
+}
+
+/// Tracks where the frontmost application's menu bar items are.
 ///
-/// A live activity draws into the strip of menu bar to the left of the notch,
-/// which is the same strip the app's own menus occupy. macOS lays those menus
-/// out inside `NSScreen.auxiliaryTopLeftArea` and offers no way to tell it that
-/// something else is using part of that space -- both auxiliary areas are
-/// read-only and derived from the display hardware. So rather than reserving
-/// room, Atoll measures what is already there and moves aside.
+/// A live activity draws into the strips of menu bar on either side of the
+/// notch, which is where the app's own menus live. When an app has more menus
+/// than fit on the left, macOS carries the rest over to the right of the notch,
+/// so both strips can be taken. macOS lays those menus out inside
+/// `NSScreen.auxiliaryTopLeftArea` / `auxiliaryTopRightArea` and offers no way
+/// to tell it that something else is using part of that space -- both areas
+/// are read-only and derived from the display hardware. So rather than
+/// reserving room, Atoll measures what is already there and steps aside.
 ///
 /// The measurement is the accessibility API's view of the menu bar, which is
 /// how the geometry is available at all: every menu reports its own position
@@ -26,11 +50,13 @@ import Combine
 final class MenuBarLayout: ObservableObject {
     static let shared = MenuBarLayout()
 
-    /// Right edge of the last menu of the frontmost app, in screen coordinates.
-    /// `nil` when it cannot be known -- no accessibility permission, an app that
-    /// exposes no menu bar, or a process that did not answer in time. Callers
-    /// treat that as "no constraint" rather than guessing.
-    @Published private(set) var appMenusRightEdge: CGFloat?
+    /// Horizontal extent of each menu of the frontmost app, in global screen
+    /// coordinates. `nil` when it cannot be known -- no accessibility
+    /// permission, an app that exposes no menu bar, a full-screen window (the
+    /// menu bar is hidden there, yet the accessibility API still reports the
+    /// old positions), or a process that did not answer in time. Callers treat
+    /// that as "no constraint" rather than guessing.
+    @Published private(set) var menuSpans: [ClosedRange<CGFloat>]?
 
     /// Menus change with the frontmost app, and within an app as its windows
     /// change, so a slow poll backs up the activation notice. It runs only
@@ -44,24 +70,46 @@ final class MenuBarLayout: ObservableObject {
 
     private init() {}
 
-    /// How far right content of `contentWidth`, centred in `screenFrame`, has to
-    /// move so its left edge clears menus ending at `menusRightEdge`.
+    /// Where a closed activity can go without covering a menu.
     ///
-    /// Zero when nothing is covered. Capped at the room remaining on the right,
-    /// because a shift that pushes the content off the far edge has traded one
-    /// covered thing for another.
-    nonisolated static func clearanceOffset(
-        contentWidth: CGFloat,
-        screenFrame: CGRect,
-        menusRightEdge: CGFloat,
+    /// The surface is `coreWidth` (the part that sits on the notch, always
+    /// drawn centred on it) plus `wingsWidth` of content that normally splits
+    /// evenly to both sides. Sliding the whole surface sideways is not an
+    /// option: the notch is a hole in the panel, so whatever slides over it is
+    /// lost. The wings can only be kept where they are, gathered on the one
+    /// side that has room (when the activity can be laid out that way), or
+    /// folded away.
+    ///
+    /// Menus are split by which side of the notch they sit on; each side's
+    /// free room runs from its nearest menu, less `gap`, to the notch.
+    nonisolated static func placement(
+        notch: ClosedRange<CGFloat>,
+        coreWidth: CGFloat,
+        wingsWidth: CGFloat,
+        menuSpans: [ClosedRange<CGFloat>],
+        canGatherWings: Bool,
         gap: CGFloat
-    ) -> CGFloat {
-        guard contentWidth > 0 else { return 0 }
-        let contentLeftEdge = screenFrame.midX - contentWidth / 2
-        let overlap = (menusRightEdge + gap) - contentLeftEdge
-        guard overlap > 0 else { return 0 }
-        let rightHeadroom = max(0, screenFrame.maxX - (contentLeftEdge + contentWidth))
-        return min(overlap, rightHeadroom)
+    ) -> ClosedActivityPlacement {
+        guard wingsWidth > 0 || coreWidth > notch.upperBound - notch.lowerBound else { return .centered }
+        let split = (notch.lowerBound + notch.upperBound) / 2
+        let leftLimit = menuSpans.filter { ($0.lowerBound + $0.upperBound) / 2 < split }
+            .map(\.upperBound).max().map { $0 + gap } ?? -.infinity
+        let rightLimit = menuSpans.filter { ($0.lowerBound + $0.upperBound) / 2 >= split }
+            .map(\.lowerBound).min().map { $0 - gap } ?? .infinity
+        let leftRoom = notch.lowerBound - leftLimit
+        let rightRoom = rightLimit - notch.upperBound
+
+        // How far the core alone reaches past each edge of the notch.
+        let coreReach = max(0, (coreWidth - (notch.upperBound - notch.lowerBound)) / 2)
+        let centredReach = coreReach + wingsWidth / 2
+        if centredReach <= leftRoom && centredReach <= rightRoom { return .centered }
+
+        if canGatherWings {
+            let gatheredReach = coreReach + wingsWidth
+            if coreReach <= leftRoom && gatheredReach <= rightRoom { return .trailing }
+            if coreReach <= rightRoom && gatheredReach <= leftRoom { return .leading }
+        }
+        return .retracted
     }
 
     /// Breathing room between the last menu and the notch content, so they do
@@ -103,17 +151,17 @@ final class MenuBarLayout: ObservableObject {
         }
         pollTimer?.invalidate()
         pollTimer = nil
-        appMenusRightEdge = nil
+        menuSpans = nil
     }
 
     func refresh() {
         guard !inFlight else { return }
         guard AXIsProcessTrusted() else {
-            appMenusRightEdge = nil
+            menuSpans = nil
             return
         }
         guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else {
-            appMenusRightEdge = nil
+            menuSpans = nil
             return
         }
 
@@ -121,11 +169,11 @@ final class MenuBarLayout: ObservableObject {
         // stopped answering would otherwise take the notch's UI down with it.
         inFlight = true
         Task.detached(priority: .utility) {
-            let edge = Self.menusRightEdge(pid: pid)
+            let spans = Self.menuSpans(pid: pid)
             await MainActor.run {
                 self.inFlight = false
                 guard self.trackers > 0 else { return }
-                if self.appMenusRightEdge != edge { self.appMenusRightEdge = edge }
+                if self.menuSpans != spans { self.menuSpans = spans }
             }
         }
     }
@@ -141,13 +189,29 @@ final class MenuBarLayout: ObservableObject {
     /// own, or a hung app would still block on the ones that inherited nothing.
     nonisolated private static let elementTimeout: Float = 0.25
 
-    /// The right edge of the last menu, or `nil` if the menu bar cannot be read.
-    nonisolated private static func menusRightEdge(pid: pid_t) -> CGFloat? {
+    /// Whether the app's focused window is full screen, where the menu bar is
+    /// hidden but the accessibility API keeps reporting its old geometry.
+    nonisolated private static func isFullScreen(_ app: AXUIElement) -> Bool {
+        var windowValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowValue) == .success,
+              let windowValue, CFGetTypeID(windowValue) == AXUIElementGetTypeID()
+        else { return false }
+        let window = unsafeBitCast(windowValue, to: AXUIElement.self)
+        AXUIElementSetMessagingTimeout(window, elementTimeout)
+        var fullScreenValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, "AXFullScreen" as CFString, &fullScreenValue) == .success
+        else { return false }
+        return (fullScreenValue as? Bool) ?? false
+    }
+
+    /// Each menu's horizontal extent, or `nil` if the menu bar cannot be read.
+    nonisolated private static func menuSpans(pid: pid_t) -> [ClosedRange<CGFloat>]? {
         let startedAt = Date()
         let app = AXUIElementCreateApplication(pid)
         // A hung app must not hold this up; the measurement is an optimisation,
         // never something worth waiting on.
         AXUIElementSetMessagingTimeout(app, elementTimeout)
+        guard !isFullScreen(app) else { return nil }
 
         var menuBarValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXMenuBarAttribute as CFString, &menuBarValue) == .success,
@@ -161,7 +225,7 @@ final class MenuBarLayout: ObservableObject {
               let items = childrenValue as? [AXUIElement], !items.isEmpty
         else { return nil }
 
-        var rightEdge: CGFloat?
+        var spans: [ClosedRange<CGFloat>] = []
         for item in items {
             // Whatever has been measured so far is still usable; a scan that has
             // run long is one where the app is not answering, and waiting out
@@ -181,8 +245,9 @@ final class MenuBarLayout: ObservableObject {
                   AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
             else { continue }
 
-            rightEdge = max(rightEdge ?? 0, origin.x + size.width)
+            guard size.width > 0 else { continue }
+            spans.append(origin.x...(origin.x + size.width))
         }
-        return rightEdge
+        return spans.isEmpty ? nil : spans
     }
 }

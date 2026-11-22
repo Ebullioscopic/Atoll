@@ -1,73 +1,117 @@
 import XCTest
 @testable import Atoll
 
-/// The screen these use is a 14" MacBook Pro: 1710pt wide, notch 185pt wide and
-/// centred, so the menu bar's left strip runs 0...762.5.
+/// Geometry measured on a 13" MacBook Air: 1470pt wide, notch 645.5...824.5.
+/// Menu spans are the accessibility frames of real apps on that screen.
 final class MenuBarClearanceTests: XCTestCase {
-    private let screen = CGRect(x: 0, y: 0, width: 1710, height: 1107)
+    private let notch: ClosedRange<CGFloat> = 645.5...824.5
     private let gap: CGFloat = 8
 
-    private func offset(contentWidth: CGFloat, menusEnd: CGFloat, screen: CGRect? = nil) -> CGFloat {
-        MenuBarLayout.clearanceOffset(
-            contentWidth: contentWidth,
-            screenFrame: screen ?? self.screen,
-            menusRightEdge: menusEnd,
+    /// Chrome in French: its last left menu ends 9.5pt before the notch, and
+    /// "Fenêtre" and "Aide" are carried over to start 9.5pt after it.
+    private let chromeMenus: [ClosedRange<CGFloat>] = [
+        10...44, 43...115, 119...181, 185...248, 253...350,
+        355...438, 442...506, 511...570, 574...636,
+        834...901, 906...954,
+    ]
+
+    /// An app with a handful of short menus, all well left of the notch.
+    private let shortMenus: [ClosedRange<CGFloat>] = [10...44, 50...120, 125...190, 195...260]
+
+    private func placement(
+        core: CGFloat = 190,
+        wings: CGFloat = 40,
+        menus: [ClosedRange<CGFloat>],
+        gatherable: Bool = true
+    ) -> ClosedActivityPlacement {
+        MenuBarLayout.placement(
+            notch: notch,
+            coreWidth: core,
+            wingsWidth: wings,
+            menuSpans: menus,
+            canGatherWings: gatherable,
             gap: gap
         )
     }
 
-    func testShortMenusLeaveTheNotchCentred() {
-        // 300pt of content is centred at 855, so it begins at 705. Menus that
-        // end at 606 -- Zen's, measured -- are nowhere near it.
-        XCTAssertEqual(offset(contentWidth: 300, menusEnd: 606), 0)
+    func testShortMenusLeaveTheActivityCentred() {
+        XCTAssertEqual(placement(menus: shortMenus), .centered)
     }
 
-    func testMenusReachingTheContentPushItRight() {
-        // Content begins at 705; menus ending at 720 overlap it by 15, plus the
-        // 8pt gap.
-        XCTAssertEqual(offset(contentWidth: 300, menusEnd: 720), 23)
+    func testNoMenusLeaveTheActivityCentred() {
+        XCTAssertEqual(placement(menus: []), .centered)
     }
 
-    func testTheGapAloneIsEnoughToMove() {
-        // Menus end exactly where the content begins: no overlap, but they would
-        // be flush, so the content still steps aside by the gap.
-        XCTAssertEqual(offset(contentWidth: 300, menusEnd: 705), 8)
+    func testMenusOnBothSidesOfTheNotchFoldTheWings() {
+        // Chrome leaves 1.5pt of room each side once the gap is counted: no
+        // arrangement of 40pt of wings fits.
+        XCTAssertEqual(placement(menus: chromeMenus), .retracted)
     }
 
-    func testMenusEndingJustShortOfTheGapDoNotMove() {
-        XCTAssertEqual(offset(contentWidth: 300, menusEnd: 697), 0)
+    func testCarriedOverMenusAreNotTreatedAsLeftMenus() {
+        // The old rule took the rightmost menu edge (954) as the end of the
+        // left menus and pushed the activity off towards the screen edge.
+        // Right-hand menus only ever limit the right-hand side.
+        let rightOnly: [ClosedRange<CGFloat>] = [10...44, 900...960]
+        XCTAssertEqual(placement(menus: rightOnly), .centered)
     }
 
-    func testAWiderActivityIsCoveredSooner() {
-        // 500pt of content begins at 605, so the same menus that cleared a
-        // 300pt activity now overlap it.
-        XCTAssertEqual(offset(contentWidth: 500, menusEnd: 606), 9)
-        XCTAssertEqual(offset(contentWidth: 300, menusEnd: 606), 0)
+    func testMenusReachingTheLeftWingGatherBothWingsOnTheRight() {
+        // Left menus end at 630: 7.5pt of room, not the 20 a centred wing
+        // needs, while the right side is open.
+        let menus: [ClosedRange<CGFloat>] = [10...44, 560...630]
+        XCTAssertEqual(placement(menus: menus), .trailing)
     }
 
-    func testTheShiftStopsAtTheScreenEdge() {
-        // Content this wide has only 105pt of room on the right, so a demand for
-        // more than that is capped rather than pushing it off screen.
-        let wide: CGFloat = 1500
-        let headroom = screen.maxX - (screen.midX - wide / 2 + wide)
-        XCTAssertEqual(offset(contentWidth: wide, menusEnd: 1000), headroom)
-        XCTAssertEqual(headroom, 105)
+    func testMenusReachingTheRightWingGatherBothWingsOnTheLeft() {
+        let menus: [ClosedRange<CGFloat>] = [10...44, 840...900]
+        XCTAssertEqual(placement(menus: menus), .leading)
     }
 
-    func testContentFillingTheScreenNeverMoves() {
-        XCTAssertEqual(offset(contentWidth: 1710, menusEnd: 900), 0)
+    func testAnActivityThatCannotGatherItsWingsFolds() {
+        let menus: [ClosedRange<CGFloat>] = [10...44, 560...630]
+        XCTAssertEqual(placement(menus: menus, gatherable: false), .retracted)
     }
 
-    func testNoContentMeansNoShift() {
-        XCTAssertEqual(offset(contentWidth: 0, menusEnd: 900), 0)
+    func testTheGapAloneIsEnoughToMakeWay() {
+        // Centred wings reach 5.5 + 20 = 25.5pt past the notch, to 620. Menus
+        // ending at 615 clear that, but not by the 8pt gap.
+        let menus: [ClosedRange<CGFloat>] = [10...44, 560...615]
+        XCTAssertEqual(placement(menus: menus), .trailing)
+        let roomier: [ClosedRange<CGFloat>] = [10...44, 560...611]
+        XCTAssertEqual(placement(menus: roomier), .centered)
     }
 
-    func testAnExternalDisplayIsMeasuredOnItsOwnGeometry() {
-        // A screen that does not start at x=0 -- the arithmetic is in global
-        // coordinates, so a second display must not be treated as if it did.
-        let external = CGRect(x: 1710, y: 0, width: 2560, height: 1440)
-        // Centre is 2990, so 300pt of content begins at 2840.
-        XCTAssertEqual(offset(contentWidth: 300, menusEnd: 2850, screen: external), 18)
-        XCTAssertEqual(offset(contentWidth: 300, menusEnd: 2000, screen: external), 0)
+    func testACoreWiderThanTheRoomFoldsEvenWhenGatherable() {
+        // A 240pt core reaches 30.5pt past each edge on its own; gathering the
+        // wings does not help when the core alone covers a menu.
+        let menus: [ClosedRange<CGFloat>] = [10...44, 560...630]
+        XCTAssertEqual(placement(core: 240, wings: 40, menus: menus), .retracted)
+    }
+
+    func testAnExternalDisplayIsMeasuredInGlobalCoordinates() {
+        // The same notch and menus on a display that starts at x=1710: only
+        // global positions are compared, so the outcomes must not change.
+        let shift: CGFloat = 1710
+        let moved: (ClosedRange<CGFloat>) -> ClosedRange<CGFloat> = {
+            ($0.lowerBound + shift)...($0.upperBound + shift)
+        }
+        func placementShifted(_ menus: [ClosedRange<CGFloat>]) -> ClosedActivityPlacement {
+            MenuBarLayout.placement(
+                notch: moved(notch),
+                coreWidth: 190,
+                wingsWidth: 40,
+                menuSpans: menus.map(moved),
+                canGatherWings: true,
+                gap: gap
+            )
+        }
+        XCTAssertEqual(placementShifted(chromeMenus), .retracted)
+        XCTAssertEqual(placementShifted(shortMenus), .centered)
+        XCTAssertEqual(placementShifted([10...44, 560...630]), .trailing)
+    }
+
+    func testNothingBeyondTheNotchNeverMoves() {
+        XCTAssertEqual(placement(core: 170, wings: 0, menus: chromeMenus), .centered)
     }
 }
