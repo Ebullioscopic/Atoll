@@ -690,10 +690,6 @@ struct ContentView: View {
             .padding(.horizontal, isIslandMode ? dynamicIslandShadowInset : 0)
             .padding(.bottom, isIslandMode ? dynamicIslandShadowInset : 0)
             .padding(.top, pillTopOffset)
-            // Gathered wings: the whole surface moves, clip shape included,
-            // so its middle stays on the notch.
-            .offset(x: closedSurfaceOffset)
-            .animation(.smooth(duration: 0.25), value: closedSurfaceOffset)
             .accessibilityIdentifier("AtollNotch")
     }
 
@@ -762,6 +758,11 @@ struct ContentView: View {
                 ? -(vm.closedNotchSize.height + pillTopOffset + currentShadowPadding + 10)
                 : 0
             )
+            // Gathered wings: the whole surface moves so its middle stays on
+            // the notch. Applied after the interaction modifiers, like the
+            // offset above, so the hover and tap shape moves with it.
+            .offset(x: closedSurfaceOffset)
+            .animation(.smooth(duration: 0.25), value: closedSurfaceOffset)
             .onAppear(perform: {
                 if coordinator.firstLaunch && !isConnectivityHUDVisible {
                     // Single open during first launch; closeHello() handles the timed close.
@@ -1083,7 +1084,7 @@ struct ContentView: View {
         let screenSpans = spans.filter {
             screen.frame.minX...screen.frame.maxX ~= ($0.lowerBound + $0.upperBound) / 2
         }
-        return MenuBarLayout.placement(
+        let placement = MenuBarLayout.placement(
             notch: physicalNotchSpan(on: screen),
             coreWidth: coreWidth,
             wingsWidth: surfaceWidth - coreWidth,
@@ -1091,6 +1092,12 @@ struct ContentView: View {
             canGatherWings: closedWingsGatherable,
             gap: MenuBarLayout.clearanceGap
         )
+        // The pointer on the notch means the user is reaching for the activity,
+        // not the menus: unfold it so its hover controls (the recording stop
+        // button, for one) can be reached. Gathered wings stay put, since
+        // re-centring them would move them out from under the pointer.
+        if placement == .retracted && isHovering { return .centered }
+        return placement
     }
 
     /// Sideways shift of the whole closed surface. Gathered wings make the
