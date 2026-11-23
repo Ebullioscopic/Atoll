@@ -26,6 +26,34 @@ import Foundation
         check(precise.quotas[0].resetsAt == Date(timeIntervalSince1970: 1800000000), "bucket reset date")
         let unavailable = try payload(#"{"quota_snapshots":{"premium_interactions":{"entitlement":0}}}"#)
         check(unavailable.quotas[0].usedPercent == nil, "placeholder is unavailable, not empty quota")
+        let placeholder = try payload(#"{"quota_snapshots":{"premium_interactions":{"entitlement":0,"remaining":0,"percent_remaining":100,"unlimited":false},"chat":{"entitlement":0,"percent_remaining":100,"unlimited":true}}}"#)
+        check(placeholder.quotas[0].usedPercent == nil, "zero entitlement ignores reported percentage")
+        check(placeholder.quotas[1].unlimited, "zero entitlement does not override explicit unlimited")
+        let stringQuota = try payload(#"{"quota_snapshots":{"premium_interactions":{"entitlement":"300","remaining":90,"percent_remaining":40},"chat":{"entitlement":"-1"}}}"#)
+        check(stringQuota.quotas[0].entitlement == 300, "numeric-string entitlement")
+        check(stringQuota.quotas[0].usedPercent == 60, "reported percentage retains precedence")
+        check(stringQuota.quotas[1].unlimited, "numeric-string unlimited sentinel")
+        for value in [#""invalid""#, "null", #""NaN""#, #""Infinity""#] {
+            let unknown = try payload("{\"quota_snapshots\":{\"chat\":{\"entitlement\":\(value)}}}")
+            check(unknown.quotas[0].entitlement == nil && unknown.quotas[0].usedPercent == nil, "invalid entitlement stays unavailable")
+        }
+        let legacyJSON = #"{"copilot_plan":"free","limited_user_reset_date":"2026-12-01","monthly_quotas":{"chat":50,"completions":2000},"limited_user_quotas":{"chat":10,"completions":1500}}"#
+        let legacy = try payload(legacyJSON)
+        check(legacy.quotas.map(\.id) == ["chat", "completions"], "legacy Free categories")
+        check(legacy.quotas[0].usedPercent == 80 && legacy.quotas[1].usedPercent == 25, "legacy remaining converted to consumed")
+        check(legacy.quotas[0].entitlement == 50 && legacy.quotas[0].remaining == 10, "legacy counters retained")
+        check(legacy.quotas[0].resetsAt == CopilotQuotaPayload.date("2026-12-01"), "legacy Free reset date")
+        let mixed = try payload(#"{"monthly_quotas":{"chat":50,"completions":2000},"limited_user_quotas":{"chat":10,"completions":1500},"quota_snapshots":{"chat":{"entitlement":"100","percent_remaining":70}}}"#)
+        check(mixed.quotas.count == 2, "mixed formats have no duplicate categories")
+        check(mixed.quotas[0].usedPercent == 30 && mixed.quotas[0].entitlement == 100, "snapshot takes precedence over legacy")
+        check(mixed.quotas[1].usedPercent == 25, "missing snapshot category falls back to legacy")
+        let legacyBounds = try payload(#"{"monthly_quotas":{"chat":50,"completions":2000},"limited_user_quotas":{"chat":100,"completions":-10}}"#)
+        check(legacyBounds.quotas[0].usedPercent == 0 && legacyBounds.quotas[1].usedPercent == 100, "legacy percentage clamped")
+        check(legacyBounds.quotas[1].remaining == 0, "legacy remaining nonnegative")
+        for json in [#"{"monthly_quotas":{"chat":0},"limited_user_quotas":{"chat":0}}"#, #"{"monthly_quotas":{"chat":-1},"limited_user_quotas":{"chat":10}}"#, #"{"monthly_quotas":{"chat":50}}"#, #"{"limited_user_quotas":{"chat":10}}"#] {
+            let incomplete = try payload(json)
+            check(incomplete.quotas.isEmpty, "incomplete or invalid legacy quota ignored")
+        }
         let empty = try payload("{}")
         check(empty.quotas.isEmpty, "missing quota data")
         let exhausted = try payload(#"{"quota_snapshots":{"premium_interactions":{"entitlement":300,"remaining":-5,"percent_remaining":-1}}}"#)
@@ -55,6 +83,11 @@ import Foundation
         })
         let quota = try await client.fetchQuota(host: "example-company.ghe.com", token: "test-token")
         check(quota.quotas[0].usedPercent == 70, "real transport mapping")
+        let legacyClient = CopilotQuotaClient(fetch: { request in
+            (Data(legacyJSON.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        })
+        let freeQuota = try await legacyClient.fetchQuota(host: "github.com", token: "test-token")
+        check(freeQuota.quotas.count == 2, "client accepts legacy-only Free response")
         let shouldNotSend = CopilotQuotaClient(fetch: { _ in
             fatalError("Invalid credentials must never make a request")
         })

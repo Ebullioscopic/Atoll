@@ -15,8 +15,11 @@ struct CopilotQuotaPayload: Decodable {
     let copilot_plan: String?
     let quota_reset_date: String?
     let quota_reset_date_utc: String?
+    let limited_user_reset_date: String?
     let token_based_billing: Bool?
     let quota_snapshots: [String: Bucket]?
+    let monthly_quotas: [String: Double]?
+    let limited_user_quotas: [String: Double]?
 
     struct Bucket: Decodable {
         let entitlement: Double?
@@ -26,17 +29,48 @@ struct CopilotQuotaPayload: Decodable {
         let unlimited: Bool?
         let quota_reset_at: Double?
         let token_based_billing: Bool?
+
+        private enum CodingKeys: String, CodingKey {
+            case entitlement, remaining, quota_remaining, percent_remaining
+            case unlimited, quota_reset_at, token_based_billing
+        }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            // GitHub returns numbers in some clients and numeric strings in others.
+            if let number = try? values.decode(Double.self, forKey: .entitlement) {
+                entitlement = number
+            } else {
+                entitlement = (try? values.decode(String.self, forKey: .entitlement)).flatMap(Double.init)
+            }
+            remaining = try values.decodeIfPresent(Double.self, forKey: .remaining)
+            quota_remaining = try values.decodeIfPresent(Double.self, forKey: .quota_remaining)
+            percent_remaining = try values.decodeIfPresent(Double.self, forKey: .percent_remaining)
+            unlimited = try values.decodeIfPresent(Bool.self, forKey: .unlimited)
+            quota_reset_at = try values.decodeIfPresent(Double.self, forKey: .quota_reset_at)
+            token_based_billing = try values.decodeIfPresent(Bool.self, forKey: .token_based_billing)
+        }
     }
 
     var quotas: [CopilotQuota] {
         let reset = Self.date(quota_reset_date_utc ?? quota_reset_date)
         return ["premium_interactions", "chat", "completions"].compactMap { key in
-            guard let bucket = quota_snapshots?[key] else { return nil }
+            guard let bucket = quota_snapshots?[key] else {
+                // Older Free accounts expose monthly limits and remaining counts.
+                guard key == "chat" || key == "completions",
+                      let monthly = monthly_quotas?[key], monthly.isFinite, monthly > 0,
+                      let remaining = limited_user_quotas?[key], remaining.isFinite else { return nil }
+                let percentRemaining = min(100, max(0, remaining / monthly * 100))
+                return CopilotQuota(id: key, title: key == "chat" ? "Chat" : "Completions",
+                                    usedPercent: 100 - percentRemaining, entitlement: monthly,
+                                    remaining: max(0, remaining), unlimited: false,
+                                    resetsAt: Self.date(limited_user_reset_date) ?? reset)
+            }
             let unlimited = bucket.unlimited == true || bucket.entitlement == -1
             let entitlement = bucket.entitlement.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
             let remaining = (bucket.quota_remaining ?? bucket.remaining).flatMap { $0.isFinite ? max(0, $0) : nil }
             let percent: Double?
-            if unlimited { percent = nil }
+            if unlimited || bucket.entitlement == 0 { percent = nil }
             else if let reported = bucket.percent_remaining, reported.isFinite {
                 percent = min(100, max(0, 100 - reported))
             } else if let entitlement, let remaining {

@@ -29,6 +29,9 @@ account API used by the GitHub Copilot runtime. The endpoint is listed in
 ## Display semantics
 
 - Percentage is **consumed**: `100 - percent_remaining`.
+- Entitlements accept JSON numbers or numeric strings. Older Free accounts use
+  `monthly_quotas` and `limited_user_quotas` for chat/completions, with
+  `limited_user_reset_date` for their reset. New snapshots take precedence per category.
 - When percentage is absent, precise `quota_remaining` or `remaining` and a
   positive entitlement provide the fallback.
 - Premium requests, chat, and completions have separate entries when reported.
@@ -40,7 +43,9 @@ account API used by the GitHub Copilot runtime. The endpoint is listed in
   or fictitious five-hour/weekly windows are inferred.
 
 Requests use ephemeral networking without cookies, response caching or automatic credential storage, a 15-second timeout and the existing manager's
-60-second refresh throttle. Redirects are refused. The token is sent only to
+60-second refresh throttle. A forced refresh requested while one is running is
+queued and repeated requests are coalesced, so saved credentials are fetched
+after the active request completes. Redirects are refused. The token is sent only to
 `api.github.com` or the validated `api.<tenant>.ghe.com` host. Other GitHub
 Enterprise server/custom-domain deployments are not supported yet.
 
@@ -76,7 +81,7 @@ swiftc -parse-as-library \
 /tmp/atoll-copilot-checks/quotas
 ```
 
-The 61 standalone quota and security checks pass. The Swift app and XCTest sources compile
+The 84 standalone quota and security checks pass. The Swift app and XCTest sources compile
 with Xcode 27.2. In the local environment, Xcode's Metal tool discovery could not
 find the installed toolchain. Both `visualizer.metal` and SwiftTerm's
 `Shaders.metal` were compiled and linked directly with the installed Apple Metal
@@ -84,8 +89,12 @@ toolchain, then included in the test app. The assembled app was ad-hoc signed,
 passed `codesign --verify --deep --strict`, and launched. Settings → Stats shows
 the Copilot toggle and connection fields.
 
-XCTest execution is blocked by the environment's access restriction to
+The refresh-manager regression XCTest also passes in an isolated harness using
+the actual manager and test sources, the existing Defaults build, and stubbed
+unrelated providers. It verifies serialization, coalescing and the saved
+connection result. It fails against the original manager.
+
+Full application XCTest execution is blocked by the environment's access restriction to
 `com.apple.testmanagerd.control`; those tests are compiled but are not reported
 as passing. An authenticated request to a real Copilot quota endpoint, a normal
-CI build, and rendering with live quota data remain unverified. This is a draft
-integration until those checks have been completed.
+CI build, and rendering with live quota data remain unverified. These checks are still required before merging.
