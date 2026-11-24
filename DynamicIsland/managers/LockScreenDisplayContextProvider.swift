@@ -65,33 +65,33 @@ final class LockScreenDisplayContextProvider {
     }
 
     func contextSnapshot() -> LockScreenDisplayContext? {
-        if let context {
-            return context
-        }
-        return refresh(reason: "snapshot-miss")
+        refresh(reason: "snapshot")
     }
 
     private func preferredLockScreen() -> NSScreen? {
-        if let builtin = NSScreen.screens.first(where: { screen in
-            guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
-                return false
-            }
-            return CGDisplayIsBuiltin(CGDirectDisplayID(number.uint32Value)) != 0
-        }) {
-            return builtin
+        let screens = NSScreen.screens
+        let displays: [(displayID: CGDirectDisplayID?, isBuiltin: Bool)] = screens.map { screen in
+            let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+            let displayID = number?.uint32Value
+            return (displayID: displayID, isBuiltin: displayID.map { CGDisplayIsBuiltin($0) != 0 } ?? false)
         }
+        let index = Self.preferredDisplayIndex(
+            displays: displays,
+            mainDisplayID: CGMainDisplayID(),
+            activeScreenIndex: NSScreen.main.flatMap { screens.firstIndex(of: $0) }
+        )
+        return index.map { screens[$0] }
+    }
 
-        let mainDisplayID = CGMainDisplayID()
-        if let mainScreen = NSScreen.screens.first(where: { screen in
-            guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
-                return false
-            }
-            return CGDirectDisplayID(number.uint32Value) == mainDisplayID
-        }) {
-            return mainScreen
-        }
-
-        return NSScreen.main ?? NSScreen.screens.first
+    nonisolated static func preferredDisplayIndex(
+        displays: [(displayID: CGDirectDisplayID?, isBuiltin: Bool)],
+        mainDisplayID: CGDirectDisplayID,
+        activeScreenIndex: Int?
+    ) -> Int? {
+        displays.firstIndex { $0.displayID == mainDisplayID }
+            ?? activeScreenIndex.flatMap { displays.indices.contains($0) ? $0 : nil }
+            ?? displays.firstIndex { $0.isBuiltin }
+            ?? displays.indices.first
     }
 
     private func registerObservers() {
