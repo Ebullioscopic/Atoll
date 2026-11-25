@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- **Atoll no longer burns a CPU core after a `log stream` helper exits**: the AirPods listening-mode, timer, Focus and media-adapter pipe readers ignored end of file, so once their helper process died the read handler fired again immediately, forever. One Mac logged 145 CPU-hours in the AirPods reader over 19 days. The readers now stop at end of file, and the AirPods listening-mode stream restarts itself 5 seconds after it exits instead of going silent.
 - A tab count in the notch settings could not be formatted. `%lld tab%@ enabled · min %lld px` was translated using `%1lld` — missing the `$` — so it was never parsed as a positional specifier, and the separator was U+22C5 (dot operator) rather than the U+00B7 the source uses. (#789)
 - The microphone privacy indicator description showed an unrelated sentence about a meeting start time, which also introduced a `%@` that the source string does not have — reading an argument that was never passed. (#789)
 - A shipped string began with `추천 번역 ⭐️: `, an AI suggestion prefix that had been committed along with the translation it labelled. (#789)

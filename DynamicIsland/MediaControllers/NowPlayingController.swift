@@ -283,10 +283,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         // Capture stderr so framework/script errors are logged
         let stderrPipe = Pipe()
         process.standardError = stderrPipe
-        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            guard !data.isEmpty,
-                  let message = String(data: data, encoding: .utf8)?
+        stderrPipe.fileHandleForReading.readUntilEOF { data in
+            guard let message = String(data: data, encoding: .utf8)?
                     .trimmingCharacters(in: .whitespacesAndNewlines),
                   !message.isEmpty
             else { return }
