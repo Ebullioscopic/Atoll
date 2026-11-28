@@ -429,6 +429,7 @@ private enum SettingsSearchIndex {
 
         // Shortcuts
         SettingsSearchEntry(tab: .shortcuts, title: "Enable global keyboard shortcuts", keywords: ["keyboard", "shortcut"], highlightID: SettingsTab.shortcuts.highlightID(for: "Enable global keyboard shortcuts")),
+        SettingsSearchEntry(tab: .shortcuts, title: "Close automatically after 3 seconds", keywords: ["toggle notch open", "auto close", "auto hide", "shortcut", "hotkey"], highlightID: SettingsTab.shortcuts.highlightID(for: "Close automatically after 3 seconds")),
 
         // Timer
         SettingsSearchEntry(tab: .timer, title: "Enable timer feature", keywords: ["timer", "enable"], highlightID: SettingsTab.timer.highlightID(for: "Enable timer feature")),
@@ -7356,6 +7357,11 @@ struct Shortcuts: View {
                 Section {
                     KeyboardShortcuts.Recorder("Toggle Notch Open:", name: .toggleNotchOpen)
                         .disabled(!enableShortcuts)
+                    Defaults.Toggle(key: .autoCloseNotchOpenedByShortcut) {
+                        Text("Close automatically after 3 seconds")
+                    }
+                    .disabled(!enableShortcuts)
+                    .settingsHighlight(id: highlightID("Close automatically after 3 seconds"))
                 } header: {
                     Text("Navigation")
                 } footer: {

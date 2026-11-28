@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Keep the notch open from the shortcut**: a new "Close automatically after 3 seconds" option under the Toggle Notch Open shortcut can be turned off, so the shortcut opens the notch until it is pressed again. On by default. (#435)
 - **Open the full notch from hidden**: with "Hide until hovered on non-notch displays" and "Open notch on hover" on, a new option opens the full notch straight away on hover instead of revealing the closed notch first. Off by default. (#577)
 - **Island top margin**: when external displays use the Dynamic Island style, a slider in General settings sets the gap between the top of the screen and the island, from 0 to 12 pt (6 pt by default). (#487)
 - **Back up and restore settings**: General settings can export your Atoll settings to a JSON file and import them again, on the same Mac or another one. API keys, sign-ins, clipboard history, notes and other private or device-specific data are never included, and Atoll offers to relaunch after an import. (#885)

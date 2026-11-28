@@ -1112,6 +1112,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             case .closed:
                 viewModel.open()
 
+                guard Defaults[.autoCloseNotchOpenedByShortcut] else { return }
                 let workItem = DispatchWorkItem { [weak viewModel] in
                     viewModel?.close()
                 }
