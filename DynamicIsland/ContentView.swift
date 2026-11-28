@@ -382,9 +382,14 @@ struct ContentView: View {
         vm.screen ?? coordinator.selectedScreen
     }
 
+    /// The screen this notch is drawn on.
+    private var currentScreen: NSScreen? {
+        NSScreen.screens.first(where: { $0.localizedName == currentScreenName })
+    }
+
     /// Whether the current screen lacks a physical notch.
     private var isNonNotchScreen: Bool {
-        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
+        guard let screen = currentScreen else {
             return true
         }
         return screen.safeAreaInsets.top <= 0
@@ -1021,18 +1026,22 @@ struct ContentView: View {
     /// floating island, no accessibility permission or a full-screen app all
     /// leave it where it belongs.
     private var closedActivityPlacement: ClosedActivityPlacement {
-        // Sneak peeks and HUDs (volume, brightness, a track change) come and go
-        // in a moment and are what the user is looking at, so they keep their
-        // full width even over a menu.
-        guard vm.notchState == .closed,
-              !vm.hideOnClosed,
-              !isIslandMode,
-              !isConnectivityHUDVisible,
-              !isSneakPeekVisibleOnCurrentScreen,
-              !isCurrentScreenExpansionVisible,
+        // A connectivity HUD must remain centred on the physical notch: its
+        // middle transparent lane is what keeps both wings visible. Moving or
+        // folding it would put that lane underneath the camera housing and clip
+        // one of the two content areas. Sneak peeks and other HUDs likewise keep
+        // their full width; see `MenuBarLayout.yieldsToMenus`.
+        guard MenuBarLayout.yieldsToMenus(
+                  isNotchClosed: vm.notchState == .closed,
+                  isHiddenOnClosed: vm.hideOnClosed,
+                  isIslandMode: isIslandMode,
+                  isConnectivityHUDVisible: isConnectivityHUDVisible,
+                  isSneakPeekVisible: isSneakPeekVisibleOnCurrentScreen,
+                  isExpansionVisible: isCurrentScreenExpansionVisible
+              ),
               closedPlacementWidth > 0,
-              let spans = menuBarLayout.menuSpans,
-              let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName })
+              let menus = menuBarLayout.appMenuBar,
+              let screen = currentScreen
         else { return .centered }
 
         let padding = notchHorizontalPadding * 2
@@ -1040,9 +1049,10 @@ struct ContentView: View {
         let coreWidth = closedWingsGatherable
             ? min(surfaceWidth, max(vm.closedNotchSize.width, 96) + padding)
             : surfaceWidth
-        let screenSpans = spans.filter {
-            screen.frame.minX...screen.frame.maxX ~= ($0.lowerBound + $0.upperBound) / 2
-        }
+        let screenSpans = menus.spans(
+            onScreen: screen.frame,
+            primaryScreenMaxY: NSScreen.screens.first?.frame.maxY ?? screen.frame.maxY
+        )
         let placement = MenuBarLayout.placement(
             notch: physicalNotchSpan(on: screen),
             coreWidth: coreWidth,
@@ -1465,117 +1475,22 @@ struct ContentView: View {
         let badgeDisplaySize = badgeDisplaySize(for: secondary, baseSize: badgeBaseSize)
         let badgeOffset = badgeOverlayOffset(for: secondary, badgeSize: badgeDisplaySize)
 
-        // Type-erased: the three sections are placed in different orders
-        // below, and keeping their full types tripped the compiler.
-        let artworkWing = AnyView(ZStack(alignment: .bottomTrailing) {
-                // Keep the matched-geometry source bounded to the closed
-                // artwork square while the surrounding hover flap expands.
-                ZStack(alignment: .bottomTrailing) {
-                    Color.clear
-                        .frame(width: artworkSize, height: artworkSize)
-                        .background(
-                            Image(nsImage: musicManager.albumArt)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .clipShape(RoundedRectangle(cornerRadius: musicManager.albumArt.size.width/musicManager.albumArt.size.height > 1.0 ? MusicPlayerImageSizes.cornerRadiusInset.closed/3.0 : MusicPlayerImageSizes.cornerRadiusInset.closed))
-                        )
-                        .clipped()
-                        .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-                        .albumArtFlip(angle: musicManager.flipAngle)
-                    albumArtBadge(for: secondary, badgeSize: badgeDisplaySize)
-                        .offset(x: badgeOffset.width, y: badgeOffset.height)
-                        .id(secondary?.id ?? "music-badge")
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .frame(width: artworkSize, height: artworkSize, alignment: .bottomTrailing)
-            }
-            .frame(width: wingBaseWidth, height: notchContentHeight, alignment: .center))
-
-        let centerSection = AnyView(Rectangle()
-                .fill(.black)
-                .frame(width: effectiveCenterWidth, height: notchContentHeight)
-                .overlay(
-                    HStack(alignment: .top) {
-                        if(coordinator.expandingView.show && coordinator.expandingView.type == .music) {
-                            MusicTitleMarqueeView(
-                                text: musicManager.songTitle,
-                                isExplicit: musicManager.isCurrentTrackExplicit,
-                                textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
-                                minDuration: 0.4,
-                                frameWidth: max(0, (effectiveCenterWidth - vm.closedNotchSize.width) / 2 - 12),
-                                badgeHeight: 13
-                            )
-                            .padding(.leading, 8)
-                            .opacity((coordinator.expandingView.show && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
-                            Spacer(minLength: vm.closedNotchSize.width)
-                            Text(musicManager.artistName)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                                .foregroundStyle(Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray)
-                                .padding(.trailing, 8)
-                                .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .music && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
-                        } else if(coordinator.expandingView.show && coordinator.expandingView.type == .timer) {
-                            MarqueeText(
-                                .constant(timerManager.timerName),
-                                textColor: timerManager.timerColor,
-                                minDuration: 0.4,
-                                frameWidth: max(0, (effectiveCenterWidth - vm.closedNotchSize.width) / 2 - 12)
-                            )
-                            .padding(.leading, 8)
-                            .opacity((coordinator.expandingView.show && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
-                            Spacer(minLength: vm.closedNotchSize.width)
-                            Text(timerManager.formattedRemainingTime())
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                                .foregroundStyle(timerManager.timerColor)
-                                .padding(.trailing, 8)
-                                .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .timer && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
-                        } else if Defaults[.showSongMetadataInClosedNotch] && isNonNotchScreen && !musicManager.songTitle.isEmpty {
-                            MarqueeText(
-                                .constant("\(musicManager.songTitle) • \(musicManager.artistName)"),
-                                textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
-                                minDuration: 3,
-                                frameWidth: max(0, effectiveCenterWidth - 16)
-                            )
-                            .padding(.horizontal, 8)
-                        }
-                    }
-                    .clipped()
-                ))
-
-        let trailingWing = AnyView(musicRightWing(for: secondary, notchHeight: notchContentHeight, trailingWidth: rightWingWidth)
-                .frame(width: rightWingWidth, height: notchContentHeight, alignment: .center)
-                .contentShape(Rectangle())
-                .onHover { hovering in
-                    guard shouldShowClosedMusicWaveformPlayPauseOverlay(for: secondary) else {
-                        if isHoveringClosedMusicWaveformControl {
-                            isHoveringClosedMusicWaveformControl = false
-                        }
-                        return
-                    }
-                    withAnimation(.smooth(duration: 0.16)) {
-                        isHoveringClosedMusicWaveformControl = hovering
-                    }
-                }
-                .id(secondary?.id ?? "music-spectrum")
-                .contentTransition(.symbolEffect(.replace)))
-
         // When the menus leave room on one side only, both wings move there
         // (see `closedActivityPlacement`); the surface is shifted to match.
         HStack(spacing: 0) {
             switch closedActivityPlacement {
             case .trailing:
-                centerSection
-                artworkWing
-                trailingWing
+                musicCenterSection(width: effectiveCenterWidth, height: notchContentHeight)
+                musicArtworkWing(for: secondary, artworkSize: artworkSize, wingWidth: wingBaseWidth, height: notchContentHeight, badgeSize: badgeDisplaySize, badgeOffset: badgeOffset)
+                musicTrailingWing(for: secondary, width: rightWingWidth, height: notchContentHeight)
             case .leading:
-                artworkWing
-                trailingWing
-                centerSection
+                musicArtworkWing(for: secondary, artworkSize: artworkSize, wingWidth: wingBaseWidth, height: notchContentHeight, badgeSize: badgeDisplaySize, badgeOffset: badgeOffset)
+                musicTrailingWing(for: secondary, width: rightWingWidth, height: notchContentHeight)
+                musicCenterSection(width: effectiveCenterWidth, height: notchContentHeight)
             case .centered, .retracted:
-                artworkWing
-                centerSection
-                trailingWing
+                musicArtworkWing(for: secondary, artworkSize: artworkSize, wingWidth: wingBaseWidth, height: notchContentHeight, badgeSize: badgeDisplaySize, badgeOffset: badgeOffset)
+                musicCenterSection(width: effectiveCenterWidth, height: notchContentHeight)
+                musicTrailingWing(for: secondary, width: rightWingWidth, height: notchContentHeight)
             }
         }
         // The inline sneak peek widens the middle to carry text across the
@@ -1584,6 +1499,118 @@ struct ContentView: View {
         .frame(width: notchWidth, height: notchContentHeight)
         .frame(height: outerHeight, alignment: .center)
         .animation(.smooth(duration: 0.25), value: secondary?.id)
+    }
+
+    // The closed music activity's three sections, split out so they can be
+    // placed in a different order when the wings gather on one side.
+
+    @ViewBuilder
+    private func musicArtworkWing(
+        for secondary: MusicSecondaryLiveActivity?,
+        artworkSize: CGFloat,
+        wingWidth: CGFloat,
+        height: CGFloat,
+        badgeSize: CGFloat,
+        badgeOffset: CGSize
+    ) -> some View {
+        ZStack(alignment: .bottomTrailing) {
+            // Keep the matched-geometry source bounded to the closed
+            // artwork square while the surrounding hover flap expands.
+            ZStack(alignment: .bottomTrailing) {
+                Color.clear
+                    .frame(width: artworkSize, height: artworkSize)
+                    .background(
+                        Image(nsImage: musicManager.albumArt)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: musicManager.albumArt.size.width/musicManager.albumArt.size.height > 1.0 ? MusicPlayerImageSizes.cornerRadiusInset.closed/3.0 : MusicPlayerImageSizes.cornerRadiusInset.closed))
+                    )
+                    .clipped()
+                    .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
+                    .albumArtFlip(angle: musicManager.flipAngle)
+                albumArtBadge(for: secondary, badgeSize: badgeSize)
+                    .offset(x: badgeOffset.width, y: badgeOffset.height)
+                    .id(secondary?.id ?? "music-badge")
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .frame(width: artworkSize, height: artworkSize, alignment: .bottomTrailing)
+        }
+        .frame(width: wingWidth, height: height, alignment: .center)
+    }
+
+    @ViewBuilder
+    private func musicCenterSection(width: CGFloat, height: CGFloat) -> some View {
+        Rectangle()
+            .fill(.black)
+            .frame(width: width, height: height)
+            .overlay(
+                HStack(alignment: .top) {
+                    if(coordinator.expandingView.show && coordinator.expandingView.type == .music) {
+                        MusicTitleMarqueeView(
+                            text: musicManager.songTitle,
+                            isExplicit: musicManager.isCurrentTrackExplicit,
+                            textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
+                            minDuration: 0.4,
+                            frameWidth: max(0, (width - vm.closedNotchSize.width) / 2 - 12),
+                            badgeHeight: 13
+                        )
+                        .padding(.leading, 8)
+                        .opacity((coordinator.expandingView.show && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
+                        Spacer(minLength: vm.closedNotchSize.width)
+                        Text(musicManager.artistName)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .foregroundStyle(Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray)
+                            .padding(.trailing, 8)
+                            .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .music && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
+                    } else if(coordinator.expandingView.show && coordinator.expandingView.type == .timer) {
+                        MarqueeText(
+                            .constant(timerManager.timerName),
+                            textColor: timerManager.timerColor,
+                            minDuration: 0.4,
+                            frameWidth: max(0, (width - vm.closedNotchSize.width) / 2 - 12)
+                        )
+                        .padding(.leading, 8)
+                        .opacity((coordinator.expandingView.show && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
+                        Spacer(minLength: vm.closedNotchSize.width)
+                        Text(timerManager.formattedRemainingTime())
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .foregroundStyle(timerManager.timerColor)
+                            .padding(.trailing, 8)
+                            .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .timer && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
+                    } else if Defaults[.showSongMetadataInClosedNotch] && isNonNotchScreen && !musicManager.songTitle.isEmpty {
+                        MarqueeText(
+                            .constant("\(musicManager.songTitle) • \(musicManager.artistName)"),
+                            textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
+                            minDuration: 3,
+                            frameWidth: max(0, width - 16)
+                        )
+                        .padding(.horizontal, 8)
+                    }
+                }
+                .clipped()
+            )
+    }
+
+    @ViewBuilder
+    private func musicTrailingWing(for secondary: MusicSecondaryLiveActivity?, width: CGFloat, height: CGFloat) -> some View {
+        musicRightWing(for: secondary, notchHeight: height, trailingWidth: width)
+            .frame(width: width, height: height, alignment: .center)
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                guard shouldShowClosedMusicWaveformPlayPauseOverlay(for: secondary) else {
+                    if isHoveringClosedMusicWaveformControl {
+                        isHoveringClosedMusicWaveformControl = false
+                    }
+                    return
+                }
+                withAnimation(.smooth(duration: 0.16)) {
+                    isHoveringClosedMusicWaveformControl = hovering
+                }
+            }
+            .id(secondary?.id ?? "music-spectrum")
+            .contentTransition(.symbolEffect(.replace))
     }
 
     private func resolveMusicSecondaryLiveActivity(isMusicPairingEligible: Bool = true) -> MusicSecondaryLiveActivity? {
@@ -2196,7 +2223,7 @@ struct ContentView: View {
     }
 
     private func hiddenHoverActivationContainsMouse(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
-        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
+        guard let screen = currentScreen else {
             return false
         }
 
@@ -2478,7 +2505,7 @@ struct ContentView: View {
             return isPointInsideNotchWindow(location)
         }
 
-        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }),
+        guard let screen = currentScreen,
               location.y >= screen.frame.maxY - 1.5 else {
             return false
         }
@@ -2529,7 +2556,7 @@ struct ContentView: View {
     }
 
     private func isMouseOverClosedNotchHitArea(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
-        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
+        guard let screen = currentScreen else {
             return false
         }
 

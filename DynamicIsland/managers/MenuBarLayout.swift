@@ -32,6 +32,26 @@ struct ClosedWingsGatherableKey: PreferenceKey {
     }
 }
 
+/// The frontmost app's menus as read from one display's menu bar.
+struct AppMenuBar: Equatable {
+    /// Horizontal extent of each menu, in global screen coordinates.
+    var spans: [ClosedRange<CGFloat>]
+    /// Top-left corner of the first menu in accessibility coordinates (global,
+    /// top-left origin). It places the menu bar on its display, which `spans`
+    /// alone cannot do when displays are stacked vertically.
+    var origin: CGPoint
+
+    /// The spans that constrain an activity on the display with frame
+    /// `screenFrame` (Cocoa coordinates). Each display has its own menu bar, and
+    /// the accessibility API reports only the one the menus were read from, so
+    /// menus measured on another display must not move this display's
+    /// activity.
+    func spans(onScreen screenFrame: CGRect, primaryScreenMaxY: CGFloat) -> [ClosedRange<CGFloat>] {
+        let cocoaPoint = CGPoint(x: origin.x + 1, y: primaryScreenMaxY - origin.y - 1)
+        return screenFrame.contains(cocoaPoint) ? spans : []
+    }
+}
+
 /// Tracks where the frontmost application's menu bar items are.
 ///
 /// A live activity draws into the strips of menu bar on either side of the
@@ -50,13 +70,12 @@ struct ClosedWingsGatherableKey: PreferenceKey {
 final class MenuBarLayout: ObservableObject {
     static let shared = MenuBarLayout()
 
-    /// Horizontal extent of each menu of the frontmost app, in global screen
-    /// coordinates. `nil` when it cannot be known -- no accessibility
-    /// permission, an app that exposes no menu bar, a full-screen window (the
-    /// menu bar is hidden there, yet the accessibility API still reports the
-    /// old positions), or a process that did not answer in time. Callers treat
-    /// that as "no constraint" rather than guessing.
-    @Published private(set) var menuSpans: [ClosedRange<CGFloat>]?
+    /// The frontmost app's menus. `nil` when they cannot be known -- no
+    /// accessibility permission, an app that exposes no menu bar, a full-screen
+    /// window (see `constraint(menus:isFullScreen:)`), or a process that did
+    /// not answer in time. Callers treat that as "no constraint" rather than
+    /// guessing.
+    @Published private(set) var appMenuBar: AppMenuBar?
 
     /// Menus change with the frontmost app, and within an app as its windows
     /// change, so a slow poll backs up the activation notice. It runs only
@@ -112,6 +131,42 @@ final class MenuBarLayout: ObservableObject {
         return .retracted
     }
 
+    /// Whether a closed activity should make way for the menus at all.
+    ///
+    /// Only a settled, closed live activity does. Sneak peeks and HUDs (volume,
+    /// brightness, a track change) come and go in a moment and are what the
+    /// user is looking at, so they keep their full width even over a menu. A
+    /// connectivity HUD must also remain centred on the physical notch: its
+    /// middle transparent lane is what keeps both wings visible, and moving or
+    /// folding it would put that lane underneath the camera housing and clip
+    /// one of the two content areas. The floating island is not in the menu
+    /// bar's way.
+    nonisolated static func yieldsToMenus(
+        isNotchClosed: Bool,
+        isHiddenOnClosed: Bool,
+        isIslandMode: Bool,
+        isConnectivityHUDVisible: Bool,
+        isSneakPeekVisible: Bool,
+        isExpansionVisible: Bool
+    ) -> Bool {
+        isNotchClosed
+            && !isHiddenOnClosed
+            && !isIslandMode
+            && !isConnectivityHUDVisible
+            && !isSneakPeekVisible
+            && !isExpansionVisible
+    }
+
+    /// What a menu-bar reading means for placement: `nil` (no constraint) when
+    /// the focused window is full screen -- the menu bar is hidden there, yet
+    /// the accessibility API still reports the old positions -- or when no menu
+    /// with a width was measured.
+    nonisolated static func constraint(menus: AppMenuBar?, isFullScreen: Bool) -> AppMenuBar? {
+        guard !isFullScreen, var menus else { return nil }
+        menus.spans.removeAll { $0.upperBound <= $0.lowerBound }
+        return menus.spans.isEmpty ? nil : menus
+    }
+
     /// Breathing room between the last menu and the notch content, so they do
     /// not end up flush against each other.
     nonisolated static let clearanceGap: CGFloat = 8
@@ -151,17 +206,17 @@ final class MenuBarLayout: ObservableObject {
         }
         pollTimer?.invalidate()
         pollTimer = nil
-        menuSpans = nil
+        appMenuBar = nil
     }
 
     func refresh() {
         guard !inFlight else { return }
         guard AXIsProcessTrusted() else {
-            menuSpans = nil
+            appMenuBar = nil
             return
         }
         guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else {
-            menuSpans = nil
+            appMenuBar = nil
             return
         }
 
@@ -169,11 +224,11 @@ final class MenuBarLayout: ObservableObject {
         // stopped answering would otherwise take the notch's UI down with it.
         inFlight = true
         Task.detached(priority: .utility) {
-            let spans = Self.menuSpans(pid: pid)
+            let menus = Self.appMenuBar(pid: pid)
             await MainActor.run {
                 self.inFlight = false
                 guard self.trackers > 0 else { return }
-                if self.menuSpans != spans { self.menuSpans = spans }
+                if self.appMenuBar != menus { self.appMenuBar = menus }
             }
         }
     }
@@ -204,14 +259,20 @@ final class MenuBarLayout: ObservableObject {
         return (fullScreenValue as? Bool) ?? false
     }
 
-    /// Each menu's horizontal extent, or `nil` if the menu bar cannot be read.
-    nonisolated private static func menuSpans(pid: pid_t) -> [ClosedRange<CGFloat>]? {
-        let startedAt = Date()
+    /// The app's menus as a placement constraint; see `constraint(menus:isFullScreen:)`.
+    nonisolated private static func appMenuBar(pid: pid_t) -> AppMenuBar? {
         let app = AXUIElementCreateApplication(pid)
         // A hung app must not hold this up; the measurement is an optimisation,
         // never something worth waiting on.
         AXUIElementSetMessagingTimeout(app, elementTimeout)
-        guard !isFullScreen(app) else { return nil }
+        // Full screen needs no scan: whatever it found would be discarded.
+        let fullScreen = isFullScreen(app)
+        return constraint(menus: fullScreen ? nil : readMenus(of: app), isFullScreen: fullScreen)
+    }
+
+    /// Each menu's extent, or `nil` if the menu bar cannot be read.
+    nonisolated private static func readMenus(of app: AXUIElement) -> AppMenuBar? {
+        let startedAt = Date()
 
         var menuBarValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXMenuBarAttribute as CFString, &menuBarValue) == .success,
@@ -226,6 +287,7 @@ final class MenuBarLayout: ObservableObject {
         else { return nil }
 
         var spans: [ClosedRange<CGFloat>] = []
+        var firstOrigin: CGPoint?
         for item in items {
             // Whatever has been measured so far is still usable; a scan that has
             // run long is one where the app is not answering, and waiting out
@@ -245,9 +307,10 @@ final class MenuBarLayout: ObservableObject {
                   AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
             else { continue }
 
-            guard size.width > 0 else { continue }
-            spans.append(origin.x...(origin.x + size.width))
+            if firstOrigin == nil { firstOrigin = origin }
+            spans.append(origin.x...(origin.x + max(0, size.width)))
         }
-        return spans.isEmpty ? nil : spans
+        guard let firstOrigin else { return nil }
+        return AppMenuBar(spans: spans, origin: firstOrigin)
     }
 }

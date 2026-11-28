@@ -114,4 +114,95 @@ final class MenuBarClearanceTests: XCTestCase {
     func testNothingBeyondTheNotchNeverMoves() {
         XCTAssertEqual(placement(core: 170, wings: 0, menus: chromeMenus), .centered)
     }
+
+    // MARK: - Full screen
+
+    func testAFullScreenWindowImposesNoConstraint() {
+        // The menu bar is hidden in full screen, but accessibility still reports
+        // the menus where they were.
+        let menus = AppMenuBar(spans: chromeMenus, origin: CGPoint(x: 10, y: 0))
+        XCTAssertNil(MenuBarLayout.constraint(menus: menus, isFullScreen: true))
+        XCTAssertEqual(MenuBarLayout.constraint(menus: menus, isFullScreen: false), menus)
+    }
+
+    func testMenusWithoutWidthImposeNoConstraint() {
+        let menus = AppMenuBar(spans: [10...10, 50...50], origin: CGPoint(x: 10, y: 0))
+        XCTAssertNil(MenuBarLayout.constraint(menus: menus, isFullScreen: false))
+        XCTAssertNil(MenuBarLayout.constraint(menus: nil, isFullScreen: false))
+    }
+
+    // MARK: - Several displays
+    //
+    // MacBook 1470x956 at the origin. In Cocoa coordinates a 27" display
+    // (2560x1440) to its right with top edges aligned starts at y = 956 - 1440;
+    // one above it starts at y = 956.
+    private let macBook = CGRect(x: 0, y: 0, width: 1470, height: 956)
+    private let externalRight = CGRect(x: 1470, y: -484, width: 2560, height: 1440)
+    private let externalAbove = CGRect(x: -545, y: 956, width: 2560, height: 1440)
+
+    private func spans(_ menus: AppMenuBar, on screen: CGRect) -> [ClosedRange<CGFloat>] {
+        menus.spans(onScreen: screen, primaryScreenMaxY: macBook.maxY)
+    }
+
+    func testMenusOnADisplayToTheRightDoNotMoveTheMacBookActivity() {
+        // Menus read on the external display's menu bar, at global x 1478...2070.
+        let menus = AppMenuBar(spans: [1478...1512, 1516...2070], origin: CGPoint(x: 1478, y: 0))
+        XCTAssertTrue(spans(menus, on: macBook).isEmpty)
+        XCTAssertEqual(spans(menus, on: externalRight), menus.spans)
+        XCTAssertEqual(placement(menus: spans(menus, on: macBook)), .centered)
+    }
+
+    func testMenusOnADisplayAboveDoNotMoveTheMacBookActivity() {
+        // Stacked displays share x positions, so the menus' x alone would put
+        // them over the MacBook's notch; their y places them on the other bar.
+        let menus = AppMenuBar(spans: [-537...(-503), -499...630], origin: CGPoint(x: -537, y: -1440))
+        XCTAssertTrue(spans(menus, on: macBook).isEmpty)
+        XCTAssertEqual(spans(menus, on: externalAbove), menus.spans)
+        XCTAssertEqual(placement(menus: spans(menus, on: macBook)), .centered)
+    }
+
+    func testMenusOnTheMacBookStillApplyThere() {
+        let menus = AppMenuBar(spans: chromeMenus, origin: CGPoint(x: 10, y: 0))
+        XCTAssertEqual(spans(menus, on: macBook), chromeMenus)
+        XCTAssertTrue(spans(menus, on: externalRight).isEmpty)
+        XCTAssertEqual(placement(menus: spans(menus, on: macBook)), .retracted)
+    }
+
+    // MARK: - Sneak peeks and HUDs
+
+    private func yields(
+        closed: Bool = true,
+        hidden: Bool = false,
+        island: Bool = false,
+        connectivityHUD: Bool = false,
+        sneakPeek: Bool = false,
+        expansion: Bool = false
+    ) -> Bool {
+        MenuBarLayout.yieldsToMenus(
+            isNotchClosed: closed,
+            isHiddenOnClosed: hidden,
+            isIslandMode: island,
+            isConnectivityHUDVisible: connectivityHUD,
+            isSneakPeekVisible: sneakPeek,
+            isExpansionVisible: expansion
+        )
+    }
+
+    func testAClosedLiveActivityMakesWayForMenus() {
+        XCTAssertTrue(yields())
+    }
+
+    func testSneakPeeksAndHUDsStayCentred() {
+        // Volume, brightness and the other sneak peeks, inline expansions and
+        // the connectivity HUD keep their full width over a menu.
+        XCTAssertFalse(yields(sneakPeek: true))
+        XCTAssertFalse(yields(expansion: true))
+        XCTAssertFalse(yields(connectivityHUD: true))
+    }
+
+    func testAnOpenHiddenOrFloatingNotchStaysCentred() {
+        XCTAssertFalse(yields(closed: false))
+        XCTAssertFalse(yields(hidden: true))
+        XCTAssertFalse(yields(island: true))
+    }
 }
