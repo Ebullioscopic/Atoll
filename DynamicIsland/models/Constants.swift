@@ -1063,6 +1063,8 @@ extension Defaults.Keys {
     static let automaticallySwitchDisplay = Key<Bool>("automaticallySwitchDisplay", default: true)
     static let releaseName = Key<String>("releaseName", default: "Kaafu")
     static let hideDynamicIslandFromScreenCapture = Key<Bool>("hideDynamicIslandFromScreenCapture", default: false)
+    /// Build number for which Atoll last showed the Accessibility prompt without the user asking.
+    static let didAutoPromptAccessibilityForBuild = Key<String?>("didAutoPromptAccessibilityForBuild", default: nil)
     
         // MARK: Behavior
     static let minimumHoverDuration = Key<TimeInterval>("minimumHoverDuration", default: 0.3)

@@ -2360,7 +2360,8 @@ private struct HUDAndOSDSettingsView: View {
                                 },
                                 openSettingsAction: {
                                     accessibilityPermission.openSystemSettings()
-                                }
+                                },
+                                footnote: SettingsPermissionCallout.accessibilityStaleEntryHint
                             )
                         } header: {
                             Text("Accessibility")
@@ -2479,7 +2480,8 @@ private struct HUDAndOSDSettingsView: View {
                                 },
                                 openSettingsAction: {
                                     accessibilityPermission.openSystemSettings()
-                                }
+                                },
+                                footnote: SettingsPermissionCallout.accessibilityStaleEntryHint
                             )
                         } header: {
                             Text("Accessibility")
@@ -2540,6 +2542,7 @@ private struct HUDAndOSDSettingsView: View {
         }
         .navigationTitle("Controls")
         .onAppear {
+            accessibilityPermission.refreshStatus()
             if #unavailable(macOS 26.0), verticalHUDMaterial == .liquid {
                 verticalHUDMaterial = .frosted
                 verticalHUDLiquidGlassCustomizationMode = .standard
@@ -2995,7 +2998,8 @@ struct HUD: View {
                     SettingsPermissionCallout(
                         message: "Accessibility permission lets Dynamic Island replace the native volume, brightness, and keyboard HUDs.",
                         requestAction: { accessibilityPermission.requestAuthorizationPrompt() },
-                        openSettingsAction: { accessibilityPermission.openSystemSettings() }
+                        openSettingsAction: { accessibilityPermission.openSystemSettings() },
+                        footnote: SettingsPermissionCallout.accessibilityStaleEntryHint
                     )
                 } header: {
                     Text("Accessibility")
@@ -9466,7 +9470,8 @@ struct CustomOSDSettings: View {
                     SettingsPermissionCallout(
                         message: "Accessibility permission is needed to intercept system controls for the Custom OSD.",
                         requestAction: { accessibilityPermission.requestAuthorizationPrompt() },
-                        openSettingsAction: { accessibilityPermission.openSystemSettings() }
+                        openSettingsAction: { accessibilityPermission.openSystemSettings() },
+                        footnote: SettingsPermissionCallout.accessibilityStaleEntryHint
                     )
                 } header: {
                     Text("Accessibility")
@@ -9625,6 +9630,10 @@ struct SettingsPermissionCallout: View {
     let openSettingsButtonTitle: String
     let requestAction: () -> Void
     let openSettingsAction: () -> Void
+    let footnote: String?
+
+    /// macOS keeps showing a stale entry as enabled after the app's signature changes.
+    static let accessibilityStaleEntryHint = "Already on in System Settings? Remove Atoll from the Accessibility list with the − button, then add it again."
 
     init(
         title: String = "Accessibility permission required",
@@ -9634,7 +9643,8 @@ struct SettingsPermissionCallout: View {
         requestButtonTitle: String = "Request Access",
         openSettingsButtonTitle: String = "Open Settings",
         requestAction: @escaping () -> Void,
-        openSettingsAction: @escaping () -> Void
+        openSettingsAction: @escaping () -> Void,
+        footnote: String? = nil
     ) {
         self.title = title
         self.message = message
@@ -9644,6 +9654,7 @@ struct SettingsPermissionCallout: View {
         self.openSettingsButtonTitle = openSettingsButtonTitle
         self.requestAction = requestAction
         self.openSettingsAction = openSettingsAction
+        self.footnote = footnote
     }
 
     var body: some View {
@@ -9668,6 +9679,12 @@ struct SettingsPermissionCallout: View {
                 .buttonStyle(.bordered)
             }
             .controlSize(.small)
+
+            if let footnote {
+                Text(LocalizedStringKey(footnote))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)

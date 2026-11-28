@@ -94543,7 +94543,8 @@
       }
     },
     "Mirroring Clock timers reads the system log, so macOS may ask for Developer Tools access." : {},
-    "Reads the system log while AirPods are connected, so macOS may ask for Developer Tools access." : {}
+    "Reads the system log while AirPods are connected, so macOS may ask for Developer Tools access." : {},
+    "Already on in System Settings? Remove Atoll from the Accessibility list with the − button, then add it again." : {}
   },
   "version" : "1.2"
 }
