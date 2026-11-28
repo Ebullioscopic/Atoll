@@ -61,3 +61,32 @@ final class SystemHUDPlacementTests: XCTestCase {
         }
     }
 }
+
+/// Volume key steps that arrive while a CoreAudio write is still running are
+/// merged, so a burst of presses cannot leave a queue of writes that keeps
+/// moving the volume after the keys are released (#892).
+final class VolumeAdjustAccumulatorTests: XCTestCase {
+    func testOnlyTheFirstStepSchedulesAWrite() {
+        var accumulator = VolumeAdjustAccumulator()
+        XCTAssertTrue(accumulator.add(-0.0625))
+        XCTAssertFalse(accumulator.add(-0.0625))
+        XCTAssertFalse(accumulator.add(-0.0625))
+    }
+
+    func testTheScheduledWriteAppliesTheNetChangeOnce() {
+        var accumulator = VolumeAdjustAccumulator()
+        _ = accumulator.add(-0.25)
+        _ = accumulator.add(-0.25)
+        _ = accumulator.add(0.125)
+        XCTAssertEqual(accumulator.take(), -0.375, accuracy: 0.0001)
+        // Nothing is left over for a later write to apply again.
+        XCTAssertEqual(accumulator.take(), 0)
+    }
+
+    func testAStepAfterTheWriteStartedSchedulesANewOne() {
+        var accumulator = VolumeAdjustAccumulator()
+        _ = accumulator.add(0.1)
+        _ = accumulator.take()
+        XCTAssertTrue(accumulator.add(0.1))
+    }
+}

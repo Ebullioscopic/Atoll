@@ -60,6 +60,36 @@ final class HUDSuppressionCoordinator {
     }
 }
 
+/// Volume key steps waiting to be written, merged into one net change.
+///
+/// A CoreAudio volume write can block for a long time (Bluetooth outputs in
+/// particular). When every key press ran its own write in turn, a burst of
+/// presses queued up writes that kept stepping the volume for seconds after
+/// the keys were released. Presses that arrive while a write is in flight are
+/// summed here and applied together by the next one.
+struct VolumeAdjustAccumulator {
+    private(set) var pendingDelta: Float = 0
+    private(set) var isScheduled = false
+
+    /// Adds a step. Returns true when no write is scheduled yet, meaning the
+    /// caller has to schedule one.
+    mutating func add(_ delta: Float) -> Bool {
+        pendingDelta += delta
+        guard !isScheduled else { return false }
+        isScheduled = true
+        return true
+    }
+
+    /// Takes everything accumulated so far, for the scheduled write to apply.
+    mutating func take() -> Float {
+        defer {
+            pendingDelta = 0
+            isScheduled = false
+        }
+        return pendingDelta
+    }
+}
+
 final class SystemVolumeController {
     static let shared = SystemVolumeController()
 
@@ -123,6 +153,7 @@ final class SystemVolumeController {
     }
 
     private let volumeMemory = OSAllocatedUnfairLock(initialState: VolumeMemory())
+    private let pendingKeyAdjust = OSAllocatedUnfairLock(initialState: VolumeAdjustAccumulator())
 
     private let candidateElements: [AudioObjectPropertyElement] = [
         kAudioObjectPropertyElementMain,
@@ -172,6 +203,30 @@ final class SystemVolumeController {
         }
 
         setVolume(max(0, min(1, current + delta)), on: deviceID)
+    }
+
+    /// Applies a volume key step off the main thread.
+    ///
+    /// The media key tap is serviced on the main run loop, so a blocking write
+    /// there both delays later presses and risks the tap being disabled.
+    /// Writes run on the listener queue, which already serialises this
+    /// controller's CoreAudio work, and steps that arrive meanwhile are merged.
+    func enqueueKeyAdjust(by delta: Float) {
+        guard delta != 0 else { return }
+        guard pendingKeyAdjust.withLock({ $0.add(delta) }) else { return }
+        callbackQueue.async { [weak self] in
+            guard let self else { return }
+            let delta = self.pendingKeyAdjust.withLock { $0.take() }
+            self.adjust(by: delta)
+        }
+    }
+
+    /// The mute key's counterpart to `enqueueKeyAdjust`, on the same queue so
+    /// a mute pressed right after a volume key lands after that step.
+    func enqueueKeyToggleMute() {
+        callbackQueue.async { [weak self] in
+            self?.toggleMute()
+        }
     }
 
     func toggleMute() {

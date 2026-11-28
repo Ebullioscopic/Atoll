@@ -94,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
+- **Volume no longer keeps changing after rapid key presses**: each volume key press wrote the new level on the main thread, one after another, so a quick burst of presses (especially with Bluetooth output) left a queue of writes that kept lowering the volume for seconds after the keys were released. Volume key writes now run off the main thread and presses that arrive during a write are merged into one change. (#892)
 - The volume HUD shows a headphones or AirPods icon only when sound is actually going to that Bluetooth device. With AirPods connected but the Mac's speakers selected as the output, it now shows the speaker icon. (#792)
 - "Use accent color" for the notch volume and brightness bars now follows the accent colour set in System Settings instead of always drawing blue. (#379)
 - The speaker icon beside the volume level in the notch HUD is drawn in white again. It followed the system appearance, so in Light Mode it was black on the black notch and the volume HUD looked like a bare slider. (#912, #879)

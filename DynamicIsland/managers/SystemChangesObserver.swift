@@ -213,14 +213,14 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
         
         let baseStep = volumeStep(for: step)
         let delta = direction == .up ? baseStep : -baseStep
-        volumeController.adjust(by: delta)
+        volumeController.enqueueKeyAdjust(by: delta)
         volumeFeedbackPlayer.playIfNeeded()
     }
 
     func mediaKeyInterceptorDidToggleMute(_ interceptor: MediaKeyInterceptor) {
         guard volumeEnabled else { return }
         SystemOSDManager.suppressNativeOSDNow()
-        volumeController.toggleMute()
+        volumeController.enqueueKeyToggleMute()
     }
 
     func mediaKeyInterceptor(
