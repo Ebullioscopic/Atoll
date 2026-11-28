@@ -2333,7 +2333,7 @@ struct ContentView: View {
                     }
                 } else if self.isHovering && self.interactionsEnabled {
                     let stillInside = self.vm.notchState == .open
-                        ? self.isPointInsideNotchWindow()
+                        ? self.isMouseOverOpenNotchHitArea()
                         : self.isMouseOverClosedNotchHitArea()
                     if !stillInside {
                         self.hoverTask?.cancel()
@@ -2601,7 +2601,7 @@ struct ContentView: View {
         guard isHovering || vm.notchState == .open else { return false }
 
         if vm.notchState == .open {
-            return isPointInsideNotchWindow(location)
+            return isMouseOverOpenNotchHitArea(location)
         }
 
         guard let screen = currentScreen,
@@ -2687,6 +2687,24 @@ struct ContentView: View {
 
         return location.x >= minX && location.x <= minX + width
             && location.y >= minY && location.y <= screen.frame.maxY
+    }
+
+    /// The visible open notch, not its window. The window is kept at the
+    /// largest size the notch can take (plus shadow and HUD allowances) so it
+    /// never resizes under the content; testing against it kept the notch open
+    /// for seconds after the pointer had visibly left it.
+    private func isMouseOverOpenNotchHitArea(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
+        guard let screen = currentScreen else { return isPointInsideNotchWindow(location) }
+        let tolerance: CGFloat = 4
+        // Same extents the open layout is framed with (see `rootBodyView`).
+        let size = dynamicNotchSize
+        let width = size.width + 24 + tolerance * 2
+        let height = size.height + 12 + pillTopOffset + tolerance
+        let rect = CGRect(x: screen.frame.midX - width / 2,
+                          y: screen.frame.maxY - height,
+                          width: width,
+                          height: height)
+        return frameContainsPointIncludingTopEdge(rect, location)
     }
 
     private func isPointInsideNotchWindow(_ point: CGPoint = NSEvent.mouseLocation) -> Bool {
