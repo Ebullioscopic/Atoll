@@ -1012,9 +1012,10 @@ struct ContentView: View {
             }
             .onChange(of: vm.notchState) { _, _ in
                 resetGestureProgress()
-                syncFullscreenPointerMonitor()
             }
-            .onChange(of: vm.hideOnClosed) { _, _ in
+            // Follows every input (notch state, hide-on-closed, lock state, screen), so
+            // the monitor comes back after unlocking with the notch hidden in fullscreen.
+            .onChange(of: needsFullscreenPointerMonitor) { _, _ in
                 syncFullscreenPointerMonitor()
             }
             .onAppear {
