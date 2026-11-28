@@ -240,6 +240,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "Arrow key seek", keywords: ["arrow", "keyboard", "key", "seek", "scrub", "rewind"], highlightID: SettingsTab.general.highlightID(for: "Arrow key seek")),
         SettingsSearchEntry(tab: .general, title: "Extend hover area", keywords: ["hover", "cursor"], highlightID: SettingsTab.general.highlightID(for: "Extend hover area")),
         SettingsSearchEntry(tab: .general, title: "Enable haptics", keywords: ["haptic", "feedback"], highlightID: SettingsTab.general.highlightID(for: "Enable haptics")),
+        SettingsSearchEntry(tab: .general, title: "Open to", keywords: ["default tab", "remember last tab", "startup"], highlightID: SettingsTab.general.highlightID(for: "Open to")),
         SettingsSearchEntry(tab: .general, title: "Open notch on hover", keywords: ["hover to open", "auto open"], highlightID: SettingsTab.general.highlightID(for: "Open notch on hover")),
         SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
         SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
@@ -1453,6 +1454,20 @@ struct GeneralSettings: View {
         }
     }
 
+    private func openDestinationName(_ destination: NotchOpenDestination) -> String {
+        switch destination {
+        case .automatic: return String(localized: "Automatic")
+        case .lastUsed: return String(localized: "Remember last tab")
+        case .home: return String(localized: "Home")
+        case .shelf: return String(localized: "Shelf")
+        case .timer: return String(localized: "Timer")
+        case .stats: return String(localized: "Stats")
+        case .llmUsage: return String(localized: "Usage")
+        case .notes: return Defaults[.enableNotes] ? String(localized: "Notes") : String(localized: "Clipboard")
+        case .terminal: return String(localized: "Terminal")
+        }
+    }
+
     @ViewBuilder
     func NotchBehaviour() -> some View {
         Section {
@@ -1468,7 +1483,32 @@ struct GeneralSettings: View {
                 Text("Open notch on hover")
             }
             .settingsHighlight(id: highlightID("Open notch on hover"))
-            Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
+            Picker("Open to", selection: Binding(
+                get: { coordinator.selectedOpenDestination },
+                set: { coordinator.setOpenDestination($0) }
+            )) {
+                Text("Automatic").tag(NotchOpenDestination.automatic)
+                Text("Remember last tab").tag(NotchOpenDestination.lastUsed)
+                ForEach(coordinator.availableStandardTabs, id: \.self) { destination in
+                    Text(openDestinationName(destination)).tag(destination)
+                        .disabled(!coordinator.alwaysShowTabs)
+                }
+                if coordinator.selectedOpenDestination.isFixed && !coordinator.availableStandardTabs.contains(coordinator.selectedOpenDestination) {
+                    Text("Unavailable — \(openDestinationName(coordinator.selectedOpenDestination))")
+                        .tag(coordinator.selectedOpenDestination)
+                }
+            }
+            .disabled(enableMinimalisticUI)
+            .settingsHighlight(id: highlightID("Open to"))
+            if enableMinimalisticUI {
+                Text("Minimalistic mode always opens Home.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if !coordinator.alwaysShowTabs {
+                Text("Opening to a specific tab requires “Always show tabs” in Appearance.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if openNotchOnHover {
                 Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
                     HStack {
@@ -3170,6 +3210,10 @@ private extension MediaControllerType {
             return ["com.github.th-ch.youtube-music"]
         case .amazonMusic:
             return ["com.amazon.music"]
+        case .netEaseCloudMusic:
+            return [NetEaseCloudMusicController.bundleIdentifier]
+        case .qqMusic:
+            return [QQMusicController.bundleIdentifier]
         case .tidal:
             return [TidalController.bundleIdentifier]
         case .cider:
@@ -3184,6 +3228,8 @@ private extension MediaControllerType {
         case .spotify: return "dot.radiowaves.left.and.right"
         case .youtubeMusic: return "play.rectangle.fill"
         case .amazonMusic: return "music.note.list"
+        case .netEaseCloudMusic: return "music.quarternote.3"
+        case .qqMusic: return "music.mic"
         case .tidal: return "waveform.path"
         case .cider: return "cup.and.saucer.fill"
         }
@@ -3196,6 +3242,8 @@ private extension MediaControllerType {
         case .spotify: return .green
         case .youtubeMusic: return .red
         case .amazonMusic: return .cyan
+        case .netEaseCloudMusic: return .red
+        case .qqMusic: return .green
         case .tidal: return .primary
         case .cider: return .orange
         }
@@ -3276,25 +3324,25 @@ struct Media: View {
             } header: {
                 Text("Media Source")
             } footer: {
-                if MusicManager.shared.isNowPlayingDeprecated {
-                    HStack {
-                        Text("YouTube Music requires this third-party app to be installed: ")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                        Link("https://github.com/th-ch/youtube-music", destination: URL(string: "https://github.com/th-ch/youtube-music")!)
-                            .font(.caption)
-                            .foregroundColor(.blue) // Ensures it's visibly a link
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(String(localized: "'Now Playing' was the only option on previous versions and works with all media apps."))
-                        if mediaController == .amazonMusic || mediaController == .tidal || mediaController == .cider {
-                            Text(mediaController.description)
+                VStack(alignment: .leading, spacing: 6) {
+                    if MusicManager.shared.isNowPlayingDeprecated {
+                        HStack {
+                            Text("YouTube Music requires this third-party app to be installed: ")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                            Link("https://github.com/th-ch/youtube-music", destination: URL(string: "https://github.com/th-ch/youtube-music")!)
+                                .font(.caption)
+                                .foregroundColor(.blue) // Ensures it's visibly a link
                         }
+                    } else {
+                        Text(String(localized: "'Now Playing' was the only option on previous versions and works with all media apps."))
                     }
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
+                    if mediaController == .amazonMusic || mediaController == .netEaseCloudMusic || mediaController == .qqMusic || mediaController == .tidal || mediaController == .cider {
+                        Text(mediaController.description)
+                    }
                 }
+                .foregroundStyle(.secondary)
+                .font(.caption)
             }
 
             if mediaController == .spotify {
@@ -3689,7 +3737,8 @@ struct Media: View {
     // Only show controller options that are available on this macOS version
     private var availableMediaControllers: [MediaControllerType] {
         if MusicManager.shared.isNowPlayingDeprecated {
-            return MediaControllerType.allCases.filter { $0 != .nowPlaying }
+            // Keep the current choice listed so the picker never goes blank.
+            return MediaControllerType.allCases.filter { $0 != .nowPlaying || $0 == mediaController }
         } else {
             return MediaControllerType.allCases
         }
@@ -3778,44 +3827,16 @@ struct CalendarSettings: View {
 
     var body: some View {
         Form {
-            if !calendarManager.hasCalendarAccess || !calendarManager.hasReminderAccess {
-                Text("Calendar or Reminder access is denied. Please enable it in System Settings.")
-                    .foregroundColor(.red)
-                    .multilineTextAlignment(.center)
-                    .padding()
-
-                HStack {
-                    Button("Request Access") {
-                        Task {
-                            await calendarManager.checkCalendarAuthorization()
-                            await calendarManager.checkReminderAuthorization()
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    Button("Open System Settings") {
-                        if let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
-                            NSWorkspace.shared.open(settingsURL)
-                        }
-                    }
+            Section(header: Text("Permissions")) {
+                CalendarPermissionRow(entity: .event, status: calendarManager.calendarAuthorizationStatus) {
+                    await calendarManager.checkCalendarAuthorization()
                 }
-            } else {
-                // Permissions status
-                Section(header: Text("Permissions")) {
-                    HStack {
-                        Text("Calendars")
-                        Spacer()
-                        Text(statusText(for: calendarManager.calendarAuthorizationStatus))
-                            .foregroundColor(color(for: calendarManager.calendarAuthorizationStatus))
-                    }
-                    HStack {
-                        Text("Reminders")
-                        Spacer()
-                        Text(statusText(for: calendarManager.reminderAuthorizationStatus))
-                            .foregroundColor(color(for: calendarManager.reminderAuthorizationStatus))
-                    }
+                CalendarPermissionRow(entity: .reminder, status: calendarManager.reminderAuthorizationStatus) {
+                    await calendarManager.checkReminderAuthorization()
                 }
+            }
 
+            if calendarManager.access.canShowSettings {
                 Defaults.Toggle(key: .showCalendar) {
                     Text("Show calendar")
                 }
@@ -3847,6 +3868,7 @@ struct CalendarSettings: View {
                 Section(header: Text("Event List")) {
                     Toggle("Hide completed reminders", isOn: $hideCompletedReminders)
                         .settingsHighlight(id: highlightID("Hide completed reminders"))
+                        .disabled(!calendarManager.hasReminderAccess)
                     Toggle("Show full event titles", isOn: $showFullEventTitles)
                         .settingsHighlight(id: highlightID("Show full event titles"))
                     Toggle("Auto-scroll to next event", isOn: $autoScrollToNextEvent)
@@ -4068,6 +4090,8 @@ struct CalendarSettings: View {
                     .settingsHighlight(id: highlightID("Show start time after event begins"))
                 }
                 
+                .disabled(!calendarManager.hasCalendarAccess)
+
                 // MARK: - Third-party Calendar Integration
                 Section {
                     Defaults.Toggle(key: .enableThirdPartyCalendarApp) {
@@ -4158,35 +4182,15 @@ struct CalendarSettings: View {
                 }
             }
         }
-        .onAppear {
-            Task {
-                await calendarManager.checkCalendarAuthorization()
-                await calendarManager.checkReminderAuthorization()
-            }
+        .task {
+            await calendarManager.refreshAuthorization()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await calendarManager.refreshAuthorizationIfChanged() }
         }
         .navigationTitle("Calendar")
     }
 
-    private func statusText(for status: EKAuthorizationStatus) -> String {
-        switch status {
-        case .fullAccess, .authorized: return String(localized: "Full Access")
-        case .writeOnly: return String(localized: "Write Only")
-        case .denied: return String(localized: "Denied")
-        case .restricted: return String(localized: "Restricted")
-        case .notDetermined: return String(localized: "Not Determined")
-        @unknown default: return String(localized: "Unknown")
-        }
-    }
-
-    private func color(for status: EKAuthorizationStatus) -> Color {
-        switch status {
-        case .fullAccess, .authorized: return .green
-        case .writeOnly: return .yellow
-        case .denied, .restricted: return .red
-        case .notDetermined: return .secondary
-        @unknown default: return .secondary
-        }
-    }
 }
 
 struct About: View {
