@@ -92,9 +92,9 @@ func notchTabContentSize(
     // `recommendedMinimumNotchWidth` already allows for it; the side lyrics
     // panel asks for an exact content width, so the rail goes on top of that.
     if view == .home, isNotchOpen, isLeadingTabRailActive() {
-        let sideLyricsWidth = sideLyricsRequiredNotchWidth()
-        if sideLyricsWidth > 0 {
-            size.width = min(max(size.width, sideLyricsWidth + tabRailWidth), maxAllowedNotchWidth())
+        let requiredWidth = homeContentRequiredNotchWidth()
+        if requiredWidth > 0 {
+            size.width = min(max(size.width, requiredWidth + tabRailWidth), maxAllowedNotchWidth())
         }
     }
 

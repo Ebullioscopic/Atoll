@@ -94,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
+- With the music player, the calendar and the Mirror all on the Home tab, the notch now widens to fit them and gives the calendar and the Mirror fixed columns, so nothing is squeezed, cut off or overlapping. (#447, #800)
 - Switching days in the calendar is fast again with large Reminders libraries: reminders are loaded once and reused until something changes, the lock screen events are no longer reloaded on every day change, and days skipped while scrolling are not fetched. (#513)
 - The timer keeps counting down while the Mac sleeps, for example with the lid closed, instead of freezing until it wakes. A timer that ran out during sleep starts ringing on wake. (#271)
 - Lock screen widgets, full-screen artwork and overlays now appear on the display set as main in System Settings, instead of always going to the built-in screen when an external monitor is the main display. (#945)

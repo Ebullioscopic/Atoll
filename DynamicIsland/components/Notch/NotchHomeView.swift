@@ -971,7 +971,10 @@ struct NotchHomeView: View {
                                 StandaloneCalendarView()
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(
+                            maxWidth: sharesRowWithPlayerAndMirror ? HomeWidgetsLayout.calendarWidth : .infinity,
+                            alignment: .leading
+                        )
                         .onHover { isHovering in
                             vm.isHoveringCalendar = isHovering
                         }
@@ -979,7 +982,12 @@ struct NotchHomeView: View {
                     }
 
                     if mirrorIsVisible {
-                        cameraPreview
+                        if sharesRowWithPlayerAndMirror {
+                            cameraPreview
+                                .frame(width: HomeWidgetsLayout.mirrorWidth)
+                        } else {
+                            cameraPreview
+                        }
                     }
                 }
             }
@@ -1006,6 +1014,12 @@ struct NotchHomeView: View {
                     .frame(minWidth: SideLyricsLayout.minimumMirrorWidth, maxWidth: .infinity)
             }
         }
+    }
+
+    /// The player, the calendar and the mirror all share the row, so the calendar
+    /// and the mirror keep fixed columns and the player takes the rest (#447).
+    private var sharesRowWithPlayerAndMirror: Bool {
+        shouldShowMusicPlayer && showCalendar && mirrorIsVisible
     }
 
     private var mirrorIsVisible: Bool {
