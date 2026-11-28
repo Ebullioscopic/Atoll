@@ -357,6 +357,26 @@ class DynamicIslandViewCoordinator: ObservableObject {
             return
         }
         DispatchQueue.main.async {
+            // Guard against redundant hide
+            if !status && !self.sneakPeek.show {
+                return
+            }
+
+            // If already showing the exact same sneak peek, just renew the timer without re-animating
+            let current = self.sneakPeek
+            if status && current.show
+                && current.type == type
+                && current.icon == icon
+                && abs(current.value - value) < 0.01
+                && current.title == title
+                && current.subtitle == subtitle
+                && current.accentColor == accentColor
+                && current.styleOverride == styleOverride
+                && current.targetScreenName == targetScreen?.localizedName {
+                self.scheduleSneakPeekHide(after: self.sneakPeekDuration)
+                return
+            }
+
             // Single write so `sneakPeek.didSet` (which schedules the auto-hide)
             // fires once, not once per field — the per-field writes raced the hide
             // Task and could wedge `show == true` with no pending hide.
