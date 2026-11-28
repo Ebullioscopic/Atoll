@@ -165,4 +165,52 @@ final class JSONLUsageParserTests: XCTestCase {
         XCTAssertEqual(snapshot.session.outputTokens, 250)
         XCTAssertTrue(snapshot.models.contains { $0.model == "codex" })
     }
+
+    func testUsagePrefilterKeepsOnlyLinesThatCanCarryTokens() {
+        XCTAssertTrue(JSONLUsageParser.mayContainUsage(Data(#"{"message":{"usage":{"input_tokens":1}}}"#.utf8)))
+        XCTAssertTrue(JSONLUsageParser.mayContainUsage(Data(#"{"type":"event_msg","payload":{"type":"token_count"}}"#.utf8)))
+        XCTAssertTrue(JSONLUsageParser.mayContainUsage(Data(#"{"type":"turn_context","payload":{"model":"gpt-5"}}"#.utf8)))
+        XCTAssertFalse(JSONLUsageParser.mayContainUsage(Data(#"{"type":"user","message":{"content":"tool output"}}"#.utf8)))
+        XCTAssertTrue(JSONLUsageParser.mayContainUsage(Data(#"{"message":{"\u0075sage":{"input_tokens":1}}}"#.utf8)))
+    }
+
+    func testUsageKeySpelledWithUnicodeEscapeIsCounted() throws {
+        let now = Date()
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let ts = iso.string(from: now.addingTimeInterval(-600))
+
+        let content = #"{"timestamp": "\#(ts)", "message": {"id": "esc1", "model": "claude-3-opus", "\u0075sage": {"input_tokens": 7, "output_tokens": 3}}}"#
+
+        let file = try makeTempFile(content: content)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let snapshot = parseFile(file, now: now)
+
+        XCTAssertEqual(snapshot.session.inputTokens, 7)
+        XCTAssertEqual(snapshot.session.outputTokens, 3)
+    }
+
+    func testRecordsSpreadAcrossChunksAmongLargeNonUsageLines() throws {
+        let now = Date()
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let ts = iso.string(from: now.addingTimeInterval(-600))
+
+        // ~40 KB tool-output lines push records across several 64 KB read chunks.
+        let filler = #"{"type":"user","message":{"content":""# + String(repeating: "x", count: 40_000) + #""}}"#
+        var lines: [String] = []
+        for index in 0..<10 {
+            lines.append(filler)
+            lines.append(#"{"timestamp": "\#(ts)", "message": {"id": "m\#(index)", "model": "claude-3-opus", "usage": {"input_tokens": 10, "output_tokens": 5}}}"#)
+        }
+
+        let file = try makeTempFile(content: lines.joined(separator: "\n"))
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let snapshot = parseFile(file, now: now)
+
+        XCTAssertEqual(snapshot.session.inputTokens, 100)
+        XCTAssertEqual(snapshot.session.outputTokens, 50)
+    }
 }

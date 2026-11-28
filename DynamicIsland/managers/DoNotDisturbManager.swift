@@ -1146,18 +1146,12 @@ private final class FocusLogStream {
             process.standardOutput = pipe
             process.standardError = pipe
 
-            pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-                guard let self else { return }
-                let data = handle.availableData
-
-                if data.isEmpty {
-                    self.queue.async { [weak self] in
-                        self?.handleTermination()
-                    }
-                    return
+            pipe.fileHandleForReading.readUntilEOF(onEOF: { [weak self] in
+                self?.queue.async { [weak self] in
+                    self?.handleTermination()
                 }
-
-                self.queue.async { [weak self] in
+            }) { [weak self] data in
+                self?.queue.async { [weak self] in
                     self?.handleIncomingData(data)
                 }
             }

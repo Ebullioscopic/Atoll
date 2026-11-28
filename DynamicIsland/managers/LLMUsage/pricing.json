@@ -391,6 +391,16 @@
       }
     },
     {
+      "id": "google/gemini-4-neon",
+      "name": "Google: Gemini 4 Neon",
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015",
+        "cache_read": "0.00000015",
+        "cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
       "id": "google/gemini-nano-banana-2.1",
       "name": "Google: Nano Banana 2.1",
       "pricing": {
@@ -784,10 +794,10 @@
       "id": "openai/gpt-5.6-sol",
       "name": "OpenAI: GPT-5.6 Sol",
       "pricing": {
-        "prompt": "0.0000044",
-        "completion": "0.000022",
-        "cache_read": "0.00000044",
-        "cache_write": "0.0000055"
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "cache_read": "0.0000004",
+        "cache_write": "0.000005"
       }
     },
     {
@@ -921,6 +931,46 @@
       }
     },
     {
+      "id": "openai/gpt-6.2-astra",
+      "name": "OpenAI: GPT-6.2 Astra",
+      "pricing": {
+        "prompt": "0.000008",
+        "completion": "0.00004",
+        "cache_read": "0.0000004",
+        "cache_write": "0.00001"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-astra-pro",
+      "name": "OpenAI: GPT-6.2 Astra Pro",
+      "pricing": {
+        "prompt": "0.000008",
+        "completion": "0.00004",
+        "cache_read": "0.0000004",
+        "cache_write": "0.00001"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-sol",
+      "name": "OpenAI: GPT-6.2 Sol",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000001",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-sol-pro",
+      "name": "OpenAI: GPT-6.2 Sol Pro",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "cache_read": "0.0000001",
+        "cache_write": "0.0000025"
+      }
+    },
+    {
       "id": "openai/gpt-audio",
       "name": "OpenAI: GPT Audio",
       "pricing": {
@@ -954,9 +1004,9 @@
       "id": "openai/gpt-oss-120b",
       "name": "OpenAI: gpt-oss-120b",
       "pricing": {
-        "prompt": "0.00000015",
-        "completion": "0.0000006",
-        "cache_read": "0.000000075",
+        "prompt": "0.00000005",
+        "completion": "0.00000025",
+        "cache_read": "0.00000005",
         "cache_write": ""
       }
     },
@@ -1001,5 +1051,5 @@
       }
     }
   ],
-  "last_updated": "2026-11-13T00:04:32Z"
+  "last_updated": "2026-11-28T00:04:02Z"
 }
