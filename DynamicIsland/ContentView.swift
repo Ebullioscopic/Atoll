@@ -384,7 +384,7 @@ struct ContentView: View {
 
     /// The screen this notch is drawn on.
     private var currentScreen: NSScreen? {
-        NSScreen.screens.first(where: { $0.localizedName == currentScreenName })
+        NSScreen.screen(named: currentScreenName)
     }
 
     /// Whether the current screen lacks a physical notch.

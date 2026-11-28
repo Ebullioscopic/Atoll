@@ -433,7 +433,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     
     // Computed property for effective notch height
     var effectiveClosedNotchHeight: CGFloat {
-        let currentScreen = NSScreen.screens.first { $0.localizedName == screen }
+        let currentScreen = NSScreen.screen(named: screen)
         let noNotchAndFullscreen = hideOnClosed && (currentScreen?.safeAreaInsets.top ?? 0 <= 0 || currentScreen == nil)
         return noNotchAndFullscreen ? 0 : closedNotchSize.height
     }

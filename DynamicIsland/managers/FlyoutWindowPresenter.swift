@@ -298,7 +298,7 @@ final class FlyoutWindowPresenter<Overlay: View, Metrics: FlyoutWindowMetrics> {
 
     private func resolveScreen(from viewModel: DynamicIslandViewModel) -> NSScreen? {
         if let screenName = viewModel.screen,
-           let targetScreen = NSScreen.screens.first(where: { $0.localizedName == screenName }) {
+           let targetScreen = NSScreen.screen(named: screenName) {
             return targetScreen
         }
         return NSScreen.main

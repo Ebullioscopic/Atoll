@@ -80,7 +80,7 @@ struct DoNotDisturbLiveActivity: View {
 
     private var resolvedScreen: NSScreen? {
         if let name = vm.screen,
-           let match = NSScreen.screens.first(where: { $0.localizedName == name }) {
+           let match = NSScreen.screen(named: name) {
             return match
         }
         return NSScreen.main

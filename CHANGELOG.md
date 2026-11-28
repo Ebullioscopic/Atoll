@@ -85,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshing the LLM Usage card now skips session logs whose last write predates the seven-day window instead of re-reading the whole log history, and counts a repeated record when the copy inside the window would previously have been suppressed by a copy outside it (#691).
 - Completed the Simplified Chinese (zh-Hans) localization, filling in all remaining untranslated strings.
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
+- "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
 - **Lower idle CPU and steadier camera/mic indicators**: Atoll no longer listens to every system-wide distributed notification to spot AirPods listening-mode changes (it now relies on the specific Bluetooth notifications and the `log stream` watcher), repeated identical HUDs no longer re-animate the notch, and the camera and microphone indicators wait briefly before hiding so they stop flickering on and off. (#893)
