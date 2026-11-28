@@ -351,6 +351,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .calendar, title: "Show time remaining", keywords: ["calendar widget", "remaining"], highlightID: SettingsTab.calendar.highlightID(for: "Show time remaining")),
         SettingsSearchEntry(tab: .calendar, title: "Show start time after event begins", keywords: ["calendar widget", "start time"], highlightID: SettingsTab.calendar.highlightID(for: "Show start time after event begins")),
         SettingsSearchEntry(tab: .calendar, title: "Chip color", keywords: ["reminder chip", "color"], highlightID: SettingsTab.calendar.highlightID(for: "Chip color")),
+        SettingsSearchEntry(tab: .calendar, title: "Show beside music player", keywords: ["calendar", "music", "hide", "home"], highlightID: SettingsTab.calendar.highlightID(for: "Show beside music player")),
         SettingsSearchEntry(tab: .calendar, title: "Hide all-day events", keywords: ["calendar", "all-day"], highlightID: SettingsTab.calendar.highlightID(for: "Hide all-day events")),
         SettingsSearchEntry(tab: .calendar, title: "Hide completed reminders", keywords: ["reminder", "completed"], highlightID: SettingsTab.calendar.highlightID(for: "Hide completed reminders")),
         SettingsSearchEntry(tab: .calendar, title: "Show full event titles", keywords: ["calendar", "titles"], highlightID: SettingsTab.calendar.highlightID(for: "Show full event titles")),
@@ -3807,6 +3808,7 @@ struct Media: View {
 struct CalendarSettings: View {
     @ObservedObject private var calendarManager = CalendarManager.shared
     @Default(.showCalendar) var showCalendar: Bool
+    @Default(.showCalendarBesideMusicPlayer) private var showCalendarBesideMusicPlayer
     @Default(.calendarViewMode) var calendarViewMode: CalendarViewMode
     @Default(.enableLyrics) private var enableLyrics
     @Default(.enableReminderLiveActivity) var enableReminderLiveActivity
@@ -3879,7 +3881,16 @@ struct CalendarSettings: View {
                     Text("Show calendar")
                 }
                 .settingsHighlight(id: highlightID("Show calendar"))
-                if enableLyrics {
+                Defaults.Toggle(key: .showCalendarBesideMusicPlayer) {
+                    Text("Show beside music player")
+                }
+                .disabled(!showCalendar)
+                .settingsHighlight(id: highlightID("Show beside music player"))
+                Text("Turn this off to give the music player the whole Home tab. The calendar still appears there when the player is hidden.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if enableLyrics && showCalendarBesideMusicPlayer {
                     Text("Lyrics are on too, so the two share the notch and lyrics drop to a single line under the artist name.")
                         .font(.caption)
                         .foregroundStyle(.secondary)

@@ -94541,7 +94541,9 @@
           }
         }
       }
-    }
+    },
+    "Show beside music player" : {},
+    "Turn this off to give the music player the whole Home tab. The calendar still appears there when the player is hidden." : {}
   },
   "version" : "1.2"
 }

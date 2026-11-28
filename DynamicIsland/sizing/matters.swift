@@ -42,9 +42,15 @@ enum SideLyricsLayout {
     static let combinedInset: CGFloat = 40
 }
 
+/// Whether the home view puts the compact calendar beside the music player
+/// while the player is on screen (#920).
+func calendarShownBesidePlayer() -> Bool {
+    Defaults[.showCalendar] && Defaults[.showCalendarBesideMusicPlayer]
+}
+
 func sideLyricsRequiredNotchWidth() -> CGFloat {
     guard Defaults[.enableLyrics],
-          !Defaults[.showCalendar],
+          !calendarShownBesidePlayer(),
           !Defaults[.enableMinimalisticUI],
           Defaults[.showStandardMediaControls],
           (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
@@ -79,7 +85,7 @@ enum HomeWidgetsLayout {
 /// Whether the music player, the compact calendar and the mirror are all on the home view.
 /// Mirrors the conditions ``NotchHomeView`` lays them out under.
 func homeWidgetsShareHomeView() -> Bool {
-    Defaults[.showCalendar]
+    calendarShownBesidePlayer()
         && Defaults[.showMirror]
         && WebcamManager.shared.cameraAvailable
         && !Defaults[.enableMinimalisticUI]
@@ -343,7 +349,7 @@ func inlineLyricsAdjustedNotchSize(
     guard isHomeTabActive,
           !Defaults[.enableMinimalisticUI],
           Defaults[.enableLyrics],
-          Defaults[.showCalendar],
+          calendarShownBesidePlayer(),
           Defaults[.showStandardMediaControls],
           (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
     else {

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Hide the calendar during playback**: a new “Show beside music player” option in Calendar settings keeps the calendar off the Home tab while the music player is on it, so the player (and side lyrics, when on) get the whole space. The calendar still shows when the player is hidden. On by default. (#920)
 - **Back up and restore settings**: General settings can export your Atoll settings to a JSON file and import them again, on the same Mac or another one. API keys, sign-ins, clipboard history, notes and other private or device-specific data are never included, and Atoll offers to relaunch after an import. (#885)
 - **GitHub Copilot usage monitor**: an optional LLM Usage card shows your Copilot account quotas (premium requests, chat, completions) with consumed percentage, remaining allowance, plan and reset date, for GitHub.com and data-residency `ghe.com` tenants. The token is stored in the Keychain and removed when the provider is turned off. It reads GitHub's undocumented `copilot_internal/user` endpoint, which may change. Off by default. (#940)
 - **OpenRouter usage tracking**: the LLM Usage tab can show today's and this week's OpenRouter spend and your key's credit limit, using a regular API key stored in the Keychain. Per-model token and request analytics are an opt-in that needs a management key. Off by default. (#834)

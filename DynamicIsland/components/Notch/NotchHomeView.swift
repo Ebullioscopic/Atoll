@@ -454,6 +454,7 @@ struct MusicControlsView: View {
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.enableLyrics) private var enableLyrics
     @Default(.showCalendar) private var showCalendar
+    @Default(.showCalendarBesideMusicPlayer) private var showCalendarBesideMusicPlayer
     private let seekInterval: TimeInterval = 10
 
     var body: some View {
@@ -503,7 +504,7 @@ struct MusicControlsView: View {
                 frameWidth: width
             )
             .fontWeight(.medium)
-            if enableLyrics && showCalendar {
+            if enableLyrics && showCalendar && showCalendarBesideMusicPlayer {
                 let transition = AnyTransition.asymmetric(
                     insertion: .move(edge: .bottom).combined(with: .opacity),
                     removal: .move(edge: .top).combined(with: .opacity)
@@ -897,6 +898,7 @@ struct NotchHomeView: View {
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
     @Default(.showCalendar) private var showCalendar
+    @Default(.showCalendarBesideMusicPlayer) private var showCalendarBesideMusicPlayer
     @Default(.enableLyrics) private var enableLyrics
     @Default(.lyricsPanelWidth) private var lyricsPanelWidth
     @Default(.lyricsPanelOffset) private var lyricsPanelOffset
@@ -909,8 +911,13 @@ struct NotchHomeView: View {
         showStandardMediaControls && (!autoHideInactiveNotchMediaPlayer || musicManager.hasActiveSession)
     }
 
+    /// The calendar can be kept off the home view while the player is on it (#920).
+    private var showsCalendarBesidePlayer: Bool {
+        showCalendar && showCalendarBesideMusicPlayer
+    }
+
     private var shouldShowSideLyrics: Bool {
-        shouldShowMusicPlayer && enableLyrics && !showCalendar
+        shouldShowMusicPlayer && enableLyrics && !showsCalendarBesidePlayer
     }
     
     var body: some View {
@@ -963,7 +970,8 @@ struct NotchHomeView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    if showCalendar && showCalendarDeferred {
+                    if showCalendar && showCalendarDeferred
+                        && (!shouldShowMusicPlayer || showCalendarBesideMusicPlayer) {
                         Group {
                             if shouldShowMusicPlayer {
                                 CalendarView()
@@ -1019,7 +1027,7 @@ struct NotchHomeView: View {
     /// The player, the calendar and the mirror all share the row, so the calendar
     /// and the mirror keep fixed columns and the player takes the rest (#447).
     private var sharesRowWithPlayerAndMirror: Bool {
-        shouldShowMusicPlayer && showCalendar && mirrorIsVisible
+        shouldShowMusicPlayer && showsCalendarBesidePlayer && mirrorIsVisible
     }
 
     private var mirrorIsVisible: Bool {
