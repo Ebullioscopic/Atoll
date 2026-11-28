@@ -5125,7 +5125,8 @@ struct Appearance: View {
                     "Use music visualizer spectrogram",
                     isOn: $useMusicVisualizer.animation()
                 )
-                .disabled(true)
+                // Turning it off shows a custom animation, so there has to be one to show.
+                .disabled(useMusicVisualizer && customVisualizers.isEmpty)
                 if !useMusicVisualizer {
                     if customVisualizers.count > 0 {
                         Picker(
@@ -5137,7 +5138,7 @@ struct Appearance: View {
                                 id: \.self
                             ) { visualizer in
                                 Text(visualizer.name)
-                                    .tag(visualizer)
+                                    .tag(Optional(visualizer))
                             }
                         }
                     } else {
@@ -5150,10 +5151,7 @@ struct Appearance: View {
                     }
                 }
             } header: {
-                HStack {
-                    Text("Custom music live activity animation")
-                    customBadge(text: "Coming soon")
-                }
+                Text("Custom music live activity animation")
             }
 
             Section {
@@ -5209,9 +5207,12 @@ struct Appearance: View {
                             if selectedListVisualizer != nil {
                                 let visualizer = selectedListVisualizer!
                                 selectedListVisualizer = nil
-                                customVisualizers.remove(at: customVisualizers.firstIndex(of: visualizer)!)
-                                if visualizer == selectedVisualizer && customVisualizers.count > 0 {
-                                    selectedVisualizer = customVisualizers[0]
+                                customVisualizers.removeAll { $0 == visualizer }
+                                if visualizer == selectedVisualizer {
+                                    selectedVisualizer = customVisualizers.first
+                                }
+                                if customVisualizers.isEmpty {
+                                    useMusicVisualizer = true
                                 }
                             }
                         } label: {
@@ -5255,15 +5256,19 @@ struct Appearance: View {
                             }
 
                             Button {
+                                guard let animationURL = CustomVisualizer.animationURL(from: url) else { return }
                                 let visualizer: CustomVisualizer = .init(
                                     UUID: UUID(),
-                                    name: name,
-                                    url: URL(string: url)!,
+                                    name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    url: animationURL,
                                     speed: speed
                                 )
 
                                 if !customVisualizers.contains(visualizer) {
                                     customVisualizers.append(visualizer)
+                                }
+                                if selectedVisualizer == nil {
+                                    selectedVisualizer = visualizer
                                 }
 
                                 isPresented.toggle()
@@ -5272,6 +5277,10 @@ struct Appearance: View {
                                     .frame(maxWidth: .infinity, alignment: .center)
                             }
                             .buttonStyle(BorderedProminentButtonStyle())
+                            .disabled(
+                                name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    || CustomVisualizer.animationURL(from: url) == nil
+                            )
                         }
                     }
                     .textFieldStyle(RoundedBorderTextFieldStyle())

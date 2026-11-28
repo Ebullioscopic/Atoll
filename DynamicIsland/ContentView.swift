@@ -227,6 +227,7 @@ struct ContentView: View {
     @Namespace var albumArtNamespace
 
     @Default(.useMusicVisualizer) var useMusicVisualizer
+    @Default(.selectedVisualizer) private var selectedVisualizer
     @Default(.musicControlWindowEnabled) var musicControlWindowEnabled
     @Default(.showNotHumanFace) var showNotHumanFace
     @Default(.useModernCloseAnimation) var useModernCloseAnimation
@@ -1883,8 +1884,10 @@ struct ContentView: View {
         trailingInset: CGFloat = 0,
         enableClosedPlayPauseOverlay: Bool = false
     ) -> some View {
-        if useMusicVisualizer || forceSpectrum {
-            SpectrumVisualizer(useMusicVisualizer: useMusicVisualizer, forceSpectrum: forceSpectrum)
+        // Without a custom animation to show, keep the spectrum rather than an empty slot.
+        let showsSpectrum = useMusicVisualizer || selectedVisualizer == nil
+        if showsSpectrum || forceSpectrum {
+            SpectrumVisualizer(useMusicVisualizer: showsSpectrum, forceSpectrum: forceSpectrum)
                 .blur(radius: (enableClosedPlayPauseOverlay && isHoveringClosedMusicWaveformControl) ? 2.4 : 0)
                 .overlay {
                     if enableClosedPlayPauseOverlay {
