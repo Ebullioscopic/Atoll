@@ -220,6 +220,16 @@ class ClipboardManager: ObservableObject {
     private var timer: Timer?
     private var lastChangeCount: Int = 0
     private var persistenceCancellable: AnyCancellable?
+    private var activityGateCancellable: AnyCancellable?
+
+    /// 1 s (with tolerance) is ample for clipboard capture and wakes the app
+    /// half as often as the previous 0.5 s poll.
+    private let pollInterval: TimeInterval = 1.0
+
+    /// Coalesces bursts of history mutations into one JSON encode + write.
+    private var saveHistoryDebounceTimer: Timer?
+    private let saveHistoryDebounceInterval: TimeInterval = 0.75
+    private var didRegisterTerminationFlush = false
     
     // Use configurable history size from settings
     private var maxHistoryItems: Int {
@@ -277,6 +287,10 @@ class ClipboardManager: ObservableObject {
                     self.saveHistoryToDefaults()
                     self.savePinnedItemsToDefaults()
                 } else {
+                    // A debounced write still pending from before the switch
+                    // must not land after the history was erased.
+                    self.saveHistoryDebounceTimer?.invalidate()
+                    self.saveHistoryDebounceTimer = nil
                     // Take the bytes into memory before the files go, or the
                     // items still on screen lose their images mid-session.
                     self.retainImagesInMemory()
@@ -371,19 +385,60 @@ class ClipboardManager: ObservableObject {
     
     // MARK: - Public Methods
     
+    @MainActor
     func startMonitoring() {
         guard !isMonitoring else { return }
         
         isMonitoring = true
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkClipboard()
-        }
+        registerTerminationFlush()
+        // The pasteboard cannot change while the displays sleep, so stop the
+        // poll entirely instead of waking the app for nothing, and catch up
+        // with one check on wake.
+        activityGateCancellable = ActivityGate.shared.$shouldSuspendBackgroundWork
+            .removeDuplicates()
+            .sink { [weak self] suspended in
+                guard let self, self.isMonitoring else { return }
+                if suspended {
+                    self.stopPollTimer()
+                } else {
+                    self.startPollTimer()
+                    self.checkClipboard()
+                }
+            }
     }
     
     func stopMonitoring() {
         isMonitoring = false
+        activityGateCancellable?.cancel()
+        activityGateCancellable = nil
+        stopPollTimer()
+        flushPendingHistorySave()
+    }
+
+    private func startPollTimer() {
+        guard timer == nil else { return }
+        let timer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
+            self?.checkClipboard()
+        }
+        timer.tolerance = pollInterval * 0.2
+        self.timer = timer
+    }
+
+    private func stopPollTimer() {
         timer?.invalidate()
         timer = nil
+    }
+
+    private func registerTerminationFlush() {
+        guard !didRegisterTerminationFlush else { return }
+        didRegisterTerminationFlush = true
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.flushPendingHistorySave()
+        }
     }
     
     /// Mark a drag-out as in progress and arm a bounded safety reset. SwiftUI `.onDrag`
@@ -778,10 +833,27 @@ class ClipboardManager: ObservableObject {
 
         guard Defaults[.persistClipboardHistory] else {
             // Keep the session's history in memory, but leave nothing behind.
+            saveHistoryDebounceTimer?.invalidate()
+            saveHistoryDebounceTimer = nil
             ClipboardManager.removeStoredHistory()
             return
         }
 
+        // A single copy can mutate the history several times (dedup, insert,
+        // trim); encode and write the whole list once after a short quiet period.
+        saveHistoryDebounceTimer?.invalidate()
+        saveHistoryDebounceTimer = Timer.scheduledTimer(withTimeInterval: saveHistoryDebounceInterval, repeats: false) { [weak self] _ in
+            self?.flushPendingHistorySave()
+        }
+    }
+
+    /// Writes a pending debounced history save now. Re-checks the setting, so a
+    /// save queued just before persistence was turned off never reaches disk.
+    private func flushPendingHistorySave() {
+        guard let pending = saveHistoryDebounceTimer else { return }
+        pending.invalidate()
+        saveHistoryDebounceTimer = nil
+        guard Defaults[.persistClipboardHistory] else { return }
         if let encoded = try? JSONEncoder().encode(clipboardHistory) {
             UserDefaults.standard.set(encoded, forKey: "ClipboardHistory")
         }
