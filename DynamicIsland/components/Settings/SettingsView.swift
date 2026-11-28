@@ -1442,6 +1442,7 @@ struct GeneralSettings: View {
                 Text("Remember last tab").tag(NotchOpenDestination.lastUsed)
                 ForEach(coordinator.availableStandardTabs, id: \.self) { destination in
                     Text(openDestinationName(destination)).tag(destination)
+                        .disabled(!coordinator.alwaysShowTabs)
                 }
                 if coordinator.selectedOpenDestination.isFixed && !coordinator.availableStandardTabs.contains(coordinator.selectedOpenDestination) {
                     Text("Unavailable — \(openDestinationName(coordinator.selectedOpenDestination))")
@@ -1452,6 +1453,10 @@ struct GeneralSettings: View {
             .settingsHighlight(id: highlightID("Open to"))
             if enableMinimalisticUI {
                 Text("Minimalistic mode always opens Home.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if !coordinator.alwaysShowTabs {
+                Text("Opening to a specific tab requires “Always show tabs” in Appearance.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

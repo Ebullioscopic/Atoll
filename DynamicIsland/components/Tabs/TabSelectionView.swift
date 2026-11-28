@@ -56,6 +56,7 @@ struct TabSelectionView: View {
     @Default(.enableThirdPartyExtensions) private var enableThirdPartyExtensions
     @Default(.enableExtensionNotchExperiences) private var enableExtensionNotchExperiences
     @Default(.enableExtensionNotchTabs) private var enableExtensionNotchTabs
+    // Observed so the tab list refreshes when the Home tab's content toggles change.
     @Default(.showCalendar) private var showCalendar
     @Default(.showMirror) private var showMirror
     @Default(.showStandardMediaControls) private var showStandardMediaControls
@@ -157,13 +158,6 @@ struct TabSelectionView: View {
 
     private var extensionTabPayloads: [ExtensionNotchExperiencePayload] {
         extensionNotchExperienceManager.activeExperiences.filter { $0.descriptor.tab != nil }
-    }
-
-    private var homeTabVisible: Bool {
-        if enableMinimalisticUI {
-            return true
-        }
-        return showStandardMediaControls || showCalendar || showMirror
     }
 
     private func isSelected(_ tab: TabModel) -> Bool {

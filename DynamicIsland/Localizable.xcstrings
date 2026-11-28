@@ -92276,6 +92276,22 @@
           }
         }
       }
+    },
+    "Opening to a specific tab requires “Always show tabs” in Appearance." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开到特定标签页需要在“外观”中开启“总是显示标签页”。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開到特定分頁需要在「外觀」中開啟「總是顯示分頁」。"
+          }
+        }
+      }
     }
   },
   "version" : "1.2"

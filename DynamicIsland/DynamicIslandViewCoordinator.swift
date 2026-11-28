@@ -134,11 +134,12 @@ class DynamicIslandViewCoordinator: ObservableObject {
     @AppStorage("alwaysShowTabs") var alwaysShowTabs: Bool = true {
         didSet {
             if !alwaysShowTabs {
-                if selectedOpenDestination == .lastUsed {
+                // Remembered and fixed tabs both need the tab bar.
+                if selectedOpenDestination != .automatic {
                     notchOpenDestination = NotchOpenDestination.automatic.rawValue
                 }
                 openLastTabByDefault = false
-                if !selectedOpenDestination.isFixed && (TrayDrop.shared.isEmpty || !Defaults[.openShelfByDefault]) {
+                if TrayDrop.shared.isEmpty || !Defaults[.openShelfByDefault] {
                     currentView = .home
                 }
             }
@@ -162,7 +163,6 @@ class DynamicIslandViewCoordinator: ObservableObject {
     func setOpenDestination(_ destination: NotchOpenDestination) {
         notchOpenDestination = destination.rawValue
         openLastTabByDefault = destination == .lastUsed
-        if destination.isFixed { alwaysShowTabs = true }
     }
 
     var availableStandardTabs: [NotchOpenDestination] {
