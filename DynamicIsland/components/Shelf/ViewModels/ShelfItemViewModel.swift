@@ -33,6 +33,7 @@ final class ShelfItemViewModel: ObservableObject {
     @Published var thumbnail: NSImage?
     @Published var displayName: String = ""
     @Published var icon: NSImage?
+    @Published private(set) var metadataRevision = 0
     @Published var isDropTargeted: Bool = false
     @Published var isRenaming: Bool = false
     @Published var draftTitle: String = ""
@@ -67,13 +68,16 @@ final class ShelfItemViewModel: ObservableObject {
             ShelfStateViewModel.shared.applyCachedPath(resolvedPath, for: itemID, resolvedFrom: bookmarkData)
         }
 
-        // Load display name
+        // Publish the display name as soon as it's available; wait until the
+        // icon is ready to signal one refresh for the combined preview metadata.
         let name = await loadDisplayNameFromURL(resolvedURL)
         await MainActor.run { self.displayName = name }
-        
-        // Load icon
+
         let image = await loadIconFromURL(resolvedURL)
-        await MainActor.run { self.icon = image }
+        await MainActor.run {
+            self.icon = image
+            self.metadataRevision += 1
+        }
         
         // Load thumbnail
         if let thumbnailImage = await ThumbnailService.shared.thumbnail(for: resolvedURL, size: CGSize(width: 56, height: 56)) {
@@ -91,36 +95,41 @@ final class ShelfItemViewModel: ObservableObject {
     }
 
     private func loadDisplayNameFromURL(_ url: URL) async -> String {
-        if url.pathExtension.lowercased() == "json" && url.path.contains("TextBlocks") {
-            do {
-                let data = try Data(contentsOf: url)
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                struct TextBlockData: Codable {
-                    let content: String
-                    let title: String?
-                    var displayTitle: String {
-                        if let title = title, !title.isEmpty { return title }
-                        let firstLine = content.components(separatedBy: .newlines).first ?? content
-                        if firstLine.count > 50 { return String(firstLine.prefix(47)) + "..." }
-                        return firstLine
+        // This view model is main-actor isolated. `async` alone does not move
+        // synchronous file reads off that actor, so keep metadata I/O on a
+        // utility worker (especially important for large or remote files).
+        return await Task.detached(priority: .utility) { [url] in
+            if url.pathExtension.lowercased() == "json" && url.path.contains("TextBlocks") {
+                do {
+                    let data = try Data(contentsOf: url)
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    struct TextBlockData: Codable {
+                        let content: String
+                        let title: String?
+                        var displayTitle: String {
+                            if let title = title, !title.isEmpty { return title }
+                            let firstLine = content.components(separatedBy: .newlines).first ?? content
+                            if firstLine.count > 50 { return String(firstLine.prefix(47)) + "..." }
+                            return firstLine
+                        }
                     }
-                }
-                if let textData = try? decoder.decode(TextBlockData.self, from: data) {
-                    return textData.displayTitle
-                }
-            } catch { /* fall through */ }
-        } else if url.pathExtension.lowercased() == "webloc" && url.path.contains("WebLocs") {
-            do {
-                let data = try Data(contentsOf: url)
-                if let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
-                   let urlString = plist["URL"] as? String {
-                    let title = plist["Title"] as? String
-                    return title ?? urlString
-                }
-            } catch { /* fall through */ }
-        }
-        return (try? url.resourceValues(forKeys: [.localizedNameKey]).localizedName) ?? url.lastPathComponent
+                    if let textData = try? decoder.decode(TextBlockData.self, from: data) {
+                        return textData.displayTitle
+                    }
+                } catch { /* fall through */ }
+            } else if url.pathExtension.lowercased() == "webloc" && url.path.contains("WebLocs") {
+                do {
+                    let data = try Data(contentsOf: url)
+                    if let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                       let urlString = plist["URL"] as? String {
+                        let title = plist["Title"] as? String
+                        return title ?? urlString
+                    }
+                } catch { /* fall through */ }
+            }
+            return (try? url.resourceValues(forKeys: [.localizedNameKey]).localizedName) ?? url.lastPathComponent
+        }.value
     }
 
     func loadIcon() async {
@@ -133,7 +142,11 @@ final class ShelfItemViewModel: ObservableObject {
     }
 
     private func loadIconFromURL(_ url: URL) async -> NSImage {
-        return NSWorkspace.shared.icon(forFile: url.path)
+        // Mirror ShelfItem.loadIcon(): LaunchServices can do disk work while
+        // resolving an icon, so don't perform it on the UI actor.
+        return await Task.detached(priority: .utility) { [path = url.path] in
+            NSWorkspace.shared.icon(forFile: path)
+        }.value
     }
 
     // Async version to resolve file URL without blocking main thread
