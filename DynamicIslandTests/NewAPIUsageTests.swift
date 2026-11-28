@@ -99,7 +99,7 @@ final class NewAPIUsageTests: XCTestCase {
         XCTAssertEqual(snapshot.weekQuota, 5_678)
         XCTAssertEqual(snapshot.currentRPM, 3)
         XCTAssertEqual(snapshot.currentTPM, 321)
-        XCTAssertEqual(recorder.requests.count, 3)
+        XCTAssertEqual(recorder.requests.count, 4)
 
         for request in recorder.requests {
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer secret-key")
