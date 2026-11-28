@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Default notch tab**: choose which enabled tab opens by default, or keep the existing automatic and last-used behavior.
+- **NetEase Cloud Music and QQ Music sources**: both desktop apps can now be picked as the Music Source. They use macOS Now Playing filtered to the app, so other players do not take over the notch. (#913)
 - **Repeat timer alerts**: configure how long the built-in timer rings and how many minutes of silence precede the next reminder. Reminders continue in overtime until stopped, and pausing silences them. Defaults are 30 seconds of ringing and 5 minutes of silence. (#865, closes #859)
 - **Charging power readings**: the charging HUD now shows actual battery charging watts, and the battery details popover separately shows battery charging power and total power input. Unavailable readings are hidden, and power is sampled only while the HUD or popover is visible. (#894)
 - **Connection status HUDs**: Atoll now shows a Dynamic Island HUD when the Mac goes offline, and a compact inline HUD when it connects to Wi-Fi or Personal Hotspot, using the matching Wi-Fi or hotspot symbol and the connected network name. (#827)
@@ -81,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
+- **The Now Playing music source no longer disappears**: a single failed startup probe, common right after login or a macOS update, marked Now Playing as unsupported for the whole session, which removed it from the Music Source picker and left the picker blank. The probe is now retried and Now Playing is only hidden when every attempt fails, and the current choice always stays listed. (#913, fixes #816, #904, #921)
 - **Atoll no longer burns a CPU core after a `log stream` helper exits**: the AirPods listening-mode, timer, Focus and media-adapter pipe readers ignored end of file, so once their helper process died the read handler fired again immediately, forever. One Mac logged 145 CPU-hours in the AirPods reader over 19 days. The readers now stop at end of file, and the AirPods listening-mode stream restarts itself 5 seconds after it exits instead of going silent.
 - Quitting Atoll now stops the `/usr/bin/log stream` processes started by the Bluetooth, timer and Focus monitors. They used to keep running after the app exited, and each launch added a new set. (#939)
 - **LLM usage no longer balloons memory on large logs**: parsing a big week of Claude Code JSONL logs (~1 GB) could push Atoll past 2.5 GB and trigger the high memory usage warning, because temporary objects piled up until the whole scan finished. Each read chunk is now drained in its own autorelease pool, which keeps the same scan around 20 MB. (#870)
