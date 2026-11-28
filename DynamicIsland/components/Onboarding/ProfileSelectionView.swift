@@ -201,6 +201,8 @@ struct ProfileCard: View {
 // MARK: - Profile Settings Configuration
 
 func applyProfileSettings(_ profiles: Set<String>) {
+    let wasMinimalistic = Defaults[.enableMinimalisticUI]
+
     // Clipboard is ALWAYS enabled (per user request)
     Defaults[.enableClipboardManager] = true
     
@@ -259,6 +261,12 @@ func applyProfileSettings(_ profiles: Set<String>) {
         Defaults[.enableMinimalisticUI] = false
     }
     
+    // Turning Minimalistic UI on also switches to the simpler close animation,
+    // as the Settings toggle does.
+    if !wasMinimalistic && Defaults[.enableMinimalisticUI] {
+        Defaults[.useModernCloseAnimation] = true
+    }
+
     // Common settings for all profiles
     Defaults[.menubarIcon] = true
     Defaults[.enableHaptics] = true
