@@ -91916,7 +91916,87 @@
       },
       "shouldTranslate" : false
     },
-    "Show remaining quota instead of usage" : {}
+    "Show remaining quota instead of usage" : {},
+    "NetEase Cloud Music" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网易云音乐"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "網易雲音樂"
+          }
+        }
+      }
+    },
+    "QQ Music" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QQ 音乐"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QQ 音樂"
+          }
+        }
+      }
+    },
+    "Uses macOS Now Playing when the NetEase Cloud Music desktop app is the active media source." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当网易云音乐桌面端为活动媒体源时，使用 macOS 正在播放通道。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當網易雲音樂桌面版為作用中媒體來源時，使用 macOS 正在播放通道。"
+          }
+        }
+      }
+    },
+    "Uses macOS Now Playing when the QQ Music desktop app is the active media source." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当 QQ 音乐桌面端为活动媒体源时，使用 macOS 正在播放通道。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當 QQ 音樂桌面版為作用中媒體來源時，使用 macOS 正在播放通道。"
+          }
+        }
+      }
+    },
+    "Shuffle and repeat have not been verified with this app yet." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随机播放和重复播放尚未在此应用中验证。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隨機播放和重複播放尚未在此應用程式中驗證。"
+          }
+        }
+      }
+    }
   },
   "version" : "1.2"
 }

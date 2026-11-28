@@ -3141,6 +3141,10 @@ private extension MediaControllerType {
             return ["com.github.th-ch.youtube-music"]
         case .amazonMusic:
             return ["com.amazon.music"]
+        case .netEaseCloudMusic:
+            return [NetEaseCloudMusicController.bundleIdentifier]
+        case .qqMusic:
+            return [QQMusicController.bundleIdentifier]
         case .tidal:
             return [TidalController.bundleIdentifier]
         case .cider:
@@ -3155,6 +3159,8 @@ private extension MediaControllerType {
         case .spotify: return "dot.radiowaves.left.and.right"
         case .youtubeMusic: return "play.rectangle.fill"
         case .amazonMusic: return "music.note.list"
+        case .netEaseCloudMusic: return "music.quarternote.3"
+        case .qqMusic: return "music.mic"
         case .tidal: return "waveform.path"
         case .cider: return "cup.and.saucer.fill"
         }
@@ -3167,6 +3173,8 @@ private extension MediaControllerType {
         case .spotify: return .green
         case .youtubeMusic: return .red
         case .amazonMusic: return .cyan
+        case .netEaseCloudMusic: return .red
+        case .qqMusic: return .green
         case .tidal: return .primary
         case .cider: return .orange
         }
@@ -3247,25 +3255,25 @@ struct Media: View {
             } header: {
                 Text("Media Source")
             } footer: {
-                if MusicManager.shared.isNowPlayingDeprecated {
-                    HStack {
-                        Text("YouTube Music requires this third-party app to be installed: ")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                        Link("https://github.com/th-ch/youtube-music", destination: URL(string: "https://github.com/th-ch/youtube-music")!)
-                            .font(.caption)
-                            .foregroundColor(.blue) // Ensures it's visibly a link
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(String(localized: "'Now Playing' was the only option on previous versions and works with all media apps."))
-                        if mediaController == .amazonMusic || mediaController == .tidal || mediaController == .cider {
-                            Text(mediaController.description)
+                VStack(alignment: .leading, spacing: 6) {
+                    if MusicManager.shared.isNowPlayingDeprecated {
+                        HStack {
+                            Text("YouTube Music requires this third-party app to be installed: ")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                            Link("https://github.com/th-ch/youtube-music", destination: URL(string: "https://github.com/th-ch/youtube-music")!)
+                                .font(.caption)
+                                .foregroundColor(.blue) // Ensures it's visibly a link
                         }
+                    } else {
+                        Text(String(localized: "'Now Playing' was the only option on previous versions and works with all media apps."))
                     }
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
+                    if mediaController == .amazonMusic || mediaController == .netEaseCloudMusic || mediaController == .qqMusic || mediaController == .tidal || mediaController == .cider {
+                        Text(mediaController.description)
+                    }
                 }
+                .foregroundStyle(.secondary)
+                .font(.caption)
             }
 
             if mediaController == .spotify {
@@ -3660,7 +3668,8 @@ struct Media: View {
     // Only show controller options that are available on this macOS version
     private var availableMediaControllers: [MediaControllerType] {
         if MusicManager.shared.isNowPlayingDeprecated {
-            return MediaControllerType.allCases.filter { $0 != .nowPlaying }
+            // Keep the current choice listed so the picker never goes blank.
+            return MediaControllerType.allCases.filter { $0 != .nowPlaying || $0 == mediaController }
         } else {
             return MediaControllerType.allCases
         }
