@@ -162,12 +162,18 @@ class AudioTap: NSObject {
         return displayMagnitudes
     }
 
-    func startCapture() async {
-        await withCheckedContinuation { continuation in
-            audioQueue.async { [weak self] in
-                self?.startCaptureSync()
-                continuation.resume()
-            }
+    /// Bumped by every stop. A deferred start (waiting for the aggregate device to come
+    /// alive) only proceeds if no stop or restart has happened since it was scheduled.
+    /// Only touched on `audioQueue`.
+    private var captureGeneration = 0
+    private var aliveListener: AudioObjectPropertyListenerBlock?
+    private var aliveListenerDeviceID: AudioObjectID = kAudioObjectUnknown
+
+    /// Enqueued directly (not from a `Task`) so it stays ordered with `stopCapture()` on the
+    /// serial queue: a start requested before a stop can never run after it.
+    func startCapture() {
+        audioQueue.async { [weak self] in
+            self?.startCaptureSync()
         }
     }
     
@@ -311,24 +317,93 @@ class AudioTap: NSObject {
         }
         print("✅ [AudioTap] Created IO proc")
 
-        // Start listening
-        status = AudioDeviceStart(aggregateDeviceID, validIOProcID)
+        // From here on the tap, aggregate and IOProc exist, so a stop must tear them down
+        // even if IO has not started yet.
+        captureIsRunning = true
+
+        // A freshly created aggregate is not necessarily alive yet, and starting IO before it
+        // is yields silent buffers for as long as the tap lives: the waveform sits flat until
+        // something happens to rebuild it. Start on the alive transition instead.
+        if Self.isDeviceAlive(aggregateDeviceID) {
+            startIO(validIOProcID)
+        } else {
+            startIOWhenAlive(validIOProcID)
+        }
+    }
+
+    private static var deviceIsAliveAddress: AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsAlive,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+    }
+
+    private static func isDeviceAlive(_ deviceID: AudioObjectID) -> Bool {
+        guard deviceID != kAudioObjectUnknown else { return false }
+        var address = deviceIsAliveAddress
+        var isAlive: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &isAlive)
+        return status == noErr && isAlive != 0
+    }
+
+    private func startIOWhenAlive(_ ioProcID: AudioDeviceIOProcID) {
+        let expectedGeneration = captureGeneration
+        let deviceID = aggregateDeviceID
+        var address = Self.deviceIsAliveAddress
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self,
+                  self.captureGeneration == expectedGeneration,
+                  self.aggregateDeviceID == deviceID,
+                  Self.isDeviceAlive(deviceID) else { return }
+            self.removeAliveListener()
+            self.startIO(ioProcID)
+        }
+
+        let status = AudioObjectAddPropertyListenerBlock(deviceID, &address, audioQueue, listener)
+        guard status == noErr else {
+            // Nothing else would start IO, so start now; flat buffers recover on the next rebuild.
+            print("⚠️ [AudioTap] Could not observe aggregate readiness (\(status)), starting now")
+            startIO(ioProcID)
+            return
+        }
+        aliveListener = listener
+        aliveListenerDeviceID = deviceID
+        print("⏳ [AudioTap] Waiting for aggregate device to become alive")
+
+        // It may have come alive between the first check and installing the listener.
+        if Self.isDeviceAlive(deviceID) {
+            removeAliveListener()
+            startIO(ioProcID)
+        }
+    }
+
+    private func removeAliveListener() {
+        guard let aliveListener, aliveListenerDeviceID != kAudioObjectUnknown else { return }
+        var address = Self.deviceIsAliveAddress
+        AudioObjectRemovePropertyListenerBlock(aliveListenerDeviceID, &address, audioQueue, aliveListener)
+        self.aliveListener = nil
+        aliveListenerDeviceID = kAudioObjectUnknown
+    }
+
+    private func startIO(_ ioProcID: AudioDeviceIOProcID) {
+        let status = AudioDeviceStart(aggregateDeviceID, ioProcID)
         guard status == noErr else {
             print("🛑 [AudioTap] Start Error: \(status) (\(fourCharCodeToString(status)))")
-            cleanupPartialSetup()
+            stopCaptureSync()
             return
         }
 
-        captureIsRunning = true
         callbackCount = 0
-        
+
         DispatchQueue.main.async { [weak self] in
             self?.updateTimer?.invalidate()
             let timer = Timer(timeInterval: 1.0 / 30.0, target: self as Any, selector: #selector(self?.updateSmoothedMagnitudes), userInfo: nil, repeats: true)
             RunLoop.main.add(timer, forMode: .common)
             self?.updateTimer = timer
         }
-        
+
         print("🟢 [AudioTap] CoreAudio CATap flowing through Aggregate Device!")
     }
 
@@ -341,6 +416,7 @@ class AudioTap: NSObject {
     }
     
     private func cleanupPartialSetup() {
+        removeAliveListener()
         if let validIOProcID = ioProcID, aggregateDeviceID != kAudioObjectUnknown {
             AudioDeviceDestroyIOProcID(aggregateDeviceID, validIOProcID)
         }
@@ -397,6 +473,10 @@ class AudioTap: NSObject {
     }
     
     private func stopCaptureSync() {
+        // Invalidate any start still waiting for the aggregate to come alive.
+        captureGeneration &+= 1
+        removeAliveListener()
+
         guard captureIsRunning else { return }
 
         // Stop listening
