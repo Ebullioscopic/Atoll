@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Open the full notch from hidden**: with "Hide until hovered on non-notch displays" and "Open notch on hover" on, a new option opens the full notch straight away on hover instead of revealing the closed notch first. Off by default. (#577)
 - **Island top margin**: when external displays use the Dynamic Island style, a slider in General settings sets the gap between the top of the screen and the island, from 0 to 12 pt (6 pt by default). (#487)
 - **Back up and restore settings**: General settings can export your Atoll settings to a JSON file and import them again, on the same Mac or another one. API keys, sign-ins, clipboard history, notes and other private or device-specific data are never included, and Atoll offers to relaunch after an import. (#885)
 - **GitHub Copilot usage monitor**: an optional LLM Usage card shows your Copilot account quotas (premium requests, chat, completions) with consumed percentage, remaining allowance, plan and reset date, for GitHub.com and data-residency `ghe.com` tenants. The token is stored in the Keychain and removed when the provider is turned off. It reads GitHub's undocumented `copilot_internal/user` endpoint, which may change. Off by default. (#940)

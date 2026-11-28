@@ -101,6 +101,7 @@ struct ContentView: View {
     @Default(.showStandardMediaControls) var showStandardMediaControls
     @Default(.externalDisplayStyle) var externalDisplayStyle
     @Default(.hideNonNotchUntilHover) var hideNonNotchUntilHover
+    @Default(.openFullNotchFromHidden) var openFullNotchFromHidden
     @Default(.terminalStickyMode) var terminalStickyMode
     
     // Battery settings reactivity
@@ -426,6 +427,13 @@ struct ContentView: View {
         )
     }
 
+    /// Whether hovering reveals the hidden closed notch. With "Open the full notch
+    /// when hovered" it stays hidden until hover opens it, so the small notch is
+    /// never shown first (#577).
+    private var isRevealedByHover: Bool {
+        isHovering && !(openFullNotchFromHidden && Defaults[.openNotchOnHover])
+    }
+
     /// Whether the fallback top-edge hover detector should run.
     /// This is only needed when the notch is fully hidden off-screen and
     /// regular `.onHover` hit-testing may not trigger reliably.
@@ -722,7 +730,7 @@ struct ContentView: View {
             // interaction modifiers so .contentShape / .onHover only covers
             // the actual notch content, not the shadow clearance below it.
             .padding(.bottom, notchBottomPadding)
-            .offset(y: shouldHideUntilHover && !isHovering
+            .offset(y: shouldHideUntilHover && !isRevealedByHover
                 ? -(vm.closedNotchSize.height + pillTopOffset + currentShadowPadding + 10)
                 : 0
             )

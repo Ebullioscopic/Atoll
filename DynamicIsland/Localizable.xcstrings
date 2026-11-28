@@ -94542,7 +94542,9 @@
         }
       }
     },
-    "Island top margin" : {}
+    "Island top margin" : {},
+    "Open the full notch when hovered" : {},
+    "Skips revealing the closed notch first." : {}
   },
   "version" : "1.2"
 }

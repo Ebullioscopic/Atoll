@@ -1076,6 +1076,8 @@ extension Defaults.Keys {
         default: .notch
     )
     static let hideNonNotchUntilHover = Key<Bool>("hideNonNotchUntilHover", default: false)
+    /// With "Hide until hovered", hovering opens the full notch without revealing the closed one first.
+    static let openFullNotchFromHidden = Key<Bool>("openFullNotchFromHidden", default: false)
     /// Gap between the top of a non-notch display and the Dynamic Island pill.
     static let dynamicIslandTopMargin = Key<CGFloat>("dynamicIslandTopMargin", default: 6)
     static let notchHeightMode = Key<WindowHeightMode>(
