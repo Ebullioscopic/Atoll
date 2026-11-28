@@ -120,6 +120,22 @@ final class TerminalScrollKnobView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
+// MARK: - Notch Terminal View
+
+/// SwiftTerm's terminal view with the input-method window level `NSTextView` reports.
+///
+/// The notch panel sits above the menu bar (`.mainMenu + 3`). Input methods place
+/// their candidate window at the level returned by `NSTextInputClient.windowLevel()`,
+/// and without it they assume a regular floating window, so the candidate list
+/// opened under the notch and was hidden while composing (for example Chinese
+/// Pinyin) in the Terminal tab. Notes is unaffected because `NSTextView` already
+/// answers with its window's level.
+final class NotchLocalProcessTerminalView: LocalProcessTerminalView {
+    @objc func windowLevel() -> Int {
+        (window?.level ?? .floating).rawValue
+    }
+}
+
 // MARK: - Terminal Manager
 
 /// Manages the Guake-style dropdown terminal session lifecycle.
@@ -225,7 +241,7 @@ class TerminalManager: ObservableObject {
         // Replace only the terminal view - keep the blur underlay between restarts.
         terminalView?.removeFromSuperview()
 
-        let view = LocalProcessTerminalView(frame: initialFrame)
+        let view = NotchLocalProcessTerminalView(frame: initialFrame)
         view.autoresizingMask = [.width, .height]
 
         // Apply all settings from Defaults
