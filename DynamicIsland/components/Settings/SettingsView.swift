@@ -393,6 +393,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .lockScreen, title: "Show media app icon", keywords: ["app icon", "media"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show media app icon"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Show panel border", keywords: ["panel border"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show panel border"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Always show volume control", keywords: ["volume", "slider", "lock screen", "media output", "accessibility"], highlightID: SettingsTab.lockScreen.highlightID(for: "Always show volume control"), lockScreenSection: .widgets),
+        SettingsSearchEntry(tab: .lockScreen, title: "Open player with large album art", keywords: ["expanded", "large album art", "artwork"], highlightID: SettingsTab.lockScreen.highlightID(for: "Open player with large album art"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Enable media panel blur", keywords: ["blur", "media panel"], highlightID: SettingsTab.lockScreen.highlightID(for: "Enable media panel blur"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen timer", keywords: ["timer widget", "lock screen timer"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen timer"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Timer surface", keywords: ["timer glass", "classic", "blur"], highlightID: SettingsTab.lockScreen.highlightID(for: "Timer surface"), lockScreenSection: .widgets),
@@ -6232,6 +6233,18 @@ struct LockScreenSettings: View {
                             .opacity(enableLockScreenMediaWidget ? 1 : 0.5)
                             .settingsHighlight(id: highlightID("Enable media panel blur"))
                     }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Defaults.Toggle(key: .lockScreenMusicOpensExpanded) {
+                            Text("Open player with large album art")
+                        }
+                        .disabled(!enableLockScreenMediaWidget)
+                        .settingsHighlight(id: highlightID("Open player with large album art"))
+                        Text("Shows the expanded player as soon as the Mac locks, without changing the wallpaper. Click the album art to switch size.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     VStack(alignment: .leading, spacing: 4) {
                         Defaults.Toggle(key: .lockScreenMusicFullscreenArtworkEnabled) {
                             Text("Fullscreen artwork on right-click")

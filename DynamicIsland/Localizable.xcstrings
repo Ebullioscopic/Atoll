@@ -94551,7 +94551,9 @@
     "Hide widgets during screen saver" : {},
     "Show battery in Minimalistic UI" : {},
     "Turn on Show battery indicator in Battery settings to use this." : {},
-    "Turn on Show battery in Minimalistic UI to use this." : {}
+    "Turn on Show battery in Minimalistic UI to use this." : {},
+    "Open player with large album art" : {},
+    "Shows the expanded player as soon as the Mac locks, without changing the wallpaper. Click the album art to switch size." : {}
   },
   "version" : "1.2"
 }

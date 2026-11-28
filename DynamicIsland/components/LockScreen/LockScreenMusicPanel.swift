@@ -81,6 +81,7 @@ struct LockScreenMusicPanel: View {
     @Default(.lockScreenMusicAlbumParallaxEnabled) private var lockScreenParallaxEnabled
     @Default(.lockScreenMusicPanelWidth) private var collapsedPanelWidth
     @Default(.lockScreenMusicFullscreenArtworkEnabled) private var fullscreenArtworkEnabled
+    @Default(.lockScreenMusicOpensExpanded) private var opensExpanded
     @Default(.lockScreenKeepAlbumArtVisibleDuringFullscreenArtwork) private var keepAlbumArtVisibleDuringFullscreenArtwork
     @Default(.lockScreenMusicFullscreenVideoArtwork) private var fullscreenVideoArtwork
     @Default(.lockScreenWidgetAppearance) private var widgetAppearance
@@ -330,6 +331,9 @@ struct LockScreenMusicPanel: View {
         .onAppear {
             sliderValue = musicManager.elapsedTime
             isActive = true
+            if opensExpanded {
+                isExpanded = true
+            }
             logPanelAppearance()
             updatePanelSize(animated: false)
             routeManager.refreshDevices()
@@ -677,7 +681,8 @@ struct LockScreenMusicPanel: View {
 
     private func registerInteraction() {
         cancelCollapseTimer()
-        guard isExpanded else { return }
+        // When expanded is the chosen default it stays until tapped (#490).
+        guard isExpanded, !opensExpanded else { return }
         guard !isPointerInsidePanel else { return }
 
         let workItem = DispatchWorkItem {
