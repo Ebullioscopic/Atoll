@@ -41,6 +41,8 @@ class SystemOSDManager {
         // Coalesces immediate suppression requests from a key event and its
         // resulting system-value notification.
         var immediateSuppressionInFlight = false
+        // Set once `crashWatchdogInput` has been created.
+        var crashWatchdogStarted = false
     }
     private static let suppressionState = OSAllocatedUnfairLock(initialState: SuppressionState())
 
@@ -177,14 +179,24 @@ class SystemOSDManager {
     /// so a SIGSTOP-frozen OSDUIHelper stays frozen after Atoll quits, breaking
     /// every native OSD Atoll does not replace (keyboard backlight,
     /// external-display brightness, …) and leaving a stuck HUD on screen. This
-    /// sends SIGCONT inline and blocks until it lands, guaranteeing the helper
-    /// is resumed before Atoll exits. Idempotent; safe to call from a
-    /// termination handler.
+    /// acts inline and blocks until it lands, guaranteeing the helper is usable
+    /// before Atoll exits. Idempotent; safe to call from a termination handler.
+    ///
+    /// A helper that was being suppressed is killed rather than resumed.
+    /// Resuming one that has been frozen for hours let it replay HUD requests
+    /// queued while it was stopped and draw them with display geometry from
+    /// before it froze -- the native HUD then showed up in the top-left corner
+    /// of the screen, or not at all (#803). launchd starts a fresh helper on
+    /// the next key press, and any HUD frozen on screen goes with the old one.
     public static func resumeOSDUIHelperForTermination() {
-        suppressionState.withLock { state in
+        let wasSuppressing = suppressionState.withLock { state -> Bool in
+            let wasActive = state.active
             state.active = false
             state.transitionGeneration &+= 1
+            return wasActive
         }
+        // This path cleans up itself; tell the crash watchdog to stand down.
+        disarmCrashWatchdog()
 
         // Cancel the watcher and wait for it to fully exit before resuming. A
         // bare cancel is cooperative, so an in-flight suspendOSDUIHelper() could
@@ -198,13 +210,15 @@ class SystemOSDManager {
 
         let resume = Process()
         resume.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-        resume.arguments = ["-CONT", "OSDUIHelper"]
+        // SIGCONT when not suppressing still undoes a stray stop from a stale
+        // transition, without disturbing a helper that is working normally.
+        resume.arguments = [wasSuppressing ? "-KILL" : "-CONT", "OSDUIHelper"]
         resume.standardError = Pipe() // silence "no such process" stderr
         do {
             try resume.run()
             resume.waitUntilExit()
         } catch {
-            NSLog("Failed to SIGCONT OSDUIHelper on termination: \(error)")
+            NSLog("Failed to restore OSDUIHelper on termination: \(error)")
         }
     }
 
@@ -214,6 +228,8 @@ class SystemOSDManager {
     public static func disableSystemHUD() {
         // Ensure sleep/wake observers are registered.
         _ = sleepWakeSetupOnce
+        _ = crashWatchdogInput
+        suppressionState.withLock { $0.crashWatchdogStarted = true }
         let generation = suppressionState.withLock { state -> UInt64 in
             state.active = true
             state.transitionGeneration &+= 1
@@ -243,7 +259,8 @@ class SystemOSDManager {
             }
 
             guard isCurrentTransition(generation, active: true) else { return }
-            if let pid = osduiHelperPID() {
+            let currentPID = osduiHelperPID()
+            if let pid = currentPID {
                 let lastPID = suppressionState.withLock { $0.lastSuspendedPID }
                 if pid == lastPID {
                     return
@@ -251,7 +268,9 @@ class SystemOSDManager {
             }
 
             guard isCurrentTransition(generation, active: true) else { return }
-            suspendOSDUIHelper()
+            // Killed rather than frozen: nothing to record, and the next
+            // instance is examined afresh.
+            guard freezeOSDUIHelper(pid: currentPID) else { return }
 
             // If this transition went stale while the SIGSTOP was in flight,
             // hand the helper over rather than assuming it should be resumed.
@@ -281,8 +300,9 @@ class SystemOSDManager {
             // SIGSTOPped needs no replacing; freezing it in place closes the
             // window entirely, and the watcher still catches any process macOS
             // swaps in later.
-            if let existing = osduiHelperPID() {
-                suspendOSDUIHelper()
+            // One that is showing a HUD is killed instead, and a fresh,
+            // idle one is started and frozen below.
+            if let existing = osduiHelperPID(), freezeOSDUIHelper(pid: existing) {
                 guard isCurrentTransition(generation, active: true) else {
                     relinquishStaleSuspension()
                     return
@@ -396,8 +416,9 @@ class SystemOSDManager {
                 let lastPID = suppressionState.withLock { $0.lastSuspendedPID }
 
                 if let pid = currentPID, pid != lastPID {
-                    suspendOSDUIHelper()
-                    suppressionState.withLock { $0.lastSuspendedPID = pid }
+                    if freezeOSDUIHelper(pid: pid) {
+                        suppressionState.withLock { $0.lastSuspendedPID = pid }
+                    }
                     stableChecks = 0
                     try? await Task.sleep(nanoseconds: 150_000_000) // 150ms
                     continue
@@ -488,6 +509,46 @@ class SystemOSDManager {
 
     private static let helperProcessName = "OSDUIHelper"
 
+    /// Freezes the helper, unless it is showing a HUD at this moment.
+    ///
+    /// SIGSTOP freezes the helper's windows exactly as they are, so a helper
+    /// caught mid-display -- a key that reached macOS before the tap, a HUD
+    /// drawn on the lock screen just before unlocking, a respawn the watcher
+    /// had not caught yet -- left its HUD stuck on the desktop for as long as
+    /// suppression lasted (#593). Such a helper is killed instead, taking its
+    /// window with it; launchd starts a new one on demand, and that one is
+    /// frozen before it has anything to draw. An idle helper owns no windows
+    /// at all, so the check only costs a window list when a new helper is
+    /// about to be frozen. Returns true when the helper was frozen.
+    @discardableResult
+    private static func freezeOSDUIHelper(pid: Int32?) -> Bool {
+        if let pid, isShowingHUD(pid: pid) {
+            let kill = Process()
+            kill.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+            kill.arguments = ["-KILL", "OSDUIHelper"]
+            kill.standardError = Pipe()
+            do {
+                try kill.run()
+                kill.waitUntilExit()
+                return false
+            } catch {
+                NSLog("Failed to kill OSDUIHelper showing a HUD: \(error)")
+            }
+        }
+        suspendOSDUIHelper()
+        return true
+    }
+
+    private static func isShowingHUD(pid: Int32) -> Bool {
+        guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+            return false
+        }
+        return windows.contains { info in
+            guard (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid else { return false }
+            return ((info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1) > 0
+        }
+    }
+
     /// Sends SIGSTOP to all OSDUIHelper processes. Idempotent.
     private static func suspendOSDUIHelper() {
         let stop = Process()
@@ -533,6 +594,51 @@ class SystemOSDManager {
         } catch {
             NSLog("Failed to resume OSDUIHelper after stale suppression: \(error)")
         }
+    }
+
+    // MARK: - Crash watchdog
+
+    /// Write end of a pipe whose read end is the stdin of a tiny `/bin/sh`
+    /// child, created the first time suppression starts.
+    ///
+    /// The termination handler only runs on a normal quit. If Atoll crashes,
+    /// is force quit or is killed, OSDUIHelper stayed SIGSTOPped and the
+    /// native HUD was dead -- or frozen on screen -- until the next login
+    /// (#908). The kernel closes this write end however the process ends; the
+    /// child, blocked in `read` at no cost, then sees EOF and kills the helper
+    /// so launchd starts a fresh one on the next key press. A normal quit
+    /// writes `q` first, and the child exits without touching anything.
+    private static let crashWatchdogInput: FileHandle? = {
+        let pipe = Pipe()
+        let writeFD = pipe.fileHandleForWriting.fileDescriptor
+        // Keep the write end out of every child process, the watchdog
+        // included, or EOF would never arrive; and never let a write to a
+        // vanished watchdog raise SIGPIPE in this process.
+        _ = fcntl(writeFD, F_SETFD, FD_CLOEXEC)
+        _ = fcntl(writeFD, F_SETNOSIGPIPE, 1)
+
+        let watchdog = Process()
+        watchdog.executableURL = URL(fileURLWithPath: "/bin/sh")
+        watchdog.arguments = [
+            "-c",
+            "trap '' HUP INT TERM; read -r line; [ \"$line\" = q ] || /usr/bin/killall -9 OSDUIHelper"
+        ]
+        watchdog.standardInput = pipe
+        watchdog.standardOutput = FileHandle.nullDevice
+        watchdog.standardError = FileHandle.nullDevice
+        do {
+            try watchdog.run()
+        } catch {
+            NSLog("⚠️ Could not start the OSDUIHelper crash watchdog: \(error)")
+            return nil
+        }
+        return pipe.fileHandleForWriting
+    }()
+
+    private static func disarmCrashWatchdog() {
+        // Only if it was ever started; this must not spawn it at quit.
+        guard suppressionState.withLock({ $0.crashWatchdogStarted }) else { return }
+        try? crashWatchdogInput?.write(contentsOf: Data("q\n".utf8))
     }
 
     /// Check if OSDUIHelper is currently running

@@ -60,6 +60,36 @@ final class HUDSuppressionCoordinator {
     }
 }
 
+/// Volume key steps waiting to be written, merged into one net change.
+///
+/// A CoreAudio volume write can block for a long time (Bluetooth outputs in
+/// particular). When every key press ran its own write in turn, a burst of
+/// presses queued up writes that kept stepping the volume for seconds after
+/// the keys were released. Presses that arrive while a write is in flight are
+/// summed here and applied together by the next one.
+struct VolumeAdjustAccumulator {
+    private(set) var pendingDelta: Float = 0
+    private(set) var isScheduled = false
+
+    /// Adds a step. Returns true when no write is scheduled yet, meaning the
+    /// caller has to schedule one.
+    mutating func add(_ delta: Float) -> Bool {
+        pendingDelta += delta
+        guard !isScheduled else { return false }
+        isScheduled = true
+        return true
+    }
+
+    /// Takes everything accumulated so far, for the scheduled write to apply.
+    mutating func take() -> Float {
+        defer {
+            pendingDelta = 0
+            isScheduled = false
+        }
+        return pendingDelta
+    }
+}
+
 final class SystemVolumeController {
     static let shared = SystemVolumeController()
 
@@ -75,6 +105,9 @@ final class SystemVolumeController {
         get { deviceIDStorage.withLock { $0 } }
         set { deviceIDStorage.withLock { $0 = newValue } }
     }
+    /// Transport of the default output, refreshed with `currentDeviceID`, so
+    /// views can ask for it while rendering without a CoreAudio round trip.
+    private let transportTypeStorage = OSAllocatedUnfairLock(initialState: UInt32(0))
     private var listenersInstalled = false
     private struct InstalledListener {
         let deviceID: AudioDeviceID
@@ -120,6 +153,7 @@ final class SystemVolumeController {
     }
 
     private let volumeMemory = OSAllocatedUnfairLock(initialState: VolumeMemory())
+    private let pendingKeyAdjust = OSAllocatedUnfairLock(initialState: VolumeAdjustAccumulator())
 
     private let candidateElements: [AudioObjectPropertyElement] = [
         kAudioObjectPropertyElementMain,
@@ -129,6 +163,7 @@ final class SystemVolumeController {
 
     private init() {
         currentDeviceID = resolveDefaultDevice()
+        refreshTransportType()
         refreshPropertyElements()
         installDefaultDeviceListener()
         installVolumeListeners(for: currentDeviceID)
@@ -170,6 +205,30 @@ final class SystemVolumeController {
         setVolume(max(0, min(1, current + delta)), on: deviceID)
     }
 
+    /// Applies a volume key step off the main thread.
+    ///
+    /// The media key tap is serviced on the main run loop, so a blocking write
+    /// there both delays later presses and risks the tap being disabled.
+    /// Writes run on the listener queue, which already serialises this
+    /// controller's CoreAudio work, and steps that arrive meanwhile are merged.
+    func enqueueKeyAdjust(by delta: Float) {
+        guard delta != 0 else { return }
+        guard pendingKeyAdjust.withLock({ $0.add(delta) }) else { return }
+        callbackQueue.async { [weak self] in
+            guard let self else { return }
+            let delta = self.pendingKeyAdjust.withLock { $0.take() }
+            self.adjust(by: delta)
+        }
+    }
+
+    /// The mute key's counterpart to `enqueueKeyAdjust`, on the same queue so
+    /// a mute pressed right after a volume key lands after that step.
+    func enqueueKeyToggleMute() {
+        callbackQueue.async { [weak self] in
+            self?.toggleMute()
+        }
+    }
+
     func toggleMute() {
         setMuted(!isMuted)
     }
@@ -180,6 +239,19 @@ final class SystemVolumeController {
 
     var isMuted: Bool {
         getMuteState()
+    }
+
+    /// CoreAudio transport type of the default output, or 0 if unknown.
+    var defaultOutputTransportType: UInt32 {
+        transportTypeStorage.withLock { $0 }
+    }
+
+    /// True when sound is actually going to a Bluetooth device. A paired pair
+    /// of AirPods being connected says nothing about where audio is routed.
+    var isDefaultOutputBluetooth: Bool {
+        let transport = transportTypeStorage.withLock { $0 }
+        return transport == kAudioDeviceTransportTypeBluetooth
+            || transport == kAudioDeviceTransportTypeBluetoothLE
     }
 
     func setVolume(_ value: Float) {
@@ -291,6 +363,19 @@ final class SystemVolumeController {
         return deviceID
     }
 
+    private func refreshTransportType() {
+        var transport: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = AudioObjectGetPropertyData(currentDeviceID, &address, 0, nil, &size, &transport)
+        let resolved: UInt32 = status == noErr ? transport : 0
+        transportTypeStorage.withLock { $0 = resolved }
+    }
+
     private func installDefaultDeviceListener() {
         guard !listenersInstalled else { return }
         var address = AudioObjectPropertyAddress(
@@ -369,6 +454,7 @@ final class SystemVolumeController {
         callbackQueue.async { [weak self] in
             guard let self else { return }
             self.currentDeviceID = self.resolveDefaultDevice()
+            self.refreshTransportType()
             self.refreshPropertyElements()
             self.installVolumeListeners(for: self.currentDeviceID)
             self.notifyCurrentState()

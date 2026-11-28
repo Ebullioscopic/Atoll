@@ -54,15 +54,25 @@ final class CircularHUDWindowManager {
         guard !windows.isEmpty else { return }
         
         for (screen, window) in windows {
-            let screenFrame = screen.frame
-            let hudSize = Defaults[.circularHUDSize]
-            let windowSize = hudSize + 80 // Padding
-            
-            let x = screenFrame.midX - (windowSize / 2)
-            let y = screenFrame.midY - (windowSize / 2)
-            let newFrame = NSRect(x: x, y: y, width: windowSize, height: windowSize)
-            
-            window.nsWindow.setFrame(newFrame, display: true, animate: true)
+            window.nsWindow.setFrame(frame(for: screen), display: true, animate: true)
+        }
+    }
+
+    private func frame(for screen: NSScreen) -> NSRect {
+        let screenFrame = screen.frame
+        let windowSize = Defaults[.circularHUDSize] + 80 // Padding
+        let x = screenFrame.midX - (windowSize / 2)
+        let y = screenFrame.midY - (windowSize / 2)
+        return NSRect(x: x, y: y, width: windowSize, height: windowSize)
+    }
+
+    /// Drops windows whose display has gone. Their screens no longer get a
+    /// HUD, so keeping them only leaks a window per reconnect.
+    private func pruneDisconnectedScreens() {
+        let current = NSScreen.screens
+        for (screen, window) in windows where !current.contains(screen) {
+            window.nsWindow.orderOut(nil)
+            windows[screen] = nil
         }
     }
     
@@ -72,9 +82,18 @@ final class CircularHUDWindowManager {
         let screens = targetScreen.map { [$0] } ?? NSScreen.screens
         guard !screens.isEmpty else { return }
         
+        pruneDisconnectedScreens()
+
         // Show on target screen(s)
         for screen in screens {
             let windowContext = ensureWindow(for: type, screen: screen)
+            // Re-place on every show: an arrangement or main-display change
+            // moves screens in global coordinates, and a window left at its old
+            // frame lands on another display, doubling that display's HUD.
+            let targetFrame = frame(for: screen)
+            if windowContext.nsWindow.frame != targetFrame {
+                windowContext.nsWindow.setFrame(targetFrame, display: false)
+            }
             updateContent(window: windowContext, type: type, value: value, icon: icon)
             
             // Ensure visible
@@ -97,15 +116,8 @@ final class CircularHUDWindowManager {
         let osdView = CircularHUDView(type: .constant(type), value: .constant(0), icon: .constant(""))
         let hostingView = NSHostingView(rootView: osdView)
         
-        let screenFrame = screen.frame
-        
-        let hudSize = Defaults[.circularHUDSize]
-        let windowSize = hudSize + 80 // Padding
-        
         // Position at center of screen
-        let x = screenFrame.midX - (windowSize / 2)
-        let y = screenFrame.midY - (windowSize / 2)
-        let frame = NSRect(x: x, y: y, width: windowSize, height: windowSize)
+        let frame = frame(for: screen)
         
         let win = NSWindow(
             contentRect: frame,

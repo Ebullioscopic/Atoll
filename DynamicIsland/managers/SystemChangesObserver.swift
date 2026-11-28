@@ -213,14 +213,14 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
         
         let baseStep = volumeStep(for: step)
         let delta = direction == .up ? baseStep : -baseStep
-        volumeController.adjust(by: delta)
+        volumeController.enqueueKeyAdjust(by: delta)
         volumeFeedbackPlayer.playIfNeeded()
     }
 
     func mediaKeyInterceptorDidToggleMute(_ interceptor: MediaKeyInterceptor) {
         guard volumeEnabled else { return }
         SystemOSDManager.suppressNativeOSDNow()
-        volumeController.toggleMute()
+        volumeController.enqueueKeyToggleMute()
     }
 
     func mediaKeyInterceptor(
@@ -232,6 +232,20 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
     ) {
         let isBacklight = modifiers.contains(.command) && keyboardBacklightEnabled
         guard isBacklight || brightnessEnabled else { return }
+        handleBrightnessKey(direction: direction, step: step, isBacklight: isBacklight)
+    }
+
+    func mediaKeyInterceptor(
+        _ interceptor: MediaKeyInterceptor,
+        didReceiveKeyboardBacklightCommand direction: MediaKeyDirection,
+        step: MediaKeyStep,
+        isRepeat: Bool
+    ) {
+        guard keyboardBacklightEnabled else { return }
+        handleBrightnessKey(direction: direction, step: step, isBacklight: true)
+    }
+
+    private func handleBrightnessKey(direction: MediaKeyDirection, step: MediaKeyStep, isBacklight: Bool) {
         SystemOSDManager.suppressNativeOSDNow()
 
         // Elastic Limit Detection (Vertical HUD)
@@ -317,7 +331,10 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
 
     @MainActor
     private func resolvedVolumeIcon(isMuted: Bool) -> String {
-        guard let icon = BluetoothAudioManager.shared.activeDeviceIconSymbol() else { return "" }
+        // A connected Bluetooth device only names the output when audio is
+        // actually routed to it; otherwise the HUD's own speaker symbol is right.
+        guard volumeController.isDefaultOutputBluetooth,
+              let icon = BluetoothAudioManager.shared.activeDeviceIconSymbol() else { return "" }
         if isMuted && Self.headsetIconSymbols.contains(icon) {
             return "headphones.slash"
         }

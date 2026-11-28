@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import CoreAudio
 import XCTest
 
 @testable import Atoll
@@ -59,5 +60,79 @@ final class SystemHUDPlacementTests: XCTestCase {
                 "locked=\(isLocked): neither this app nor macOS would draw a HUD"
             )
         }
+    }
+}
+
+/// Volume key steps that arrive while a CoreAudio write is still running are
+/// merged, so a burst of presses cannot leave a queue of writes that keeps
+/// moving the volume after the keys are released (#892).
+final class VolumeAdjustAccumulatorTests: XCTestCase {
+    func testOnlyTheFirstStepSchedulesAWrite() {
+        var accumulator = VolumeAdjustAccumulator()
+        XCTAssertTrue(accumulator.add(-0.0625))
+        XCTAssertFalse(accumulator.add(-0.0625))
+        XCTAssertFalse(accumulator.add(-0.0625))
+    }
+
+    func testTheScheduledWriteAppliesTheNetChangeOnce() {
+        var accumulator = VolumeAdjustAccumulator()
+        _ = accumulator.add(-0.25)
+        _ = accumulator.add(-0.25)
+        _ = accumulator.add(0.125)
+        XCTAssertEqual(accumulator.take(), -0.375, accuracy: 0.0001)
+        // Nothing is left over for a later write to apply again.
+        XCTAssertEqual(accumulator.take(), 0)
+    }
+
+    func testAStepAfterTheWriteStartedSchedulesANewOne() {
+        var accumulator = VolumeAdjustAccumulator()
+        _ = accumulator.add(0.1)
+        _ = accumulator.take()
+        XCTAssertTrue(accumulator.add(0.1))
+    }
+}
+
+/// OSDUIHelper is frozen only when this app has a HUD to show instead (#908).
+final class NativeHUDSuppressionTests: XCTestCase {
+    func testLeavesTheNativeHUDAloneWhenNoChannelIsHandled() {
+        XCTAssertFalse(SystemHUDManager.shouldSuppressNativeHUD(
+            volume: false, brightness: false, backlight: false, thirdPartyDDCActive: false
+        ))
+    }
+
+    func testSuppressesWhenAnyChannelIsHandled() {
+        XCTAssertTrue(SystemHUDManager.shouldSuppressNativeHUD(
+            volume: true, brightness: false, backlight: false, thirdPartyDDCActive: false
+        ))
+        XCTAssertTrue(SystemHUDManager.shouldSuppressNativeHUD(
+            volume: false, brightness: true, backlight: false, thirdPartyDDCActive: false
+        ))
+        XCTAssertTrue(SystemHUDManager.shouldSuppressNativeHUD(
+            volume: false, brightness: false, backlight: true, thirdPartyDDCActive: false
+        ))
+    }
+
+    /// A DDC app drives this app's HUD through its own notifications, with
+    /// every channel flag cleared.
+    func testSuppressesForARunningDDCApp() {
+        XCTAssertTrue(SystemHUDManager.shouldSuppressNativeHUD(
+            volume: false, brightness: false, backlight: false, thirdPartyDDCActive: true
+        ))
+    }
+}
+
+/// With the external volume listener on, a DDC app only owns the volume keys
+/// for outputs it can control (#465).
+final class ExternalVolumeOwnershipTests: XCTestCase {
+    func testBuiltInAndBluetoothOutputsStayWithAtoll() {
+        XCTAssertFalse(SystemHUDManager.externalProviderControlsVolume(outputTransport: kAudioDeviceTransportTypeBuiltIn))
+        XCTAssertFalse(SystemHUDManager.externalProviderControlsVolume(outputTransport: kAudioDeviceTransportTypeBluetooth))
+        XCTAssertFalse(SystemHUDManager.externalProviderControlsVolume(outputTransport: kAudioDeviceTransportTypeBluetoothLE))
+    }
+
+    func testDisplayAndUnknownOutputsGoToTheProvider() {
+        XCTAssertTrue(SystemHUDManager.externalProviderControlsVolume(outputTransport: kAudioDeviceTransportTypeDisplayPort))
+        XCTAssertTrue(SystemHUDManager.externalProviderControlsVolume(outputTransport: kAudioDeviceTransportTypeHDMI))
+        XCTAssertTrue(SystemHUDManager.externalProviderControlsVolume(outputTransport: 0))
     }
 }

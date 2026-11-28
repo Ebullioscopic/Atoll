@@ -33,6 +33,10 @@ private let NX_KEYTYPE_SOUND_DOWN: Int32 = 1
 private let NX_KEYTYPE_BRIGHTNESS_UP: Int32 = 2
 private let NX_KEYTYPE_BRIGHTNESS_DOWN: Int32 = 3
 private let NX_KEYTYPE_MUTE: Int32 = 7
+// Dedicated keyboard backlight keys. Recent Mac keyboards have none, but
+// remappers such as Karabiner-Elements send these for "illumination up/down".
+private let NX_KEYTYPE_ILLUMINATION_UP: Int32 = 21
+private let NX_KEYTYPE_ILLUMINATION_DOWN: Int32 = 22
 
 extension Notification.Name {
     /// Posted when the media key tap comes up or goes away, so settings can
@@ -55,6 +59,8 @@ enum MediaKeyStep {
 struct MediaKeyConfiguration {
     var interceptVolume: Bool
     var interceptBrightness: Bool
+    /// Keyboard backlight: ⌘ + brightness keys, and the dedicated
+    /// illumination keys.
     var interceptCommandModifiedBrightness: Bool
 
     static let disabled = MediaKeyConfiguration(
@@ -107,6 +113,12 @@ protocol MediaKeyInterceptorDelegate: AnyObject {
         step: MediaKeyStep,
         isRepeat: Bool,
         modifiers: NSEvent.ModifierFlags
+    )
+    func mediaKeyInterceptor(
+        _ interceptor: MediaKeyInterceptor,
+        didReceiveKeyboardBacklightCommand direction: MediaKeyDirection,
+        step: MediaKeyStep,
+        isRepeat: Bool
     )
     func mediaKeyInterceptorDidToggleMute(_ interceptor: MediaKeyInterceptor)
 }
@@ -381,6 +393,14 @@ final class MediaKeyInterceptor {
             guard shouldHandleBrightness(modifiers: modifiers) else { return Unmanaged.passUnretained(cgEvent) }
             dispatchBrightnessCommand(.down, step: step, isRepeat: isRepeat, modifiers: modifiers)
             return nil
+        case NX_KEYTYPE_ILLUMINATION_UP:
+            guard configuration.interceptCommandModifiedBrightness else { return Unmanaged.passUnretained(cgEvent) }
+            dispatchKeyboardBacklightCommand(.up, step: step, isRepeat: isRepeat)
+            return nil
+        case NX_KEYTYPE_ILLUMINATION_DOWN:
+            guard configuration.interceptCommandModifiedBrightness else { return Unmanaged.passUnretained(cgEvent) }
+            dispatchKeyboardBacklightCommand(.down, step: step, isRepeat: isRepeat)
+            return nil
         default:
             return Unmanaged.passUnretained(cgEvent)
         }
@@ -425,6 +445,22 @@ final class MediaKeyInterceptor {
         }
     }
 
+    private func dispatchKeyboardBacklightCommand(
+        _ direction: MediaKeyDirection,
+        step: MediaKeyStep,
+        isRepeat: Bool
+    ) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.delegate?.mediaKeyInterceptor(
+                self,
+                didReceiveKeyboardBacklightCommand: direction,
+                step: step,
+                isRepeat: isRepeat
+            )
+        }
+    }
+
     private func dispatchMuteCommand() {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
@@ -438,6 +474,8 @@ final class MediaKeyInterceptor {
             return configuration.interceptVolume
         case NX_KEYTYPE_BRIGHTNESS_UP, NX_KEYTYPE_BRIGHTNESS_DOWN:
             return configuration.interceptBrightness || (configuration.interceptCommandModifiedBrightness && modifiers.contains(.command))
+        case NX_KEYTYPE_ILLUMINATION_UP, NX_KEYTYPE_ILLUMINATION_DOWN:
+            return configuration.interceptCommandModifiedBrightness
         default:
             return false
         }

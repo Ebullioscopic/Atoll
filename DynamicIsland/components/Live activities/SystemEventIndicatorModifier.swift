@@ -48,12 +48,14 @@ struct SystemEventIndicatorModifier: View {
                             .contentTransition(.interpolate)
                             .symbolVariant(value > 0 ? .none : .slash)
                             .frame(width: 20, height: 15, alignment: .leading)
+                            .foregroundStyle(.white)
                     } else {
                         Image(systemName: icon)
                             .contentTransition(.interpolate)
                             .opacity(value.isZero ? 0.6 : 1)
                             .scaleEffect(value.isZero ? 0.85 : 1)
                             .frame(width: 20, height: 15, alignment: .leading)
+                            .foregroundStyle(.white)
                     }
                 case .brightness:
                     Image(systemName: "sun.max.fill")
@@ -204,6 +206,12 @@ struct PercentageLabel: View {
     }
 }
 
+private extension Color {
+    /// The accent colour chosen in System Settings › Appearance. The stored
+    /// `accentColor` default has no control in Settings, so it is always blue.
+    static var systemAccent: Color { Color(nsColor: .controlAccentColor) }
+}
+
 enum ProgressColorMode {
     case volume
     case battery
@@ -279,7 +287,7 @@ struct DraggableProgressBar: View {
 
     private func progressFill(width: CGFloat) -> some View {
         let clampedWidth = max(0, min(width * value, width))
-        let accentColor = Defaults[.accentColor]
+        let accentColor = Color.systemAccent
         let shadowColor: Color = {
             guard useShadow else { return .clear }
             if useAccentColor {
@@ -374,7 +382,7 @@ struct SegmentedProgressContent: View {
     private func segmentColor(isActive: Bool) -> Color {
         if isActive {
             if Defaults[.systemEventIndicatorUseAccent] {
-                return Defaults[.accentColor]
+                return Color.systemAccent
             }
             return .white
         } else {
@@ -386,11 +394,11 @@ struct SegmentedProgressContent: View {
         if isActive {
             if let glowIndex = glowIndex, index == glowIndex {
                 return Defaults[.systemEventIndicatorUseAccent]
-                    ? Defaults[.accentColor].ensureMinimumBrightness(factor: 0.8)
+                    ? Color.systemAccent.ensureMinimumBrightness(factor: 0.8)
                     : .white
             } else {
                 return Defaults[.systemEventIndicatorUseAccent]
-                    ? Defaults[.accentColor].ensureMinimumBrightness(factor: 0.7)
+                    ? Color.systemAccent.ensureMinimumBrightness(factor: 0.7)
                     : .white
             }
         }
