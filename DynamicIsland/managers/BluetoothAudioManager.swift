@@ -105,6 +105,7 @@ class BluetoothAudioManager: ObservableObject {
     private var listeningModeClearTask: Task<Void, Never>?
     private var listeningModePresentationTask: Task<Void, Never>?
     private var lastListeningModeByAddress: [String: AirPodsListeningMode] = [:]
+    private var listeningModeBaselineAddresses: Set<String> = []
     private var listeningModeRefreshTask: Task<Void, Never>?
     private let listeningModeLogObserver = AirPodsListeningModeLogObserver()
     private let listeningModeNotificationNames: [Notification.Name] = [
@@ -252,6 +253,46 @@ class BluetoothAudioManager: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        Defaults.publisher(.showAirPodsListeningModeChanges)
+            .map(\.newValue)
+            .removeDuplicates()
+            .combineLatest($connectedDevices)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled, devices in
+                self?.seedListeningModeBaselines(enabled: enabled, devices: devices)
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Reads the current mode of newly connected AirPods so the first mode the log reports
+    /// can be compared against it. Without a baseline the first logged value had to be
+    /// taken as the starting mode, which swallowed the HUD for the first real change.
+    private func seedListeningModeBaselines(enabled: Bool, devices: [BluetoothAudioDevice]) {
+        guard enabled else {
+            listeningModeBaselineAddresses.removeAll()
+            return
+        }
+        let airPods = devices.filter { $0.deviceType.isAirPods }
+        let connectedKeys = Set(airPods.map { normalizeBluetoothIdentifier($0.address) }).subtracting([""])
+        for device in airPods {
+            let key = normalizeBluetoothIdentifier(device.address)
+            guard !key.isEmpty, !listeningModeBaselineAddresses.contains(key) else { continue }
+            // A mode remembered from an earlier connection may have changed on another device.
+            lastListeningModeByAddress[key] = nil
+            if let mode = readListeningModeViaDynamicSelectors(for: device) {
+                lastListeningModeByAddress[key] = mode
+                continue
+            }
+            Task { @MainActor [weak self] in
+                let mode = await Task.detached(priority: .utility) {
+                    Self.readListeningModeFromIORegistry()
+                }.value
+                guard let self, let mode, self.lastListeningModeByAddress[key] == nil else { return }
+                self.lastListeningModeByAddress[key] = mode
+            }
+        }
+        listeningModeBaselineAddresses = connectedKeys
     }
 
     /// Starts polling for device connection changes (fallback mechanism)
@@ -399,7 +440,8 @@ class BluetoothAudioManager: ObservableObject {
         guard let device else { return }
 
         // The daemons also log the current mode when audio routing changes (e.g. on track
-        // changes), so the first value seen for a device is a baseline, not a change.
+        // changes). The baseline is normally read when the AirPods connect; if that read
+        // found nothing, the first value seen for a device is the baseline, not a change.
         let key = normalizeBluetoothIdentifier(device.address)
         if !key.isEmpty, lastListeningModeByAddress[key] == nil {
             lastListeningModeByAddress[key] = mode
