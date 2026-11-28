@@ -378,6 +378,9 @@ class ClipboardManager: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.checkClipboard()
         }
+        // Lets macOS coalesce the wakeup with others; a copy shows up a little
+        // later at worst.
+        timer?.tolerance = 0.25
     }
     
     func stopMonitoring() {

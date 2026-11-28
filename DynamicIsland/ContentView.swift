@@ -58,6 +58,8 @@ struct ContentView: View {
     /// compared against the frontmost app's menus. Only the *size* is read --
     /// the offset that follows does not change it, so there is no feedback.
     @State private var closedContentWidth: CGFloat = 0
+    /// Whether this view holds one of `MenuBarLayout`'s tracking counts.
+    @State private var isTrackingMenuBar = false
     /// Closed content width that menu-bar placement is decided on; see
     /// `recordClosedContentWidth`.
     @State private var closedPlacementWidth: CGFloat = 0
@@ -951,8 +953,16 @@ struct ContentView: View {
                 }
             }
             .onChange(of: isHovering) { _, hovering in
+                if hovering {
+                    startHiddenEdgeHoverPolling()
+                }
                 if shouldShowMusicControlWindow() {
                     enqueueMusicControlWindowSync(forceRefresh: true, delay: hovering ? 0.05 : 0.12)
+                }
+            }
+            .onChange(of: shouldUseHiddenEdgeHoverPolling) { _, shouldPoll in
+                if shouldPoll {
+                    startHiddenEdgeHoverPolling()
                 }
             }
             .onChange(of: recordingManager.isRecording) { _, isRecording in
@@ -979,17 +989,13 @@ struct ContentView: View {
                 }
             }
             .onAppear {
-                if vm.notchState == .closed { menuBarLayout.startTracking() }
+                syncMenuBarTracking()
             }
-            .onChange(of: vm.notchState) { _, state in
+            .onChange(of: needsMenuBarTracking) { _, _ in
+                syncMenuBarTracking()
+            }
+            .onChange(of: vm.notchState) { _, _ in
                 resetGestureProgress()
-                // An open notch covers the menu bar wholesale and is the user's
-                // own doing, so there is nothing to step around while it is up.
-                if state == .closed {
-                    menuBarLayout.startTracking()
-                } else {
-                    menuBarLayout.stopTracking()
-                }
             }
             .onDisappear {
                 performViewTeardown()
@@ -1000,6 +1006,29 @@ struct ContentView: View {
     /// the notch itself (`MusicLiveActivity` uses the same figure).
     private var closedMusicCenterWidth: CGFloat {
         max(vm.closedNotchSize.width + (isHovering ? 8 : 0), 96)
+    }
+
+    /// Whether the frontmost app's menus need measuring: only while a closed
+    /// activity has wings reaching into the menu bar. An open notch covers the
+    /// menu bar wholesale and is the user's own doing, and an idle notch or the
+    /// floating island cover nothing, so the menu scan (a cross-process
+    /// accessibility walk every few seconds) stays off then.
+    private var needsMenuBarTracking: Bool {
+        vm.notchState == .closed
+            && !vm.hideOnClosed
+            && !isIslandMode
+            && closedContentWidth > vm.closedNotchSize.width
+    }
+
+    private func syncMenuBarTracking() {
+        let needed = needsMenuBarTracking
+        guard needed != isTrackingMenuBar else { return }
+        isTrackingMenuBar = needed
+        if needed {
+            menuBarLayout.startTracking()
+        } else {
+            menuBarLayout.stopTracking()
+        }
     }
 
     /// The physical notch on `screen`, in global x. A screen without one gets
@@ -2253,7 +2282,10 @@ struct ContentView: View {
     /// Cancels every long-lived task / event monitor this view owns. Called from
     /// `.onDisappear` and from `vm.onViewTeardown` on window close. Idempotent.
     private func performViewTeardown() {
-        menuBarLayout.stopTracking()
+        if isTrackingMenuBar {
+            isTrackingMenuBar = false
+            menuBarLayout.stopTracking()
+        }
         hoverTask?.cancel()
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
@@ -2286,23 +2318,26 @@ struct ContentView: View {
                         self.stopHoverClickMonitor()
                         self.finishHoverExit()
                     }
+                } else {
+                    // Nothing to watch: stop instead of waking every second for
+                    // the life of the app. Hovering or hide-until-hover start
+                    // the poll again.
+                    break
                 }
 
                 try? await Task.sleep(for: .milliseconds(self.hiddenEdgeHoverPollingIntervalMs()))
             }
 
-            self.hiddenEdgeHoverPollingTask = nil
+            // A cancelled poll was already cleared by `stopHiddenEdgeHoverPolling`,
+            // which may have started its replacement since.
+            if !Task.isCancelled {
+                self.hiddenEdgeHoverPollingTask = nil
+            }
         }
     }
 
     private func hiddenEdgeHoverPollingIntervalMs() -> Int {
-        if shouldUseHiddenEdgeHoverPolling {
-            return 50
-        }
-        if isHovering && interactionsEnabled {
-            return 100
-        }
-        return 1_000
+        shouldUseHiddenEdgeHoverPolling ? 50 : 100
     }
 
     private func stopHiddenEdgeHoverPolling() {

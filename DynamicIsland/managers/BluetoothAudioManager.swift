@@ -249,6 +249,7 @@ class BluetoothAudioManager: ObservableObject {
         pollingTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             self?.checkForDeviceChanges()
         }
+        pollingTimer?.tolerance = 1.0
     }
     
     /// Checks for device connection/disconnection changes
