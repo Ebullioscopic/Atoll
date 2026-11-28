@@ -424,6 +424,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     private var didCaptureStaticBackup = false
     private var appliedStaticWallpaper = false
     private var didApplyAerialWallpaper = false
+    private var needsStoreRestoreFromBackup = false
     private var fallbackRightClickMonitor: Any?
     private var artworkLayoutOverCanvasPreferenceCancellable: AnyCancellable?
     private var lyricsTextCancellable: AnyCancellable?
@@ -500,6 +501,9 @@ final class FullScreenArtworkWindowManager: ObservableObject {
             .debounce(for: .milliseconds(180), scheduler: DispatchQueue.main)
             .sink { [weak self] newArt in
                 guard let self else { return }
+                // Full-screen artwork only appears on the lock screen; skip encoding
+                // and writing every artwork change to disk while unlocked.
+                guard self.isShowing || LockScreenManager.shared.isLocked else { return }
                 guard let fingerprint = self.imageFingerprint(for: newArt) else { return }
                 guard fingerprint != self.cachedArtworkFingerprint else { return }
                 let url = self.artworkCacheFileURL(for: fingerprint)
@@ -628,9 +632,10 @@ final class FullScreenArtworkWindowManager: ObservableObject {
 
         guard let rawArtworkFileURL = persistedArtworkFileURL(for: artwork, fingerprint: artworkFingerprint) else { return }
         let expectCanvas = effectiveVideoURL != nil
-        let blurredFallbackURL = blurredWallpaperFileURL(for: artwork, fingerprint: artworkFingerprint, screen: screen) ?? rawArtworkFileURL
+        // The blurred, screen-sized render is only needed for the Spotify fallback
+        // and canvas tracks; building it for every track change stalled the lock screen (#791).
         let wallpaperURL = (shouldUseStaticFallbackWallpaper || expectCanvas)
-            ? blurredFallbackURL
+            ? (blurredWallpaperFileURL(for: artwork, fingerprint: artworkFingerprint, screen: screen) ?? rawArtworkFileURL)
             : rawArtworkFileURL
         let wallpaperKey = wallpaperIdentityKey(
             fingerprint: artworkFingerprint,
@@ -650,7 +655,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
 
         if requiresWallpaperRefresh {
             if expectCanvas {
-                pendingFallbackStaticURL = blurredFallbackURL
+                pendingFallbackStaticURL = wallpaperURL
                 pendingFallbackWallpaperKey = wallpaperKey
                 activeWallpaperKey = nil
                 activeLiveWallpaperFingerprint = nil
@@ -1692,11 +1697,20 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         guard !didCaptureStaticBackup else { return }
         let ws = NSWorkspace.shared
         for screen in NSScreen.screens {
-            if let url = ws.desktopImageURL(for: screen) {
-                originalDesktopImageURLs[screenKey(screen)] = url
+            guard let url = ws.desktopImageURL(for: screen) else { continue }
+            // Atoll's own artwork means an earlier session ended (quit or crash) before
+            // restoring; the wallpaper store backup kept from that session holds the original.
+            if Self.isAtollArtworkFile(url) {
+                needsStoreRestoreFromBackup = true
+                continue
             }
+            originalDesktopImageURLs[screenKey(screen)] = url
         }
         didCaptureStaticBackup = true
+    }
+
+    nonisolated static func isAtollArtworkFile(_ url: URL) -> Bool {
+        url.isFileURL && url.lastPathComponent.hasPrefix("atoll_artwork_wallpaper")
     }
 
     @discardableResult
@@ -1907,7 +1921,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
             restoreStaticWallpaper()
         }
 
-        if didApplyAerialWallpaper, hasValidBackup {
+        if didApplyAerialWallpaper || needsStoreRestoreFromBackup, hasValidBackup {
             do {
                 try fm.removeItem(at: wallpaperPlistURL)
                 try fm.copyItem(at: backupPlistURL, to: wallpaperPlistURL)
@@ -1922,6 +1936,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         }
 
         didApplyAerialWallpaper = false
+        needsStoreRestoreFromBackup = false
     }
 
     // MARK: - Track Change Observer

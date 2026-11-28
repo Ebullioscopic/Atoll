@@ -67,6 +67,12 @@ final class MemoryUsageMonitor {
     }
 
     private func restartIfNeeded(currentUsage: UInt64) {
+        // A modal alert behind the lock screen can't be seen or answered, and its
+        // modal loop stalls the lock screen widgets and HUDs until unlock (#791).
+        guard !Self.isScreenLocked else {
+            Logger.log("[MemoryMonitor] Usage \(formatMegabytes(currentUsage)) MB exceeds threshold; deferring prompt until unlock", category: .warning)
+            return
+        }
         let now = Date()
         guard now.timeIntervalSince(lastRestartAttempt) >= restartCooldown else {
             Logger.log("[MemoryMonitor] Usage \(formatMegabytes(currentUsage)) MB exceeds threshold but cooldown active", category: .warning)
@@ -91,6 +97,11 @@ final class MemoryUsageMonitor {
         } else {
             Logger.log("[MemoryMonitor] Restart postponed by user", category: .warning)
         }
+    }
+
+    private static var isScreenLocked: Bool {
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else { return false }
+        return session["CGSSessionScreenIsLocked"] as? Bool ?? false
     }
 
     private func relaunchApplication() {
