@@ -94541,7 +94541,13 @@
           }
         }
       }
-    }
+    },
+    "Use a custom location" : {},
+    "City" : {},
+    "Searching…" : {},
+    "No city found with that name." : {},
+    "Weather uses this city instead of Location Services." : {},
+    "Showing weather for %@." : {}
   },
   "version" : "1.2"
 }

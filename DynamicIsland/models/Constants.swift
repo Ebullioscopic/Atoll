@@ -1184,6 +1184,10 @@ extension Defaults.Keys {
     static let lockScreenWeatherAQIScale = Key<LockScreenWeatherAirQualityScale>("lockScreenWeatherAQIScale", default: .us)
     static let lockScreenWeatherUsesGaugeTint = Key<Bool>("lockScreenWeatherUsesGaugeTint", default: false)
     static let lockScreenWeatherProviderSource = Key<LockScreenWeatherProviderSource>("lockScreenWeatherProviderSource", default: .openMeteo)
+    static let lockScreenWeatherUsesCustomLocation = Key<Bool>("lockScreenWeatherUsesCustomLocation", default: false)
+    static let lockScreenWeatherCustomLocationName = Key<String>("lockScreenWeatherCustomLocationName", default: "")
+    static let lockScreenWeatherCustomLatitude = Key<Double?>("lockScreenWeatherCustomLatitude", default: nil)
+    static let lockScreenWeatherCustomLongitude = Key<Double?>("lockScreenWeatherCustomLongitude", default: nil)
     static let lockScreenWeatherVerticalOffset = Key<Double>("lockScreenWeatherVerticalOffset", default: 0)
     static let lockScreenMusicVerticalOffset = Key<Double>("lockScreenMusicVerticalOffset", default: 0)
     static let lockScreenMusicPanelWidth = Key<Double>(
