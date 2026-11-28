@@ -370,9 +370,9 @@ enum ClipboardProvider: String, CaseIterable, Codable, Defaults.Serializable, Id
     var description: String {
         switch self {
         case .builtIn:
-            return "Atoll keeps its own clipboard history and shows it in the notch."
+            return String(localized: "Atoll keeps its own clipboard history and shows it in the notch.")
         case .maccy:
-            return "Maccy handles the clipboard. Atoll's own history and clipboard shortcut are turned off."
+            return String(localized: "Maccy handles the clipboard. Atoll's own history and clipboard shortcut are turned off.")
         }
     }
 }

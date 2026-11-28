@@ -84,7 +84,14 @@ final class ClipboardProviderManager: ObservableObject {
     ///   caller should fall through to Atoll's own clipboard UI.
     @discardableResult
     nonisolated static func handleClipboardTrigger() -> Bool {
-        openProviderPopup(resolvedProvider)
+        let provider = resolvedProvider
+        if openProviderPopup(provider) { return true }
+        if provider.isExternal {
+            // The cached install state was stale (the app was removed): hand the clipboard
+            // back to Atoll so its polling and shortcut resume right away.
+            Task { @MainActor in shared.refreshAndSync() }
+        }
+        return false
     }
 
     /// Reopen the provider app, which toggles its clipboard popup.
@@ -113,7 +120,7 @@ final class ClipboardProviderManager: ObservableObject {
     // `nonisolated(unsafe)` because the cache is read from nonisolated resolution helpers on
     // whichever thread asks; every access below is serialized by `installationCacheLock`.
     nonisolated(unsafe) private static var installationCache: [String: Bool] = [:]
-    private static let installationCacheLock = NSLock()
+    nonisolated private static let installationCacheLock = NSLock()
 
     /// Cached because view bodies and notch sizing ask this on every layout pass;
     /// the cache is dropped whenever an app is installed, launched, or removed.
@@ -169,6 +176,14 @@ final class ClipboardProviderManager: ObservableObject {
         isRunning = Self.isRunning(provider)
     }
 
+    /// Re-detect the provider and bring Atoll's own polling, shortcut and tab in line with it.
+    func refreshAndSync() {
+        refreshDetectionStatus()
+        syncBuiltInMonitoring()
+        syncShortcutRegistration()
+        dismissBuiltInClipboardViewIfNeeded()
+    }
+
     // MARK: - Built-in monitoring
 
     /// Keep Atoll's own pasteboard polling in step with the selected provider: there is no
@@ -197,9 +212,10 @@ final class ClipboardProviderManager: ObservableObject {
     ///
     /// Must run after `registerOptionalShortcutHandlers()` — `KeyboardShortcuts.disable`
     /// unregisters the hotkey rather than remembering a disabled state, so a later
-    /// registration would silently bring the collision back.
+    /// registration would silently bring the collision back. The app delegate's feature
+    /// shortcut refresh calls this too, so the two never disagree.
     func syncShortcutRegistration() {
-        if Self.usesBuiltInClipboard {
+        if Defaults[.enableShortcuts] && Self.usesBuiltInClipboard {
             KeyboardShortcuts.enable(.clipboardHistoryPanel)
         } else {
             KeyboardShortcuts.disable(.clipboardHistoryPanel)
@@ -229,7 +245,7 @@ final class ClipboardProviderManager: ObservableObject {
                       ClipboardProvider.allCases.contains(where: { $0.bundleIdentifiers.contains(bundleID) })
                 else { return }
                 Task { @MainActor in
-                    self?.refreshDetectionStatus()
+                    self?.refreshAndSync()
                 }
             }
             workspaceObservers.append(observer)
@@ -243,10 +259,7 @@ final class ClipboardProviderManager: ObservableObject {
         )
         .receive(on: DispatchQueue.main)
         .sink { [weak self] _ in
-            self?.refreshDetectionStatus()
-            self?.syncBuiltInMonitoring()
-            self?.syncShortcutRegistration()
-            self?.dismissBuiltInClipboardViewIfNeeded()
+            self?.refreshAndSync()
         }
         .store(in: &cancellables)
     }

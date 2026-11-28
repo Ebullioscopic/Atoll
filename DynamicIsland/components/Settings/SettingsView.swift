@@ -8578,12 +8578,12 @@ struct ClipboardSettings: View {
     private var providerStatusDescription: String {
         let name = clipboardProvider.displayName
         if !providerManager.isDetected {
-            return "\(name) isn't installed. Atoll uses its own history for now."
+            return String(localized: "\(name) isn't installed. Atoll uses its own history for now.")
         }
         if !providerManager.isRunning {
-            return "\(name) isn't running yet. Atoll opens it the first time you use the clipboard."
+            return String(localized: "\(name) isn't running yet. Atoll opens it the first time you use the clipboard.")
         }
-        return "The notch clipboard icon opens \(name). From the keyboard, use \(name)'s own hotkey."
+        return String(localized: "The notch clipboard icon opens \(name). From the keyboard, use \(name)'s own hotkey.")
     }
 
     var body: some View {
@@ -8664,7 +8664,7 @@ struct ClipboardSettings: View {
 
                         HStack(spacing: 16) {
                             Button {
-                                providerManager.refreshDetectionStatus()
+                                providerManager.refreshAndSync()
                             } label: {
                                 Label("Refresh detection", systemImage: "arrow.clockwise")
                                     .font(.caption)
@@ -8807,7 +8807,7 @@ struct ClipboardSettings: View {
         .formStyle(.grouped)
         .navigationTitle("Clipboard")
         .onAppear {
-            providerManager.refreshDetectionStatus()
+            providerManager.refreshAndSync()
             if usesBuiltInClipboard && enableClipboardManager && !clipboardManager.isMonitoring {
                 clipboardManager.startMonitoring()
             }

@@ -1113,10 +1113,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         KeyboardShortcuts.isEnabled = Defaults[.enableShortcuts]
         registerOptionalShortcutHandlers()
-
-        // Must follow the registration above: an external clipboard app owns the clipboard
-        // hotkey, so Atoll releases its own to avoid two apps answering one key press.
-        ClipboardProviderManager.shared.syncShortcutRegistration()
         updateFeatureShortcutAvailability()
 
         if !Defaults[.showOnAllDisplays] {
@@ -1567,7 +1563,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func updateFeatureShortcutAvailability() {
         updateShortcut(.startDemoTimer, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableTimerFeature])
-        updateShortcut(.clipboardHistoryPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableClipboardManager])
+        // An external clipboard app owns the clipboard hotkey while it is selected.
+        ClipboardProviderManager.shared.syncShortcutRegistration()
         updateShortcut(.colorPickerPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableColorPickerFeature])
         updateShortcut(.screenAssistantPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableScreenAssistant])
         updateShortcut(.toggleTerminalTab, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableTerminalFeature])
