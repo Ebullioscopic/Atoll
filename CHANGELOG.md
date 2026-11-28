@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Double-click a date to open your calendar app**: double-clicking a day in the notch calendar opens Calendar, or Fantastical on that day, or Notion Calendar when one is chosen under Third-party Calendar Integration. (#383)
 - **Minimal calendar**: turn off the new “Show date picker” option in Calendar settings to hide the month, week or 3-day picker and show only the day's events when the calendar has the Home tab to itself. The notch then keeps its standard height. On by default. (#341)
 - **Hide the calendar during playback**: a new “Show beside music player” option in Calendar settings keeps the calendar off the Home tab while the music player is on it, so the player (and side lyrics, when on) get the whole space. The calendar still shows when the player is hidden. On by default. (#920)
 - **Back up and restore settings**: General settings can export your Atoll settings to a JSON file and import them again, on the same Mac or another one. API keys, sign-ins, clipboard history, notes and other private or device-specific data are never included, and Atoll offers to relaunch after an import. (#885)

@@ -289,6 +289,8 @@ struct WheelPicker: View {
             .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())
+        .simultaneousGesture(TapGesture(count: 2).onEnded { EventModel.openCalendarApp(at: date) })
+        .accessibilityAction(named: Text("Open in Calendar")) { EventModel.openCalendarApp(at: date) }
         .id(id)
         .background(GeometryReader { geo in
             Color.clear.preference(key: CellWidthKey.self, value: geo.size.width)
@@ -820,6 +822,9 @@ struct StandaloneCalendarView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // Double-clicking a day opens it in the calendar app (#383).
+        .simultaneousGesture(TapGesture(count: 2).onEnded { EventModel.openCalendarApp(at: day) })
+        .accessibilityAction(named: Text("Open in Calendar")) { EventModel.openCalendarApp(at: day) }
     }
 
     private func dayTextColor(isInVisibleRange: Bool, isSelected: Bool, isToday: Bool) -> Color {
