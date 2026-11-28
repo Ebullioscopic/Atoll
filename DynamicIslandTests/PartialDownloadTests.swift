@@ -38,6 +38,7 @@ final class PartialDownloadTests: XCTestCase {
         XCTAssertTrue(PartialDownload.isInProgress("archive.zip.download"))
         XCTAssertTrue(PartialDownload.isInProgress("archive.zip.part"))
         XCTAssertTrue(PartialDownload.isInProgress("archive.zip.opdownload"))
+        XCTAssertTrue(PartialDownload.isInProgress("archive.zip.fdmdownload"))
     }
 
     /// Extensions come off disks in whatever case the browser felt like.
@@ -60,6 +61,7 @@ final class PartialDownloadTests: XCTestCase {
         XCTAssertEqual(PartialDownload.destination(of: "archive.zip.download"), "archive.zip")
         XCTAssertEqual(PartialDownload.destination(of: "archive.zip.part"), "archive.zip")
         XCTAssertEqual(PartialDownload.destination(of: "archive.zip.opdownload"), "archive.zip")
+        XCTAssertEqual(PartialDownload.destination(of: "archive.zip.fdmdownload"), "archive.zip")
         XCTAssertEqual(PartialDownload.destination(of: "report.2026.01.pdf.part"), "report.2026.01.pdf")
     }
 
