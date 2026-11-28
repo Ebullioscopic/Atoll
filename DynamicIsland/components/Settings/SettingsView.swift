@@ -237,8 +237,10 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "Close gesture", keywords: ["pinch", "swipe"], highlightID: SettingsTab.general.highlightID(for: "Close gesture")),
         SettingsSearchEntry(tab: .general, title: "Reverse swipe gestures", keywords: ["reverse", "swipe", "media"], highlightID: SettingsTab.general.highlightID(for: "Reverse swipe gestures")),
         SettingsSearchEntry(tab: .general, title: "Reverse scroll gestures", keywords: ["reverse", "scroll", "open", "close"], highlightID: SettingsTab.general.highlightID(for: "Reverse scroll gestures")),
+        SettingsSearchEntry(tab: .general, title: "Arrow key seek", keywords: ["arrow", "keyboard", "key", "seek", "scrub", "rewind"], highlightID: SettingsTab.general.highlightID(for: "Arrow key seek")),
         SettingsSearchEntry(tab: .general, title: "Extend hover area", keywords: ["hover", "cursor"], highlightID: SettingsTab.general.highlightID(for: "Extend hover area")),
         SettingsSearchEntry(tab: .general, title: "Enable haptics", keywords: ["haptic", "feedback"], highlightID: SettingsTab.general.highlightID(for: "Enable haptics")),
+        SettingsSearchEntry(tab: .general, title: "Open to", keywords: ["default tab", "remember last tab", "startup"], highlightID: SettingsTab.general.highlightID(for: "Open to")),
         SettingsSearchEntry(tab: .general, title: "Open notch on hover", keywords: ["hover to open", "auto open"], highlightID: SettingsTab.general.highlightID(for: "Open notch on hover")),
         SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
         SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
@@ -435,11 +437,16 @@ private enum SettingsSearchIndex {
         // Stats
         SettingsSearchEntry(tab: .stats, title: "Enable system stats monitoring", keywords: ["stats", "monitoring"], highlightID: SettingsTab.stats.highlightID(for: "Enable system stats monitoring")),
         SettingsSearchEntry(tab: .stats, title: "Enable LLM Usage Monitor", keywords: ["llm", "usage", "ai", "monitor"], highlightID: SettingsTab.stats.highlightID(for: "Enable LLM Usage Monitor")),
+        SettingsSearchEntry(tab: .stats, title: "Show remaining quota instead of usage", keywords: ["llm", "usage", "ai", "quota", "remaining", "left"], highlightID: SettingsTab.stats.highlightID(for: "Show remaining quota instead of usage")),
         SettingsSearchEntry(tab: .stats, title: "Claude Provider", keywords: ["llm", "claude", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Claude Provider")),
         SettingsSearchEntry(tab: .stats, title: "Codex Provider", keywords: ["llm", "codex", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Codex Provider")),
+        SettingsSearchEntry(tab: .stats, title: "Copilot Provider", keywords: ["llm", "github", "copilot", "quota"], highlightID: SettingsTab.stats.highlightID(for: "Copilot Provider")),
         SettingsSearchEntry(tab: .stats, title: "Cursor Provider", keywords: ["llm", "cursor", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Cursor Provider")),
         SettingsSearchEntry(tab: .stats, title: "Antigravity Provider", keywords: ["llm", "antigravity", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Antigravity Provider")),
         SettingsSearchEntry(tab: .stats, title: "New API Provider", keywords: ["llm", "new api", "newapi", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "New API Provider")),
+        SettingsSearchEntry(tab: .stats, title: "OpenRouter Provider", keywords: ["llm", "openrouter", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter Provider")),
+        SettingsSearchEntry(tab: .stats, title: "OpenRouter API Key", keywords: ["llm", "openrouter", "api", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter API Key")),
+        SettingsSearchEntry(tab: .stats, title: "OpenRouter Per-model Analytics", keywords: ["llm", "openrouter", "management", "key", "analytics"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter Per-model Analytics")),
         SettingsSearchEntry(tab: .stats, title: "New API Accounts", keywords: ["llm", "new api", "newapi", "accounts", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "New API Accounts")),
         SettingsSearchEntry(tab: .stats, title: "Stop monitoring after closing the notch", keywords: ["stats", "auto stop"], highlightID: SettingsTab.stats.highlightID(for: "Stop monitoring after closing the notch")),
         SettingsSearchEntry(tab: .stats, title: "CPU Usage", keywords: ["cpu", "graph"], highlightID: SettingsTab.stats.highlightID(for: "CPU Usage")),
@@ -1390,7 +1397,21 @@ struct GeneralSettings: View {
                     Text("Reverse open/close scroll gestures")
                 }
                 .settingsHighlight(id: highlightID("Reverse scroll gestures"))
+
             }
+
+            // Outside the gestures block on purpose: an arrow key is a keyboard
+            // shortcut, not a gesture, and NotchSeekKeyMonitor does not consult
+            // `enableGestures`. Nesting it there would hide the switch while the
+            // feature carried on working.
+            Defaults.Toggle(key: .arrowKeySeekEnabled) {
+                Text("Seek with arrow keys while the notch is open")
+            }
+            .settingsHighlight(id: highlightID("Arrow key seek"))
+
+            Text("Left and right seek by 10 seconds while the notch is open on the home view and Atoll has keyboard focus. Arrow keys typed into other apps or text fields are never used for seeking.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         } header: {
             HStack {
                 Text("Gesture control")
@@ -1401,6 +1422,20 @@ struct GeneralSettings: View {
                 .multilineTextAlignment(.trailing)
                 .foregroundStyle(.secondary)
                 .font(.caption)
+        }
+    }
+
+    private func openDestinationName(_ destination: NotchOpenDestination) -> String {
+        switch destination {
+        case .automatic: return String(localized: "Automatic")
+        case .lastUsed: return String(localized: "Remember last tab")
+        case .home: return String(localized: "Home")
+        case .shelf: return String(localized: "Shelf")
+        case .timer: return String(localized: "Timer")
+        case .stats: return String(localized: "Stats")
+        case .llmUsage: return String(localized: "Usage")
+        case .notes: return Defaults[.enableNotes] ? String(localized: "Notes") : String(localized: "Clipboard")
+        case .terminal: return String(localized: "Terminal")
         }
     }
 
@@ -1419,7 +1454,32 @@ struct GeneralSettings: View {
                 Text("Open notch on hover")
             }
             .settingsHighlight(id: highlightID("Open notch on hover"))
-            Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
+            Picker("Open to", selection: Binding(
+                get: { coordinator.selectedOpenDestination },
+                set: { coordinator.setOpenDestination($0) }
+            )) {
+                Text("Automatic").tag(NotchOpenDestination.automatic)
+                Text("Remember last tab").tag(NotchOpenDestination.lastUsed)
+                ForEach(coordinator.availableStandardTabs, id: \.self) { destination in
+                    Text(openDestinationName(destination)).tag(destination)
+                        .disabled(!coordinator.alwaysShowTabs)
+                }
+                if coordinator.selectedOpenDestination.isFixed && !coordinator.availableStandardTabs.contains(coordinator.selectedOpenDestination) {
+                    Text("Unavailable — \(openDestinationName(coordinator.selectedOpenDestination))")
+                        .tag(coordinator.selectedOpenDestination)
+                }
+            }
+            .disabled(enableMinimalisticUI)
+            .settingsHighlight(id: highlightID("Open to"))
+            if enableMinimalisticUI {
+                Text("Minimalistic mode always opens Home.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if !coordinator.alwaysShowTabs {
+                Text("Opening to a specific tab requires “Always show tabs” in Appearance.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if openNotchOnHover {
                 Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
                     HStack {
@@ -3121,6 +3181,10 @@ private extension MediaControllerType {
             return ["com.github.th-ch.youtube-music"]
         case .amazonMusic:
             return ["com.amazon.music"]
+        case .netEaseCloudMusic:
+            return [NetEaseCloudMusicController.bundleIdentifier]
+        case .qqMusic:
+            return [QQMusicController.bundleIdentifier]
         case .tidal:
             return [TidalController.bundleIdentifier]
         case .cider:
@@ -3135,6 +3199,8 @@ private extension MediaControllerType {
         case .spotify: return "dot.radiowaves.left.and.right"
         case .youtubeMusic: return "play.rectangle.fill"
         case .amazonMusic: return "music.note.list"
+        case .netEaseCloudMusic: return "music.quarternote.3"
+        case .qqMusic: return "music.mic"
         case .tidal: return "waveform.path"
         case .cider: return "cup.and.saucer.fill"
         }
@@ -3147,6 +3213,8 @@ private extension MediaControllerType {
         case .spotify: return .green
         case .youtubeMusic: return .red
         case .amazonMusic: return .cyan
+        case .netEaseCloudMusic: return .red
+        case .qqMusic: return .green
         case .tidal: return .primary
         case .cider: return .orange
         }
@@ -3227,25 +3295,25 @@ struct Media: View {
             } header: {
                 Text("Media Source")
             } footer: {
-                if MusicManager.shared.isNowPlayingDeprecated {
-                    HStack {
-                        Text("YouTube Music requires this third-party app to be installed: ")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                        Link("https://github.com/th-ch/youtube-music", destination: URL(string: "https://github.com/th-ch/youtube-music")!)
-                            .font(.caption)
-                            .foregroundColor(.blue) // Ensures it's visibly a link
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(String(localized: "'Now Playing' was the only option on previous versions and works with all media apps."))
-                        if mediaController == .amazonMusic || mediaController == .tidal || mediaController == .cider {
-                            Text(mediaController.description)
+                VStack(alignment: .leading, spacing: 6) {
+                    if MusicManager.shared.isNowPlayingDeprecated {
+                        HStack {
+                            Text("YouTube Music requires this third-party app to be installed: ")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                            Link("https://github.com/th-ch/youtube-music", destination: URL(string: "https://github.com/th-ch/youtube-music")!)
+                                .font(.caption)
+                                .foregroundColor(.blue) // Ensures it's visibly a link
                         }
+                    } else {
+                        Text(String(localized: "'Now Playing' was the only option on previous versions and works with all media apps."))
                     }
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
+                    if mediaController == .amazonMusic || mediaController == .netEaseCloudMusic || mediaController == .qqMusic || mediaController == .tidal || mediaController == .cider {
+                        Text(mediaController.description)
+                    }
                 }
+                .foregroundStyle(.secondary)
+                .font(.caption)
             }
 
             if mediaController == .spotify {
@@ -3640,7 +3708,8 @@ struct Media: View {
     // Only show controller options that are available on this macOS version
     private var availableMediaControllers: [MediaControllerType] {
         if MusicManager.shared.isNowPlayingDeprecated {
-            return MediaControllerType.allCases.filter { $0 != .nowPlaying }
+            // Keep the current choice listed so the picker never goes blank.
+            return MediaControllerType.allCases.filter { $0 != .nowPlaying || $0 == mediaController }
         } else {
             return MediaControllerType.allCases
         }
@@ -3729,44 +3798,16 @@ struct CalendarSettings: View {
 
     var body: some View {
         Form {
-            if !calendarManager.hasCalendarAccess || !calendarManager.hasReminderAccess {
-                Text("Calendar or Reminder access is denied. Please enable it in System Settings.")
-                    .foregroundColor(.red)
-                    .multilineTextAlignment(.center)
-                    .padding()
-
-                HStack {
-                    Button("Request Access") {
-                        Task {
-                            await calendarManager.checkCalendarAuthorization()
-                            await calendarManager.checkReminderAuthorization()
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    Button("Open System Settings") {
-                        if let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
-                            NSWorkspace.shared.open(settingsURL)
-                        }
-                    }
+            Section(header: Text("Permissions")) {
+                CalendarPermissionRow(entity: .event, status: calendarManager.calendarAuthorizationStatus) {
+                    await calendarManager.checkCalendarAuthorization()
                 }
-            } else {
-                // Permissions status
-                Section(header: Text("Permissions")) {
-                    HStack {
-                        Text("Calendars")
-                        Spacer()
-                        Text(statusText(for: calendarManager.calendarAuthorizationStatus))
-                            .foregroundColor(color(for: calendarManager.calendarAuthorizationStatus))
-                    }
-                    HStack {
-                        Text("Reminders")
-                        Spacer()
-                        Text(statusText(for: calendarManager.reminderAuthorizationStatus))
-                            .foregroundColor(color(for: calendarManager.reminderAuthorizationStatus))
-                    }
+                CalendarPermissionRow(entity: .reminder, status: calendarManager.reminderAuthorizationStatus) {
+                    await calendarManager.checkReminderAuthorization()
                 }
+            }
 
+            if calendarManager.access.canShowSettings {
                 Defaults.Toggle(key: .showCalendar) {
                     Text("Show calendar")
                 }
@@ -3798,6 +3839,7 @@ struct CalendarSettings: View {
                 Section(header: Text("Event List")) {
                     Toggle("Hide completed reminders", isOn: $hideCompletedReminders)
                         .settingsHighlight(id: highlightID("Hide completed reminders"))
+                        .disabled(!calendarManager.hasReminderAccess)
                     Toggle("Show full event titles", isOn: $showFullEventTitles)
                         .settingsHighlight(id: highlightID("Show full event titles"))
                     Toggle("Auto-scroll to next event", isOn: $autoScrollToNextEvent)
@@ -4019,6 +4061,8 @@ struct CalendarSettings: View {
                     .settingsHighlight(id: highlightID("Show start time after event begins"))
                 }
                 
+                .disabled(!calendarManager.hasCalendarAccess)
+
                 // MARK: - Third-party Calendar Integration
                 Section {
                     Defaults.Toggle(key: .enableThirdPartyCalendarApp) {
@@ -4109,35 +4153,15 @@ struct CalendarSettings: View {
                 }
             }
         }
-        .onAppear {
-            Task {
-                await calendarManager.checkCalendarAuthorization()
-                await calendarManager.checkReminderAuthorization()
-            }
+        .task {
+            await calendarManager.refreshAuthorization()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await calendarManager.refreshAuthorizationIfChanged() }
         }
         .navigationTitle("Calendar")
     }
 
-    private func statusText(for status: EKAuthorizationStatus) -> String {
-        switch status {
-        case .fullAccess, .authorized: return String(localized: "Full Access")
-        case .writeOnly: return String(localized: "Write Only")
-        case .denied: return String(localized: "Denied")
-        case .restricted: return String(localized: "Restricted")
-        case .notDetermined: return String(localized: "Not Determined")
-        @unknown default: return String(localized: "Unknown")
-        }
-    }
-
-    private func color(for status: EKAuthorizationStatus) -> Color {
-        switch status {
-        case .fullAccess, .authorized: return .green
-        case .writeOnly: return .yellow
-        case .denied, .restricted: return .red
-        case .notDetermined: return .secondary
-        @unknown default: return .secondary
-        }
-    }
 }
 
 struct About: View {
@@ -8082,6 +8106,7 @@ struct StatsSettings: View {
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.enableLLMUsageFeature) var enableLLMUsageFeature
     @Default(.enableNewAPIProvider) var enableNewAPIProvider
+    @Default(.enableOpenRouterProvider) var enableOpenRouterProvider
     @Default(.statsStopWhenNotchCloses) var statsStopWhenNotchCloses
     @Default(.statsUpdateInterval) var statsUpdateInterval
     @Default(.showCpuGraph) var showCpuGraph
@@ -8091,10 +8116,14 @@ struct StatsSettings: View {
     @Default(.showDiskGraph) var showDiskGraph
     @Default(.cpuTemperatureUnit) var cpuTemperatureUnit
     @State private var newAPIAccounts = Defaults[.newAPIAccounts]
+    @Default(.openRouterUsageAnalytics) var openRouterUsageAnalytics
+    @State private var openRouterAPIKey = ""
+    @State private var hasOpenRouterKey = false
     @State private var isNewAPIEditorPresented = false
     @State private var editingNewAPIAccount: NewAPIAccount?
     @State private var accountPendingDeletion: NewAPIAccount?
     @State private var newAPIAccountErrorMessage: String?
+    @State private var openRouterErrorMessage: String?
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.stats.highlightID(for: title)
@@ -8119,6 +8148,35 @@ struct StatsSettings: View {
         !statsStopWhenNotchCloses && statsUpdateInterval <= 5
     }
 
+    private func saveOpenRouterKey() {
+        let trimmed = openRouterAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            openRouterErrorMessage = String(localized: "Enter an OpenRouter API key.")
+            return
+        }
+        do {
+            try OpenRouterKeychain.save(trimmed)
+            openRouterAPIKey = ""
+            hasOpenRouterKey = true
+            openRouterErrorMessage = nil
+            LLMUsageManager.shared.refreshAll(force: true)
+        } catch {
+            openRouterErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteOpenRouterKey() {
+        do {
+            try OpenRouterKeychain.delete()
+            openRouterAPIKey = ""
+            hasOpenRouterKey = false
+            openRouterErrorMessage = nil
+            LLMUsageManager.shared.refreshAll(force: true)
+        } catch {
+            openRouterErrorMessage = error.localizedDescription
+        }
+    }
+
     var body: some View {
         Form {
             Section {
@@ -8137,6 +8195,13 @@ struct StatsSettings: View {
                     Text("Enable LLM Usage Monitor")
                 }
                 .settingsHighlight(id: highlightID("Enable LLM Usage Monitor"))
+
+                if enableLLMUsageFeature {
+                    Defaults.Toggle(key: .enableUsageRemainingDisplay) {
+                        Text("Show remaining quota instead of usage")
+                    }
+                    .settingsHighlight(id: highlightID("Show remaining quota instead of usage"))
+                }
 
             } header: {
                 Text("General")
@@ -8159,6 +8224,9 @@ struct StatsSettings: View {
                     }
                     .settingsHighlight(id: highlightID("Codex Provider"))
 
+                    CopilotUsageSettings()
+                        .settingsHighlight(id: highlightID("Copilot Provider"))
+
                     Defaults.Toggle(key: .enableCursorProvider) {
                         Text("Cursor")
                     }
@@ -8176,6 +8244,14 @@ struct StatsSettings: View {
                     .onChange(of: enableNewAPIProvider) { _, _ in
                         LLMUsageManager.shared.refreshAll(force: true)
                     }
+
+                    Defaults.Toggle(key: .enableOpenRouterProvider) {
+                        Text("OpenRouter")
+                    }
+                    .settingsHighlight(id: highlightID("OpenRouter Provider"))
+                    .onChange(of: enableOpenRouterProvider) { _, _ in
+                        LLMUsageManager.shared.refreshAll(force: true)
+                    }
                 } header: {
                     Text("LLM Providers")
                 } footer: {
@@ -8183,6 +8259,44 @@ struct StatsSettings: View {
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                     .font(.caption)
+                }
+
+                Section {
+                    SecureField(hasOpenRouterKey ? "Replace saved API key" : "API key", text: $openRouterAPIKey)
+                        .textContentType(.password)
+                        .settingsHighlight(id: highlightID("OpenRouter API Key"))
+
+                    HStack {
+                        Button("Save OpenRouter Key") {
+                            saveOpenRouterKey()
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Button("Remove Key", role: .destructive) {
+                            deleteOpenRouterKey()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!hasOpenRouterKey)
+                    }
+
+                    Toggle("Per-model analytics (management key)", isOn: $openRouterUsageAnalytics)
+                        .settingsHighlight(id: highlightID("OpenRouter Per-model Analytics"))
+                        .onChange(of: openRouterUsageAnalytics) { _, _ in
+                            LLMUsageManager.shared.refreshAll(force: true)
+                        }
+
+                    if let openRouterErrorMessage {
+                        Text(openRouterErrorMessage)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("OpenRouter")
+                } footer: {
+                    Text("A regular OpenRouter API key shows today's and this week's spend and the key's credit limit. Per-model token and request analytics need a management key, which can also create and delete API keys — only turn it on if you're comfortable storing one. The key is stored in the macOS Keychain.")
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
                 }
 
                 Section {
@@ -8443,6 +8557,7 @@ struct StatsSettings: View {
         .navigationTitle("Stats")
         .onAppear {
             newAPIAccounts = Defaults[.newAPIAccounts]
+            hasOpenRouterKey = OpenRouterKeychain.hasKey()
         }
         .sheet(isPresented: $isNewAPIEditorPresented) {
             NewAPIAccountEditor(account: editingNewAPIAccount) { account, apiKey in

@@ -35,6 +35,7 @@ struct DownloadLiveActivity: View {
     private var speedText: String? {
         guard showDownloadSpeed,
               !downloadManager.isDownloadCompleted,
+              !downloadManager.isDownloadStalled,
               let speed = downloadManager.downloadSpeed else { return nil }
         return Self.speedFormatter.string(fromByteCount: Int64(speed)) + "/s"
     }
@@ -111,6 +112,19 @@ struct DownloadLiveActivity: View {
                                     .foregroundStyle(.green)
                                     .font(.system(size: 16, weight: .semibold))
                                     .padding(.trailing, 6)
+                            } else if downloadManager.isDownloadStalled {
+                                // Nothing is arriving, so the spinner's
+                                // endless turn would claim progress that is
+                                // not happening. The download is still there
+                                // -- paused in the browser, or stalled --
+                                // and the activity says so instead of
+                                // disappearing.
+                                Image(systemName: "pause.circle.fill")
+                                    .foregroundStyle(.white.opacity(0.9))
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .padding(.trailing, 6)
+                                    .accessibilityLabel(Text("Paused"))
+                                    .transition(.opacity)
                             } else {
                                 HStack(spacing: 6) {
                                     if let speedText {
@@ -145,6 +159,7 @@ struct DownloadLiveActivity: View {
                     height: vm.effectiveClosedNotchHeight - (isHovering ? 0 : 12)
                 )
                 .animation(.smooth(duration: 0.25), value: speedAllowance)
+                .animation(.smooth(duration: 0.2), value: downloadManager.isDownloadStalled)
         }
         .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0))
         .onAppear {
