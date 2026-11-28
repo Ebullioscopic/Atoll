@@ -3111,7 +3111,7 @@ private extension MediaControllerType {
 
     var applicationBundleIdentifiers: [String] {
         switch self {
-        case .nowPlaying, .autoDetect:
+        case .nowPlaying:
             return []
         case .appleMusic:
             return ["com.apple.Music"]
@@ -3135,7 +3135,6 @@ private extension MediaControllerType {
     var fallbackSymbol: String {
         switch self {
         case .nowPlaying: return "waveform"
-        case .autoDetect: return "waveform.badge.magnifyingglass"
         case .appleMusic: return "music.note"
         case .spotify: return "dot.radiowaves.left.and.right"
         case .youtubeMusic: return "play.rectangle.fill"
@@ -3149,7 +3148,7 @@ private extension MediaControllerType {
 
     var fallbackColor: Color {
         switch self {
-        case .nowPlaying, .autoDetect: return .accentColor
+        case .nowPlaying: return .accentColor
         case .appleMusic: return .pink
         case .spotify: return .green
         case .youtubeMusic: return .red
@@ -3249,7 +3248,7 @@ struct Media: View {
                     } else {
                         Text(String(localized: "'Now Playing' was the only option on previous versions and works with all media apps."))
                     }
-                    if mediaController == .amazonMusic || mediaController == .netEaseCloudMusic || mediaController == .qqMusic || mediaController == .autoDetect || mediaController == .tidal || mediaController == .cider {
+                    if mediaController == .amazonMusic || mediaController == .netEaseCloudMusic || mediaController == .qqMusic || mediaController == .tidal || mediaController == .cider {
                         Text(mediaController.description)
                     }
                 }
@@ -3649,7 +3648,8 @@ struct Media: View {
     // Only show controller options that are available on this macOS version
     private var availableMediaControllers: [MediaControllerType] {
         if MusicManager.shared.isNowPlayingDeprecated {
-            return MediaControllerType.allCases.filter { $0 != .nowPlaying }
+            // Keep the current choice listed so the picker never goes blank.
+            return MediaControllerType.allCases.filter { $0 != .nowPlaying || $0 == mediaController }
         } else {
             return MediaControllerType.allCases
         }

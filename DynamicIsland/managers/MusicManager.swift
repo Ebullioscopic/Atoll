@@ -823,9 +823,6 @@ class MusicManager: ObservableObject {
     }
 
     // MARK: - Setup Methods
-    /// Creates the requested controller and subscribes to its playback updates.
-    /// Legacy Now Playing respects startup deprecation detection, while Auto Detect
-    /// always attempts the system controller. Returns nil if initialization fails.
     private func createController(for type: MediaControllerType) -> (any MediaControllerProtocol)? {
         // Cleanup previous controller
         if activeController != nil {
@@ -843,8 +840,6 @@ class MusicManager: ObservableObject {
             } else {
                 return nil
             }
-        case .autoDetect:
-            newController = NowPlayingController()
         case .appleMusic:
             newController = AppleMusicController()
         case .spotify:
@@ -2270,8 +2265,6 @@ extension MusicManager {
         Self.brandAccentColor(for: Defaults[.mediaController], bundleIdentifier: bundleIdentifier)
     }
 
-    /// Resolves the selected source's accent color, following the active app's
-    /// brand for automatic sources and falling back to the app accent as needed.
     private static func brandAccentColor(for controller: MediaControllerType, bundleIdentifier: String?) -> Color {
         switch controller {
         case .appleMusic:
@@ -2282,7 +2275,7 @@ extension MusicManager {
             return amazonOrange
         case .tidal, .cider, .netEaseCloudMusic, .qqMusic:
             return .accentColor
-        case .nowPlaying, .autoDetect:
+        case .nowPlaying:
             if let bundleIdentifier,
                let bundleColor = brandAccentColor(forBundleIdentifier: bundleIdentifier) {
                 return bundleColor
@@ -2293,7 +2286,6 @@ extension MusicManager {
         }
     }
 
-    /// Returns a known application's brand accent, or nil for an unknown bundle.
     private static func brandAccentColor(forBundleIdentifier bundleIdentifier: String) -> Color? {
         switch bundleIdentifier {
         case "com.apple.Music":

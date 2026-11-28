@@ -449,7 +449,6 @@ enum LyricHighlightStyle: String, CaseIterable, Identifiable, Defaults.Serializa
 
 enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializable {
     case nowPlaying = "Now Playing"
-    case autoDetect = "Auto Detect"
     case appleMusic = "Apple Music"
     case spotify = "Spotify"
     case youtubeMusic = "Youtube Music"
@@ -464,7 +463,6 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     var localizedName: String {
         switch self {
         case .nowPlaying: return String(localized: "Now Playing")
-        case .autoDetect: return String(localized: "Auto Detect")
         case .appleMusic: return String(localized: "Apple Music")
         case .spotify: return String(localized: "Spotify")
         case .youtubeMusic: return String(localized: "Youtube Music")
