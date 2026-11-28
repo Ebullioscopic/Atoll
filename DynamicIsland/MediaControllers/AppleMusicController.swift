@@ -234,8 +234,15 @@ class AppleMusicController: MediaControllerProtocol {
     
     func updatePlaybackInfo() async {
         let generation = await beginPlaybackInfoRequest()
+        // The script reads `player position` near its start, then fetches the
+        // artwork's raw data, which can take a good fraction of a second. The
+        // position is a reading of when the request went out, not of when the
+        // reply was applied; stamping it with the later instant made every
+        // refresh -- including the one each notch open asks for -- pull the
+        // progress bar back by the script's run time before it caught up.
+        let sampledAt = Date()
         guard let info = await playbackInfoProvider() else { return }
-        await applyPlaybackInfo(info, generation: generation)
+        await applyPlaybackInfo(info, generation: generation, sampledAt: sampledAt)
     }
 
     @MainActor
@@ -245,7 +252,7 @@ class AppleMusicController: MediaControllerProtocol {
     }
 
     @MainActor
-    private func applyPlaybackInfo(_ info: AppleMusicPlaybackInfo, generation: Int) {
+    private func applyPlaybackInfo(_ info: AppleMusicPlaybackInfo, generation: Int, sampledAt: Date) {
         guard generation == playbackInfoRequestGeneration else { return }
         var updatedState = playbackState
 
@@ -258,7 +265,7 @@ class AppleMusicController: MediaControllerProtocol {
         updatedState.isShuffled = info.isShuffled
         updatedState.repeatMode = info.repeatMode
         updatedState.artwork = info.artwork
-        updatedState.lastUpdated = Date()
+        updatedState.lastUpdated = sampledAt
 
         artworkFetchTask?.cancel()
         artworkFetchTask = nil
