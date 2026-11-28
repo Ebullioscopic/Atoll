@@ -1058,7 +1058,7 @@ extension Defaults.Keys {
     static let menubarIcon = Key<Bool>("menubarIcon", default: true)
     static let showOnAllDisplays = Key<Bool>("showOnAllDisplays", default: false)
     static let automaticallySwitchDisplay = Key<Bool>("automaticallySwitchDisplay", default: true)
-    static let releaseName = Key<String>("releaseName", default: "Kaafu")
+    static let releaseName = Key<String>("releaseName", default: "Santorini")
     static let hideDynamicIslandFromScreenCapture = Key<Bool>("hideDynamicIslandFromScreenCapture", default: false)
     /// Build number for which Atoll last showed the Accessibility prompt without the user asking.
     static let didAutoPromptAccessibilityForBuild = Key<String?>("didAutoPromptAccessibilityForBuild", default: nil)
