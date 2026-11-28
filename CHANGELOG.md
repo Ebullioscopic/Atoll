@@ -94,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
+- The keyboard backlight HUD now also appears for the dedicated keyboard illumination keys, such as function keys remapped to them with Karabiner-Elements. Atoll only handled ⌘ + brightness, so remapped keys changed the backlight with no HUD from Atoll or macOS. (#276)
 - With more than one display, the vertical and circular HUDs no longer show up twice on one screen. Their windows kept the position from before a display was rearranged, connected or made main, so one screen's HUD could land on the other display. They are now repositioned every time they appear. (#846)
 - With the external volume control listener on for Lunar or BetterDisplay, Atoll now handles the volume keys itself while sound goes to the built-in speakers or Bluetooth headphones, which those apps never control. Unplugging from a monitor no longer brings back macOS's volume HUD and leaves Atoll's out. (#465)
 - macOS's own volume or brightness HUD no longer gets stuck on the desktop. If the HUD helper is caught while it is showing a HUD, Atoll now restarts it instead of pausing it with the HUD still on screen. (#593)

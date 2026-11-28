@@ -232,6 +232,20 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
     ) {
         let isBacklight = modifiers.contains(.command) && keyboardBacklightEnabled
         guard isBacklight || brightnessEnabled else { return }
+        handleBrightnessKey(direction: direction, step: step, isBacklight: isBacklight)
+    }
+
+    func mediaKeyInterceptor(
+        _ interceptor: MediaKeyInterceptor,
+        didReceiveKeyboardBacklightCommand direction: MediaKeyDirection,
+        step: MediaKeyStep,
+        isRepeat: Bool
+    ) {
+        guard keyboardBacklightEnabled else { return }
+        handleBrightnessKey(direction: direction, step: step, isBacklight: true)
+    }
+
+    private func handleBrightnessKey(direction: MediaKeyDirection, step: MediaKeyStep, isBacklight: Bool) {
         SystemOSDManager.suppressNativeOSDNow()
 
         // Elastic Limit Detection (Vertical HUD)
