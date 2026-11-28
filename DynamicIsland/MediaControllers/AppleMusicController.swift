@@ -135,6 +135,9 @@ class AppleMusicController: MediaControllerProtocol {
     private var playbackInfoRequestGeneration = 0
     private var artworkFetchTask: Task<Void, Never>?
     private var artworkRequestID: UUID?
+    /// The last artwork Music.app returned that was accepted as belonging to its album.
+    private var lastEmbeddedArtwork: Data?
+    private var lastEmbeddedArtworkAlbum: String?
     private let catalogArtworkResolver = AppleMusicCatalogArtworkResolver()
     private let commandUpdateDelay: Duration
     private let commandExecutor: (String) async -> Void
@@ -257,7 +260,8 @@ class AppleMusicController: MediaControllerProtocol {
         updatedState.duration = info.duration
         updatedState.isShuffled = info.isShuffled
         updatedState.repeatMode = info.repeatMode
-        updatedState.artwork = info.artwork
+        let artwork = acceptedEmbeddedArtwork(info.artwork, album: info.album)
+        updatedState.artwork = artwork
         updatedState.lastUpdated = Date()
 
         artworkFetchTask?.cancel()
@@ -269,7 +273,7 @@ class AppleMusicController: MediaControllerProtocol {
         // Waiting for it here leaves the previous track's poster on screen.
         playbackState = updatedState
 
-        guard info.artwork == nil else { return }
+        guard artwork == nil else { return }
 
         let requestID = UUID()
         let artworkProvider = catalogArtworkProvider
@@ -293,6 +297,23 @@ class AppleMusicController: MediaControllerProtocol {
             guard !Task.isCancelled else { return }
             self?.completeArtworkRequest(artwork, requestID: requestID)
         }
+    }
+
+    /// For streamed tracks that are not in the library, Music.app's `artwork 1 of current
+    /// track` can still hold the artwork of the last library track, so the notch flipped
+    /// to the same poster. The same bytes under a different album are treated as no
+    /// artwork, which sends the track to the catalog fallback instead.
+    @MainActor
+    private func acceptedEmbeddedArtwork(_ artwork: Data?, album: String) -> Data? {
+        guard let artwork else { return nil }
+        if let lastEmbeddedArtworkAlbum,
+           lastEmbeddedArtworkAlbum != album,
+           artwork == lastEmbeddedArtwork {
+            return nil
+        }
+        lastEmbeddedArtwork = artwork
+        lastEmbeddedArtworkAlbum = album
+        return artwork
     }
 
     @MainActor
