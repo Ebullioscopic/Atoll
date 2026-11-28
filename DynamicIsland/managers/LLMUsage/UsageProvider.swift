@@ -2,15 +2,17 @@ import Foundation
 import Defaults
 
 enum ProviderID: String, CaseIterable, Identifiable {
-    case claude, codex, cursor, antigravity, newAPI
+    case claude, codex, cursor, copilot, antigravity, newAPI, openrouter
     var id: String { rawValue }
     var displayName: String {
         switch self {
         case .claude: return "Claude"
         case .codex: return "Codex"
         case .cursor: return "Cursor"
+        case .copilot: return "GitHub Copilot"
         case .antigravity: return "Antigravity"
         case .newAPI: return "New API"
+        case .openrouter: return "OpenRouter"
         }
     }
     var enabledKey: Defaults.Key<Bool> {
@@ -18,8 +20,10 @@ enum ProviderID: String, CaseIterable, Identifiable {
         case .claude: return .enableClaudeProvider
         case .codex: return .enableCodexProvider
         case .cursor: return .enableCursorProvider
+        case .copilot: return .enableCopilotProvider
         case .antigravity: return .enableAntigravityProvider
         case .newAPI: return .enableNewAPIProvider
+        case .openrouter: return .enableOpenRouterProvider
         }
     }
 }
@@ -28,6 +32,7 @@ struct UsageTotals: Equatable {
     var inputTokens: Int = 0
     var outputTokens: Int = 0
     var costUSD: Double = 0
+    var requestCount: Int = 0
     var hasUnpricedModel: Bool = false
     var isPercentage: Bool = false
     var totalTokens: Int { inputTokens + outputTokens }
@@ -64,6 +69,7 @@ struct UsageSnapshot: Equatable {
     var models: [ModelUsage] = []
     var plan: String? = nil // Subscription plan label (e.g. "Max 5x"); provided by Claude only, nil otherwise.
     var newAPIAccounts: [NewAPIAccountSnapshot] = []
+    var copilotQuotas: [CopilotQuota] = []
     var lastUpdated: Date = .distantPast
 }
 

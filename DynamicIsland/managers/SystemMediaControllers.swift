@@ -659,7 +659,8 @@ final class SystemBrightnessController {
     private let maximumBrightnessAnimationDuration: TimeInterval = 0.3
     private let brightnessAnimationDurationScale: TimeInterval = 1.6
     private var lastEmittedBrightness: Float = 0.5
-    private var pendingAdjustTarget: Float?
+    private var confirmedBrightness: Float?
+    private var pendingAdjustDelta: Float = 0
     private let coreBrightnessClient = CoreBrightnessDisplayClient.shared
     private var pollTimer: Timer?
     private let pollInterval: TimeInterval = 0.15
@@ -680,7 +681,9 @@ final class SystemBrightnessController {
 
     private init() {
         registerExternalNotifications()
-        lastEmittedBrightness = currentBrightness
+        if let systemLevel = readSystemBrightness() {
+            lastEmittedBrightness = systemLevel
+        }
     }
 
     func start() {
@@ -691,8 +694,9 @@ final class SystemBrightnessController {
         }
         notifyCurrentBrightness()
         // Only start polling as a fallback when CoreBrightness notifications
-        // are unavailable.  When CoreBrightness IS available the distributed
-        // notifications (registerExternalNotifications) handle detection.
+        // are unavailable. Auto-brightness (ALS) changes that arrive without a
+        // notification are picked up by syncWithSystemBrightnessIfNeeded()
+        // before each key-press delta is applied.
         if !coreBrightnessClient.isAvailable {
             startPolling()
         }
@@ -707,7 +711,7 @@ final class SystemBrightnessController {
         userInitiatedResetTimer?.invalidate()
         userInitiatedResetTimer = nil
         userInitiatedBrightnessChange = false
-        pendingAdjustTarget = nil
+        pendingAdjustDelta = 0
     }
 
     func adjust(by delta: Float) {
@@ -715,15 +719,22 @@ final class SystemBrightnessController {
 
         // Do not synchronously query CoreBrightness/DisplayServices here. This
         // method is reached from hardware-key handling, and those calls can be
-        // slow enough for macOS to disable the event tap. beginBrightnessAnimation
-        // still refreshes the system baseline after the tap callback has returned.
-        let inFlightTarget = brightnessAnimationTimer == nil ? nil : brightnessAnimationTarget
-        let base = pendingAdjustTarget ?? inFlightTarget ?? lastEmittedBrightness
-        pendingAdjustTarget = max(0, min(1, base + delta))
-
+        // slow enough for macOS to disable the event tap. Presses that land
+        // before the main-queue block runs are accumulated, then applied on top
+        // of a baseline refreshed from the system (auto-brightness may have
+        // moved it).
+        pendingAdjustDelta += delta
         DispatchQueue.main.async { [weak self] in
-            guard let self, let target = self.pendingAdjustTarget else { return }
-            self.pendingAdjustTarget = nil
+            guard let self, self.pendingAdjustDelta != 0 else { return }
+            let delta = self.pendingAdjustDelta
+            self.pendingAdjustDelta = 0
+            self.syncWithSystemBrightnessIfNeeded()
+            let inFlightTarget = self.brightnessAnimationTimer == nil ? nil : self.brightnessAnimationTarget
+            guard let base = inFlightTarget ?? self.confirmedBrightness else {
+                NSLog("⚠️ Not adjusting brightness: no confirmed level to adjust from")
+                return
+            }
+            let target = max(0, min(1, base + delta))
             self.beginBrightnessAnimation(to: target)
         }
     }
@@ -749,32 +760,43 @@ final class SystemBrightnessController {
     }
 
     var currentBrightness: Float {
+        readSystemBrightness() ?? confirmedBrightness ?? lastEmittedBrightness
+    }
+
+    private func readSystemBrightness() -> Float? {
         if let level = coreBrightnessClient.currentBrightness() {
-            return level
+            let clamped = max(0, min(1, level))
+            confirmedBrightness = clamped
+            return clamped
         }
         if let level = getBrightnessViaDisplayServices() {
-            return level
+            let clamped = max(0, min(1, level))
+            confirmedBrightness = clamped
+            return clamped
         }
-        guard let service = displayService() else { return 0.5 }
+        guard let service = displayService() else { return nil }
         var brightness: Float = 0
         let result = IODisplayGetFloatParameter(service, 0, kIODisplayBrightnessKey as CFString, &brightness)
         IOObjectRelease(service)
-        if result != kIOReturnSuccess {
-            return 0.5
+        guard result == kIOReturnSuccess else {
+            return nil
         }
-        return brightness
+        let clamped = max(0, min(1, brightness))
+        confirmedBrightness = clamped
+        return clamped
     }
 
     private func notifyCurrentBrightness() {
-        let brightness = currentBrightness
+        guard let brightness = readSystemBrightness() ?? confirmedBrightness else { return }
         emitBrightnessChange(value: brightness)
     }
 
     private func syncWithSystemBrightnessIfNeeded() {
         // Align our internal baseline with the actual system brightness so that
         // subsequent adjustments apply deltas from the true value (important when
-        // auto-brightness has changed the level behind our back).
-        let systemLevel = currentBrightness
+        // auto-brightness has changed the level behind our back). If all hardware
+        // reads fail, keep the last confirmed baseline rather than falling back to 0.5.
+        guard let systemLevel = readSystemBrightness() else { return }
         if abs(systemLevel - lastEmittedBrightness) > 0.001 {
             // Only update the baseline — don't emit to avoid spurious HUD flashes.
             lastEmittedBrightness = systemLevel
@@ -787,7 +809,7 @@ final class SystemBrightnessController {
         // Refresh baseline from system in case auto-brightness adjusted it.
         syncWithSystemBrightnessIfNeeded()
 
-        let start = lastEmittedBrightness
+        let start = confirmedBrightness ?? lastEmittedBrightness
         if abs(start - target) <= 0.0005 {
             applyBrightness(target)
             emitBrightnessChange(value: target)
@@ -838,15 +860,19 @@ final class SystemBrightnessController {
     private func applyBrightness(_ value: Float) {
         let clamped = max(0, min(1, value))
         if coreBrightnessClient.setBrightness(clamped) {
+            confirmedBrightness = clamped
             return
         }
         if setBrightnessViaDisplayServices(clamped) {
+            confirmedBrightness = clamped
             return
         }
         guard let service = displayService() else { return }
         let status = IODisplaySetFloatParameter(service, 0, kIODisplayBrightnessKey as CFString, clamped)
         IOObjectRelease(service)
-        if status != kIOReturnSuccess {
+        if status == kIOReturnSuccess {
+            confirmedBrightness = clamped
+        } else {
             NSLog("⚠️ Failed to set brightness via IODisplay: \(status)")
         }
     }
@@ -943,12 +969,12 @@ final class SystemBrightnessController {
                 // Always keep our baseline in sync with the actual system brightness
                 // so that subsequent key-press deltas are accurate, but only fire the
                 // HUD callback when the change was user-initiated (key press).
-                let system = self.currentBrightness
+                guard let system = self.readSystemBrightness() else { return }
                 if self.userInitiatedBrightnessChange {
-                    self.notifyCurrentBrightness()
+                    self.emitBrightnessChange(value: system)
                 } else {
                     // Silently absorb auto-brightness change — update baseline only.
-                    self.lastEmittedBrightness = max(0, min(1, system))
+                    self.lastEmittedBrightness = system
                 }
             }
         }
@@ -963,7 +989,7 @@ final class SystemBrightnessController {
             // Skip polling while an animation is actively running — the
             // animation timer already handles emission during key presses.
             guard self.brightnessAnimationTimer == nil else { return }
-            let system = self.currentBrightness
+            guard let system = self.readSystemBrightness() else { return }
             guard abs(system - self.lastEmittedBrightness) > self.pollChangeThreshold else { return }
 
             if self.userInitiatedBrightnessChange {
@@ -975,7 +1001,7 @@ final class SystemBrightnessController {
                 self.emitBrightnessChange(value: system)
             } else {
                 // Auto-brightness or external change — absorb silently.
-                self.lastEmittedBrightness = max(0, min(1, system))
+                self.lastEmittedBrightness = system
             }
         }
     }
