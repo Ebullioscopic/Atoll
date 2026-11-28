@@ -42,6 +42,7 @@ final class CPUSensorCollector {
     private var channels: CFMutableDictionary?
     private var subscription: IOReportSubscriptionRef?
     private var previousSample: (samples: CFDictionary, time: TimeInterval)?
+    private var cachedPrimaryTemperatureKey: String?
 
     init() {
         setupFrequencyChannel()
@@ -55,8 +56,17 @@ final class CPUSensorCollector {
 
     func readTemperature() -> CPUTemperatureMetrics {
         let platform = hardware.platform
-        if let value = primaryTemperatureKeyCandidates.compactMap({ SMC.shared.getValue($0) }).first(where: { $0 < 110 }) {
-            return CPUTemperatureMetrics(celsius: value)
+        // Try the last key that worked first, then scan candidates with early exit so we
+        // stop issuing SMC reads (each a syscall) as soon as one returns a valid value.
+        var keysToTry = primaryTemperatureKeyCandidates
+        if let cached = cachedPrimaryTemperatureKey {
+            keysToTry = [cached] + keysToTry.filter { $0 != cached }
+        }
+        for key in keysToTry {
+            if let value = SMC.shared.getValue(key), value < 110 {
+                cachedPrimaryTemperatureKey = key
+                return CPUTemperatureMetrics(celsius: value)
+            }
         }
         let list = temperatureFallbackKeys(for: platform)
         var total: Double = 0

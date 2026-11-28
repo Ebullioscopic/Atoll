@@ -59,6 +59,10 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
     private var competingSessionActive = false
     private var competingSessionSource: String?
 
+    /// Reused across every stream update to avoid re-allocating a formatter
+    /// on each (1+/second) now playing payload.
+    private static let iso8601Formatter = ISO8601DateFormatter()
+
     init?(bundleIdentifier: String, controllerName: String) {
         self.targetBundleIdentifier = bundleIdentifier
         self.controllerName = controllerName
@@ -160,8 +164,10 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
     func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool { false }
 
     func toggleShuffle() async {
-        MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
-        playbackState.isShuffled.toggle()
+        await MainActor.run {
+            MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
+            playbackState.isShuffled.toggle()
+        }
     }
 
     /// Openings for a subclass whose app reports shuffle and repeat somewhere
@@ -179,9 +185,11 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
     }
 
     func toggleRepeat() async {
-        let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
-        playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off
-        MRMediaRemoteSetRepeatModeFunction(newRepeatMode)
+        await MainActor.run {
+            let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
+            playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off
+            MRMediaRemoteSetRepeatModeFunction(newRepeatMode)
+        }
     }
 
     private func setupNowPlayingObserver() async {
@@ -250,11 +258,14 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         return state
     }
 
-    private func applyIdleBecauseDifferentSource() {
+    private func applyIdleBecauseDifferentSource() async {
         targetSessionActive = false
         competingSessionActive = true
         competingSessionSource = nil
-        playbackState = Self.makeIdlePlaybackState(bundleIdentifier: targetBundleIdentifier)
+        let idleState = Self.makeIdlePlaybackState(bundleIdentifier: targetBundleIdentifier)
+        await MainActor.run { [weak self] in
+            self?.playbackState = idleState
+        }
     }
 
     /// Subclasses may retain their state while another Media Remote client is
@@ -283,7 +294,7 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
                     competingSessionSource = source
                     return
                 }
-                applyIdleBecauseDifferentSource()
+                await applyIdleBecauseDifferentSource()
                 return
             }
             targetSessionActive = true
@@ -296,61 +307,69 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
             // cannot leave stale metadata indefinitely.
             if let source = competingSessionSource,
                !shouldPreservePlaybackState(whenCompetingWith: source) {
-                applyIdleBecauseDifferentSource()
+                await applyIdleBecauseDifferentSource()
             }
             return
         } else if !diff {
-            applyIdleBecauseDifferentSource()
+            await applyIdleBecauseDifferentSource()
             return
         } else if !targetSessionActive {
             return
         }
 
-        var newPlaybackState = PlaybackState(bundleIdentifier: targetBundleIdentifier)
+        // Merge and publish inside one main-actor transaction. Reading the
+        // baseline out here and publishing a whole snapshot later left a window
+        // where a command, WebSocket or artwork update could land on the main
+        // actor and then be overwritten by this older, fuller snapshot.
+        await MainActor.run { [weak self] in
+            guard let self else { return }
 
-        newPlaybackState.title = payload.title ?? (diff ? self.playbackState.title : "")
-        newPlaybackState.artist = payload.artist ?? (diff ? self.playbackState.artist : "")
-        newPlaybackState.album = payload.album ?? (diff ? self.playbackState.album : "")
-        newPlaybackState.duration = payload.duration ?? (diff ? self.playbackState.duration : 0)
-        newPlaybackState.currentTime = payload.elapsedTime ?? (diff ? self.playbackState.currentTime : 0)
+            var newPlaybackState = PlaybackState(bundleIdentifier: self.targetBundleIdentifier)
 
-        if let shuffleMode = payload.shuffleMode {
-            newPlaybackState.isShuffled = shuffleMode != 1
-        } else if !diff {
-            newPlaybackState.isShuffled = false
-        } else {
-            newPlaybackState.isShuffled = self.playbackState.isShuffled
+            newPlaybackState.title = payload.title ?? (diff ? self.playbackState.title : "")
+            newPlaybackState.artist = payload.artist ?? (diff ? self.playbackState.artist : "")
+            newPlaybackState.album = payload.album ?? (diff ? self.playbackState.album : "")
+            newPlaybackState.duration = payload.duration ?? (diff ? self.playbackState.duration : 0)
+            newPlaybackState.currentTime = payload.elapsedTime ?? (diff ? self.playbackState.currentTime : 0)
+
+            if let shuffleMode = payload.shuffleMode {
+                newPlaybackState.isShuffled = shuffleMode != 1
+            } else if !diff {
+                newPlaybackState.isShuffled = false
+            } else {
+                newPlaybackState.isShuffled = self.playbackState.isShuffled
+            }
+            if let repeatModeValue = payload.repeatMode {
+                newPlaybackState.repeatMode = RepeatMode(rawValue: repeatModeValue) ?? .off
+            } else if !diff {
+                newPlaybackState.repeatMode = .off
+            } else {
+                newPlaybackState.repeatMode = self.playbackState.repeatMode
+            }
+
+            if let artworkDataString = payload.artworkData {
+                newPlaybackState.artwork = Data(
+                    base64Encoded: artworkDataString.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            } else if !diff {
+                newPlaybackState.artwork = nil
+            }
+
+            if let dateString = payload.timestamp,
+               let date = Self.iso8601Formatter.date(from: dateString) {
+                newPlaybackState.lastUpdated = date
+            } else if !diff {
+                newPlaybackState.lastUpdated = Date()
+            } else {
+                newPlaybackState.lastUpdated = self.playbackState.lastUpdated
+            }
+
+            newPlaybackState.playbackRate = payload.playbackRate ?? (diff ? self.playbackState.playbackRate : 1.0)
+            newPlaybackState.isPlaying = payload.playing ?? (diff ? self.playbackState.isPlaying : false)
+            newPlaybackState.bundleIdentifier = self.targetBundleIdentifier
+
+            self.playbackState = newPlaybackState
         }
-        if let repeatModeValue = payload.repeatMode {
-            newPlaybackState.repeatMode = RepeatMode(rawValue: repeatModeValue) ?? .off
-        } else if !diff {
-            newPlaybackState.repeatMode = .off
-        } else {
-            newPlaybackState.repeatMode = self.playbackState.repeatMode
-        }
-
-        if let artworkDataString = payload.artworkData {
-            newPlaybackState.artwork = Data(
-                base64Encoded: artworkDataString.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-        } else if !diff {
-            newPlaybackState.artwork = nil
-        }
-
-        if let dateString = payload.timestamp,
-           let date = ISO8601DateFormatter().date(from: dateString) {
-            newPlaybackState.lastUpdated = date
-        } else if !diff {
-            newPlaybackState.lastUpdated = Date()
-        } else {
-            newPlaybackState.lastUpdated = self.playbackState.lastUpdated
-        }
-
-        newPlaybackState.playbackRate = payload.playbackRate ?? (diff ? self.playbackState.playbackRate : 1.0)
-        newPlaybackState.isPlaying = payload.playing ?? (diff ? self.playbackState.isPlaying : false)
-        newPlaybackState.bundleIdentifier = targetBundleIdentifier
-
-        self.playbackState = newPlaybackState
     }
 }
 
