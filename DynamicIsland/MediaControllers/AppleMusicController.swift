@@ -28,10 +28,74 @@ private struct ITunesSearchResponse: Decodable {
     let results: [ITunesTrack]
 }
 
-private struct ITunesTrack: Decodable {
+struct ITunesTrack: Decodable {
     let trackName: String?
+    let artistName: String?
     let collectionName: String?
+    let trackTimeMillis: Double?
     let artworkUrl100: String?
+}
+
+/// Normalizes catalog and Music.app metadata for comparison: case, diacritics,
+/// punctuation and bracketed/" - Remastered" style suffixes are ignored. Letters
+/// of any script are kept so non-Latin titles still compare.
+func normalizedAppleMusicCatalogText(_ value: String, isTitle: Bool = false) -> String {
+    var text = value.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: nil)
+    if isTitle {
+        text = text.replacingOccurrences(
+            of: #"\([^)]*\)|\[[^\]]*\]"#,
+            with: " ",
+            options: .regularExpression
+        )
+        text = text.replacingOccurrences(
+            of: #"\s-\s(?:\d{4}\s)?(?:remaster(?:ed)?|live|edit|mix|version|mono|stereo).*$"#,
+            with: " ",
+            options: .regularExpression
+        )
+    }
+    let words = text.components(separatedBy: CharacterSet.alphanumerics.inverted)
+    return words.filter { !$0.isEmpty }.joined(separator: " ")
+}
+
+/// Picks the catalog result whose artwork belongs to the playing track. Title and
+/// artist must both match after normalization; anything else returns nil so the
+/// notch shows no cover instead of an unrelated one. Among matches, the same album
+/// wins, then the closest duration.
+func bestAppleMusicCatalogArtworkMatch(
+    in results: [ITunesTrack],
+    title: String,
+    artist: String,
+    album: String,
+    duration: Double
+) -> ITunesTrack? {
+    let wantedTitle = normalizedAppleMusicCatalogText(title, isTitle: true)
+    let wantedArtist = normalizedAppleMusicCatalogText(artist)
+    guard !wantedTitle.isEmpty, !wantedArtist.isEmpty else { return nil }
+    let wantedAlbum = normalizedAppleMusicCatalogText(album, isTitle: true)
+
+    func artistMatches(_ candidate: String) -> Bool {
+        guard !candidate.isEmpty else { return false }
+        if candidate == wantedArtist { return true }
+        // "Artist & Other" / "Artist feat. Other" on either side.
+        let paddedCandidate = " \(candidate) "
+        let paddedWanted = " \(wantedArtist) "
+        return paddedCandidate.contains(paddedWanted) || paddedWanted.contains(paddedCandidate)
+    }
+
+    let matches = results.filter { track in
+        !(track.artworkUrl100 ?? "").isEmpty
+            && normalizedAppleMusicCatalogText(track.trackName ?? "", isTitle: true) == wantedTitle
+            && artistMatches(normalizedAppleMusicCatalogText(track.artistName ?? ""))
+    }
+
+    func rank(_ track: ITunesTrack) -> (Int, Double) {
+        let albumRank = !wantedAlbum.isEmpty
+            && normalizedAppleMusicCatalogText(track.collectionName ?? "", isTitle: true) == wantedAlbum ? 0 : 1
+        guard duration > 0, let millis = track.trackTimeMillis, millis > 0 else { return (albumRank, .infinity) }
+        return (albumRank, abs(millis / 1000 - duration))
+    }
+
+    return matches.min { rank($0) < rank($1) }
 }
 
 func makeAppleMusicCatalogSearchURL(query: String) -> URL? {
@@ -51,16 +115,18 @@ func makeAppleMusicCatalogSearchURL(query: String) -> URL? {
 }
 
 private actor AppleMusicCatalogArtworkResolver {
-    // Intentionally cache only the most recent artwork to bound memory usage.
+    // Intentionally cache only the most recent lookup to bound memory usage.
     // Consecutive refreshes commonly request the same track, while a larger
     // cache would retain decoded image data for tracks that may not recur.
+    // A lookup that found no matching track is cached too, so play/pause
+    // notifications for a local recording don't search the catalog again.
     private var lastArtworkKey: String?
     private var cachedArtwork: Data?
 
-    func fetch(title: String, artist: String, album: String) async -> Data? {
+    func fetch(title: String, artist: String, album: String, duration: Double) async -> Data? {
         let key = "\(title)|\(artist)|\(album)"
 
-        if key == lastArtworkKey, let cachedArtwork {
+        if key == lastArtworkKey {
             return cachedArtwork
         }
 
@@ -73,20 +139,20 @@ private actor AppleMusicCatalogArtworkResolver {
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let response = try JSONDecoder().decode(ITunesSearchResponse.self, from: data)
-            guard !response.results.isEmpty else { return nil }
 
-            let normalizedAlbum = album.lowercased()
-            let normalizedTitle = title.lowercased()
-            let match = response.results.first(where: {
-                $0.trackName?.lowercased() == normalizedTitle
-                    && $0.collectionName?.lowercased() == normalizedAlbum
-            }) ?? response.results.first(where: {
-                $0.collectionName?.lowercased() == normalizedAlbum
-            }) ?? response.results.first(where: {
-                $0.trackName?.lowercased() == normalizedTitle
-            }) ?? response.results.first
-
-            guard let artworkURLString = match?.artworkUrl100 else { return nil }
+            guard let match = bestAppleMusicCatalogArtworkMatch(
+                in: response.results,
+                title: title,
+                artist: artist,
+                album: album,
+                duration: duration
+            ),
+                let artworkURLString = match.artworkUrl100
+            else {
+                lastArtworkKey = key
+                cachedArtwork = nil
+                return nil
+            }
             let highResURL = artworkURLString.replacingOccurrences(of: "100x100", with: "600x600")
             guard let imageURL = URL(string: highResURL) else { return nil }
 
@@ -288,6 +354,7 @@ class AppleMusicController: MediaControllerProtocol {
         let title = info.title
         let artist = info.artist
         let album = info.album
+        let duration = info.duration
         artworkRequestID = requestID
         artworkFetchTask = Task { @MainActor [weak self] in
             let artwork: Data?
@@ -297,7 +364,8 @@ class AppleMusicController: MediaControllerProtocol {
                 artwork = await artworkResolver.fetch(
                     title: title,
                     artist: artist,
-                    album: album
+                    album: album,
+                    duration: duration
                 )
             }
 

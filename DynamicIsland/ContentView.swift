@@ -274,6 +274,9 @@ struct ContentView: View {
     // MARK: - Tab switch direction for smooth transitions
     
     private var tabSwitchTransition: AnyTransition {
+        if reduceMotion {
+            return .opacity
+        }
         if coordinator.tabSwitchForward {
             return .asymmetric(
                 insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -2902,6 +2905,7 @@ struct ContentView: View {
             && !lockScreenManager.isLocked
             && !hasAnyActivePopovers()
             && !vm.isHoveringCalendar
+            && !vm.isHoveringSwipeableTabBar
             && !vm.isScrollGestureActive
     }
 

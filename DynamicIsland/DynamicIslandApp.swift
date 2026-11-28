@@ -456,6 +456,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.animationBehavior = .none
         // collectionBehavior is configured in DynamicIslandWindow.init
+        window.notchViewModel = viewModel
 
         let hostingView = FirstMouseHostingView(
             rootView: ContentView()

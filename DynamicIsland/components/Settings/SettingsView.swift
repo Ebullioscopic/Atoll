@@ -236,6 +236,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "Enable gestures", keywords: ["gestures", "trackpad"], highlightID: SettingsTab.general.highlightID(for: "Enable gestures")),
         SettingsSearchEntry(tab: .general, title: "Close gesture", keywords: ["pinch", "swipe"], highlightID: SettingsTab.general.highlightID(for: "Close gesture")),
         SettingsSearchEntry(tab: .general, title: "Reverse swipe gestures", keywords: ["reverse", "swipe", "media"], highlightID: SettingsTab.general.highlightID(for: "Reverse swipe gestures")),
+        SettingsSearchEntry(tab: .general, title: "Swipe between tabs", keywords: ["swipe", "tabs", "trackpad", "gesture"], highlightID: SettingsTab.general.highlightID(for: "Swipe between tabs")),
         SettingsSearchEntry(tab: .general, title: "Reverse scroll gestures", keywords: ["reverse", "scroll", "open", "close"], highlightID: SettingsTab.general.highlightID(for: "Reverse scroll gestures")),
         SettingsSearchEntry(tab: .general, title: "Arrow key seek", keywords: ["arrow", "keyboard", "key", "seek", "scrub", "rewind"], highlightID: SettingsTab.general.highlightID(for: "Arrow key seek")),
         SettingsSearchEntry(tab: .general, title: "Extend hover area", keywords: ["hover", "cursor"], highlightID: SettingsTab.general.highlightID(for: "Extend hover area")),
@@ -1455,6 +1456,15 @@ struct GeneralSettings: View {
                     }
                     .settingsHighlight(id: highlightID("Reverse swipe gestures"))
                 }
+
+                Defaults.Toggle(key: .swipeBetweenTabs) {
+                    Text("Swipe between tabs")
+                }
+                .settingsHighlight(id: highlightID("Swipe between tabs"))
+
+                Text("Swipe two fingers left or right over the tab bar to move to the tab on that side. Swipes over the notch's content are unchanged.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 Defaults.Toggle(key: .closeGestureEnabled) {
                     Text("Close gesture")

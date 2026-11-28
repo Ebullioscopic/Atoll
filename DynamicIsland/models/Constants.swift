@@ -1143,6 +1143,8 @@ extension Defaults.Keys {
     static let musicGestureBehavior = Key<MusicSkipBehavior>("musicGestureBehavior", default: .track)
     static let reverseSwipeGestures = Key<Bool>("reverseSwipeGestures", default: false)
     static let reverseScrollGestures = Key<Bool>("reverseScrollGestures", default: false)
+    /// Two-finger horizontal swipes over the tab bar switch tabs (#794).
+    static let swipeBetweenTabs = Key<Bool>("swipeBetweenTabs", default: false)
     
         // MARK: Media playback
     static let coloredSpectrogram = Key<Bool>("coloredSpectrogram", default: true)

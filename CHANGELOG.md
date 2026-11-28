@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Swipe between tabs**: an option under Gesture control switches to the neighbouring tab when you swipe two fingers left or right over the notch's tab bar. Swipes over the content still skip tracks and scroll as before. Off by default. (#794)
 - **Keep the notch open from the shortcut**: a new "Close automatically after 3 seconds" option under the Toggle Notch Open shortcut can be turned off, so the shortcut opens the notch until it is pressed again. On by default. (#435)
 - **Open the full notch from hidden**: with "Hide until hovered on non-notch displays" and "Open notch on hover" on, a new option opens the full notch straight away on hover instead of revealing the closed notch first. Off by default. (#577)
 - **Island top margin**: when external displays use the Dynamic Island style, a slider in General settings sets the gap between the top of the screen and the island, from 0 to 12 pt (6 pt by default). (#487)
@@ -116,6 +117,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshing the LLM Usage card reads large session logs faster: lines are split from each 64 KB chunk in one pass instead of shifting the buffer after every line (#655).
 
 ### Fixed
+- Clicking the notch over a full-screen app no longer leaves that app's title bar and the menu bar showing after the notch closes. Only tabs you type in (Terminal, Notes, Clipboard, Shelf, Timer, extension tabs, and Home with arrow-key seeking on) take the keyboard, and closing the notch hands it back to the app that was in front. (#386)
+- Apple Music tracks without their own artwork, such as local recordings, no longer get an unrelated album cover from the catalog lookup. A cover is only shown when the catalog has a song with the same title and artist; otherwise the notch shows no artwork. (#876)
 - The keyboard backlight HUD now also appears for the dedicated keyboard illumination keys, such as function keys remapped to them with Karabiner-Elements. Atoll only handled ⌘ + brightness, so remapped keys changed the backlight with no HUD from Atoll or macOS. (#276)
 - With more than one display, the vertical and circular HUDs no longer show up twice on one screen. Their windows kept the position from before a display was rearranged, connected or made main, so one screen's HUD could land on the other display. They are now repositioned every time they appear. (#846)
 - With the external volume control listener on for Lunar or BetterDisplay, Atoll now handles the volume keys itself while sound goes to the built-in speakers or Bluetooth headphones, which those apps never control. Unplugging from a monitor no longer brings back macOS's volume HUD and leaves Atoll's out. (#465)

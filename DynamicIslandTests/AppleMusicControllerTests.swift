@@ -114,6 +114,52 @@ final class AppleMusicControllerTests: XCTestCase {
         XCTAssertEqual(queryItems["limit"], "10")
     }
 
+    private func catalogTrack(
+        _ title: String,
+        artist: String,
+        album: String = "",
+        seconds: Double? = nil,
+        artwork: String = "https://example.com/100x100.jpg"
+    ) -> ITunesTrack {
+        ITunesTrack(
+            trackName: title,
+            artistName: artist,
+            collectionName: album,
+            trackTimeMillis: seconds.map { $0 * 1000 },
+            artworkUrl100: artwork
+        )
+    }
+
+    func testCatalogArtworkMatchRejectsUnrelatedResults() {
+        let results = [
+            catalogTrack("Another Song", artist: "Some Artist", album: "Voice Memos"),
+            catalogTrack("Voice Memo", artist: "Different Artist", album: "Voice Memos")
+        ]
+
+        XCTAssertNil(bestAppleMusicCatalogArtworkMatch(
+            in: results, title: "Voice Memo", artist: "Me", album: "Voice Memos", duration: 60))
+        XCTAssertNil(bestAppleMusicCatalogArtworkMatch(
+            in: results, title: "Voice Memo", artist: "", album: "", duration: 0))
+    }
+
+    func testCatalogArtworkMatchNormalizesAndPrefersAlbumThenDuration() {
+        let single = catalogTrack("Héllo (Remastered 2011)", artist: "Adele & Friend", album: "Single", seconds: 200,
+                                  artwork: "single")
+        let albumCut = catalogTrack("Hello", artist: "ADELE", album: "25", seconds: 295, artwork: "album")
+        let closest = catalogTrack("Hello - Live", artist: "Adele", album: "Live", seconds: 240, artwork: "live")
+
+        XCTAssertEqual(bestAppleMusicCatalogArtworkMatch(
+            in: [single, albumCut, closest], title: "hello", artist: "Adele", album: "25", duration: 240
+        )?.artworkUrl100, "album")
+        XCTAssertEqual(bestAppleMusicCatalogArtworkMatch(
+            in: [single, albumCut, closest], title: "Hello", artist: "Adele", album: "Unknown", duration: 238
+        )?.artworkUrl100, "live")
+        XCTAssertEqual(bestAppleMusicCatalogArtworkMatch(
+            in: [catalogTrack("夜曲", artist: "周杰伦", artwork: "cjk")], title: "夜曲", artist: "周杰伦", album: "",
+            duration: 0
+        )?.artworkUrl100, "cjk")
+    }
+
     func testDeferredArtworkProviderWaitTimesOutWithoutRequest() async {
         let provider = DeferredArtworkProvider()
 
