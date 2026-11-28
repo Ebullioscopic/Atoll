@@ -438,6 +438,16 @@ class StatsManager: ObservableObject {
     private var shouldMonitorForStats: Bool = false
     private var lastNotchState: String = "closed"
     private var lastCurrentView: String = "other"
+
+    /// Each display's notch reports its own state. Monitoring follows all of them
+    /// together, so a closed notch on one display can't stop the stats another
+    /// display is showing (#851).
+    private struct NotchMonitoringReport {
+        weak var source: AnyObject?
+        let isOpen: Bool
+        let showsStats: Bool
+    }
+    private var notchReports: [ObjectIdentifier: NotchMonitoringReport] = [:]
     
     // Network monitoring state
     private var previousNetworkStats: (bytesIn: UInt64, bytesOut: UInt64) = (0, 0)
@@ -523,7 +533,20 @@ class StatsManager: ObservableObject {
     }
     
     // MARK: - Smart Monitoring
-    func updateMonitoringState(notchIsOpen: Bool, currentView: String) {
+    func updateMonitoringState(notchIsOpen: Bool, currentView: String, source: AnyObject? = nil) {
+        var notchIsOpen = notchIsOpen
+        var currentView = currentView
+        if let source {
+            notchReports[ObjectIdentifier(source)] = NotchMonitoringReport(
+                source: source,
+                isOpen: notchIsOpen,
+                showsStats: notchIsOpen && currentView == "stats"
+            )
+            notchReports = notchReports.filter { $0.value.source != nil }
+            notchIsOpen = notchReports.values.contains { $0.isOpen }
+            currentView = notchReports.values.contains { $0.showsStats } ? "stats" : "other"
+        }
+
         let notchState = notchIsOpen ? "open" : "closed"
         
         // Only react to actual state changes

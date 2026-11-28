@@ -753,7 +753,8 @@ struct ContentView: View {
                     let currentViewString = coordinator.currentView == .stats ? "stats" : "other"
                     statsManager.updateMonitoringState(
                         notchIsOpen: newState == .open,
-                        currentView: currentViewString
+                        currentView: currentViewString,
+                        source: vm
                     )
                 }
 
@@ -820,7 +821,8 @@ struct ContentView: View {
                     let currentViewString = newValue == .stats ? "stats" : "other"
                     statsManager.updateMonitoringState(
                         notchIsOpen: vm.notchState == .open,
-                        currentView: currentViewString
+                        currentView: currentViewString,
+                        source: vm
                     )
                 }
                 syncStickyTerminalOutsideClickMonitor()

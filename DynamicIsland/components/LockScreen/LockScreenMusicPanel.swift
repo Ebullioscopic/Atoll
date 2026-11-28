@@ -81,6 +81,7 @@ struct LockScreenMusicPanel: View {
     @Default(.lockScreenMusicAlbumParallaxEnabled) private var lockScreenParallaxEnabled
     @Default(.lockScreenMusicPanelWidth) private var collapsedPanelWidth
     @Default(.lockScreenMusicFullscreenArtworkEnabled) private var fullscreenArtworkEnabled
+    @Default(.lockScreenMusicOpensExpanded) private var opensExpanded
     @Default(.lockScreenKeepAlbumArtVisibleDuringFullscreenArtwork) private var keepAlbumArtVisibleDuringFullscreenArtwork
     @Default(.lockScreenMusicFullscreenVideoArtwork) private var fullscreenVideoArtwork
     @Default(.lockScreenWidgetAppearance) private var widgetAppearance
@@ -330,6 +331,9 @@ struct LockScreenMusicPanel: View {
         .onAppear {
             sliderValue = musicManager.elapsedTime
             isActive = true
+            if opensExpanded {
+                isExpanded = true
+            }
             logPanelAppearance()
             updatePanelSize(animated: false)
             routeManager.refreshDevices()
@@ -653,7 +657,8 @@ struct LockScreenMusicPanel: View {
         guard musicManager.hasActiveSession else { return }
 
         let artwork = musicManager.albumArt
-        let videoURL = musicManager.videoArtworkURL
+        let supportsCanvas = musicManager.isAppleMusicActive || musicManager.isSpotifyActive
+        let canvasURL = (fullscreenVideoArtwork && supportsCanvas) ? musicManager.videoArtworkURL : nil
 
         withAnimation(.easeInOut(duration: 0.28)) {
             isArtworkFullscreen = true
@@ -669,14 +674,15 @@ struct LockScreenMusicPanel: View {
 
         FullScreenArtworkWindowManager.shared.show(
             artwork: artwork,
-            videoURL: fullscreenVideoArtwork ? videoURL : nil,
-            allowLiveWallpaper: fullscreenVideoArtwork
+            videoURL: canvasURL,
+            allowLiveWallpaper: fullscreenVideoArtwork && supportsCanvas
         )
     }
 
     private func registerInteraction() {
         cancelCollapseTimer()
-        guard isExpanded else { return }
+        // When expanded is the chosen default it stays until tapped (#490).
+        guard isExpanded, !opensExpanded else { return }
         guard !isPointerInsidePanel else { return }
 
         let workItem = DispatchWorkItem {
@@ -1489,7 +1495,9 @@ struct LockScreenMusicPanel: View {
     @ViewBuilder
     private var panelBackgroundLayer: some View {
         Group {
-            if usesSpotifyCanvasFallbackContentPresentation {
+            // The large-artwork layout keeps the user's liquid glass choice; the
+            // scrim is for the frosted and opaque styles (#495).
+            if usesSpotifyCanvasFallbackContentPresentation && !usesLiquidGlass {
                 canvasFallbackScrim
             } else if usesCustomLiquidGlass {
                 customLiquidPanelBackdrop

@@ -395,6 +395,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .lockScreen, title: "Show media app icon", keywords: ["app icon", "media"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show media app icon"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Show panel border", keywords: ["panel border"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show panel border"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Always show volume control", keywords: ["volume", "slider", "lock screen", "media output", "accessibility"], highlightID: SettingsTab.lockScreen.highlightID(for: "Always show volume control"), lockScreenSection: .widgets),
+        SettingsSearchEntry(tab: .lockScreen, title: "Open player with large album art", keywords: ["expanded", "large album art", "artwork"], highlightID: SettingsTab.lockScreen.highlightID(for: "Open player with large album art"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Enable media panel blur", keywords: ["blur", "media panel"], highlightID: SettingsTab.lockScreen.highlightID(for: "Enable media panel blur"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen timer", keywords: ["timer widget", "lock screen timer"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen timer"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Timer surface", keywords: ["timer glass", "classic", "blur"], highlightID: SettingsTab.lockScreen.highlightID(for: "Timer surface"), lockScreenSection: .widgets),
@@ -404,6 +405,8 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen weather", keywords: ["weather widget"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen weather"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Widget layout", keywords: ["inline", "circular", "widget layout", "weather layout", "status widget"], highlightID: SettingsTab.lockScreen.highlightID(for: "Widget layout"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Weather data provider", keywords: ["wttr", "open meteo"], highlightID: SettingsTab.lockScreen.highlightID(for: "Weather data provider"), lockScreenSection: .widgets),
+        SettingsSearchEntry(tab: .lockScreen, title: "Hide widgets during screen saver", keywords: ["screensaver", "screen saver", "immersive"], highlightID: SettingsTab.lockScreen.highlightID(for: "Hide widgets during screen saver"), lockScreenSection: .widgets),
+        SettingsSearchEntry(tab: .lockScreen, title: "Use a custom location", keywords: ["city", "location", "weather"], highlightID: SettingsTab.lockScreen.highlightID(for: "Use a custom location"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Temperature unit", keywords: ["celsius", "fahrenheit"], highlightID: SettingsTab.lockScreen.highlightID(for: "Temperature unit"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Show location label", keywords: ["location", "weather"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show location label"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Show charging status", keywords: ["charging", "weather"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show charging status"), lockScreenSection: .widgets),
@@ -1200,11 +1203,14 @@ struct GeneralSettings: View {
                 }
                 .settingsHighlight(id: highlightID("Enable Minimalistic UI"))
 
-                Defaults.Toggle(key: .showMinimalisticBatteryIndicator) {
-                    Text("Show battery indicator")
+                // Only applies to the minimalistic layout; the standard notch uses
+                // "Show battery indicator" in Battery settings (#930).
+                if enableMinimalisticUI {
+                    Defaults.Toggle(key: .showMinimalisticBatteryIndicator) {
+                        Text("Show battery in Minimalistic UI")
+                    }
+                    .settingsHighlight(id: highlightID("Show battery indicator in Minimalistic UI"))
                 }
-                .disabled(!enableMinimalisticUI)
-                .settingsHighlight(id: highlightID("Show battery indicator in Minimalistic UI"))
 
                 Defaults.Toggle(key: .showBatteryPercentInside) {
                     Text("Show battery percentage inside icon")
@@ -1219,6 +1225,16 @@ struct GeneralSettings: View {
                 .disabled(!showBatteryIndicator
                     || (enableMinimalisticUI && !showMinimalisticBatteryIndicator))
                 .settingsHighlight(id: highlightID("Show battery percentage inside icon"))
+
+                if !showBatteryIndicator {
+                    Text("Turn on Show battery indicator in Battery settings to use this.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if enableMinimalisticUI && !showMinimalisticBatteryIndicator {
+                    Text("Turn on Show battery in Minimalistic UI to use this.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Text("UI Mode")
             } footer: {
@@ -5824,6 +5840,57 @@ struct SettingsSegmentedPicker<Item: Hashable>: View {
     }
 }
 
+private struct LockScreenWeatherCustomLocationField: View {
+    @Default(.lockScreenWeatherCustomLocationName) private var savedName
+    @State private var query = ""
+    @State private var isSearching = false
+    @State private var didFail = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                TextField("City", text: $query, prompt: Text(savedName.isEmpty ? String(localized: "City") : savedName))
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(search)
+                Button("Set", action: search)
+                    .disabled(isSearching || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            Text(statusText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var statusText: String {
+        if isSearching {
+            return String(localized: "Searching…")
+        }
+        if didFail {
+            return String(localized: "No city found with that name.")
+        }
+        if savedName.isEmpty {
+            return String(localized: "Weather uses this city instead of Location Services.")
+        }
+        return String(localized: "Showing weather for \(savedName).")
+    }
+
+    private func search() {
+        let text = query
+        guard !isSearching, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        isSearching = true
+        didFail = false
+        Task { @MainActor in
+            let location = await LockScreenWeatherManager.shared.setCustomLocation(named: text)
+            isSearching = false
+            didFail = location == nil
+            if location != nil {
+                query = ""
+            }
+        }
+    }
+}
+
 struct LockScreenSettings: View {
     @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.enableReminderLiveActivity) private var enableReminderLiveActivity
@@ -5845,6 +5912,7 @@ struct LockScreenSettings: View {
     @Default(.siriResponsivenessMode) private var siriResponsivenessMode
     @Default(.lockScreenWeatherWidgetStyle) private var lockScreenWeatherWidgetStyle
     @Default(.lockScreenWeatherProviderSource) private var lockScreenWeatherProviderSource
+    @Default(.lockScreenWeatherUsesCustomLocation) private var lockScreenWeatherUsesCustomLocation
     @Default(.lockScreenWeatherTemperatureUnit) private var lockScreenWeatherTemperatureUnit
     @Default(.lockScreenBatteryShowsCharging) private var lockScreenWeatherShowsCharging
     @Default(.lockScreenBatteryShowsBatteryGauge) private var lockScreenWeatherShowsBatteryGauge
@@ -6130,6 +6198,11 @@ struct LockScreenSettings: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+
+                    Defaults.Toggle(key: .lockScreenHideWidgetsDuringScreenSaver) {
+                        Text("Hide widgets during screen saver")
+                    }
+                    .settingsHighlight(id: highlightID("Hide widgets during screen saver"))
                 } header: {
                     Text("Appearance")
                 } footer: {
@@ -6187,6 +6260,18 @@ struct LockScreenSettings: View {
                             .opacity(enableLockScreenMediaWidget ? 1 : 0.5)
                             .settingsHighlight(id: highlightID("Enable media panel blur"))
                     }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Defaults.Toggle(key: .lockScreenMusicOpensExpanded) {
+                            Text("Open player with large album art")
+                        }
+                        .disabled(!enableLockScreenMediaWidget)
+                        .settingsHighlight(id: highlightID("Open player with large album art"))
+                        Text("Shows the expanded player as soon as the Mac locks, without changing the wallpaper. Click the album art to switch size.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     VStack(alignment: .leading, spacing: 4) {
                         Defaults.Toggle(key: .lockScreenMusicFullscreenArtworkEnabled) {
                             Text("Fullscreen artwork on right-click")
@@ -6299,6 +6384,15 @@ struct LockScreenSettings: View {
                         ) { $0.displayName }
                         .settingsHighlight(id: highlightID("Weather data provider"))
 
+                        Defaults.Toggle(key: .lockScreenWeatherUsesCustomLocation) {
+                            Text("Use a custom location")
+                        }
+                        .settingsHighlight(id: highlightID("Use a custom location"))
+
+                        if lockScreenWeatherUsesCustomLocation {
+                            LockScreenWeatherCustomLocationField()
+                        }
+
                         SettingsSegmentedPicker(
                             "Temperature unit",
                             selection: $lockScreenWeatherTemperatureUnit,
@@ -6345,6 +6439,10 @@ struct LockScreenSettings: View {
                             Text("Use colored gauges")
                         }
                         .settingsHighlight(id: highlightID("Use colored gauges"))
+
+                        Text("Colors the gauges in the circular layout and the icons in the inline layout.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 } header: {
                     Text("Weather Widget")

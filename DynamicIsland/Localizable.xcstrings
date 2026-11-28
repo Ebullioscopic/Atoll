@@ -94548,7 +94548,20 @@
     "Island top margin" : {},
     "Open the full notch when hovered" : {},
     "Skips revealing the closed notch first." : {},
-    "Close automatically after 3 seconds" : {}
+    "Close automatically after 3 seconds" : {},
+    "No city found with that name." : {},
+    "Showing weather for %@." : {},
+    "Hide widgets during screen saver" : {},
+    "Use a custom location" : {},
+    "Show battery in Minimalistic UI" : {},
+    "Shows the expanded player as soon as the Mac locks, without changing the wallpaper. Click the album art to switch size." : {},
+    "Colors the gauges in the circular layout and the icons in the inline layout." : {},
+    "Weather uses this city instead of Location Services." : {},
+    "Searching…" : {},
+    "Turn on Show battery indicator in Battery settings to use this." : {},
+    "Open player with large album art" : {},
+    "City" : {},
+    "Turn on Show battery in Minimalistic UI to use this." : {}
   },
   "version" : "1.2"
 }

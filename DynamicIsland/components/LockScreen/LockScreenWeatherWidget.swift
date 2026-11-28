@@ -428,7 +428,7 @@ struct LockScreenWeatherWidget: View {
 	}
 
 	private var enabledRowKinds: [RowKind] {
-		var enabled: Set<RowKind> = [.weather]
+		var enabled: Set<RowKind> = hasMainRowContent ? [.weather] : []
 		if lockScreenShowCalendarEvent { enabled.insert(.calendar) }
 		if shouldShowFocusWidget { enabled.insert(.focus) }
 		if shouldShowFocusInCalendarSlot { enabled.insert(.calendar); enabled.remove(.focus) }
@@ -443,7 +443,7 @@ struct LockScreenWeatherWidget: View {
 	private func isRowActive(_ kind: RowKind) -> Bool {
 		switch kind {
 		case .weather:
-			return true
+			return hasMainRowContent
 		case .focus:
 			return shouldShowFocusWidget
 		case .calendar:
@@ -468,6 +468,12 @@ struct LockScreenWeatherWidget: View {
 		let bottomActive = isRowActive(bottomKind)
 
 		return (!middleActive && bottomActive) ? -collapseDistance : 0
+	}
+
+	/// With weather turned off the row still carries the battery, charging and
+	/// Bluetooth segments (#523).
+	private var hasMainRowContent: Bool {
+		snapshot.showsWeather || snapshot.charging != nil || snapshot.battery != nil || snapshot.bluetooth != nil
 	}
 
 	private var isInline: Bool { snapshot.widgetStyle == .inline }
@@ -638,18 +644,20 @@ struct LockScreenWeatherWidget: View {
 				bluetoothSegment(for: bluetooth)
 			}
 
-			if let airQuality = snapshot.airQuality {
-				airQualitySegment(for: airQuality)
-			}
+			if snapshot.showsWeather {
+				if let airQuality = snapshot.airQuality {
+					airQualitySegment(for: airQuality)
+				}
 
-			weatherSegment
+				weatherSegment
 
-			if snapshot.showsSunrise, let sunriseText = sunriseTimeText {
-				sunriseSegment(text: sunriseText)
-			}
+				if snapshot.showsSunrise, let sunriseText = sunriseTimeText {
+					sunriseSegment(text: sunriseText)
+				}
 
-			if shouldShowLocation {
-				locationSegment
+				if shouldShowLocation {
+					locationSegment
+				}
 			}
 		}
 		.frame(maxWidth: .infinity, alignment: mainRowAlignment)
@@ -887,7 +895,7 @@ struct LockScreenWeatherWidget: View {
 		HStack(alignment: .center, spacing: 6) {
 			Image(systemName: snapshot.symbolName)
 				.font(.system(size: 26, weight: .medium))
-				.symbolRenderingMode(.hierarchical)
+				.symbolRenderingMode(snapshot.usesGaugeTint ? .multicolor : .hierarchical)
 			Text(snapshot.temperatureText)
 				.font(inlinePrimaryFont)
 				.kerning(-0.3)
@@ -932,6 +940,7 @@ struct LockScreenWeatherWidget: View {
 				Image(systemName: iconName)
 					.font(.system(size: 20, weight: .semibold))
 					.symbolRenderingMode(.hierarchical)
+					.modifier(InlineIconTint(tint: inlineIconTint(Color(.systemGreen))))
 			}
 			Text(inlineChargingLabel(for: info))
 				.font(inlinePrimaryFont)
@@ -1017,6 +1026,7 @@ struct LockScreenWeatherWidget: View {
 			Image(systemName: info.iconName)
 				.font(.system(size: 20, weight: .semibold))
 				.symbolRenderingMode(.hierarchical)
+				.modifier(InlineIconTint(tint: inlineIconTint(bluetoothTint(for: clampedBatteryLevel(info.batteryLevel)))))
 			Text(bluetoothPercentageText(for: info.batteryLevel))
 				.font(inlinePrimaryFont)
 				.lineLimit(1)
@@ -1033,6 +1043,7 @@ struct LockScreenWeatherWidget: View {
             Image(systemName: info.usesLaptopSymbol ? "laptopcomputer" : batteryIconName(for: level))
                 .font(.system(size: 20, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
+                .modifier(InlineIconTint(tint: inlineIconTint(batteryTint(for: level))))
 
             // ✅ The actual percentage text you want in inline style
             Text("\(level)%")
@@ -1084,6 +1095,7 @@ struct LockScreenWeatherWidget: View {
 			Image(systemName: "wind")
 				.font(.system(size: 18, weight: .semibold))
 				.symbolRenderingMode(.hierarchical)
+				.modifier(InlineIconTint(tint: inlineIconTint(aqiTint(for: info))))
 			inlineComposite(primary: "\(info.scale.compactLabel) \(info.index)", secondary: info.category.displayName)
 				.lineLimit(1)
 				.minimumScaleFactor(0.85)
@@ -1361,6 +1373,12 @@ struct LockScreenWeatherWidget: View {
 		return text
 	}
 
+	/// Inline icons take the gauge colours when "Use colored gauges" is on, and
+	/// keep the widget's own foreground otherwise (#434).
+	private func inlineIconTint(_ tint: Color) -> Color? {
+		snapshot.usesGaugeTint ? tint : nil
+	}
+
 	private func batteryTint(for level: Int) -> Color {
 		guard snapshot.usesGaugeTint else { return monochromeGaugeTint }
 		let clamped = clampedBatteryLevel(level)
@@ -1492,7 +1510,9 @@ struct LockScreenWeatherWidget: View {
 	private var accessibilityLabel: String {
 		var components: [String] = []
 
-		if snapshot.showsLocation, let locationName = snapshot.locationName, !locationName.isEmpty {
+		if !snapshot.showsWeather {
+			// Weather is turned off; only the accessory segments below are shown.
+		} else if snapshot.showsLocation, let locationName = snapshot.locationName, !locationName.isEmpty {
 			components.append(
 				String(
 					format: NSLocalizedString("Weather: %@ %@ in %@", comment: "Weather description, temperature, and location"),
@@ -1519,7 +1539,7 @@ struct LockScreenWeatherWidget: View {
 			components.append(accessibilityBluetoothText(for: bluetooth))
 		}
 
-		if let airQuality = snapshot.airQuality {
+		if snapshot.showsWeather, let airQuality = snapshot.airQuality {
 			components.append(accessibilityAirQualityText(for: airQuality))
 		}
 
@@ -1701,5 +1721,17 @@ private struct ArcShape: Shape {
 			clockwise: false
 		)
 		return path
+	}
+}
+
+private struct InlineIconTint: ViewModifier {
+	let tint: Color?
+
+	func body(content: Content) -> some View {
+		if let tint {
+			content.foregroundStyle(tint)
+		} else {
+			content
+		}
 	}
 }
