@@ -19,6 +19,7 @@
 import Foundation
 import Combine
 import AppKit
+import Defaults
 #if canImport(ApplicationServices)
 import ApplicationServices
 #endif
@@ -31,11 +32,50 @@ final class AccessibilityPermissionStore: ObservableObject {
     @Published private(set) var isAuthorized: Bool = AccessibilityPermissionStore.isAccessibilityAuthorized()
 
     private var pollingTask: Task<Void, Never>?
+    private var observers: [NSObjectProtocol] = []
 
-    private init() {}
+    private init() {
+        // Trust can change at any time in System Settings; the bounded poll after a prompt
+        // misses grants made later, leaving settings asking for a permission already given.
+        // macOS posts this when the Accessibility list changes, slightly before AX reflects it.
+        observers.append(DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.accessibility.api"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                AccessibilityPermissionStore.shared.refreshStatus()
+            }
+        })
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                AccessibilityPermissionStore.shared.refreshStatus()
+            }
+        })
+    }
 
     deinit {
         pollingTask?.cancel()
+    }
+
+    /// Shows the system Accessibility prompt for a feature that starts on its own, at most once
+    /// per build. If System Settings already lists Atoll but its entry no longer matches this
+    /// build's signature, macOS reports it as untrusted and would otherwise prompt on every launch.
+    /// Buttons in Settings still prompt every time they are used.
+    nonisolated static func requestAutomaticPromptIfNeeded() {
+#if canImport(ApplicationServices)
+        guard !AppRuntimeEnvironment.isUITesting, !AXIsProcessTrusted() else { return }
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        guard Defaults[.didAutoPromptAccessibilityForBuild] != build else { return }
+        Defaults[.didAutoPromptAccessibilityForBuild] = build
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        _ = AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
+#endif
     }
 
     func refreshStatus() {

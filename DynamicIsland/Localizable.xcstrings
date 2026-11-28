@@ -94573,7 +94573,27 @@
     "Show Window" : {},
     "Open to terminal while a command runs" : {},
     "The notch opens on the terminal while a command is running in it, until the command finishes or you switch to another tab." : {},
-    "Open in floating window" : {}
+    "Open in floating window" : {},
+    "Mirroring Clock timers reads the system log, so macOS may ask for Developer Tools access." : {},
+    "Enter a DeepSeek API key." : {},
+    "DeepSeek" : {},
+    "Custom model ID" : {},
+    "Save DeepSeek Key" : {},
+    "No balance reported" : {},
+    "Topped up %@" : {},
+    "Reads the system log while AirPods are connected, so macOS may ask for Developer Tools access." : {},
+    "DeepSeek request failed. Check the saved API key." : {},
+    "Sent instead of the model picked above, for example a model name on your own server." : {},
+    "Optional" : {},
+    "Unable to store the DeepSeek key (Keychain status %d)." : {},
+    "Change to use an OpenAI-compatible proxy or local server. The API key is optional for other servers." : {},
+    "Already on in System Settings? Remove Atoll from the Accessibility list with the − button, then add it again." : {},
+    "Granted %@" : {},
+    "Shows your prepaid DeepSeek balance and warns when it is too low for API calls. The key is stored in the macOS Keychain." : {},
+    "DeepSeek returned an invalid response" : {},
+    "Balance too low for API calls" : {},
+    "Balance" : {},
+    "DeepSeek API key not configured" : {}
   },
   "version" : "1.2"
 }

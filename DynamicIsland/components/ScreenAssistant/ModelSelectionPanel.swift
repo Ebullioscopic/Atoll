@@ -129,6 +129,8 @@ struct ModelSelectionView: View {
     @State private var claudeApiKey: String = KeychainAIKeyStore.shared.value(.claude)
     @State private var localEndpoint: String = Defaults[.localModelEndpoint]
     @State private var groqApiKey: String = KeychainAIKeyStore.shared.value(.groq)
+    @State private var openaiBaseURL: String = Defaults[.openaiBaseURL]
+    @State private var openaiCustomModelID: String = Defaults[.openaiCustomModelID]
     
     @State private var showingApiKeyAlert = false
     /// Set when a Keychain write fails, which keeps the panel open — see
@@ -259,7 +261,9 @@ struct ModelSelectionView: View {
                             openaiApiKey: $openaiApiKey,
                             claudeApiKey: $claudeApiKey,
                             localEndpoint: $localEndpoint,
-                            groqApiKey: $groqApiKey
+                            groqApiKey: $groqApiKey,
+                            openaiBaseURL: $openaiBaseURL,
+                            openaiCustomModelID: $openaiCustomModelID
                         )
                     }
                 }
@@ -307,7 +311,9 @@ struct ModelSelectionView: View {
         case .gemini:
             return !geminiApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .openai:
+            guard OpenAICompatibleEndpoint.chatCompletionsURL(baseURL: openaiBaseURL) != nil else { return false }
             return !openaiApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || !OpenAICompatibleEndpoint.isDefault(openaiBaseURL)
         case .claude:
             return !claudeApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .local:
@@ -328,6 +334,8 @@ struct ModelSelectionView: View {
         claudeApiKey = keyStore.value(.claude)
         localEndpoint = Defaults[.localModelEndpoint]
         groqApiKey = keyStore.value(.groq)
+        openaiBaseURL = Defaults[.openaiBaseURL]
+        openaiCustomModelID = Defaults[.openaiCustomModelID]
     }
     
     private func saveConfiguration() {
@@ -381,6 +389,8 @@ struct ModelSelectionView: View {
         Defaults[.selectedAIModel] = selectedModel
         Defaults[.enableThinkingMode] = enableThinking
         Defaults[.localModelEndpoint] = localEndpoint
+        Defaults[.openaiBaseURL] = openaiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        Defaults[.openaiCustomModelID] = openaiCustomModelID.trimmingCharacters(in: .whitespacesAndNewlines)
 
         closePanel()
 
@@ -523,6 +533,8 @@ struct ApiConfigurationSection: View {
     @Binding var claudeApiKey: String
     @Binding var localEndpoint: String
     @Binding var groqApiKey: String
+    @Binding var openaiBaseURL: String
+    @Binding var openaiCustomModelID: String
     
     var body: some View {
         VStack(spacing: 12) {
@@ -541,6 +553,22 @@ struct ApiConfigurationSection: View {
                     placeholder: "Enter your OpenAI API key",
                     value: $openaiApiKey,
                     helpText: "Get your API key from OpenAI Platform"
+                )
+
+                ApiKeyField(
+                    title: "Base URL",
+                    placeholder: "https://api.openai.com/v1",
+                    value: $openaiBaseURL,
+                    helpText: "Change to use an OpenAI-compatible proxy or local server. The API key is optional for other servers.",
+                    isSecure: false
+                )
+
+                ApiKeyField(
+                    title: "Custom model ID",
+                    placeholder: "Optional",
+                    value: $openaiCustomModelID,
+                    helpText: "Sent instead of the model picked above, for example a model name on your own server.",
+                    isSecure: false
                 )
                 
             case .claude:
@@ -576,10 +604,10 @@ struct ApiConfigurationSection: View {
 
 // MARK: - API Key Field
 struct ApiKeyField: View {
-    let title: String
-    let placeholder: String
+    let title: LocalizedStringKey
+    let placeholder: LocalizedStringKey
     @Binding var value: String
-    let helpText: String
+    let helpText: LocalizedStringKey
     var isSecure: Bool = true
     
     var body: some View {

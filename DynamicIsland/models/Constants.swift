@@ -415,25 +415,6 @@ enum ClipboardProvider: String, CaseIterable, Codable, Defaults.Serializable, Id
     }
 }
 
-enum ScreenAssistantDisplayMode: String, CaseIterable, Codable, Defaults.Serializable {
-    case popover = "popover"     // Traditional popover attached to button
-    case panel = "panel"         // Floating panel near notch
-    
-    var displayName: String {
-        switch self {
-        case .popover: return String(localized: "Popover")
-        case .panel: return String(localized: "Panel")
-        }
-    }
-    
-    var description: String {
-        switch self {
-        case .popover: return String(localized: "Shows screen assistant as a dropdown attached to the AI button")
-        case .panel: return String(localized: "Shows screen assistant in a floating panel near the notch")
-        }
-    }
-}
-
 enum ColorPickerDisplayMode: String, CaseIterable, Codable, Defaults.Serializable {
     case popover = "popover"     // Traditional popover attached to button
     case panel = "panel"         // Floating panel near notch
@@ -1079,6 +1060,8 @@ extension Defaults.Keys {
     static let automaticallySwitchDisplay = Key<Bool>("automaticallySwitchDisplay", default: true)
     static let releaseName = Key<String>("releaseName", default: "Kaafu")
     static let hideDynamicIslandFromScreenCapture = Key<Bool>("hideDynamicIslandFromScreenCapture", default: false)
+    /// Build number for which Atoll last showed the Accessibility prompt without the user asking.
+    static let didAutoPromptAccessibilityForBuild = Key<String?>("didAutoPromptAccessibilityForBuild", default: nil)
     
         // MARK: Behavior
     static let minimumHoverDuration = Key<TimeInterval>("minimumHoverDuration", default: 0.3)
@@ -1404,6 +1387,7 @@ extension Defaults.Keys {
     static let enableAntigravityProvider = Key<Bool>("enableAntigravityProvider", default: true)
     static let enableNewAPIProvider = Key<Bool>("enableNewAPIProvider", default: false)
     static let enableOpenRouterProvider = Key<Bool>("enableOpenRouterProvider", default: false)
+    static let enableDeepSeekProvider = Key<Bool>("enableDeepSeekProvider", default: false)
     static let openRouterUsageAnalytics = Key<Bool>("openRouterUsageAnalytics", default: false)
     static let newAPIAccounts = Key<[NewAPIAccount]>("newAPIAccounts", default: [])
     static let autoStartStatsMonitoring = Key<Bool>("autoStartStatsMonitoring", default: true)
@@ -1500,7 +1484,6 @@ extension Defaults.Keys {
 
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)
-    static let screenAssistantDisplayMode = Key<ScreenAssistantDisplayMode>("screenAssistantDisplayMode", default: .panel)
     // The provider API keys live in the Keychain (see KeychainAIKeyStore);
     // these four keys remain only for the one-time migration of older builds.
     static let geminiApiKey = Key<String>("geminiApiKey", default: "")
@@ -1511,6 +1494,10 @@ extension Defaults.Keys {
     static let selectedAIModel = Key<AIModel?>("selectedAIModel", default: nil)
     static let enableThinkingMode = Key<Bool>("enableThinkingMode", default: false)
     static let localModelEndpoint = Key<String>("localModelEndpoint", default: "http://localhost:11434")
+    /// Base URL for the OpenAI provider, so OpenAI-compatible proxies and servers can be used.
+    static let openaiBaseURL = Key<String>("openaiBaseURL", default: OpenAICompatibleEndpoint.defaultBaseURL)
+    /// Model ID sent to the OpenAI provider instead of the picked model; empty uses the picked one.
+    static let openaiCustomModelID = Key<String>("openaiCustomModelID", default: "")
 
     // MARK: Third-Party Extensions
     static let enableThirdPartyExtensions = Key<Bool>("enableThirdPartyExtensions", default: true)

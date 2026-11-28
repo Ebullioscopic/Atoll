@@ -22,6 +22,29 @@ import AVFoundation
 import Defaults
 import Foundation
 
+/// Builds the chat completions URL for the OpenAI provider from a user-set base URL.
+enum OpenAICompatibleEndpoint {
+    static let defaultBaseURL = "https://api.openai.com/v1"
+
+    /// Accepts a base such as `https://api.openai.com/v1` or a full `…/chat/completions` URL.
+    /// An empty value means OpenAI itself; anything that is not an http(s) URL is rejected.
+    static func chatCompletionsURL(baseURL: String) -> URL? {
+        var base = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if base.isEmpty { base = defaultBaseURL }
+        while base.hasSuffix("/") { base.removeLast() }
+        if !base.hasSuffix("/chat/completions") { base += "/chat/completions" }
+
+        guard let components = URLComponents(string: base),
+              let scheme = components.scheme?.lowercased(), scheme == "https" || scheme == "http",
+              components.host?.isEmpty == false else { return nil }
+        return components.url
+    }
+
+    static func isDefault(_ baseURL: String) -> Bool {
+        chatCompletionsURL(baseURL: baseURL) == chatCompletionsURL(baseURL: defaultBaseURL)
+    }
+}
+
 // Chat message model
 struct ChatMessage: Identifiable, Codable {
     let id = UUID()
@@ -430,7 +453,9 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     
     private func sendToOpenAIAPI(message: String, files: [ScreenAssistantFile]) {
         let apiKey = keyStore.value(.openai)
-        guard !apiKey.isEmpty else {
+        let baseURL = Defaults[.openaiBaseURL]
+        // Local OpenAI-compatible servers often need no key; OpenAI itself always does.
+        guard !apiKey.isEmpty || !OpenAICompatibleEndpoint.isDefault(baseURL) else {
             print("❌ ScreenAssistant: No OpenAI API key configured")
             addAssistantMessage("Error: No OpenAI API key configured. Please set your API key in model settings.")
             isLoading = false
@@ -439,11 +464,12 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         
         // Get selected model or default to gpt-4o
         let selectedModel = Defaults[.selectedAIModel] ?? AIModel(id: "gpt-4o", name: "GPT-4o", supportsThinking: false)
-        let modelId = selectedModel.id
+        let customModelId = Defaults[.openaiCustomModelID].trimmingCharacters(in: .whitespacesAndNewlines)
+        let modelId = customModelId.isEmpty ? selectedModel.id : customModelId
         
-        guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+        guard let url = OpenAICompatibleEndpoint.chatCompletionsURL(baseURL: baseURL) else {
             print("❌ ScreenAssistant: Invalid OpenAI API URL")
-            addAssistantMessage("Error: Invalid API URL")
+            addAssistantMessage("Error: Invalid API URL. Check the OpenAI base URL in model settings.")
             isLoading = false
             return
         }
@@ -725,7 +751,9 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if !apiKey.isEmpty {
+            request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: requestBody, options: .prettyPrinted)

@@ -462,6 +462,8 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .stats, title: "OpenRouter Provider", keywords: ["llm", "openrouter", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter Provider")),
         SettingsSearchEntry(tab: .stats, title: "OpenRouter API Key", keywords: ["llm", "openrouter", "api", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter API Key")),
         SettingsSearchEntry(tab: .stats, title: "OpenRouter Per-model Analytics", keywords: ["llm", "openrouter", "management", "key", "analytics"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter Per-model Analytics")),
+        SettingsSearchEntry(tab: .stats, title: "DeepSeek Provider", keywords: ["llm", "deepseek", "provider", "balance", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "DeepSeek Provider")),
+        SettingsSearchEntry(tab: .stats, title: "DeepSeek API Key", keywords: ["llm", "deepseek", "api", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "DeepSeek API Key")),
         SettingsSearchEntry(tab: .stats, title: "New API Accounts", keywords: ["llm", "new api", "newapi", "accounts", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "New API Accounts")),
         SettingsSearchEntry(tab: .stats, title: "Stop monitoring after closing the notch", keywords: ["stats", "auto stop"], highlightID: SettingsTab.stats.highlightID(for: "Stop monitoring after closing the notch")),
         SettingsSearchEntry(tab: .stats, title: "CPU Usage", keywords: ["cpu", "graph"], highlightID: SettingsTab.stats.highlightID(for: "CPU Usage")),
@@ -481,7 +483,6 @@ private enum SettingsSearchIndex {
 
         // Screen Assistant
         SettingsSearchEntry(tab: .screenAssistant, title: "Enable Screen Assistant", keywords: ["screen assistant", "ai"], highlightID: SettingsTab.screenAssistant.highlightID(for: "Enable Screen Assistant")),
-        SettingsSearchEntry(tab: .screenAssistant, title: "Display Mode", keywords: ["screen assistant", "mode"], highlightID: SettingsTab.screenAssistant.highlightID(for: "Display Mode")),
 
         // Color Picker
         SettingsSearchEntry(tab: .colorPicker, title: "Enable Color Picker", keywords: ["color picker", "eyedropper"], highlightID: SettingsTab.colorPicker.highlightID(for: "Enable Color Picker")),
@@ -2405,7 +2406,8 @@ private struct HUDAndOSDSettingsView: View {
                                 },
                                 openSettingsAction: {
                                     accessibilityPermission.openSystemSettings()
-                                }
+                                },
+                                footnote: SettingsPermissionCallout.accessibilityStaleEntryHint
                             )
                         } header: {
                             Text("Accessibility")
@@ -2524,7 +2526,8 @@ private struct HUDAndOSDSettingsView: View {
                                 },
                                 openSettingsAction: {
                                     accessibilityPermission.openSystemSettings()
-                                }
+                                },
+                                footnote: SettingsPermissionCallout.accessibilityStaleEntryHint
                             )
                         } header: {
                             Text("Accessibility")
@@ -2585,6 +2588,7 @@ private struct HUDAndOSDSettingsView: View {
         }
         .navigationTitle("Controls")
         .onAppear {
+            accessibilityPermission.refreshStatus()
             if #unavailable(macOS 26.0), verticalHUDMaterial == .liquid {
                 verticalHUDMaterial = .frosted
                 verticalHUDLiquidGlassCustomizationMode = .standard
@@ -2947,6 +2951,7 @@ private struct DevicesSettingsView: View {
                 Defaults.Toggle(key: .showAirPodsListeningModeChanges) {
                     Text("Show AirPods listening mode changes")
                 }
+                .help("Reads the system log while AirPods are connected, so macOS may ask for Developer Tools access.")
                 .settingsHighlight(id: highlightID("Show AirPods listening mode changes"))
                 VStack(alignment: .leading, spacing: 12) {
                     Text("HUD icon style")
@@ -3039,7 +3044,8 @@ struct HUD: View {
                     SettingsPermissionCallout(
                         message: "Accessibility permission lets Dynamic Island replace the native volume, brightness, and keyboard HUDs.",
                         requestAction: { accessibilityPermission.requestAuthorizationPrompt() },
-                        openSettingsAction: { accessibilityPermission.openSystemSettings() }
+                        openSettingsAction: { accessibilityPermission.openSystemSettings() },
+                        footnote: SettingsPermissionCallout.accessibilityStaleEntryHint
                     )
                 } header: {
                     Text("Accessibility")
@@ -7795,7 +7801,10 @@ struct TimerSettings: View {
         } header: {
             Text("Timer Feature")
         } footer: {
-            Text("Control timer availability, live activity behaviour, and whether the app mirrors timers started from the macOS Clock app.")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Control timer availability, live activity behaviour, and whether the app mirrors timers started from the macOS Clock app.")
+                Text("Mirroring Clock timers reads the system log, so macOS may ask for Developer Tools access.")
+            }
         }
     }
 
@@ -8368,6 +8377,7 @@ struct StatsSettings: View {
     @Default(.enableLLMUsageFeature) var enableLLMUsageFeature
     @Default(.enableNewAPIProvider) var enableNewAPIProvider
     @Default(.enableOpenRouterProvider) var enableOpenRouterProvider
+    @Default(.enableDeepSeekProvider) var enableDeepSeekProvider
     @Default(.statsStopWhenNotchCloses) var statsStopWhenNotchCloses
     @Default(.statsUpdateInterval) var statsUpdateInterval
     @Default(.showCpuGraph) var showCpuGraph
@@ -8385,6 +8395,9 @@ struct StatsSettings: View {
     @State private var accountPendingDeletion: NewAPIAccount?
     @State private var newAPIAccountErrorMessage: String?
     @State private var openRouterErrorMessage: String?
+    @State private var deepSeekAPIKey = ""
+    @State private var hasDeepSeekKey = false
+    @State private var deepSeekErrorMessage: String?
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.stats.highlightID(for: title)
@@ -8435,6 +8448,35 @@ struct StatsSettings: View {
             LLMUsageManager.shared.refreshAll(force: true)
         } catch {
             openRouterErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func saveDeepSeekKey() {
+        let trimmed = deepSeekAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            deepSeekErrorMessage = String(localized: "Enter a DeepSeek API key.")
+            return
+        }
+        do {
+            try DeepSeekKeychain.save(trimmed)
+            deepSeekAPIKey = ""
+            hasDeepSeekKey = true
+            deepSeekErrorMessage = nil
+            LLMUsageManager.shared.refreshAll(force: true)
+        } catch {
+            deepSeekErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteDeepSeekKey() {
+        do {
+            try DeepSeekKeychain.delete()
+            deepSeekAPIKey = ""
+            hasDeepSeekKey = false
+            deepSeekErrorMessage = nil
+            LLMUsageManager.shared.refreshAll(force: true)
+        } catch {
+            deepSeekErrorMessage = error.localizedDescription
         }
     }
 
@@ -8513,6 +8555,14 @@ struct StatsSettings: View {
                     .onChange(of: enableOpenRouterProvider) { _, _ in
                         LLMUsageManager.shared.refreshAll(force: true)
                     }
+
+                    Defaults.Toggle(key: .enableDeepSeekProvider) {
+                        Text("DeepSeek")
+                    }
+                    .settingsHighlight(id: highlightID("DeepSeek Provider"))
+                    .onChange(of: enableDeepSeekProvider) { _, _ in
+                        LLMUsageManager.shared.refreshAll(force: true)
+                    }
                 } header: {
                     Text("LLM Providers")
                 } footer: {
@@ -8558,6 +8608,40 @@ struct StatsSettings: View {
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                         .font(.caption)
+                }
+
+                if enableDeepSeekProvider {
+                    Section {
+                        SecureField(hasDeepSeekKey ? "Replace saved API key" : "API key", text: $deepSeekAPIKey)
+                            .textContentType(.password)
+                            .settingsHighlight(id: highlightID("DeepSeek API Key"))
+
+                        HStack {
+                            Button("Save DeepSeek Key") {
+                                saveDeepSeekKey()
+                            }
+                            .buttonStyle(.borderedProminent)
+
+                            Button("Remove Key", role: .destructive) {
+                                deleteDeepSeekKey()
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(!hasDeepSeekKey)
+                        }
+
+                        if let deepSeekErrorMessage {
+                            Text(deepSeekErrorMessage)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    } header: {
+                        Text("DeepSeek")
+                    } footer: {
+                        Text("Shows your prepaid DeepSeek balance and warns when it is too low for API calls. The key is stored in the macOS Keychain.")
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
                 }
 
                 Section {
@@ -8819,6 +8903,7 @@ struct StatsSettings: View {
         .onAppear {
             newAPIAccounts = Defaults[.newAPIAccounts]
             hasOpenRouterKey = OpenRouterKeychain.hasKey()
+            hasDeepSeekKey = DeepSeekKeychain.hasKey()
         }
         .sheet(isPresented: $isNewAPIEditorPresented) {
             NewAPIAccountEditor(account: editingNewAPIAccount) { account, apiKey in
@@ -9231,7 +9316,6 @@ struct ClipboardSettings: View {
 struct ScreenAssistantSettings: View {
     @ObservedObject var screenAssistantManager = ScreenAssistantManager.shared
     @Default(.enableScreenAssistant) var enableScreenAssistant
-    @Default(.screenAssistantDisplayMode) var screenAssistantDisplayMode
     /// The key itself lives in the Keychain, so only its presence is mirrored
     /// into view state — the secret is never held longer than an edit.
     private let keyStore: AIKeyStoring = KeychainAIKeyStore.shared
@@ -9342,19 +9426,6 @@ struct ScreenAssistantSettings: View {
                     }
 
                     HStack {
-                        Text("Display Mode")
-                        Spacer()
-                        Picker("", selection: $screenAssistantDisplayMode) {
-                            ForEach(ScreenAssistantDisplayMode.allCases, id: \.self) { mode in
-                                Text(mode.displayName).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(minWidth: 100)
-                    }
-                    .settingsHighlight(id: highlightID("Display Mode"))
-
-                    HStack {
                         Text("Attached Files")
                         Spacer()
                         Text("\(screenAssistantManager.attachedFiles.count)")
@@ -9369,13 +9440,6 @@ struct ScreenAssistantSettings: View {
                     }
                 } header: {
                     Text("Configuration")
-                } footer: {
-                    switch screenAssistantDisplayMode {
-                    case .popover:
-                        Text("Popover mode shows the assistant as a dropdown attached to the AI button. Panel mode shows the assistant in a floating window near the notch.")
-                    case .panel:
-                        Text("Panel mode shows the assistant in a floating window near the notch. Popover mode shows the assistant as a dropdown attached to the AI button.")
-                    }
                 }
 
                 Section {
@@ -9624,7 +9688,8 @@ struct CustomOSDSettings: View {
                     SettingsPermissionCallout(
                         message: "Accessibility permission is needed to intercept system controls for the Custom OSD.",
                         requestAction: { accessibilityPermission.requestAuthorizationPrompt() },
-                        openSettingsAction: { accessibilityPermission.openSystemSettings() }
+                        openSettingsAction: { accessibilityPermission.openSystemSettings() },
+                        footnote: SettingsPermissionCallout.accessibilityStaleEntryHint
                     )
                 } header: {
                     Text("Accessibility")
@@ -9783,6 +9848,10 @@ struct SettingsPermissionCallout: View {
     let openSettingsButtonTitle: String
     let requestAction: () -> Void
     let openSettingsAction: () -> Void
+    let footnote: String?
+
+    /// macOS keeps showing a stale entry as enabled after the app's signature changes.
+    static let accessibilityStaleEntryHint = "Already on in System Settings? Remove Atoll from the Accessibility list with the − button, then add it again."
 
     init(
         title: String = "Accessibility permission required",
@@ -9792,7 +9861,8 @@ struct SettingsPermissionCallout: View {
         requestButtonTitle: String = "Request Access",
         openSettingsButtonTitle: String = "Open Settings",
         requestAction: @escaping () -> Void,
-        openSettingsAction: @escaping () -> Void
+        openSettingsAction: @escaping () -> Void,
+        footnote: String? = nil
     ) {
         self.title = title
         self.message = message
@@ -9802,6 +9872,7 @@ struct SettingsPermissionCallout: View {
         self.openSettingsButtonTitle = openSettingsButtonTitle
         self.requestAction = requestAction
         self.openSettingsAction = openSettingsAction
+        self.footnote = footnote
     }
 
     var body: some View {
@@ -9826,6 +9897,12 @@ struct SettingsPermissionCallout: View {
                 .buttonStyle(.bordered)
             }
             .controlSize(.small)
+
+            if let footnote {
+                Text(LocalizedStringKey(footnote))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)

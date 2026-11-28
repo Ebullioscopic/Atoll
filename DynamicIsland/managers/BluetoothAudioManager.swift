@@ -31,13 +31,7 @@ class BluetoothAudioManager: ObservableObject {
     
     // MARK: - Published Properties
     @Published var lastConnectedDevice: BluetoothAudioDevice?
-    @Published var connectedDevices: [BluetoothAudioDevice] = [] {
-        didSet {
-            // Tie the AirPods listening-mode log stream to device lifecycle:
-            // only keep it running while an AirPods device is actually connected.
-            reconcileListeningModeLogObserverForConnectedDevices()
-        }
-    }
+    @Published var connectedDevices: [BluetoothAudioDevice] = []
     @Published var isBluetoothAudioConnected: Bool = false
     @Published private(set) var activeListeningModeEvent: AirPodsListeningModeEvent?
     
@@ -233,32 +227,33 @@ class BluetoothAudioManager: ObservableObject {
             }
         }
 
-        reconcileListeningModeLogObserverForConnectedDevices()
+        // Tailing the unified log can trigger the Developer Tools Access prompt, so only run it
+        // while AirPods are actually connected.
+        let hasAirPods = $connectedDevices
+            .map { devices in devices.contains { $0.deviceType.isAirPods } }
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
 
-        Defaults.publisher(.showAirPodsListeningModeChanges, options: [])
-            .sink { [weak self] _ in
-                self?.reconcileListeningModeLogObserverForConnectedDevices()
+        Defaults.publisher(.showAirPodsListeningModeChanges)
+            .map(\.newValue)
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .handleEvents(receiveOutput: { [weak self] enabled in
+                if enabled {
+                    self?.listeningModeLogObserver.resetRestartPolicy()
+                }
+            })
+            .combineLatest(hasAirPods)
+            .sink { [weak self] enabled, hasAirPods in
+                if enabled && hasAirPods {
+                    self?.listeningModeLogObserver.start()
+                } else {
+                    self?.listeningModeLogObserver.stop()
+                }
             }
             .store(in: &cancellables)
     }
 
-    /// Starts the AirPods listening-mode log stream only when the feature is
-    /// enabled AND at least one AirPods device is connected; stops it otherwise.
-    /// Idempotent (start/stop are internally guarded), so it is safe to call
-    /// from `connectedDevices.didSet` and the Defaults publisher.
-    private func reconcileListeningModeLogObserverForConnectedDevices() {
-        guard Defaults[.showAirPodsListeningModeChanges] else {
-            listeningModeLogObserver.stop()
-            return
-        }
-
-        if connectedDevices.contains(where: { $0.deviceType.isAirPods }) {
-            listeningModeLogObserver.start()
-        } else {
-            listeningModeLogObserver.stop()
-        }
-    }
-    
     /// Starts polling for device connection changes (fallback mechanism)
     private func startPollingForChanges() {
         print("🎧 [BluetoothAudioManager] Starting polling timer (3s interval)...")
@@ -2188,9 +2183,12 @@ private final class AirPodsListeningModeLogObserver {
     private var process: Process?
     private let queue = DispatchQueue(label: "com.dynamicisland.airpods-listening-log", qos: .utility)
     private var lineBuffer = ""
+    private var isWanted = false
+    private var restartPolicy = LogStreamRestartPolicy()
 
     func start() {
-        guard process == nil else { return }
+        isWanted = true
+        guard process == nil, !restartPolicy.hasGivenUp else { return }
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/log")
@@ -2214,12 +2212,22 @@ private final class AirPodsListeningModeLogObserver {
         }
 
         // `log stream` can exit on its own (logd restart, memory pressure). Start a new one so
-        // listening-mode changes keep arriving; stop() clears this handler first.
+        // listening-mode changes keep arriving, unless it keeps dying right away (Developer Tools
+        // access denied), where restarting would just re-prompt. stop() clears this handler first.
+        let startedAt = Date()
         process.terminationHandler = { [weak self] exited in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            DispatchQueue.main.async {
                 guard let self, self.process === exited else { return }
                 self.process = nil
-                self.start()
+                let runtime = Date().timeIntervalSince(startedAt)
+                guard let delay = self.restartPolicy.restartDelay(afterRuntime: runtime, baseDelay: 5) else {
+                    print("🎧 [BluetoothAudioManager] AirPods listening mode log observer keeps exiting; not restarting it this session")
+                    return
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    guard let self, self.isWanted, self.process == nil else { return }
+                    self.start()
+                }
             }
         }
 
@@ -2234,9 +2242,14 @@ private final class AirPodsListeningModeLogObserver {
     }
 
     func stop() {
+        isWanted = false
         process?.terminationHandler = nil
         process?.terminate()
         process = nil
+    }
+
+    func resetRestartPolicy() {
+        restartPolicy.reset()
     }
 
     private func consume(_ text: String) {

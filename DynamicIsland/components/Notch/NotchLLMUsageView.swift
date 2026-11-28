@@ -88,6 +88,8 @@ struct NotchLLMUsageView: View {
                     newAPISuccess(snap)
                 } else if provider == .openrouter {
                     openRouterSuccess(snap)
+                } else if provider == .deepseek {
+                    deepSeekSuccess(snap)
                 } else {
                     success(snap, provider: provider)
                 }
@@ -227,6 +229,41 @@ struct NotchLLMUsageView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+        }
+    }
+
+    @ViewBuilder
+    private func deepSeekSuccess(_ snap: UsageSnapshot) -> some View {
+        let balance = snap.deepSeekBalance
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(balance?.balances ?? []) { info in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Balance")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(info.total, format: .currency(code: info.currency))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                    HStack(spacing: 4) {
+                        Text("Topped up \(info.toppedUp, format: .currency(code: info.currency))")
+                        Text(verbatim: "·")
+                        Text("Granted \(info.granted, format: .currency(code: info.currency))")
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                }
+            }
+            if balance?.balances.isEmpty ?? true {
+                Text("No balance reported").font(.caption2).foregroundStyle(.secondary)
+            }
+            if balance?.isAvailable == false {
+                Label("Balance too low for API calls", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
         }
     }
 

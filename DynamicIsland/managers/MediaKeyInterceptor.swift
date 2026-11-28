@@ -500,12 +500,9 @@ final class MediaKeyInterceptor {
 #if canImport(ApplicationServices)
 extension MediaKeyInterceptor {
     private func requestAccessibilityPermissionIfNeeded() {
-        guard !AXIsProcessTrusted(), !didRequestAccessibilityPrompt else { return }
-        if AppRuntimeEnvironment.isUITesting { return }
-        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        let options: CFDictionary = [promptKey: true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
+        guard !didRequestAccessibilityPrompt else { return }
         didRequestAccessibilityPrompt = true
+        AccessibilityPermissionStore.requestAutomaticPromptIfNeeded()
     }
 }
 #endif

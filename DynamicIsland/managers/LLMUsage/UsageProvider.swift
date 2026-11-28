@@ -2,7 +2,7 @@ import Foundation
 import Defaults
 
 enum ProviderID: String, CaseIterable, Identifiable {
-    case claude, codex, cursor, copilot, antigravity, newAPI, openrouter
+    case claude, codex, cursor, copilot, antigravity, newAPI, openrouter, deepseek
     var id: String { rawValue }
     var displayName: String {
         switch self {
@@ -13,6 +13,7 @@ enum ProviderID: String, CaseIterable, Identifiable {
         case .antigravity: return "Antigravity"
         case .newAPI: return "New API"
         case .openrouter: return "OpenRouter"
+        case .deepseek: return "DeepSeek"
         }
     }
     var enabledKey: Defaults.Key<Bool> {
@@ -24,6 +25,7 @@ enum ProviderID: String, CaseIterable, Identifiable {
         case .antigravity: return .enableAntigravityProvider
         case .newAPI: return .enableNewAPIProvider
         case .openrouter: return .enableOpenRouterProvider
+        case .deepseek: return .enableDeepSeekProvider
         }
     }
 }
@@ -70,6 +72,7 @@ struct UsageSnapshot: Equatable {
     var plan: String? = nil // Subscription plan label (e.g. "Max 5x"); provided by Claude only, nil otherwise.
     var newAPIAccounts: [NewAPIAccountSnapshot] = []
     var copilotQuotas: [CopilotQuota] = []
+    var deepSeekBalance: DeepSeekBalanceResponse? = nil
     var lastUpdated: Date = .distantPast
 }
 

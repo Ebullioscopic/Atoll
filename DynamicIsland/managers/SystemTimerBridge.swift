@@ -86,6 +86,8 @@ final class SystemTimerBridge: ObservableObject {
     private var logPipe: Pipe?
     private var logBuffer = Data()
     private var logRestartWorkItem: DispatchWorkItem?
+    private var logStartedAt: Date?
+    private var logRestartPolicy = LogStreamRestartPolicy()
     private var logPreferredName: String?
     private var logPreferredDuration: TimeInterval?
     private var logIdentifier: String?
@@ -189,6 +191,7 @@ final class SystemTimerBridge: ObservableObject {
             guard let self else { return }
             guard !self.isMonitoring else { return }
             self.logInfo("Starting monitoring pipeline")
+            self.logRestartPolicy.reset()
 
             self.refreshMetadata()
             self.startFileMonitor()
@@ -314,6 +317,7 @@ final class SystemTimerBridge: ObservableObject {
         do {
             try process.run()
             logProcess = process
+            logStartedAt = Date()
             logInfo("Log stream started (pid: \(process.processIdentifier))")
             return true
         } catch {
@@ -352,7 +356,8 @@ final class SystemTimerBridge: ObservableObject {
         logPipe = nil
         logProcess = nil
         logBuffer.removeAll(keepingCapacity: false)
-        logError("Log stream exited unexpectedly; scheduling restart")
+        let runtime = logStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+        logStartedAt = nil
 
         guard Defaults[.mirrorSystemTimer] else { return }
 
@@ -360,10 +365,16 @@ final class SystemTimerBridge: ObservableObject {
             setupTicker()
         }
 
-        scheduleLogStreamRestart()
+        guard let delay = logRestartPolicy.restartDelay(afterRuntime: runtime, baseDelay: 2.0) else {
+            logError("Log stream keeps exiting right away (Developer Tools access denied?); not restarting it this session")
+            return
+        }
+
+        logError("Log stream exited unexpectedly; scheduling restart")
+        scheduleLogStreamRestart(after: delay)
     }
 
-    private func scheduleLogStreamRestart() {
+    private func scheduleLogStreamRestart(after delay: TimeInterval) {
         logRestartWorkItem?.cancel()
 
         let workItem = DispatchWorkItem { [weak self] in
@@ -376,8 +387,8 @@ final class SystemTimerBridge: ObservableObject {
         }
 
         logRestartWorkItem = workItem
-        queue.asyncAfter(deadline: .now() + 2.0, execute: workItem)
-        logDebug("Scheduled log stream restart in 2s")
+        queue.asyncAfter(deadline: .now() + delay, execute: workItem)
+        logDebug("Scheduled log stream restart in \(Int(delay))s")
     }
 
     private func consumeLogData(_ data: Data) {
