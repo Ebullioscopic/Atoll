@@ -120,9 +120,14 @@ private struct ScrollMonitor: NSViewRepresentable {
         private func handleScroll(_ event: NSEvent) {
             guard lastEventTimestamp != event.timestamp else { return }
             lastEventTimestamp = event.timestamp
-            guard isCursorNearObservedView(using: event) else { return }
 
-            if event.phase == .ended || event.momentumPhase == .ended {
+            // A gesture that started on the view must still end if the cursor
+            // drifted off it mid-scroll; otherwise the view keeps its in-flight
+            // gesture feedback (blur/stretch) indefinitely.
+            let isEnd = event.phase == .ended || event.phase == .cancelled || event.momentumPhase == .ended
+            guard (isEnd && active) || isCursorNearObservedView(using: event) else { return }
+
+            if isEnd {
                 if active {
                     action(accumulated.magnitude, .ended)
                 } else {

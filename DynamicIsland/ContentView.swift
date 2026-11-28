@@ -988,6 +988,7 @@ struct ContentView: View {
                 if vm.notchState == .closed { menuBarLayout.startTracking() }
             }
             .onChange(of: vm.notchState) { _, state in
+                resetGestureProgress()
                 // An open notch covers the menu bar wholesale and is the user's
                 // own doing, so there is nothing to step around while it is up.
                 if state == .closed {
@@ -2686,6 +2687,13 @@ struct ContentView: View {
     }
 
     private func handleScrollGesture(isDownward: Bool, translation: CGFloat, phase: NSEvent.Phase) {
+        // Reset before any guard: if the notch state, calendar hover or the
+        // gesture settings change mid-scroll, the handlers below bail out and
+        // would otherwise leave the content blurred until relaunch.
+        if phase == .ended || phase == .cancelled {
+            resetGestureProgress()
+        }
+
         let reverse = Defaults[.reverseScrollGestures]
         let shouldOpen = isDownward ? !reverse : reverse
 
@@ -2719,6 +2727,13 @@ struct ContentView: View {
                 gestureProgress = .zero
             }
             openNotch()
+        }
+    }
+
+    private func resetGestureProgress() {
+        guard gestureProgress != .zero else { return }
+        withAnimation(.smooth) {
+            gestureProgress = .zero
         }
     }
 
