@@ -99,7 +99,7 @@ final class NewAPIUsageTests: XCTestCase {
         XCTAssertEqual(snapshot.weekQuota, 5_678)
         XCTAssertEqual(snapshot.currentRPM, 3)
         XCTAssertEqual(snapshot.currentTPM, 321)
-        XCTAssertEqual(recorder.requests.count, 4)
+        XCTAssertEqual(recorder.requests.count, 3)
 
         for request in recorder.requests {
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer secret-key")
@@ -226,4 +226,102 @@ private struct TestAccountSource: NewAPIAccountProviding {
     func accounts() -> [NewAPIAccount] { configuredAccounts }
 
     func apiKey(for account: NewAPIAccount) -> String? { keys[account.id] }
+}
+
+final class OpenRouterUsageTests: XCTestCase {
+    func testDecodesCreditsAndAnalyticsNumericStrings() throws {
+        let credits = try JSONDecoder().decode(
+            OpenRouterCredits.self,
+            from: Data(#"{"total_credits":"100.5","total_usage":25.75}"#.utf8)
+        )
+        XCTAssertEqual(credits, OpenRouterCredits(totalCredits: 100.5, totalUsage: 25.75))
+
+        let row = try JSONDecoder().decode(
+            OpenRouterAnalyticsRow.self,
+            from: Data(#"{"model":"openai/gpt-4o-mini","total_usage":"0.005","tokens_total":"6331","request_count":"6"}"#.utf8)
+        )
+        XCTAssertEqual(row, OpenRouterAnalyticsRow(model: "openai/gpt-4o-mini", totalUsage: 0.005, tokensTotal: 6331, requestCount: 6))
+    }
+
+    func testFetchSnapshotUsesKeyEndpointByDefault() async throws {
+        let recorder = RequestRecorder()
+        let client = OpenRouterClient { request in
+            recorder.append(request)
+            XCTAssertEqual(request.url?.path, "/api/v1/key")
+            let body = #"{"data":{"limit":50,"limit_remaining":40,"usage":12.5,"usage_daily":1.25,"usage_weekly":10,"is_free_tier":false}}"#
+            return (
+                Data(body.utf8),
+                HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            )
+        }
+
+        let snapshot = try await client.fetchSnapshot(apiKey: "regular-key", now: Date())
+
+        XCTAssertEqual(recorder.requests.count, 1)
+        XCTAssertEqual(recorder.requests.first?.httpMethod, "GET")
+        XCTAssertEqual(recorder.requests.first?.value(forHTTPHeaderField: "Authorization"), "Bearer regular-key")
+        XCTAssertEqual(snapshot.today.costUSD, 1.25, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.week.costUSD, 10, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.sessionLimit?.used, 10)
+        XCTAssertEqual(snapshot.sessionLimit?.limit, 50)
+        XCTAssertTrue(snapshot.models.isEmpty)
+    }
+
+    func testFetchSnapshotUsesManagementEndpointsWhenAnalyticsEnabled() async throws {
+        let recorder = RequestRecorder()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let client = OpenRouterClient { request in
+            recorder.append(request)
+            let body: String
+            if request.url?.path == "/api/v1/credits" {
+                body = #"{"data":{"total_credits":100.0,"total_usage":25.0}}"#
+            } else if request.url?.path == "/api/v1/analytics/query" {
+                body = #"{"data":{"data":[{"model":"openai/gpt-4o-mini","total_usage":0.5,"tokens_total":"1000","request_count":"4"},{"model":"anthropic/claude-sonnet-4","total_usage":"0.25","tokens_total":500,"request_count":2}],"metadata":{"row_count":2,"truncated":false}}}"#
+            } else {
+                XCTFail("Unexpected OpenRouter request: \(request.url?.absoluteString ?? "nil")")
+                body = #"{"data":{"data":[]}}"#
+            }
+            return (
+                Data(body.utf8),
+                HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            )
+        }
+
+        let snapshot = try await client.fetchSnapshot(apiKey: "management-key", includeAnalytics: true, now: now, calendar: calendar)
+
+        XCTAssertEqual(snapshot.sessionLimit?.used, 25.0)
+        XCTAssertEqual(snapshot.sessionLimit?.limit, 100.0)
+        XCTAssertEqual(snapshot.today.totalTokens, 1_500)
+        XCTAssertEqual(snapshot.today.requestCount, 6)
+        XCTAssertEqual(snapshot.today.costUSD, 0.75, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.week.totalTokens, 1_500)
+        XCTAssertEqual(snapshot.models.map(\.model), ["openai/gpt-4o-mini", "anthropic/claude-sonnet-4"])
+        XCTAssertEqual(recorder.requests.count, 3)
+        for request in recorder.requests {
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer management-key")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
+        }
+        XCTAssertEqual(recorder.requests.filter { $0.httpMethod == "POST" }.count, 2)
+    }
+
+    func testOpenRouterProviderRequiresConfiguredKey() async throws {
+        let provider = OpenRouterUsageProvider(keySource: TestOpenRouterKeySource(key: nil), client: OpenRouterClient { _ in
+            XCTFail("Missing OpenRouter key must not create a request")
+            throw OpenRouterClientError.httpFailure
+        })
+
+        do {
+            _ = try await provider.fetchSnapshot(now: Date())
+            XCTFail("Expected missing key to throw")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, "OpenRouter API key not configured")
+        }
+    }
+}
+
+private struct TestOpenRouterKeySource: OpenRouterAPIKeyProviding {
+    let key: String?
+    func apiKey() -> String? { key }
 }

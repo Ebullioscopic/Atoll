@@ -83,6 +83,8 @@ struct NotchLLMUsageView: View {
             case .success(let snap):
                 if provider == .newAPI {
                     newAPISuccess(snap)
+                } else if provider == .openrouter {
+                    openRouterSuccess(snap)
                 } else {
                     success(snap, provider: provider)
                 }
@@ -155,6 +157,53 @@ struct NotchLLMUsageView: View {
                 window("Today", snap.today, compact: true)
                 window("Week", snap.week, compact: true)
             }
+        }
+    }
+
+    private func openRouterSuccess(_ snap: UsageSnapshot) -> some View {
+        // Token and request counts only come from the opt-in management-key analytics;
+        // a regular API key reports spend and the key's own credit limit.
+        let hasAnalytics = !snap.models.isEmpty || snap.week.requestCount > 0 || snap.week.totalTokens > 0
+        return VStack(alignment: .leading, spacing: 6) {
+            if let limit = snap.sessionLimit {
+                quotaGauge(hasAnalytics ? String(localized: "Credits") : String(localized: "Key limit"), limit)
+            }
+            openRouterWindow(Text("Today"), snap.today, showsAnalytics: hasAnalytics)
+            openRouterWindow(Text("Week"), snap.week, showsAnalytics: hasAnalytics)
+            let models = Array(snap.models.prefix(3))
+            if !models.isEmpty {
+                Divider().opacity(0.25)
+                ForEach(models) { model in
+                    openRouterWindow(Text(verbatim: model.model), model.totals, showsAnalytics: true)
+                }
+            }
+        }
+    }
+
+    private func openRouterWindow(_ label: Text, _ totals: UsageTotals, showsAnalytics: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            label
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .leading)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if showsAnalytics {
+                Text(tokens(totals.totalTokens))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+            }
+            Spacer(minLength: 4)
+            if showsAnalytics {
+                Text("\(quota(totals.requestCount)) req")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Text(money(totals.costUSD))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         }
     }
 
