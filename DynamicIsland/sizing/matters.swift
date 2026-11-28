@@ -134,8 +134,23 @@ func enabledStandardTabCount() -> Int {
     return count
 }
 
+/// Width the leading tab rail occupies: the icons plus the gap to the content.
+let tabRailWidth: CGFloat = 42
+
+/// Whether the open notch draws its tabs as a leading rail. Minimalistic mode
+/// has no tab bar at all, so the rail never shows there.
+func isLeadingTabRailActive() -> Bool {
+    Defaults[.tabBarPosition] == .left && !Defaults[.enableMinimalisticUI]
+}
+
 /// Returns the recommended minimum notch width for the given tab count.
 func recommendedMinimumNotchWidth(forTabCount count: Int) -> CGFloat {
+    // A rail spends height per tab rather than width, so the tab count stops
+    // driving the width. What the leading position still needs is the 640pt of
+    // content a header of up to four tabs leaves, plus the width the rail takes
+    // out of it — a constant 682pt, under the 690 and 770 a header row asks for
+    // at five and six tabs.
+    if isLeadingTabRailActive() { return 640 + tabRailWidth }
     if count >= 6 { return 770 }
     if count >= 5 { return 690 }
     return 640
