@@ -253,6 +253,85 @@ private struct SpotifyCanvasFallbackLayoutFrames {
     let lyricsFrame: NSRect?
 }
 
+// MARK: - Artwork Encoding
+
+/// Encodes artwork through a single bitmap. `tiffRepresentation` serialises every
+/// representation of an image, and app-icon fallbacks carry ~32 of them up to
+/// 2048 px, which spiked memory past 1 GB (#866).
+enum ArtworkImageEncoding {
+    static let maxPixelDimension: CGFloat = 2048
+    private static let fingerprintSide = 32
+
+    static func cgImage(from image: NSImage, maxPixelDimension: CGFloat = maxPixelDimension) -> CGImage? {
+        let pointSize = image.size
+        guard pointSize.width > 0, pointSize.height > 0 else { return nil }
+
+        let largestRepPixels = image.representations
+            .map { CGFloat(max($0.pixelsWide, $0.pixelsHigh)) }
+            .max() ?? 0
+        let naturalPixels = largestRepPixels > 0 ? largestRepPixels : max(pointSize.width, pointSize.height)
+        let targetPixels = min(naturalPixels, maxPixelDimension)
+        let scale = targetPixels / max(pointSize.width, pointSize.height)
+        var rect = CGRect(x: 0, y: 0, width: pointSize.width * scale, height: pointSize.height * scale)
+        guard let cgImage = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else { return nil }
+
+        // AppKit can hand back a larger representation than the proposed rect.
+        let largestSide = CGFloat(max(cgImage.width, cgImage.height))
+        guard largestSide > maxPixelDimension else { return cgImage }
+        let downscale = maxPixelDimension / largestSide
+        let width = max(Int((CGFloat(cgImage.width) * downscale).rounded()), 1)
+        let height = max(Int((CGFloat(cgImage.height) * downscale).rounded()), 1)
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              )
+        else { return nil }
+        context.interpolationQuality = .high
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
+    }
+
+    static func pngData(from image: NSImage) -> Data? {
+        guard let cgImage = cgImage(from: image) else { return nil }
+        return NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:])
+    }
+
+    /// Hashes a small thumbnail instead of a full PNG encode, so comparing artwork
+    /// on every album-art change stays cheap on the main thread.
+    static func fingerprint(for image: NSImage) -> String? {
+        guard let cgImage = cgImage(from: image, maxPixelDimension: 256) else { return nil }
+        let side = fingerprintSide
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                data: nil,
+                width: side,
+                height: side,
+                bitsPerComponent: 8,
+                bytesPerRow: side * 4,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              )
+        else { return nil }
+        context.interpolationQuality = .medium
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
+        guard let data = context.data else { return nil }
+
+        var hasher = Hasher()
+        hasher.combine(Data(bytes: data, count: side * side * 4))
+        hasher.combine(cgImage.width)
+        hasher.combine(cgImage.height)
+        hasher.combine(Int(image.size.width.rounded()))
+        hasher.combine(Int(image.size.height.rounded()))
+        return String(hasher.finalize())
+    }
+}
+
 // MARK: - Window Manager
 
 @MainActor
@@ -811,25 +890,16 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     }
 
     private nonisolated func encodeToPNG(_ image: NSImage) -> Data? {
-        guard let tiffData = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData)
-        else { return nil }
-        return bitmap.representation(using: .png, properties: [:])
+        autoreleasepool { ArtworkImageEncoding.pngData(from: image) }
     }
 
     private nonisolated func imageFingerprint(for image: NSImage) -> String? {
-        guard let pngData = encodeToPNG(image) else { return nil }
-        var hasher = Hasher()
-        hasher.combine(pngData)
-        hasher.combine(Int(image.size.width.rounded()))
-        hasher.combine(Int(image.size.height.rounded()))
-        return String(hasher.finalize())
+        autoreleasepool { ArtworkImageEncoding.fingerprint(for: image) }
     }
 
     private func encodeBlurredWallpaperPNG(from artwork: NSImage, targetPixelSize: CGSize) -> Data? {
-        guard let tiffData = artwork.tiffRepresentation,
-              let sourceImage = CIImage(data: tiffData)
-        else { return nil }
+        guard let artworkImage = ArtworkImageEncoding.cgImage(from: artwork) else { return nil }
+        let sourceImage = CIImage(cgImage: artworkImage)
 
         let targetRect = CGRect(origin: .zero, size: targetPixelSize)
         let sourceExtent = sourceImage.extent
@@ -862,32 +932,48 @@ final class FullScreenArtworkWindowManager: ObservableObject {
                 ]
             )
 
-        let context = CIContext(options: nil)
+        let context = Self.wallpaperCIContext
         guard let cgImage = context.createCGImage(blurredImage, from: targetRect) else { return nil }
 
-        let renderedImage = NSImage(cgImage: cgImage, size: NSSize(width: targetPixelSize.width, height: targetPixelSize.height))
-        let composedImage = NSImage(size: renderedImage.size)
+        let pixelWidth = Int(targetPixelSize.width.rounded())
+        let pixelHeight = Int(targetPixelSize.height.rounded())
+        guard pixelWidth > 0, pixelHeight > 0,
+              let bitmap = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: pixelWidth,
+                pixelsHigh: pixelHeight,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+              ),
+              let graphicsContext = NSGraphicsContext(bitmapImageRep: bitmap)
+        else { return nil }
 
-        composedImage.lockFocus()
-        renderedImage.draw(in: NSRect(origin: .zero, size: renderedImage.size))
+        let canvasRect = NSRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = graphicsContext
+        graphicsContext.cgContext.draw(cgImage, in: canvasRect)
 
         NSColor(calibratedWhite: 0.02, alpha: 0.08).setFill()
-        NSBezierPath(rect: NSRect(origin: .zero, size: renderedImage.size)).fill()
+        NSBezierPath(rect: canvasRect).fill()
 
         let gradient = NSGradient(colors: [
             NSColor.white.withAlphaComponent(0.05),
             NSColor.clear,
             NSColor.black.withAlphaComponent(0.16)
         ])
-        gradient?.draw(in: NSRect(origin: .zero, size: renderedImage.size), angle: -90)
-        composedImage.unlockFocus()
+        gradient?.draw(in: canvasRect, angle: -90)
+        graphicsContext.flushGraphics()
+        NSGraphicsContext.restoreGraphicsState()
 
-        guard let finalTIFF = composedImage.tiffRepresentation,
-              let finalBitmap = NSBitmapImageRep(data: finalTIFF)
-        else { return nil }
-
-        return finalBitmap.representation(using: .png, properties: [:])
+        return bitmap.representation(using: .png, properties: [:])
     }
+
+    private static let wallpaperCIContext = CIContext(options: [.cacheIntermediates: false])
 
     private func applyDeferredStaticFallback() {
         guard let url = pendingFallbackStaticURL else { return }
