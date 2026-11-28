@@ -421,7 +421,9 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     private var pendingFallbackStaticURL: URL?
     private var pendingFallbackWallpaperKey: String?
     private var originalDesktopImageURLs: [String: URL] = [:]
-    private var didCaptureStaticBackup = false
+    private var capturedScreenKeys: Set<String> = []
+    private var staticWallpaperScreenKeys: Set<String> = []
+    private var didCaptureStoreBackup = false
     private var appliedStaticWallpaper = false
     private var didApplyAerialWallpaper = false
     private var needsStoreRestoreFromBackup = false
@@ -650,7 +652,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         artworkFileURL = wallpaperURL
 
         if backupWallpaperConfiguration {
-            backupWallpaperConfig()
+            captureWallpaperBackupIfNeeded()
         }
 
         if requiresWallpaperRefresh {
@@ -661,10 +663,6 @@ final class FullScreenArtworkWindowManager: ObservableObject {
                 activeLiveWallpaperFingerprint = nil
             } else {
                 showWallpaperTransition(on: screen, imageURL: wallpaperURL)
-
-                if backupWallpaperConfiguration {
-                    captureStaticWallpaperBackupIfNeeded()
-                }
 
                 guard applyStaticWallpaper(imageURL: wallpaperURL) else {
                     print("[FullScreenArtworkWindowManager] Failed to set desktop image")
@@ -996,7 +994,6 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         if let screen = targetScreen {
             showWallpaperTransition(on: screen, imageURL: url)
         }
-        captureStaticWallpaperBackupIfNeeded()
         guard applyStaticWallpaper(imageURL: url) else {
             print("[FullScreenArtworkWindowManager] Failed to apply deferred static fallback")
             hideWallpaperTransition()
@@ -1076,6 +1073,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
                     self.applyDeferredStaticFallback()
                     return
                 }
+                self.captureWallpaperBackupIfNeeded()
                 guard self.applyAerialToPlist(assetID: assetID) else {
                     self.applyDeferredStaticFallback()
                     return
@@ -1681,9 +1679,56 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         FileManager.default.fileExists(atPath: backupPlistURL.path)
     }
 
+    /// Captures both backups before Atoll first changes the wallpaper in a session. Every
+    /// wallpaper change calls this first; it only does work the first time and for new screens.
+    private func captureWallpaperBackupIfNeeded() {
+        backupWallpaperConfig()
+        captureStaticWallpaperBackupIfNeeded()
+    }
+
     private func backupWallpaperConfig() {
-        guard !hasValidBackup else { return }
-        try? FileManager.default.copyItem(at: wallpaperPlistURL, to: backupPlistURL)
+        guard !didCaptureStoreBackup else { return }
+        didCaptureStoreBackup = true
+        let fm = FileManager.default
+        if hasValidBackup {
+            // A backup left by an earlier session that never restored (quit or crash) holds the
+            // original only while the store still shows Atoll's wallpaper; otherwise it is stale.
+            if storeShowsAtollWallpaper() {
+                needsStoreRestoreFromBackup = true
+                return
+            }
+            try? fm.removeItem(at: backupPlistURL)
+        }
+        try? fm.copyItem(at: wallpaperPlistURL, to: backupPlistURL)
+    }
+
+    private func storeShowsAtollWallpaper() -> Bool {
+        if NSScreen.screens.contains(where: { NSWorkspace.shared.desktopImageURL(for: $0).map(Self.isAtollArtworkFile) ?? false }) {
+            return true
+        }
+        guard let data = try? Data(contentsOf: wallpaperPlistURL) else { return false }
+        return Self.wallpaperStoreReferencesAtoll(data, liveWallpaperAssetID: customLiveWallpaperAssetID)
+    }
+
+    nonisolated static func wallpaperStoreReferencesAtoll(_ storeData: Data, liveWallpaperAssetID: String) -> Bool {
+        ["atoll_artwork_wallpaper", liveWallpaperAssetID].contains { marker in
+            storeData.range(of: Data(marker.utf8)) != nil
+        }
+    }
+
+    /// Copies the wallpaper store backup over the live store and removes the backup only once the
+    /// store verifiably holds the backed-up bytes.
+    nonisolated static func restoreWallpaperStore(from backupURL: URL, to storeURL: URL) -> Bool {
+        guard let backupData = try? Data(contentsOf: backupURL) else { return false }
+        do {
+            try backupData.write(to: storeURL, options: .atomic)
+        } catch {
+            print("[FullScreenArtworkWindowManager] Failed to restore plist: \(error)")
+            return false
+        }
+        guard (try? Data(contentsOf: storeURL)) == backupData else { return false }
+        try? FileManager.default.removeItem(at: backupURL)
+        return true
     }
 
     private func screenKey(_ screen: NSScreen) -> String {
@@ -1694,9 +1739,11 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     }
 
     private func captureStaticWallpaperBackupIfNeeded() {
-        guard !didCaptureStaticBackup else { return }
         let ws = NSWorkspace.shared
         for screen in NSScreen.screens {
+            let key = screenKey(screen)
+            guard !capturedScreenKeys.contains(key) else { continue }
+            capturedScreenKeys.insert(key)
             guard let url = ws.desktopImageURL(for: screen) else { continue }
             // Atoll's own artwork means an earlier session ended (quit or crash) before
             // restoring; the wallpaper store backup kept from that session holds the original.
@@ -1704,9 +1751,8 @@ final class FullScreenArtworkWindowManager: ObservableObject {
                 needsStoreRestoreFromBackup = true
                 continue
             }
-            originalDesktopImageURLs[screenKey(screen)] = url
+            originalDesktopImageURLs[key] = url
         }
-        didCaptureStaticBackup = true
     }
 
     nonisolated static func isAtollArtworkFile(_ url: URL) -> Bool {
@@ -1715,12 +1761,14 @@ final class FullScreenArtworkWindowManager: ObservableObject {
 
     @discardableResult
     private func applyStaticWallpaper(imageURL: URL) -> Bool {
+        captureWallpaperBackupIfNeeded()
         let ws = NSWorkspace.shared
         var anySucceeded = false
         for screen in NSScreen.screens {
             let options = ws.desktopImageOptions(for: screen) ?? [:]
             do {
                 try ws.setDesktopImageURL(imageURL, for: screen, options: options)
+                staticWallpaperScreenKeys.insert(screenKey(screen))
                 anySucceeded = true
             } catch {
                 print("[FullScreenArtworkWindowManager] setDesktopImageURL failed: \(error)")
@@ -1732,17 +1780,29 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         return anySucceeded
     }
 
-    private func restoreStaticWallpaper() {
-        guard appliedStaticWallpaper else { return }
+    /// Puts back each screen's captured picture. Returns true only when every screen Atoll
+    /// changed is connected, had a captured original, and now reports that original.
+    private func restoreStaticWallpaper() -> Bool {
+        guard appliedStaticWallpaper else { return true }
         let ws = NSWorkspace.shared
-        for screen in NSScreen.screens {
-            guard let url = originalDesktopImageURLs[screenKey(screen)] else { continue }
+        let screensByKey = Dictionary(NSScreen.screens.map { (screenKey($0), $0) }, uniquingKeysWith: { first, _ in first })
+        var restoredAll = true
+        for key in staticWallpaperScreenKeys {
+            guard let screen = screensByKey[key], let url = originalDesktopImageURLs[key] else {
+                restoredAll = false
+                continue
+            }
             let options = ws.desktopImageOptions(for: screen) ?? [:]
-            try? ws.setDesktopImageURL(url, for: screen, options: options)
+            do {
+                try ws.setDesktopImageURL(url, for: screen, options: options)
+            } catch {
+                print("[FullScreenArtworkWindowManager] Failed to restore desktop image: \(error)")
+            }
+            if ws.desktopImageURL(for: screen)?.standardizedFileURL != url.standardizedFileURL {
+                restoredAll = false
+            }
         }
-        appliedStaticWallpaper = false
-        didCaptureStaticBackup = false
-        originalDesktopImageURLs.removeAll()
+        return restoredAll
     }
 
     private func applyArtworkToPlist(imageURL: URL) -> Bool {
@@ -1915,26 +1975,27 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     }
 
     private func restoreWallpaper() {
-        let fm = FileManager.default
+        var restored = restoreStaticWallpaper()
 
-        if appliedStaticWallpaper {
-            restoreStaticWallpaper()
-        }
-
-        if didApplyAerialWallpaper || needsStoreRestoreFromBackup, hasValidBackup {
-            do {
-                try fm.removeItem(at: wallpaperPlistURL)
-                try fm.copyItem(at: backupPlistURL, to: wallpaperPlistURL)
-                try fm.removeItem(at: backupPlistURL)
-            } catch {
-                print("[FullScreenArtworkWindowManager] Failed to restore plist: \(error)")
+        if didApplyAerialWallpaper || needsStoreRestoreFromBackup || !restored, hasValidBackup {
+            restored = Self.restoreWallpaperStore(from: backupPlistURL, to: wallpaperPlistURL)
+            if restored {
+                restoreLiveWallpaperResources()
+                restartWallpaperAgent()
             }
-            restoreLiveWallpaperResources()
-            restartWallpaperAgent()
-        } else if hasValidBackup {
-            try? fm.removeItem(at: backupPlistURL)
+        } else if restored, hasValidBackup {
+            try? FileManager.default.removeItem(at: backupPlistURL)
+        }
+        // On failure the store backup stays on disk so the next session can still restore it.
+        if !restored {
+            print("[FullScreenArtworkWindowManager] Wallpaper restore incomplete; keeping backup")
         }
 
+        appliedStaticWallpaper = false
+        originalDesktopImageURLs.removeAll()
+        capturedScreenKeys.removeAll()
+        staticWallpaperScreenKeys.removeAll()
+        didCaptureStoreBackup = false
         didApplyAerialWallpaper = false
         needsStoreRestoreFromBackup = false
     }
