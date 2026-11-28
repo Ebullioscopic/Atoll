@@ -423,8 +423,6 @@ struct TimerLiveActivity: View {
                 .foregroundColor(timerManager.isOvertime ? .red : .white)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
-                .contentTransition(.numericText())
-                .animation(.smooth(duration: 0.25), value: timerManager.remainingTime)
                 .frame(maxWidth: .infinity, alignment: .trailing)
 
             if showsBarProgress {

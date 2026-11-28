@@ -161,12 +161,17 @@ func enforceMinimumNotchWidth() {
     }
 }
 private let minimalisticBaseOpenNotchSize: CGSize = .init(width: 420, height: 180)
-private let minimalisticLyricsExtraHeight: CGFloat = 40
+// 10pt top padding + 40pt lyrics content; keep in sync with MinimalisticMusicPlayerView.calculateDynamicHeight
+private let minimalisticLyricsExtraHeight: CGFloat = 50
 let minimalisticTimerCountdownTopPadding: CGFloat = 12
 let minimalisticTimerCountdownContentHeight: CGFloat = 82
 let minimalisticTimerCountdownBlockHeight: CGFloat = minimalisticTimerCountdownTopPadding + minimalisticTimerCountdownContentHeight
 let statsSecondRowContentHeight: CGFloat = 120
 let statsGridSpacingHeight: CGFloat = 12
+let statsAdditionalRowHeight: CGFloat = statsSecondRowContentHeight + statsGridSpacingHeight
+/// Height the month calendar needs to show every week row at a readable size.
+/// 6 rows at ~27pt plus the title row, weekday row and the notch's own chrome.
+let calendarFullMonthNotchHeight: CGFloat = 340
 let notchShadowPaddingStandard: CGFloat = 18
 let notchShadowPaddingMinimalistic: CGFloat = 12
 
@@ -179,7 +184,7 @@ func minimalisticOpenNotchSize(isDynamicIslandMode: Bool) -> CGSize {
         size.height = 144 // Exact height of the minimalistic music player view
     }
 
-    if Defaults[.enableLyrics] {
+    if Defaults[.enableLyrics] && !MusicManager.shared.isAdvertisement {
         size.height += minimalisticLyricsExtraHeight
     }
     
@@ -240,6 +245,65 @@ func notchTerminalBottomCornerRadii(
         outerBottom = active.closed.bottom
     }
     return (outerBottom, max(0, outerBottom - p))
+}
+
+/// Height of the inline lyrics line shown under the artist name on the home tab.
+///
+/// The player column is laid out inside a greedy `GeometryReader`, so the lyrics
+/// line takes its space out of the gap above the transport controls instead of
+/// growing the notch. Handing that height back keeps the controls from being
+/// crowded when lyrics are on.
+let inlineLyricsLineHeight: CGFloat = 18
+
+/// Grows the open notch by one lyrics line when the home tab renders inline lyrics.
+///
+/// The extra height is applied whenever inline lyrics are enabled rather than only
+/// while a line is on screen, so the notch keeps a stable height between lyric lines.
+///
+/// Minimalistic UI is excluded: its player draws lyrics whenever they are enabled,
+/// regardless of the calendar, and sizes itself for them through its own resize
+/// publisher. Adding this line there would reserve room for a line the standard
+/// player is not drawing.
+/// Whether the home tab's calendar is the full-width ``StandaloneCalendarView``
+/// rather than the narrow ``CalendarView`` shown beside the music player. Only
+/// the standalone variant owns a month grid, and only it can spend extra height.
+///
+/// Mirrors ``NotchHomeView.shouldShowMusicPlayer``, which stays the layout's own
+/// source of truth because SwiftUI tracks its `@Default` reads for invalidation.
+func standaloneCalendarActive() -> Bool {
+    guard Defaults[.showCalendar],
+          !Defaults[.enableMinimalisticUI]
+    else {
+        return false
+    }
+
+    let playerVisible = Defaults[.showStandardMediaControls]
+        && (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+    return !playerVisible
+}
+
+func inlineLyricsAdjustedNotchSize(
+    from baseSize: CGSize,
+    isHomeTabActive: Bool
+) -> CGSize {
+    // The same conditions `sideLyricsRequiredNotchWidth` tests, for the same
+    // reason: the extra line belongs to the standard player, so it is only
+    // owed when that player is on screen to draw it. Without the last two the
+    // notch grew for a line nobody could see whenever the player was switched
+    // off, or hidden by auto-hide with nothing playing.
+    guard isHomeTabActive,
+          !Defaults[.enableMinimalisticUI],
+          Defaults[.enableLyrics],
+          Defaults[.showCalendar],
+          Defaults[.showStandardMediaControls],
+          (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+    else {
+        return baseSize
+    }
+
+    var adjustedSize = baseSize
+    adjustedSize.height += inlineLyricsLineHeight
+    return adjustedSize
 }
 
 func statsAdjustedNotchSize(

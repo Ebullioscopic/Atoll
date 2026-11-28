@@ -37,6 +37,7 @@ class LockScreenPanelManager {
     private var collapsedFrame: NSRect?
     private var isPanelExpanded = false
     private var currentAdditionalHeight: CGFloat = 0
+    private var currentAdditionalWidth: CGFloat = 0
     private let collapsedPanelCornerRadius: CGFloat = 28
     private let expandedPanelCornerRadius: CGFloat = 52
     private(set) var latestFrame: NSRect?
@@ -118,6 +119,7 @@ class LockScreenPanelManager {
         collapsedFrame = defaultCollapsedFrame
         isPanelExpanded = false
         currentAdditionalHeight = 0
+        currentAdditionalWidth = 0
 
         let window: NSWindow
 
@@ -184,7 +186,12 @@ class LockScreenPanelManager {
         print("[\(timestamp())] LockScreenPanelManager: panel visible")
     }
 
-    func updatePanelSize(expanded: Bool, additionalHeight: CGFloat = 0, animated: Bool = true) {
+    func updatePanelSize(
+        expanded: Bool,
+        additionalHeight: CGFloat = 0,
+        additionalWidth: CGFloat = 0,
+        animated: Bool = true
+    ) {
         guard let window = panelWindow, let screen = currentScreen() else {
             return
         }
@@ -194,7 +201,10 @@ class LockScreenPanelManager {
         let baseSize = expanded ? LockScreenMusicPanel.expandedSize : LockScreenMusicPanel.collapsedSize
         let targetFrame = targetFrame(
             for: screen.frame,
-            panelSize: CGSize(width: baseSize.width, height: baseSize.height + additionalHeight)
+            panelSize: CGSize(
+                width: baseSize.width + additionalWidth,
+                height: baseSize.height + additionalHeight
+            )
         )
 
         if animated {
@@ -225,6 +235,7 @@ class LockScreenPanelManager {
 
         isPanelExpanded = expanded
         currentAdditionalHeight = additionalHeight
+        currentAdditionalWidth = additionalWidth
     }
 
     func notifyTimerWidgetFrameChanged(animated: Bool) {
@@ -239,8 +250,34 @@ class LockScreenPanelManager {
         collapsedFrame = newCollapsed
 
         guard panelWindow != nil else { return }
-        updatePanelSize(expanded: isPanelExpanded, additionalHeight: currentAdditionalHeight, animated: animated)
+        updatePanelSize(
+            expanded: isPanelExpanded,
+            additionalHeight: currentAdditionalHeight,
+            additionalWidth: currentAdditionalWidth,
+            animated: animated
+        )
         LockScreenTimerWidgetManager.shared.notifyMusicPanelFrameChanged(animated: animated)
+    }
+
+    /// Re-presents the panel if it has gone while the screen is still locked.
+    ///
+    /// `hidePanel` clears the window's content view, so anything that hides the
+    /// panel mid-lock leaves it gone until the next lock — there is nothing that
+    /// brings it back. Rather than chase every route that can hide it, check that
+    /// what should be on screen still is, and restore it if not. `showPanel`
+    /// already returns early when the widget is switched off, so this cannot
+    /// resurrect a panel the user disabled.
+    func ensurePresentedWhileLocked() {
+        guard Defaults[.enableLockScreenMediaWidget] else { return }
+        guard LockScreenManager.shared.isLocked else { return }
+
+        let isMissing = panelWindow == nil
+            || panelWindow?.isVisible != true
+            || panelWindow?.contentView == nil
+        guard isMissing else { return }
+
+        print("[\(timestamp())] LockScreenPanelManager: panel missing while locked, re-presenting")
+        showPanel()
     }
 
     func hidePanel() {
@@ -274,7 +311,12 @@ class LockScreenPanelManager {
 
         let screenFrame = screen.frame
         collapsedFrame = collapsedFrame(for: screenFrame)
-        updatePanelSize(expanded: isPanelExpanded, additionalHeight: currentAdditionalHeight, animated: false)
+        updatePanelSize(
+            expanded: isPanelExpanded,
+            additionalHeight: currentAdditionalHeight,
+            additionalWidth: currentAdditionalWidth,
+            animated: false
+        )
         LockScreenTimerWidgetManager.shared.notifyMusicPanelFrameChanged(animated: false)
 
         print("[\(timestamp())] LockScreenPanelManager: realigned window due to \(reason)")
@@ -361,7 +403,11 @@ class LockScreenPanelManager {
         let collapsedSize = LockScreenMusicPanel.collapsedSize
         let originX = screenFrame.midX - (collapsedSize.width / 2)
         let baseOriginY = screenFrame.origin.y + (screenFrame.height / 2) - collapsedSize.height - 32
-        let defaultLowering: CGFloat = -28
+        // Sits a little below the vertical centre, clear of the clock above it.
+        // The panel grows upward as the volume and lyrics rows appear, so the
+        // resting position has to leave room for them without drifting up into
+        // the time. Fine tuning is the vertical offset setting, below.
+        let defaultLowering: CGFloat = -68
         let userOffset = CGFloat(Defaults[.lockScreenMusicVerticalOffset])
         let clampedOffset = min(max(userOffset, -160), 160)
         var originY = baseOriginY + defaultLowering + clampedOffset

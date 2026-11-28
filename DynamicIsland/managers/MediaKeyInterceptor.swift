@@ -34,6 +34,14 @@ private let NX_KEYTYPE_BRIGHTNESS_UP: Int32 = 2
 private let NX_KEYTYPE_BRIGHTNESS_DOWN: Int32 = 3
 private let NX_KEYTYPE_MUTE: Int32 = 7
 
+extension Notification.Name {
+    /// Posted when the media key tap comes up or goes away, so settings can
+    /// tell the user why their volume and brightness keys are behaving natively.
+    static let mediaKeyInterceptionAvailabilityDidChange = Notification.Name(
+        "MediaKeyInterceptionAvailabilityDidChange"
+    )
+}
+
 enum MediaKeyDirection {
     case up
     case down
@@ -54,6 +62,35 @@ struct MediaKeyConfiguration {
         interceptBrightness: false,
         interceptCommandModifiedBrightness: false
     )
+}
+
+/// How hard to keep trying to install the media key event tap.
+///
+/// Accessibility is usually granted within a few seconds of the prompt, so the
+/// first attempts are quick; after that the poll would just be burning wakeups,
+/// and past an hour the user is not coming back to the prompt this session.
+enum MediaKeyTapRetryPolicy {
+    static let fastInterval: TimeInterval = 2
+    static let slowInterval: TimeInterval = 15
+    /// Attempts at `fastInterval` before backing off — the first minute.
+    static let fastAttemptLimit = 30
+    static let giveUpAfter: TimeInterval = 3600
+
+    enum Step: Equatable {
+        /// Try again on the current schedule.
+        case retry
+        /// Try again now, but reschedule the timer at `slowInterval` first.
+        case backOff
+        /// Stop polling.
+        case giveUp
+    }
+
+    static func step(attempt: Int, elapsed: TimeInterval) -> Step {
+        if elapsed >= giveUpAfter {
+            return .giveUp
+        }
+        return attempt == fastAttemptLimit ? .backOff : .retry
+    }
 }
 
 protocol MediaKeyInterceptorDelegate: AnyObject {
@@ -84,9 +121,26 @@ final class MediaKeyInterceptor {
         }
     }
 
+    /// False while the event tap could not be created — almost always because
+    /// Accessibility has not been granted yet. The media keys then reach macOS
+    /// untouched, so the native HUD draws over this app's, and brightness gets
+    /// no HUD at all (it is only detected when this app drives the change).
+    private(set) var isInterceptionAvailable = false {
+        didSet {
+            guard isInterceptionAvailable != oldValue else { return }
+            NotificationCenter.default.post(
+                name: .mediaKeyInterceptionAvailabilityDidChange,
+                object: nil
+            )
+        }
+    }
+
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var isTapEnabled = false
+    private var retryTimer: Timer?
+    private var retryStartDate: Date?
+    private var retryAttempts = 0
 #if canImport(ApplicationServices)
     private var didRequestAccessibilityPrompt = false
 #endif
@@ -101,6 +155,13 @@ final class MediaKeyInterceptor {
 
     private init() {}
 
+    /// Installs the media key tap, and keeps trying if it cannot be installed yet.
+    ///
+    /// `CGEvent.tapCreate` fails outright until Accessibility is granted, and
+    /// granting it does not relaunch the app — so a single attempt at startup
+    /// leaves interception off for the rest of the session. The only way back
+    /// was to toggle a HUD style in Settings and toggle it again, which
+    /// restarts the observer and so retries the tap by accident (#601).
     @discardableResult
     func start() -> Bool {
         guard eventTap == nil else {
@@ -111,6 +172,17 @@ final class MediaKeyInterceptor {
 #if canImport(ApplicationServices)
         requestAccessibilityPermissionIfNeeded()
 #endif
+
+        if installTap() {
+            return true
+        }
+        scheduleTapRetry()
+        return false
+    }
+
+    @discardableResult
+    private func installTap() -> Bool {
+        guard eventTap == nil else { return true }
 
         guard let systemDefinedType = systemDefinedEventType else {
             NSLog("❌ Unable to resolve system-defined event type")
@@ -145,6 +217,7 @@ final class MediaKeyInterceptor {
             }
 #endif
             NSLog("❌ Failed to create media key event tap")
+            isInterceptionAvailable = false
             return false
         }
 
@@ -155,11 +228,80 @@ final class MediaKeyInterceptor {
         }
         CGEvent.tapEnable(tap: tap, enable: true)
         isTapEnabled = true
+        cancelTapRetry()
+        isInterceptionAvailable = true
         NSLog("✅ Media key event tap installed (HID)")
         return true
     }
 
+    /// Polls for the tap becoming creatable. Accessibility is granted in System
+    /// Settings while the app is already running and tccd publishes no
+    /// notification for it, so polling is the only signal available.
+    /// `MediaKeyTapRetryPolicy` decides how often, and when to stop.
+    private func scheduleTapRetry() {
+        guard retryTimer == nil else { return }
+        retryStartDate = Date()
+        retryAttempts = 0
+        NSLog("ℹ️ Media key interception unavailable; retrying until Accessibility is granted")
+        installRetryTimer(interval: MediaKeyTapRetryPolicy.fastInterval)
+    }
+
+    private func installRetryTimer(interval: TimeInterval) {
+        retryTimer?.invalidate()
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] timer in
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            self.performTapRetry()
+        }
+        retryTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func performTapRetry() {
+        guard eventTap == nil else {
+            cancelTapRetry()
+            return
+        }
+
+        retryAttempts += 1
+        let elapsed = retryStartDate.map { Date().timeIntervalSince($0) } ?? 0
+
+        switch MediaKeyTapRetryPolicy.step(attempt: retryAttempts, elapsed: elapsed) {
+        case .giveUp:
+            NSLog("⚠️ Giving up on media key interception; grant Accessibility and reopen Atoll")
+            cancelTapRetry()
+            return
+        case .backOff:
+            installRetryTimer(interval: MediaKeyTapRetryPolicy.slowInterval)
+        case .retry:
+            break
+        }
+
+        // Cheap gate: tapCreate cannot succeed without Accessibility, and asking
+        // tccd costs far less than a tap creation that is going to fail.
+#if canImport(ApplicationServices)
+        guard AXIsProcessTrusted() else { return }
+#endif
+        guard installTap() else { return }
+
+        updateTapState()
+        // This tap missed every key until now, and the native HUD has been
+        // drawing in its place — take the HUD back immediately.
+        SystemOSDManager.suppressNativeOSDNow()
+    }
+
+    private func cancelTapRetry() {
+        retryTimer?.invalidate()
+        retryTimer = nil
+        retryStartDate = nil
+        retryAttempts = 0
+    }
+
     func stop() {
+        cancelTapRetry()
+        isInterceptionAvailable = false
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             CFMachPortInvalidate(tap)
