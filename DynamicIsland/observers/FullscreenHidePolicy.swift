@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import CoreGraphics
 import Foundation
 
 /// The decisions behind "Hide DynamicIsland" in fullscreen, kept free of
@@ -58,6 +59,52 @@ enum FullscreenHidePolicy {
             && detectionEnabled
             && hasFullscreenCandidate
             && (!isHidden || !nowPlayingIsObserved)
+    }
+
+    /// How an on-screen window covers its display.
+    enum WindowFit: Equatable {
+        /// Not the shape of a fullscreen window.
+        case none
+        /// The whole safe area, like a fullscreen window (or a maximized one).
+        case whole
+        /// The full height of the safe area but only part of its width, like
+        /// one side of a fullscreen Split View.
+        case tile
+    }
+
+    /// Classifies a window frame against its display's safe area (both in the
+    /// same coordinate space). Sizes may be off by `sizeTolerance` of the safe
+    /// area and edges by `edgeTolerance` points. A tile must be at least
+    /// `minimumTileWidthFraction` of the width, which keeps narrow full-height
+    /// panels out while still covering the narrowest Split View pane.
+    static func windowFit(window: CGRect,
+                          safeArea: CGRect,
+                          sizeTolerance: CGFloat = 0.02,
+                          edgeTolerance: CGFloat = 5,
+                          minimumTileWidthFraction: CGFloat = 0.2) -> WindowFit {
+        guard safeArea.width > 0, safeArea.height > 0 else { return .none }
+        let heightMatches = abs(window.height - safeArea.height) < safeArea.height * sizeTolerance
+            && abs(window.minY - safeArea.minY) < edgeTolerance
+        guard heightMatches else { return .none }
+
+        let widthMatches = abs(window.width - safeArea.width) < safeArea.width * sizeTolerance
+            && abs(window.minX - safeArea.minX) < edgeTolerance
+        if widthMatches { return .whole }
+
+        let insideHorizontally = window.minX > safeArea.minX - edgeTolerance
+            && window.maxX < safeArea.maxX + edgeTolerance
+        guard insideHorizontally, window.width >= safeArea.width * minimumTileWidthFraction else { return .none }
+        return .tile
+    }
+
+    /// Whether an Accessibility window frame is the on-screen window that was
+    /// detected, so the fullscreen check reads that window and not another one
+    /// of the same app (for example a fullscreen window on another Space).
+    static func isSameWindow(_ frame: CGRect, as detected: CGRect, tolerance: CGFloat = 2) -> Bool {
+        abs(frame.minX - detected.minX) <= tolerance
+            && abs(frame.minY - detected.minY) <= tolerance
+            && abs(frame.width - detected.width) <= tolerance
+            && abs(frame.height - detected.height) <= tolerance
     }
 
     /// Follow-up checks allowed after a Space, screen, frontmost-app or
