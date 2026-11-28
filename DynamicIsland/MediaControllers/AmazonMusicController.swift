@@ -140,7 +140,7 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
     }
 
     func isActive() -> Bool {
-        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == targetBundleIdentifier }
+        RunningApplicationsCache.shared.isRunning(targetBundleIdentifier)
     }
 
     // MARK: - Favouriting

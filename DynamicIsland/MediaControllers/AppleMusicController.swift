@@ -297,8 +297,7 @@ class AppleMusicController: MediaControllerProtocol {
     }
     
     func isActive() -> Bool {
-        let runningApps = NSWorkspace.shared.runningApplications
-        return runningApps.contains { $0.bundleIdentifier == "com.apple.Music" }
+        RunningApplicationsCache.shared.isRunning("com.apple.Music")
     }
     
     func updatePlaybackInfo() async {
@@ -517,7 +516,7 @@ enum AppleMusicFavoriting {
     /// in the notch is not a reason to open Music.
     @MainActor
     static var isAvailable: Bool {
-        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == bundleIdentifier }
+        RunningApplicationsCache.shared.isRunning(bundleIdentifier)
     }
 
     static func isCurrentTrackFavorited() async -> Bool? {

@@ -121,9 +121,7 @@ struct CiderFavoriting: Sendable {
     /// that quietly disappears.
     @MainActor
     static var isAvailable: Bool {
-        NSRunningApplication
-            .runningApplications(withBundleIdentifier: CiderController.bundleIdentifier)
-            .isEmpty == false
+        RunningApplicationsCache.shared.isRunning(CiderController.bundleIdentifier)
     }
 
     /// nil when the answer is not knowable: Cider closed, API off, bad token, or

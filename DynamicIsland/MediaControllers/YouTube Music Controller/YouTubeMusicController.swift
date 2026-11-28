@@ -93,9 +93,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
     func toggleRepeat() async { await sendCommand(endpoint: "/switch-repeat", method: "POST") }
 
     nonisolated func isActive() -> Bool {
-        NSWorkspace.shared.runningApplications.contains {
-            $0.bundleIdentifier == configuration.bundleIdentifier
-        }
+        RunningApplicationsCache.shared.isRunning(configuration.bundleIdentifier)
     }
     
     // MARK: - Favouriting
@@ -573,9 +571,7 @@ struct YouTubeMusicFavoriting {
 
     /// Only true while the app is already running. Nothing here launches it.
     var isAvailable: Bool {
-        NSWorkspace.shared.runningApplications.contains {
-            $0.bundleIdentifier == configuration.bundleIdentifier
-        }
+        RunningApplicationsCache.shared.isRunning(configuration.bundleIdentifier)
     }
 
     func isCurrentTrackFavorited() async -> Bool? {

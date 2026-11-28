@@ -147,7 +147,7 @@ class SpotifyController: MediaControllerProtocol {
     }
 
     func isActive() -> Bool {
-        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == playbackState.bundleIdentifier }
+        RunningApplicationsCache.shared.isRunning(playbackState.bundleIdentifier)
     }
 
     // MARK: - Favouriting
