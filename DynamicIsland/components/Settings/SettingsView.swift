@@ -454,6 +454,8 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .stats, title: "OpenRouter Provider", keywords: ["llm", "openrouter", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter Provider")),
         SettingsSearchEntry(tab: .stats, title: "OpenRouter API Key", keywords: ["llm", "openrouter", "api", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter API Key")),
         SettingsSearchEntry(tab: .stats, title: "OpenRouter Per-model Analytics", keywords: ["llm", "openrouter", "management", "key", "analytics"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter Per-model Analytics")),
+        SettingsSearchEntry(tab: .stats, title: "DeepSeek Provider", keywords: ["llm", "deepseek", "provider", "balance", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "DeepSeek Provider")),
+        SettingsSearchEntry(tab: .stats, title: "DeepSeek API Key", keywords: ["llm", "deepseek", "api", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "DeepSeek API Key")),
         SettingsSearchEntry(tab: .stats, title: "New API Accounts", keywords: ["llm", "new api", "newapi", "accounts", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "New API Accounts")),
         SettingsSearchEntry(tab: .stats, title: "Stop monitoring after closing the notch", keywords: ["stats", "auto stop"], highlightID: SettingsTab.stats.highlightID(for: "Stop monitoring after closing the notch")),
         SettingsSearchEntry(tab: .stats, title: "CPU Usage", keywords: ["cpu", "graph"], highlightID: SettingsTab.stats.highlightID(for: "CPU Usage")),
@@ -8213,6 +8215,7 @@ struct StatsSettings: View {
     @Default(.enableLLMUsageFeature) var enableLLMUsageFeature
     @Default(.enableNewAPIProvider) var enableNewAPIProvider
     @Default(.enableOpenRouterProvider) var enableOpenRouterProvider
+    @Default(.enableDeepSeekProvider) var enableDeepSeekProvider
     @Default(.statsStopWhenNotchCloses) var statsStopWhenNotchCloses
     @Default(.statsUpdateInterval) var statsUpdateInterval
     @Default(.showCpuGraph) var showCpuGraph
@@ -8230,6 +8233,9 @@ struct StatsSettings: View {
     @State private var accountPendingDeletion: NewAPIAccount?
     @State private var newAPIAccountErrorMessage: String?
     @State private var openRouterErrorMessage: String?
+    @State private var deepSeekAPIKey = ""
+    @State private var hasDeepSeekKey = false
+    @State private var deepSeekErrorMessage: String?
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.stats.highlightID(for: title)
@@ -8280,6 +8286,35 @@ struct StatsSettings: View {
             LLMUsageManager.shared.refreshAll(force: true)
         } catch {
             openRouterErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func saveDeepSeekKey() {
+        let trimmed = deepSeekAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            deepSeekErrorMessage = String(localized: "Enter a DeepSeek API key.")
+            return
+        }
+        do {
+            try DeepSeekKeychain.save(trimmed)
+            deepSeekAPIKey = ""
+            hasDeepSeekKey = true
+            deepSeekErrorMessage = nil
+            LLMUsageManager.shared.refreshAll(force: true)
+        } catch {
+            deepSeekErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteDeepSeekKey() {
+        do {
+            try DeepSeekKeychain.delete()
+            deepSeekAPIKey = ""
+            hasDeepSeekKey = false
+            deepSeekErrorMessage = nil
+            LLMUsageManager.shared.refreshAll(force: true)
+        } catch {
+            deepSeekErrorMessage = error.localizedDescription
         }
     }
 
@@ -8358,6 +8393,14 @@ struct StatsSettings: View {
                     .onChange(of: enableOpenRouterProvider) { _, _ in
                         LLMUsageManager.shared.refreshAll(force: true)
                     }
+
+                    Defaults.Toggle(key: .enableDeepSeekProvider) {
+                        Text("DeepSeek")
+                    }
+                    .settingsHighlight(id: highlightID("DeepSeek Provider"))
+                    .onChange(of: enableDeepSeekProvider) { _, _ in
+                        LLMUsageManager.shared.refreshAll(force: true)
+                    }
                 } header: {
                     Text("LLM Providers")
                 } footer: {
@@ -8403,6 +8446,40 @@ struct StatsSettings: View {
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                         .font(.caption)
+                }
+
+                if enableDeepSeekProvider {
+                    Section {
+                        SecureField(hasDeepSeekKey ? "Replace saved API key" : "API key", text: $deepSeekAPIKey)
+                            .textContentType(.password)
+                            .settingsHighlight(id: highlightID("DeepSeek API Key"))
+
+                        HStack {
+                            Button("Save DeepSeek Key") {
+                                saveDeepSeekKey()
+                            }
+                            .buttonStyle(.borderedProminent)
+
+                            Button("Remove Key", role: .destructive) {
+                                deleteDeepSeekKey()
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(!hasDeepSeekKey)
+                        }
+
+                        if let deepSeekErrorMessage {
+                            Text(deepSeekErrorMessage)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    } header: {
+                        Text("DeepSeek")
+                    } footer: {
+                        Text("Shows your prepaid DeepSeek balance and warns when it is too low for API calls. The key is stored in the macOS Keychain.")
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
                 }
 
                 Section {
@@ -8664,6 +8741,7 @@ struct StatsSettings: View {
         .onAppear {
             newAPIAccounts = Defaults[.newAPIAccounts]
             hasOpenRouterKey = OpenRouterKeychain.hasKey()
+            hasDeepSeekKey = DeepSeekKeychain.hasKey()
         }
         .sheet(isPresented: $isNewAPIEditorPresented) {
             NewAPIAccountEditor(account: editingNewAPIAccount) { account, apiKey in

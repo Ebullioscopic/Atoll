@@ -94548,7 +94548,20 @@
     "Change to use an OpenAI-compatible proxy or local server. The API key is optional for other servers." : {},
     "Custom model ID" : {},
     "Optional" : {},
-    "Sent instead of the model picked above, for example a model name on your own server." : {}
+    "Sent instead of the model picked above, for example a model name on your own server." : {},
+    "DeepSeek" : {},
+    "Balance" : {},
+    "Topped up %@" : {},
+    "Granted %@" : {},
+    "No balance reported" : {},
+    "Balance too low for API calls" : {},
+    "Enter a DeepSeek API key." : {},
+    "Save DeepSeek Key" : {},
+    "Shows your prepaid DeepSeek balance and warns when it is too low for API calls. The key is stored in the macOS Keychain." : {},
+    "DeepSeek request failed. Check the saved API key." : {},
+    "DeepSeek returned an invalid response" : {},
+    "DeepSeek API key not configured" : {},
+    "Unable to store the DeepSeek key (Keychain status %d)." : {}
   },
   "version" : "1.2"
 }
