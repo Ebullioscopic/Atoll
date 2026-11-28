@@ -165,7 +165,7 @@ struct LockScreenTimerWidget: View {
     }
 
     private var pauseLabel: String {
-        timerManager.isPaused ? "Resume" : "Pause"
+        timerManager.isPaused ? String(localized: "Resume") : String(localized: "Pause")
     }
 
     private var secondaryIcon: String {
@@ -173,7 +173,7 @@ struct LockScreenTimerWidget: View {
     }
 
     private var secondaryLabel: String {
-        timerManager.isOvertime ? "Stop" : "Cancel"
+        timerManager.isOvertime ? String(localized: "Stop") : String(localized: "Cancel")
     }
 
     var body: some View {

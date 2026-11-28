@@ -145,7 +145,7 @@ class AtollUserDriver: NSObject, @preconcurrency SPUUserDriver {
         self.hostingController = hostingController
         
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "Atoll Update"
+        window.title = String(localized: "Atoll Update")
         window.styleMask = [.titled, .fullSizeContentView]
         window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = true
