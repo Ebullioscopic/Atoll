@@ -190,59 +190,12 @@ struct ContentView: View {
             }
         }
         
-        if coordinator.currentView == .timer {
-            return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
-        }
-        
-        if coordinator.currentView == .notes {
-            let preferredHeight = coordinator.notesLayoutState.preferredHeight
-            let resolvedHeight = max(baseSize.height, preferredHeight)
-            return CGSize(width: baseSize.width, height: resolvedHeight)
-        }
-
-        if coordinator.currentView == .clipboard {
-            // Clipboard has its own fixed height source; don't inherit whatever notes
-            // layout state happens to be set.
-            let resolvedHeight = max(baseSize.height, NotesLayoutState.list.preferredHeight)
-            return CGSize(width: baseSize.width, height: resolvedHeight)
-        }
-
-        if coordinator.currentView == .terminal {
-            // Dynamic height: up to terminalMaxHeightFraction of screen, min 300pt
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-            let maxFraction = Defaults[.terminalMaxHeightFraction]
-            let terminalHeight = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
-            return CGSize(width: baseSize.width, height: terminalHeight)
-        }
-
-        if coordinator.currentView == .extensionExperience {
-            if let preferredHeight = extensionTabPreferredHeight(baseSize: baseSize) {
-                return CGSize(width: baseSize.width, height: preferredHeight)
-            }
-            return baseSize
-        }
-
-        if enableMinimalisticUI,
-           coordinator.currentView == .home,
-           let preferredHeight = extensionMinimalisticPreferredHeight(baseSize: baseSize) {
-            return CGSize(width: baseSize.width, height: preferredHeight)
-        }
-
-        guard coordinator.currentView == .stats else {
-            return inlineLyricsAdjustedNotchSize(
-                from: baseSize,
-                isHomeTabActive: coordinator.currentView == .home && vm.notchState == .open
-            )
-        }
-        
-        let rows = statsRowCount()
-        if rows <= 1 {
-            return baseSize
-        }
-        
-        let additionalRows = max(rows - 1, 0)
-        let extraHeight = CGFloat(additionalRows) * statsAdditionalRowHeight
-        return CGSize(width: baseSize.width, height: baseSize.height + extraHeight)
+        return notchTabContentSize(
+            from: baseSize,
+            view: coordinator.currentView,
+            isNotchOpen: vm.notchState == .open,
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion
+        )
     }
     
 
@@ -253,6 +206,8 @@ struct ContentView: View {
     @State private var hoverClickLocalMonitor: Any?
     @State private var stickyTerminalClickMonitor: Any?
     @State private var hiddenEdgeHoverPollingTask: Task<Void, Never>?
+    @State private var retainedHoverExitWatchdogTask: Task<Void, Never>?
+    @State private var retainedHoverExitWatchdogGeneration: Int = 0
     @State private var isHoveringClosedMusicWaveformControl: Bool = false
 
     @State private var gestureProgress: CGFloat = .zero
@@ -307,7 +262,6 @@ struct ContentView: View {
     }
     
     private let zeroHeightHoverPadding: CGFloat = 10
-    private let statsAdditionalRowHeight: CGFloat = statsSecondRowContentHeight + statsGridSpacingHeight
     private let musicControlPauseGrace: TimeInterval = 5
     private let musicControlResumeDelay: TimeInterval = 0.24
 
@@ -657,6 +611,10 @@ struct ContentView: View {
         installRootLifecycleHandlers(on: rootBodyView)
     }
 
+    private var isNotchShadowVisible: Bool {
+        (vm.notchState == .open || isHovering) && Defaults[.enableShadow]
+    }
+
     private var mainLayoutBase: some View {
         NotchLayout()
             .frame(alignment: .top)
@@ -680,10 +638,10 @@ struct ContentView: View {
             }
             .compositingGroup()
             .shadow(
-                color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
-                    ? .black.opacity(0.6)
-                    : .clear,
-                radius: Defaults[.cornerRadiusScaling] ? 10 : 5
+                color: isNotchShadowVisible ? .black.opacity(0.6) : .clear,
+                // A clear shadow still rasterizes and blurs the whole notch on
+                // every frame; zero radius lets SwiftUI skip the blur pass.
+                radius: isNotchShadowVisible ? (Defaults[.cornerRadiusScaling] ? 10 : 5) : 0
             )
             // Extra horizontal inset for Dynamic Island mode so the shadow
             // is not clipped by the outer frame constraint
@@ -792,6 +750,7 @@ struct ContentView: View {
                 }
                 if newState == .closed {
                     removeStickyTerminalClickMonitor()
+                    stopRetainedHoverExitWatchdog()
                 } else {
                     // Install the outside-click monitor for terminal opens that don't
                     // change `currentView` (e.g. shortcut re-opening with the terminal
@@ -2265,6 +2224,7 @@ struct ContentView: View {
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
         stopHiddenEdgeHoverPolling()
+        stopRetainedHoverExitWatchdog()
         cancelMusicControlWindowSync()
         hideMusicControlWindow()
         cancelMusicControlVisibilityTimer()
@@ -2410,8 +2370,11 @@ struct ContentView: View {
     
     /// Handle hover state changes with debouncing
     private func handleHover(_ hovering: Bool) {
-        // Ignore false hover-exit when the cursor is parked on the screen's top pixel.
-        if !hovering, shouldRetainHoverAtScreenTopEdge() {
+        // Ignore false hover-exit when the cursor is still on the panel: growing
+        // the panel swaps its tracking area under a cursor that never moved, and
+        // AppKit reports that as an exit without ever reporting the enter again.
+        if !hovering, shouldRetainHoverExit() {
+            startRetainedHoverExitWatchdog()
             return
         }
 
@@ -2432,6 +2395,7 @@ struct ContentView: View {
         }
 
         if hovering {
+            stopRetainedHoverExitWatchdog()
             withAnimation(.bouncy.speed(1.2)) {
                 isHovering = true
             }
@@ -2475,7 +2439,8 @@ struct ContentView: View {
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    if self.shouldRetainHoverAtScreenTopEdge() {
+                    if self.shouldRetainHoverExit() {
+                        self.startRetainedHoverExitWatchdog()
                         return
                     }
                     self.finishHoverExit()
@@ -2500,17 +2465,67 @@ struct ContentView: View {
         }
     }
 
-    private func shouldRetainHoverAtScreenTopEdge(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
-        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
-            return false
-        }
+    /// Whether a hover-exit report should be ignored because the cursor is
+    /// demonstrably still on the panel.
+    ///
+    /// `.onHover` is what closes the notch, so a false exit closes it right after
+    /// it opened (see #457). The panel is only a few points tall while closed, so
+    /// a cursor parked on the screen's top pixel counts as on it.
+    private func shouldRetainHoverExit(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
         guard isHovering || vm.notchState == .open else { return false }
-        guard location.y >= screen.frame.maxY - 1.5 else { return false }
 
         if vm.notchState == .open {
             return isPointInsideNotchWindow(location)
         }
+
+        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }),
+              location.y >= screen.frame.maxY - 1.5 else {
+            return false
+        }
+
         return isMouseOverClosedNotchHitArea(location)
+    }
+
+    /// Watches the cursor after a hover-exit report was retained, because AppKit
+    /// will not report another exit for the tracking area that produced it. Two
+    /// consecutive samples off the panel finish the exit for real.
+    private func startRetainedHoverExitWatchdog() {
+        guard retainedHoverExitWatchdogTask == nil else { return }
+
+        retainedHoverExitWatchdogGeneration &+= 1
+        let generation = retainedHoverExitWatchdogGeneration
+
+        retainedHoverExitWatchdogTask = Task { @MainActor in
+            var consecutiveOutsideSamples = 0
+
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(80))
+                guard !Task.isCancelled else { break }
+                guard self.vm.notchState == .open else { break }
+
+                if self.shouldRetainHoverExit() {
+                    consecutiveOutsideSamples = 0
+                    continue
+                }
+
+                consecutiveOutsideSamples += 1
+                guard consecutiveOutsideSamples >= 2 else { continue }
+
+                self.stopHoverClickMonitor()
+                self.finishHoverExit()
+                break
+            }
+
+            if self.retainedHoverExitWatchdogGeneration == generation {
+                self.retainedHoverExitWatchdogTask = nil
+            }
+        }
+    }
+
+    private func stopRetainedHoverExitWatchdog() {
+        retainedHoverExitWatchdogGeneration &+= 1
+        retainedHoverExitWatchdogTask?.cancel()
+        retainedHoverExitWatchdogTask = nil
     }
 
     private func isMouseOverClosedNotchHitArea(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
@@ -2624,72 +2639,8 @@ struct ContentView: View {
         return count <= 3 ? 1 : 2
     }
 
-    private func currentExtensionTabPayload() -> ExtensionNotchExperiencePayload? {
-        guard Defaults[.enableThirdPartyExtensions],
-              Defaults[.enableExtensionNotchExperiences],
-              Defaults[.enableExtensionNotchTabs] else {
-            return nil
-        }
-        if let selectedID = coordinator.selectedExtensionExperienceID,
-           let payload = extensionNotchExperienceManager.payload(experienceID: selectedID) {
-            return payload
-        }
-        return extensionNotchExperienceManager.highestPriorityTabPayload()
-    }
-
-    private func extensionTabPreferredHeight(baseSize: CGSize) -> CGFloat? {
-        guard let preferred = currentExtensionTabPayload()?.descriptor.tab?.preferredHeight else {
-            return nil
-        }
-        let minHeight = baseSize.height
-        let maxHeight = baseSize.height + statsAdditionalRowHeight
-        return min(max(preferred, minHeight), maxHeight)
-    }
-
     // Estimate the height required for minimalistic overrides (notably web content) and clamp it to the notch bounds.
-    private func extensionMinimalisticPreferredHeight(baseSize: CGSize) -> CGFloat? {
-        guard let configuration = extensionNotchExperienceManager.minimalisticReplacementPayload()?.descriptor.minimalistic else {
-            return nil
-        }
-
-        let minHeight = baseSize.height
-        let maxHeight = baseSize.height + statsAdditionalRowHeight
-
-        var contentHeight: CGFloat = 0
-        var blockCount = 0
-
-        if configuration.headline != nil {
-            contentHeight += 24
-            blockCount += 1
-        }
-
-        if configuration.subtitle != nil {
-            contentHeight += 20
-            blockCount += 1
-        }
-
-        if !configuration.sections.isEmpty {
-            let sectionEstimate: CGFloat = 98
-            contentHeight += CGFloat(configuration.sections.count) * sectionEstimate
-            blockCount += configuration.sections.count
-        }
-
-        if let webDescriptor = configuration.webContent {
-            contentHeight += webDescriptor.preferredHeight
-            blockCount += 1
-        }
-
-        guard blockCount > 0 else { return nil }
-
-        let spacingAllowance = CGFloat(max(blockCount - 1, 0)) * 16
-        let topPadding: CGFloat = 10
-        let bottomPadding: CGFloat = configuration.webContent == nil ? 10 : 0
-        let estimatedHeight = contentHeight + spacingAllowance + topPadding + bottomPadding
-
-        let clampedHeight = min(max(estimatedHeight, minHeight), maxHeight)
-        return clampedHeight > minHeight ? clampedHeight : nil
-    }
-    
+   
     // MARK: - Gesture Handling
     
     private func handleDownGesture(translation: CGFloat, phase: NSEvent.Phase) {
@@ -3214,8 +3165,6 @@ private struct MusicTimerSupplementView: View {
                 .foregroundColor(timerManager.isOvertime ? .red : .white)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
-                .contentTransition(.numericText())
-                .animation(.smooth(duration: 0.25), value: timerManager.remainingTime)
                 .frame(width: countdownFrameWidth, alignment: .trailing)
 
             if showsBarProgress {
