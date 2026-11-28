@@ -636,6 +636,28 @@ struct ContentView: View {
         (vm.notchState == .open || isHovering) && Defaults[.enableShadow]
     }
 
+    /// The notch's opaque black surface (plus the anti-gap fill above it) with
+    /// the notch shadow. Laid out in the same frame as the clipped content.
+    private var notchSilhouette: some View {
+        resolvedClipShape
+            .fill(.black)
+            .padding(.top, isIslandMode ? 0 : notchTopScreenBleedAmount)
+            .overlay(alignment: .top) {
+                if !isIslandMode {
+                    Rectangle()
+                        .fill(.black)
+                        .frame(height: notchTopScreenBleedAmount)
+                }
+            }
+            .compositingGroup()
+            .shadow(
+                color: isNotchShadowVisible ? .black.opacity(0.6) : .clear,
+                // A clear shadow still rasterizes and blurs the silhouette on
+                // every frame; zero radius lets SwiftUI skip the blur pass.
+                radius: isNotchShadowVisible ? (Defaults[.cornerRadiusScaling] ? 10 : 5) : 0
+            )
+    }
+
     private var mainLayoutBase: some View {
         NotchLayout()
             .frame(alignment: .top)
@@ -644,7 +666,6 @@ struct ContentView: View {
             // wider than both the root view and its NSWindow, clipping both sides.
             .padding(.horizontal, isConnectivityHUDVisible ? 0 : notchHorizontalPadding)
             .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-            .background(.black)
             .clipShape(resolvedClipShape)
             // Keep the anti-gap fill outside the clipped notch. The window sits
             // this far above screen.maxY, so placing the spacer after clipShape
@@ -657,13 +678,11 @@ struct ContentView: View {
                         .frame(height: notchTopScreenBleedAmount)
                 }
             }
-            .compositingGroup()
-            .shadow(
-                color: isNotchShadowVisible ? .black.opacity(0.6) : .clear,
-                // A clear shadow still rasterizes and blurs the whole notch on
-                // every frame; zero radius lets SwiftUI skip the blur pass.
-                radius: isNotchShadowVisible ? (Defaults[.cornerRadiusScaling] ? 10 : 5) : 0
-            )
+            // The black surface and its shadow come from the bare silhouette.
+            // Shadowing the composited notch instead re-rendered all of its
+            // content offscreen on every frame the content changed, which held
+            // open/close animations to 60 Hz on a 120 Hz display.
+            .background { notchSilhouette }
             // Extra horizontal inset for Dynamic Island mode so the shadow
             // is not clipped by the outer frame constraint
             .padding(.horizontal, isIslandMode ? dynamicIslandShadowInset : 0)
