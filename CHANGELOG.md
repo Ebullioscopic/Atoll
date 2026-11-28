@@ -94,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
+- The volume HUD shows a headphones or AirPods icon only when sound is actually going to that Bluetooth device. With AirPods connected but the Mac's speakers selected as the output, it now shows the speaker icon. (#792)
 - "Use accent color" for the notch volume and brightness bars now follows the accent colour set in System Settings instead of always drawing blue. (#379)
 - The speaker icon beside the volume level in the notch HUD is drawn in white again. It followed the system appearance, so in Light Mode it was black on the black notch and the volume HUD looked like a bare slider. (#912, #879)
 - Lock screen widgets, full-screen artwork and overlays now appear on the display set as main in System Settings, instead of always going to the built-in screen when an external monitor is the main display. (#945)

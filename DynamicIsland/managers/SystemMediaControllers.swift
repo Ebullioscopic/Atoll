@@ -75,6 +75,9 @@ final class SystemVolumeController {
         get { deviceIDStorage.withLock { $0 } }
         set { deviceIDStorage.withLock { $0 = newValue } }
     }
+    /// Transport of the default output, refreshed with `currentDeviceID`, so
+    /// views can ask for it while rendering without a CoreAudio round trip.
+    private let transportTypeStorage = OSAllocatedUnfairLock(initialState: UInt32(0))
     private var listenersInstalled = false
     private struct InstalledListener {
         let deviceID: AudioDeviceID
@@ -129,6 +132,7 @@ final class SystemVolumeController {
 
     private init() {
         currentDeviceID = resolveDefaultDevice()
+        refreshTransportType()
         refreshPropertyElements()
         installDefaultDeviceListener()
         installVolumeListeners(for: currentDeviceID)
@@ -180,6 +184,14 @@ final class SystemVolumeController {
 
     var isMuted: Bool {
         getMuteState()
+    }
+
+    /// True when sound is actually going to a Bluetooth device. A paired pair
+    /// of AirPods being connected says nothing about where audio is routed.
+    var isDefaultOutputBluetooth: Bool {
+        let transport = transportTypeStorage.withLock { $0 }
+        return transport == kAudioDeviceTransportTypeBluetooth
+            || transport == kAudioDeviceTransportTypeBluetoothLE
     }
 
     func setVolume(_ value: Float) {
@@ -291,6 +303,19 @@ final class SystemVolumeController {
         return deviceID
     }
 
+    private func refreshTransportType() {
+        var transport: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = AudioObjectGetPropertyData(currentDeviceID, &address, 0, nil, &size, &transport)
+        let resolved: UInt32 = status == noErr ? transport : 0
+        transportTypeStorage.withLock { $0 = resolved }
+    }
+
     private func installDefaultDeviceListener() {
         guard !listenersInstalled else { return }
         var address = AudioObjectPropertyAddress(
@@ -369,6 +394,7 @@ final class SystemVolumeController {
         callbackQueue.async { [weak self] in
             guard let self else { return }
             self.currentDeviceID = self.resolveDefaultDevice()
+            self.refreshTransportType()
             self.refreshPropertyElements()
             self.installVolumeListeners(for: self.currentDeviceID)
             self.notifyCurrentState()

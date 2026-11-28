@@ -239,8 +239,8 @@ struct InlineHUD: View {
                     switch (type) {
                         case .volume:
                             if icon.isEmpty {
-                                // Show headphone icon if Bluetooth audio is connected, otherwise speaker
-                                let baseIcon = bluetoothManager.isBluetoothAudioConnected ? "headphones" : SpeakerSymbol(value)
+                                // Headphones only when audio is routed to a Bluetooth device, not merely when one is connected
+                                let baseIcon = SystemVolumeController.shared.isDefaultOutputBluetooth ? "headphones" : SpeakerSymbol(value)
                                 Image(systemName: baseIcon)
                                     .contentTransition(.interpolate)
                                     .symbolVariant(value > 0 ? .none : .slash)

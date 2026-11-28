@@ -317,7 +317,10 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
 
     @MainActor
     private func resolvedVolumeIcon(isMuted: Bool) -> String {
-        guard let icon = BluetoothAudioManager.shared.activeDeviceIconSymbol() else { return "" }
+        // A connected Bluetooth device only names the output when audio is
+        // actually routed to it; otherwise the HUD's own speaker symbol is right.
+        guard volumeController.isDefaultOutputBluetooth,
+              let icon = BluetoothAudioManager.shared.activeDeviceIconSymbol() else { return "" }
         if isMuted && Self.headsetIconSymbols.contains(icon) {
             return "headphones.slash"
         }
