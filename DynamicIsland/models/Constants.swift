@@ -1462,6 +1462,10 @@ extension Defaults.Keys {
     static let selectedAIModel = Key<AIModel?>("selectedAIModel", default: nil)
     static let enableThinkingMode = Key<Bool>("enableThinkingMode", default: false)
     static let localModelEndpoint = Key<String>("localModelEndpoint", default: "http://localhost:11434")
+    /// Base URL for the OpenAI provider, so OpenAI-compatible proxies and servers can be used.
+    static let openaiBaseURL = Key<String>("openaiBaseURL", default: OpenAICompatibleEndpoint.defaultBaseURL)
+    /// Model ID sent to the OpenAI provider instead of the picked model; empty uses the picked one.
+    static let openaiCustomModelID = Key<String>("openaiCustomModelID", default: "")
 
     // MARK: Third-Party Extensions
     static let enableThirdPartyExtensions = Key<Bool>("enableThirdPartyExtensions", default: true)

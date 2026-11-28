@@ -94544,7 +94544,11 @@
     },
     "Mirroring Clock timers reads the system log, so macOS may ask for Developer Tools access." : {},
     "Reads the system log while AirPods are connected, so macOS may ask for Developer Tools access." : {},
-    "Already on in System Settings? Remove Atoll from the Accessibility list with the − button, then add it again." : {}
+    "Already on in System Settings? Remove Atoll from the Accessibility list with the − button, then add it again." : {},
+    "Change to use an OpenAI-compatible proxy or local server. The API key is optional for other servers." : {},
+    "Custom model ID" : {},
+    "Optional" : {},
+    "Sent instead of the model picked above, for example a model name on your own server." : {}
   },
   "version" : "1.2"
 }
