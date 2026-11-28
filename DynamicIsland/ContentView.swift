@@ -379,7 +379,7 @@ struct ContentView: View {
 
     /// Whether the current screen lacks a physical notch.
     private var isNonNotchScreen: Bool {
-        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
+        guard let screen = NSScreen.screen(named: currentScreenName) else {
             return true
         }
         return screen.safeAreaInsets.top <= 0
@@ -2086,7 +2086,7 @@ struct ContentView: View {
     }
 
     private func hiddenHoverActivationContainsMouse(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
-        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
+        guard let screen = NSScreen.screen(named: currentScreenName) else {
             return false
         }
 
@@ -2369,7 +2369,7 @@ struct ContentView: View {
             return isPointInsideNotchWindow(location)
         }
 
-        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }),
+        guard let screen = NSScreen.screen(named: currentScreenName),
               location.y >= screen.frame.maxY - 1.5 else {
             return false
         }
@@ -2420,7 +2420,7 @@ struct ContentView: View {
     }
 
     private func isMouseOverClosedNotchHitArea(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
-        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
+        guard let screen = NSScreen.screen(named: currentScreenName) else {
             return false
         }
 

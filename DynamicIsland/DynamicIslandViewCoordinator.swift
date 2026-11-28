@@ -159,10 +159,11 @@ class DynamicIslandViewCoordinator: ObservableObject {
         }
     }
 
-    /// `CGDirectDisplayID` of the preferred display. Unlike `preferredScreen` (the
-    /// display's localized name), the ID tells identical monitors apart and survives
-    /// display renames. `0` means "not set" (legacy installs only stored the name).
-    @AppStorage("preferred_screen_id") var preferredScreenID: Int = 0 {
+    /// UUID of the preferred display (`CGDisplayCreateUUIDFromDisplayID`). Unlike
+    /// `preferredScreen` (the display's localized name), it tells identical monitors
+    /// apart, and unlike a `CGDirectDisplayID` it is stable across reconnects and
+    /// reboots. Empty means "not set" (legacy installs only stored the name).
+    @AppStorage(NSScreen.preferredDisplayUUIDDefaultsKey) var preferredScreenUUID: String = "" {
         didSet {
             NotificationCenter.default.post(name: Notification.Name.selectedScreenChanged, object: nil)
         }
@@ -170,26 +171,23 @@ class DynamicIslandViewCoordinator: ObservableObject {
 
     @Published var selectedScreen: String = NSScreen.main?.localizedName ?? "Unknown"
 
-    /// The display the user picked in Settings, matched by stable display ID
-    /// (identical monitors share a localized name). The legacy name lookup only
-    /// applies when no ID was stored yet — with an ID set, falling back to the
-    /// name could silently pick the wrong one of two identical displays.
+    /// The display the user picked in Settings, matched by its stable UUID so
+    /// identical monitors (which share a localized name) can be told apart. Falls
+    /// back to the stored name when no UUID is stored or that display isn't connected.
     func preferredNSScreen() -> NSScreen? {
-        guard preferredScreenID != 0 else {
-            return NSScreen.screens.first(where: { $0.localizedName == preferredScreen })
+        if !preferredScreenUUID.isEmpty,
+           let match = NSScreen.screens.first(where: { $0.displayUUID == preferredScreenUUID }) {
+            return match
         }
-        return NSScreen.screens.first(where: {
-            $0.displayID == CGDirectDisplayID(preferredScreenID)
-        })
+        return NSScreen.screens.first(where: { $0.localizedName == preferredScreen })
     }
 
-    /// Legacy installs only stored the preferred display's name; backfill its ID.
-    private func migratePreferredScreenIDIfNeeded() {
-        guard preferredScreenID == 0,
-              let match = NSScreen.screens.first(where: { $0.localizedName == preferredScreen }),
-              let id = match.displayID
+    /// Legacy installs only stored the preferred display's name; backfill its UUID.
+    private func migratePreferredScreenUUIDIfNeeded() {
+        guard preferredScreenUUID.isEmpty,
+              let uuid = NSScreen.screens.first(where: { $0.localizedName == preferredScreen })?.displayUUID
         else { return }
-        preferredScreenID = Int(id)
+        preferredScreenUUID = uuid
     }
 
     @Published var optionKeyPressed: Bool = true
@@ -197,7 +195,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
     
     private init() {
         selectedScreen = preferredScreen
-        migratePreferredScreenIDIfNeeded()
+        migratePreferredScreenUUIDIfNeeded()
         Defaults.publisher(.timerDisplayMode)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in

@@ -79,7 +79,7 @@ var openNotchSize: CGSize {
 func maxAllowedNotchWidth(for screenName: String? = nil) -> CGFloat {
     let screen: NSScreen?
     if let screenName {
-        screen = NSScreen.screens.first { $0.localizedName == screenName }
+        screen = NSScreen.screen(named: screenName)
     } else {
         screen = NSScreen.main
     }
@@ -361,7 +361,7 @@ func shouldUseDynamicIslandMode(for screenName: String?) -> Bool {
 
     var selectedScreen: NSScreen? = NSScreen.main
     if let screenName {
-        selectedScreen = NSScreen.screens.first(where: { $0.localizedName == screenName })
+        selectedScreen = NSScreen.screen(named: screenName)
     }
 
     guard let screen = selectedScreen else {
@@ -407,7 +407,7 @@ func getScreenFrame(_ screen: String? = nil) -> CGRect? {
     var selectedScreen = NSScreen.main
 
     if let customScreen = screen {
-        selectedScreen = NSScreen.screens.first(where: { $0.localizedName == customScreen })
+        selectedScreen = NSScreen.screen(named: customScreen)
     }
     
     if let screen = selectedScreen {
@@ -425,7 +425,7 @@ func getClosedNotchSize(screen: String? = nil) -> CGSize {
     var selectedScreen = NSScreen.main
 
     if let customScreen = screen {
-        selectedScreen = NSScreen.screens.first(where: { $0.localizedName == customScreen })
+        selectedScreen = NSScreen.screen(named: customScreen)
     }
 
     // Check if the screen is available

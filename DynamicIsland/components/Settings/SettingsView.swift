@@ -1117,7 +1117,7 @@ struct SettingsView: View {
 }
 
 struct GeneralSettings: View {
-    @State private var screens: [(id: CGDirectDisplayID, label: String)] = NSScreen.displayPickerItems()
+    @State private var screens: [(uuid: String, label: String)] = NSScreen.displayPickerItems()
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @Default(.mirrorShape) var mirrorShape
@@ -1150,16 +1150,16 @@ struct GeneralSettings: View {
         SettingsTab.general.highlightID(for: title)
     }
 
-    /// Bridges the picker to the coordinator: persists the stable display ID and
+    /// Bridges the picker to the coordinator: persists the stable display UUID and
     /// keeps the legacy display-name preference in sync for downstream consumers.
-    private var preferredDisplayBinding: Binding<CGDirectDisplayID> {
+    private var preferredDisplayBinding: Binding<String> {
         Binding(
-            get: { CGDirectDisplayID(coordinator.preferredScreenID) },
-            set: { newID in
-                if let screen = NSScreen.screens.first(where: { $0.displayID == newID }) {
+            get: { coordinator.preferredNSScreen()?.displayUUID ?? coordinator.preferredScreenUUID },
+            set: { newUUID in
+                coordinator.preferredScreenUUID = newUUID
+                if let screen = NSScreen.screens.first(where: { $0.displayUUID == newUUID }) {
                     coordinator.preferredScreen = screen.localizedName
                 }
-                coordinator.preferredScreenID = Int(newID)
             }
         )
     }
@@ -1220,8 +1220,8 @@ struct GeneralSettings: View {
                 }
                 .settingsHighlight(id: highlightID("Show on all displays"))
                 Picker("Show on a specific display", selection: preferredDisplayBinding) {
-                    ForEach(screens, id: \.id) { screen in
-                        Text(screen.label).tag(screen.id)
+                    ForEach(screens, id: \.uuid) { screen in
+                        Text(screen.label).tag(screen.uuid)
                     }
                 }
                 .onChange(of: NSScreen.screens) {
