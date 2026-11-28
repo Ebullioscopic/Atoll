@@ -5,10 +5,10 @@
         <item>
             <title>3.0.0</title>
             <pubDate>Sat, 28 Nov 2026 10:56:38 +0000</pubDate>
-            <sparkle:version>20260720006</sparkle:version>
+            <sparkle:version>20261128001</sparkle:version>
             <sparkle:shortVersionString>3.0.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.6</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/Ebullioscopic/Atoll/releases/download/v3.0.0/Atoll-3.0.0.dmg" length="24507569" type="application/octet-stream" sparkle:edSignature="nwvikUOdo3nawoyip76/FpWWPzj82OPaF3F8q1THzWnUoLGJS6S2FE8b0295U8FRuRM3DKsYzZDyGD6U8ZpNDw=="/>
+            <enclosure url="https://github.com/Ebullioscopic/Atoll/releases/download/v3.0.0/Atoll-3.0.0.dmg" length="31390401" type="application/octet-stream" sparkle:edSignature="1sGg7WAlErOX+vb2I3Led1ISjNlYHdmHfMR7+0mIe10nCzhAZo9WBmZaCF6fdvJNvFVg2+SST0sED7d+Ul1vAg=="/>
         </item>
         <item>
             <title>2.3.3</title>
