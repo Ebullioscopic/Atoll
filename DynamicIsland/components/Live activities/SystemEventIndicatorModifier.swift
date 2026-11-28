@@ -48,12 +48,14 @@ struct SystemEventIndicatorModifier: View {
                             .contentTransition(.interpolate)
                             .symbolVariant(value > 0 ? .none : .slash)
                             .frame(width: 20, height: 15, alignment: .leading)
+                            .foregroundStyle(.white)
                     } else {
                         Image(systemName: icon)
                             .contentTransition(.interpolate)
                             .opacity(value.isZero ? 0.6 : 1)
                             .scaleEffect(value.isZero ? 0.85 : 1)
                             .frame(width: 20, height: 15, alignment: .leading)
+                            .foregroundStyle(.white)
                     }
                 case .brightness:
                     Image(systemName: "sun.max.fill")
