@@ -163,7 +163,12 @@ struct ShelfView: View {
                 }
             } else {
                 ScrollView(.horizontal) {
-                    HStack(spacing: spacing) {
+                    // The shelf can retain many items. An eager HStack creates
+                    // every cell at once, which starts bookmark resolution,
+                    // icon/thumbnail loading and drag-preview work for items
+                    // that are still off-screen. Keep that work scoped to the
+                    // visible cells as the user scrolls.
+                    LazyHStack(spacing: spacing) {
                         ForEach(tvm.items) { item in
                             ShelfItemView(item: item)
                                 .environmentObject(quickLookService)
