@@ -146,17 +146,19 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
     @MainActor
     deinit {
+        // A view model can be thrown away while its notch is still open --
+        // window cleanup removes one without going through close() -- and the
+        // seek monitor is process-wide, so release this notch's claim. Hopping
+        // to the main actor keeps this valid if deinit runs nonisolated under
+        // Swift 6; releasing a claim that was never made does nothing.
+        let seekMonitorOwner = seekMonitorOwner
+        Task { @MainActor in
+            NotchSeekKeyMonitor.shared.stop(owner: seekMonitorOwner)
+        }
         destroy()
     }
 
     func destroy() {
-        // A view model can be thrown away while its notch is still open --
-        // window cleanup removes one without going through close() -- and the
-        // seek monitor is a pair of process-wide event taps that would then
-        // stay registered with nothing left to drive them. Releasing a claim
-        // that was never made does nothing, so this needs no test for whether
-        // this notch was open.
-        NotchSeekKeyMonitor.shared.stop(owner: seekMonitorOwner)
         onViewTeardown?()
         onViewTeardown = nil
         cancellables.forEach { $0.cancel() }

@@ -1055,8 +1055,8 @@ extension Defaults.Keys {
     static let enableGestures = Key<Bool>("enableGestures", default: true)
     static let closeGestureEnabled = Key<Bool>("closeGestureEnabled", default: true)
     static let gestureSensitivity = Key<CGFloat>("gestureSensitivity", default: 200.0)
-    /// Left/right arrow keys seek while the notch is open.
-    static let arrowKeySeekEnabled = Key<Bool>("arrowKeySeekEnabled", default: true)
+    /// Left/right arrow keys seek while the notch is open on the home view.
+    static let arrowKeySeekEnabled = Key<Bool>("arrowKeySeekEnabled", default: false)
     static let enableHorizontalMusicGestures = Key<Bool>("enableHorizontalMusicGestures", default: true)
     static let musicGestureBehavior = Key<MusicSkipBehavior>("musicGestureBehavior", default: .track)
     static let reverseSwipeGestures = Key<Bool>("reverseSwipeGestures", default: false)

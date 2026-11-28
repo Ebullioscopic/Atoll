@@ -1403,7 +1403,7 @@ struct GeneralSettings: View {
             }
             .settingsHighlight(id: highlightID("Arrow key seek"))
 
-            Text("Left and right seek by 10 seconds. Only while the notch is open, so the keys stay yours everywhere else. Seeking from another app needs Accessibility; without it this works while Atoll is frontmost.")
+            Text("Left and right seek by 10 seconds while the notch is open on the home view and Atoll has keyboard focus. Arrow keys typed into other apps or text fields are never used for seeking.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } header: {
