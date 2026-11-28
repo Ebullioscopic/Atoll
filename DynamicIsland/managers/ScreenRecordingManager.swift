@@ -198,6 +198,15 @@ class ScreenRecordingManager: ObservableObject {
     private var stopRequestTask: Task<Void, Never>?
     private var stopFailureClearTask: Task<Void, Never>?
     private var workspaceObservers: [NSObjectProtocol] = []
+    private var recordingConfirmationTask: Task<Void, Never>?
+
+    /// How long a screen watcher has to stay before it counts as a recording.
+    /// Apps that grab the screen for a moment — AltTab refreshing its window
+    /// thumbnails, screenshot tools, colour pickers — attach a watcher for a
+    /// fraction of a second, every few seconds. Reported straight away, each
+    /// grab flashed the recording activity, which knocked the music and Focus
+    /// activities off the notch and back on again.
+    private static let recordingConfirmationDelay: Duration = .milliseconds(1500)
 
     private init(stopController: ScreenRecordingStopControlling = NativeScreenRecordingStopController()) {
         self.stopController = stopController
@@ -206,6 +215,7 @@ class ScreenRecordingManager: ObservableObject {
     deinit {
         stopRequestTask?.cancel()
         stopFailureClearTask?.cancel()
+        recordingConfirmationTask?.cancel()
         durationTimer?.invalidate()
     }
 
@@ -229,6 +239,8 @@ class ScreenRecordingManager: ObservableObject {
         }
 
         isMonitoring = false
+        recordingConfirmationTask?.cancel()
+        recordingConfirmationTask = nil
         stopScreenSharingAppMonitoring()
         stopDurationTracking()
         isRecording = false
@@ -431,17 +443,22 @@ class ScreenRecordingManager: ObservableObject {
 
     func checkRecordingStatus() {
         let currentRecordingState = CGSIsScreenWatcherPresent()
+        if !currentRecordingState {
+            recordingConfirmationTask?.cancel()
+            recordingConfirmationTask = nil
+        }
         guard currentRecordingState != isRecording else { return }
 
         if currentRecordingState {
-            startDurationTracking()
-            clearStopFailure()
-            stopControlState = .ready
-            coordinator.toggleExpandingView(status: true, type: .recording)
-            withAnimation(.smooth) {
-                isRecording = true
+            guard recordingConfirmationTask == nil else { return }
+            let watcherAppearedAt = Date()
+            recordingConfirmationTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: Self.recordingConfirmationDelay)
+                guard !Task.isCancelled, let self else { return }
+                self.recordingConfirmationTask = nil
+                guard self.isMonitoring, !self.isRecording, CGSIsScreenWatcherPresent() else { return }
+                self.beginRecording(since: watcherAppearedAt)
             }
-            screenRecordingDebugLog("Screen recording started")
         } else {
             stopDurationTracking()
             stopRequestTask?.cancel()
@@ -456,9 +473,20 @@ class ScreenRecordingManager: ObservableObject {
         }
     }
 
-    private func startDurationTracking() {
-        recordingStartTime = Date()
-        recordingDuration = 0
+    private func beginRecording(since startDate: Date) {
+        startDurationTracking(since: startDate)
+        clearStopFailure()
+        stopControlState = .ready
+        coordinator.toggleExpandingView(status: true, type: .recording)
+        withAnimation(.smooth) {
+            isRecording = true
+        }
+        screenRecordingDebugLog("Screen recording started")
+    }
+
+    private func startDurationTracking(since startDate: Date) {
+        recordingStartTime = startDate
+        recordingDuration = Date().timeIntervalSince(startDate)
         durationTimer?.invalidate()
         durationTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in
