@@ -450,4 +450,63 @@ final class AppleMusicControllerTests: XCTestCase {
 
         withExtendedLifetime(cancellable) {}
     }
+
+    func testRepeatedArtworkFromAnotherAlbumFallsBackToCatalog() async {
+        let libraryArtwork = Data("library-artwork".utf8)
+        let catalogArtwork = Data("catalog-artwork".utf8)
+        let catalogPublished = expectation(description: "catalog artwork published")
+        let playbackInfoProvider = PlaybackInfoProvider(values: [
+            AppleMusicPlaybackInfo(
+                isPlaying: true,
+                title: "Library Song",
+                artist: "Artist",
+                album: "Library Album",
+                currentTime: 0,
+                duration: 180,
+                isShuffled: false,
+                repeatMode: .off,
+                artwork: libraryArtwork
+            ),
+            AppleMusicPlaybackInfo(
+                isPlaying: true,
+                title: "Streamed Song",
+                artist: "Other Artist",
+                album: "Streamed Album",
+                currentTime: 0,
+                duration: 180,
+                isShuffled: false,
+                repeatMode: .off,
+                artwork: libraryArtwork
+            )
+        ])
+        let controller = AppleMusicController(
+            startsObservers: false,
+            playbackInfoProvider: { await playbackInfoProvider.next() },
+            catalogArtworkProvider: { _, _, album in
+                album == "Streamed Album" ? catalogArtwork : nil
+            }
+        )
+        var states: [PlaybackState] = []
+        let cancellable = controller.playbackStatePublisher.sink { state in
+            states.append(state)
+            if state.artwork == catalogArtwork {
+                catalogPublished.fulfill()
+            }
+        }
+
+        await controller.updatePlaybackInfo()
+        XCTAssertEqual(states.last?.artwork, libraryArtwork)
+
+        await controller.updatePlaybackInfo()
+        await fulfillment(of: [catalogPublished], timeout: 1)
+
+        let streamedStates = states.filter { $0.title == "Streamed Song" }
+        XCTAssertFalse(streamedStates.isEmpty)
+        XCTAssertFalse(
+            streamedStates.contains { $0.artwork == libraryArtwork },
+            "The previous album's poster must not be reused"
+        )
+        XCTAssertEqual(states.last?.artwork, catalogArtwork)
+        withExtendedLifetime(cancellable) {}
+    }
 }

@@ -41,6 +41,22 @@ struct CustomVisualizer: Codable, Hashable, Equatable, Defaults.Serializable {
     var name: String
     var url: URL
     var speed: CGFloat = 1.0
+
+    /// Accepts a web or file URL, or a local path such as one pasted from Finder.
+    static func animationURL(from input: String) -> URL? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.hasPrefix("/") || trimmed.hasPrefix("~") {
+            return URL(fileURLWithPath: (trimmed as NSString).expandingTildeInPath)
+        }
+        guard let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https", "file"].contains(scheme) else {
+            return nil
+        }
+        if scheme != "file", url.host?.isEmpty ?? true { return nil }
+        return url
+    }
 }
 
 struct CustomAppIcon: Codable, Hashable, Equatable, Defaults.Serializable, Identifiable {

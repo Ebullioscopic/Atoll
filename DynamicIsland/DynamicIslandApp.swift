@@ -817,9 +817,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Setup Real-time Audio Waveform capture if enabled
         if Defaults[.enableRealTimeWaveform] {
-            Task {
-                await AudioTap.shared.startCapture()
-            }
+            AudioTap.shared.startCapture()
             setupAudioTapMusicObservers()
         }
         
@@ -828,9 +826,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 if change.newValue {
-                    Task {
-                        await AudioTap.shared.startCapture()
-                    }
+                    AudioTap.shared.startCapture()
                     self?.setupAudioTapMusicObservers()
                 } else {
                     AudioTap.shared.stopCapture()

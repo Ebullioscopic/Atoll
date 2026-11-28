@@ -402,6 +402,14 @@ class BluetoothAudioManager: ObservableObject {
         } ?? primaryConnectedAirPodsDevice()
 
         guard let device else { return }
+
+        // The daemons also log the current mode when audio routing changes (e.g. on track
+        // changes), so the first value seen for a device is a baseline, not a change.
+        let key = normalizeBluetoothIdentifier(device.address)
+        if !key.isEmpty, lastListeningModeByAddress[key] == nil {
+            lastListeningModeByAddress[key] = mode
+            return
+        }
         presentListeningModeIfChanged(AirPodsListeningModeEvent(device: device, mode: mode))
     }
     
@@ -1005,9 +1013,11 @@ class BluetoothAudioManager: ObservableObject {
         for result in results {
             let level = clampBatteryPercentage(result.level)
 
+            // A GATT read is a live value, so it replaces the cached one even when lower;
+            // keeping the higher number left a stale, too-high percentage on screen.
             if let addressKey = result.addressKey, !addressKey.isEmpty {
                 let previous = batteryStatusByAddress[addressKey] ?? -1
-                if level > previous {
+                if level != previous {
                     batteryStatusByAddress[addressKey] = level
                     batteryStatus[addressKey] = String(level)
                     didUpdate = true
@@ -1016,7 +1026,7 @@ class BluetoothAudioManager: ObservableObject {
 
             if let nameKey = result.nameKey, !nameKey.isEmpty {
                 let previous = batteryStatusByName[nameKey] ?? -1
-                if level > previous {
+                if level != previous {
                     batteryStatusByName[nameKey] = level
                     didUpdate = true
                 }
@@ -2240,27 +2250,8 @@ private final class AirPodsListeningModeLogObserver {
     }
 
     private func handle(_ line: String) {
-        guard Self.isModeChangeLine(line) else { return }
-        guard let mode = AirPodsListeningMode.from(line) else { return }
+        guard let mode = AirPodsListeningMode.fromLogLine(line) else { return }
         onModeChange?(mode, extractBluetoothAddress(from: line))
-    }
-
-    private static func isModeChangeLine(_ line: String) -> Bool {
-        let value = line.lowercased()
-
-        if value.contains("available") ||
-           value.contains("supported") ||
-           value.contains("capability") ||
-           value.contains("capabilities") ||
-           value.contains("listening modes") {
-            return false
-        }
-
-        return value.contains("lsnm") ||
-            value.contains("noisecontrolmode") ||
-            value.contains("active noise control") ||
-            value.contains("activeNoiseControlMode".lowercased()) ||
-            value.contains("activeNoiseCancellationMode".lowercased())
     }
 
     private func extractBluetoothAddress(from line: String) -> String? {
@@ -2306,6 +2297,10 @@ private final class BluetoothLEBatteryReader: NSObject, CBCentralManagerDelegate
     private var lookupByUUID: [UUID: Lookup] = [:]
     private var completion: (([Result]) -> Void)?
     private var pendingPeripherals: [UUID: CBPeripheral] = [:]
+    /// Peripherals this reader asked CoreBluetooth to connect. Each must be released with
+    /// `cancelPeripheralConnection` once read (or on timeout); otherwise the pending/open LE
+    /// link outlives the request and keeps contending with the headset's audio link.
+    private var readerConnections: [UUID: CBPeripheral] = [:]
     private var results: [UUID: Result] = [:]
     private var missingUUIDs: Set<UUID> = []
     private var timeoutWorkItem: DispatchWorkItem?
@@ -2479,13 +2474,20 @@ private final class BluetoothLEBatteryReader: NSObject, CBCentralManagerDelegate
         case .connected:
             peripheral.discoverServices([Self.batteryServiceUUID])
         default:
+            readerConnections[peripheral.identifier] = peripheral
             central.connect(peripheral, options: nil)
         }
+    }
+
+    private func releaseConnection(for identifier: UUID) {
+        guard let peripheral = readerConnections.removeValue(forKey: identifier) else { return }
+        central.cancelPeripheralConnection(peripheral)
     }
 
     private func markPeripheralFinished(_ identifier: UUID) {
         pendingPeripherals.removeValue(forKey: identifier)
         missingUUIDs.remove(identifier)
+        releaseConnection(for: identifier)
 
         if missingUUIDs.isEmpty {
             central.stopScan()
@@ -2517,6 +2519,9 @@ private final class BluetoothLEBatteryReader: NSObject, CBCentralManagerDelegate
         central.stopScan()
         state = .idle
 
+        for identifier in Array(readerConnections.keys) {
+            releaseConnection(for: identifier)
+        }
         pendingPeripherals.removeAll()
         missingUUIDs.removeAll()
         pendingLookups.removeAll()
@@ -2656,6 +2661,75 @@ enum AirPodsListeningMode: Equatable {
         }
 
         return from("\(value)")
+    }
+
+    private static let logModeKeyPattern = try? NSRegularExpression(
+        pattern: #"\b(?:lsnm|listeningmode|noisecontrolmode|activenoisecontrolmode|activenoisecancellationmode)\b\s*[:=]?\s*["'(\[]?\s*([a-z]+|\d+)"#,
+        options: [.caseInsensitive]
+    )
+    private static let logModeTransitionPattern = try? NSRegularExpression(
+        pattern: #"\bto\s+["'(\[]?\s*([a-z]+|\d+)"#,
+        options: [.caseInsensitive]
+    )
+
+    /// Reads the listening mode from a Bluetooth daemon log line.
+    ///
+    /// Only the value written right after a listening-mode key (or after "to" in a
+    /// "from … to …" transition) counts. Searching the whole line for words like "anc" or
+    /// "transparency" matched unrelated text ("instance", "balance", capability lists) in
+    /// the routing chatter logged on every track change and popped a mode HUD although
+    /// nothing changed. Lines naming more than one mode without a transition are ignored.
+    static func fromLogLine(_ line: String) -> AirPodsListeningMode? {
+        let value = line.lowercased()
+        if value.contains("available") ||
+           value.contains("supported") ||
+           value.contains("capabilit") ||
+           value.contains("listening modes") {
+            return nil
+        }
+
+        guard let keyPattern = logModeKeyPattern else { return nil }
+        let range = NSRange(line.startIndex..., in: line)
+        let keyMatches = keyPattern.matches(in: line, range: range)
+        guard let firstKeyMatch = keyMatches.first else { return nil }
+
+        func token(_ match: NSTextCheckingResult) -> String? {
+            guard let tokenRange = Range(match.range(at: 1), in: line) else { return nil }
+            return String(line[tokenRange])
+        }
+
+        if let transitionPattern = logModeTransitionPattern {
+            let afterKey = NSRange(
+                location: firstKeyMatch.range.location,
+                length: range.length - firstKeyMatch.range.location
+            )
+            if let transition = transitionPattern.matches(in: line, range: afterKey).last,
+               let mode = token(transition).flatMap(fromLogToken) {
+                return mode
+            }
+        }
+
+        let modes = keyMatches.compactMap { token($0).flatMap(fromLogToken) }
+        guard let mode = modes.first, modes.allSatisfy({ $0 == mode }) else { return nil }
+        return mode
+    }
+
+    private static func fromLogToken(_ token: String) -> AirPodsListeningMode? {
+        if let number = Int(token) {
+            return fromPrivateValue(number)
+        }
+        switch token.lowercased() {
+        case "anc", "noisecancellation", "noisecancelling":
+            return .noiseCancellation
+        case "transparency", "transparent":
+            return .transparency
+        case "autoanc", "adaptive":
+            return .adaptive
+        case "normal", "off":
+            return .off
+        default:
+            return nil
+        }
     }
 
     static func fromPrivateValue(_ value: Int) -> AirPodsListeningMode? {

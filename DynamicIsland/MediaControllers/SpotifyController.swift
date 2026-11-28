@@ -50,6 +50,8 @@ class SpotifyController: MediaControllerProtocol {
 
     private var lastArtworkURL: String?
     private var artworkFetchTask: Task<Void, Never>?
+    private var lastPublishedTrackURI: String?
+    private var artworkRecheckTask: Task<Void, Never>?
     private var canvasFetchTask: Task<Void, Never>?
     private var currentCanvasTrackURI: String?
     private var lastCanvasRequestTrackURI: String?
@@ -116,6 +118,7 @@ class SpotifyController: MediaControllerProtocol {
     deinit {
         notificationTask?.cancel()
         artworkFetchTask?.cancel()
+        artworkRecheckTask?.cancel()
         canvasFetchTask?.cancel()
         artistMetadataFetchTask?.cancel()
         sessionChangeCancellable?.cancel()
@@ -241,6 +244,22 @@ class SpotifyController: MediaControllerProtocol {
             merged.liveArtworkURL = isSameCanvasTrack ? self.playbackState.liveArtworkURL : nil
             self.playbackState = merged
             return merged
+        }
+
+        // Spotify posts its change notification as soon as the item changes, but the
+        // artwork URL it reports can still be the previous item's (seen when an ad starts),
+        // and no further notification follows. Read once more shortly after a track change
+        // that kept the old artwork URL, so the poster catches up without a hover.
+        let trackChanged = trackURI != lastPublishedTrackURI
+        lastPublishedTrackURI = trackURI
+        artworkRecheckTask?.cancel()
+        artworkRecheckTask = nil
+        if trackChanged, !artworkURL.isEmpty, artworkURL == lastArtworkURL {
+            artworkRecheckTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                await self?.updatePlaybackInfo()
+            }
         }
 
         if !trackURI.isEmpty {

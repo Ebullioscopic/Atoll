@@ -162,13 +162,70 @@ class AudioTap: NSObject {
         return displayMagnitudes
     }
 
-    func startCapture() async {
-        await withCheckedContinuation { continuation in
-            audioQueue.async { [weak self] in
-                self?.startCaptureSync()
-                continuation.resume()
+    /// Bumped by every stop. A deferred start (waiting for the aggregate device to come
+    /// alive) only proceeds if no stop or restart has happened since it was scheduled.
+    /// Only touched on `audioQueue`.
+    private var captureGeneration = 0
+    private var aliveListener: AudioObjectPropertyListenerBlock?
+    private var aliveListenerDeviceID: AudioObjectID = kAudioObjectUnknown
+
+    /// Enqueued directly (not from a `Task`) so it stays ordered with `stopCapture()` on the
+    /// serial queue: a start requested before a stop can never run after it.
+    func startCapture() {
+        audioQueue.async { [weak self] in
+            self?.installProcessListListener()
+            self?.startCaptureSync()
+        }
+    }
+
+    /// The target process objects the last start attempt was built for. Only touched on
+    /// `audioQueue`.
+    private var attemptedProcessObjects = Set<AudioObjectID>()
+    private var processListListener: AudioObjectPropertyListenerBlock?
+
+    private static var processObjectListAddress: AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyProcessObjectList,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+    }
+
+    /// A tap is bound to the process objects that existed when it was built. A player that
+    /// only registers with CoreAudio when it first plays, a helper process spawned for
+    /// playback, or a player relaunched after Atoll started would otherwise never be tapped
+    /// and the waveform would stay as static dots. Rebuild when the set of target processes
+    /// actually changes.
+    private func installProcessListListener() {
+        guard processListListener == nil else { return }
+        var address = Self.processObjectListAddress
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self, self.processListListener != nil,
+                  Defaults[.enableRealTimeWaveform] else { return }
+            let targets = Set(self.resolveTargetProcessObjects(verbose: false))
+            guard targets != self.attemptedProcessObjects else { return }
+            print("🔄 [AudioTap] Target audio processes changed, rebuilding tap")
+            DispatchQueue.main.async {
+                self.restartCapture()
             }
         }
+        let status = AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &address, audioQueue, listener
+        )
+        if status == noErr {
+            processListListener = listener
+        } else {
+            print("⚠️ [AudioTap] Could not observe audio process list (\(status))")
+        }
+    }
+
+    private func removeProcessListListener() {
+        guard let processListListener else { return }
+        var address = Self.processObjectListAddress
+        AudioObjectRemovePropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &address, audioQueue, processListListener
+        )
+        self.processListListener = nil
     }
     
     private func startCaptureSync() {
@@ -177,74 +234,12 @@ class AudioTap: NSObject {
             return
         }
 
-        var targetProcessObjects = Set<AudioObjectID>()
-        var bundleIdentifierByProcessObject: [AudioObjectID: String] = [:]
+        let sortedTargetProcessObjects = resolveTargetProcessObjects(verbose: true)
+        attemptedProcessObjects = Set(sortedTargetProcessObjects)
 
-        // AirPods/Bluetooth output + Spotify don't mix: process-tapping Spotify into our
-        // private aggregate device disturbs the system Now Playing / AVRCP session, so the
-        // AirPods pause gesture finds no target and macOS falls back to Siri. Spotify is
-        // controlled via AppleScript and registers weakly with MediaRemote, which is why
-        // only it is affected (Apple Music etc. stay registered). While a Bluetooth route is
-        // active, skip tapping Spotify to preserve media control — the visualizer stays live
-        // for Spotify on wired/built-in output and for every other app on any output.
-        let bluetoothOutputActive = AudioRouteManager.shared.isDefaultOutputBluetooth()
-
-        // Enumerate CoreAudio's process objects rather than relying only on
-        // NSRunningApplication. Electron players commonly render and play from
-        // nested helpers; TIDAL, for example, emits audio from
-        // `com.tidal.desktop.player`, while its main app PID has no audio object.
-        for processObject in getAudioProcessObjectIDs() {
-            guard let processBundleIdentifier = getBundleIdentifier(for: processObject),
-                  let targetBundleIdentifier = AudioTapTargetMatcher.targetBundleIdentifier(
-                    for: processBundleIdentifier,
-                    among: targetBundleIDs
-                  ) else {
-                continue
-            }
-
-            if shouldSkipSpotifyTap(
-                bundleIdentifier: targetBundleIdentifier,
-                bluetoothOutputActive: bluetoothOutputActive
-            ) {
-                print("⏭️ [AudioTap] Bluetooth output active — skipping Spotify tap to preserve AirPods media control")
-                continue
-            }
-
-            targetProcessObjects.insert(processObject)
-            bundleIdentifierByProcessObject[processObject] = processBundleIdentifier
-            let pidDescription = getPID(for: processObject).map(String.init) ?? "unknown"
-            print("🎯 [AudioTap] Found audio process \(processBundleIdentifier) with PID: \(pidDescription), AudioObjectID: \(processObject)")
-        }
-
-        // Preserve the previous PID translation as a fallback for applications
-        // whose CoreAudio process does not publish a bundle identifier.
-        for app in NSWorkspace.shared.runningApplications {
-            guard let bundleIdentifier = app.bundleIdentifier,
-                  targetBundleIDs.contains(bundleIdentifier) else { continue }
-            if shouldSkipSpotifyTap(
-                bundleIdentifier: bundleIdentifier,
-                bluetoothOutputActive: bluetoothOutputActive
-            ) {
-                continue
-            }
-            if let processObject = getAudioObjectID(for: app.processIdentifier),
-               targetProcessObjects.insert(processObject).inserted {
-                bundleIdentifierByProcessObject[processObject] = bundleIdentifier
-                print("🎯 [AudioTap] Found \(app.localizedName ?? "App") with PID: \(app.processIdentifier), AudioObjectID: \(processObject)")
-            }
-        }
-
-        if targetProcessObjects.isEmpty {
+        if sortedTargetProcessObjects.isEmpty {
             print("⚠️ [AudioTap] None of our target apps are running right now.")
             return
-        }
-
-        let sortedTargetProcessObjects = targetProcessObjects.sorted { lhs, rhs in
-            let lhsBundleIdentifier = bundleIdentifierByProcessObject[lhs]?.lowercased() ?? ""
-            let rhsBundleIdentifier = bundleIdentifierByProcessObject[rhs]?.lowercased() ?? ""
-            return lhsBundleIdentifier == rhsBundleIdentifier
-                ? lhs < rhs
-                : lhsBundleIdentifier < rhsBundleIdentifier
         }
 
         let description = CATapDescription()
@@ -311,24 +306,164 @@ class AudioTap: NSObject {
         }
         print("✅ [AudioTap] Created IO proc")
 
-        // Start listening
-        status = AudioDeviceStart(aggregateDeviceID, validIOProcID)
+        // From here on the tap, aggregate and IOProc exist, so a stop must tear them down
+        // even if IO has not started yet.
+        captureIsRunning = true
+
+        // A freshly created aggregate is not necessarily alive yet, and starting IO before it
+        // is yields silent buffers for as long as the tap lives: the waveform sits flat until
+        // something happens to rebuild it. Start on the alive transition instead.
+        if Self.isDeviceAlive(aggregateDeviceID) {
+            startIO(validIOProcID)
+        } else {
+            startIOWhenAlive(validIOProcID)
+        }
+    }
+
+    /// Process objects of the running target players, sorted so the same set always builds
+    /// the same tap description.
+    private func resolveTargetProcessObjects(verbose: Bool) -> [AudioObjectID] {
+        var targetProcessObjects = Set<AudioObjectID>()
+        var bundleIdentifierByProcessObject: [AudioObjectID: String] = [:]
+
+        // AirPods/Bluetooth output + Spotify don't mix: process-tapping Spotify into our
+        // private aggregate device disturbs the system Now Playing / AVRCP session, so the
+        // AirPods pause gesture finds no target and macOS falls back to Siri. Spotify is
+        // controlled via AppleScript and registers weakly with MediaRemote, which is why
+        // only it is affected (Apple Music etc. stay registered). While a Bluetooth route is
+        // active, skip tapping Spotify to preserve media control — the visualizer stays live
+        // for Spotify on wired/built-in output and for every other app on any output.
+        let bluetoothOutputActive = AudioRouteManager.shared.isDefaultOutputBluetooth()
+
+        // Enumerate CoreAudio's process objects rather than relying only on
+        // NSRunningApplication. Electron players commonly render and play from
+        // nested helpers; TIDAL, for example, emits audio from
+        // `com.tidal.desktop.player`, while its main app PID has no audio object.
+        for processObject in getAudioProcessObjectIDs() {
+            guard let processBundleIdentifier = getBundleIdentifier(for: processObject),
+                  let targetBundleIdentifier = AudioTapTargetMatcher.targetBundleIdentifier(
+                    for: processBundleIdentifier,
+                    among: targetBundleIDs
+                  ) else {
+                continue
+            }
+
+            if shouldSkipSpotifyTap(
+                bundleIdentifier: targetBundleIdentifier,
+                bluetoothOutputActive: bluetoothOutputActive
+            ) {
+                if verbose { print("⏭️ [AudioTap] Bluetooth output active — skipping Spotify tap to preserve AirPods media control") }
+                continue
+            }
+
+            targetProcessObjects.insert(processObject)
+            bundleIdentifierByProcessObject[processObject] = processBundleIdentifier
+            if verbose {
+                let pidDescription = getPID(for: processObject).map(String.init) ?? "unknown"
+                print("🎯 [AudioTap] Found audio process \(processBundleIdentifier) with PID: \(pidDescription), AudioObjectID: \(processObject)")
+            }
+        }
+
+        // Preserve the previous PID translation as a fallback for applications
+        // whose CoreAudio process does not publish a bundle identifier.
+        for app in NSWorkspace.shared.runningApplications {
+            guard let bundleIdentifier = app.bundleIdentifier,
+                  targetBundleIDs.contains(bundleIdentifier) else { continue }
+            if shouldSkipSpotifyTap(
+                bundleIdentifier: bundleIdentifier,
+                bluetoothOutputActive: bluetoothOutputActive
+            ) {
+                continue
+            }
+            if let processObject = getAudioObjectID(for: app.processIdentifier),
+               targetProcessObjects.insert(processObject).inserted {
+                bundleIdentifierByProcessObject[processObject] = bundleIdentifier
+                if verbose { print("🎯 [AudioTap] Found \(app.localizedName ?? "App") with PID: \(app.processIdentifier), AudioObjectID: \(processObject)") }
+            }
+        }
+
+        return targetProcessObjects.sorted { lhs, rhs in
+            let lhsBundleIdentifier = bundleIdentifierByProcessObject[lhs]?.lowercased() ?? ""
+            let rhsBundleIdentifier = bundleIdentifierByProcessObject[rhs]?.lowercased() ?? ""
+            return lhsBundleIdentifier == rhsBundleIdentifier
+                ? lhs < rhs
+                : lhsBundleIdentifier < rhsBundleIdentifier
+        }
+    }
+
+    private static var deviceIsAliveAddress: AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsAlive,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+    }
+
+    private static func isDeviceAlive(_ deviceID: AudioObjectID) -> Bool {
+        guard deviceID != kAudioObjectUnknown else { return false }
+        var address = deviceIsAliveAddress
+        var isAlive: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &isAlive)
+        return status == noErr && isAlive != 0
+    }
+
+    private func startIOWhenAlive(_ ioProcID: AudioDeviceIOProcID) {
+        let expectedGeneration = captureGeneration
+        let deviceID = aggregateDeviceID
+        var address = Self.deviceIsAliveAddress
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self,
+                  self.captureGeneration == expectedGeneration,
+                  self.aggregateDeviceID == deviceID,
+                  Self.isDeviceAlive(deviceID) else { return }
+            self.removeAliveListener()
+            self.startIO(ioProcID)
+        }
+
+        let status = AudioObjectAddPropertyListenerBlock(deviceID, &address, audioQueue, listener)
+        guard status == noErr else {
+            // Nothing else would start IO, so start now; flat buffers recover on the next rebuild.
+            print("⚠️ [AudioTap] Could not observe aggregate readiness (\(status)), starting now")
+            startIO(ioProcID)
+            return
+        }
+        aliveListener = listener
+        aliveListenerDeviceID = deviceID
+        print("⏳ [AudioTap] Waiting for aggregate device to become alive")
+
+        // It may have come alive between the first check and installing the listener.
+        if Self.isDeviceAlive(deviceID) {
+            removeAliveListener()
+            startIO(ioProcID)
+        }
+    }
+
+    private func removeAliveListener() {
+        guard let aliveListener, aliveListenerDeviceID != kAudioObjectUnknown else { return }
+        var address = Self.deviceIsAliveAddress
+        AudioObjectRemovePropertyListenerBlock(aliveListenerDeviceID, &address, audioQueue, aliveListener)
+        self.aliveListener = nil
+        aliveListenerDeviceID = kAudioObjectUnknown
+    }
+
+    private func startIO(_ ioProcID: AudioDeviceIOProcID) {
+        let status = AudioDeviceStart(aggregateDeviceID, ioProcID)
         guard status == noErr else {
             print("🛑 [AudioTap] Start Error: \(status) (\(fourCharCodeToString(status)))")
-            cleanupPartialSetup()
+            stopCaptureSync()
             return
         }
 
-        captureIsRunning = true
         callbackCount = 0
-        
+
         DispatchQueue.main.async { [weak self] in
             self?.updateTimer?.invalidate()
             let timer = Timer(timeInterval: 1.0 / 30.0, target: self as Any, selector: #selector(self?.updateSmoothedMagnitudes), userInfo: nil, repeats: true)
             RunLoop.main.add(timer, forMode: .common)
             self?.updateTimer = timer
         }
-        
+
         print("🟢 [AudioTap] CoreAudio CATap flowing through Aggregate Device!")
     }
 
@@ -341,6 +476,7 @@ class AudioTap: NSObject {
     }
     
     private func cleanupPartialSetup() {
+        removeAliveListener()
         if let validIOProcID = ioProcID, aggregateDeviceID != kAudioObjectUnknown {
             AudioDeviceDestroyIOProcID(aggregateDeviceID, validIOProcID)
         }
@@ -392,11 +528,16 @@ class AudioTap: NSObject {
         pendingRestartWorkItem = nil
 
         audioQueue.sync { [weak self] in
+            self?.removeProcessListListener()
             self?.stopCaptureSync()
         }
     }
     
     private func stopCaptureSync() {
+        // Invalidate any start still waiting for the aggregate to come alive.
+        captureGeneration &+= 1
+        removeAliveListener()
+
         guard captureIsRunning else { return }
 
         // Stop listening
