@@ -55,6 +55,8 @@
 		F1E2D3C4B5A6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */; };
 		F3E4D5C6B7A8E9F0A1B2C3D4 /* Contents/Helpers/NowPlayingTestClient in CopyFiles */ = {isa = PBXBuildFile; fileRef = F2E3D4C5B6A7E8F9A0B1C2D3 /* Contents/Helpers/NowPlayingTestClient */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		F5A6B7C8D9E0F1A2B3C4D5E6 /* NewAPIUsageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6B7C8D9E0F1A2B3C4D5E6F7 /* NewAPIUsageTests.swift */; };
+		9D7BDCD5A9320BB9465DA24E /* LLMUsageManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448B2AD2A5B5E7C90762A657 /* LLMUsageManagerTests.swift */; };
+		15922237DDF80397BC0E3F75 /* CopilotUsageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22037F3E7D41DF8D95E7A3D3 /* CopilotUsageTests.swift */; };
 		F910B9C812C7AEFE2293F7D2 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 47C39E67B09152F6665ED683 /* Cocoa.framework */; };
 /* End PBXBuildFile section */
 
@@ -127,6 +129,8 @@
 		F4C1DD09EC134302938E84F6 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = Frameworks/MediaRemoteAdapter.framework; sourceTree = SOURCE_ROOT; };
 		F54406E72CD4987A00C7AFD9 /* Atoll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atoll.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6B7C8D9E0F1A2B3C4D5E6F7 /* NewAPIUsageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewAPIUsageTests.swift; sourceTree = "<group>"; };
+		448B2AD2A5B5E7C90762A657 /* LLMUsageManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LLMUsageManagerTests.swift; sourceTree = "<group>"; };
+		22037F3E7D41DF8D95E7A3D3 /* CopilotUsageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CopilotUsageTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -240,6 +244,8 @@
 				E1F2A3B4C5D6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift */,
 				B1C2D3E4F5061728394A5B6D /* PartialDownloadTests.swift */,
 				F6B7C8D9E0F1A2B3C4D5E6F7 /* NewAPIUsageTests.swift */,
+				448B2AD2A5B5E7C90762A657 /* LLMUsageManagerTests.swift */,
+				22037F3E7D41DF8D95E7A3D3 /* CopilotUsageTests.swift */,
 				957599910322B546D91E6F96 /* Info.plist */,
 			);
 			path = DynamicIslandTests;
@@ -530,6 +536,8 @@
 				C0DECAFE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift in Sources */,
 				B1C2D3E4F5A60718293A4B01 /* MediaKeyTapRetryPolicyTests.swift in Sources */,
 				F5A6B7C8D9E0F1A2B3C4D5E6 /* NewAPIUsageTests.swift in Sources */,
+				9D7BDCD5A9320BB9465DA24E /* LLMUsageManagerTests.swift in Sources */,
+				15922237DDF80397BC0E3F75 /* CopilotUsageTests.swift in Sources */,
 				B5E314BBF3AF4E6D8E90B25B /* LRCParserTests.swift in Sources */,
 				8C9E422544384A70B829EDE7 /* NowPlayingPayloadTests.swift in Sources */,
 				6B8DE5BE065E4BFE9E531A74 /* MarqueeTextMeasurementTests.swift in Sources */,

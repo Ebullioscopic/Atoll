@@ -500,6 +500,8 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     case spotify = "Spotify"
     case youtubeMusic = "Youtube Music"
     case amazonMusic = "Amazon Music"
+    case netEaseCloudMusic = "NetEase Cloud Music"
+    case qqMusic = "QQ Music"
     case tidal = "TIDAL"
     case cider = "Cider"
     
@@ -512,6 +514,8 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
         case .spotify: return String(localized: "Spotify")
         case .youtubeMusic: return String(localized: "Youtube Music")
         case .amazonMusic: return String(localized: "Amazon Music")
+        case .netEaseCloudMusic: return String(localized: "NetEase Cloud Music")
+        case .qqMusic: return String(localized: "QQ Music")
         case .tidal: return String(localized: "TIDAL")
         case .cider: return String(localized: "Cider")
         }
@@ -1102,6 +1106,8 @@ extension Defaults.Keys {
     static let enableGestures = Key<Bool>("enableGestures", default: true)
     static let closeGestureEnabled = Key<Bool>("closeGestureEnabled", default: true)
     static let gestureSensitivity = Key<CGFloat>("gestureSensitivity", default: 200.0)
+    /// Left/right arrow keys seek while the notch is open on the home view.
+    static let arrowKeySeekEnabled = Key<Bool>("arrowKeySeekEnabled", default: false)
     static let enableHorizontalMusicGestures = Key<Bool>("enableHorizontalMusicGestures", default: true)
     static let musicGestureBehavior = Key<MusicSkipBehavior>("musicGestureBehavior", default: .track)
     static let reverseSwipeGestures = Key<Bool>("reverseSwipeGestures", default: false)
@@ -1329,11 +1335,16 @@ extension Defaults.Keys {
     // MARK: Stats Feature
     static let enableStatsFeature = Key<Bool>("enableStatsFeature", default: false)
     static let enableLLMUsageFeature = Key<Bool>("enableLLMUsageFeature", default: false)
+    static let enableUsageRemainingDisplay = Key<Bool>("enableUsageRemainingDisplay", default: false)
     static let enableClaudeProvider = Key<Bool>("enableClaudeProvider", default: true)
     static let enableCodexProvider = Key<Bool>("enableCodexProvider", default: true)
+    static let enableCopilotProvider = Key<Bool>("enableCopilotProvider", default: false)
+    static let copilotHost = Key<String>("copilotHost", default: "github.com")
     static let enableCursorProvider = Key<Bool>("enableCursorProvider", default: true)
     static let enableAntigravityProvider = Key<Bool>("enableAntigravityProvider", default: true)
     static let enableNewAPIProvider = Key<Bool>("enableNewAPIProvider", default: false)
+    static let enableOpenRouterProvider = Key<Bool>("enableOpenRouterProvider", default: false)
+    static let openRouterUsageAnalytics = Key<Bool>("openRouterUsageAnalytics", default: false)
     static let newAPIAccounts = Key<[NewAPIAccount]>("newAPIAccounts", default: [])
     static let autoStartStatsMonitoring = Key<Bool>("autoStartStatsMonitoring", default: true)
     static let statsStopWhenNotchCloses = Key<Bool>("statsStopWhenNotchCloses", default: true)

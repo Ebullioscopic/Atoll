@@ -31,7 +31,8 @@ struct MusicControllerSelectionView: View {
     
     private var availableMediaControllers: [MediaControllerType] {
         if MusicManager.shared.isNowPlayingDeprecated {
-            return MediaControllerType.allCases.filter { $0 != .nowPlaying }
+            // Keep the current choice listed so the picker never goes blank.
+            return MediaControllerType.allCases.filter { $0 != .nowPlaying || $0 == mediaController }
         } else {
             return MediaControllerType.allCases
         }
@@ -137,6 +138,10 @@ extension MediaControllerType {
         switch self {
         case .nowPlaying:
             return String(localized: "Works with most media apps, including browsers, to detect what's playing. Note: This may be removed in a future macOS version.")
+        case .netEaseCloudMusic:
+            return String(localized: "Uses macOS Now Playing when the NetEase Cloud Music desktop app is the active media source.")
+        case .qqMusic:
+            return String(localized: "Uses macOS Now Playing when the QQ Music desktop app is the active media source.")
         case .spotify:
             return String(localized: "Connects directly to the Spotify app.")
         case .appleMusic:

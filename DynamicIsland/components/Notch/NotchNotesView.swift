@@ -599,6 +599,7 @@ struct NoteListView: View {
                                 .textFieldStyle(.plain)
                                 .font(.system(size: 12))
                                 .foregroundStyle(.white)
+                                .environment(\.colorScheme, .dark)
                             if !searchText.isEmpty {
                                 Button(action: { searchText = "" }) {
                                     Image(systemName: "xmark.circle.fill")
@@ -939,10 +940,14 @@ struct NoteEditorView: View {
             
             // Title & Color Picker Row
             HStack(alignment: .center, spacing: 12) {
+                // The field editor used while typing ignores `.foregroundStyle`
+                // and resolves the label color from its appearance, which is
+                // black in light mode. The notch is always dark, so say so.
                 TextField("Title", text: $title)
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .textFieldStyle(.plain)
                     .foregroundStyle(.white)
+                    .environment(\.colorScheme, .dark)
                 
                 Spacer()
                 

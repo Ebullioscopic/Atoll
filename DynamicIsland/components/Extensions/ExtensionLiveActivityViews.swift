@@ -180,8 +180,24 @@ private func logExtensionDiagnostics(_ message: String) {
     Logger.log(message, category: .extensions)
 }
 
+private struct ExtensionTabContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+private struct ExtensionTabViewportHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 struct ExtensionNotchExperienceTabView: View {
     let payload: ExtensionNotchExperiencePayload
+
+    @EnvironmentObject private var vm: DynamicIslandViewModel
+    @State private var suppressionToken = UUID()
+    @State private var isHovering = false
+    @State private var standardContentHeight: CGFloat = 0
+    @State private var standardViewportHeight: CGFloat = 0
 
     @Default(.enableExtensionNotchInteractiveWebViews) private var interactiveWebViewsEnabled
 
@@ -195,32 +211,26 @@ struct ExtensionNotchExperienceTabView: View {
     var body: some View {
         Group {
             if let tabConfiguration {
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        header(for: tabConfiguration)
-                        ForEach(Array(tabConfiguration.sections.enumerated()), id: \.offset) { index, section in
-                            ExtensionNotchSectionView(
-                                section: section,
-                                accent: accentColor,
-                                allowWebInteraction: allowInteractiveWebViews
-                            )
-                            .accessibilityIdentifier("extension-notch-section-\(payload.descriptor.id)-\(index)")
+                if tabConfiguration.contentLayout == .contentOnly {
+                    contentStack(for: tabConfiguration, spacing: 0, clipsWebContent: false)
+                        .frame(maxHeight: .infinity, alignment: .topLeading)
+                } else {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 18) {
+                            header(for: tabConfiguration)
+                            contentStack(for: tabConfiguration, spacing: 18, clipsWebContent: true)
                         }
-                        if let webDescriptor = tabConfiguration.webContent {
-                            ExtensionWebContentView(descriptor: webDescriptor, allowInteraction: allowInteractiveWebViews)
-                                .frame(height: webDescriptor.preferredHeight)
-                                .frame(maxWidth: webDescriptor.maximumContentWidth ?? .infinity)
-                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        }
-                        if let footnote = tabConfiguration.footnote {
-                            Text(footnote)
-                                .font(.system(size: 11, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.65))
-                                .lineLimit(2)
-                        }
+                        .padding(.vertical, 14)
+                        .padding(.horizontal, 16)
+                        .background(GeometryReader { proxy in
+                            Color.clear.preference(key: ExtensionTabContentHeightKey.self, value: proxy.size.height)
+                        })
                     }
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 16)
+                    .background(GeometryReader { proxy in
+                        Color.clear.preference(key: ExtensionTabViewportHeightKey.self, value: proxy.size.height)
+                    })
+                    .onPreferenceChange(ExtensionTabContentHeightKey.self) { standardContentHeight = $0 }
+                    .onPreferenceChange(ExtensionTabViewportHeightKey.self) { standardViewportHeight = $0 }
                 }
             } else {
                 Text("Extension tab unavailable")
@@ -232,6 +242,83 @@ struct ExtensionNotchExperienceTabView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(tabBackground)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onHover { hovering in
+            isHovering = hovering
+            updateScrollSuppression()
+        }
+        .onChange(of: standardContentOverflows) { _, _ in
+            updateScrollSuppression()
+        }
+        .onDisappear {
+            isHovering = false
+            vm.setScrollGestureSuppression(false, token: suppressionToken)
+        }
+        .onChange(of: vm.notchState) { _, state in
+            if state == .closed {
+                vm.setScrollGestureSuppression(false, token: suppressionToken)
+            }
+        }
+    }
+
+    /// Content-only tabs and interactive web content scroll on their own, so they always
+    /// take scroll gestures. A standard tab only does when its sections overflow;
+    /// otherwise scrolling over it still closes the notch.
+    private var needsScrollSuppression: Bool {
+        guard let tabConfiguration else { return false }
+        if tabConfiguration.contentLayout == .contentOnly { return true }
+        if tabConfiguration.webContent != nil && allowInteractiveWebViews { return true }
+        return standardContentOverflows
+    }
+
+    private var standardContentOverflows: Bool {
+        standardContentHeight > standardViewportHeight + 1
+    }
+
+    private func updateScrollSuppression() {
+        vm.setScrollGestureSuppression(isHovering && needsScrollSuppression, token: suppressionToken)
+    }
+
+    @ViewBuilder
+    private func contentStack(
+        for configuration: AtollNotchExperienceDescriptor.TabConfiguration,
+        spacing: CGFloat,
+        clipsWebContent: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            ForEach(Array(configuration.sections.enumerated()), id: \.offset) { index, section in
+                ExtensionNotchSectionView(
+                    section: section,
+                    accent: accentColor,
+                    allowWebInteraction: allowInteractiveWebViews
+                )
+                .accessibilityIdentifier("extension-notch-section-\(payload.descriptor.id)-\(index)")
+            }
+            if let webDescriptor = configuration.webContent {
+                Group {
+                    if clipsWebContent {
+                        ExtensionWebContentView(
+                            descriptor: webDescriptor,
+                            allowInteraction: allowInteractiveWebViews
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    } else {
+                        ExtensionWebContentView(
+                            descriptor: webDescriptor,
+                            allowInteraction: allowInteractiveWebViews
+                        )
+                    }
+                }
+                .frame(height: webDescriptor.preferredHeight)
+                .frame(maxWidth: webDescriptor.maximumContentWidth ?? .infinity)
+            }
+            if let footnote = configuration.footnote {
+                Text(footnote)
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.65))
+                    .lineLimit(2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder

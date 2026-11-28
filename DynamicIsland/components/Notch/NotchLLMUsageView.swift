@@ -27,6 +27,7 @@ enum AntigravityPool: String, CaseIterable {
 struct NotchLLMUsageView: View {
     @ObservedObject private var manager = LLMUsageManager.shared
     @State private var antigravityPool: AntigravityPool = .gemini
+    @Default(.enableUsageRemainingDisplay) private var enableUsageRemainingDisplay
 
     private func isEnabled(_ provider: ProviderID) -> Bool { Defaults[provider.enabledKey] }
 
@@ -81,8 +82,12 @@ struct NotchLLMUsageView: View {
             case .failure(let reason):
                 Text(reason).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             case .success(let snap):
-                if provider == .newAPI {
+                if provider == .copilot {
+                    copilotSuccess(snap)
+                } else if provider == .newAPI {
                     newAPISuccess(snap)
+                } else if provider == .openrouter {
+                    openRouterSuccess(snap)
                 } else {
                     success(snap, provider: provider)
                 }
@@ -95,6 +100,26 @@ struct NotchLLMUsageView: View {
         // that either clips content or leaves blank space.
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func copilotSuccess(_ snap: UsageSnapshot) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(snap.copilotQuotas) { quota in
+                    if quota.unlimited {
+                        Text("\(quota.title): Unlimited").font(.caption)
+                    } else if let percent = quota.usedPercent {
+                        quotaGauge(quota.title, UsageLimit(used: percent, limit: 100, resetsAt: quota.resetsAt))
+                        if let remaining = quota.remaining, let entitlement = quota.entitlement {
+                            Text("\(remaining.formatted()) / \(entitlement.formatted()) remaining")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Text("\(quota.title): quota unavailable").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -155,6 +180,53 @@ struct NotchLLMUsageView: View {
                 window("Today", snap.today, compact: true)
                 window("Week", snap.week, compact: true)
             }
+        }
+    }
+
+    private func openRouterSuccess(_ snap: UsageSnapshot) -> some View {
+        // Token and request counts only come from the opt-in management-key analytics;
+        // a regular API key reports spend and the key's own credit limit.
+        let hasAnalytics = !snap.models.isEmpty || snap.week.requestCount > 0 || snap.week.totalTokens > 0
+        return VStack(alignment: .leading, spacing: 6) {
+            if let limit = snap.sessionLimit {
+                quotaGauge(hasAnalytics ? String(localized: "Credits") : String(localized: "Key limit"), limit)
+            }
+            openRouterWindow(Text("Today"), snap.today, showsAnalytics: hasAnalytics)
+            openRouterWindow(Text("Week"), snap.week, showsAnalytics: hasAnalytics)
+            let models = Array(snap.models.prefix(3))
+            if !models.isEmpty {
+                Divider().opacity(0.25)
+                ForEach(models) { model in
+                    openRouterWindow(Text(verbatim: model.model), model.totals, showsAnalytics: true)
+                }
+            }
+        }
+    }
+
+    private func openRouterWindow(_ label: Text, _ totals: UsageTotals, showsAnalytics: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            label
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .leading)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if showsAnalytics {
+                Text(tokens(totals.totalTokens))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+            }
+            Spacer(minLength: 4)
+            if showsAnalytics {
+                Text("\(quota(totals.requestCount)) req")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Text(money(totals.costUSD))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         }
     }
 
@@ -253,16 +325,26 @@ struct NotchLLMUsageView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(.white.opacity(0.15))
-                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: max(4, geo.size.width * limit.fraction))
+                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: fillWidth(fillFraction(limit), in: geo.size.width))
                 }
             }
             .frame(height: 6)
             HStack {
-                Text("\(usedPct)% used").font(.caption2).monospacedDigit()
+                Text(enableUsageRemainingDisplay ? "\(leftPct)% left" : "\(usedPct)% used").font(.caption2).monospacedDigit()
                 Spacer()
-                Text("\(leftPct)% left").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                Text(enableUsageRemainingDisplay ? "\(usedPct)% used" : "\(leftPct)% left").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             }
         }
+    }
+
+    /// Share of the gauge to fill: used quota, or remaining quota when that display is on.
+    private func fillFraction(_ limit: UsageLimit) -> Double {
+        enableUsageRemainingDisplay ? 1 - limit.fraction : limit.fraction
+    }
+
+    /// An empty gauge stays empty; any other value gets a visible minimum width.
+    private func fillWidth(_ fraction: Double, in width: CGFloat) -> CGFloat {
+        fraction <= 0 ? 0 : max(4, width * fraction)
     }
 
     private func gaugeTint(_ fraction: Double) -> Color {
