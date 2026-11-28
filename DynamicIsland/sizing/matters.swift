@@ -357,6 +357,13 @@ func notchShadowPaddingValue(isMinimalistic: Bool) -> CGFloat {
     isMinimalistic ? notchShadowPaddingMinimalistic : notchShadowPaddingStandard
 }
 
+/// Room the window must leave around a closed HUD surface (battery, recording)
+/// beyond the surface itself: the notch's side insets, which are the closed
+/// bottom corner radius on each side, plus the 8pt the surface grows on hover.
+/// A window narrower than its content used to be widened by AppKit from its
+/// left edge, pushing the notch off-centre.
+let closedHUDWindowAllowance = CGSize(width: cornerRadiusInsets.closed.bottom * 2 + 8, height: 8)
+
 func addShadowPadding(to size: CGSize, isMinimalistic: Bool) -> CGSize {
     CGSize(width: size.width, height: size.height + notchShadowPaddingValue(isMinimalistic: isMinimalistic))
 }

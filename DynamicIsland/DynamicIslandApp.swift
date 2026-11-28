@@ -455,12 +455,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.animationBehavior = .none
         // collectionBehavior is configured in DynamicIslandWindow.init
 
-        window.contentView = FirstMouseHostingView(
+        let hostingView = FirstMouseHostingView(
             rootView: ContentView()
                 .environmentObject(viewModel)
                 .environmentObject(webcamManager)
                 //.moveToSky()
         )
+        // The notch window is sized and centred only by `resizeWindow`. With the
+        // default sizing options the hosting view pins the window's min/max
+        // size to the SwiftUI content, and whenever the content briefly needs
+        // more room than the window has (a HUD or track change mid-transition)
+        // AppKit grows the window from its bottom-left origin -- pushing the
+        // notch off-centre to the right or up under the camera housing until
+        // the next explicit resize.
+        hostingView.sizingOptions = []
+        window.contentView = hostingView
         
         window.orderFrontRegardless()
         NotchSpaceManager.shared.notchSpace.windows.insert(window)
@@ -551,7 +560,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             closedNotchSize: vm.closedNotchSize,
             effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
         ) {
-            return addShadowPadding(to: recordingHUDSize, isMinimalistic: Defaults[.enableMinimalisticUI])
+            return addShadowPadding(to: withClosedHUDAllowance(recordingHUDSize), isMinimalistic: Defaults[.enableMinimalisticUI])
         }
 
         // Check for battery HUD expansion
@@ -573,21 +582,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }()
                 
-                var width = closedNotchWidth
-                var height = closedNotchHeight
-                
-                switch (kind, style) {
-                case (.charging, _), (.lowBattery, .compact), (.fullBattery, .compact):
-                    width += 180
-                case (.lowBattery, .standard):
-                    width += 100
-                    height += 75
-                case (.fullBattery, .standard):
-                    width += 80
-                    height += 70
-                }
-                
-                return addShadowPadding(to: CGSize(width: width, height: height), isMinimalistic: Defaults[.enableMinimalisticUI])
+                let hudSize = kind.hudSize(
+                    style: style,
+                    closedNotchWidth: closedNotchWidth,
+                    baseHeight: closedNotchHeight
+                )
+                return addShadowPadding(to: withClosedHUDAllowance(hudSize), isMinimalistic: Defaults[.enableMinimalisticUI])
             }
         }
         
@@ -621,6 +621,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         return result
+    }
+
+    private func withClosedHUDAllowance(_ size: CGSize) -> CGSize {
+        CGSize(
+            width: size.width + closedHUDWindowAllowance.width,
+            height: size.height + closedHUDWindowAllowance.height
+        )
     }
 
     private func recordingHUDLayoutForSizing() -> RecordingHUDLayout {

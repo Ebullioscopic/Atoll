@@ -173,21 +173,15 @@ struct ContentView: View {
                     }
                 }()
                 
-                var width = vm.closedNotchSize.width
-                var height = vm.effectiveClosedNotchHeight
-                
-                switch (kind, style) {
-                case (.charging, _), (.lowBattery, .compact), (.fullBattery, .compact):
-                    width += 180
-                case (.lowBattery, .standard):
-                    width += 100
-                    height += 75
-                case (.fullBattery, .standard):
-                    width += 80
-                    height += 70
-                }
-                
-                return CGSize(width: width, height: height)
+                let hudSize = kind.hudSize(
+                    style: style,
+                    closedNotchWidth: vm.closedNotchSize.width,
+                    baseHeight: vm.effectiveClosedNotchHeight
+                )
+                return CGSize(
+                    width: hudSize.width + closedHUDWindowAllowance.width,
+                    height: hudSize.height + closedHUDWindowAllowance.height
+                )
             }
         }
         
