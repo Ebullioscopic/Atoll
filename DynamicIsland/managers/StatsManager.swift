@@ -1476,21 +1476,32 @@ class StatsManager: ObservableObject {
     @MainActor
     private func refreshProcessStatsIfNeeded(force: Bool = false) {
         let now = Date()
-        guard force || now.timeIntervalSince(lastProcessStatsUpdate) >= processStatsUpdateInterval else { return }
+        guard force || Self.isProcessRefreshDue(
+            now: now,
+            lastRefreshStart: lastProcessStatsUpdate,
+            interval: processStatsUpdateInterval
+        ) else { return }
         guard !isProcessRefreshInFlight else { return }
 
         isProcessRefreshInFlight = true
+        lastProcessStatsUpdate = now
 
         Task.detached { [weak self] in
             guard let self else { return }
             let processes = StatsManager.collectTopProcesses(limit: self.maxProcessEntries)
             await MainActor.run {
                 self.cachedProcessStats = processes
-                self.lastProcessStatsUpdate = Date()
                 self.isProcessRefreshInFlight = false
                 self.topCPUProcesses = processes
             }
         }
+    }
+
+    /// Measured from when the previous refresh started, not finished: stamping on completion
+    /// added the `ps` run time, so a 1 s stats tick only passed every third tick (~3 s). The
+    /// slack absorbs timer jitter so a tick landing just short of the interval still counts.
+    static func isProcessRefreshDue(now: Date, lastRefreshStart: Date, interval: TimeInterval) -> Bool {
+        now.timeIntervalSince(lastRefreshStart) >= interval - 0.1
     }
 
     private static func collectTopProcesses(limit: Int) -> [ProcessStats] {
