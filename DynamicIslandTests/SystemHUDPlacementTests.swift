@@ -90,6 +90,27 @@ final class VolumeAdjustAccumulatorTests: XCTestCase {
         _ = accumulator.take()
         XCTAssertTrue(accumulator.add(0.1))
     }
+
+    /// Volume up, mute, volume up: the second step must land after the mute
+    /// (and unmute), not be merged into the first write ahead of it.
+    func testAMuteClosesTheBatchInProgress() {
+        var accumulator = VolumeAdjustAccumulator()
+        XCTAssertTrue(accumulator.add(0.1))
+        accumulator.close()
+        XCTAssertTrue(accumulator.add(0.2), "a step after the mute needs its own write")
+        XCTAssertFalse(accumulator.add(0.05))
+
+        XCTAssertEqual(accumulator.take(), 0.1, accuracy: 0.0001)
+        XCTAssertEqual(accumulator.take(), 0.25, accuracy: 0.0001)
+        XCTAssertTrue(accumulator.add(0.1))
+    }
+
+    func testClosingWithNothingScheduledChangesNothing() {
+        var accumulator = VolumeAdjustAccumulator()
+        accumulator.close()
+        XCTAssertTrue(accumulator.add(0.1))
+        XCTAssertEqual(accumulator.take(), 0.1, accuracy: 0.0001)
+    }
 }
 
 /// OSDUIHelper is frozen only when this app has a HUD to show instead (#908).

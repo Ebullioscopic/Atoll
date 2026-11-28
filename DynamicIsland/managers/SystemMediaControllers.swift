@@ -67,9 +67,14 @@ final class HUDSuppressionCoordinator {
 /// presses queued up writes that kept stepping the volume for seconds after
 /// the keys were released. Presses that arrive while a write is in flight are
 /// summed here and applied together by the next one.
+///
+/// A mute toggle queued between steps closes the open batch, so steps pressed
+/// after the mute are applied after it instead of being merged ahead of it.
 struct VolumeAdjustAccumulator {
     private(set) var pendingDelta: Float = 0
     private(set) var isScheduled = false
+    /// Closed batches whose writes are already queued, oldest first.
+    private var closedDeltas: [Float] = []
 
     /// Adds a step. Returns true when no write is scheduled yet, meaning the
     /// caller has to schedule one.
@@ -80,8 +85,21 @@ struct VolumeAdjustAccumulator {
         return true
     }
 
-    /// Takes everything accumulated so far, for the scheduled write to apply.
+    /// Seals the batch in progress so later steps start a new write, queued
+    /// behind whatever is enqueued next.
+    mutating func close() {
+        guard isScheduled else { return }
+        closedDeltas.append(pendingDelta)
+        pendingDelta = 0
+        isScheduled = false
+    }
+
+    /// Takes the oldest batch, for the scheduled write to apply. Writes run in
+    /// the order they were scheduled, so closed batches come before the open one.
     mutating func take() -> Float {
+        if !closedDeltas.isEmpty {
+            return closedDeltas.removeFirst()
+        }
         defer {
             pendingDelta = 0
             isScheduled = false
@@ -224,6 +242,7 @@ final class SystemVolumeController {
     /// The mute key's counterpart to `enqueueKeyAdjust`, on the same queue so
     /// a mute pressed right after a volume key lands after that step.
     func enqueueKeyToggleMute() {
+        pendingKeyAdjust.withLock { $0.close() }
         callbackQueue.async { [weak self] in
             self?.toggleMute()
         }
