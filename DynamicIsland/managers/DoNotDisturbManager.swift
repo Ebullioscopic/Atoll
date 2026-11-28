@@ -33,6 +33,12 @@ final class DoNotDisturbManager: ObservableObject {
     // Used by the brief-toast UI to show an ON toast when the active mode switches while Focus stays enabled.
     @Published var focusToastTrigger: UUID = UUID()
 
+    /// When the current brief "On" toast started: Focus turning on or switching
+    /// mode. The indicator view is torn down whenever a HUD or another live
+    /// activity takes the closed notch and is rebuilt afterwards, so it reads
+    /// this to tell a toast that is still due from one that already played.
+    private(set) var focusToastStartedAt: Date = .distantPast
+
     /// Briefly `true` after focus turns OFF while toast mode is enabled,
     /// keeping the standalone DoNotDisturbLiveActivity mounted long enough
     /// for the "Off" dismissal animation to play out.
@@ -170,6 +176,9 @@ final class DoNotDisturbManager: ObservableObject {
             // mode set by the log-stream or notification handler.
             if usableIdentifier == nil && usableName == nil {
                 if let isActive = isActive, isActive != previousActive {
+                    if isActive {
+                        self.focusToastStartedAt = Date()
+                    }
                     withAnimation(.smooth(duration: 0.25)) {
                         self.isDoNotDisturbActive = isActive
                     }
@@ -245,6 +254,7 @@ final class DoNotDisturbManager: ObservableObject {
 
             // If Focus remains active and the mode switches (e.g., DND -> Sleep), trigger an ON toast for the new mode.
             if isActive == nil, previousActive == true, identifierChanged {
+                self.focusToastStartedAt = Date()
                 self.focusToastTrigger = UUID()
             }
 
@@ -254,6 +264,9 @@ final class DoNotDisturbManager: ObservableObject {
 
             guard let isActive = isActive, shouldToggleActive else { return }
 
+            if isActive {
+                self.focusToastStartedAt = Date()
+            }
             withAnimation(.smooth(duration: 0.25)) {
                 self.isDoNotDisturbActive = isActive
             }
