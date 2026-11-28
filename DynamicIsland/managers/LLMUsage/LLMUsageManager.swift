@@ -11,13 +11,14 @@ final class LLMUsageManager: ObservableObject {
 
     private let injectedProviders: [UsageProvider]? // overrides the flag-based default when non-nil
     private var lastRefresh: Date = .distantPast
+    private var pendingForcedRefresh = false
     private static let minRefreshInterval: TimeInterval = 60
 
     init(providers: [UsageProvider]? = nil) {
         self.injectedProviders = providers
     }
 
-    private static let allProviders: [UsageProvider] = [ClaudeUsageProvider(), CodexUsageProvider(), CursorUsageProvider(), AntigravityUsageProvider(), NewAPIUsageProvider(), OpenRouterUsageProvider()]
+    private static let allProviders: [UsageProvider] = [ClaudeUsageProvider(), CodexUsageProvider(), CursorUsageProvider(), CopilotUsageProvider(), AntigravityUsageProvider(), NewAPIUsageProvider(), OpenRouterUsageProvider()]
 
     private var enabledProviders: [UsageProvider] {
         if let injectedProviders { return injectedProviders }
@@ -25,7 +26,10 @@ final class LLMUsageManager: ObservableObject {
     }
 
     func refreshAll(force: Bool = false) {
-        guard !isRefreshing else { return }
+        guard !isRefreshing else {
+            if force { pendingForcedRefresh = true }
+            return
+        }
         guard force || Date().timeIntervalSince(lastRefresh) >= Self.minRefreshInterval else { return }
         lastRefresh = Date()
         isRefreshing = true
@@ -48,5 +52,9 @@ final class LLMUsageManager: ObservableObject {
             for await (id, result) in group { results[id] = result }
         }
         isRefreshing = false
+        if pendingForcedRefresh {
+            pendingForcedRefresh = false
+            refreshAll(force: true)
+        }
     }
 }
