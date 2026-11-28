@@ -99,7 +99,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var hoverOpenSuppressedUntil: Date = .distantPast
     
-    private static let tabOrder: [NotchViews] = [.home, .shelf, .timer, .stats, .llmUsage, .colorPicker, .notes, .clipboard, .terminal, .extensionExperience]
+    private static let tabOrder: [NotchViews] = [.home, .nowPlaying, .shelf, .timer, .stats, .llmUsage, .colorPicker, .notes, .clipboard, .terminal, .extensionExperience]
     
     /// Direction of the most recent tab switch (true = forward/right, false = backward/left)
     @Published var tabSwitchForward: Bool = true
@@ -109,6 +109,15 @@ class DynamicIslandViewCoordinator: ObservableObject {
             if Defaults[.enableMinimalisticUI] && currentView != .home {
                 currentView = .home
                 return
+            }
+            // Home lost the player to the Now Playing tab, so with the calendar
+            // and the mirror both off it has nothing to draw. Every "back to
+            // Home" in the app lands on Now Playing instead.
+            if currentView == .home, !Defaults[.enableMinimalisticUI] {
+                let available = availableStandardTabs
+                if !available.contains(.home), available.contains(.nowPlaying) {
+                    currentView = .nowPlaying
+                }
             }
             // Track direction before SwiftUI re-renders
             let oldIdx = Self.tabOrder.firstIndex(of: oldValue) ?? 0
@@ -167,7 +176,10 @@ class DynamicIslandViewCoordinator: ObservableObject {
 
     var availableStandardTabs: [NotchOpenDestination] {
         StandardNotchTabAvailability(
-            home: Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls] || Defaults[.showCalendar] || Defaults[.showMirror],
+            // The standard player has its own tab; Home keeps the calendar and
+            // the mirror. Minimalistic mode has no tab bar and draws its player on Home.
+            home: Defaults[.enableMinimalisticUI] || Defaults[.showCalendar] || Defaults[.showMirror],
+            nowPlaying: !Defaults[.enableMinimalisticUI] && Defaults[.showStandardMediaControls],
             shelf: Defaults[.dynamicShelf],
             timer: Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] == .tab,
             stats: Defaults[.enableStatsFeature],
@@ -177,25 +189,26 @@ class DynamicIslandViewCoordinator: ObservableObject {
         ).available
     }
 
-    func selectOpenDestination() {
+    func selectOpenDestination(isPlaying: Bool = MusicManager.shared.isPlaying) {
         guard !Defaults[.enableMinimalisticUI] else { currentView = .home; return }
         let destination = selectedOpenDestination
-        guard destination.isFixed else { return }
-        guard let tab = destination.resolved(available: availableStandardTabs) else {
-            // TabSelectionView chooses the first available extension if one exists.
-            currentView = .home
+        let tab: NotchOpenDestination?
+        switch destination {
+        case .lastUsed:
             return
+        case .automatic:
+            // Closing parks Automatic on Home (or on Now Playing, when Home is
+            // empty). Anything else was chosen on purpose -- the shelf when it
+            // holds files and "open shelf by default" is on, or a file dropped
+            // onto the closed notch -- and is kept.
+            guard currentView == .home || currentView == .nowPlaying else { return }
+            tab = NotchOpenDestination.automaticTab(isPlaying: isPlaying, available: availableStandardTabs)
+        default:
+            tab = destination.resolved(available: availableStandardTabs)
         }
-        switch tab {
-        case .home: currentView = .home
-        case .shelf: currentView = .shelf
-        case .timer: currentView = .timer
-        case .stats: currentView = .stats
-        case .llmUsage: currentView = .llmUsage
-        case .notes: currentView = .notes
-        case .terminal: currentView = .terminal
-        case .automatic, .lastUsed: break
-        }
+        // With no standard tab to open, TabSelectionView chooses the first
+        // available extension if one exists.
+        currentView = tab?.notchView ?? .home
     }
 
     @AppStorage("hudReplacement") var hudReplacement: Bool = true
@@ -312,8 +325,9 @@ class DynamicIslandViewCoordinator: ObservableObject {
             Defaults.publisher(.enableMinimalisticUI).map { _ in () }.eraseToAnyPublisher()
         )
         .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
-        .sink { _ in
+        .sink { [weak self] _ in
             enforceMinimumNotchWidth()
+            self?.leaveUnavailableMediaTab()
         }
         .store(in: &cancellables)
 
@@ -346,6 +360,20 @@ class DynamicIslandViewCoordinator: ObservableObject {
     private func handleTimerFeatureToggle(_ isEnabled: Bool) {
         guard !isEnabled, currentView == .timer else { return }
         withAnimation(.smooth) {
+            currentView = .home
+        }
+    }
+
+    /// Home and Now Playing come and go with the media, calendar and mirror
+    /// settings. Leave whichever of them was just switched off rather than keep
+    /// drawing it; re-assigning Home lets `currentView` hand an empty Home over
+    /// to Now Playing.
+    private func leaveUnavailableMediaTab() {
+        guard !Defaults[.enableMinimalisticUI] else { return }
+        let available = availableStandardTabs
+        if currentView == .nowPlaying, !available.contains(.nowPlaying) {
+            currentView = .home
+        } else if currentView == .home, !available.contains(.home) {
             currentView = .home
         }
     }

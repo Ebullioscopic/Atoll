@@ -82,6 +82,11 @@ func notchTabContentSize(
             // `notchState`.
             size.height = max(size.height, Defaults[.calendarViewMode].notchHeight)
         }
+    case .nowPlaying:
+        // The standard open height, like the tabs below. The player gives up
+        // nothing to a calendar or lyrics here, so it needs nothing extra; the
+        // header adjustment further down still applies, as it did on Home.
+        break
     case .shelf, .stats, .colorPicker, .llmUsage:
         // The usage tab was given its own height once and had it taken back
         // again upstream (5d4233f, "keep the usage tab at the normal tab
@@ -89,25 +94,15 @@ func notchTabContentSize(
         break
     }
 
-    // The rail takes its width out of the content. The tab-count minimum in
-    // `recommendedMinimumNotchWidth` already allows for it; the side lyrics
-    // panel asks for an exact content width, so the rail goes on top of that.
-    if view == .home, isNotchOpen, isLeadingTabRailActive() {
-        let requiredWidth = homeContentRequiredNotchWidth()
-        if requiredWidth > 0 {
-            size.width = min(max(size.width, requiredWidth + tabRailWidth), maxAllowedNotchWidth())
-        }
-    }
+    // No tab asks for a width of its own: the tab-count minimum in
+    // `recommendedMinimumNotchWidth` already fits the player
+    // (`nowPlayingContentMinimumWidth`) and allows for the leading rail.
 
-    // Both of these no-op unless their own tab is the active one, so applying
-    // them to every tab is the same as the per-tab returns they replaced.
-    size = inlineLyricsAdjustedNotchSize(
-        from: size,
-        isHomeTabActive: view == .home && isNotchOpen
-    )
+    // Both adjustments below no-op unless their own tab is the active one, so
+    // applying them to every tab is the same as the per-tab returns they replaced.
     size = headerAdjustedNotchSize(
         from: size,
-        isHomeTabActive: view == .home && isNotchOpen,
+        isHomeTabActive: (view == .home || view == .nowPlaying) && isNotchOpen,
         closedNotchHeight: closedNotchHeight,
         isMinimalistic: Defaults[.enableMinimalisticUI]
     )

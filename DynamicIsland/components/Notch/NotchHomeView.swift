@@ -225,11 +225,14 @@ struct DynamicIslandArtworkSourceView: View {
 struct MusicPlayerView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     let albumArtNamespace: Namespace.ID
+    /// The single lyric line under the artist name. Off everywhere today: the
+    /// player moved to the Now Playing tab, which shows it without lyrics.
+    var showsInlineLyrics = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             AlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace)
-            MusicControlsView()
+            MusicControlsView(showsInlineLyrics: showsInlineLyrics)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -453,9 +456,8 @@ struct MusicControlsView: View {
     @Default(.showMediaOutputControl) private var showMediaOutputControl
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.enableLyrics) private var enableLyrics
-    @Default(.showCalendar) private var showCalendar
     @State private var songInfoHeight: CGFloat = 0
-    @Default(.showCalendarBesideMusicPlayer) private var showCalendarBesideMusicPlayer
+    var showsInlineLyrics = false
     private let seekInterval: TimeInterval = 10
 
     var body: some View {
@@ -524,7 +526,7 @@ struct MusicControlsView: View {
                 frameWidth: width
             )
             .fontWeight(.medium)
-            if enableLyrics && showCalendar && showCalendarBesideMusicPlayer {
+            if enableLyrics && showsInlineLyrics {
                 let transition = AnyTransition.asymmetric(
                     insertion: .move(edge: .bottom).combined(with: .opacity),
                     removal: .move(edge: .top).combined(with: .opacity)
@@ -914,32 +916,13 @@ struct NotchHomeView: View {
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject private var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
-    @ObservedObject private var musicManager = MusicManager.shared
-    @Default(.showStandardMediaControls) private var showStandardMediaControls
-    @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
     @Default(.showCalendar) private var showCalendar
-    @Default(.showCalendarBesideMusicPlayer) private var showCalendarBesideMusicPlayer
-    @Default(.enableLyrics) private var enableLyrics
     @Default(.lyricsPanelWidth) private var lyricsPanelWidth
     @Default(.lyricsPanelOffset) private var lyricsPanelOffset
     @State private var showCalendarDeferred = false
     @State private var calendarSyncGeneration = 0
     let albumArtNamespace: Namespace.ID
 
-    /// Whether the music player should actively display (enabled AND has real content).
-    private var shouldShowMusicPlayer: Bool {
-        showStandardMediaControls && (!autoHideInactiveNotchMediaPlayer || musicManager.hasActiveSession)
-    }
-
-    /// The calendar can be kept off the home view while the player is on it (#920).
-    private var showsCalendarBesidePlayer: Bool {
-        showCalendar && showCalendarBesideMusicPlayer
-    }
-
-    private var shouldShowSideLyrics: Bool {
-        shouldShowMusicPlayer && enableLyrics && !showsCalendarBesidePlayer
-    }
-    
     var body: some View {
         Group {
             if !coordinator.firstLaunch {
@@ -980,42 +963,21 @@ struct NotchHomeView: View {
                 } else {
                     MinimalisticMusicPlayerView(albumArtNamespace: albumArtNamespace)
                 }
-            } else if shouldShowSideLyrics {
-                sideLyricsContent
             } else {
+                // Normal mode: the calendar and the mirror. The music player
+                // has its own tab (NotchNowPlayingView).
                 HStack(alignment: .top, spacing: SideLyricsLayout.hStackSpacing) {
-                    // Normal mode: Show full music player with optional calendar and webcam
-                    if shouldShowMusicPlayer {
-                        MusicPlayerView(albumArtNamespace: albumArtNamespace)
+                    if showCalendar && showCalendarDeferred {
+                        StandaloneCalendarView()
                             .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    if showCalendar && showCalendarDeferred
-                        && (!shouldShowMusicPlayer || showCalendarBesideMusicPlayer) {
-                        Group {
-                            if shouldShowMusicPlayer {
-                                CalendarView()
-                            } else {
-                                StandaloneCalendarView()
+                            .onHover { isHovering in
+                                vm.isHoveringCalendar = isHovering
                             }
-                        }
-                        .frame(
-                            maxWidth: sharesRowWithPlayerAndMirror ? HomeWidgetsLayout.calendarWidth : .infinity,
-                            alignment: .leading
-                        )
-                        .onHover { isHovering in
-                            vm.isHoveringCalendar = isHovering
-                        }
-                        .environmentObject(vm)
+                            .environmentObject(vm)
                     }
 
                     if mirrorIsVisible {
-                        if sharesRowWithPlayerAndMirror {
-                            cameraPreview
-                                .frame(width: HomeWidgetsLayout.mirrorWidth)
-                        } else {
-                            cameraPreview
-                        }
+                        cameraPreview
                     }
                 }
             }
@@ -1026,6 +988,9 @@ struct NotchHomeView: View {
         .padding(Defaults[.enableMinimalisticUI] ? 0 : 8) //Putting the main padding for home view here for consistency
     }
 
+    /// The player beside the lyrics panel, which Home drew while it held the
+    /// player. Neither Home nor Now Playing shows it now; it is kept for when
+    /// lyrics find their place again.
     private var sideLyricsContent: some View {
         HStack(alignment: .top, spacing: SideLyricsLayout.hStackSpacing) {
             MusicPlayerView(albumArtNamespace: albumArtNamespace)
@@ -1042,12 +1007,6 @@ struct NotchHomeView: View {
                     .frame(minWidth: SideLyricsLayout.minimumMirrorWidth, maxWidth: .infinity)
             }
         }
-    }
-
-    /// The player, the calendar and the mirror all share the row, so the calendar
-    /// and the mirror keep fixed columns and the player takes the rest (#447).
-    private var sharesRowWithPlayerAndMirror: Bool {
-        shouldShowMusicPlayer && showsCalendarBesidePlayer && mirrorIsVisible
     }
 
     private var mirrorIsVisible: Bool {

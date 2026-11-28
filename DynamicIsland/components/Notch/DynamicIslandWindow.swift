@@ -70,7 +70,8 @@ class DynamicIslandWindow: NSPanel {
     override var canBecomeKey: Bool {
         notchTabTakesKeyboardInput(
             DynamicIslandViewCoordinator.shared.currentView,
-            arrowKeySeekEnabled: Defaults[.arrowKeySeekEnabled]
+            arrowKeySeekEnabled: Defaults[.arrowKeySeekEnabled],
+            isMinimalistic: Defaults[.enableMinimalisticUI]
         )
     }
     
@@ -81,14 +82,14 @@ class DynamicIslandWindow: NSPanel {
 }
 
 /// Whether a notch tab needs the keyboard: text fields, the terminal, the shelf's
-/// Delete and ⌘A, the timer's rename field, extension content, and the home view's
-/// arrow-key seeking when that option is on.
-func notchTabTakesKeyboardInput(_ view: NotchViews, arrowKeySeekEnabled: Bool) -> Bool {
+/// Delete and ⌘A, the timer's rename field, extension content, and the music
+/// player's arrow-key seeking when that option is on.
+func notchTabTakesKeyboardInput(_ view: NotchViews, arrowKeySeekEnabled: Bool, isMinimalistic: Bool) -> Bool {
     switch view {
     case .terminal, .notes, .clipboard, .shelf, .timer, .extensionExperience:
         return true
-    case .home:
-        return arrowKeySeekEnabled
+    case .home, .nowPlaying:
+        return arrowKeySeekEnabled && view.showsMusicPlayer(isMinimalistic: isMinimalistic)
     case .stats, .llmUsage, .colorPicker:
         return false
     }

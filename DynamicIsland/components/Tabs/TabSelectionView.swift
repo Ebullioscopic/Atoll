@@ -99,6 +99,10 @@ struct TabSelectionView: View {
             tabsArray.append(TabModel(label: "Home", icon: "house.fill", view: .home))
         }
 
+        if coordinator.availableStandardTabs.contains(.nowPlaying) {
+            tabsArray.append(TabModel(label: "Now Playing", icon: "music.note", view: .nowPlaying))
+        }
+
         if coordinator.availableStandardTabs.contains(.shelf) {
             tabsArray.append(TabModel(label: "Shelf", icon: "tray.fill", view: .shelf))
         }
@@ -170,6 +174,11 @@ struct TabSelectionView: View {
                 // Render the tab button
                 TabButton(label: tab.label, icon: tab.icon, selected: isSelected) {
                     select(tab)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if tab.view == .nowPlaying {
+                        NowPlayingTabDot()
+                    }
                 }
                 .frame(width: vertical ? 30 : nil, height: 26)
                 .foregroundStyle(isSelected ? activeAccent : .gray)
@@ -320,6 +329,27 @@ struct TabSelectionView: View {
             coordinator.selectedExtensionExperienceID = nil
         }
         coordinator.currentView = first.view
+    }
+}
+
+/// The orange dot on the Now Playing icon while music plays.
+///
+/// Only the playing state is taken from ``MusicManager``, through its own
+/// publisher: observing the whole manager would redraw the tab bar on every
+/// title, artwork and position update.
+private struct NowPlayingTabDot: View {
+    @State private var isPlaying = MusicManager.shared.isPlaying
+
+    var body: some View {
+        Circle()
+            .fill(Color.orange)
+            .frame(width: 5, height: 5)
+            .offset(x: 5, y: -1)
+            .opacity(isPlaying ? 1 : 0)
+            .animation(.smooth(duration: 0.2), value: isPlaying)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .onReceive(MusicManager.shared.$isPlaying.removeDuplicates()) { isPlaying = $0 }
     }
 }
 

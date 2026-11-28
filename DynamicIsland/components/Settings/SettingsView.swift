@@ -332,10 +332,7 @@ private enum SettingsSearchIndex {
         // scrolls to nothing for anyone who has not turned them on yet -- which
         // is everyone, by default.
         SettingsSearchEntry(tab: .media, title: "Lyric highlight", keywords: ["lyrics", "highlight", "sweep", "gradient", "solid", "karaoke", "animation"], highlightID: SettingsTab.media.highlightID(for: "Show lyrics")),
-        SettingsSearchEntry(tab: .media, title: "Side lyrics width", keywords: ["lyrics", "width", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics width")),
-        SettingsSearchEntry(tab: .media, title: "Side lyrics horizontal offset", keywords: ["lyrics", "offset", "panel"], highlightID: SettingsTab.media.highlightID(for: "Side lyrics horizontal offset")),
         SettingsSearchEntry(tab: .media, title: "Show live canvas in Dynamic Island", keywords: ["canvas", "live canvas", "album art", "dynamic island", "spotify canvas"], highlightID: SettingsTab.media.highlightID(for: "Show live canvas in Dynamic Island")),
-        SettingsSearchEntry(tab: .media, title: "Auto-hide inactive notch media player", keywords: ["auto hide", "inactive", "placeholder", "notch media"], highlightID: SettingsTab.media.highlightID(for: "Auto-hide inactive notch media player")),
         SettingsSearchEntry(tab: .media, title: "Show Change Media Output control", keywords: ["airplay", "route picker", "media output"], highlightID: SettingsTab.media.highlightID(for: "Show Change Media Output control")),
         SettingsSearchEntry(tab: .media, title: "Enable album art parallax", keywords: ["parallax", "lock screen", "album art"], highlightID: SettingsTab.media.highlightID(for: "Enable album art parallax")),
         SettingsSearchEntry(tab: .media, title: "Enable album art parallax effect", keywords: ["parallax", "parallax effect", "album art"], highlightID: SettingsTab.media.highlightID(for: "Enable album art parallax effect")),
@@ -355,7 +352,6 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .calendar, title: "Show start time after event begins", keywords: ["calendar widget", "start time"], highlightID: SettingsTab.calendar.highlightID(for: "Show start time after event begins")),
         SettingsSearchEntry(tab: .calendar, title: "Chip color", keywords: ["reminder chip", "color"], highlightID: SettingsTab.calendar.highlightID(for: "Chip color")),
         SettingsSearchEntry(tab: .calendar, title: "Show date picker", keywords: ["calendar", "minimal", "month", "week"], highlightID: SettingsTab.calendar.highlightID(for: "Show date picker")),
-        SettingsSearchEntry(tab: .calendar, title: "Show beside music player", keywords: ["calendar", "music", "hide", "home"], highlightID: SettingsTab.calendar.highlightID(for: "Show beside music player")),
         SettingsSearchEntry(tab: .calendar, title: "Hide all-day events", keywords: ["calendar", "all-day"], highlightID: SettingsTab.calendar.highlightID(for: "Hide all-day events")),
         SettingsSearchEntry(tab: .calendar, title: "Hide completed reminders", keywords: ["reminder", "completed"], highlightID: SettingsTab.calendar.highlightID(for: "Hide completed reminders")),
         SettingsSearchEntry(tab: .calendar, title: "Show full event titles", keywords: ["calendar", "titles"], highlightID: SettingsTab.calendar.highlightID(for: "Show full event titles")),
@@ -1495,7 +1491,7 @@ struct GeneralSettings: View {
             }
             .settingsHighlight(id: highlightID("Arrow key seek"))
 
-            Text("Left and right seek by 10 seconds while the notch is open on the home view and Atoll has keyboard focus. Arrow keys typed into other apps or text fields are never used for seeking.")
+            Text("Left and right seek by 10 seconds while the notch is open on the music player and Atoll has keyboard focus. Arrow keys typed into other apps or text fields are never used for seeking.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } header: {
@@ -1516,6 +1512,7 @@ struct GeneralSettings: View {
         case .automatic: return String(localized: "Automatic")
         case .lastUsed: return String(localized: "Remember last tab")
         case .home: return String(localized: "Home")
+        case .nowPlaying: return String(localized: "Now Playing")
         case .shelf: return String(localized: "Shelf")
         case .timer: return String(localized: "Timer")
         case .stats: return String(localized: "Stats")
@@ -3368,14 +3365,10 @@ struct Media: View {
     @Default(.lockScreenMusicAlbumParallaxEnabled) private var lockScreenMusicAlbumParallaxEnabled
     @Default(.lockScreenMusicFullscreenArtworkEnabled) private var lockScreenMusicFullscreenArtworkEnabled
     @Default(.showStandardMediaControls) private var showStandardMediaControls
-    @Default(.autoHideInactiveNotchMediaPlayer) private var autoHideInactiveNotchMediaPlayer
-    @Default(.showCalendar) private var showCalendar
     @Default(.enableLyrics) private var enableLyrics
     @Default(.pinLyricsWhenClosed) private var pinLyricsWhenClosed
     @Default(.pinnedLyricContext) private var pinnedLyricContext
     @Default(.lyricHighlightStyle) private var lyricHighlightStyle
-    @Default(.lyricsPanelWidth) private var lyricsPanelWidth
-    @Default(.lyricsPanelOffset) private var lyricsPanelOffset
     @Default(.visualizerBarCount) private var visualizerBarCount
     @Default(.enableWaveformScrubber) private var enableWaveformScrubber
     @Default(.colorExtractionMode) private var colorExtractionMode
@@ -3460,11 +3453,9 @@ struct Media: View {
                 .disabled(enableMinimalisticUI)
                 .settingsHighlight(id: highlightID("Show media controls in Dynamic Island"))
 
-                Defaults.Toggle(key: .autoHideInactiveNotchMediaPlayer) {
-                    Text("Auto-hide inactive notch media player")
-                }
-                .disabled(enableMinimalisticUI || !showStandardMediaControls)
-                .settingsHighlight(id: highlightID("Auto-hide inactive notch media player"))
+                // "Auto-hide inactive notch media player" is gone: it let the
+                // calendar take Home while nothing played, and the player now
+                // has its own tab. The key stays for upstream.
 
                 if enableMinimalisticUI {
                     Text("Disable Minimalistic UI to configure the standard notch media controls.")
@@ -3472,10 +3463,6 @@ struct Media: View {
                         .foregroundStyle(.secondary)
                 } else if standardControlsSuppressed {
                     Text("Standard notch media controls are hidden. Re-enable the toggle above to restore them.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if !autoHideInactiveNotchMediaPlayer {
-                    Text("When disabled, the notch music player stays visible with placeholder metadata even when playback is inactive.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -3611,20 +3598,12 @@ struct Media: View {
                     .settingsHighlight(id: highlightID("Pinned lyric context"))
 
 
-                    Text("Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen. Can also be toggled from the pin on the lyrics panel.")
+                    Text("Shows timed lyrics below the closed notch with the selected context. Keeps the space during instrumental breaks; hides the words while a HUD is on screen.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text(
-                    showCalendar
-                        ? "Lyrics sit on one line under the artist name, since the calendar is using the rest of the notch. Turn the calendar off to give them a full panel beside the player."
-                        : "Lyrics get their own panel beside the player. Turn the calendar on to move them under the artist name instead."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
                 if enableMinimalisticUI {
                     Text("Disable Minimalistic UI to use lyrics.")
                         .font(.caption)
@@ -3635,31 +3614,9 @@ struct Media: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                if enableLyrics && !enableMinimalisticUI && !showCalendar && showStandardMediaControls {
-                    Slider(value: $lyricsPanelWidth, in: 180...420, step: 10) {
-                        HStack {
-                            Text("Side lyrics width")
-                            Spacer()
-                            Text("\(Int(lyricsPanelWidth)) px")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .settingsHighlight(id: highlightID("Side lyrics width"))
-
-                    Slider(value: $lyricsPanelOffset, in: -100...100, step: 1) {
-                        HStack {
-                            Text("Side lyrics horizontal offset")
-                            Spacer()
-                            Text("\(lyricsPanelOffset >= 0 ? "+" : "")\(Int(lyricsPanelOffset)) px")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .settingsHighlight(id: highlightID("Side lyrics horizontal offset"))
-
-                    Text("These controls apply when the calendar is disabled.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                // The side lyrics panel and the inline line left the open notch
+                // with the player's move to the Now Playing tab, so their width
+                // and offset sliders went too. The keys stay for upstream.
                 Defaults.Toggle(key: .showLiveCanvasInDynamicIsland) {
                     Text("Show live canvas in Dynamic Island")
                 }
@@ -3868,10 +3825,8 @@ struct Media: View {
 struct CalendarSettings: View {
     @ObservedObject private var calendarManager = CalendarManager.shared
     @Default(.showCalendar) var showCalendar: Bool
-    @Default(.showCalendarBesideMusicPlayer) private var showCalendarBesideMusicPlayer
     @Default(.calendarViewMode) var calendarViewMode: CalendarViewMode
     @Default(.showCalendarDatePicker) private var showCalendarDatePicker
-    @Default(.enableLyrics) private var enableLyrics
     @Default(.enableReminderLiveActivity) var enableReminderLiveActivity
     @Default(.reminderPresentationStyle) var reminderPresentationStyle
     @Default(.reminderLeadTime) var reminderLeadTime
@@ -3942,21 +3897,10 @@ struct CalendarSettings: View {
                     Text("Show calendar")
                 }
                 .settingsHighlight(id: highlightID("Show calendar"))
-                Defaults.Toggle(key: .showCalendarBesideMusicPlayer) {
-                    Text("Show beside music player")
-                }
-                .disabled(!showCalendar)
-                .settingsHighlight(id: highlightID("Show beside music player"))
-                Text("Turn this off to give the music player the whole Home tab. The calendar still appears there when the player is hidden.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if enableLyrics && showCalendarBesideMusicPlayer {
-                    Text("Lyrics are on too, so the two share the notch and lyrics drop to a single line under the artist name.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                // "Show beside music player" is gone: the player moved to the
+                // Now Playing tab, so the calendar has Home to itself. The
+                // `showCalendarBesideMusicPlayer` key stays, unread, so the
+                // stored value and upstream's references to it keep working.
 
                 Defaults.Toggle(key: .showCalendarDatePicker) {
                     Text("Show date picker")

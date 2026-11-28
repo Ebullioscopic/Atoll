@@ -42,75 +42,18 @@ enum SideLyricsLayout {
     static let combinedInset: CGFloat = 40
 }
 
-/// Whether the home view puts the compact calendar beside the music player
-/// while the player is on screen (#920).
-func calendarShownBesidePlayer() -> Bool {
-    Defaults[.showCalendar] && Defaults[.showCalendarBesideMusicPlayer]
-}
-
-func sideLyricsRequiredNotchWidth() -> CGFloat {
-    guard Defaults[.enableLyrics],
-          !calendarShownBesidePlayer(),
-          !Defaults[.enableMinimalisticUI],
-          Defaults[.showStandardMediaControls],
-          (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
-    else { return 0 }
-
-    let panelWidth = max(0, Defaults[.lyricsPanelWidth])
-    let offsetDistance = abs(Defaults[.lyricsPanelOffset])
-    let mirrorWidth = Defaults[.showMirror] && WebcamManager.shared.cameraAvailable
-        ? SideLyricsLayout.minimumMirrorWidth + SideLyricsLayout.hStackSpacing
-        : 0
-
-    // Include the home-view and notch content insets so the player receives
-    // the same usable width it had before the panel was added.
-    return SideLyricsLayout.minimumPlayerWidth
-        + panelWidth
-        + SideLyricsLayout.hStackSpacing
-        + offsetDistance
-        + mirrorWidth
-        + SideLyricsLayout.combinedInset
-}
-
-/// Columns the home view gives the calendar and the mirror when both sit
-/// beside the standard music player, so neither squeezes the player (#447, #800).
-enum HomeWidgetsLayout {
-    /// Width the compact calendar keeps beside the player and the mirror
-    static let calendarWidth: CGFloat = 215
-
-    /// Width of the square mirror preview beside the player and the calendar
-    static let mirrorWidth: CGFloat = 130
-}
-
-/// Whether the music player, the compact calendar and the mirror are all on the home view.
-/// Mirrors the conditions ``NotchHomeView`` lays them out under.
-func homeWidgetsShareHomeView() -> Bool {
-    calendarShownBesidePlayer()
-        && Defaults[.showMirror]
-        && WebcamManager.shared.cameraAvailable
-        && !Defaults[.enableMinimalisticUI]
-        && Defaults[.showStandardMediaControls]
-        && (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
-}
-
-/// Width the open notch needs for the home view's columns, or 0 when the
-/// configured width always suffices.
-func homeContentRequiredNotchWidth() -> CGFloat {
-    let widgetsWidth = homeWidgetsShareHomeView()
-        ? SideLyricsLayout.minimumPlayerWidth
-            + HomeWidgetsLayout.calendarWidth
-            + HomeWidgetsLayout.mirrorWidth
-            + SideLyricsLayout.hStackSpacing * 2
-            + SideLyricsLayout.combinedInset
-        : 0
-    return max(sideLyricsRequiredNotchWidth(), widgetsWidth)
-}
+/// Width the standard music player needs: its own minimum plus the insets
+/// around it. Now Playing gives it the whole row, and this sits under the
+/// narrowest open notch (``recommendedMinimumNotchWidth(forTabCount:)``), so
+/// the tab needs no width of its own. Home lost the player, and with it the
+/// rows that once had to widen the notch (#447, #800).
+let nowPlayingContentMinimumWidth: CGFloat = SideLyricsLayout.minimumPlayerWidth + SideLyricsLayout.combinedInset
 
 var openNotchSize: CGSize {
     let storedWidth = Defaults[.openNotchWidth]
     let minWidth = currentRecommendedMinimumNotchWidth()
     let maxWidth = maxAllowedNotchWidth()
-    let width = min(max(storedWidth, minWidth, homeContentRequiredNotchWidth()), maxWidth)
+    let width = min(max(storedWidth, minWidth), maxWidth)
     return .init(width: width, height: 200)
 }
 
@@ -142,7 +85,12 @@ func enabledStandardTabCount() -> Int {
     var count = 0
 
     // Home tab
-    if Defaults[.showStandardMediaControls] || Defaults[.showCalendar] || Defaults[.showMirror] {
+    if Defaults[.showCalendar] || Defaults[.showMirror] {
+        count += 1
+    }
+
+    // Now Playing tab
+    if Defaults[.showStandardMediaControls] {
         count += 1
     }
 
@@ -302,63 +250,12 @@ func notchTerminalBottomCornerRadii(
     return (outerBottom, max(0, outerBottom - p))
 }
 
-/// Height of the inline lyrics line shown under the artist name on the home tab.
-///
-/// The player column is laid out inside a greedy `GeometryReader`, so the lyrics
-/// line takes its space out of the gap above the transport controls instead of
-/// growing the notch. Handing that height back keeps the controls from being
-/// crowded when lyrics are on.
-let inlineLyricsLineHeight: CGFloat = 18
-
-/// Grows the open notch by one lyrics line when the home tab renders inline lyrics.
-///
-/// The extra height is applied whenever inline lyrics are enabled rather than only
-/// while a line is on screen, so the notch keeps a stable height between lyric lines.
-///
-/// Minimalistic UI is excluded: its player draws lyrics whenever they are enabled,
-/// regardless of the calendar, and sizes itself for them through its own resize
-/// publisher. Adding this line there would reserve room for a line the standard
-/// player is not drawing.
-/// Whether the home tab's calendar is the full-width ``StandaloneCalendarView``
-/// rather than the narrow ``CalendarView`` shown beside the music player. Only
-/// the standalone variant owns a month grid, and only it can spend extra height.
-///
-/// Mirrors ``NotchHomeView.shouldShowMusicPlayer``, which stays the layout's own
-/// source of truth because SwiftUI tracks its `@Default` reads for invalidation.
+/// Whether the home tab draws the full-width ``StandaloneCalendarView``, the
+/// only calendar that owns a month grid and can spend extra height. The music
+/// player moved to its own tab, so the calendar has Home to itself whenever it
+/// is on; the minimalistic UI draws its player there instead.
 func standaloneCalendarActive() -> Bool {
-    guard Defaults[.showCalendar],
-          !Defaults[.enableMinimalisticUI]
-    else {
-        return false
-    }
-
-    let playerVisible = Defaults[.showStandardMediaControls]
-        && (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
-    return !playerVisible
-}
-
-func inlineLyricsAdjustedNotchSize(
-    from baseSize: CGSize,
-    isHomeTabActive: Bool
-) -> CGSize {
-    // The same conditions `sideLyricsRequiredNotchWidth` tests, for the same
-    // reason: the extra line belongs to the standard player, so it is only
-    // owed when that player is on screen to draw it. Without the last two the
-    // notch grew for a line nobody could see whenever the player was switched
-    // off, or hidden by auto-hide with nothing playing.
-    guard isHomeTabActive,
-          !Defaults[.enableMinimalisticUI],
-          Defaults[.enableLyrics],
-          calendarShownBesidePlayer(),
-          Defaults[.showStandardMediaControls],
-          (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
-    else {
-        return baseSize
-    }
-
-    var adjustedSize = baseSize
-    adjustedSize.height += inlineLyricsLineHeight
-    return adjustedSize
+    Defaults[.showCalendar] && !Defaults[.enableMinimalisticUI]
 }
 
 /// Header height the 200pt open notch was laid out for. The open header is as

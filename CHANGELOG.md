@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Now Playing tab**: the music player moves out of Home into a tab of its own, right after Home, with the whole row to itself. Its icon carries an orange dot while music plays, and with “Open to” on Automatic the notch opens on Now Playing while music plays and on Home otherwise. Home keeps the calendar and the mirror; the minimalistic UI is unchanged.
 - **Swipe between tabs**: an option under Gesture control switches to the neighbouring tab when you swipe two fingers left or right over the notch's tab bar. Swipes over the content still skip tracks and scroll as before. Off by default. (#794)
 - **Keep the notch open from the shortcut**: a new "Close automatically after 3 seconds" option under the Toggle Notch Open shortcut can be turned off, so the shortcut opens the notch until it is pressed again. On by default. (#435)
 - **Open the full notch from hidden**: with "Hide until hovered on non-notch displays" and "Open notch on hover" on, a new option opens the full notch straight away on hover instead of revealing the closed notch first. Off by default. (#577)
@@ -298,6 +299,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A hover exit no longer closes the notch it just opened**: opening resizes the panel, which swaps its tracking area under a cursor that never moved, so AppKit reported an exit without a matching enter and the debounced handler closed the notch a frame later — most visibly after a fast flick to the notch, which then either flashed open and shut or did not open at all. A hover exit is now ignored while the cursor is still inside the panel, and a cursor check finishes the exit once the pointer really leaves, since AppKit will not report the next exit for an area that already "exited". (#457)
 
 ### Removed
+- The “Show beside music player” calendar option, the “Auto-hide inactive notch media player” option and the side lyrics width and offset sliders. They arranged the player against the calendar and the lyrics on Home, and the player now has its own tab. The open notch no longer shows lyrics; lyrics pinned under the closed notch still work.
 - The Screen Assistant "Display Mode" setting. Its Popover option was never implemented, so choosing it made the assistant shortcut do nothing; the shortcut now always opens the assistant panel (#58).
 
 ## [2.3.3] - 2026-07-24

@@ -1427,6 +1427,8 @@ struct ContentView: View {
                               switch coordinator.currentView {
                                   case .home:
                                       NotchHomeView(albumArtNamespace: albumArtNamespace)
+                                  case .nowPlaying:
+                                      NotchNowPlayingView(albumArtNamespace: albumArtNamespace)
                                   case .shelf:
                                       NotchShelfView()
                                   case .timer:
@@ -2925,11 +2927,12 @@ struct ContentView: View {
     }
 
     private func canPerformSkipGesture() -> Bool {
-        let canSkipInOpenHome = vm.notchState == .open && coordinator.currentView == .home
+        let canSkipInOpenPlayer = vm.notchState == .open
+            && coordinator.currentView.showsMusicPlayer(isMinimalistic: Defaults[.enableMinimalisticUI])
         let canSkipInClosedMusic = !Defaults[.openNotchOnHover] && isClosedMusicGestureContext
 
         return enableHorizontalMusicGestures
-            && (canSkipInOpenHome || canSkipInClosedMusic)
+            && (canSkipInOpenPlayer || canSkipInClosedMusic)
             && (!musicManager.isPlayerIdle || musicManager.bundleIdentifier != nil)
             && !lockScreenManager.isLocked
             && !hasAnyActivePopovers()

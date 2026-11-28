@@ -72,6 +72,7 @@ public enum NotchState {
 
 public enum NotchViews {
     case home
+    case nowPlaying
     case shelf
     case timer
     case stats
@@ -81,6 +82,18 @@ public enum NotchViews {
     case clipboard
     case terminal
     case extensionExperience
+}
+
+extension NotchViews {
+    /// Whether this tab draws a music player: Now Playing, or Home in the
+    /// minimalistic UI, which has no Now Playing tab and keeps its player on Home.
+    func showsMusicPlayer(isMinimalistic: Bool) -> Bool {
+        switch self {
+        case .nowPlaying: return true
+        case .home: return isMinimalistic
+        default: return false
+        }
+    }
 }
 
 enum NotesLayoutState: Equatable {

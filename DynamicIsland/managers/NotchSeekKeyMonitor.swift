@@ -21,7 +21,8 @@ import Defaults
 import SwiftTerm
 
 /// Left and right arrow keys seek the playing track, but only while the notch
-/// is open on the home view and Atoll itself has the keyboard.
+/// is open on the music player (Now Playing, or the minimalistic Home) and
+/// Atoll itself has the keyboard.
 ///
 /// Scoped that tightly on purpose. Arrow keys belong to whatever the user is
 /// typing in, so there is no global monitor (it would seek while the keys also
@@ -81,7 +82,8 @@ final class NotchSeekKeyMonitor {
     private func handle(_ event: NSEvent) -> Bool {
         guard Defaults[.arrowKeySeekEnabled] else { return false }
         guard let arrow = ArrowKey(rawValue: event.keyCode) else { return false }
-        guard DynamicIslandViewCoordinator.shared.currentView == .home else { return false }
+        guard DynamicIslandViewCoordinator.shared.currentView
+            .showsMusicPlayer(isMinimalistic: Defaults[.enableMinimalisticUI]) else { return false }
 
         // Text fields (clipboard search, notes) and the terminal use the arrows
         // to move the caret, so leave the key to them.
