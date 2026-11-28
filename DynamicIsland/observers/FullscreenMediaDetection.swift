@@ -35,8 +35,8 @@ class FullscreenMediaDetector: ObservableObject {
     private var nowPlayingAppCancellable: AnyCancellable?
     /// Pending follow-up check while a fullscreen app waits to become Now Playing.
     @MainActor private var recheckTask: Task<Void, Never>?
-    /// Follow-up checks made since the last Space, screen or Now Playing change;
-    /// sets the back-off delay of the next one.
+    /// Follow-up checks made since the last Space, screen, frontmost-app or
+    /// playback change; sets the back-off delay of the next one.
     @MainActor private var rechecksDone = 0
     /// Bumped on every refresh so a slower, older refresh cannot overwrite a newer one.
     @MainActor private var refreshGeneration = 0
@@ -66,6 +66,18 @@ class FullscreenMediaDetector: ObservableObject {
                     }
                 }
                 
+                // Bringing a player forward (or leaving it) is when playback
+                // usually starts or moves, and causes no Space change.
+                group.addTask {
+                    let activationNotifications = NSWorkspace.shared.notificationCenter.notifications(
+                        named: NSWorkspace.didActivateApplicationNotification
+                    )
+
+                    for await _ in activationNotifications {
+                        await self?.scheduleRefresh()
+                    }
+                }
+
                 group.addTask {
                     let screenParameterNotifications = NSWorkspace.shared.notificationCenter.notifications(
                         named:  NSApplication.didChangeScreenParametersNotification
@@ -80,12 +92,12 @@ class FullscreenMediaDetector: ObservableObject {
     }
 
     /// Playback that starts (or moves to another app) after the window went
-    /// fullscreen produces no Space change, so the Now Playing app is a trigger
-    /// of its own — and so is the active controller starting or stopping to
-    /// follow system Now Playing, which can happen without the id changing.
-    /// Under a controller that follows system Now Playing this fires on every
-    /// switch between players; otherwise the follow-up checks in `refresh`
-    /// cover the gap.
+    /// fullscreen produces no Space change, so the Now Playing app and the
+    /// play state are triggers of their own — and so is the active controller
+    /// starting or stopping to follow system Now Playing, which can happen
+    /// without the id changing. Under a controller pinned to one player, the
+    /// capped follow-up checks in `refresh` and the frontmost-app trigger cover
+    /// playback in other apps.
     private func observeNowPlayingApp() {
         let bundleChanges = musicManager.$bundleIdentifier
             .removeDuplicates()
@@ -95,7 +107,11 @@ class FullscreenMediaDetector: ObservableObject {
             .removeDuplicates()
             .dropFirst()
             .map { _ in () }
-        nowPlayingAppCancellable = bundleChanges.merge(with: trackingChanges)
+        let playbackChanges = musicManager.$isPlaying
+            .removeDuplicates()
+            .dropFirst()
+            .map { _ in () }
+        nowPlayingAppCancellable = Publishers.Merge3(bundleChanges, trackingChanges, playbackChanges)
             .sink { [weak self] _ in
                 self?.scheduleRefresh()
             }
@@ -134,8 +150,9 @@ class FullscreenMediaDetector: ObservableObject {
             NSLog("✅ Fullscreen status: \(newStatus)")
         }
 
-        guard keepRechecking else { return }
-        let delay = FullscreenHidePolicy.recheckDelay(afterRechecks: rechecksDone)
+        guard keepRechecking,
+              let delay = FullscreenHidePolicy.recheckDelay(afterRechecks: rechecksDone)
+        else { return }
         rechecksDone += 1
         recheckTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(delay))

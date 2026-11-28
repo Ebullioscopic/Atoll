@@ -104,12 +104,10 @@ final class FullscreenHidePolicyTests: XCTestCase {
             nowPlayingIsObserved: true))
     }
 
-    /// Playback can start long after the window went fullscreen (browsing a
-    /// library first), so checks continue for as long as the app stays
-    /// fullscreen, but back off so an app that never plays costs one Now Playing
-    /// query per 30 s rather than one every 2 s.
-    func testRecheckDelayBacksOffToThirtySeconds() {
-        let delays = (0..<7).map { FullscreenHidePolicy.recheckDelay(afterRechecks: $0) }
-        XCTAssertEqual(delays, [2, 4, 8, 16, 30, 30, 30])
+    /// Follow-up checks are capped: later playback is picked up by the
+    /// Space, frontmost-app and play-state triggers instead of polling.
+    func testRecheckDelayStopsAfterThreeAttempts() {
+        let delays = (0..<5).map { FullscreenHidePolicy.recheckDelay(afterRechecks: $0) }
+        XCTAssertEqual(delays, [2, 4, 8, nil, nil])
     }
 }

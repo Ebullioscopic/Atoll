@@ -35,9 +35,26 @@ enum SystemNowPlayingProbe {
         return candidates.compactMap { $0 }.first { !$0.isEmpty }
     }
 
-    /// Runs the bundled adapter's `get` off the main thread. Nil on any failure
-    /// (missing resources, launch error, non-zero exit, timeout, bad output).
+    /// The adapter run in flight, shared by every caller that asks meanwhile.
+    @MainActor private static var inFlight: Task<String?, Never>?
+
+    /// Runs the bundled adapter's `get` off the main thread. Concurrent callers
+    /// share one run, so at most one adapter process exists at a time. Nil on
+    /// any failure (missing resources, launch error, non-zero exit, timeout,
+    /// bad output).
+    @MainActor
     static func currentBundleIdentifier() async -> String? {
+        if let inFlight {
+            return await inFlight.value
+        }
+        let task = Task { await runAdapter() }
+        inFlight = task
+        let result = await task.value
+        inFlight = nil
+        return result
+    }
+
+    private static func runAdapter() async -> String? {
         guard
             let scriptURL = Bundle.main.url(forResource: "mediaremote-adapter", withExtension: "pl"),
             let frameworkPath = Bundle.main.resourceURL?

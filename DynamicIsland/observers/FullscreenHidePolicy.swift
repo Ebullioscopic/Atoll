@@ -60,11 +60,17 @@ enum FullscreenHidePolicy {
             && (!isHidden || !nowPlayingIsObserved)
     }
 
+    /// Follow-up checks allowed after a Space, screen, frontmost-app or
+    /// playback change. Anything later is picked up by the next such event.
+    static let maxRechecks = 3
+
     /// Seconds to wait before the next follow-up check, given how many have run
-    /// since the last Space, screen or Now Playing change. Quick at first, for
-    /// playback started right after going fullscreen, then settling at 30 s so a
-    /// fullscreen app that never plays costs one Now Playing query per 30 s.
-    static func recheckDelay(afterRechecks rechecksDone: Int) -> TimeInterval {
-        min(2 * pow(2, Double(max(rechecksDone, 0))), 30)
+    /// since the last change: 2, 4 and 8 s, for playback started right after
+    /// going fullscreen. Nil once `maxRechecks` is reached, so a fullscreen app
+    /// that never plays stops costing Now Playing queries.
+    static func recheckDelay(afterRechecks rechecksDone: Int) -> TimeInterval? {
+        let done = max(rechecksDone, 0)
+        guard done < maxRechecks else { return nil }
+        return 2 * pow(2, Double(done))
     }
 }
