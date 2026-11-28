@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Highlights
 - **Lyrics that follow the music:** synced lyrics sweep word by word in time with playback — beside the player, pinned under the closed notch, and in a new lyrics column on the lock screen — with NetEase Cloud Music as a fallback source.
 - **A more capable lock screen:** a volume slider under the playback controls, a large-artwork player that opens on lock, a fingerprint unlock animation, colored widgets, a custom weather city and a day-range temperature gauge.
-- **More music sources, more control:** TIDAL, NetEase Cloud Music, QQ Music and Auto Detect join the source picker, and the heart control favourites songs in Apple Music, Spotify, YouTube Music and Cider.
+- **More music sources, more control:** TIDAL, NetEase Cloud Music and QQ Music join the source picker, and the Now Playing source no longer disappears after a failed startup check, and the heart control favourites songs in Apple Music, Spotify, YouTube Music and Cider.
 - **New notch controls:** a per-app volume mixer, Keep Awake, screen and keyboard cleaning modes, a swipe-between-tabs gesture, a default tab, a tab rail and adjustable animation speed.
 - **LLM Usage grows up:** GitHub Copilot, OpenRouter, DeepSeek, New API and Antigravity tracking, with cache-aware cost estimates and a remaining-quota view.
 - **Productivity:** a redesigned clipboard with a draggable in-notch tab and Maccy support, file conversion and marquee selection on the Shelf, a pop-out terminal, and 3 Days, Week and Month calendar views.
@@ -28,10 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Notch:** The tab switcher can sit as a rail down the leading edge instead of in the header, and can switch tabs on hover. (#693)
 - **Notch:** Left and right arrow keys can seek the playing track by 10 seconds while the notch is open on the home view. Off by default. (#768)
 - **Notch:** A per-app volume mixer in the header gives each app playing audio its own volume slider and mute button, remembered per app. Off by default. (#805)
-- **Notch:** Keep Awake keeps the Mac awake indefinitely or for 15 minutes to 4 hours, with an option to keep the display on, ⌘⇧K to toggle it, and a separate option to stay awake with the lid closed. (#804, #677)
+- **Notch:** Keep Awake keeps the Mac awake indefinitely or for 15 minutes to 4 hours, with an option to keep the display on, and ⌘⇧K to toggle it. (#804)
 - **Notch:** Clean screen blacks out every display and Clean keyboard ignores key presses until you click, so you can wipe them down. Off by default. (#677)
 - **Media:** TIDAL can be selected as the music source, with its own Now Playing session, real-time waveform and official logo. (#764, #775, #782)
-- **Media:** NetEase Cloud Music, QQ Music and Auto Detect can be picked as the music source; other players no longer take over the notch. (#913, #816, #721)
+- **Media:** NetEase Cloud Music and QQ Music can be picked as the music source; other players no longer take over the notch. (#913, #816, #721)
 - **Media:** The heart control favourites the playing song in Apple Music, Spotify and YouTube Music — no subscription or developer credentials required — and shows TIDAL's favourite state. (#599, #702, #788)
 - **Media:** A Spotify "Like Song" control saves or removes the current track from your Liked Songs from the notch, lock screen and minimalist player. (#454, #579)
 - **Media:** Favourite the current song in Cider through Cider's local API; add its token in media settings. (#788)
