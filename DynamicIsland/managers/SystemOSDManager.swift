@@ -268,9 +268,9 @@ class SystemOSDManager {
             }
 
             guard isCurrentTransition(generation, active: true) else { return }
-            // Killed rather than frozen: nothing to record, and the next
+            // Nothing could be frozen: nothing to record, and the next
             // instance is examined afresh.
-            guard freezeOSDUIHelper(pid: currentPID) else { return }
+            guard await freezeOSDUIHelper(pid: currentPID) else { return }
 
             // If this transition went stale while the SIGSTOP was in flight,
             // hand the helper over rather than assuming it should be resumed.
@@ -300,16 +300,17 @@ class SystemOSDManager {
             // SIGSTOPped needs no replacing; freezing it in place closes the
             // window entirely, and the watcher still catches any process macOS
             // swaps in later.
-            // One that is showing a HUD is killed instead, and a fresh,
-            // idle one is started and frozen below.
-            if let existing = osduiHelperPID(), freezeOSDUIHelper(pid: existing) {
+            // One that is showing a HUD is replaced by a fresh, idle one that
+            // is frozen instead.
+            if let existing = osduiHelperPID(), await freezeOSDUIHelper(pid: existing) {
                 guard isCurrentTransition(generation, active: true) else {
                     relinquishStaleSuspension()
                     return
                 }
-                suppressionState.withLock { $0.lastSuspendedPID = existing }
+                let frozen = osduiHelperPID() ?? existing
+                suppressionState.withLock { $0.lastSuspendedPID = frozen }
                 await MainActor.run {
-                    print("✅ System HUD disabled (suspended running helper \(existing))")
+                    print("✅ System HUD disabled (suspended running helper \(frozen))")
                 }
                 return
             }
@@ -416,8 +417,9 @@ class SystemOSDManager {
                 let lastPID = suppressionState.withLock { $0.lastSuspendedPID }
 
                 if let pid = currentPID, pid != lastPID {
-                    if freezeOSDUIHelper(pid: pid) {
-                        suppressionState.withLock { $0.lastSuspendedPID = pid }
+                    if await freezeOSDUIHelper(pid: pid) {
+                        let frozen = osduiHelperPID() ?? pid
+                        suppressionState.withLock { $0.lastSuspendedPID = frozen }
                     }
                     stableChecks = 0
                     try? await Task.sleep(nanoseconds: 150_000_000) // 150ms
@@ -509,34 +511,85 @@ class SystemOSDManager {
 
     private static let helperProcessName = "OSDUIHelper"
 
-    /// Freezes the helper, unless it is showing a HUD at this moment.
+    /// Freezes the helper, replacing it first if it is showing a HUD at this moment.
     ///
     /// SIGSTOP freezes the helper's windows exactly as they are, so a helper
     /// caught mid-display -- a key that reached macOS before the tap, a HUD
     /// drawn on the lock screen just before unlocking, a respawn the watcher
     /// had not caught yet -- left its HUD stuck on the desktop for as long as
     /// suppression lasted (#593). Such a helper is killed instead, taking its
-    /// window with it; launchd starts a new one on demand, and that one is
-    /// frozen before it has anything to draw. An idle helper owns no windows
-    /// at all, so the check only costs a window list when a new helper is
-    /// about to be frozen. Returns true when the helper was frozen.
+    /// window with it. Killing alone left no helper at all, so launchd spawned
+    /// a live one on the next key press that drew the native HUD next to
+    /// Atoll's, was killed again, and so on for every key burst. A fresh,
+    /// idle replacement is therefore started and frozen right away, as
+    /// `disableSystemHUDAsync` does. An idle helper owns no windows at all, so
+    /// the check only costs a window list when a new helper is about to be
+    /// frozen. Returns true when a helper was left frozen.
     @discardableResult
-    private static func freezeOSDUIHelper(pid: Int32?) -> Bool {
-        if let pid, isShowingHUD(pid: pid) {
-            let kill = Process()
-            kill.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-            kill.arguments = ["-KILL", "OSDUIHelper"]
-            kill.standardError = Pipe()
-            do {
-                try kill.run()
-                kill.waitUntilExit()
-                return false
-            } catch {
-                NSLog("Failed to kill OSDUIHelper showing a HUD: \(error)")
-            }
+    private static func freezeOSDUIHelper(pid: Int32?) async -> Bool {
+        guard let pid, isShowingHUD(pid: pid) else {
+            suspendOSDUIHelper()
+            return true
         }
-        suspendOSDUIHelper()
-        return true
+
+        var showingPID = pid
+        for _ in 0..<2 {
+            guard killOSDUIHelper() else { break }
+            guard let replacement = await startReplacementHelper(excluding: showingPID) else { return false }
+            if isShowingHUD(pid: replacement) {
+                showingPID = replacement
+                continue
+            }
+            // Suppression may have ended while the replacement was starting;
+            // never leave the native HUD frozen once Atoll stops drawing its own.
+            guard suppressionState.withLock({ $0.active }) else { return false }
+            suspendOSDUIHelper()
+            guard suppressionState.withLock({ $0.active }) else {
+                resumeOSDUIHelperProcess()
+                return false
+            }
+            return true
+        }
+        return false
+    }
+
+    private static func killOSDUIHelper() -> Bool {
+        let kill = Process()
+        kill.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+        kill.arguments = ["-KILL", "OSDUIHelper"]
+        kill.standardError = Pipe()
+        do {
+            try kill.run()
+            kill.waitUntilExit()
+            return true
+        } catch {
+            NSLog("Failed to kill OSDUIHelper showing a HUD: \(error)")
+            return false
+        }
+    }
+
+    /// Asks launchd for a new helper and returns its PID once it is running,
+    /// or nil if none appears within ~2s or suppression ends meanwhile.
+    private static func startReplacementHelper(excluding oldPID: Int32) async -> Int32? {
+        let kickstart = Process()
+        kickstart.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        kickstart.arguments = ["kickstart", "gui/\(getuid())/com.apple.OSDUIHelper"]
+        kickstart.standardError = Pipe()
+        do {
+            try kickstart.run()
+            kickstart.waitUntilExit()
+        } catch {
+            NSLog("Failed to restart OSDUIHelper: \(error)")
+            return nil
+        }
+        for _ in 0..<20 {
+            guard suppressionState.withLock({ $0.active }) else { return nil }
+            if let pid = osduiHelperPID(), pid != oldPID {
+                return pid
+            }
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        }
+        return nil
     }
 
     private static func isShowingHUD(pid: Int32) -> Bool {
