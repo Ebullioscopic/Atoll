@@ -69,114 +69,23 @@ let audioIOProc: AudioDeviceIOProc = {
     return noErr
 }
 
+// These four lookups moved to `AudioProcessQuery` when the per-app volume
+// taps started needing the same reads. They stay here as thin wrappers so the
+// call sites below read the way they always have.
 private func getAudioObjectID(for pid: pid_t) -> AudioObjectID? {
-    var audioObjectID: AudioObjectID = kAudioObjectUnknown
-    var pidValue = pid
-
-    var address = AudioObjectPropertyAddress(
-        mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
-    )
-
-    var size = UInt32(MemoryLayout<AudioObjectID>.size)
-    let qualifierSize = UInt32(MemoryLayout<pid_t>.size)
-
-    // We query the global system object (kAudioObjectSystemObject)
-    // We pass the PID as the "qualifier", and it returns the AudioObjectID
-    let status = AudioObjectGetPropertyData(
-        AudioObjectID(kAudioObjectSystemObject),
-        &address,
-        qualifierSize,
-        &pidValue,
-        &size,
-        &audioObjectID
-    )
-
-    if status == noErr && audioObjectID != kAudioObjectUnknown {
-        return audioObjectID
-    }
-
-    return nil
+    AudioProcessQuery.processObject(for: pid)
 }
 
 private func getAudioProcessObjectIDs() -> [AudioObjectID] {
-    var address = AudioObjectPropertyAddress(
-        mSelector: kAudioHardwarePropertyProcessObjectList,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
-    )
-    let systemObject = AudioObjectID(kAudioObjectSystemObject)
-    var size: UInt32 = 0
-
-    guard AudioObjectGetPropertyDataSize(systemObject, &address, 0, nil, &size) == noErr,
-          size >= UInt32(MemoryLayout<AudioObjectID>.size) else {
-        return []
-    }
-
-    var processObjects = [AudioObjectID](
-        repeating: kAudioObjectUnknown,
-        count: Int(size) / MemoryLayout<AudioObjectID>.size
-    )
-    guard AudioObjectGetPropertyData(
-        systemObject,
-        &address,
-        0,
-        nil,
-        &size,
-        &processObjects
-    ) == noErr else {
-        return []
-    }
-
-    return processObjects.filter { $0 != kAudioObjectUnknown }
+    AudioProcessQuery.processObjectIDs()
 }
 
 private func getBundleIdentifier(for audioProcessObject: AudioObjectID) -> String? {
-    var address = AudioObjectPropertyAddress(
-        mSelector: kAudioProcessPropertyBundleID,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
-    )
-    var unmanagedBundleIdentifier: Unmanaged<CFString>?
-    var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
-
-    guard AudioObjectGetPropertyData(
-        audioProcessObject,
-        &address,
-        0,
-        nil,
-        &size,
-        &unmanagedBundleIdentifier
-    ) == noErr,
-          let unmanagedBundleIdentifier else {
-        return nil
-    }
-
-    return unmanagedBundleIdentifier.takeRetainedValue() as String
+    AudioProcessQuery.bundleIdentifier(for: audioProcessObject)
 }
 
 private func getPID(for audioProcessObject: AudioObjectID) -> pid_t? {
-    var address = AudioObjectPropertyAddress(
-        mSelector: kAudioProcessPropertyPID,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
-    )
-    var pid: pid_t = 0
-    var size = UInt32(MemoryLayout<pid_t>.size)
-
-    guard AudioObjectGetPropertyData(
-        audioProcessObject,
-        &address,
-        0,
-        nil,
-        &size,
-        &pid
-    ) == noErr else {
-        return nil
-    }
-
-    return pid
+    AudioProcessQuery.pid(for: audioProcessObject)
 }
 
 enum AudioTapTargetMatcher {
@@ -267,6 +176,7 @@ class AudioTap: NSObject {
         }
 
         var targetProcessObjects = Set<AudioObjectID>()
+        var bundleIdentifierByProcessObject: [AudioObjectID: String] = [:]
 
         // AirPods/Bluetooth output + Spotify don't mix: process-tapping Spotify into our
         // private aggregate device disturbs the system Now Playing / AVRCP session, so the
@@ -290,13 +200,16 @@ class AudioTap: NSObject {
                 continue
             }
 
-            if targetBundleIdentifier.caseInsensitiveCompare(SpotifyController.bundleIdentifier) == .orderedSame,
-               bluetoothOutputActive {
+            if shouldSkipSpotifyTap(
+                bundleIdentifier: targetBundleIdentifier,
+                bluetoothOutputActive: bluetoothOutputActive
+            ) {
                 print("⏭️ [AudioTap] Bluetooth output active — skipping Spotify tap to preserve AirPods media control")
                 continue
             }
 
             targetProcessObjects.insert(processObject)
+            bundleIdentifierByProcessObject[processObject] = processBundleIdentifier
             let pidDescription = getPID(for: processObject).map(String.init) ?? "unknown"
             print("🎯 [AudioTap] Found audio process \(processBundleIdentifier) with PID: \(pidDescription), AudioObjectID: \(processObject)")
         }
@@ -306,11 +219,15 @@ class AudioTap: NSObject {
         for app in NSWorkspace.shared.runningApplications {
             guard let bundleIdentifier = app.bundleIdentifier,
                   targetBundleIDs.contains(bundleIdentifier) else { continue }
-            if bundleIdentifier == SpotifyController.bundleIdentifier, bluetoothOutputActive {
+            if shouldSkipSpotifyTap(
+                bundleIdentifier: bundleIdentifier,
+                bluetoothOutputActive: bluetoothOutputActive
+            ) {
                 continue
             }
             if let processObject = getAudioObjectID(for: app.processIdentifier),
                targetProcessObjects.insert(processObject).inserted {
+                bundleIdentifierByProcessObject[processObject] = bundleIdentifier
                 print("🎯 [AudioTap] Found \(app.localizedName ?? "App") with PID: \(app.processIdentifier), AudioObjectID: \(processObject)")
             }
         }
@@ -320,7 +237,13 @@ class AudioTap: NSObject {
             return
         }
 
-        let sortedTargetProcessObjects = targetProcessObjects.sorted()
+        let sortedTargetProcessObjects = targetProcessObjects.sorted { lhs, rhs in
+            let lhsBundleIdentifier = bundleIdentifierByProcessObject[lhs]?.lowercased() ?? ""
+            let rhsBundleIdentifier = bundleIdentifierByProcessObject[rhs]?.lowercased() ?? ""
+            return lhsBundleIdentifier == rhsBundleIdentifier
+                ? lhs < rhs
+                : lhsBundleIdentifier < rhsBundleIdentifier
+        }
 
         let description = CATapDescription()
         description.processes = sortedTargetProcessObjects
@@ -399,12 +322,20 @@ class AudioTap: NSObject {
         
         DispatchQueue.main.async { [weak self] in
             self?.updateTimer?.invalidate()
-            let timer = Timer(timeInterval: 1.0 / 60.0, target: self as Any, selector: #selector(self?.updateSmoothedMagnitudes), userInfo: nil, repeats: true)
+            let timer = Timer(timeInterval: 1.0 / 30.0, target: self as Any, selector: #selector(self?.updateSmoothedMagnitudes), userInfo: nil, repeats: true)
             RunLoop.main.add(timer, forMode: .common)
             self?.updateTimer = timer
         }
         
         print("🟢 [AudioTap] CoreAudio CATap flowing through Aggregate Device!")
+    }
+
+    private func shouldSkipSpotifyTap(
+        bundleIdentifier: String,
+        bluetoothOutputActive: Bool
+    ) -> Bool {
+        bluetoothOutputActive
+            && bundleIdentifier.caseInsensitiveCompare(SpotifyController.bundleIdentifier) == .orderedSame
     }
     
     private func cleanupPartialSetup() {

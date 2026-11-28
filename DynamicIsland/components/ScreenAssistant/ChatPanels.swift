@@ -459,25 +459,10 @@ struct ChatInputView: View {
     }
     
     private func sendMessage() {
-        // Check if API key is configured for the selected provider
+        // Check if API key is configured for the selected provider.
+        // A provider with no key account (local models) needs none.
         let provider = Defaults[.selectedAIProvider]
-        var apiKey = ""
-        
-        switch provider {
-        case .gemini:
-            apiKey = Defaults[.geminiApiKey]
-        case .openai:
-            apiKey = Defaults[.openaiApiKey]
-        case .claude:
-            apiKey = Defaults[.claudeApiKey]
-        case .local:
-            // Local models don't need API keys
-            apiKey = "local"
-        case .groq:
-            apiKey = Defaults[.groqApiKey]
-        }
-        
-        if apiKey.isEmpty {
+        if let account = provider.keyAccount, !KeychainAIKeyStore.shared.hasKey(account) {
             showingApiKeyAlert = true
             return
         }

@@ -134,6 +134,75 @@ extension NSImage {
         
     }
     
+    /// Synchronous cheap average, used to seed `avgColor` before the async extraction lands.
+    func quickAverageColor() -> NSColor {
+        guard let cgImage = cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return .systemGray
+        }
+
+        let side: CGFloat = 32
+        let scale = min(side / CGFloat(cgImage.width), side / CGFloat(cgImage.height))
+        let drawWidth = max(1, Int(CGFloat(cgImage.width) * scale))
+        let drawHeight = max(1, Int(CGFloat(cgImage.height) * scale))
+
+        guard let context = CGContext(data: nil,
+                                      width: drawWidth,
+                                      height: drawHeight,
+                                      bitsPerComponent: 8,
+                                      bytesPerRow: drawWidth * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return .systemGray
+        }
+        context.interpolationQuality = .medium
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: drawWidth, height: drawHeight))
+
+        guard let data = context.data else {
+            return .systemGray
+        }
+
+        let pointer = data.bindMemory(to: UInt32.self, capacity: drawWidth * drawHeight)
+        var totalRed: UInt64 = 0
+        var totalGreen: UInt64 = 0
+        var totalBlue: UInt64 = 0
+
+        for i in 0..<(drawWidth * drawHeight) {
+            let color = pointer[i]
+            totalRed += UInt64(color & 0xFF)
+            totalGreen += UInt64((color >> 8) & 0xFF)
+            totalBlue += UInt64((color >> 16) & 0xFF)
+        }
+
+        let count = UInt64(drawWidth * drawHeight)
+        let minBrightness: CGFloat = 0.5
+        let averageRed = CGFloat(totalRed) / CGFloat(count) / 255.0
+        let averageGreen = CGFloat(totalGreen) / CGFloat(count) / 255.0
+        let averageBlue = CGFloat(totalBlue) / CGFloat(count) / 255.0
+
+        let isNearBlack = averageRed < 0.03 && averageGreen < 0.03 && averageBlue < 0.03
+        if isNearBlack {
+            return NSColor(white: minBrightness, alpha: 1.0)
+        }
+
+        var color = NSColor(red: averageRed, green: averageGreen, blue: averageBlue, alpha: 1.0)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+
+        if brightness < minBrightness {
+            let saturationScale = brightness / minBrightness
+            color = NSColor(hue: hue,
+                            saturation: saturation * saturationScale,
+                            brightness: minBrightness,
+                            alpha: alpha)
+        }
+
+        return color
+    }
+
     func prominentOpposingColors(completion: @escaping (NSColor, NSColor) -> Void) {
         let isLegacyMode = Defaults[.colorExtractionMode] == .legacy
         DispatchQueue.global(qos: .userInitiated).async {
@@ -370,6 +439,35 @@ extension NSImage {
         let brightness = (0.2126 * CGFloat(bitmap[0]) + 0.7152 * CGFloat(bitmap[1]) + 0.0722 * CGFloat(bitmap[2])) / 255.0
         
         return brightness
+    }
+
+    /// Renders a fixed pre-blurred texture so the art glow is a plain scaled
+    /// image during view transitions instead of a per-frame re-blur.
+    func preBlurred(radius: CGFloat) -> NSImage {
+        guard let cgImage = self.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return self
+        }
+
+        let inputImage = CIImage(cgImage: cgImage)
+        let filter = CIFilter.gaussianBlur()
+        // No clampedToExtent: clamping stretches the edge pixels, which after
+        // blur renders as flat art-coloured bars around the image bounds. Let
+        // the edges blend toward transparency instead so the halo has a soft
+        // falloff and the view can fade it out radially.
+        filter.inputImage = inputImage
+        filter.radius = Float(radius)
+
+        guard let outputImage = filter.outputImage else {
+            return self
+        }
+
+        let extent = inputImage.extent
+        let context = CIContext(options: nil)
+        guard let finalImage = context.createCGImage(outputImage, from: extent) else {
+            return self
+        }
+
+        return NSImage(cgImage: finalImage, size: size)
     }
 }
 
