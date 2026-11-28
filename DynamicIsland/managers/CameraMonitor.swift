@@ -131,6 +131,8 @@ class CameraMonitor: ObservableObject {
         }
         
         // Reset state
+        deactivationTask?.cancel()
+        deactivationTask = nil
         if isCameraActive {
             isCameraActive = false
         }

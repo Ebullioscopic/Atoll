@@ -134,6 +134,8 @@ class MicrophoneMonitor: ObservableObject {
         }
         
         // Reset state
+        deactivationTask?.cancel()
+        deactivationTask = nil
         if isMicActive {
             isMicActive = false
         }

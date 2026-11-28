@@ -363,7 +363,16 @@ class DynamicIslandViewCoordinator: ObservableObject {
             }
 
             // If already showing the exact same sneak peek, just renew the timer without re-animating
-            if status && self.sneakPeek.show && self.sneakPeek.type == type && self.sneakPeek.icon == icon && abs(self.sneakPeek.value - value) < 0.01 {
+            let current = self.sneakPeek
+            if status && current.show
+                && current.type == type
+                && current.icon == icon
+                && abs(current.value - value) < 0.01
+                && current.title == title
+                && current.subtitle == subtitle
+                && current.accentColor == accentColor
+                && current.styleOverride == styleOverride
+                && current.targetScreenName == targetScreen?.localizedName {
                 self.scheduleSneakPeekHide(after: self.sneakPeekDuration)
                 return
             }

@@ -359,30 +359,6 @@ class BluetoothAudioManager: ObservableObject {
         scheduleEventDrivenListeningModeRefresh(reason: notification.name.rawValue)
     }
 
-    @objc private func handlePotentialAirPodsListeningModeNotification(_ notification: Notification) {
-        guard Defaults[.showAirPodsListeningModeChanges] else { return }
-        let name = notification.name.rawValue.lowercased()
-        let payload = notification.userInfo?
-            .map { "\($0.key)=\($0.value)" }
-            .joined(separator: " ")
-            .lowercased() ?? ""
-
-        let hasExplicitModePayload = payload.contains("listening") ||
-            payload.contains("lsnm") ||
-            payload.contains("noisecontrol") ||
-            payload.contains("anc") ||
-            payload.contains("transparency") ||
-            payload.contains("adaptive") ||
-            payload.contains("conversation")
-
-        let isSpecificSettingsNotification = name.contains("airpodspro.settingschanged") ||
-            name.contains("audioaccessory.prefschanged") ||
-            name.contains("controlcenter.airpods")
-
-        guard hasExplicitModePayload || isSpecificSettingsNotification else { return }
-        scheduleEventDrivenListeningModeRefresh(reason: notification.name.rawValue)
-    }
-
     private func handleAirPodsListeningModeDarwinNotification(_ name: String) {
         guard Defaults[.showAirPodsListeningModeChanges] else { return }
         scheduleEventDrivenListeningModeRefresh(reason: name)
