@@ -85,6 +85,40 @@ final class SpotifyLibraryTests: XCTestCase {
         }
     }
 
+    private actor SpotifyPlaybackRecorder {
+        private var events: [String] = []
+
+        func record(_ event: String) {
+            events.append(event)
+        }
+
+        func snapshot() -> [String] {
+            events
+        }
+    }
+
+    // MARK: - Playback commands
+
+    func testNextTrackRefreshesPlaybackInfoWithoutWaitingForNotification() async {
+        let recorder = SpotifyPlaybackRecorder()
+        let controller = SpotifyController(
+            commandUpdateDelay: .zero,
+            startsObservers: false,
+            commandExecutor: { command in
+                await recorder.record("command:\(command)")
+            },
+            playbackInfoFetcher: {
+                await recorder.record("refresh")
+                return nil
+            }
+        )
+
+        await controller.nextTrack()
+
+        let events = await recorder.snapshot()
+        XCTAssertEqual(events, ["command:next track", "refresh"])
+    }
+
     // MARK: - Rate limiting (item 6)
 
     func testRequestRetriesAfter429WithinCeiling() async {

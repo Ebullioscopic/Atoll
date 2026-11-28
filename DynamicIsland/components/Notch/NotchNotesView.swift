@@ -903,7 +903,11 @@ struct NoteEditorView: View {
     }
 
     @FocusState private var isContentFocused: Bool
-    
+
+    @EnvironmentObject var vm: DynamicIslandViewModel
+    private var suppressionToken = UUID()
+    @State private var isSuppressing = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Toolbar
@@ -1047,10 +1051,22 @@ struct NoteEditorView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity) // Ensure VStack takes full space
         .background(Color.black) // Ensure solid background
+        .onHover { hovering in
+            updateSuppression(for: hovering)
+        }
+        .onDisappear {
+            updateSuppression(for: false)
+        }
         .onAppear {
             if isNew {
                 isContentFocused = true
             }
         }
+    }
+
+    private func updateSuppression(for hovering: Bool) {
+        guard hovering != isSuppressing else { return }
+        isSuppressing = hovering
+        vm.setScrollGestureSuppression(hovering, token: suppressionToken)
     }
 }

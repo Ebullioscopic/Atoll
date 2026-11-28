@@ -44,6 +44,7 @@ struct AuthResponse: Decodable, Sendable {
 
 struct PlaybackResponse: Decodable, Sendable {
     let isPaused: Bool
+    let videoId: String?
     let title: String?
     let artist: String?
     let album: String?
@@ -101,6 +102,7 @@ extension PlaybackResponse {
             isPaused = true
         }
         
+        let videoId = (songData?["videoId"] as? String) ?? (websocketData["videoId"] as? String)
         let title = (songData?["title"] as? String) ??
                    (songData?["alternativeTitle"] as? String) ??
                    (websocketData["title"] as? String)
@@ -135,6 +137,7 @@ extension PlaybackResponse {
         
         return PlaybackResponse(
             isPaused: isPaused,
+            videoId: videoId,
             title: title,
             artist: artist,
             album: album,
@@ -149,6 +152,7 @@ extension PlaybackResponse {
     func with(elapsedSeconds: Double) -> PlaybackResponse {
         PlaybackResponse(
             isPaused: isPaused,
+            videoId: videoId,
             title: title,
             artist: artist,
             album: album,

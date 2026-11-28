@@ -87,16 +87,10 @@ struct sneakPeek {
     var targetScreenName: String? = nil
 }
 
-enum BrowserType {
-    case chromium
-    case safari
-}
-
 struct ExpandedItem {
     var show: Bool = false
     var type: SneakContentType = .battery
     var value: CGFloat = 0
-    var browser: BrowserType = .chromium
     var autoHideDuration: TimeInterval? = nil
 }
 
@@ -451,7 +445,6 @@ class DynamicIslandViewCoordinator: ObservableObject {
         status: Bool,
         type: SneakContentType,
         value: CGFloat = 0,
-        browser: BrowserType = .chromium,
         autoHideDuration: TimeInterval? = nil
     ) {
         Task { @MainActor in
@@ -459,7 +452,6 @@ class DynamicIslandViewCoordinator: ObservableObject {
                 self.expandingView.show = status
                 self.expandingView.type = type
                 self.expandingView.value = value
-                self.expandingView.browser = browser
                 self.expandingView.autoHideDuration = autoHideDuration
             }
         }

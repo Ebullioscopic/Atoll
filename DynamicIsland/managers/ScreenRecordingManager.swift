@@ -17,18 +17,15 @@
  */
 
 import Foundation
-import Combine
 import AppKit
-import Defaults
 import SwiftUI
-
-// MARK: - Private API Declarations
-// These private APIs provide direct screen capture detection
-// Use at your own risk - may break in future macOS versions
 
 @_silgen_name("CGSIsScreenWatcherPresent")
 func CGSIsScreenWatcherPresent() -> Bool
 
+// Private SkyLight/CGS symbols are intentionally isolated here. They provide
+// event-driven screen recording detection without polling, but they are not
+// public API and may change across macOS releases.
 @_silgen_name("CGSRegisterNotifyProc")
 func CGSRegisterNotifyProc(
     _ callback: (@convention(c) (Int32, Int32, Int32, UnsafeMutableRawPointer?) -> Void)?,
@@ -36,102 +33,212 @@ func CGSRegisterNotifyProc(
     _ context: UnsafeMutableRawPointer?
 ) -> Bool
 
-// MARK: - Global Callback Function
-// C function pointer cannot capture context, so we need a global function
+private func screenRecordingDebugLog(_ message: String) {
+#if DEBUG
+    print("ScreenRecordingManager: \(message)")
+#endif
+}
+
+private let screenSharingAppBundleIdentifiers: Set<String> = [
+    "com.apple.FaceTime",
+    "com.apple.ScreenSharing",
+    "com.cisco.webexmeetingsapp",
+    "com.hnc.Discord",
+    "com.microsoft.teams",
+    "com.microsoft.teams2",
+    "com.skype.skype",
+    "com.tinyspeck.slackmacgap",
+    "us.zoom.xos"
+]
+
+private let screenSharingAppNameTokens: [String] = [
+    "discord",
+    "facetime",
+    "microsoft teams",
+    "screen sharing",
+    "skype",
+    "slack",
+    "webex",
+    "zoom"
+]
+
+private func isScreenSharingApplication(_ application: NSRunningApplication?) -> Bool {
+    guard let application else { return false }
+
+    if let bundleIdentifier = application.bundleIdentifier,
+       screenSharingAppBundleIdentifiers.contains(bundleIdentifier) {
+        return true
+    }
+
+    let appName = (application.localizedName ?? "").lowercased()
+    return screenSharingAppNameTokens.contains { appName.contains($0) }
+}
+
 private func screenCaptureEventCallback(eventType: Int32, _: Int32, _: Int32, context: UnsafeMutableRawPointer?) {
-    guard let context = context else { return }
+    guard let context else { return }
     let manager = Unmanaged<ScreenRecordingManager>.fromOpaque(context).takeUnretainedValue()
-    
+
     DispatchQueue.main.async {
-        print("ScreenRecordingManager: 📢 Screen capture event received (type: \(eventType))")
+        screenRecordingDebugLog("Screen capture event received (type: \(eventType))")
         manager.checkRecordingStatus()
+    }
+}
+
+enum RecordingStopControlState: Equatable {
+    case unavailable
+    case ready
+    case sending
+    case failed(String)
+
+    var canSubmitStopRequest: Bool {
+        switch self {
+        case .ready, .failed:
+            return true
+        case .unavailable, .sending:
+            return false
+        }
+    }
+
+    var isSending: Bool {
+        self == .sending
+    }
+
+    var failureMessage: String? {
+        guard case let .failed(message) = self else { return nil }
+        return message
+    }
+}
+
+protocol ScreenRecordingStopControlling {
+    func requestStop() async -> Bool
+}
+
+struct NativeScreenRecordingStopController: ScreenRecordingStopControlling {
+    func requestStop() async -> Bool {
+        var sentStopRequest = await sendStopRecordingShortcutViaSystemEvents()
+
+        if Task.isCancelled { return sentStopRequest }
+        try? await Task.sleep(for: .milliseconds(120))
+        sentStopRequest = await sendStopRecordingShortcutViaCGEvent() || sentStopRequest
+
+        if Task.isCancelled { return sentStopRequest }
+        try? await Task.sleep(for: .milliseconds(300))
+        sentStopRequest = await sendStopRecordingShortcutViaSystemEvents() || sentStopRequest
+
+        return sentStopRequest
+    }
+
+    private func sendStopRecordingShortcutViaSystemEvents() async -> Bool {
+        let script = """
+        tell application "System Events"
+            key down command
+            key down control
+            key code 53
+            delay 0.05
+            key up control
+            key up command
+        end tell
+        """
+
+        do {
+            try await AppleScriptHelper.executeVoid(script)
+            screenRecordingDebugLog("Sent Command-Control-Escape through System Events")
+            return true
+        } catch {
+            screenRecordingDebugLog("System Events stop shortcut failed: \(error)")
+            return false
+        }
+    }
+
+    private func sendStopRecordingShortcutViaCGEvent() async -> Bool {
+        guard let source = CGEventSource(stateID: .hidSystemState) else {
+            screenRecordingDebugLog("Unable to create CGEventSource for stop shortcut")
+            return false
+        }
+
+        let flags: CGEventFlags = [.maskCommand, .maskControl]
+        let keyCode = CGKeyCode(53)
+        let taps: [CGEventTapLocation] = [.cghidEventTap, .cgSessionEventTap]
+
+        for tap in taps {
+            let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)
+            keyDown?.flags = flags
+            keyDown?.post(tap: tap)
+
+            try? await Task.sleep(for: .milliseconds(45))
+            guard !Task.isCancelled else { return false }
+
+            let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
+            keyUp?.flags = flags
+            keyUp?.post(tap: tap)
+
+            try? await Task.sleep(for: .milliseconds(80))
+            guard !Task.isCancelled else { return false }
+        }
+
+        screenRecordingDebugLog("Sent Command-Control-Escape CGEvent stop shortcut")
+        return true
     }
 }
 
 @MainActor
 class ScreenRecordingManager: ObservableObject {
     static let shared = ScreenRecordingManager()
-    
-    // MARK: - Coordinator
-    private let coordinator = DynamicIslandViewCoordinator.shared
-    
-    // MARK: - Published Properties
+
     @Published var isRecording: Bool = false
     @Published var isMonitoring: Bool = false
     @Published var recordingDuration: TimeInterval = 0
-    @Published var isRecorderIdle: Bool = true
-    @Published var lastUpdated: Date = .distantPast
-    
-    // MARK: - Private Properties
-    private var cancellables = Set<AnyCancellable>()
+    @Published var stopControlState: RecordingStopControlState = .unavailable
+    @Published var isScreenSharingAppActive: Bool = false
+
+    private let coordinator = DynamicIslandViewCoordinator.shared
+    private let stopController: ScreenRecordingStopControlling
     private var recordingStartTime: Date?
     private var durationTimer: Timer?
-    private var debounceIdleTask: Task<Void, Never>?
-    
-    // MARK: - Configuration
-    private let debounceDelay: TimeInterval = 0.2 // Debounce rapid changes
-    
-    // MARK: - Initialization
-    private init() {
-        // No initial setup needed
+    private var stopRequestTask: Task<Void, Never>?
+    private var stopFailureClearTask: Task<Void, Never>?
+    private var workspaceObservers: [NSObjectProtocol] = []
+
+    private init(stopController: ScreenRecordingStopControlling = NativeScreenRecordingStopController()) {
+        self.stopController = stopController
     }
-    
+
     deinit {
-        // Clean up monitoring state
-        // Note: We can't call async methods in deinit, so we just clean up local state
-        debounceIdleTask?.cancel()
+        stopRequestTask?.cancel()
+        stopFailureClearTask?.cancel()
         durationTimer?.invalidate()
     }
-    
-    // MARK: - Public Methods
-    
-    /// Start monitoring for screen recording activity
+
     func startMonitoring() {
-        guard !isMonitoring else { 
-            print("ScreenRecordingManager: Already monitoring, skipping start")
-            return 
+        guard !isMonitoring else {
+            screenRecordingDebugLog("Already monitoring, skipping start")
+            return
         }
-        
+
         isMonitoring = true
-        
-        print("ScreenRecordingManager: 🟢 Starting screen capture monitoring (Private API)...")
-        
-        // Setup event-driven capture detection using private CoreGraphics APIs
+        startScreenSharingAppMonitoring()
         setupPrivateAPINotifications()
-        
-        // Check initial state
         checkRecordingStatus()
-        
-        print("ScreenRecordingManager: ✅ Started monitoring (event-driven, no polling)")
+        screenRecordingDebugLog("Started screen capture monitoring")
     }
-    
-    /// Stop monitoring for screen recording activity
+
     func stopMonitoring() {
-        guard isMonitoring else { 
-            print("ScreenRecordingManager: Not monitoring, skipping stop")
-            return 
+        guard isMonitoring else {
+            screenRecordingDebugLog("Not monitoring, skipping stop")
+            return
         }
-        
-        print("ScreenRecordingManager: 🛑 Stopping monitoring...")
-        
+
         isMonitoring = false
-        
-        // Note: We don't unregister the callback as there's no CGSUnregisterNotifyProc API
-        // The callback will simply not be processed when isMonitoring is false
-        
-        // Stop duration tracking
+        stopScreenSharingAppMonitoring()
         stopDurationTracking()
-        
-        // Reset recording state when stopping
-        if isRecording {
-            print("ScreenRecordingManager: Resetting isRecording from true to false")
-        }
         isRecording = false
-        
-        print("ScreenRecordingManager: ✅ Stopped monitoring")
+        stopRequestTask?.cancel()
+        stopRequestTask = nil
+        clearStopFailure()
+        stopControlState = .unavailable
+        screenRecordingDebugLog("Stopped screen capture monitoring")
     }
-    
-    /// Toggle monitoring state
+
     func toggleMonitoring() {
         if isMonitoring {
             stopMonitoring()
@@ -139,133 +246,303 @@ class ScreenRecordingManager: ObservableObject {
             startMonitoring()
         }
     }
-    
-    // MARK: - Private Methods
-    
-    /// Setup private API notifications for screen capture events
-    private func setupPrivateAPINotifications() {
-        // Pass self as context to the global callback function
-        let context = Unmanaged.passUnretained(self).toOpaque()
-        
-        // Register for remote session events (screen capture start/stop)
-        // kCGSessionRemoteConnect - fires when screen sharing/recording starts
-        let registered1 = CGSRegisterNotifyProc(screenCaptureEventCallback, 1502, context)
-        
-        // kCGSessionRemoteDisconnect - fires when screen sharing/recording stops
-        let registered2 = CGSRegisterNotifyProc(screenCaptureEventCallback, 1503, context)
-        
-        if registered1 && registered2 {
-            print("ScreenRecordingManager: ✅ Private API notifications registered")
-        } else {
-            print("ScreenRecordingManager: ⚠️ Failed to register private API notifications")
+
+    func stopActiveRecording() {
+        guard isRecording, stopControlState.canSubmitStopRequest else { return }
+
+        clearStopFailure()
+        stopControlState = .sending
+        stopRequestTask?.cancel()
+
+        stopRequestTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            let nativeStopTask: Task<Void, Never>? = await isNativeMacOSScreenRecordingProcessActive()
+                ? Task { @MainActor [weak self] in
+                    await self?.stopNativeMacOSScreenRecordingProcesses()
+                }
+                : nil
+            let shortcutStopTask = Task<Bool, Never> { [stopController] in
+                await stopController.requestStop()
+            }
+
+            await waitForRecordingToStop(maxAttempts: 2)
+            guard !Task.isCancelled else { return }
+
+            if isRecording {
+                await nativeStopTask?.value
+                let shortcutSucceeded = await shortcutStopTask.value
+                if !shortcutSucceeded {
+                    screenRecordingDebugLog("All stop shortcut delivery attempts failed")
+                }
+            } else {
+                nativeStopTask?.cancel()
+                shortcutStopTask.cancel()
+            }
+            guard !Task.isCancelled else { return }
+
+            if isRecording {
+                await waitForRecordingToStop(maxAttempts: 8)
+            }
+
+            if isRecording {
+                publishStopFailure()
+            } else {
+                clearStopFailure()
+                stopControlState = .unavailable
+            }
+
+            stopRequestTask = nil
         }
     }
-    
-    /// Check current recording status using private API
-    func checkRecordingStatus() {
-        let currentRecordingState = CGSIsScreenWatcherPresent()
-        
-        // Debug: Always log current check
-        print("ScreenRecordingManager: 🔍 Checking... current=\(isRecording), detected=\(currentRecordingState)")
-        
-        // Debounce changes to avoid flickering
-        if currentRecordingState != isRecording {
-            print("ScreenRecordingManager: 🔄 State change detected (\(isRecording) -> \(currentRecordingState))")
-            
-            if currentRecordingState && !isRecording {
-                // Started recording
-                lastUpdated = Date()
-                startDurationTracking()
-                updateIdleState(recording: true)
-                // Trigger expanding view like music activity
-                coordinator.toggleExpandingView(status: true, type: .recording)
-                withAnimation(.smooth) {
-                    isRecording = currentRecordingState
-                }
-                print("ScreenRecordingManager: 🔴 Screen recording STARTED")
-            } else if !currentRecordingState && isRecording {
-                // Stopped recording - let expanding view auto-collapse naturally (like music)
-                lastUpdated = Date()
-                stopDurationTracking()
-                updateIdleState(recording: false)
-                withAnimation(.smooth) {
-                    isRecording = currentRecordingState
-                }
-                print("ScreenRecordingManager: ⚪ Screen recording STOPPED")
+
+    private func waitForRecordingToStop(maxAttempts: Int) async {
+        var attempts = 0
+        while attempts < maxAttempts {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+
+            checkRecordingStatus()
+            if !isRecording {
+                break
+            }
+            attempts += 1
+        }
+    }
+
+    private func isNativeMacOSScreenRecordingProcessActive() async -> Bool {
+        await isProcessRunning(named: "screencapture")
+    }
+
+    private func isProcessRunning(named processName: String) async -> Bool {
+        await Task.detached(priority: .userInitiated) {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+            task.arguments = ["-x", processName]
+            task.standardOutput = Pipe()
+            task.standardError = Pipe()
+
+            do {
+                try task.run()
+                task.waitUntilExit()
+                return task.terminationStatus == 0
+            } catch {
+                screenRecordingDebugLog("pgrep \(processName) failed: \(error)")
+                return false
+            }
+        }.value
+    }
+
+    private func stopNativeMacOSScreenRecordingProcesses() async {
+        let attempts = [
+            ["-INT", "screencapture"],
+            ["-TERM", "screencapture"],
+            ["-TERM", "screencaptureui"],
+            ["-TERM", "ScreenCaptureUI"]
+        ]
+
+        for arguments in attempts {
+            guard await isNativeMacOSScreenRecordingProcessActive() else { return }
+
+            await runKillall(arguments)
+            guard !Task.isCancelled else { return }
+
+            try? await Task.sleep(for: .milliseconds(180))
+            checkRecordingStatus()
+            if !isRecording {
+                return
             }
         }
     }
-    
-    /// Start tracking recording duration
+
+    private func runKillall(_ arguments: [String]) async {
+        await Task.detached(priority: .userInitiated) {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+            task.arguments = arguments
+            task.standardOutput = Pipe()
+            task.standardError = Pipe()
+
+            do {
+                try task.run()
+                task.waitUntilExit()
+            } catch {
+                screenRecordingDebugLog("killall \(arguments.joined(separator: " ")) failed: \(error)")
+            }
+        }.value
+    }
+
+    private func setupPrivateAPINotifications() {
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        let registeredConnect = CGSRegisterNotifyProc(screenCaptureEventCallback, 1502, context)
+        let registeredDisconnect = CGSRegisterNotifyProc(screenCaptureEventCallback, 1503, context)
+
+        if registeredConnect && registeredDisconnect {
+            screenRecordingDebugLog("Private API notifications registered")
+        } else {
+            screenRecordingDebugLog("Failed to register private API notifications")
+        }
+    }
+
+    private func startScreenSharingAppMonitoring() {
+        stopScreenSharingAppMonitoring()
+        updateScreenSharingAppState()
+
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        let activationObserver = workspaceCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateScreenSharingAppState()
+            }
+        }
+
+        let terminationObserver = workspaceCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateScreenSharingAppState()
+            }
+        }
+
+        workspaceObservers = [activationObserver, terminationObserver]
+    }
+
+    private func stopScreenSharingAppMonitoring() {
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        for observer in workspaceObservers {
+            workspaceCenter.removeObserver(observer)
+        }
+        workspaceObservers.removeAll()
+        isScreenSharingAppActive = false
+    }
+
+    private func updateScreenSharingAppState() {
+        let isActive = isScreenSharingApplication(NSWorkspace.shared.frontmostApplication)
+        guard isActive != isScreenSharingAppActive else { return }
+
+        isScreenSharingAppActive = isActive
+        screenRecordingDebugLog("Screen sharing app active: \(isActive)")
+    }
+
+    func checkRecordingStatus() {
+        let currentRecordingState = CGSIsScreenWatcherPresent()
+        guard currentRecordingState != isRecording else { return }
+
+        if currentRecordingState {
+            startDurationTracking()
+            clearStopFailure()
+            stopControlState = .ready
+            coordinator.toggleExpandingView(status: true, type: .recording)
+            withAnimation(.smooth) {
+                isRecording = true
+            }
+            screenRecordingDebugLog("Screen recording started")
+        } else {
+            stopDurationTracking()
+            stopRequestTask?.cancel()
+            stopRequestTask = nil
+            stopControlState = .unavailable
+            clearStopFailure()
+            coordinator.toggleExpandingView(status: false, type: .recording)
+            withAnimation(.smooth) {
+                isRecording = false
+            }
+            screenRecordingDebugLog("Screen recording stopped")
+        }
+    }
+
     private func startDurationTracking() {
         recordingStartTime = Date()
         recordingDuration = 0
-        
-        durationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        durationTimer?.invalidate()
+        durationTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.updateDuration()
             }
         }
-        
-        print("ScreenRecordingManager: ⏱️ Started duration tracking")
+
+        screenRecordingDebugLog("Started duration tracking")
     }
-    
-    /// Stop tracking recording duration
+
     private func stopDurationTracking() {
         durationTimer?.invalidate()
         durationTimer = nil
         recordingStartTime = nil
-        
-        // Keep the last duration for a moment before resetting
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.recordingDuration = 0
+            guard let self, !self.isRecording, self.recordingStartTime == nil else { return }
+            self.recordingDuration = 0
         }
-        
-        print("ScreenRecordingManager: ⏹️ Stopped duration tracking")
+
+        screenRecordingDebugLog("Stopped duration tracking")
     }
-    
-    /// Update the current recording duration
+
     private func updateDuration() {
-        guard let startTime = recordingStartTime else { return }
-        recordingDuration = Date().timeIntervalSince(startTime)
+        guard let recordingStartTime else { return }
+        recordingDuration = Date().timeIntervalSince(recordingStartTime)
     }
-    
-    /// Copy EXACT music idle state logic
-    private func updateIdleState(recording: Bool) {
-        if recording {
-            isRecorderIdle = false
-            debounceIdleTask?.cancel()
-        } else {
-            debounceIdleTask?.cancel()
-            debounceIdleTask = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(Defaults[.waitInterval]))
-                guard let self = self, !Task.isCancelled else { return }
-                await MainActor.run {
-                    if self.lastUpdated.timeIntervalSinceNow < -Defaults[.waitInterval] {
-                        withAnimation {
-                            self.isRecorderIdle = !self.isRecording
-                        }
-                    }
-                }
+
+    private func clearStopFailure() {
+        stopFailureClearTask?.cancel()
+        stopFailureClearTask = nil
+
+        if case .failed = stopControlState {
+            stopControlState = isRecording ? .ready : .unavailable
+        }
+    }
+
+    private func publishStopFailure() {
+        let message = String(localized: "Unable to stop recording. Use Command-Control-Escape or the macOS recording menu.")
+        stopControlState = .failed(message)
+        NSSound.beep()
+
+        stopFailureClearTask?.cancel()
+        stopFailureClearTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard let self, !Task.isCancelled else { return }
+            if case .failed = stopControlState {
+                stopControlState = isRecording ? .ready : .unavailable
             }
+            stopFailureClearTask = nil
         }
     }
 }
 
-// MARK: - Extensions
-
 extension ScreenRecordingManager {
-    /// Get current recording status without async
     var currentRecordingStatus: Bool {
-        return isRecording
+        isRecording
     }
-    
-    /// Check if monitoring is available (for settings UI)
+
     var isMonitoringAvailable: Bool {
-        return true // Window-based monitoring is always available
+        true
     }
-    
-    /// Get formatted recording duration string
+
+    var isSendingStopRequest: Bool {
+        stopControlState.isSending
+    }
+
+    var canStopFromHUD: Bool {
+        isRecording && stopControlState.canSubmitStopRequest
+    }
+
+    var shouldShowStopControlsInHUD: Bool {
+        switch stopControlState {
+        case .ready, .sending, .failed:
+            return isRecording
+        case .unavailable:
+            return false
+        }
+    }
+
+    var stopFailureMessage: String? {
+        stopControlState.failureMessage
+    }
+
     var formattedDuration: String {
         let totalSeconds = Int(recordingDuration)
         let minutes = totalSeconds / 60

@@ -18,6 +18,7 @@
 
 import SwiftUI
 import Lottie
+import Defaults
 
 @MainActor
 final class LockIconAnimator: ObservableObject {
@@ -86,18 +87,78 @@ struct LockIconProgressView: View {
     var progress: CGFloat
     var iconColor: Color = .white
 
+    @ObservedObject private var lockScreenManager = LockScreenManager.shared
+    @Default(.lockScreenLiveActivityIconStyle) private var iconStyle
+
+    private var isLocked: Bool {
+        progress >= 0.5 && !lockScreenManager.isFingerprintAnimating
+    }
+
     var body: some View {
-        if LockIconLottieView.isAvailable {
-            Rectangle()
-                .fill(iconColor)
-                .mask {
-                    LockIconLottieView(progress: 1 - progress)
-                        .scaleEffect(1.12)
+        // The system lock symbol rather than the bundled Lottie: the drawn one is
+        // noticeably lighter in the stroke and reads as a different icon next to
+        // everything else macOS puts on the lock screen. `.replace` gives the
+        // open-to-closed change the shackle movement the animation was there for.
+        Group {
+            if iconStyle.showsLock {
+                Image(systemName: isLocked ? "lock.fill" : "lock.open.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(iconColor)
+                    .contentTransition(.symbolEffect(.replace.downUp))
+                    .animation(.snappy(duration: 0.28), value: isLocked)
+            }
+        }
+    }
+}
+
+/// Biometric affordance shown instead of the lock icon. The lock-screen manager
+/// starts one shared scan state for both the in-app view and delegated overlay.
+struct LockScreenFingerprintProgressView: View {
+    var iconColor: Color = .white
+
+    private static let animation = LottieAnimation.named("FingerprintScan")
+    /// FingerprintScan.json is authored on an 800×600 canvas; this crops its
+    /// empty outer area so the central fingerprint fills the indicator frame.
+    private static let fingerprintCanvasCropScale: CGFloat = 2.65
+    private static let successColor = ColorValueProvider(
+        LottieColor(r: 0.18, g: 0.92, b: 0.34, a: 1)
+    )
+
+    @ObservedObject private var lockScreenManager = LockScreenManager.shared
+    @Default(.lockScreenLiveActivityIconStyle) private var iconStyle
+
+    var body: some View {
+        Group {
+            if iconStyle.showsFingerprint {
+                ZStack {
+                    Image(systemName: "touchid")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(iconColor)
+                        .opacity(lockScreenManager.isFingerprintAnimating ? 0 : 1)
+
+                    if lockScreenManager.isFingerprintAnimating, let animation = Self.animation {
+                        LottieView(animation: animation)
+                            .playing(
+                                .fromProgress(
+                                    0,
+                                    toProgress: 0.70,
+                                    loopMode: .playOnce
+                                )
+                            )
+                            .animationSpeed(5)
+                            .valueProvider(
+                                Self.successColor,
+                                for: "**.Stroke 1.Color"
+                            )
+                            .configuration(.init(renderingEngine: .mainThread))
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .scaleEffect(Self.fingerprintCanvasCropScale)
+                            .id(lockScreenManager.fingerprintAnimationGeneration)
+                    }
                 }
-        } else {
-            Image(systemName: progress >= 0.5 ? "lock.fill" : "lock.open.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(iconColor)
+                    .accessibilityLabel(lockScreenManager.isFingerprintAnimating ? "Unlocking" : "Fingerprint unlock")
+            }
         }
     }
 }
