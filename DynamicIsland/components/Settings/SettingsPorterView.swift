@@ -16,34 +16,24 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
-
-// MARK: - UTType extension
-
-extension UTType {
-    /// Custom uniform type identifier for `.atollsettings` files.
-    static let atollSettings = UTType(exportedAs: SettingsPorter.utType)
-}
 
 // MARK: - SettingsPorterSection
 
 /// Drop-in `Form` section that provides Export and Import buttons for
-/// Atoll's custom settings format.  Intended to be embedded inside
-/// `GeneralSettings.body` as its own `Section`.
+/// Atoll's settings backup (a `.json` file). Embedded in `GeneralSettings`.
 struct SettingsPorterSection: View {
 
     // MARK: State
-
-    @State private var isExporting = false
-    @State private var isImporting = false
-    @State private var exportData: Data? = nil
 
     @State private var alertTitle = ""
     @State private var alertMessage = ""
     @State private var showAlert = false
     @State private var showImportConfirmation = false
-    @State private var pendingImportData: Data? = nil
+    @State private var showRelaunchPrompt = false
+    @State private var pendingSettings: [String: Any]? = nil
     @State private var isProcessing = false
 
     // MARK: Body
@@ -55,40 +45,10 @@ struct SettingsPorterSection: View {
         } header: {
             Text("Settings Backup")
         } footer: {
-            Text("Export your current settings to a \(Text(".atollsettings").fontWeight(.medium)) file you can share or restore later. API keys and authentication tokens are not included.")
+            Text("Export your settings to a file you can restore later or on another Mac. API keys, sign-ins, clipboard history and notes are not included.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        // Export file panel
-        .fileExporter(
-            isPresented: $isExporting,
-            document: exportData.map { AtollSettingsDocument(data: $0) },
-            contentType: .atollSettings,
-            defaultFilename: defaultExportFilename
-        ) { result in
-            isProcessing = false
-            switch result {
-            case .success:
-                break
-            case .failure(let error):
-                showError(title: String(localized: "Export Failed"), error: error)
-            }
-        }
-        // Import file panel
-        .fileImporter(
-            isPresented: $isImporting,
-            allowedContentTypes: [.atollSettings, .json],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                loadImportFile(url: url)
-            case .failure(let error):
-                showError(title: String(localized: "Import Failed"), error: error)
-            }
-        }
-        // Import confirmation dialog
         .confirmationDialog(
             String(localized: "Replace Current Settings?"),
             isPresented: $showImportConfirmation,
@@ -98,12 +58,19 @@ struct SettingsPorterSection: View {
                 applyImport()
             }
             Button("Cancel", role: .cancel) {
-                pendingImportData = nil
+                pendingSettings = nil
             }
         } message: {
             Text("This will overwrite all your current Atoll settings with the values from the imported file. This cannot be undone.")
         }
-        // Generic alert for errors / success
+        .alert(String(localized: "Settings Imported"), isPresented: $showRelaunchPrompt) {
+            Button("Relaunch Now") {
+                SettingsPorter.relaunch()
+            }
+            Button("Later", role: .cancel) {}
+        } message: {
+            Text("Your settings have been restored. Relaunch Atoll so every feature picks up the imported settings.")
+        }
         .alert(alertTitle, isPresented: $showAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -142,7 +109,7 @@ struct SettingsPorterSection: View {
             }
             Spacer()
             Button {
-                isImporting = true
+                beginImport()
             } label: {
                 Label("Import…", systemImage: "square.and.arrow.down")
             }
@@ -154,100 +121,91 @@ struct SettingsPorterSection: View {
     // MARK: Actions
 
     private func beginExport() {
-        isProcessing = true
-        Task.detached(priority: .userInitiated) {
-            do {
-                let data = try SettingsPorter.exportData()
-                await MainActor.run {
-                    self.exportData = data
-                    self.isExporting = true
-                }
-            } catch {
-                await MainActor.run {
-                    self.isProcessing = false
-                    self.showError(title: String(localized: "Export Failed"), error: error)
+        let data: Data
+        do {
+            data = try SettingsPorter.exportData()
+        } catch {
+            showError(title: String(localized: "Export Failed"), error: error)
+            return
+        }
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = defaultExportFilename
+        panel.canCreateDirectories = true
+        present(panel) { url in
+            isProcessing = true
+            Task.detached(priority: .userInitiated) {
+                do {
+                    try data.write(to: url, options: .atomic)
+                    await MainActor.run { isProcessing = false }
+                } catch {
+                    await MainActor.run {
+                        isProcessing = false
+                        showError(title: String(localized: "Export Failed"), error: error)
+                    }
                 }
             }
         }
     }
 
-    private func loadImportFile(url: URL) {
-        Task.detached(priority: .userInitiated) {
-            let accessing = url.startAccessingSecurityScopedResource()
-            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-            do {
-                let data = try Data(contentsOf: url)
-                // Validate the data before asking the user
-                _ = try JSONDecoder().decode(AtollSettingsSnapshot.self, from: data)
-                await MainActor.run {
-                    self.pendingImportData = data
-                    self.showImportConfirmation = true
-                }
-            } catch {
-                await MainActor.run {
-                    self.showError(title: String(localized: "Invalid Settings File"), error: error)
+    private func beginImport() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        present(panel) { url in
+            isProcessing = true
+            Task.detached(priority: .userInitiated) {
+                do {
+                    let settings = try SettingsPorter.validate(Data(contentsOf: url))
+                    await MainActor.run {
+                        isProcessing = false
+                        pendingSettings = settings
+                        showImportConfirmation = true
+                    }
+                } catch {
+                    await MainActor.run {
+                        isProcessing = false
+                        showError(title: String(localized: "Invalid Settings File"), error: error)
+                    }
                 }
             }
         }
     }
 
     private func applyImport() {
-        guard let data = pendingImportData else { return }
-        isProcessing = true
-        Task.detached(priority: .userInitiated) {
-            do {
-                try SettingsPorter.importData(data)
-                await MainActor.run {
-                    self.isProcessing = false
-                    self.pendingImportData = nil
-                    self.alertTitle = String(localized: "Settings Imported")
-                    self.alertMessage = String(localized: "Your settings have been restored successfully. Some changes may require restarting Atoll to take full effect.")
-                    self.showAlert = true
-                }
-            } catch {
-                await MainActor.run {
-                    self.isProcessing = false
-                    self.showError(title: String(localized: "Import Failed"), error: error)
-                }
-            }
-        }
+        guard let settings = pendingSettings else { return }
+        pendingSettings = nil
+        SettingsPorter.apply(settings)
+        showRelaunchPrompt = true
     }
 
     // MARK: Helpers
 
+    /// Shows the panel as a sheet on the Settings window when possible.
+    private func present(_ panel: NSSavePanel, completion: @escaping (URL) -> Void) {
+        let handler: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, let url = panel.url else { return }
+            completion(url)
+        }
+        if let window = NSApp.keyWindow {
+            panel.beginSheetModal(for: window, completionHandler: handler)
+        } else {
+            panel.begin(completionHandler: handler)
+        }
+    }
+
     private var defaultExportFilename: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        return "Atoll-Settings-\(formatter.string(from: Date())).\(SettingsPorter.fileExtension)"
+        return "Atoll Settings \(formatter.string(from: Date())).json"
     }
 
     private func showError(title: String, error: Error) {
         alertTitle = title
         alertMessage = error.localizedDescription
         showAlert = true
-    }
-}
-
-// MARK: - AtollSettingsDocument
-
-/// `FileDocument` wrapper so `fileExporter` can write the JSON data to disk.
-struct AtollSettingsDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.atollSettings, .json] }
-
-    var data: Data
-
-    init(data: Data) {
-        self.data = data
-    }
-
-    init(configuration: ReadConfiguration) throws {
-        guard let fileData = configuration.file.regularFileContents else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        self.data = fileData
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: data)
     }
 }

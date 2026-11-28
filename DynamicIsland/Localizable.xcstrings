@@ -91881,7 +91881,24 @@
         }
       },
       "shouldTranslate" : false
-    }
+    },
+    "Settings Backup" : {},
+    "Export your settings to a file you can restore later or on another Mac. API keys, sign-ins, clipboard history and notes are not included." : {},
+    "Replace Current Settings?" : {},
+    "Import and Replace" : {},
+    "This will overwrite all your current Atoll settings with the values from the imported file. This cannot be undone." : {},
+    "Settings Imported" : {},
+    "Relaunch Now" : {},
+    "Your settings have been restored. Relaunch Atoll so every feature picks up the imported settings." : {},
+    "Export Settings" : {},
+    "Save all settings to a file" : {},
+    "Export…" : {},
+    "Import Settings" : {},
+    "Restore settings from a file" : {},
+    "Import…" : {},
+    "Invalid Settings File" : {},
+    "The file is not an Atoll settings backup." : {},
+    "This settings file was created by a newer version of Atoll. Update Atoll and try again." : {}
   },
   "version" : "1.2"
 }
