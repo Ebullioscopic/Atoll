@@ -248,6 +248,8 @@ struct ContentView: View {
     @State private var hoverClickLocalMonitor: Any?
     @State private var stickyTerminalClickMonitor: Any?
     @State private var hiddenEdgeHoverPollingTask: Task<Void, Never>?
+    @State private var retainedHoverExitWatchdogTask: Task<Void, Never>?
+    @State private var retainedHoverExitWatchdogGeneration: Int = 0
     @State private var isHoveringClosedMusicWaveformControl: Bool = false
 
     @State private var gestureProgress: CGFloat = .zero
@@ -782,6 +784,7 @@ struct ContentView: View {
                 }
                 if newState == .closed {
                     removeStickyTerminalClickMonitor()
+                    stopRetainedHoverExitWatchdog()
                 } else {
                     // Install the outside-click monitor for terminal opens that don't
                     // change `currentView` (e.g. shortcut re-opening with the terminal
@@ -2156,6 +2159,7 @@ struct ContentView: View {
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
         stopHiddenEdgeHoverPolling()
+        stopRetainedHoverExitWatchdog()
         cancelMusicControlWindowSync()
         hideMusicControlWindow()
         cancelMusicControlVisibilityTimer()
@@ -2301,8 +2305,11 @@ struct ContentView: View {
     
     /// Handle hover state changes with debouncing
     private func handleHover(_ hovering: Bool) {
-        // Ignore false hover-exit when the cursor is parked on the screen's top pixel.
-        if !hovering, shouldRetainHoverAtScreenTopEdge() {
+        // Ignore false hover-exit when the cursor is still on the panel: growing
+        // the panel swaps its tracking area under a cursor that never moved, and
+        // AppKit reports that as an exit without ever reporting the enter again.
+        if !hovering, shouldRetainHoverExit() {
+            startRetainedHoverExitWatchdog()
             return
         }
 
@@ -2323,6 +2330,7 @@ struct ContentView: View {
         }
 
         if hovering {
+            stopRetainedHoverExitWatchdog()
             withAnimation(.bouncy.speed(1.2)) {
                 isHovering = true
             }
@@ -2366,7 +2374,8 @@ struct ContentView: View {
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    if self.shouldRetainHoverAtScreenTopEdge() {
+                    if self.shouldRetainHoverExit() {
+                        self.startRetainedHoverExitWatchdog()
                         return
                     }
                     self.finishHoverExit()
@@ -2391,17 +2400,67 @@ struct ContentView: View {
         }
     }
 
-    private func shouldRetainHoverAtScreenTopEdge(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
-        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
-            return false
-        }
+    /// Whether a hover-exit report should be ignored because the cursor is
+    /// demonstrably still on the panel.
+    ///
+    /// `.onHover` is what closes the notch, so a false exit closes it right after
+    /// it opened (see #457). The panel is only a few points tall while closed, so
+    /// a cursor parked on the screen's top pixel counts as on it.
+    private func shouldRetainHoverExit(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
         guard isHovering || vm.notchState == .open else { return false }
-        guard location.y >= screen.frame.maxY - 1.5 else { return false }
 
         if vm.notchState == .open {
             return isPointInsideNotchWindow(location)
         }
+
+        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }),
+              location.y >= screen.frame.maxY - 1.5 else {
+            return false
+        }
+
         return isMouseOverClosedNotchHitArea(location)
+    }
+
+    /// Watches the cursor after a hover-exit report was retained, because AppKit
+    /// will not report another exit for the tracking area that produced it. Two
+    /// consecutive samples off the panel finish the exit for real.
+    private func startRetainedHoverExitWatchdog() {
+        guard retainedHoverExitWatchdogTask == nil else { return }
+
+        retainedHoverExitWatchdogGeneration &+= 1
+        let generation = retainedHoverExitWatchdogGeneration
+
+        retainedHoverExitWatchdogTask = Task { @MainActor in
+            var consecutiveOutsideSamples = 0
+
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(80))
+                guard !Task.isCancelled else { break }
+                guard self.vm.notchState == .open else { break }
+
+                if self.shouldRetainHoverExit() {
+                    consecutiveOutsideSamples = 0
+                    continue
+                }
+
+                consecutiveOutsideSamples += 1
+                guard consecutiveOutsideSamples >= 2 else { continue }
+
+                self.stopHoverClickMonitor()
+                self.finishHoverExit()
+                break
+            }
+
+            if self.retainedHoverExitWatchdogGeneration == generation {
+                self.retainedHoverExitWatchdogTask = nil
+            }
+        }
+    }
+
+    private func stopRetainedHoverExitWatchdog() {
+        retainedHoverExitWatchdogGeneration &+= 1
+        retainedHoverExitWatchdogTask?.cancel()
+        retainedHoverExitWatchdogTask = nil
     }
 
     private func isMouseOverClosedNotchHitArea(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {

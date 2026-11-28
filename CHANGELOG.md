@@ -183,6 +183,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Recover the Claude quota display after Claude Code rotates its OAuth token, instead of showing "quota unavailable" until the app is restarted (#685).
 - Fixed the Claude quota staying "quota unavailable" on recent Claude Code versions, which store the OAuth token under a per-install hash-suffixed Keychain item (`Claude Code-credentials-<hash>`) and no longer update the un-suffixed item the app read; the freshest matching item is now used (#699, follow-up to #685).
 - Normalized Claude model IDs when pricing local usage so newer IDs are costed instead of showing `US$0.00+`, and show an explicit unavailable/partial estimate when a model isn't in the pricing table (#683, #664).
+- **A hover exit no longer closes the notch it just opened**: opening resizes the panel, which swaps its tracking area under a cursor that never moved, so AppKit reported an exit without a matching enter and the debounced handler closed the notch a frame later — most visibly after a fast flick to the notch, which then either flashed open and shut or did not open at all. A hover exit is now ignored while the cursor is still inside the panel, and a cursor check finishes the exit once the pointer really leaves, since AppKit will not report the next exit for an area that already "exited". (#457)
 
 ### Removed
 
