@@ -172,7 +172,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
             timer: Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] == .tab,
             stats: Defaults[.enableStatsFeature],
             llmUsage: Defaults[.enableLLMUsageFeature],
-            notes: Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab),
+            notes: Defaults[.enableNotes] || (ClipboardProviderManager.usesBuiltInClipboard && Defaults[.clipboardDisplayMode] == .separateTab),
             terminal: Defaults[.enableTerminalFeature]
         ).available
     }
@@ -307,6 +307,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
             Defaults.publisher(.enableNotes).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableClipboardManager).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.clipboardDisplayMode).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.clipboardProvider).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableTerminalFeature).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableMinimalisticUI).map { _ in () }.eraseToAnyPublisher()
         )

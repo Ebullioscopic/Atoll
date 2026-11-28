@@ -774,6 +774,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup Lunar integration
         LunarManager.shared.configure(coordinator: coordinator)
+
+        // Bring up the clipboard provider router so it can detect an external clipboard
+        // app (Maccy) and keep Atoll's own polling in step with the user's choice.
+        ClipboardProviderManager.shared.refreshDetectionStatus()
         
         // Honour "Save History Across Restarts" before anything can read the
         // stored history back.
@@ -1439,6 +1443,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             guard Defaults[.enableShortcuts], Defaults[.enableClipboardManager] else { return }
 
+            // An external clipboard app owns the feature: hand the shortcut to it and
+            // skip Atoll's own history entirely.
+            if ClipboardProviderManager.handleClipboardTrigger() { return }
+
             if !ClipboardManager.shared.isMonitoring {
                 ClipboardManager.shared.startMonitoring()
             }
@@ -1554,7 +1562,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func updateFeatureShortcutAvailability() {
         updateShortcut(.startDemoTimer, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableTimerFeature])
-        updateShortcut(.clipboardHistoryPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableClipboardManager])
+        // An external clipboard app owns the clipboard hotkey while it is selected.
+        ClipboardProviderManager.shared.syncShortcutRegistration()
         updateShortcut(.colorPickerPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableColorPickerFeature])
         updateShortcut(.screenAssistantPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableScreenAssistant])
         updateShortcut(.toggleTerminalTab, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableTerminalFeature])

@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Lyrics on the side**: Added ability to show lyrics of the current song when calendar is disabled (#741)
 
+- **Maccy as clipboard source**: A new "Clipboard Source" setting hands the clipboard over to [Maccy](https://maccy.app) instead of Atoll's own history. The notch clipboard icon then opens Maccy, Atoll stops polling the pasteboard, and its own clipboard panel and tabs are hidden. Atoll also releases its clipboard shortcut while an external app is selected: Atoll's default Cmd+Shift+C is Maccy's default popup hotkey too, so both apps answered one key press and the popup only flashed open and shut. Atoll's built-in manager stays the default, and is used automatically when the selected app isn't installed. (#748)
 - **New API provider**: monitor multiple New API accounts with balance, usage (today/week), RPM, TPM, and request counts in the LLM Usage tab (#752)
 - Secure API key storage in macOS Keychain; account metadata in UserDefaults
 - Per-account error isolation — one account's failure doesn't block others

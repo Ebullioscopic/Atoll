@@ -461,6 +461,7 @@ private enum SettingsSearchIndex {
 
         // Clipboard
         SettingsSearchEntry(tab: .clipboard, title: "Enable Clipboard Manager", keywords: ["clipboard", "manager"], highlightID: SettingsTab.clipboard.highlightID(for: "Enable Clipboard Manager")),
+        SettingsSearchEntry(tab: .clipboard, title: "Clipboard Source", keywords: ["maccy", "provider", "third-party", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Clipboard Source")),
         SettingsSearchEntry(tab: .clipboard, title: "Show Clipboard Icon", keywords: ["icon", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Show Clipboard Icon")),
         SettingsSearchEntry(tab: .clipboard, title: "Save History Across Restarts", keywords: ["clipboard", "history", "save", "persist", "privacy", "disk", "disable"], highlightID: SettingsTab.clipboard.highlightID(for: "Enable Clipboard Manager")),
         SettingsSearchEntry(tab: .clipboard, title: "Display Mode", keywords: ["list", "grid", "clipboard"], highlightID: SettingsTab.clipboard.highlightID(for: "Display Mode")),
@@ -8697,13 +8698,42 @@ private func boundShortcutDescription(for name: KeyboardShortcuts.Name) -> Strin
 
 struct ClipboardSettings: View {
     @ObservedObject var clipboardManager = ClipboardManager.shared
+    @ObservedObject private var providerManager = ClipboardProviderManager.shared
     @Default(.enableClipboardManager) var enableClipboardManager
     @Default(.clipboardHistorySize) var clipboardHistorySize
     @Default(.showClipboardIcon) var showClipboardIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
+    @Default(.clipboardProvider) var clipboardProvider
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.clipboard.highlightID(for: title)
+    }
+
+    /// Mirrors `ClipboardProviderManager.resolvedProvider`, but reads the observed manager
+    /// so the form re-renders as soon as the external app is installed or removed.
+    private var usesBuiltInClipboard: Bool {
+        !(clipboardProvider.isExternal && providerManager.isDetected)
+    }
+
+    private var providerStatusText: String {
+        if !providerManager.isDetected { return String(localized: "Not installed") }
+        return providerManager.isRunning ? String(localized: "Running") : String(localized: "Installed")
+    }
+
+    private var providerStatusColor: Color {
+        if !providerManager.isDetected { return .secondary }
+        return providerManager.isRunning ? .green : .orange
+    }
+
+    private var providerStatusDescription: String {
+        let name = clipboardProvider.displayName
+        if !providerManager.isDetected {
+            return String(localized: "\(name) isn't installed. Atoll uses its own history for now.")
+        }
+        if !providerManager.isRunning {
+            return String(localized: "\(name) isn't running yet. Atoll opens it the first time you use the clipboard.")
+        }
+        return String(localized: "The notch clipboard icon opens \(name). From the keyboard, use \(name)'s own hotkey.")
     }
 
     var body: some View {
@@ -8714,7 +8744,7 @@ struct ClipboardSettings: View {
                 }
                 .settingsHighlight(id: highlightID("Enable Clipboard Manager"))
                 .onChange(of: enableClipboardManager) { _, enabled in
-                    if enabled {
+                    if enabled && usesBuiltInClipboard {
                         clipboardManager.startMonitoring()
                     } else {
                         clipboardManager.stopMonitoring()
@@ -8731,15 +8761,17 @@ struct ClipboardSettings: View {
             }
 
             if enableClipboardManager {
-                Section {
-                    Defaults.Toggle(key: .persistClipboardHistory) {
-                        Text("Save History Across Restarts")
+                if usesBuiltInClipboard {
+                    Section {
+                        Defaults.Toggle(key: .persistClipboardHistory) {
+                            Text("Save History Across Restarts")
+                        }
+                        .settingsHighlight(id: highlightID("Save History Across Restarts"))
+                    } header: {
+                        Text("Privacy")
+                    } footer: {
+                        Text("When off, clipboard history is kept in memory for this session only and is never written to disk. Turning it off also erases history that was already saved. Pinned items are kept either way.")
                     }
-                    .settingsHighlight(id: highlightID("Save History Across Restarts"))
-                } header: {
-                    Text("Privacy")
-                } footer: {
-                    Text("When off, clipboard history is kept in memory for this session only and is never written to disk. Turning it off also erases history that was already saved. Pinned items are kept either way.")
                 }
 
                 Section {
@@ -8748,110 +8780,176 @@ struct ClipboardSettings: View {
                     }
                     .settingsHighlight(id: highlightID("Show Clipboard Icon"))
 
-                    HStack {
-                        Text("Display Mode")
-                        Spacer()
-                        Picker("", selection: $clipboardDisplayMode) {
-                            ForEach(ClipboardDisplayMode.allCases, id: \.self) { mode in
-                                Text(mode.displayName).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(minWidth: 100)
-                    }
-                    .settingsHighlight(id: highlightID("Display Mode"))
-
-                    HStack {
-                        Text("History Size")
-                        Spacer()
-                        Picker("", selection: $clipboardHistorySize) {
-                            Text("3 items").tag(3)
-                            Text("5 items").tag(5)
-                            Text("7 items").tag(7)
-                            Text("10 items").tag(10)
-                        }
-                        .pickerStyle(.menu)
-                        .frame(minWidth: 100)
-                    }
-                    .settingsHighlight(id: highlightID("History Size"))
-
-                    HStack {
-                        Text("Current Items")
-                        Spacer()
-                        Text("\(clipboardManager.clipboardHistory.count)")
-                            .foregroundColor(.secondary)
-                    }
-
-                    HStack {
-                        Text("Pinned Items")
-                        Spacer()
-                        Text("\(clipboardManager.pinnedItems.count)")
-                            .foregroundColor(.secondary)
-                    }
-
-                    HStack {
-                        Text("Monitoring Status")
-                        Spacer()
-                        Text(clipboardManager.isMonitoring ? "Active" : "Stopped")
-                            .foregroundColor(clipboardManager.isMonitoring ? .green : .secondary)
-                    }
-                } header: {
-                    Text("Settings")
-                } footer: {
-                    switch clipboardDisplayMode {
-                    case .popover:
-                        Text("Popover mode shows clipboard as a dropdown attached to the clipboard button.")
-                    case .panel:
-                        Text("Panel mode shows clipboard in a floating window near the notch.")
-                    case .separateTab:
-                        Text("Separate Tab mode integrates Copied Items and Notes into a single view. If both are enabled, Notes appear on the right and Clipboard on the left.")
-                    case .notchTab:
-                        Text("Notch Tab mode shows clipboard in its own tab inside the notch. Drag text, image, or single-file items straight out to Finder or another app.")
-                    }
-                }
-
-                Section {
-                    Button("Clear Clipboard History") {
-                        clipboardManager.clearHistory()
-                    }
-                    .foregroundColor(.red)
-                    .disabled(clipboardManager.clipboardHistory.isEmpty)
-
-                    Button("Clear Pinned Items") {
-                        clipboardManager.clearPinnedItems()
-                    }
-                    .foregroundColor(.red)
-                    .disabled(clipboardManager.pinnedItems.isEmpty)
-                } header: {
-                    Text("Actions")
-                } footer: {
-                    Text("Clear clipboard history removes recent copies. Clear pinned items removes your favorites. Both actions are permanent.")
-                }
-
-                if !clipboardManager.clipboardHistory.isEmpty {
-                    Section {
-                        ForEach(clipboardManager.clipboardHistory) { item in
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Image(systemName: item.type.icon)
-                                        .foregroundColor(.blue)
-                                        .frame(width: 16)
-                                    Text(item.type.displayName)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Spacer()
-                                    Text(timeAgoString(from: item.timestamp))
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
+                    Picker(selection: $clipboardProvider) {
+                        ForEach(ClipboardProvider.allCases) { provider in
+                            HStack {
+                                if provider.isExternal {
+                                    AppIconImage(
+                                        bundleIdentifiers: provider.bundleIdentifiers,
+                                        symbolFallback: "doc.on.clipboard",
+                                        symbolColor: .secondary
+                                    )
                                 }
-                                Text(item.preview)
-                                    .font(.system(.body, design: .monospaced))
-                                    .lineLimit(2)
+                                Text(provider.displayName)
                             }
-                            .padding(.vertical, 2)
+                            .tag(provider)
+                        }
+                    } label: {
+                        Text("Clipboard Source")
+                    }
+                    .settingsHighlight(id: highlightID("Clipboard Source"))
+
+                    if clipboardProvider.isExternal {
+                        HStack {
+                            Text("Status")
+                            Spacer()
+                            Text(providerStatusText)
+                                .font(.caption)
+                                .foregroundStyle(providerStatusColor)
+                        }
+
+                        Text(providerStatusDescription)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 16) {
+                            Button {
+                                providerManager.refreshAndSync()
+                            } label: {
+                                Label("Refresh detection", systemImage: "arrow.clockwise")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.link)
+
+                            if providerManager.isDetected {
+                                Button {
+                                    ClipboardProviderManager.openProviderPopup(clipboardProvider)
+                                } label: {
+                                    Label("Open \(clipboardProvider.displayName)", systemImage: "arrow.up.forward.app")
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.link)
+                            } else if let downloadURL = clipboardProvider.downloadURL {
+                                Link(destination: downloadURL) {
+                                    Label("Get \(clipboardProvider.displayName)", systemImage: "arrow.down.circle")
+                                        .font(.caption)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Clipboard Source")
+                } footer: {
+                    Text(clipboardProvider.description)
+                }
+
+                if usesBuiltInClipboard {
+                    Section {
+                        HStack {
+                            Text("Display Mode")
+                            Spacer()
+                            Picker("", selection: $clipboardDisplayMode) {
+                                ForEach(ClipboardDisplayMode.allCases, id: \.self) { mode in
+                                    Text(mode.displayName).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(minWidth: 100)
+                        }
+                        .settingsHighlight(id: highlightID("Display Mode"))
+
+                        HStack {
+                            Text("History Size")
+                            Spacer()
+                            Picker("", selection: $clipboardHistorySize) {
+                                Text("3 items").tag(3)
+                                Text("5 items").tag(5)
+                                Text("7 items").tag(7)
+                                Text("10 items").tag(10)
+                            }
+                            .pickerStyle(.menu)
+                            .frame(minWidth: 100)
+                        }
+                        .settingsHighlight(id: highlightID("History Size"))
+
+                        HStack {
+                            Text("Current Items")
+                            Spacer()
+                            Text("\(clipboardManager.clipboardHistory.count)")
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack {
+                            Text("Pinned Items")
+                            Spacer()
+                            Text("\(clipboardManager.pinnedItems.count)")
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack {
+                            Text("Monitoring Status")
+                            Spacer()
+                            Text(clipboardManager.isMonitoring ? "Active" : "Stopped")
+                                .foregroundColor(clipboardManager.isMonitoring ? .green : .secondary)
                         }
                     } header: {
-                        Text("Current History")
+                        Text("Settings")
+                    } footer: {
+                        switch clipboardDisplayMode {
+                        case .popover:
+                            Text("Popover mode shows clipboard as a dropdown attached to the clipboard button.")
+                        case .panel:
+                            Text("Panel mode shows clipboard in a floating window near the notch.")
+                        case .separateTab:
+                            Text("Separate Tab mode integrates Copied Items and Notes into a single view. If both are enabled, Notes appear on the right and Clipboard on the left.")
+                        case .notchTab:
+                            Text("Notch Tab mode shows clipboard in its own tab inside the notch. Drag text, image, or single-file items straight out to Finder or another app.")
+                        }
+                    }
+
+                    Section {
+                        Button("Clear Clipboard History") {
+                            clipboardManager.clearHistory()
+                        }
+                        .foregroundColor(.red)
+                        .disabled(clipboardManager.clipboardHistory.isEmpty)
+
+                        Button("Clear Pinned Items") {
+                            clipboardManager.clearPinnedItems()
+                        }
+                        .foregroundColor(.red)
+                        .disabled(clipboardManager.pinnedItems.isEmpty)
+                    } header: {
+                        Text("Actions")
+                    } footer: {
+                        Text("Clear clipboard history removes recent copies. Clear pinned items removes your favorites. Both actions are permanent.")
+                    }
+
+                    if !clipboardManager.clipboardHistory.isEmpty {
+                        Section {
+                            ForEach(clipboardManager.clipboardHistory) { item in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Image(systemName: item.type.icon)
+                                            .foregroundColor(.blue)
+                                            .frame(width: 16)
+                                        Text(item.type.displayName)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                        Text(timeAgoString(from: item.timestamp))
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Text(item.preview)
+                                        .font(.system(.body, design: .monospaced))
+                                        .lineLimit(2)
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        } header: {
+                            Text("Current History")
+                        }
                     }
                 }
             }
@@ -8859,7 +8957,8 @@ struct ClipboardSettings: View {
         .formStyle(.grouped)
         .navigationTitle("Clipboard")
         .onAppear {
-            if enableClipboardManager && !clipboardManager.isMonitoring {
+            providerManager.refreshAndSync()
+            if usesBuiltInClipboard && enableClipboardManager && !clipboardManager.isMonitoring {
                 clipboardManager.startMonitoring()
             }
         }
