@@ -32,6 +32,49 @@ struct ClosedWingsGatherableKey: PreferenceKey {
     }
 }
 
+/// A zero-spacing row for the closed music activity's three sections, given in
+/// the order artwork wing, middle, trailing wing, and placed in the order that
+/// `placement` calls for.
+///
+/// Each section is declared once and reordered here rather than repeated in a
+/// `switch`: repeating the same opaque-typed sections in several branches makes
+/// the Release (whole-module) build reject `ContentView.body` as an opaque type
+/// defined in terms of itself.
+struct ClosedMusicSectionsLayout: Layout {
+    var placement: ClosedActivityPlacement
+
+    /// Indices of the sections from leading to trailing edge.
+    static func order(for placement: ClosedActivityPlacement) -> [Int] {
+        switch placement {
+        case .trailing: return [1, 0, 2]
+        case .leading: return [0, 2, 1]
+        case .centered, .retracted: return [0, 1, 2]
+        }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        return CGSize(
+            width: sizes.reduce(0) { $0 + $1.width },
+            height: sizes.map(\.height).max() ?? 0
+        )
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let order = subviews.count == 3 ? Self.order(for: placement) : Array(subviews.indices)
+        var x = bounds.minX
+        for index in order {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            subviews[index].place(
+                at: CGPoint(x: x, y: bounds.midY),
+                anchor: .leading,
+                proposal: ProposedViewSize(size)
+            )
+            x += size.width
+        }
+    }
+}
+
 /// The frontmost app's menus as read from one display's menu bar.
 struct AppMenuBar: Equatable {
     /// Horizontal extent of each menu, in global screen coordinates.

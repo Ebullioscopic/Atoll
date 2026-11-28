@@ -1541,22 +1541,14 @@ struct ContentView: View {
 
         // When the menus leave room on one side only, both wings move there
         // (see `closedActivityPlacement`); the surface is shifted to match.
-        HStack(spacing: 0) {
-            switch closedActivityPlacement {
-            case .trailing:
-                musicCenterSection(width: effectiveCenterWidth, height: notchContentHeight)
-                musicArtworkWing(for: secondary, artworkSize: artworkSize, wingWidth: wingBaseWidth, height: notchContentHeight, badgeSize: badgeDisplaySize, badgeOffset: badgeOffset)
-                musicTrailingWing(for: secondary, width: rightWingWidth, height: notchContentHeight)
-            case .leading:
-                musicArtworkWing(for: secondary, artworkSize: artworkSize, wingWidth: wingBaseWidth, height: notchContentHeight, badgeSize: badgeDisplaySize, badgeOffset: badgeOffset)
-                musicTrailingWing(for: secondary, width: rightWingWidth, height: notchContentHeight)
-                musicCenterSection(width: effectiveCenterWidth, height: notchContentHeight)
-            case .centered, .retracted:
-                musicArtworkWing(for: secondary, artworkSize: artworkSize, wingWidth: wingBaseWidth, height: notchContentHeight, badgeSize: badgeDisplaySize, badgeOffset: badgeOffset)
-                musicCenterSection(width: effectiveCenterWidth, height: notchContentHeight)
-                musicTrailingWing(for: secondary, width: rightWingWidth, height: notchContentHeight)
-            }
+        let placement = closedActivityPlacement
+        ClosedMusicSectionsLayout(placement: placement) {
+            musicArtworkWing(for: secondary, artworkSize: artworkSize, wingWidth: wingBaseWidth, height: notchContentHeight, badgeSize: badgeDisplaySize, badgeOffset: badgeOffset)
+            musicCenterSection(width: effectiveCenterWidth, height: notchContentHeight)
+            musicTrailingWing(for: secondary, width: rightWingWidth, height: notchContentHeight)
         }
+        // A new arrangement replaces the sections, as separate branches would.
+        .id(ClosedMusicSectionsLayout.order(for: placement))
         // The inline sneak peek widens the middle to carry text across the
         // notch, which only reads with a wing on each side.
         .preference(key: ClosedWingsGatherableKey.self, value: !inlineSneakPeekActive)
