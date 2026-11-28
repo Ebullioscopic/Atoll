@@ -257,6 +257,10 @@ private struct SpotifyCanvasFallbackLayoutFrames {
 
 @MainActor
 final class FullScreenArtworkWindowManager: ObservableObject {
+    private var targetScreen: NSScreen? {
+        LockScreenDisplayContextProvider.shared.contextSnapshot()?.screen ?? NSScreen.main
+    }
+
     private enum ArtworkOverlayMode {
         case none
         case spotifyFallback
@@ -356,7 +360,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
 
     func show(artwork: NSImage, videoURL: URL? = nil, allowLiveWallpaper: Bool = false) {
         guard !isShowing else { return }
-        guard let screen = NSScreen.main else { return }
+        guard let screen = targetScreen else { return }
         applyPresentation(
             artwork: artwork,
             videoURL: videoURL,
@@ -621,7 +625,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     private func refreshPresentationForCurrentTrack() {
         guard isShowing else { return }
         guard MusicManager.shared.hasActiveSession else { return }
-        guard let screen = NSScreen.main else { return }
+        guard let screen = targetScreen else { return }
 
         applyPresentation(
             artwork: MusicManager.shared.albumArt,
@@ -891,7 +895,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         pendingFallbackStaticURL = nil
         pendingFallbackWallpaperKey = nil
 
-        if let screen = NSScreen.main {
+        if let screen = targetScreen {
             showWallpaperTransition(on: screen, imageURL: url)
         }
         guard applyArtworkToPlist(imageURL: url) else {
@@ -927,7 +931,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
             return
         }
 
-        if let screen = NSScreen.main {
+        if let screen = targetScreen {
             showVideoWindow(on: screen, videoURL: videoURL)
         }
         scheduleWallpaperTransitionHide(after: .milliseconds(420))
@@ -1316,7 +1320,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     private func updateArtworkOverlayFrameIfNeeded() {
         guard isShowing, currentArtworkOverlayMode != .none else { return }
         guard let window = artworkOverlayWindow else { return }
-        guard let screen = NSScreen.main, let frame = artworkOverlayFrame(on: screen) else { return }
+        guard let screen = targetScreen, let frame = artworkOverlayFrame(on: screen) else { return }
         window.setFrame(frame, display: true)
     }
 
@@ -1334,7 +1338,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         return frames.artworkFrame
     }
 
-    private func updateLyricsOverlayIfNeeded(on screen: NSScreen? = NSScreen.main) {
+    private func updateLyricsOverlayIfNeeded(on screen: NSScreen? = nil) {
         guard isShowing, isShowingSpotifyCanvasFallback, Defaults[.enableLyrics] else {
             hideLyricsOverlay()
             return
@@ -1346,7 +1350,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
             return
         }
 
-        guard let screen, let frame = spotifyCanvasFallbackLayoutFrames(on: screen)?.lyricsFrame else {
+        guard let screen = screen ?? targetScreen, let frame = spotifyCanvasFallbackLayoutFrames(on: screen)?.lyricsFrame else {
             hideLyricsOverlay()
             return
         }
