@@ -362,7 +362,9 @@ struct BatteryMenuView: View {
         }
         .padding()
         .frame(width: 280)
-        .foregroundStyle(.primary)
+        // The notch header uses a fixed gray foreground. Reset it here so
+        // the popover text follows the system's light and dark appearances.
+        .foregroundColor(Color(nsColor: .labelColor))
         .task(id: isPluggedIn) {
             await sampleBatteryPower { power = $0 }
         }

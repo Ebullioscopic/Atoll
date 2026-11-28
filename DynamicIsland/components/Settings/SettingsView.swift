@@ -441,6 +441,9 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .stats, title: "Cursor Provider", keywords: ["llm", "cursor", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Cursor Provider")),
         SettingsSearchEntry(tab: .stats, title: "Antigravity Provider", keywords: ["llm", "antigravity", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Antigravity Provider")),
         SettingsSearchEntry(tab: .stats, title: "New API Provider", keywords: ["llm", "new api", "newapi", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "New API Provider")),
+        SettingsSearchEntry(tab: .stats, title: "OpenRouter Provider", keywords: ["llm", "openrouter", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter Provider")),
+        SettingsSearchEntry(tab: .stats, title: "OpenRouter API Key", keywords: ["llm", "openrouter", "api", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter API Key")),
+        SettingsSearchEntry(tab: .stats, title: "OpenRouter Per-model Analytics", keywords: ["llm", "openrouter", "management", "key", "analytics"], highlightID: SettingsTab.stats.highlightID(for: "OpenRouter Per-model Analytics")),
         SettingsSearchEntry(tab: .stats, title: "New API Accounts", keywords: ["llm", "new api", "newapi", "accounts", "key", "token"], highlightID: SettingsTab.stats.highlightID(for: "New API Accounts")),
         SettingsSearchEntry(tab: .stats, title: "Stop monitoring after closing the notch", keywords: ["stats", "auto stop"], highlightID: SettingsTab.stats.highlightID(for: "Stop monitoring after closing the notch")),
         SettingsSearchEntry(tab: .stats, title: "CPU Usage", keywords: ["cpu", "graph"], highlightID: SettingsTab.stats.highlightID(for: "CPU Usage")),
@@ -3672,6 +3675,7 @@ struct Media: View {
 struct CalendarSettings: View {
     @ObservedObject private var calendarManager = CalendarManager.shared
     @Default(.showCalendar) var showCalendar: Bool
+    @Default(.calendarViewMode) var calendarViewMode: CalendarViewMode
     @Default(.enableLyrics) private var enableLyrics
     @Default(.enableReminderLiveActivity) var enableReminderLiveActivity
     @Default(.reminderPresentationStyle) var reminderPresentationStyle
@@ -3777,6 +3781,23 @@ struct CalendarSettings: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Picker("Calendar view", selection: $calendarViewMode) {
+                        ForEach(CalendarViewMode.allCases) { viewMode in
+                            Text(viewMode.displayName).tag(viewMode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(!showCalendar)
+
+                    Text(calendarViewMode.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .settingsHighlight(id: highlightID("Calendar view"))
 
                 Section(header: Text("Event List")) {
                     Toggle("Hide completed reminders", isOn: $hideCompletedReminders)
@@ -7376,6 +7397,8 @@ func warningBadge(_ text: String, _ description: String) -> some View {
 }
 
 struct TimerSettings: View {
+    @Default(.timerAlertDurationSeconds) private var alertDurationSeconds
+    @Default(.timerAlertRepeatIntervalMinutes) private var alertRepeatIntervalMinutes
     @ObservedObject private var coordinator = DynamicIslandViewCoordinator.shared
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.timerPresets) private var timerPresets
@@ -7474,6 +7497,7 @@ struct TimerSettings: View {
         }
     }
 
+    /// Groups the enabled timer settings, including the repeat-alert controls.
     @ViewBuilder
     private var timerConfigurationSections: some View {
         Group {
@@ -7482,6 +7506,7 @@ struct TimerSettings: View {
             appearanceSection
             timerPresetsSection
             timerSoundSection
+            timerAlertSection
         }
     }
 
@@ -7706,6 +7731,69 @@ struct TimerSettings: View {
             Text("Timer Sound")
         } footer: {
             Text("Select a custom sound to play when a timer ends. Supported formats include MP3, M4A, WAV, and AIFF.")
+        }
+    }
+
+    /// Bounds the saved ring duration before showing its minute and second components.
+    private var duration: Int {
+        min(3600, max(1, alertDurationSeconds))
+    }
+
+    /// Edits ring minutes while preserving the saved seconds component.
+    private var minutesBinding: Binding<Int> {
+        Binding(
+            get: { duration / 60 },
+            set: { alertDurationSeconds = min(3600, max(1, $0 * 60 + duration % 60)) }
+        )
+    }
+
+    /// Edits ring seconds while preserving the saved minutes component.
+    private var secondsBinding: Binding<Int> {
+        Binding(
+            get: { duration % 60 },
+            set: { alertDurationSeconds = min(3600, max(1, duration / 60 * 60 + $0)) }
+        )
+    }
+
+    /// Bounds and edits the silent interval in whole minutes.
+    private var intervalBinding: Binding<Int> {
+        Binding(
+            get: { min(1440, max(1, alertRepeatIntervalMinutes)) },
+            set: { alertRepeatIntervalMinutes = min(1440, max(1, $0)) }
+        )
+    }
+
+    /// Excludes a zero-length ring and values beyond one hour.
+    private var secondsRange: ClosedRange<Int> {
+        if duration / 60 == 60 { return 0...0 }
+        return duration / 60 == 0 ? 1...59 : 0...59
+    }
+
+    /// Presents ring duration and repeat interval using existing timer controls.
+    private var timerAlertSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Ring duration")
+                HStack(spacing: 16) {
+                    TimerPresetComponentControl(title: String(localized: "Minutes"), value: minutesBinding, range: 0...60)
+                    TimerPresetComponentControl(title: String(localized: "Seconds"), value: secondsBinding, range: secondsRange)
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Remind again after")
+                HStack {
+                    TimerPresetComponentControl(title: String(localized: "Minutes"), value: intervalBinding, range: 1...1440)
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Timer Alerts")
+        } footer: {
+            Text("When an Atoll timer ends, it rings for the selected duration, then stays silent for the selected interval. This repeats until you stop the timer. Changes also apply to an active reminder.")
         }
     }
 
@@ -7977,6 +8065,7 @@ struct StatsSettings: View {
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.enableLLMUsageFeature) var enableLLMUsageFeature
     @Default(.enableNewAPIProvider) var enableNewAPIProvider
+    @Default(.enableOpenRouterProvider) var enableOpenRouterProvider
     @Default(.statsStopWhenNotchCloses) var statsStopWhenNotchCloses
     @Default(.statsUpdateInterval) var statsUpdateInterval
     @Default(.showCpuGraph) var showCpuGraph
@@ -7986,10 +8075,14 @@ struct StatsSettings: View {
     @Default(.showDiskGraph) var showDiskGraph
     @Default(.cpuTemperatureUnit) var cpuTemperatureUnit
     @State private var newAPIAccounts = Defaults[.newAPIAccounts]
+    @Default(.openRouterUsageAnalytics) var openRouterUsageAnalytics
+    @State private var openRouterAPIKey = ""
+    @State private var hasOpenRouterKey = false
     @State private var isNewAPIEditorPresented = false
     @State private var editingNewAPIAccount: NewAPIAccount?
     @State private var accountPendingDeletion: NewAPIAccount?
     @State private var newAPIAccountErrorMessage: String?
+    @State private var openRouterErrorMessage: String?
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.stats.highlightID(for: title)
@@ -8012,6 +8105,35 @@ struct StatsSettings: View {
 
     private var shouldShowStatsBatteryWarning: Bool {
         !statsStopWhenNotchCloses && statsUpdateInterval <= 5
+    }
+
+    private func saveOpenRouterKey() {
+        let trimmed = openRouterAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            openRouterErrorMessage = String(localized: "Enter an OpenRouter API key.")
+            return
+        }
+        do {
+            try OpenRouterKeychain.save(trimmed)
+            openRouterAPIKey = ""
+            hasOpenRouterKey = true
+            openRouterErrorMessage = nil
+            LLMUsageManager.shared.refreshAll(force: true)
+        } catch {
+            openRouterErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteOpenRouterKey() {
+        do {
+            try OpenRouterKeychain.delete()
+            openRouterAPIKey = ""
+            hasOpenRouterKey = false
+            openRouterErrorMessage = nil
+            LLMUsageManager.shared.refreshAll(force: true)
+        } catch {
+            openRouterErrorMessage = error.localizedDescription
+        }
     }
 
     var body: some View {
@@ -8074,6 +8196,14 @@ struct StatsSettings: View {
                     .onChange(of: enableNewAPIProvider) { _, _ in
                         LLMUsageManager.shared.refreshAll(force: true)
                     }
+
+                    Defaults.Toggle(key: .enableOpenRouterProvider) {
+                        Text("OpenRouter")
+                    }
+                    .settingsHighlight(id: highlightID("OpenRouter Provider"))
+                    .onChange(of: enableOpenRouterProvider) { _, _ in
+                        LLMUsageManager.shared.refreshAll(force: true)
+                    }
                 } header: {
                     Text("LLM Providers")
                 } footer: {
@@ -8081,6 +8211,44 @@ struct StatsSettings: View {
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                     .font(.caption)
+                }
+
+                Section {
+                    SecureField(hasOpenRouterKey ? "Replace saved API key" : "API key", text: $openRouterAPIKey)
+                        .textContentType(.password)
+                        .settingsHighlight(id: highlightID("OpenRouter API Key"))
+
+                    HStack {
+                        Button("Save OpenRouter Key") {
+                            saveOpenRouterKey()
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Button("Remove Key", role: .destructive) {
+                            deleteOpenRouterKey()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!hasOpenRouterKey)
+                    }
+
+                    Toggle("Per-model analytics (management key)", isOn: $openRouterUsageAnalytics)
+                        .settingsHighlight(id: highlightID("OpenRouter Per-model Analytics"))
+                        .onChange(of: openRouterUsageAnalytics) { _, _ in
+                            LLMUsageManager.shared.refreshAll(force: true)
+                        }
+
+                    if let openRouterErrorMessage {
+                        Text(openRouterErrorMessage)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("OpenRouter")
+                } footer: {
+                    Text("A regular OpenRouter API key shows today's and this week's spend and the key's credit limit. Per-model token and request analytics need a management key, which can also create and delete API keys — only turn it on if you're comfortable storing one. The key is stored in the macOS Keychain.")
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
                 }
 
                 Section {
@@ -8341,6 +8509,7 @@ struct StatsSettings: View {
         .navigationTitle("Stats")
         .onAppear {
             newAPIAccounts = Defaults[.newAPIAccounts]
+            hasOpenRouterKey = OpenRouterKeychain.hasKey()
         }
         .sheet(isPresented: $isNewAPIEditorPresented) {
             NewAPIAccountEditor(account: editingNewAPIAccount) { account, apiKey in
@@ -8656,9 +8825,34 @@ struct ScreenAssistantSettings: View {
     @ObservedObject var screenAssistantManager = ScreenAssistantManager.shared
     @Default(.enableScreenAssistant) var enableScreenAssistant
     @Default(.screenAssistantDisplayMode) var screenAssistantDisplayMode
-    @Default(.geminiApiKey) var geminiApiKey
+    /// The key itself lives in the Keychain, so only its presence is mirrored
+    /// into view state — the secret is never held longer than an edit.
+    private let keyStore: AIKeyStoring = KeychainAIKeyStore.shared
+    @State private var hasGeminiApiKey = KeychainAIKeyStore.shared.hasKey(.gemini)
     @State private var apiKeyText = ""
     @State private var showingApiKey = false
+    /// Shown when the Keychain refuses a write or a delete. The field keeps its
+    /// text in that case so the entered key is not lost.
+    @State private var keyStoreError: String?
+
+    /// Writes the field to the Keychain — an empty field deletes the stored key,
+    /// which is the only way to remove one from here. Returns whether the field
+    /// and the disclosure may now be reset: on failure they must not be, or the
+    /// user is told nothing and loses what they typed.
+    private func commitGeminiKey() -> Bool {
+        let status = keyStore.save(apiKeyText, account: .gemini)
+        guard status == errSecSuccess else {
+            Logger.log(
+                "Could not write the Gemini key to the Keychain (OSStatus \(status)).",
+                category: .warning
+            )
+            keyStoreError = String(localized: "The key could not be saved to the Keychain.")
+            return false
+        }
+        keyStoreError = nil
+        hasGeminiApiKey = keyStore.hasKey(.gemini)
+        return true
+    }
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.screenAssistant.highlightID(for: title)
@@ -8682,24 +8876,23 @@ struct ScreenAssistantSettings: View {
                     HStack {
                         Text("Gemini API Key")
                         Spacer()
-                        if geminiApiKey.isEmpty {
-                            Text("Not Set")
-                                .foregroundColor(.red)
-                        } else {
+                        if hasGeminiApiKey {
                             Text("••••••••")
                                 .foregroundColor(.green)
+                        } else {
+                            Text("Not Set")
+                                .foregroundColor(.red)
                         }
 
-                        Button(showingApiKey ? "Hide" : (geminiApiKey.isEmpty ? "Set" : "Change")) {
+                        Button(showingApiKey ? "Hide" : (hasGeminiApiKey ? "Change" : "Set")) {
                             if showingApiKey {
+                                guard commitGeminiKey() else { return }
                                 showingApiKey = false
-                                if !apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    Defaults[.geminiApiKey] = apiKeyText
-                                }
                                 apiKeyText = ""
                             } else {
                                 showingApiKey = true
-                                apiKeyText = geminiApiKey
+                                keyStoreError = nil
+                                apiKeyText = keyStore.value(.gemini)
                             }
                         }
                     }
@@ -8713,6 +8906,13 @@ struct ScreenAssistantSettings: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
 
+                            if let keyStoreError {
+                                Label(keyStoreError, systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
                             HStack {
                                 Button("Open Google AI Studio") {
                                     NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!)
@@ -8721,12 +8921,15 @@ struct ScreenAssistantSettings: View {
 
                                 Spacer()
 
-                                Button("Save") {
-                                    Defaults[.geminiApiKey] = apiKeyText
+                                Button(apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Remove" : "Save") {
+                                    guard commitGeminiKey() else { return }
                                     showingApiKey = false
                                     apiKeyText = ""
                                 }
-                                .disabled(apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                // Clearing the field and confirming is how a key is
+                                // removed, so an empty field is only invalid when
+                                // there is nothing stored to remove.
+                                .disabled(!hasGeminiApiKey && apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }
                         }
                     }
@@ -8810,6 +9013,14 @@ struct ScreenAssistantSettings: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Screen Assistant")
+        // The Keychain is not observable, so pick up keys saved elsewhere (the
+        // model selection panel) instead of showing a stale "Not Set".
+        .onAppear {
+            hasGeminiApiKey = keyStore.hasKey(.gemini)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aiModelConfigurationChanged)) { _ in
+            hasGeminiApiKey = keyStore.hasKey(.gemini)
+        }
     }
 
     private func timeAgoString(from date: Date) -> String {

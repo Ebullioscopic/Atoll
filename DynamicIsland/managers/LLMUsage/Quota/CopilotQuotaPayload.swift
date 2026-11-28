@@ -61,7 +61,7 @@ struct CopilotQuotaPayload: Decodable {
                       let monthly = monthly_quotas?[key], monthly.isFinite, monthly > 0,
                       let remaining = limited_user_quotas?[key], remaining.isFinite else { return nil }
                 let percentRemaining = min(100, max(0, remaining / monthly * 100))
-                return CopilotQuota(id: key, title: key == "chat" ? "Chat" : "Completions",
+                return CopilotQuota(id: key, title: key == "chat" ? String(localized: "Chat") : String(localized: "Completions"),
                                     usedPercent: 100 - percentRemaining, entitlement: monthly,
                                     remaining: max(0, remaining), unlimited: false,
                                     resetsAt: Self.date(limited_user_reset_date) ?? reset)
@@ -78,9 +78,9 @@ struct CopilotQuotaPayload: Decodable {
             } else { percent = nil }
             let title: String
             switch key {
-            case "premium_interactions": title = (bucket.token_based_billing ?? token_based_billing) == true ? "AI credits" : "Premium requests"
-            case "chat": title = "Chat"
-            default: title = "Completions"
+            case "premium_interactions": title = (bucket.token_based_billing ?? token_based_billing) == true ? String(localized: "AI credits") : String(localized: "Premium requests")
+            case "chat": title = String(localized: "Chat")
+            default: title = String(localized: "Completions")
             }
             return CopilotQuota(id: key, title: title, usedPercent: percent,
                                 entitlement: entitlement, remaining: remaining,
@@ -132,12 +132,12 @@ enum CopilotQuotaError: LocalizedError {
     case invalidHost, notConfigured, unauthorized, unavailable(Int), invalidResponse, networkUnavailable
     var errorDescription: String? {
         switch self {
-        case .invalidHost: return "Use github.com or your tenant.ghe.com GitHub host."
-        case .notConfigured: return "Connect GitHub Copilot in Settings → Stats."
-        case .unauthorized: return "Copilot access denied. Check the GitHub token and enterprise authorization."
-        case .unavailable(let code): return "GitHub Copilot quota unavailable (HTTP \(code))."
-        case .invalidResponse: return "GitHub did not return usable Copilot quota information."
-        case .networkUnavailable: return "Unable to connect to GitHub Copilot. Check your network and try again."
+        case .invalidHost: return String(localized: "Use github.com or your tenant.ghe.com GitHub host.")
+        case .notConfigured: return String(localized: "Connect GitHub Copilot in Settings → Stats.")
+        case .unauthorized: return String(localized: "Copilot access denied. Check the GitHub token and enterprise authorization.")
+        case .unavailable(let code): return String(localized: "GitHub Copilot quota unavailable (HTTP \(code)).")
+        case .invalidResponse: return String(localized: "GitHub did not return usable Copilot quota information.")
+        case .networkUnavailable: return String(localized: "Unable to connect to GitHub Copilot. Check your network and try again.")
         }
     }
 }

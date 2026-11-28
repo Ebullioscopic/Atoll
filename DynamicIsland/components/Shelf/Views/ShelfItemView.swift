@@ -144,6 +144,11 @@ struct ShelfItemView: View {
                 cachedPreviewImage = await renderDragPreview()
             }
         }
+        .onChange(of: viewModel.metadataRevision) { _, _ in
+            Task {
+                cachedPreviewImage = await renderDragPreview()
+            }
+        }
         .quickLookPresenter(using: quickLookService)
     }
 
@@ -269,7 +274,12 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
         view.viewModel = viewModel
         view.isHovering = isHovering
         view.onHoverChange = onHoverChange
-        view.dragPreviewImage = cachedPreviewImage ?? renderDragPreview()
+        // `renderDragPreview()` uses ImageRenderer synchronously on the main
+        // actor. A cell can be created while its async thumbnail is still
+        // loading, so rendering here makes merely opening the shelf hitch.
+        // `onAppear` fills the cache; dragging before then uses the item's
+        // already available icon.
+        view.dragPreviewImage = cachedPreviewImage
         view.onRightClick = onRightClick
         view.onClick = onClick
         view.onDragEnded = onDragEnded

@@ -11,8 +11,8 @@ Enter `github.com` or a GitHub Enterprise data-residency host such as
 `your-company.ghe.com`, and a GitHub token authorized for Copilot on that host.
 Save connection stores the token only in Atoll's own macOS Keychain item, scoped
 to the host. No Copilot Desktop credential is extracted or changed. Tokens and
-HTTP response bodies are never logged. Disconnect deletes the saved token for
-the configured host and disables the provider. Existing saved credentials for
+HTTP response bodies are never logged. Disconnect, or turning the provider off,
+deletes the saved token for the configured host. Existing saved credentials for
 other hosts are separate Keychain items.
 
 This implementation uses GitHub's **undocumented** account endpoint
@@ -70,31 +70,15 @@ upstream CI still require validation.
 
 ## Validation
 
-Run the standalone quota tests without an Xcode app build:
+`DynamicIslandTests/CopilotUsageTests.swift` covers quota parsing, host and
+token validation and error handling, and `LLMUsageManagerTests.swift` covers
+refresh coalescing. Both are part of the `DynamicIslandTests` target:
 
 ```sh
-mkdir -p /tmp/atoll-copilot-checks
-swiftc -parse-as-library \
-  DynamicIsland/managers/LLMUsage/Quota/CopilotQuotaPayload.swift \
-  DynamicIsland/managers/LLMUsage/Quota/CopilotQuotaClient.swift \
-  tests/copilot/main.swift -o /tmp/atoll-copilot-checks/quotas
-/tmp/atoll-copilot-checks/quotas
+xcodebuild test -project DynamicIsland.xcodeproj -scheme DynamicIsland \
+  -only-testing:DynamicIslandTests/CopilotUsageTests \
+  -only-testing:DynamicIslandTests/LLMUsageManagerTests
 ```
 
-The 84 standalone quota and security checks pass. The Swift app and XCTest sources compile
-with Xcode 27.2. In the local environment, Xcode's Metal tool discovery could not
-find the installed toolchain. Both `visualizer.metal` and SwiftTerm's
-`Shaders.metal` were compiled and linked directly with the installed Apple Metal
-toolchain, then included in the test app. The assembled app was ad-hoc signed,
-passed `codesign --verify --deep --strict`, and launched. Settings → Stats shows
-the Copilot toggle and connection fields.
-
-The refresh-manager regression XCTest also passes in an isolated harness using
-the actual manager and test sources, the existing Defaults build, and stubbed
-unrelated providers. It verifies serialization, coalescing and the saved
-connection result. It fails against the original manager.
-
-Full application XCTest execution is blocked by the environment's access restriction to
-`com.apple.testmanagerd.control`; those tests are compiled but are not reported
-as passing. An authenticated request to a real Copilot quota endpoint, a normal
-CI build, and rendering with live quota data remain unverified. These checks are still required before merging.
+An authenticated request to a real Copilot quota endpoint and rendering with
+live quota data still need to be checked on a real account.

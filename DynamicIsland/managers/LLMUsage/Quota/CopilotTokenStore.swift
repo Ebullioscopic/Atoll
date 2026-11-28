@@ -23,11 +23,13 @@ enum CopilotTokenStore {
         _ = try CopilotEndpoint.url(host: host)
         guard CopilotTokenValidation.isValid(token) else { throw CopilotQuotaError.notConfigured }
         let query = query(host: host)
-        let attributes = [kSecValueData as String: Data(token.utf8)]
+        let attributes: [String: Any] = [
+            kSecValueData as String: Data(token.utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {
-            var item = query
-            item[kSecValueData as String] = Data(token.utf8)
+            let item = query.merging(attributes) { _, new in new }
             let added = SecItemAdd(item as CFDictionary, nil)
             guard added == errSecSuccess else { throw StoreError(status: added) }
         } else if status != errSecSuccess { throw StoreError(status: status) }
@@ -38,6 +40,6 @@ enum CopilotTokenStore {
     }
     private struct StoreError: LocalizedError {
         let status: OSStatus
-        var errorDescription: String? { "Copilot credential storage failed (Keychain status \(status))." }
+        var errorDescription: String? { String(localized: "Copilot credential storage failed (Keychain status \(status)).") }
     }
 }

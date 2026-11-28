@@ -12,7 +12,14 @@ struct CopilotUsageSettings: View {
         VStack(alignment: .leading, spacing: 8) {
             Defaults.Toggle(key: .enableCopilotProvider) { Text("GitHub Copilot") }
                 .onChange(of: enabled) { _, enabled in
-                    if !enabled { token = "" }
+                    if !enabled {
+                        // Turning the provider off also forgets the saved token.
+                        token = ""
+                        do {
+                            try CopilotTokenStore.delete(host: savedHost)
+                            message = nil
+                        } catch { message = error.localizedDescription }
+                    }
                     LLMUsageManager.shared.refreshAll(force: true)
                 }
             if enabled {
@@ -27,7 +34,7 @@ struct CopilotUsageSettings: View {
                             try CopilotTokenStore.save(secret, host: normalized)
                             savedHost = normalized
                             token = ""
-                            message = "Saved in Keychain. Refreshing usage…"
+                            message = String(localized: "Saved in Keychain. Refreshing usage…")
                             LLMUsageManager.shared.refreshAll(force: true)
                         } catch { message = error.localizedDescription }
                     }
@@ -36,12 +43,12 @@ struct CopilotUsageSettings: View {
                             try CopilotTokenStore.delete(host: savedHost)
                             token = ""
                             enabled = false
-                            message = "Disconnected."
+                            message = String(localized: "Disconnected.")
                             LLMUsageManager.shared.refreshAll(force: true)
                         } catch { message = error.localizedDescription }
                     }
                 }
-                Text("Monthly Copilot account quota, shared with the desktop app and IDEs. No project hooks required. Tokens are stored in the macOS Keychain.")
+                Text("Monthly Copilot account quota, shared with the desktop app and IDEs. No project hooks required. Tokens are stored in the macOS Keychain and removed when this provider is turned off. Uses GitHub's undocumented copilot_internal/user endpoint, which may change without notice.")
                     .font(.caption).foregroundStyle(.secondary)
                 if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
             }
