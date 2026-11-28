@@ -269,16 +269,42 @@ final class DownloadScanSequenceTests: XCTestCase {
         XCTAssertFalse(manager.isDownloading)
     }
 
-    func testSamplingStopsWhenLastIgnoredFileDisappearsDuringCompletion() {
+    func testWatchStopsWhenLastIgnoredFileDisappearsDuringCompletion() {
         let manager = makeManager()
         manager.processScanForTesting(["old.zip.crdownload"])
+        XCTAssertTrue(manager.isWatchingIgnoredFilesForTesting)
+        XCTAssertFalse(manager.isSpeedSamplingForTesting)
         manager.processScanForTesting(["old.zip.crdownload", "new.zip.crdownload"])
         manager.processScanForTesting(["old.zip.crdownload"], stamps: ["new.zip": written])
         XCTAssertTrue(manager.isDownloadCompleted)
-        XCTAssertTrue(manager.isSpeedSamplingForTesting)
+        XCTAssertFalse(manager.isSpeedSamplingForTesting)
+        XCTAssertTrue(manager.isWatchingIgnoredFilesForTesting)
         manager.processScanForTesting([], stamps: ["new.zip": written])
         XCTAssertTrue(manager.isDownloadCompleted)
-        XCTAssertFalse(manager.isSpeedSamplingForTesting)
+        XCTAssertFalse(manager.isWatchingIgnoredFilesForTesting)
+    }
+
+    /// A stale partial file that never grows must not keep the folder polled forever.
+    func testWatchGivesUpOnAnIgnoredFileThatNeverGrows() {
+        let manager = makeManager()
+        manager.processScanForTesting(["old.zip.crdownload"])
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        for step in 0...8 {
+            XCTAssertTrue(manager.isWatchingIgnoredFilesForTesting)
+            manager.recordIgnoredSampleForTesting(.init(bytes: 1_000, files: ["old.zip.crdownload"], takenAt: start.addingTimeInterval(Double(step) * 15), sizes: ["old.zip.crdownload": 1_000]))
+        }
+        XCTAssertFalse(manager.isWatchingIgnoredFilesForTesting)
+        XCTAssertFalse(manager.isDownloading)
+    }
+
+    func testWatchPromotesAnIgnoredFileThatResumes() {
+        let manager = makeManager()
+        manager.processScanForTesting(["old.zip.crdownload"])
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        manager.recordIgnoredSampleForTesting(.init(bytes: 1_000, files: ["old.zip.crdownload"], takenAt: start, sizes: ["old.zip.crdownload": 1_000]))
+        manager.recordIgnoredSampleForTesting(.init(bytes: 5_000, files: ["old.zip.crdownload"], takenAt: start.addingTimeInterval(15), sizes: ["old.zip.crdownload": 5_000]))
+        XCTAssertTrue(manager.isDownloading)
+        XCTAssertFalse(manager.isWatchingIgnoredFilesForTesting)
     }
 
     /// ...but once that file is gone the name is free again, so a later
@@ -408,8 +434,8 @@ final class DownloadStallTests: XCTestCase {
         var stall = DownloadStall()
 
         XCTAssertFalse(stall.record(rate: 0, at: at(1)), "the first idle reading starts the clock")
-        XCTAssertFalse(stall.record(rate: 0, at: at(2)))
-        XCTAssertTrue(stall.record(rate: 0, at: at(3)))
+        XCTAssertFalse(stall.record(rate: 0, at: at(4)))
+        XCTAssertTrue(stall.record(rate: 0, at: at(6)))
     }
 
     /// The gap a slow transfer leaves between flushes is not a pause.
@@ -417,7 +443,7 @@ final class DownloadStallTests: XCTestCase {
         var stall = DownloadStall()
 
         XCTAssertFalse(stall.record(rate: 0, at: at(1)))
-        XCTAssertFalse(stall.record(rate: 0, at: at(2.9)))
+        XCTAssertFalse(stall.record(rate: 0, at: at(5.9)))
     }
 
     /// Bytes arriving again -- the browser was resumed -- clear the state
@@ -426,9 +452,9 @@ final class DownloadStallTests: XCTestCase {
         var stall = DownloadStall()
 
         _ = stall.record(rate: 0, at: at(1))
-        XCTAssertTrue(stall.record(rate: 0, at: at(5)))
-        XCTAssertFalse(stall.record(rate: 1_000, at: at(6)))
+        XCTAssertTrue(stall.record(rate: 0, at: at(6)))
         XCTAssertFalse(stall.record(rate: 1_000, at: at(7)))
+        XCTAssertFalse(stall.record(rate: 1_000, at: at(8)))
     }
 
     /// A pair that could not be compared -- a file joined or left -- says
@@ -437,19 +463,19 @@ final class DownloadStallTests: XCTestCase {
         var stall = DownloadStall()
 
         _ = stall.record(rate: 0, at: at(1))
-        XCTAssertTrue(stall.record(rate: 0, at: at(5)))
-        XCTAssertTrue(stall.record(rate: nil, at: at(6)))
+        XCTAssertTrue(stall.record(rate: 0, at: at(6)))
+        XCTAssertTrue(stall.record(rate: nil, at: at(7)))
     }
 
     func testResetForgetsThePreviousRun() {
         var stall = DownloadStall()
 
         _ = stall.record(rate: 0, at: at(1))
-        _ = stall.record(rate: 0, at: at(5))
+        _ = stall.record(rate: 0, at: at(6))
         stall.reset()
 
         XCTAssertFalse(stall.isStalled)
-        XCTAssertFalse(stall.record(rate: 0, at: at(6)), "the clock starts over")
+        XCTAssertFalse(stall.record(rate: 0, at: at(7)), "the clock starts over")
     }
 }
 
@@ -471,10 +497,10 @@ final class DownloadStallStateTests: XCTestCase {
         manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 1))
         XCTAssertFalse(manager.isDownloadStalled)
 
-        manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 5))
+        manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 6))
         XCTAssertTrue(manager.isDownloadStalled)
 
-        manager.recordSpeedSampleForTesting(sample(2_000, ["a.crdownload"], after: 6))
+        manager.recordSpeedSampleForTesting(sample(2_000, ["a.crdownload"], after: 7))
         XCTAssertFalse(manager.isDownloadStalled)
     }
 
@@ -488,10 +514,10 @@ final class DownloadStallStateTests: XCTestCase {
 
         manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 0))
         manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 1))
-        manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 5))
+        manager.recordSpeedSampleForTesting(sample(1_000, ["a.crdownload"], after: 6))
         XCTAssertTrue(manager.isDownloadStalled)
 
-        manager.recordSpeedSampleForTesting(sample(1_000, ["b.crdownload"], after: 6))
+        manager.recordSpeedSampleForTesting(sample(1_000, ["b.crdownload"], after: 7))
         XCTAssertTrue(manager.isDownloadStalled)
     }
 }

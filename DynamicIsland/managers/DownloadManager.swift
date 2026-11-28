@@ -93,10 +93,11 @@ enum PartialDownload {
 /// apart.
 struct DownloadStall {
     /// How long the files have to hold still before the activity reads as
-    /// paused. Longer than the gap a slow transfer can leave between buffered
-    /// writes, short enough that a pause is noticed while the download is
-    /// still in front of the person who paused it.
-    static let threshold: TimeInterval = 2
+    /// paused. Longer than the gap a slow or buffered Chromium transfer
+    /// regularly leaves between writes (often over 2 s), short enough that a
+    /// pause is noticed while the download is still in front of the person
+    /// who paused it.
+    static let threshold: TimeInterval = 5
 
     private(set) var isStalled = false
     private var lastGrowthAt: Date?
@@ -157,7 +158,18 @@ class DownloadManager {
     /// Smoothed, because a raw sample swings with whatever the browser
     /// happened to flush in the last second.
     private var smoothedSpeed: Double?
-    
+
+    /// Partial files already present at launch may be paused downloads, so
+    /// they are checked for growth on a slow timer -- and given up on after a
+    /// run of unchanged readings, so a stale leftover does not keep Atoll
+    /// polling the Downloads folder forever.
+    private var ignoredWatchTimer: Timer?
+    private var lastIgnoredSample: DownloadsSample?
+    private var unchangedIgnoredSamples = 0
+    private var ignoredWatchSession = 0
+    private static let ignoredWatchInterval: TimeInterval = 15
+    private static let ignoredWatchLimit = 8
+
     private let coordinator = DynamicIslandViewCoordinator.shared
     private var source: DispatchSourceFileSystemObject?
     /// Which run of monitoring a scan belongs to. A scan reads the folder on
@@ -274,6 +286,7 @@ class DownloadManager {
         destinationStampsWhenStarted.removeAll()
         isDownloading = false
         stopSpeedSampling()
+        stopWatchingIgnoredFiles()
     }
 
     /// Sampling is the only thing that can see a download stop moving: the
@@ -340,16 +353,7 @@ class DownloadManager {
 
         guard let previous = lastSpeedSample else { return }
 
-        // Files present at launch may be paused downloads. Promote only the
-        // files that have subsequently grown, including when they resume.
-        let resumed = ignoredFiles.filter { name in
-            guard let before = previous.sizes[name], let now = reading.sizes[name] else { return false }
-            return now > before
-        }
-        if !resumed.isEmpty {
-            ignoredFiles.subtract(resumed)
-            updateDownloadingState(isActive: true)
-        }
+        promoteResumedIgnoredFiles(from: previous, to: reading)
         guard isDownloading else { return }
         guard let sample = reading.rate(since: previous) else {
             // Nothing measurable across this pair. Drop the displayed rate
@@ -367,6 +371,73 @@ class DownloadManager {
         // Below a byte a second there is nothing worth showing, and a paused or
         // stalled download should not read as a very slow one.
         downloadSpeed = smoothed >= 1 ? smoothed : nil
+    }
+
+    /// Files present at launch may be paused downloads. Promote only the
+    /// files that have subsequently grown, including when they resume.
+    @discardableResult
+    private func promoteResumedIgnoredFiles(from previous: DownloadsSample, to reading: DownloadsSample) -> Bool {
+        let resumed = ignoredFiles.filter { name in
+            guard let before = previous.sizes[name], let now = reading.sizes[name] else { return false }
+            return now > before
+        }
+        guard !resumed.isEmpty else { return false }
+        ignoredFiles.subtract(resumed)
+        updateDownloadingState(isActive: true)
+        return true
+    }
+
+    private func startWatchingIgnoredFiles() {
+        guard ignoredWatchTimer == nil, !ignoredFiles.isEmpty else { return }
+
+        ignoredWatchSession &+= 1
+        lastIgnoredSample = nil
+        unchangedIgnoredSamples = 0
+
+        let timer = Timer(timeInterval: Self.ignoredWatchInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.sampleIgnoredFiles() }
+        }
+        timer.tolerance = Self.ignoredWatchInterval / 3
+        RunLoop.main.add(timer, forMode: .common)
+        ignoredWatchTimer = timer
+        sampleIgnoredFiles()
+    }
+
+    private func stopWatchingIgnoredFiles() {
+        ignoredWatchSession &+= 1
+        ignoredWatchTimer?.invalidate()
+        ignoredWatchTimer = nil
+        lastIgnoredSample = nil
+    }
+
+    private func sampleIgnoredFiles() {
+        guard let downloadsDirectory else { return }
+
+        let session = ignoredWatchSession
+        queue.async { [weak self] in
+            guard let self else { return }
+            let reading = Self.sample(in: downloadsDirectory, at: Date())
+            Task { @MainActor in
+                self.recordIgnoredSample(reading, session: session)
+            }
+        }
+    }
+
+    private func recordIgnoredSample(_ reading: DownloadsSample, session: Int) {
+        guard session == ignoredWatchSession else { return }
+
+        let previous = lastIgnoredSample
+        lastIgnoredSample = reading
+        guard let previous else { return }
+
+        if promoteResumedIgnoredFiles(from: previous, to: reading) {
+            unchangedIgnoredSamples = 0
+        } else {
+            unchangedIgnoredSamples += 1
+        }
+        if ignoredFiles.isEmpty || unchangedIgnoredSamples >= Self.ignoredWatchLimit {
+            stopWatchingIgnoredFiles()
+        }
     }
 
     /// One reading of what the Downloads folder is holding.
@@ -523,7 +594,7 @@ class DownloadManager {
                 destinationStampsWhenStarted[target] = stamps[target]
             }
             isDownloading = false
-            if !ignoredFiles.isEmpty { startSpeedSampling() }
+            startWatchingIgnoredFiles()
             return
         }
 
@@ -547,6 +618,7 @@ class DownloadManager {
         // that happens to reuse it is a new download, and was otherwise ignored
         // for the life of the process.
         ignoredFiles.subtract(disappearedFiles)
+        if ignoredFiles.isEmpty { stopWatchingIgnoredFiles() }
 
         let activeFiles = inProgressFiles.subtracting(ignoredFiles)
 
@@ -559,7 +631,6 @@ class DownloadManager {
 
         // completion logic
         guard isDownloading else {
-            if ignoredFiles.isEmpty { stopSpeedSampling() }
             vanishedSinceActive.removeAll()
             retainIgnoredDestinationStamps()
             return
@@ -571,7 +642,6 @@ class DownloadManager {
         // nothing left to have completed, and would close the view mid-animation.
         guard !isDownloadCompleted else {
             vanishedSinceActive.removeAll()
-            if ignoredFiles.isEmpty { stopSpeedSampling() }
             retainIgnoredDestinationStamps()
             return
         }
@@ -594,7 +664,6 @@ class DownloadManager {
         } else {
             updateDownloadingState(isActive: false)
         }
-        if !ignoredFiles.isEmpty { startSpeedSampling() }
     }
     
     private func retainIgnoredDestinationStamps() {
@@ -627,6 +696,11 @@ class DownloadManager {
     }
 
     var isSpeedSamplingForTesting: Bool { speedTimer != nil }
+    var isWatchingIgnoredFilesForTesting: Bool { ignoredWatchTimer != nil }
+
+    func recordIgnoredSampleForTesting(_ reading: DownloadsSample) {
+        recordIgnoredSample(reading, session: ignoredWatchSession)
+    }
 
     /// One speed reading, in the shape the sampler delivers them.
     ///
