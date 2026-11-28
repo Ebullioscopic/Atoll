@@ -58,6 +58,11 @@ struct ContentView: View {
     /// compared against the frontmost app's menus. Only the *size* is read --
     /// the offset that follows does not change it, so there is no feedback.
     @State private var closedContentWidth: CGFloat = 0
+    /// Closed content width that menu-bar placement is decided on; see
+    /// `recordClosedContentWidth`.
+    @State private var closedPlacementWidth: CGFloat = 0
+    /// Whether the closed activity can gather its wings on one side.
+    @State private var closedWingsGatherable = false
     @ObservedObject var capsLockManager = CapsLockManager.shared
     @ObservedObject var extensionLiveActivityManager = ExtensionLiveActivityManager.shared
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
@@ -377,9 +382,14 @@ struct ContentView: View {
         vm.screen ?? coordinator.selectedScreen
     }
 
+    /// The screen this notch is drawn on.
+    private var currentScreen: NSScreen? {
+        NSScreen.screen(named: currentScreenName)
+    }
+
     /// Whether the current screen lacks a physical notch.
     private var isNonNotchScreen: Bool {
-        guard let screen = NSScreen.screen(named: currentScreenName) else {
+        guard let screen = currentScreen else {
             return true
         }
         return screen.safeAreaInsets.top <= 0
@@ -711,6 +721,11 @@ struct ContentView: View {
                 ? -(vm.closedNotchSize.height + pillTopOffset + currentShadowPadding + 10)
                 : 0
             )
+            // Gathered wings: the whole surface moves so its middle stays on
+            // the notch. Applied after the interaction modifiers, like the
+            // offset above, so the hover and tap shape moves with it.
+            .offset(x: closedSurfaceOffset)
+            .animation(.smooth(duration: 0.25), value: closedSurfaceOffset)
             .onAppear(perform: {
                 if coordinator.firstLaunch && !isConnectivityHUDVisible {
                     // Single open during first launch; closeHello() handles the timed close.
@@ -982,32 +997,108 @@ struct ContentView: View {
             }
     }
 
-    /// How far right the closed-notch content has to move so it stops covering
-    /// the frontmost app's menus.
-    ///
-    /// A live activity's left wing draws into the strip of menu bar beside the
-    /// notch, which is where the app's own menus live. macOS lays those out
-    /// against `NSScreen.auxiliaryTopLeftArea` and there is no way to tell it
-    /// some of that strip is spoken for -- both auxiliary areas are read-only.
-    /// So the content moves instead of the menus.
-    ///
-    /// Zero unless something is actually being covered: no live activity, an
-    /// open notch, no accessibility permission, or menus that end before the
-    /// content begins all leave the notch centred where it belongs.
-    private var menuBarClearanceOffset: CGFloat {
-        guard vm.notchState == .closed,
-              !vm.hideOnClosed,
-              closedContentWidth > 0,
-              let menusRightEdge = menuBarLayout.appMenusRightEdge,
-              let screenFrame = getScreenFrame(currentScreenName)
-        else { return 0 }
+    /// Width of the closed music activity's middle section, the part drawn on
+    /// the notch itself (`MusicLiveActivity` uses the same figure).
+    private var closedMusicCenterWidth: CGFloat {
+        max(vm.closedNotchSize.width + (isHovering ? 8 : 0), 96)
+    }
 
-        return MenuBarLayout.clearanceOffset(
-            contentWidth: closedContentWidth,
-            screenFrame: screenFrame,
-            menusRightEdge: menusRightEdge,
+    /// The physical notch on `screen`, in global x. A screen without one gets
+    /// a zero-width line at its centre, where the drawn notch stands in for it.
+    private func physicalNotchSpan(on screen: NSScreen) -> ClosedRange<CGFloat> {
+        if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea,
+           left.maxX <= right.minX {
+            return left.maxX...right.minX
+        }
+        return screen.frame.midX...screen.frame.midX
+    }
+
+    /// Where the closed live activity goes so it does not cover the frontmost
+    /// app's menus.
+    ///
+    /// Its wings draw into the strips of menu bar beside the notch, which is
+    /// where the app's own menus live -- on both sides when the app has more
+    /// menus than fit on the left. macOS lays those out against the auxiliary
+    /// areas and there is no way to tell it some of that strip is spoken for,
+    /// so the activity makes way instead of the menus.
+    ///
+    /// Centred unless something is actually being covered: an open notch, the
+    /// floating island, no accessibility permission or a full-screen app all
+    /// leave it where it belongs.
+    private var closedActivityPlacement: ClosedActivityPlacement {
+        // A connectivity HUD must remain centred on the physical notch: its
+        // middle transparent lane is what keeps both wings visible. Moving or
+        // folding it would put that lane underneath the camera housing and clip
+        // one of the two content areas. Sneak peeks and other HUDs likewise keep
+        // their full width; see `MenuBarLayout.yieldsToMenus`.
+        guard MenuBarLayout.yieldsToMenus(
+                  isNotchClosed: vm.notchState == .closed,
+                  isHiddenOnClosed: vm.hideOnClosed,
+                  isIslandMode: isIslandMode,
+                  isConnectivityHUDVisible: isConnectivityHUDVisible,
+                  isSneakPeekVisible: isSneakPeekVisibleOnCurrentScreen,
+                  isExpansionVisible: isCurrentScreenExpansionVisible
+              ),
+              closedPlacementWidth > 0,
+              let menus = menuBarLayout.appMenuBar,
+              let screen = currentScreen
+        else { return .centered }
+
+        let padding = notchHorizontalPadding * 2
+        let surfaceWidth = closedPlacementWidth + padding
+        let coreWidth = closedWingsGatherable
+            ? min(surfaceWidth, max(vm.closedNotchSize.width, 96) + padding)
+            : surfaceWidth
+        let screenSpans = menus.spans(
+            onScreen: screen.frame,
+            primaryScreenMaxY: NSScreen.screens.first?.frame.maxY ?? screen.frame.maxY
+        )
+        let placement = MenuBarLayout.placement(
+            notch: physicalNotchSpan(on: screen),
+            coreWidth: coreWidth,
+            wingsWidth: surfaceWidth - coreWidth,
+            menuSpans: screenSpans,
+            canGatherWings: closedWingsGatherable,
             gap: MenuBarLayout.clearanceGap
         )
+        // The pointer on the notch means the user is reaching for the activity,
+        // not the menus: unfold it so its hover controls (the recording stop
+        // button, for one) can be reached. Gathered wings stay put, since
+        // re-centring them would move them out from under the pointer.
+        if placement == .retracted && isHovering { return .centered }
+        return placement
+    }
+
+    /// Sideways shift of the whole closed surface. Gathered wings make the
+    /// content lopsided; moving it by half their width puts its middle section
+    /// back on the notch.
+    private var closedSurfaceOffset: CGFloat {
+        let wings = max(0, closedContentWidth - closedMusicCenterWidth)
+        switch closedActivityPlacement {
+        case .trailing: return wings / 2
+        case .leading: return -wings / 2
+        case .centered, .retracted: return 0
+        }
+    }
+
+    /// Width of the closed content while its wings are folded away.
+    private var retractedClosedContentWidth: CGFloat {
+        vm.closedNotchSize.width - 20
+    }
+
+    /// Records the closed content's width for `closedActivityPlacement`.
+    ///
+    /// Held while the pointer is over the notch, whose hover growth would
+    /// otherwise move the activity under the pointer, and during a sneak peek
+    /// or expansion, which pass. While retracted, content that stretches to
+    /// fill what it is offered reports exactly the folded width; taking that
+    /// as its size would unfold it, and the next measurement would fold it
+    /// again, so only a width beyond the folded one is news.
+    private func recordClosedContentWidth(_ width: CGFloat) {
+        closedContentWidth = width
+        guard !isHovering, !isSneakPeekVisibleOnCurrentScreen, !isCurrentScreenExpansionVisible else { return }
+        if closedActivityPlacement == .retracted, width <= retractedClosedContentWidth + 0.5 { return }
+        closedPlacementWidth = width
     }
 
     @ViewBuilder
@@ -1227,18 +1318,25 @@ struct ContentView: View {
               .background {
                   GeometryReader { geo in
                       Color.clear
-                          .onAppear { closedContentWidth = geo.size.width }
-                          .onChange(of: geo.size.width) { _, width in closedContentWidth = width }
+                          .onAppear { recordClosedContentWidth(geo.size.width) }
+                          .onChange(of: geo.size.width) { _, width in recordClosedContentWidth(width) }
                   }
               }
+              .onPreferenceChange(ClosedWingsGatherableKey.self) { gatherable in
+                  guard gatherable != closedWingsGatherable else { return }
+                  closedWingsGatherable = gatherable
+                  // A different activity: the held width described the old one.
+                  // Forget it and measure again under the usual holds.
+                  closedPlacementWidth = 0
+                  recordClosedContentWidth(closedContentWidth)
+              }
+              // Retracted: the surface keeps only its notch-sized middle. The
+              // content still lays out at its own width and the notch's clip
+              // shape trims the wings, so nothing inside has to know.
+              .frame(width: closedActivityPlacement == .retracted ? retractedClosedContentWidth : nil)
+              .animation(.smooth(duration: 0.25), value: closedActivityPlacement)
               .pinnedLyrics(isVisible: pinnedLyricsVisible,
                   isContentHidden: isSneakPeekVisibleOnCurrentScreen || isConnectivityHUDVisible)
-              // A connectivity HUD must remain centred on the physical notch:
-              // its middle transparent lane is what keeps both wings visible.
-              // Menu-bar clearance would shift that lane underneath the camera
-              // housing and clip one of the two content areas.
-              .offset(x: isConnectivityHUDVisible ? 0 : menuBarClearanceOffset)
-              .animation(.smooth(duration: 0.25), value: menuBarClearanceOffset)
               .zIndex(2)
               
               ZStack {
@@ -1377,103 +1475,142 @@ struct ContentView: View {
         let badgeDisplaySize = badgeDisplaySize(for: secondary, baseSize: badgeBaseSize)
         let badgeOffset = badgeOverlayOffset(for: secondary, badgeSize: badgeDisplaySize)
 
+        // When the menus leave room on one side only, both wings move there
+        // (see `closedActivityPlacement`); the surface is shifted to match.
         HStack(spacing: 0) {
-            ZStack(alignment: .bottomTrailing) {
-                // Keep the matched-geometry source bounded to the closed
-                // artwork square while the surrounding hover flap expands.
-                ZStack(alignment: .bottomTrailing) {
-                    Color.clear
-                        .frame(width: artworkSize, height: artworkSize)
-                        .background(
-                            Image(nsImage: musicManager.albumArt)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .clipShape(RoundedRectangle(cornerRadius: musicManager.albumArt.size.width/musicManager.albumArt.size.height > 1.0 ? MusicPlayerImageSizes.cornerRadiusInset.closed/3.0 : MusicPlayerImageSizes.cornerRadiusInset.closed))
-                        )
-                        .clipped()
-                        .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-                        .albumArtFlip(angle: musicManager.flipAngle)
-                    albumArtBadge(for: secondary, badgeSize: badgeDisplaySize)
-                        .offset(x: badgeOffset.width, y: badgeOffset.height)
-                        .id(secondary?.id ?? "music-badge")
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .frame(width: artworkSize, height: artworkSize, alignment: .bottomTrailing)
+            switch closedActivityPlacement {
+            case .trailing:
+                musicCenterSection(width: effectiveCenterWidth, height: notchContentHeight)
+                musicArtworkWing(for: secondary, artworkSize: artworkSize, wingWidth: wingBaseWidth, height: notchContentHeight, badgeSize: badgeDisplaySize, badgeOffset: badgeOffset)
+                musicTrailingWing(for: secondary, width: rightWingWidth, height: notchContentHeight)
+            case .leading:
+                musicArtworkWing(for: secondary, artworkSize: artworkSize, wingWidth: wingBaseWidth, height: notchContentHeight, badgeSize: badgeDisplaySize, badgeOffset: badgeOffset)
+                musicTrailingWing(for: secondary, width: rightWingWidth, height: notchContentHeight)
+                musicCenterSection(width: effectiveCenterWidth, height: notchContentHeight)
+            case .centered, .retracted:
+                musicArtworkWing(for: secondary, artworkSize: artworkSize, wingWidth: wingBaseWidth, height: notchContentHeight, badgeSize: badgeDisplaySize, badgeOffset: badgeOffset)
+                musicCenterSection(width: effectiveCenterWidth, height: notchContentHeight)
+                musicTrailingWing(for: secondary, width: rightWingWidth, height: notchContentHeight)
             }
-            .frame(width: wingBaseWidth, height: notchContentHeight, alignment: .center)
-
-            Rectangle()
-                .fill(.black)
-                .frame(width: effectiveCenterWidth, height: notchContentHeight)
-                .overlay(
-                    HStack(alignment: .top) {
-                        if(coordinator.expandingView.show && coordinator.expandingView.type == .music) {
-                            MusicTitleMarqueeView(
-                                text: musicManager.songTitle,
-                                isExplicit: musicManager.isCurrentTrackExplicit,
-                                textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
-                                minDuration: 0.4,
-                                frameWidth: max(0, (effectiveCenterWidth - vm.closedNotchSize.width) / 2 - 12),
-                                badgeHeight: 13
-                            )
-                            .padding(.leading, 8)
-                            .opacity((coordinator.expandingView.show && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
-                            Spacer(minLength: vm.closedNotchSize.width)
-                            Text(musicManager.artistName)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                                .foregroundStyle(Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray)
-                                .padding(.trailing, 8)
-                                .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .music && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
-                        } else if(coordinator.expandingView.show && coordinator.expandingView.type == .timer) {
-                            MarqueeText(
-                                .constant(timerManager.timerName),
-                                textColor: timerManager.timerColor,
-                                minDuration: 0.4,
-                                frameWidth: max(0, (effectiveCenterWidth - vm.closedNotchSize.width) / 2 - 12)
-                            )
-                            .padding(.leading, 8)
-                            .opacity((coordinator.expandingView.show && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
-                            Spacer(minLength: vm.closedNotchSize.width)
-                            Text(timerManager.formattedRemainingTime())
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                                .foregroundStyle(timerManager.timerColor)
-                                .padding(.trailing, 8)
-                                .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .timer && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
-                        } else if Defaults[.showSongMetadataInClosedNotch] && isNonNotchScreen && !musicManager.songTitle.isEmpty {
-                            MarqueeText(
-                                .constant("\(musicManager.songTitle) • \(musicManager.artistName)"),
-                                textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
-                                minDuration: 3,
-                                frameWidth: max(0, effectiveCenterWidth - 16)
-                            )
-                            .padding(.horizontal, 8)
-                        }
-                    }
-                    .clipped()
-                )
-
-            musicRightWing(for: secondary, notchHeight: notchContentHeight, trailingWidth: rightWingWidth)
-                .frame(width: rightWingWidth, height: notchContentHeight, alignment: .center)
-                .contentShape(Rectangle())
-                .onHover { hovering in
-                    guard shouldShowClosedMusicWaveformPlayPauseOverlay(for: secondary) else {
-                        if isHoveringClosedMusicWaveformControl {
-                            isHoveringClosedMusicWaveformControl = false
-                        }
-                        return
-                    }
-                    withAnimation(.smooth(duration: 0.16)) {
-                        isHoveringClosedMusicWaveformControl = hovering
-                    }
-                }
-                .id(secondary?.id ?? "music-spectrum")
-                .contentTransition(.symbolEffect(.replace))
         }
+        // The inline sneak peek widens the middle to carry text across the
+        // notch, which only reads with a wing on each side.
+        .preference(key: ClosedWingsGatherableKey.self, value: !inlineSneakPeekActive)
         .frame(width: notchWidth, height: notchContentHeight)
         .frame(height: outerHeight, alignment: .center)
         .animation(.smooth(duration: 0.25), value: secondary?.id)
+    }
+
+    // The closed music activity's three sections, split out so they can be
+    // placed in a different order when the wings gather on one side.
+
+    @ViewBuilder
+    private func musicArtworkWing(
+        for secondary: MusicSecondaryLiveActivity?,
+        artworkSize: CGFloat,
+        wingWidth: CGFloat,
+        height: CGFloat,
+        badgeSize: CGFloat,
+        badgeOffset: CGSize
+    ) -> some View {
+        ZStack(alignment: .bottomTrailing) {
+            // Keep the matched-geometry source bounded to the closed
+            // artwork square while the surrounding hover flap expands.
+            ZStack(alignment: .bottomTrailing) {
+                Color.clear
+                    .frame(width: artworkSize, height: artworkSize)
+                    .background(
+                        Image(nsImage: musicManager.albumArt)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: musicManager.albumArt.size.width/musicManager.albumArt.size.height > 1.0 ? MusicPlayerImageSizes.cornerRadiusInset.closed/3.0 : MusicPlayerImageSizes.cornerRadiusInset.closed))
+                    )
+                    .clipped()
+                    .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
+                    .albumArtFlip(angle: musicManager.flipAngle)
+                albumArtBadge(for: secondary, badgeSize: badgeSize)
+                    .offset(x: badgeOffset.width, y: badgeOffset.height)
+                    .id(secondary?.id ?? "music-badge")
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .frame(width: artworkSize, height: artworkSize, alignment: .bottomTrailing)
+        }
+        .frame(width: wingWidth, height: height, alignment: .center)
+    }
+
+    @ViewBuilder
+    private func musicCenterSection(width: CGFloat, height: CGFloat) -> some View {
+        Rectangle()
+            .fill(.black)
+            .frame(width: width, height: height)
+            .overlay(
+                HStack(alignment: .top) {
+                    if(coordinator.expandingView.show && coordinator.expandingView.type == .music) {
+                        MusicTitleMarqueeView(
+                            text: musicManager.songTitle,
+                            isExplicit: musicManager.isCurrentTrackExplicit,
+                            textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
+                            minDuration: 0.4,
+                            frameWidth: max(0, (width - vm.closedNotchSize.width) / 2 - 12),
+                            badgeHeight: 13
+                        )
+                        .padding(.leading, 8)
+                        .opacity((coordinator.expandingView.show && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
+                        Spacer(minLength: vm.closedNotchSize.width)
+                        Text(musicManager.artistName)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .foregroundStyle(Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray)
+                            .padding(.trailing, 8)
+                            .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .music && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
+                    } else if(coordinator.expandingView.show && coordinator.expandingView.type == .timer) {
+                        MarqueeText(
+                            .constant(timerManager.timerName),
+                            textColor: timerManager.timerColor,
+                            minDuration: 0.4,
+                            frameWidth: max(0, (width - vm.closedNotchSize.width) / 2 - 12)
+                        )
+                        .padding(.leading, 8)
+                        .opacity((coordinator.expandingView.show && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
+                        Spacer(minLength: vm.closedNotchSize.width)
+                        Text(timerManager.formattedRemainingTime())
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .foregroundStyle(timerManager.timerColor)
+                            .padding(.trailing, 8)
+                            .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .timer && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
+                    } else if Defaults[.showSongMetadataInClosedNotch] && isNonNotchScreen && !musicManager.songTitle.isEmpty {
+                        MarqueeText(
+                            .constant("\(musicManager.songTitle) • \(musicManager.artistName)"),
+                            textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
+                            minDuration: 3,
+                            frameWidth: max(0, width - 16)
+                        )
+                        .padding(.horizontal, 8)
+                    }
+                }
+                .clipped()
+            )
+    }
+
+    @ViewBuilder
+    private func musicTrailingWing(for secondary: MusicSecondaryLiveActivity?, width: CGFloat, height: CGFloat) -> some View {
+        musicRightWing(for: secondary, notchHeight: height, trailingWidth: width)
+            .frame(width: width, height: height, alignment: .center)
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                guard shouldShowClosedMusicWaveformPlayPauseOverlay(for: secondary) else {
+                    if isHoveringClosedMusicWaveformControl {
+                        isHoveringClosedMusicWaveformControl = false
+                    }
+                    return
+                }
+                withAnimation(.smooth(duration: 0.16)) {
+                    isHoveringClosedMusicWaveformControl = hovering
+                }
+            }
+            .id(secondary?.id ?? "music-spectrum")
+            .contentTransition(.symbolEffect(.replace))
     }
 
     private func resolveMusicSecondaryLiveActivity(isMusicPairingEligible: Bool = true) -> MusicSecondaryLiveActivity? {
@@ -2086,7 +2223,7 @@ struct ContentView: View {
     }
 
     private func hiddenHoverActivationContainsMouse(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
-        guard let screen = NSScreen.screen(named: currentScreenName) else {
+        guard let screen = currentScreen else {
             return false
         }
 
@@ -2094,11 +2231,10 @@ struct ContentView: View {
         let activationWidth = vm.closedNotchSize.width + horizontalPadding * 2
         let activationHeight = max(vm.closedNotchSize.height + zeroHeightHoverPadding, 14)
 
-        // Follows the rendered content: when a live activity has stepped aside
-         // from the menus, activating at the old centre would arm the notch where
-         // nothing is drawn and refuse the pointer where it is.
+        // Centred on the notch whatever the menu-bar placement: every placement
+        // keeps the surface's middle there.
         let activationRect = CGRect(
-            x: screen.frame.midX - activationWidth / 2 + menuBarClearanceOffset,
+            x: screen.frame.midX - activationWidth / 2,
             y: screen.frame.maxY - activationHeight,
             width: activationWidth,
             height: activationHeight
@@ -2369,7 +2505,7 @@ struct ContentView: View {
             return isPointInsideNotchWindow(location)
         }
 
-        guard let screen = NSScreen.screen(named: currentScreenName),
+        guard let screen = currentScreen,
               location.y >= screen.frame.maxY - 1.5 else {
             return false
         }
@@ -2420,7 +2556,7 @@ struct ContentView: View {
     }
 
     private func isMouseOverClosedNotchHitArea(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
-        guard let screen = NSScreen.screen(named: currentScreenName) else {
+        guard let screen = currentScreen else {
             return false
         }
 
@@ -2433,9 +2569,20 @@ struct ContentView: View {
         let height = max(closedHeight, recordingSize?.height ?? 0) + 6
             + PinnedLyricsView.reservedHeight(isEligible: pinnedLyricsVisible,
                 availability: musicManager.lyricsAvailability, context: pinnedLyricContext)
-        let width = max(closedWidth, recordingSize?.width ?? 0) + 24
-        // Same shift the content is drawn with, so the hit area stays under it.
-        let minX = screen.frame.midX - width / 2 + menuBarClearanceOffset
+        var width = max(closedWidth, recordingSize?.width ?? 0) + 24
+        var minX = screen.frame.midX - width / 2
+        // Gathered wings sit past the side they were moved to; the pointer is
+        // still over the activity there.
+        let gatheredWings = max(0, closedContentWidth - closedMusicCenterWidth)
+        switch closedActivityPlacement {
+        case .trailing:
+            width += gatheredWings
+        case .leading:
+            width += gatheredWings
+            minX -= gatheredWings
+        case .centered, .retracted:
+            break
+        }
         let minY = screen.frame.maxY - height
 
         return location.x >= minX && location.x <= minX + width
