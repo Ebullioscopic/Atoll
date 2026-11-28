@@ -184,7 +184,6 @@ private struct CellWidthKey: PreferenceKey {
 }
 
 struct WheelPicker: View {
-    @EnvironmentObject var vm: DynamicIslandViewModel
     @Binding var selectedDate: Date
     @State private var scrollPosition: Int?
     @State private var haptics: Bool = false
@@ -196,6 +195,11 @@ struct WheelPicker: View {
     let config: Config
 
     var body: some View {
+        // Calendar/today/selection are resolved once per render rather than per cell.
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let startDate = calendar.date(byAdding: .day, value: -config.past, to: today) ?? today
+        let selectedDay = calendar.startOfDay(for: selectedDate)
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: config.spacing) {
                 let spacerNum = config.offset
@@ -207,9 +211,15 @@ struct WheelPicker: View {
                             .frame(width: 24, height: 24)
                             .id(index)
                     } else {
-                        let date = dateForItemIndex(index: index, spacerNum: spacerNum)
-                        let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
-                        dateButton(date: date, isSelected: isSelected, id: index) {
+                        let date = calendar.date(byAdding: .day, value: (index - spacerNum) * max(config.steps, 1), to: startDate) ?? today
+                        let day = calendar.startOfDay(for: date)
+                        dateButton(
+                            date: date,
+                            isToday: day == today,
+                            isSelected: day == selectedDay,
+                            id: index,
+                            measuresWidth: index == spacerNum
+                        ) {
                             selectedDate = date
                             byClick = true
                             withAnimation {
@@ -276,11 +286,10 @@ struct WheelPicker: View {
         )
     }
 
-    private func dateButton(date: Date, isSelected: Bool, id: Int, onClick: @escaping () -> Void) -> some View {
-        let isToday = Calendar.current.isDateInToday(date)
-        return Button(action: onClick) {
+    private func dateButton(date: Date, isToday: Bool, isSelected: Bool, id: Int, measuresWidth: Bool, onClick: @escaping () -> Void) -> some View {
+        Button(action: onClick) {
             VStack(spacing: 8) {
-                dayText(date: dateToString(for: date), isToday: isToday, isSelected: isSelected)
+                dayText(date: CachedDateFormatter.string(from: date, format: "E"), isToday: isToday, isSelected: isSelected)
                 dateCircle(date: date, isToday: isToday, isSelected: isSelected)
             }
             .padding(.vertical, 4)
@@ -292,9 +301,14 @@ struct WheelPicker: View {
         .simultaneousGesture(TapGesture(count: 2).onEnded { EventModel.openCalendarApp(at: date) })
         .accessibilityAction(named: Text("Open in Calendar")) { EventModel.openCalendarApp(at: date) }
         .id(id)
-        .background(GeometryReader { geo in
-            Color.clear.preference(key: CellWidthKey.self, value: geo.size.width)
-        })
+        // Cells share one layout, so measuring a single cell is enough.
+        .background {
+            if measuresWidth {
+                GeometryReader { geo in
+                    Color.clear.preference(key: CellWidthKey.self, value: geo.size.width)
+                }
+            }
+        }
     }
 
     private func dayText(date: String, isToday: Bool, isSelected: Bool) -> some View {
@@ -359,12 +373,6 @@ struct WheelPicker: View {
         let range = config.past + config.future
         let step = max(config.steps, 1)
         return Int(ceil(Double(range) / Double(step))) + 1
-    }
-
-    private func dateToString(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "E"
-        return formatter.string(from: date)
     }
 }
 

@@ -21,8 +21,37 @@
  */
 
 import Foundation
+import os
 
+/// Shared `DateFormatter`s for hot paths such as SwiftUI bodies, so a formatter
+/// isn't allocated per cell per render. Formatters use the current locale and
+/// time zone, so the cache is dropped whenever either changes.
+enum CachedDateFormatter {
+    private static let storage = OSAllocatedUnfairLock(uncheckedState: [String: DateFormatter]())
+    private static let invalidationObservers: [NSObjectProtocol] = [
+        NSLocale.currentLocaleDidChangeNotification,
+        .NSSystemTimeZoneDidChange
+    ].map { name in
+        NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { _ in
+            storage.withLockUnchecked { $0.removeAll() }
+        }
+    }
 
+    static func formatter(_ key: String, configure: (DateFormatter) -> Void) -> DateFormatter {
+        _ = invalidationObservers
+        return storage.withLockUnchecked { cache in
+            if let cached = cache[key] { return cached }
+            let formatter = DateFormatter()
+            configure(formatter)
+            cache[key] = formatter
+            return formatter
+        }
+    }
+
+    static func string(from date: Date, format: String) -> String {
+        formatter(format) { $0.dateFormat = format }.string(from: date)
+    }
+}
 
 extension Date {
     static var yesterday: Date { return Date().dayBefore }
@@ -38,22 +67,16 @@ extension Date {
     }
     
     var date: String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "dd"
-        return dateFormatter.string(from: self)
+        CachedDateFormatter.string(from: self, format: "dd")
     }
     
     var month: String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMMM"
-        return dateFormatter.string(from: self)
+        CachedDateFormatter.string(from: self, format: "MMMM")
     }
     
     func dayOfTheWeek(dayOfWeek: Int) -> String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "EEE"
         let date = Calendar.current.date(bySetting: .weekday, value: dayOfWeek, of: self) ?? self
-        return dateFormatter.string(from: date)
+        return CachedDateFormatter.string(from: date, format: "EEE")
     }
 }
 
