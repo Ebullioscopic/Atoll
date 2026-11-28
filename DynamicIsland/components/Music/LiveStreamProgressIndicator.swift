@@ -18,62 +18,50 @@
 
 import SwiftUI
 
+/// The stand-in for a progress bar on a stream that has no position to show.
+///
+/// Apple runs the line *through* the word rather than printing the word on top
+/// of a bar: two thin rules meeting a plain "LIVE" in the middle, the rules
+/// softening as they run away from it. The previous version drew a 10pt capsule
+/// with a fill, a centre shade, a stroke and three blend modes, then dropped
+/// shadowed text over the whole thing — which reads as a progress bar someone
+/// has written on, and a stream has no progress to draw.
 struct LiveStreamProgressIndicator: View {
     let tint: Color
+    var labelSize: CGFloat = 12
 
-    private var baseGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                tint.opacity(0.18),
-                tint.opacity(0.42),
-                tint.opacity(0.18)
-            ],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-    }
+    /// Thin, the way a rule is. The old bar was sized like a track you could
+    /// scrub, which is the one thing this is not.
+    private var ruleHeight: CGFloat { 3 }
 
-    private var centerShade: LinearGradient {
-        LinearGradient(
-            stops: [
-                .init(color: .black.opacity(0.0), location: 0.0),
-                .init(color: .black.opacity(0.38), location: 0.5),
-                .init(color: .black.opacity(0.0), location: 1.0)
-            ],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
+    /// The rules fade as they run away from the word, so the eye is carried to
+    /// it rather than along the full width.
+    private func rule(fadingTowards edge: UnitPoint) -> some View {
+        Capsule(style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [tint.opacity(0.5), tint.opacity(0.16)],
+                    startPoint: edge == .leading ? .trailing : .leading,
+                    endPoint: edge
+                )
+            )
+            .frame(height: ruleHeight)
     }
 
     var body: some View {
-        Capsule()
-            .fill(Color.white.opacity(0.07))
-            .overlay(
-                Capsule()
-                    .fill(baseGradient)
-                    .opacity(0.9)
-                    .blendMode(.plusLighter)
-            )
-            .overlay(
-                Capsule()
-                    .fill(centerShade)
-                    .blendMode(.multiply)
-            )
-            .overlay(
-                Capsule()
-                    .stroke(tint.opacity(0.6), lineWidth: 0.7)
-                    .blendMode(.screen)
-            )
-            .frame(height: 10)
-            .overlay {
-                Text("LIVE")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
-                    .tracking(1.4)
-                    .foregroundStyle(Color.white)
-                    .shadow(color: .black.opacity(0.65), radius: 4, y: 1)
-            }
-            .allowsHitTesting(false)
-            .accessibilityLabel("Live stream indicator")
-            .opacity(0.95)
+        HStack(spacing: 10) {
+            rule(fadingTowards: .leading)
+
+            Text("LIVE")
+                .font(.system(size: labelSize, weight: .semibold, design: .rounded))
+                .tracking(0.6)
+                .foregroundStyle(tint)
+                .fixedSize()
+
+            rule(fadingTowards: .trailing)
+        }
+        .allowsHitTesting(false)
+        .accessibilityElement()
+        .accessibilityLabel("Live stream")
     }
 }

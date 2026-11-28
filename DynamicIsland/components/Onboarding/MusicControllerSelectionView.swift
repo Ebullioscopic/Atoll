@@ -145,6 +145,8 @@ extension MediaControllerType {
             return String(localized: "Requires a third-party client with API plugin enabled.")
         case .amazonMusic:
             return String(localized: "Uses macOS Now Playing when the Amazon Music app is the active media source. Playback controls follow the system Now Playing target. Scrubbing the timeline may not work if the Amazon Music app does not support remote seek.")
+        case .tidal:
+            return String(localized: "Uses macOS Now Playing when the TIDAL app is the active media source. Playback controls follow the system Now Playing target. Scrubbing, shuffle, or repeat may not work if TIDAL does not support the corresponding remote command.")
         case .cider:
             return String(localized: "Uses macOS Now Playing when Cider is the active media source. Playback controls follow the system Now Playing target.")
         }

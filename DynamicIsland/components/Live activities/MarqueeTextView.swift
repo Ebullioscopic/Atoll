@@ -46,6 +46,19 @@ struct MarqueeText: View {
     let minDuration: Double
     let frameWidth: CGFloat
     
+    /// Gap between the two copies of the text that make up the scrolling loop.
+    static let loopSpacing: CGFloat = 20
+
+    /// Recovers the width of a single copy of the text from the measured loop.
+    ///
+    /// The loop is two copies of the text separated by ``loopSpacing``, so the gap
+    /// has to come off before halving. Halving the raw measurement instead leaves
+    /// every string half a gap wider than it really is, which makes short text look
+    /// like it needs to scroll.
+    static func textWidth(fromLoopWidth loopWidth: CGFloat) -> CGFloat {
+        max(0, (loopWidth - loopSpacing) / 2)
+    }
+
     @State private var textSize: CGSize = .zero
     @State private var offset: CGFloat = 0
     @State private var isAnimating: Bool = false
@@ -66,7 +79,7 @@ struct MarqueeText: View {
     
     var body: some View {
         ZStack(alignment: .leading) {
-            HStack(spacing: 20) {
+            HStack(spacing: Self.loopSpacing) {
                 Text(text)
                 Text(text)
                     .opacity(needsScrolling ? 1 : 0)
@@ -79,7 +92,8 @@ struct MarqueeText: View {
             .background(backgroundColor)
             .modifier(MeasureSizeModifier())
             .onPreferenceChange(SizePreferenceKey.self) { size in
-                self.textSize = CGSize(width: size.width / 2, height: NSFont.preferredFont(forTextStyle: nsFont).pointSize)
+                let measuredWidth = Self.textWidth(fromLoopWidth: size.width)
+                self.textSize = CGSize(width: measuredWidth, height: NSFont.preferredFont(forTextStyle: nsFont).pointSize)
                 resetAndStart()
             }
             .onChange(of: text) { _, _ in
@@ -123,7 +137,7 @@ struct MarqueeText: View {
             
             // 2. Linear Move
             withAnimation(.linear(duration: duration)) {
-                offset = -(textSize.width + 20) // Text width + spacing
+                offset = -(textSize.width + Self.loopSpacing) // Text width + spacing
             }
             
             // 3. Wait for move to finish

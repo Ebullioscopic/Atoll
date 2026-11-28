@@ -21,6 +21,7 @@ import AppKit
 import SwiftUI
 import SkyLightWindow
 import QuartzCore
+import Combine
 import Defaults
 
 /// Manages custom OSD windows for volume, brightness, and keyboard backlight controls
@@ -34,6 +35,7 @@ final class CustomOSDWindowManager {
     private var backlightWindows: [NSScreen: OSDWindow] = [:]
     
     private var hideWorkItem: DispatchWorkItem?
+    private var cancellables = Set<AnyCancellable>()
     private let displayDuration: TimeInterval = 2.0
     private let animationDuration: TimeInterval = 0.3
     private var isInitialized = false
@@ -62,7 +64,59 @@ final class CustomOSDWindowManager {
     }
     
     func initialize() {
+        guard !isInitialized else { return }
         isInitialized = true
+        observeSettings()
+    }
+
+    /// Immediately dismisses every visible OSD window and cancels any pending
+    /// auto-hide. Used when the OSD is switched off while a window is on screen,
+    /// which otherwise left the overlay stuck there with nothing to hide it.
+    func hideAllImmediately() {
+        hideWorkItem?.cancel()
+        hideWorkItem = nil
+
+        for window in allWindows where window.nsWindow.alphaValue > 0.01 {
+            hideWindowImmediately(window)
+        }
+    }
+
+    private var allWindows: [OSDWindow] {
+        Array(volumeWindows.values) + Array(brightnessWindows.values) + Array(backlightWindows.values)
+    }
+
+    private func observeSettings() {
+        Defaults.publisher(.enableCustomOSD, options: []).sink { [weak self] change in
+            guard !change.newValue else { return }
+            Task { @MainActor in self?.hideAllImmediately() }
+        }.store(in: &cancellables)
+
+        let perTypeToggles: [(Defaults.Key<Bool>, SneakContentType)] = [
+            (.enableOSDVolume, .volume),
+            (.enableOSDBrightness, .brightness),
+            (.enableOSDKeyboardBacklight, .backlight)
+        ]
+
+        for (key, type) in perTypeToggles {
+            Defaults.publisher(key, options: []).sink { [weak self] change in
+                guard !change.newValue else { return }
+                Task { @MainActor in self?.hideWindowsImmediately(for: type) }
+            }.store(in: &cancellables)
+        }
+    }
+
+    private func hideWindowsImmediately(for type: SneakContentType) {
+        let windows: [OSDWindow]
+        switch type {
+        case .volume: windows = Array(volumeWindows.values)
+        case .brightness: windows = Array(brightnessWindows.values)
+        case .backlight: windows = Array(backlightWindows.values)
+        default: return
+        }
+
+        for window in windows where window.nsWindow.alphaValue > 0.01 {
+            hideWindowImmediately(window)
+        }
     }
     
     // MARK: - Private Implementation
@@ -201,6 +255,7 @@ final class CustomOSDWindowManager {
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             window.nsWindow.animator().alphaValue = 0
         } completionHandler: {
+            guard window.nsWindow.alphaValue <= 0.01 else { return }
             window.nsWindow.orderOut(nil)
         }
     }
@@ -244,6 +299,7 @@ final class CustomOSDWindowManager {
             window.nsWindow.animator().setFrame(hideFrame, display: true)
             window.nsWindow.animator().alphaValue = 0
         } completionHandler: {
+            guard window.nsWindow.alphaValue <= 0.01 else { return }
             window.nsWindow.orderOut(nil)
         }
         }
@@ -255,13 +311,8 @@ final class CustomOSDWindowManager {
         hideWorkItem?.cancel()
         hideWorkItem = nil
         
-        for window in volumeWindows.values {
-            window.nsWindow.orderOut(nil)
-        }
-        for window in brightnessWindows.values {
-            window.nsWindow.orderOut(nil)
-        }
-        for window in backlightWindows.values {
+        for window in allWindows {
+            window.nsWindow.alphaValue = 0
             window.nsWindow.orderOut(nil)
         }
         
