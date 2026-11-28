@@ -2571,20 +2571,18 @@ struct ContentView: View {
         let height = max(closedHeight, recordingSize?.height ?? 0) + 6
             + PinnedLyricsView.reservedHeight(isEligible: pinnedLyricsVisible,
                 availability: musicManager.lyricsAvailability, context: pinnedLyricContext)
-        var width = max(closedWidth, recordingSize?.width ?? 0) + 24
-        var minX = screen.frame.midX - width / 2
-        // Gathered wings sit past the side they were moved to; the pointer is
-        // still over the activity there.
-        let gatheredWings = max(0, closedContentWidth - closedMusicCenterWidth)
-        switch closedActivityPlacement {
-        case .trailing:
-            width += gatheredWings
-        case .leading:
-            width += gatheredWings
-            minX -= gatheredWings
-        case .centered, .retracted:
-            break
-        }
+        // The live activity's wings (album art, waveform, HUD text) reach well
+        // past the physical notch. Measuring only the notch made a pointer
+        // resting on a wing count as outside: the hover poll and the retained
+        // exit then dropped the hover, the surface shrank, AppKit reported a
+        // fresh enter and the activity shook in a loop (#444, #943).
+        let placement = closedActivityPlacement
+        let surfaceWidth = (placement == .retracted ? retractedClosedContentWidth : closedContentWidth)
+            + notchHorizontalPadding * 2
+        let width = max(max(closedWidth, recordingSize?.width ?? 0) + 24, surfaceWidth)
+        // Gathered wings move the whole surface to one side (see
+        // `closedSurfaceOffset`); the hit area moves with it.
+        let minX = screen.frame.midX + closedSurfaceOffset - width / 2
         let minY = screen.frame.maxY - height
 
         return location.x >= minX && location.x <= minX + width
