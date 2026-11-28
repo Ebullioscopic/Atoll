@@ -94593,7 +94593,10 @@
     "DeepSeek returned an invalid response" : {},
     "Balance too low for API calls" : {},
     "Balance" : {},
-    "DeepSeek API key not configured" : {}
+    "DeepSeek API key not configured" : {},
+    "Change to use an OpenAI-compatible proxy or local server. Use https, or http only for a server on this Mac." : {},
+    "Server API key" : {},
+    "Sent only to the base URL above. Your OpenAI API key is only ever sent to OpenAI." : {}
   },
   "version" : "1.2"
 }

@@ -130,6 +130,7 @@ struct ModelSelectionView: View {
     @State private var localEndpoint: String = Defaults[.localModelEndpoint]
     @State private var groqApiKey: String = KeychainAIKeyStore.shared.value(.groq)
     @State private var openaiBaseURL: String = Defaults[.openaiBaseURL]
+    @State private var openaiCompatibleApiKey: String = KeychainAIKeyStore.shared.value(.openaiCompatible)
     @State private var openaiCustomModelID: String = Defaults[.openaiCustomModelID]
     
     @State private var showingApiKeyAlert = false
@@ -263,6 +264,7 @@ struct ModelSelectionView: View {
                             localEndpoint: $localEndpoint,
                             groqApiKey: $groqApiKey,
                             openaiBaseURL: $openaiBaseURL,
+                            openaiCompatibleApiKey: $openaiCompatibleApiKey,
                             openaiCustomModelID: $openaiCustomModelID
                         )
                     }
@@ -313,7 +315,7 @@ struct ModelSelectionView: View {
         case .openai:
             guard OpenAICompatibleEndpoint.chatCompletionsURL(baseURL: openaiBaseURL) != nil else { return false }
             return !openaiApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                || !OpenAICompatibleEndpoint.isDefault(openaiBaseURL)
+                || !OpenAICompatibleEndpoint.isOpenAI(openaiBaseURL)
         case .claude:
             return !claudeApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .local:
@@ -335,6 +337,7 @@ struct ModelSelectionView: View {
         localEndpoint = Defaults[.localModelEndpoint]
         groqApiKey = keyStore.value(.groq)
         openaiBaseURL = Defaults[.openaiBaseURL]
+        openaiCompatibleApiKey = keyStore.value(.openaiCompatible)
         openaiCustomModelID = Defaults[.openaiCustomModelID]
     }
     
@@ -342,7 +345,7 @@ struct ModelSelectionView: View {
         ensureValidModelSelection()
 
         // Snapshot what is there before writing anything, so a failure partway
-        // through the four accounts can be rolled back instead of leaving some
+        // through the accounts can be rolled back instead of leaving some
         // accounts on the new value and others still on the old one.
         let previousValues: [AIKeyAccount: String] = Dictionary(
             uniqueKeysWithValues: AIKeyAccount.allCases.map { ($0, keyStore.value($0)) }
@@ -351,7 +354,8 @@ struct ModelSelectionView: View {
             (.gemini, geminiApiKey),
             (.openai, openaiApiKey),
             (.claude, claudeApiKey),
-            (.groq, groqApiKey)
+            (.groq, groqApiKey),
+            (.openaiCompatible, openaiCompatibleApiKey)
         ]
 
         var succeeded: [AIKeyAccount] = []
@@ -534,6 +538,7 @@ struct ApiConfigurationSection: View {
     @Binding var localEndpoint: String
     @Binding var groqApiKey: String
     @Binding var openaiBaseURL: String
+    @Binding var openaiCompatibleApiKey: String
     @Binding var openaiCustomModelID: String
     
     var body: some View {
@@ -559,9 +564,18 @@ struct ApiConfigurationSection: View {
                     title: "Base URL",
                     placeholder: "https://api.openai.com/v1",
                     value: $openaiBaseURL,
-                    helpText: "Change to use an OpenAI-compatible proxy or local server. The API key is optional for other servers.",
+                    helpText: "Change to use an OpenAI-compatible proxy or local server. Use https, or http only for a server on this Mac.",
                     isSecure: false
                 )
+
+                if !OpenAICompatibleEndpoint.isOpenAI(openaiBaseURL) {
+                    ApiKeyField(
+                        title: "Server API key",
+                        placeholder: "Optional",
+                        value: $openaiCompatibleApiKey,
+                        helpText: "Sent only to the base URL above. Your OpenAI API key is only ever sent to OpenAI."
+                    )
+                }
 
                 ApiKeyField(
                     title: "Custom model ID",

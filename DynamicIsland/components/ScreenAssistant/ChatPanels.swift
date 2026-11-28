@@ -463,7 +463,7 @@ struct ChatInputView: View {
         // A provider with no key account (local models) needs none.
         let provider = Defaults[.selectedAIProvider]
         // A custom OpenAI-compatible server may not need one either.
-        let keyIsOptional = provider == .openai && !OpenAICompatibleEndpoint.isDefault(Defaults[.openaiBaseURL])
+        let keyIsOptional = provider == .openai && !OpenAICompatibleEndpoint.isOpenAI(Defaults[.openaiBaseURL])
         if let account = provider.keyAccount, !keyIsOptional, !KeychainAIKeyStore.shared.hasKey(account) {
             showingApiKeyAlert = true
             return

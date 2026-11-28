@@ -26,8 +26,12 @@ import Foundation
 enum OpenAICompatibleEndpoint {
     static let defaultBaseURL = "https://api.openai.com/v1"
 
+    private static let openAIHost = "api.openai.com"
+    private static let loopbackHosts: Set<String> = ["localhost", "127.0.0.1", "::1", "[::1]"]
+
     /// Accepts a base such as `https://api.openai.com/v1` or a full `…/chat/completions` URL.
-    /// An empty value means OpenAI itself; anything that is not an http(s) URL is rejected.
+    /// An empty value means OpenAI itself. Only https is accepted, except plain http to a
+    /// server on this Mac, so prompts and keys never cross the network unencrypted.
     static func chatCompletionsURL(baseURL: String) -> URL? {
         var base = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if base.isEmpty { base = defaultBaseURL }
@@ -35,13 +39,22 @@ enum OpenAICompatibleEndpoint {
         if !base.hasSuffix("/chat/completions") { base += "/chat/completions" }
 
         guard let components = URLComponents(string: base),
-              let scheme = components.scheme?.lowercased(), scheme == "https" || scheme == "http",
-              components.host?.isEmpty == false else { return nil }
+              let scheme = components.scheme?.lowercased(),
+              let host = components.host?.lowercased(), !host.isEmpty else { return nil }
+        guard scheme == "https" || (scheme == "http" && loopbackHosts.contains(host)) else { return nil }
         return components.url
     }
 
-    static func isDefault(_ baseURL: String) -> Bool {
-        chatCompletionsURL(baseURL: baseURL) == chatCompletionsURL(baseURL: defaultBaseURL)
+    /// True when requests go to OpenAI itself, the only server the saved OpenAI key is sent to.
+    static func isOpenAI(_ baseURL: String) -> Bool {
+        guard let url = chatCompletionsURL(baseURL: baseURL) else { return false }
+        return url.scheme?.lowercased() == "https" && url.host?.lowercased() == openAIHost
+    }
+
+    /// The key to send: the OpenAI key for OpenAI, otherwise only the key entered for the
+    /// custom server, so the OpenAI key is never handed to a third-party host.
+    static func apiKey(baseURL: String, openAIKey: String, customServerKey: String) -> String {
+        isOpenAI(baseURL) ? openAIKey : customServerKey
     }
 }
 
@@ -452,10 +465,14 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
     
     private func sendToOpenAIAPI(message: String, files: [ScreenAssistantFile]) {
-        let apiKey = keyStore.value(.openai)
         let baseURL = Defaults[.openaiBaseURL]
+        let apiKey = OpenAICompatibleEndpoint.apiKey(
+            baseURL: baseURL,
+            openAIKey: keyStore.value(.openai),
+            customServerKey: keyStore.value(.openaiCompatible)
+        )
         // Local OpenAI-compatible servers often need no key; OpenAI itself always does.
-        guard !apiKey.isEmpty || !OpenAICompatibleEndpoint.isDefault(baseURL) else {
+        guard !apiKey.isEmpty || !OpenAICompatibleEndpoint.isOpenAI(baseURL) else {
             print("❌ ScreenAssistant: No OpenAI API key configured")
             addAssistantMessage("Error: No OpenAI API key configured. Please set your API key in model settings.")
             isLoading = false

@@ -28,14 +28,14 @@ final class OpenAICompatibleEndpointTests: XCTestCase {
 
     func testEmptyBaseURLMeansOpenAI() {
         XCTAssertEqual(url(""), "https://api.openai.com/v1/chat/completions")
-        XCTAssertTrue(OpenAICompatibleEndpoint.isDefault("  "))
-        XCTAssertTrue(OpenAICompatibleEndpoint.isDefault("https://api.openai.com/v1/"))
+        XCTAssertTrue(OpenAICompatibleEndpoint.isOpenAI("  "))
+        XCTAssertTrue(OpenAICompatibleEndpoint.isOpenAI("https://api.openai.com/v1/"))
     }
 
     func testAppendsChatCompletionsToABase() {
         XCTAssertEqual(url("http://localhost:1234/v1/"), "http://localhost:1234/v1/chat/completions")
         XCTAssertEqual(url(" https://proxy.example.com/openai/v1 "), "https://proxy.example.com/openai/v1/chat/completions")
-        XCTAssertFalse(OpenAICompatibleEndpoint.isDefault("http://localhost:1234/v1"))
+        XCTAssertFalse(OpenAICompatibleEndpoint.isOpenAI("http://localhost:1234/v1"))
     }
 
     func testKeepsAFullEndpoint() {
@@ -46,5 +46,22 @@ final class OpenAICompatibleEndpointTests: XCTestCase {
         XCTAssertNil(url("localhost:1234"))
         XCTAssertNil(url("ftp://example.com/v1"))
         XCTAssertNil(url("not a url"))
+    }
+
+    func testPlainHTTPIsOnlyAllowedForThisMac() {
+        XCTAssertEqual(url("http://127.0.0.1:8080/v1"), "http://127.0.0.1:8080/v1/chat/completions")
+        XCTAssertNotNil(url("http://[::1]:8080/v1"))
+        XCTAssertNil(url("http://proxy.example.com/v1"))
+        XCTAssertNil(url("http://192.168.1.5:1234/v1"))
+        XCTAssertNil(url("http://api.openai.com/v1"))
+    }
+
+    func testOpenAIKeyIsOnlySentToOpenAI() {
+        let key = { OpenAICompatibleEndpoint.apiKey(baseURL: $0, openAIKey: "openai", customServerKey: "custom") }
+        XCTAssertEqual(key(""), "openai")
+        XCTAssertEqual(key("https://api.openai.com/v1/chat/completions"), "openai")
+        XCTAssertEqual(key("https://proxy.example.com/v1"), "custom")
+        XCTAssertEqual(key("http://localhost:1234/v1"), "custom")
+        XCTAssertEqual(key("https://api.openai.com.evil.example/v1"), "custom")
     }
 }

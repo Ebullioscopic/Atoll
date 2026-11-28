@@ -26,6 +26,9 @@ enum AIKeyAccount: String, CaseIterable {
     case openai = "openai-api-key"
     case claude = "claude-api-key"
     case groq = "groq-api-key"
+    /// Key for a custom OpenAI-compatible base URL, kept apart so the OpenAI key is only
+    /// ever sent to OpenAI.
+    case openaiCompatible = "openai-compatible-api-key"
 }
 
 extension AIModelProvider {
