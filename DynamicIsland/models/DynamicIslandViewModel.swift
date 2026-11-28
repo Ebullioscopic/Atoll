@@ -528,7 +528,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         returnKeyboardFocusIfNeeded()
         let targetSize = getClosedNotchSize(screen: screen)
         notchSize = targetSize
-        closedNotchSize = targetSize
+        // Usually unchanged; an unconditional set publishes and makes SwiftUI
+        // update the whole notch an extra time at the start of every close.
+        if closedNotchSize != targetSize { closedNotchSize = targetSize }
         notchState = .closed
         NotchSeekKeyMonitor.shared.stop(owner: seekMonitorOwner)
         resetScrollGestureSuppression()

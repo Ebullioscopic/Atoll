@@ -231,7 +231,10 @@ class CalendarManager: ObservableObject {
     }
 
     func updateCurrentDate(_ date: Date) async {
-        currentWeekStartDate = Calendar.current.startOfDay(for: date)
+        // Each notch open re-selects today; republishing an unchanged day or
+        // event list re-rendered the calendar mid-animation for nothing.
+        let day = Calendar.current.startOfDay(for: date)
+        if currentWeekStartDate != day { currentWeekStartDate = day }
         await updateEvents(force: true)
         // Lock screen events do not depend on the selected day, so switching
         // days only refreshes them when they are due anyway (#513).
@@ -366,7 +369,7 @@ class CalendarManager: ObservableObject {
         }
 
         guard let events, currentWeekStartDate == startDate else { return }
-        self.events = events
+        if self.events != events { self.events = events }
         lastEventsFetchDate = Date()
     }
 
