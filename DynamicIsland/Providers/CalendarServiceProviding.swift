@@ -33,6 +33,22 @@ protocol CalendarServiceProviding {
 
 class CalendarService: CalendarServiceProviding {
     private let store = EKEventStore()
+
+    /// EventKit can only fetch reminders list by list, not by due date, so
+    /// every fetch loads every reminder ever written, completed ones included.
+    /// That took seconds per date change on large libraries (#513), so the
+    /// reminders that have a due date are kept here until the store changes.
+    private let reminderCacheLock = NSLock()
+    private var cachedReminders: [EventModel]?
+    private var reminderCacheGeneration = 0
+
+    /// Drops the reminder cache; call when the event store reports a change.
+    func invalidateReminderCache() {
+        reminderCacheLock.withLock {
+            cachedReminders = nil
+            reminderCacheGeneration &+= 1
+        }
+    }
     
     @MainActor
     func requestAccess() async -> Bool {
@@ -78,55 +94,58 @@ class CalendarService: CalendarServiceProviding {
     }
     
     func events(from start: Date, to end: Date, calendars ids: [String]) async -> [EventModel] {
-        let allCalendars = await self.calendars()
-        let filteredCalendars = allCalendars.filter { ids.isEmpty || ids.contains($0.id) }
-        let ekCalendars = filteredCalendars.compactMap { calendarModel in
-            store.calendars(for: .event).first { $0.calendarIdentifier == calendarModel.id } ??
-            store.calendars(for: .reminder).first { $0.calendarIdentifier == calendarModel.id }
+        let wanted = Set(ids)
+        func isWanted(_ calendar: EKCalendar) -> Bool {
+            wanted.isEmpty || wanted.contains(calendar.calendarIdentifier)
         }
         
         var events: [EventModel] = []
         
         // Fetch regular events
         if hasAccess(to: .event) {
-            let eventCalendars = ekCalendars.filter { store.calendars(for: .event).contains($0) }
-            let predicate = store.predicateForEvents(withStart: start, end: end, calendars: eventCalendars)
-            let ekEvents = store.events(matching: predicate)
-            events.append(contentsOf: ekEvents.compactMap { EventModel(from: $0) })
+            let eventCalendars = store.calendars(for: .event).filter(isWanted)
+            if !eventCalendars.isEmpty {
+                let predicate = store.predicateForEvents(withStart: start, end: end, calendars: eventCalendars)
+                let ekEvents = store.events(matching: predicate)
+                events.append(contentsOf: ekEvents.compactMap { EventModel(from: $0) })
+            }
         }
         
         // Fetch reminders
         if hasAccess(to: .reminder) {
-            let reminderCalendars = ekCalendars.filter { store.calendars(for: .reminder).contains($0) }
-            events.append(contentsOf: await fetchReminders(from: start, to: end, calendars: reminderCalendars))
+            let reminders = await remindersWithDueDates()
+            events.append(contentsOf: reminders.filter { reminder in
+                (wanted.isEmpty || wanted.contains(reminder.calendar.id))
+                    && reminder.start >= start
+                    && reminder.start <= end
+            })
         }
         
         return events.sorted { $0.start < $1.start }
     }
     
-    private func fetchReminders(from start: Date, to end: Date, calendars: [EKCalendar]) async -> [EventModel] {
+    /// Every reminder with a due date, from the cache when it is still valid.
+    private func remindersWithDueDates() async -> [EventModel] {
+        let (cached, generation) = reminderCacheLock.withLock { (cachedReminders, reminderCacheGeneration) }
+        if let cached { return cached }
+
+        let calendars = store.calendars(for: .reminder)
         guard !calendars.isEmpty else { return [] }
 
-        return await withCheckedContinuation { continuation in
+        let fetched: [EventModel] = await withCheckedContinuation { continuation in
             let predicate = store.predicateForReminders(in: calendars)
             store.fetchReminders(matching: predicate) { reminders in
-                guard let reminders else {
-                    continuation.resume(returning: [])
-                    return
-                }
-
-                let filtered = reminders.compactMap { reminder -> EventModel? in
-                    guard let dueDate = reminder.dueDateComponents?.date,
-                          dueDate >= start,
-                          dueDate <= end else {
-                        return nil
-                    }
-                    return EventModel(from: reminder)
-                }
-
-                continuation.resume(returning: filtered)
+                continuation.resume(returning: (reminders ?? []).compactMap { EventModel(from: $0) })
             }
         }
+
+        reminderCacheLock.withLock {
+            // A change that arrived mid-fetch may not be in this result.
+            if generation == reminderCacheGeneration {
+                cachedReminders = fetched
+            }
+        }
+        return fetched
     }
 
     @MainActor
@@ -138,6 +157,7 @@ class CalendarService: CalendarServiceProviding {
         } catch {
             print("Failed to update reminder completion: \(error)")
         }
+        invalidateReminderCache()
     }
 }
 

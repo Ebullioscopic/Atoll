@@ -352,6 +352,8 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         Publishers.MergeMany(
             Defaults.publisher(.enableLyrics, options: []).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.showCalendar, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.showCalendarBesideMusicPlayer, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.showCalendarDatePicker, options: []).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.showStandardMediaControls, options: []).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.autoHideInactiveNotchMediaPlayer, options: []).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.showMirror, options: []).map { _ in () }.eraseToAnyPublisher(),

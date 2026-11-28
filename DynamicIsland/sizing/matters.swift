@@ -42,9 +42,15 @@ enum SideLyricsLayout {
     static let combinedInset: CGFloat = 40
 }
 
+/// Whether the home view puts the compact calendar beside the music player
+/// while the player is on screen (#920).
+func calendarShownBesidePlayer() -> Bool {
+    Defaults[.showCalendar] && Defaults[.showCalendarBesideMusicPlayer]
+}
+
 func sideLyricsRequiredNotchWidth() -> CGFloat {
     guard Defaults[.enableLyrics],
-          !Defaults[.showCalendar],
+          !calendarShownBesidePlayer(),
           !Defaults[.enableMinimalisticUI],
           Defaults[.showStandardMediaControls],
           (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
@@ -66,11 +72,45 @@ func sideLyricsRequiredNotchWidth() -> CGFloat {
         + SideLyricsLayout.combinedInset
 }
 
+/// Columns the home view gives the calendar and the mirror when both sit
+/// beside the standard music player, so neither squeezes the player (#447, #800).
+enum HomeWidgetsLayout {
+    /// Width the compact calendar keeps beside the player and the mirror
+    static let calendarWidth: CGFloat = 215
+
+    /// Width of the square mirror preview beside the player and the calendar
+    static let mirrorWidth: CGFloat = 130
+}
+
+/// Whether the music player, the compact calendar and the mirror are all on the home view.
+/// Mirrors the conditions ``NotchHomeView`` lays them out under.
+func homeWidgetsShareHomeView() -> Bool {
+    calendarShownBesidePlayer()
+        && Defaults[.showMirror]
+        && WebcamManager.shared.cameraAvailable
+        && !Defaults[.enableMinimalisticUI]
+        && Defaults[.showStandardMediaControls]
+        && (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+}
+
+/// Width the open notch needs for the home view's columns, or 0 when the
+/// configured width always suffices.
+func homeContentRequiredNotchWidth() -> CGFloat {
+    let widgetsWidth = homeWidgetsShareHomeView()
+        ? SideLyricsLayout.minimumPlayerWidth
+            + HomeWidgetsLayout.calendarWidth
+            + HomeWidgetsLayout.mirrorWidth
+            + SideLyricsLayout.hStackSpacing * 2
+            + SideLyricsLayout.combinedInset
+        : 0
+    return max(sideLyricsRequiredNotchWidth(), widgetsWidth)
+}
+
 var openNotchSize: CGSize {
     let storedWidth = Defaults[.openNotchWidth]
     let minWidth = currentRecommendedMinimumNotchWidth()
     let maxWidth = maxAllowedNotchWidth()
-    let width = min(max(storedWidth, minWidth, sideLyricsRequiredNotchWidth()), maxWidth)
+    let width = min(max(storedWidth, minWidth, homeContentRequiredNotchWidth()), maxWidth)
     return .init(width: width, height: 200)
 }
 
@@ -309,7 +349,7 @@ func inlineLyricsAdjustedNotchSize(
     guard isHomeTabActive,
           !Defaults[.enableMinimalisticUI],
           Defaults[.enableLyrics],
-          Defaults[.showCalendar],
+          calendarShownBesidePlayer(),
           Defaults[.showStandardMediaControls],
           (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
     else {

@@ -94561,7 +94561,13 @@
     "Turn on Show battery indicator in Battery settings to use this." : {},
     "Open player with large album art" : {},
     "City" : {},
-    "Turn on Show battery in Minimalistic UI to use this." : {}
+    "Turn on Show battery in Minimalistic UI to use this." : {},
+    "When the calendar has the Home tab to itself, turn this off to show only the day's events." : {},
+    "Show beside music player" : {},
+    "Timer name" : {},
+    "Double-click to rename" : {},
+    "Turn this off to give the music player the whole Home tab. The calendar still appears there when the player is hidden." : {},
+    "Show date picker" : {}
   },
   "version" : "1.2"
 }

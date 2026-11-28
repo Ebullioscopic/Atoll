@@ -43,6 +43,9 @@ struct NotchTimerView: View {
     @State private var customSeconds: Int = 0
     @State private var isSyncingCustomDuration = false
     @State private var lockedAccentColor: Color?
+    @State private var isRenamingTimer = false
+    @State private var timerNameDraft = ""
+    @FocusState private var isTimerNameFieldFocused: Bool
 
     var body: some View {
         Group {
@@ -77,6 +80,7 @@ struct NotchTimerView: View {
                 lockAccentColorIfNeeded()
             } else {
                 lockedAccentColor = nil
+                isRenamingTimer = false
             }
         }
         .onChange(of: timerManager.activePresetId) { _, _ in
@@ -218,15 +222,38 @@ struct NotchTimerView: View {
             let marqueeWidth = max(48, geometry.size.width - badgeWidth - spacing)
 
             HStack(alignment: .center, spacing: spacing) {
-                MarqueeText(
-                    .constant(timerDisplayName),
-                    font: .system(size: 20, weight: .semibold),
-                    nsFont: .title3,
-                    textColor: .white,
-                    minDuration: 0.2,
-                    frameWidth: marqueeWidth
-                )
-                .frame(width: marqueeWidth, height: 24, alignment: .leading)
+                if isRenamingTimer {
+                    TextField(String(localized: "Timer name"), text: $timerNameDraft)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .focused($isTimerNameFieldFocused)
+                        .onSubmit(commitTimerRename)
+                        .onExitCommand { isRenamingTimer = false }
+                        .onChange(of: isTimerNameFieldFocused) { _, focused in
+                            if !focused { commitTimerRename() }
+                        }
+                        .onChange(of: timerNameDraft) { _, newValue in
+                            if newValue.count > TimerManager.maximumNameLength {
+                                timerNameDraft = String(newValue.prefix(TimerManager.maximumNameLength))
+                            }
+                        }
+                        .frame(width: marqueeWidth, height: 24, alignment: .leading)
+                } else {
+                    MarqueeText(
+                        .constant(timerDisplayName),
+                        font: .system(size: 20, weight: .semibold),
+                        nsFont: .title3,
+                        textColor: .white,
+                        minDuration: 0.2,
+                        frameWidth: marqueeWidth
+                    )
+                    .frame(width: marqueeWidth, height: 24, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2, perform: beginTimerRename)
+                    .help(canRenameTimer ? String(localized: "Double-click to rename") : "")
+                    .accessibilityAction(named: Text("Rename")) { beginTimerRename() }
+                }
 
                 if let status {
                     statusBadge(status)
@@ -285,6 +312,26 @@ struct NotchTimerView: View {
                 .padding(.top, 6)
                 .padding(.bottom, 2)
         }
+    }
+
+    /// Only timers Atoll runs itself can be renamed; Clock app timers report their own name.
+    private var canRenameTimer: Bool {
+        timerManager.hasManualTimerRunning
+    }
+
+    private func beginTimerRename() {
+        guard canRenameTimer else { return }
+        timerNameDraft = timerManager.timerName
+        isRenamingTimer = true
+        DispatchQueue.main.async {
+            isTimerNameFieldFocused = true
+        }
+    }
+
+    private func commitTimerRename() {
+        guard isRenamingTimer else { return }
+        isRenamingTimer = false
+        timerManager.renameTimer(timerNameDraft)
     }
 
     private func togglePauseAction() {

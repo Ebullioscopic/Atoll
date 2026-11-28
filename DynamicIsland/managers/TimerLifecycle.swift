@@ -39,3 +39,12 @@ struct TimerLifecycle {
         sessionID == candidate
     }
 }
+
+/// Countdown arithmetic for a timer that runs against the wall clock, so time
+/// the Mac spends asleep (for example with the lid closed) still counts down.
+enum TimerCountdown {
+    /// Whole seconds left until `endDate`; negative once the timer is in overtime.
+    static func remainingSeconds(until endDate: Date, now: Date) -> TimeInterval {
+        endDate.timeIntervalSince(now).rounded()
+    }
+}

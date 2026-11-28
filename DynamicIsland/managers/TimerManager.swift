@@ -124,6 +124,8 @@ class TimerManager: ObservableObject {
     }
     
     private var timerInstance: Timer?
+    /// Wall-clock moment a running manual countdown reaches zero; nil while paused.
+    private var countdownEndDate: Date?
     private var cancellables = Set<AnyCancellable>()
     private var soundPlayer: AVAudioPlayer?
     private var alertController = TimerAlertController()
@@ -156,7 +158,12 @@ class TimerManager: ObservableObject {
             .store(in: &cancellables)
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.updateTimerAlert() }
+            .sink { [weak self] _ in
+                // The run loop timer does not fire during sleep, so catch the
+                // countdown up to the wall clock right away on wake.
+                self?.advanceCountdown()
+                self?.updateTimerAlert()
+            }
             .store(in: &cancellables)
         // Views observe TimerManager, not the bridge; forward capability
         // changes so allowsManualInteraction reflects Clock app lifecycle.
@@ -201,10 +208,21 @@ class TimerManager: ObservableObject {
         lastUpdated = Date()
 
         activePresetId = preset?.id
+        countdownEndDate = lastUpdated.addingTimeInterval(duration)
         
         scheduleCountdown()
     }
     
+    /// Renames the running Atoll timer; an empty name restores the default (#824).
+    /// Clock app timers keep the name the Clock app reports.
+    func renameTimer(_ name: String) {
+        guard activeSource == .manual, isTimerActive else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        timerName = trimmed.isEmpty ? "Timer" : String(trimmed.prefix(Self.maximumNameLength))
+    }
+
+    static let maximumNameLength = 40
+
     func startDemoTimer(duration: TimeInterval) {
         startTimer(duration: duration, name: "Demo Timer")
     }
@@ -264,7 +282,9 @@ class TimerManager: ObservableObject {
         }
         guard activeSource == .manual else { return }
         guard isTimerActive && !isPaused else { return }
+        advanceCountdown()
         isPaused = true
+        countdownEndDate = nil
         alertController.stop()
         soundPlayer?.stop()
         timerInstance?.invalidate()
@@ -285,6 +305,7 @@ class TimerManager: ObservableObject {
         guard isTimerActive && isPaused else { return }
         isPaused = false
         lastUpdated = Date()
+        countdownEndDate = lastUpdated.addingTimeInterval(remainingTime)
         
         if isOvertime {
             alertController.start()
@@ -298,29 +319,33 @@ class TimerManager: ObservableObject {
         let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] timer in
             Task { @MainActor [weak self] in
                 // Invalidating Timer does not cancel a tick already queued as a Task.
-                guard let self,
-                      self.timerInstance === timer,
-                      self.activeSource == .manual,
-                      self.isTimerActive, !self.isPaused else { return }
-                if self.remainingTime > 0 {
-                    self.remainingTime -= 1
-                    self.elapsedTime = self.totalDuration - self.remainingTime
-                } else if self.remainingTime == 0 {
-                    // Enter overtime once; later ticks advance the alert phase.
-                    self.isFinished = true
-                    self.isOvertime = true
-                    self.alertController.start()
-                    self.playTimerSound()
-                    self.remainingTime = -1
-                } else {
-                    self.remainingTime -= 1
-                }
-                self.lastUpdated = Date()
+                guard let self, self.timerInstance === timer else { return }
+                self.advanceCountdown()
                 self.updateTimerAlert()
             }
         }
+        // The countdown is read from the wall clock, so a late tick never drifts.
+        timer.tolerance = 0.1
         timerInstance = timer
         RunLoop.main.add(timer, forMode: .common)
+    }
+
+    /// Derives the remaining time from the wall clock rather than counting ticks,
+    /// so a countdown keeps running while the Mac sleeps (#271).
+    private func advanceCountdown(now: Date = Date()) {
+        guard activeSource == .manual, isTimerActive, !isPaused,
+              let countdownEndDate else { return }
+        let remaining = TimerCountdown.remainingSeconds(until: countdownEndDate, now: now)
+        if remaining <= 0 && !isOvertime {
+            // Enter overtime once; later ticks advance the alert phase.
+            isFinished = true
+            isOvertime = true
+            alertController.start(at: now)
+            playTimerSound()
+        }
+        remainingTime = remaining
+        elapsedTime = totalDuration - max(0, remaining)
+        lastUpdated = now
     }
 
     /// Adopts a Clock timer after clearing any Atoll-managed alert session.
@@ -409,6 +434,7 @@ class TimerManager: ObservableObject {
     
     private func resetTimer() {
         endTimerSession()
+        countdownEndDate = nil
         withAnimation(.smooth) {
             isTimerActive = false
         }
