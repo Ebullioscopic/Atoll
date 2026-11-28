@@ -56,7 +56,14 @@ final class ShelfItemViewModel: ObservableObject {
 
     // Single coordinated load: resolves bookmark once, populates all metadata
     func loadMetadata() async {
-        guard case .file(let bookmarkData) = item.kind else { return }
+        guard case .file(let bookmarkData) = item.kind else {
+            // Links and text have no file to resolve; without this their cell
+            // had no name and no icon and drew as empty space.
+            displayName = item.displayName
+            icon = item.icon
+            metadataRevision += 1
+            return
+        }
         let bookmark = Bookmark(data: bookmarkData)
         let (url, _) = await bookmark.resolveAsync()
         guard let resolvedURL = url else { return }

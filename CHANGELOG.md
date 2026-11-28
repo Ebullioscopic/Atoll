@@ -95,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
+- **Links and text on the Shelf are visible again**: a link or text snippet dropped on the Shelf now shows with its address or text and an icon, instead of an empty cell that was counted but could not be seen or removed. (#902)
 - **No more phantom screen recordings**: apps that grab the screen for a moment, such as AltTab refreshing its thumbnails, no longer flash the recording activity, which made the music activity disappear and the Focus indicator replay every few seconds. A recording now shows once the capture has lasted 1.5 seconds, with its timer counted from the start. (#362)
 - **Focus toast only on Focus changes**: with “Show focus label as brief toast” on, the On toast no longer replays after every volume, brightness or other HUD, or when another live activity hands the notch back. (#415)
 - **Camera indicator with phone and extension cameras**: cameras that appear after Atoll starts, such as a phone camera from a Camera Extension, are now watched, and an external camera that only reports itself busy while no app has it open no longer lights the indicator. (#884)
