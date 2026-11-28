@@ -485,6 +485,7 @@ struct StandaloneCalendarView: View {
     @Default(.hideAllDayEvents) private var hideAllDayEvents
     @Default(.hideCompletedReminders) private var hideCompletedReminders
     @Default(.calendarViewMode) private var mode
+    @Default(.showCalendarDatePicker) private var showDatePicker
 
     private let calendar = Calendar.current
 
@@ -613,13 +614,16 @@ struct StandaloneCalendarView: View {
             let paneHeight = max(0, geometry.size.height)
 
             HStack(alignment: .top, spacing: paneSpacing) {
-                leftPickerPane
-                    .frame(width: paneWidth, alignment: .topLeading)
-                    .frame(height: paneHeight, alignment: .topLeading)
-                    .layoutPriority(1)
+                if showDatePicker {
+                    leftPickerPane
+                        .frame(width: paneWidth, alignment: .topLeading)
+                        .frame(height: paneHeight, alignment: .topLeading)
+                        .layoutPriority(1)
+                }
 
+                // Without the picker the day's events take the whole width (#341).
                 rightEventsPane
-                    .frame(width: paneWidth, alignment: .topLeading)
+                    .frame(width: showDatePicker ? paneWidth : geometry.size.width, alignment: .topLeading)
                     .frame(height: paneHeight, alignment: .topLeading)
                     .layoutPriority(1)
             }

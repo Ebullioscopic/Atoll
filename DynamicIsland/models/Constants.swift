@@ -1111,6 +1111,7 @@ extension Defaults.Keys {
     static let showCalendar = Key<Bool>("showCalendar", default: true)
     static let showCalendarBesideMusicPlayer = Key<Bool>("showCalendarBesideMusicPlayer", default: true)
     static let calendarViewMode = Key<CalendarViewMode>("calendarViewMode", default: .week)
+    static let showCalendarDatePicker = Key<Bool>("showCalendarDatePicker", default: true)
     static let hideCompletedReminders = Key<Bool>("hideCompletedReminders", default: true)
     static let hideAllDayEvents = Key<Bool>("hideAllDayEvents", default: false)
     static let sliderColor = Key<SliderColorEnum>(

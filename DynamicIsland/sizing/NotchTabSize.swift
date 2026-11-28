@@ -72,7 +72,7 @@ func notchTabContentSize(
         if Defaults[.enableMinimalisticUI],
            let preferred = extensionMinimalisticPreferredHeight(baseSize: baseSize) {
             size.height = preferred
-        } else if isNotchOpen, standaloneCalendarActive() {
+        } else if isNotchOpen, standaloneCalendarActive(), Defaults[.showCalendarDatePicker] {
             // Gated on the open state: a closed notch draws nothing that needs
             // the month's height, and sizing the window for it would leave a
             // tall transparent slab over the top of the screen while the notch

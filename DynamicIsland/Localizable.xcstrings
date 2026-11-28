@@ -94543,7 +94543,9 @@
       }
     },
     "Show beside music player" : {},
-    "Turn this off to give the music player the whole Home tab. The calendar still appears there when the player is hidden." : {}
+    "Turn this off to give the music player the whole Home tab. The calendar still appears there when the player is hidden." : {},
+    "Show date picker" : {},
+    "When the calendar has the Home tab to itself, turn this off to show only the day's events." : {}
   },
   "version" : "1.2"
 }

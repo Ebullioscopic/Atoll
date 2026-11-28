@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Minimal calendar**: turn off the new “Show date picker” option in Calendar settings to hide the month, week or 3-day picker and show only the day's events when the calendar has the Home tab to itself. The notch then keeps its standard height. On by default. (#341)
 - **Hide the calendar during playback**: a new “Show beside music player” option in Calendar settings keeps the calendar off the Home tab while the music player is on it, so the player (and side lyrics, when on) get the whole space. The calendar still shows when the player is hidden. On by default. (#920)
 - **Back up and restore settings**: General settings can export your Atoll settings to a JSON file and import them again, on the same Mac or another one. API keys, sign-ins, clipboard history, notes and other private or device-specific data are never included, and Atoll offers to relaunch after an import. (#885)
 - **GitHub Copilot usage monitor**: an optional LLM Usage card shows your Copilot account quotas (premium requests, chat, completions) with consumed percentage, remaining allowance, plan and reset date, for GitHub.com and data-residency `ghe.com` tenants. The token is stored in the Keychain and removed when the provider is turned off. It reads GitHub's undocumented `copilot_internal/user` endpoint, which may change. Off by default. (#940)

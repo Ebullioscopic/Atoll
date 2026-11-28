@@ -351,6 +351,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .calendar, title: "Show time remaining", keywords: ["calendar widget", "remaining"], highlightID: SettingsTab.calendar.highlightID(for: "Show time remaining")),
         SettingsSearchEntry(tab: .calendar, title: "Show start time after event begins", keywords: ["calendar widget", "start time"], highlightID: SettingsTab.calendar.highlightID(for: "Show start time after event begins")),
         SettingsSearchEntry(tab: .calendar, title: "Chip color", keywords: ["reminder chip", "color"], highlightID: SettingsTab.calendar.highlightID(for: "Chip color")),
+        SettingsSearchEntry(tab: .calendar, title: "Show date picker", keywords: ["calendar", "minimal", "month", "week"], highlightID: SettingsTab.calendar.highlightID(for: "Show date picker")),
         SettingsSearchEntry(tab: .calendar, title: "Show beside music player", keywords: ["calendar", "music", "hide", "home"], highlightID: SettingsTab.calendar.highlightID(for: "Show beside music player")),
         SettingsSearchEntry(tab: .calendar, title: "Hide all-day events", keywords: ["calendar", "all-day"], highlightID: SettingsTab.calendar.highlightID(for: "Hide all-day events")),
         SettingsSearchEntry(tab: .calendar, title: "Hide completed reminders", keywords: ["reminder", "completed"], highlightID: SettingsTab.calendar.highlightID(for: "Hide completed reminders")),
@@ -3810,6 +3811,7 @@ struct CalendarSettings: View {
     @Default(.showCalendar) var showCalendar: Bool
     @Default(.showCalendarBesideMusicPlayer) private var showCalendarBesideMusicPlayer
     @Default(.calendarViewMode) var calendarViewMode: CalendarViewMode
+    @Default(.showCalendarDatePicker) private var showCalendarDatePicker
     @Default(.enableLyrics) private var enableLyrics
     @Default(.enableReminderLiveActivity) var enableReminderLiveActivity
     @Default(.reminderPresentationStyle) var reminderPresentationStyle
@@ -3897,6 +3899,16 @@ struct CalendarSettings: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                Defaults.Toggle(key: .showCalendarDatePicker) {
+                    Text("Show date picker")
+                }
+                .disabled(!showCalendar)
+                .settingsHighlight(id: highlightID("Show date picker"))
+                Text("When the calendar has the Home tab to itself, turn this off to show only the day's events.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 VStack(alignment: .leading, spacing: 6) {
                     Picker("Calendar view", selection: $calendarViewMode) {
                         ForEach(CalendarViewMode.allCases) { viewMode in
@@ -3904,7 +3916,7 @@ struct CalendarSettings: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    .disabled(!showCalendar)
+                    .disabled(!showCalendar || !showCalendarDatePicker)
 
                     Text(calendarViewMode.description)
                         .font(.caption)
