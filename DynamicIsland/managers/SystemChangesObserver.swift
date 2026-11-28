@@ -115,11 +115,10 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
         }
         volumeController.start()
 
-        brightnessController.onBrightnessChange = { [weak self] brightness in
-            guard let self, self.brightnessEnabled else { return }
-            self.sendBrightnessNotification(value: brightness)
+        configureBrightnessCallback()
+        if brightnessEnabled {
+            brightnessController.start()
         }
-        brightnessController.start()
 
         configureKeyboardBacklightCallback()
         if keyboardBacklightEnabled {
@@ -140,9 +139,19 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
 
     func update(volumeEnabled: Bool, brightnessEnabled: Bool, keyboardBacklightEnabled: Bool) {
         self.volumeEnabled = volumeEnabled
+        let brightnessStateChanged = self.brightnessEnabled != brightnessEnabled
         self.brightnessEnabled = brightnessEnabled
         let backlightStateChanged = self.keyboardBacklightEnabled != keyboardBacklightEnabled
         self.keyboardBacklightEnabled = keyboardBacklightEnabled
+
+        configureBrightnessCallback()
+        if brightnessStateChanged {
+            if brightnessEnabled {
+                brightnessController.start()
+            } else {
+                brightnessController.stop()
+            }
+        }
 
         if keyboardBacklightEnabled {
             configureKeyboardBacklightCallback()
@@ -392,6 +401,17 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
                     icon: ""
                 )
             }
+        }
+    }
+
+    private func configureBrightnessCallback() {
+        if brightnessEnabled {
+            brightnessController.onBrightnessChange = { [weak self] brightness in
+                guard let self, self.brightnessEnabled else { return }
+                self.sendBrightnessNotification(value: brightness)
+            }
+        } else {
+            brightnessController.onBrightnessChange = nil
         }
     }
 

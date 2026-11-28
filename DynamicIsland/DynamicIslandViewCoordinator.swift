@@ -134,6 +134,10 @@ class DynamicIslandViewCoordinator: ObservableObject {
     @AppStorage("alwaysShowTabs") var alwaysShowTabs: Bool = true {
         didSet {
             if !alwaysShowTabs {
+                // Remembered and fixed tabs both need the tab bar.
+                if selectedOpenDestination != .automatic {
+                    notchOpenDestination = NotchOpenDestination.automatic.rawValue
+                }
                 openLastTabByDefault = false
                 if TrayDrop.shared.isEmpty || !Defaults[.openShelfByDefault] {
                     currentView = .home
@@ -150,6 +154,50 @@ class DynamicIslandViewCoordinator: ObservableObject {
         }
     }
     
+    @AppStorage("notchOpenDestination") var notchOpenDestination: String = ""
+
+    var selectedOpenDestination: NotchOpenDestination {
+        NotchOpenDestination.selected(notchOpenDestination, rememberLast: openLastTabByDefault)
+    }
+
+    func setOpenDestination(_ destination: NotchOpenDestination) {
+        notchOpenDestination = destination.rawValue
+        openLastTabByDefault = destination == .lastUsed
+    }
+
+    var availableStandardTabs: [NotchOpenDestination] {
+        StandardNotchTabAvailability(
+            home: Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls] || Defaults[.showCalendar] || Defaults[.showMirror],
+            shelf: Defaults[.dynamicShelf],
+            timer: Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] == .tab,
+            stats: Defaults[.enableStatsFeature],
+            llmUsage: Defaults[.enableLLMUsageFeature],
+            notes: Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab),
+            terminal: Defaults[.enableTerminalFeature]
+        ).available
+    }
+
+    func selectOpenDestination() {
+        guard !Defaults[.enableMinimalisticUI] else { currentView = .home; return }
+        let destination = selectedOpenDestination
+        guard destination.isFixed else { return }
+        guard let tab = destination.resolved(available: availableStandardTabs) else {
+            // TabSelectionView chooses the first available extension if one exists.
+            currentView = .home
+            return
+        }
+        switch tab {
+        case .home: currentView = .home
+        case .shelf: currentView = .shelf
+        case .timer: currentView = .timer
+        case .stats: currentView = .stats
+        case .llmUsage: currentView = .llmUsage
+        case .notes: currentView = .notes
+        case .terminal: currentView = .terminal
+        case .automatic, .lastUsed: break
+        }
+    }
+
     @AppStorage("hudReplacement") var hudReplacement: Bool = true
     
     @AppStorage("preferred_screen_name") var preferredScreen = NSScreen.main?.localizedName ?? "Unknown" {
@@ -357,6 +405,26 @@ class DynamicIslandViewCoordinator: ObservableObject {
             return
         }
         DispatchQueue.main.async {
+            // Guard against redundant hide
+            if !status && !self.sneakPeek.show {
+                return
+            }
+
+            // If already showing the exact same sneak peek, just renew the timer without re-animating
+            let current = self.sneakPeek
+            if status && current.show
+                && current.type == type
+                && current.icon == icon
+                && abs(current.value - value) < 0.01
+                && current.title == title
+                && current.subtitle == subtitle
+                && current.accentColor == accentColor
+                && current.styleOverride == styleOverride
+                && current.targetScreenName == targetScreen?.localizedName {
+                self.scheduleSneakPeekHide(after: self.sneakPeekDuration)
+                return
+            }
+
             // Single write so `sneakPeek.didSet` (which schedules the auto-hide)
             // fires once, not once per field — the per-field writes raced the hide
             // Task and could wedge `show == true` with no pending hide.

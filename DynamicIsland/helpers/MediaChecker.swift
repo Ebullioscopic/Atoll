@@ -30,7 +30,25 @@ final class MediaChecker: Sendable {
         case timeout
     }
 
+    /// Delays before re-running a probe that reported Now Playing as broken.
+    private static let retryDelays: [Duration] = [.seconds(3), .seconds(7)]
+
+    /// Whether the MediaRemote adapter no longer works on this system.
+    ///
+    /// One "broken" probe is not enough: right after login or an OS update the
+    /// probe can transiently fail, and a single misfire used to hide the Now
+    /// Playing source for the whole session (#816, #904, #921). It is only
+    /// reported deprecated when every attempt agrees.
     func checkDeprecationStatus() async throws -> Bool {
+        guard try await probe() else { return false }
+        for delay in Self.retryDelays {
+            try await Task.sleep(for: delay)
+            guard try await probe() else { return false }
+        }
+        return true
+    }
+
+    private func probe() async throws -> Bool {
         guard let scriptURL = Bundle.main.url(forResource: "mediaremote-adapter", withExtension: "pl"),
               let frameworkPath =
                     Bundle.main.resourceURL?
