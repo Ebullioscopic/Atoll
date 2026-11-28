@@ -501,17 +501,17 @@ struct LockScreenWeatherSnapshot: Equatable {
 
             var displayName: String {
                 switch self {
-                case .good: return "Good"
-                case .fair: return "Fair"
-                case .moderate: return "Moderate"
-                case .unhealthyForSensitive: return "Sensitive"
-                case .unhealthy: return "Unhealthy"
-                case .poor: return "Poor"
-                case .veryPoor: return "Very Poor"
-                case .veryUnhealthy: return "Very Unhealthy"
-                case .extremelyPoor: return "Extremely Poor"
-                case .hazardous: return "Hazardous"
-                case .unknown: return "Unknown"
+                case .good: return String(localized: "Good")
+                case .fair: return String(localized: "Fair")
+                case .moderate: return String(localized: "Moderate")
+                case .unhealthyForSensitive: return String(localized: "Sensitive")
+                case .unhealthy: return String(localized: "Unhealthy")
+                case .poor: return String(localized: "Poor")
+                case .veryPoor: return String(localized: "Very Poor")
+                case .veryUnhealthy: return String(localized: "Very Unhealthy")
+                case .extremelyPoor: return String(localized: "Extremely Poor")
+                case .hazardous: return String(localized: "Hazardous")
+                case .unknown: return String(localized: "Unknown")
                 }
             }
         }

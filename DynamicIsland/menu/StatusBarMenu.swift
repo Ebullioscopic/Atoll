@@ -50,7 +50,7 @@ class StatusBarMenu: NSMenu {
         }
         
         // Set up the menu
-        self.addItem(NSMenuItem(title: "Quit", action: #selector(NSApp.terminate(_:)), keyEquivalent: "q"))
+        self.addItem(NSMenuItem(title: String(localized: "Quit"), action: #selector(NSApp.terminate(_:)), keyEquivalent: String(localized: "q")))
         statusItem.menu = self
     }
 

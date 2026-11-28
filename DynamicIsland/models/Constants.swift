@@ -22,6 +22,7 @@
 
 import SwiftUI
 import Defaults
+import KeyboardShortcuts
 import Lottie
 import Foundation
 
@@ -169,10 +170,10 @@ enum ExtensionPermissionScope: String, CaseIterable, Codable, Defaults.Serializa
 
     var displayName: String {
         switch self {
-        case .liveActivities: return "Live Activities"
-        case .lockScreenWidgets: return "Lock Screen Widgets"
-        case .notchExperiences: return "Notch Experiences"
-        case .fileSharing: return "File Sharing"
+        case .liveActivities: return String(localized: "Live Activities")
+        case .lockScreenWidgets: return String(localized: "Lock Screen Widgets")
+        case .notchExperiences: return String(localized: "Notch Experiences")
+        case .fileSharing: return String(localized: "File Sharing")
         }
     }
 }
@@ -284,8 +285,8 @@ enum FantasticalViewStyle: String, CaseIterable, Codable, Defaults.Serializable 
     
     var displayName: String {
         switch self {
-        case .mini: return "Mini View"
-        case .calendar: return "Full Calendar"
+        case .mini: return String(localized: "Mini View")
+        case .calendar: return String(localized: "Full Calendar")
         }
     }
 }
@@ -376,15 +377,15 @@ enum ColorPickerDisplayMode: String, CaseIterable, Codable, Defaults.Serializabl
     
     var displayName: String {
         switch self {
-        case .popover: return "Popover"
-        case .panel: return "Panel"
+        case .popover: return String(localized: "Popover")
+        case .panel: return String(localized: "Panel")
         }
     }
     
     var description: String {
         switch self {
-        case .popover: return "Shows color picker as a dropdown attached to the color picker button"
-        case .panel: return "Shows color picker in a floating panel near the notch"
+        case .popover: return String(localized: "Shows color picker as a dropdown attached to the color picker button")
+        case .panel: return String(localized: "Shows color picker in a floating panel near the notch")
         }
     }
 }
@@ -425,12 +426,56 @@ extension Notification.Name {
 }
 
 // Media controller types for selection in settings
+/// How the line being sung is picked out from the rest.
+enum PinnedLyricContext: Int, CaseIterable, Identifiable, Defaults.Serializable {
+    case current = 1
+    case three = 3
+    case five = 5
+
+    var id: Int { rawValue }
+    var localizedName: String {
+        switch self {
+        case .current: return String(localized: "Current")
+        case .three: return String(localized: "3 lines")
+        case .five: return String(localized: "5 lines")
+        }
+    }
+}
+
+enum LyricHighlightStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case sweep = "Sweep"
+    case gradient = "Gradient"
+    case solid = "Solid"
+
+    var id: String { rawValue }
+
+    var localizedName: String {
+        switch self {
+        case .sweep: return String(localized: "Sweep")
+        case .gradient: return String(localized: "Gradient")
+        case .solid: return String(localized: "Solid")
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .sweep:
+            return String(localized: "The highlight travels across the line word by word, in reading order.")
+        case .gradient:
+            return String(localized: "The current line is lit by one fixed gradient that does not move, the way lyrics were marked before the sweep.")
+        case .solid:
+            return String(localized: "The current line is lit in one flat colour, with nothing crossing it.")
+        }
+    }
+}
+
 enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializable {
     case nowPlaying = "Now Playing"
     case appleMusic = "Apple Music"
     case spotify = "Spotify"
     case youtubeMusic = "Youtube Music"
     case amazonMusic = "Amazon Music"
+    case tidal = "TIDAL"
     case cider = "Cider"
     
     var id: String { self.rawValue }
@@ -442,6 +487,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
         case .spotify: return String(localized: "Spotify")
         case .youtubeMusic: return String(localized: "Youtube Music")
         case .amazonMusic: return String(localized: "Amazon Music")
+        case .tidal: return String(localized: "TIDAL")
         case .cider: return String(localized: "Cider")
         }
     }
@@ -536,6 +582,38 @@ enum BatteryNotificationStyle: String, CaseIterable, Identifiable, Defaults.Seri
     }
 }
 
+enum RecordingHoverStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case `default`
+    case inline
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .default:
+            return String(localized: "Default")
+        case .inline:
+            return String(localized: "Inline")
+        }
+    }
+}
+
+enum RecordingControlMode: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case indicatorOnly
+    case withStopButton
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .indicatorOnly:
+            return String(localized: "Indicator only")
+        case .withStopButton:
+            return String(localized: "With stop button")
+        }
+    }
+}
+
 enum MusicAuxiliaryControl: String, CaseIterable, Identifiable, Defaults.Serializable {
     case shuffle
     case repeatMode
@@ -547,13 +625,13 @@ enum MusicAuxiliaryControl: String, CaseIterable, Identifiable, Defaults.Seriali
     var displayName: String {
         switch self {
         case .shuffle:
-            return "Shuffle"
+            return String(localized: "Shuffle")
         case .repeatMode:
-            return "Repeat"
+            return String(localized: "Repeat")
         case .mediaOutput:
-            return "Media Output"
+            return String(localized: "Media Output")
         case .lyrics:
-            return "Lyrics"
+            return String(localized: "Lyrics")
         }
     }
 
@@ -631,6 +709,40 @@ enum TimerProgressStyle: String, CaseIterable, Identifiable, Defaults.Serializab
         switch self {
         case .bar: return String(localized:"Bar")
         case .ring: return String(localized:"Ring")
+        }
+    }
+}
+
+enum CaffeinateDuration: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case indefinite = "indefinite"
+    case fifteenMinutes = "fifteenMinutes"
+    case thirtyMinutes = "thirtyMinutes"
+    case oneHour = "oneHour"
+    case twoHours = "twoHours"
+    case fourHours = "fourHours"
+
+    var id: String { rawValue }
+
+    /// How long the session lasts, or `nil` when it runs until turned off.
+    var seconds: TimeInterval? {
+        switch self {
+        case .indefinite: return nil
+        case .fifteenMinutes: return 15 * 60
+        case .thirtyMinutes: return 30 * 60
+        case .oneHour: return 60 * 60
+        case .twoHours: return 2 * 60 * 60
+        case .fourHours: return 4 * 60 * 60
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .indefinite: return String(localized: "Until turned off")
+        case .fifteenMinutes: return String(localized: "15 minutes")
+        case .thirtyMinutes: return String(localized: "30 minutes")
+        case .oneHour: return String(localized: "1 hour")
+        case .twoHours: return String(localized: "2 hours")
+        case .fourHours: return String(localized: "4 hours")
         }
     }
 }
@@ -713,11 +825,11 @@ enum AIModelProvider: String, CaseIterable, Identifiable, Defaults.Serializable 
     
     var description: String {
         switch self {
-        case .gemini: return "Google's Gemini AI with multimodal capabilities"
-        case .openai: return "OpenAI's GPT models with advanced reasoning"
-        case .claude: return "Anthropic's Claude with strong analytical skills"
-        case .local: return "Local AI model (Ollama or similar)"
-        case .groq: return "Groq's fast inference for OpenAI-compatible models"
+        case .gemini: return String(localized: "Google's Gemini AI with multimodal capabilities")
+        case .openai: return String(localized: "OpenAI's GPT models with advanced reasoning")
+        case .claude: return String(localized: "Anthropic's Claude with strong analytical skills")
+        case .local: return String(localized: "Local AI model (Ollama or similar)")
+        case .groq: return String(localized: "Groq's fast inference for OpenAI-compatible models")
         }
     }
     
@@ -882,6 +994,15 @@ enum ColorExtractionMode: String, CaseIterable, Identifiable, Defaults.Serializa
     var id: Self { self }
 }
 
+enum LockScreenLiveActivityIconStyle: String, Defaults.Serializable {
+    case lock
+    case fingerprint
+    case both
+
+    var showsLock: Bool { self == .lock || self == .both }
+    var showsFingerprint: Bool { self == .fingerprint || self == .both }
+}
+
 extension Defaults.Keys {
         // MARK: General
     static let updateChannel = Key<UpdateChannel>("updateChannel", default: .stable)
@@ -935,6 +1056,7 @@ extension Defaults.Keys {
     static let animationTransformOverrides = Key<[String: AnimationTransformConfig]>("animationTransformOverrides", default: [:])
     static let tileShowLabels = Key<Bool>("tileShowLabels", default: false)
     static let showCalendar = Key<Bool>("showCalendar", default: true)
+    static let calendarViewMode = Key<CalendarViewMode>("calendarViewMode", default: .week)
     static let hideCompletedReminders = Key<Bool>("hideCompletedReminders", default: true)
     static let hideAllDayEvents = Key<Bool>("hideAllDayEvents", default: false)
     static let sliderColor = Key<SliderColorEnum>(
@@ -971,6 +1093,14 @@ extension Defaults.Keys {
     static let waitInterval = Key<Double>("waitInterval", default: 3)
     static let showShuffleAndRepeat = Key<Bool>("showShuffleAndRepeat", default: true)
     static let showMediaOutputControl = Key<Bool>("showMediaOutputControl", default: true)
+    /// Whether the lock screen panel keeps a volume slider under the transport
+    /// row, rather than leaving volume behind the output button.
+    ///
+    /// Off by default and named after the setting it copies: iOS puts "Always
+    /// Show Volume Control" in Accessibility rather than showing the slider to
+    /// everybody, because a Lock Screen that is mostly artwork is the point for
+    /// most people and a permanent slider is a preference, not an improvement.
+    static let alwaysShowLockScreenVolume = Key<Bool>("alwaysShowLockScreenVolume", default: false)
     static let musicAuxLeftControl = Key<MusicAuxiliaryControl>("musicAuxLeftControl", default: .shuffle)
     static let musicAuxRightControl = Key<MusicAuxiliaryControl>("musicAuxRightControl", default: .repeatMode)
     static let didMigrateMusicAuxControls = Key<Bool>("didMigrateMusicAuxControls", default: false)
@@ -994,14 +1124,17 @@ extension Defaults.Keys {
     static let lockScreenWeatherShowsLocation = Key<Bool>("lockScreenWeatherShowsLocation", default: true)
     static let lockScreenWeatherShowsSunrise = Key<Bool>("lockScreenWeatherShowsSunrise", default: true)
     static let lockScreenWeatherWidgetStyle = Key<LockScreenWeatherWidgetStyle>("lockScreenWeatherWidgetStyle", default: .inline)
-    static let lockScreenWeatherTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("lockScreenWeatherTemperatureUnit", default: .celsius)
+    static let lockScreenWeatherTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("lockScreenWeatherTemperatureUnit", default: .matchingSystemPreference)
     static let lockScreenWeatherShowsAQI = Key<Bool>("lockScreenWeatherShowsAQI", default: true)
     static let lockScreenWeatherAQIScale = Key<LockScreenWeatherAirQualityScale>("lockScreenWeatherAQIScale", default: .us)
     static let lockScreenWeatherUsesGaugeTint = Key<Bool>("lockScreenWeatherUsesGaugeTint", default: false)
     static let lockScreenWeatherProviderSource = Key<LockScreenWeatherProviderSource>("lockScreenWeatherProviderSource", default: .openMeteo)
     static let lockScreenWeatherVerticalOffset = Key<Double>("lockScreenWeatherVerticalOffset", default: 0)
     static let lockScreenMusicVerticalOffset = Key<Double>("lockScreenMusicVerticalOffset", default: 0)
-    static let lockScreenMusicPanelWidth = Key<Double>("lockScreenMusicPanelWidth", default: 350)
+    static let lockScreenMusicPanelWidth = Key<Double>(
+        "lockScreenMusicPanelWidth",
+        default: Double(LockScreenMusicPanel.defaultCollapsedWidth)
+    )
     static let lockScreenMusicAlbumParallaxEnabled = Key<Bool>("lockScreenMusicAlbumParallaxEnabled", default: false)
     static let lockScreenTimerVerticalOffset = Key<Double>("lockScreenTimerVerticalOffset", default: 0)
     static let lockScreenTimerWidgetWidth = Key<Double>("lockScreenTimerWidgetWidth", default: 350)
@@ -1089,6 +1222,7 @@ extension Defaults.Keys {
     static let enableDownloadListener = Key<Bool>("enableDownloadListener", default: true)
     static let enableSafariDownloads = Key<Bool>("enableSafariDownloads", default: true)
     static let selectedDownloadIndicatorStyle = Key<DownloadIndicatorStyle>("selectedDownloadIndicatorStyle", default: DownloadIndicatorStyle.progress)
+    static let showDownloadSpeed = Key<Bool>("showDownloadSpeed", default: false)
     static let selectedDownloadIconStyle = Key<DownloadIconStyle>("selectedDownloadIconStyle", default: DownloadIconStyle.onlyAppIcon)
     
         // MARK: HUD
@@ -1135,6 +1269,21 @@ extension Defaults.Keys {
     static let spotifyAuthAccessTokenExpiration = Key<Double>("spotifyAuthAccessTokenExpiration", default: 0)
     static let spotifyAuthLastValidatedAt = Key<Double>("spotifyAuthLastValidatedAt", default: 0)
     static let spotifyLibraryClientID = Key<String>("spotifyLibraryClientID", default: "")
+
+    /// Token for Cider's external-application API, from
+    /// Settings > Connectivity > Manage External Application Access in Cider.
+    /// Empty is a valid setting: Cider can also run that API with
+    /// authentication switched off, and then no header is wanted at all.
+    /// Superseded by `CiderTokenStore`, which keeps the token in the Keychain.
+    /// Kept only so an existing value can be migrated out of the preferences
+    /// plist on first launch; nothing reads it to make a request.
+    /// Named `legacy…` so nothing new reaches for it by the old name; the
+    /// stored key string is unchanged so existing values still migrate.
+    /// A `@available(*, deprecated)` attribute would have been the obvious
+    /// alternative, but it fires on `CiderTokenStore` -- the one place that is
+    /// supposed to read this -- and a warning at the sanctioned use site is
+    /// worse than none.
+    static let legacyCiderAPIToken = Key<String>("ciderAPIToken", default: "")
     // The OAuth token pair lives in the Keychain (see KeychainSpotifyTokenStore);
     // these two keys remain only for the one-time migration of early builds.
     static let spotifyLibraryAccessToken = Key<String>("spotifyLibraryAccessToken", default: "")
@@ -1159,6 +1308,8 @@ extension Defaults.Keys {
     static let enableCodexProvider = Key<Bool>("enableCodexProvider", default: true)
     static let enableCursorProvider = Key<Bool>("enableCursorProvider", default: true)
     static let enableAntigravityProvider = Key<Bool>("enableAntigravityProvider", default: true)
+    static let enableNewAPIProvider = Key<Bool>("enableNewAPIProvider", default: false)
+    static let newAPIAccounts = Key<[NewAPIAccount]>("newAPIAccounts", default: [])
     static let autoStartStatsMonitoring = Key<Bool>("autoStartStatsMonitoring", default: true)
     static let statsStopWhenNotchCloses = Key<Bool>("statsStopWhenNotchCloses", default: true)
     static let statsUpdateInterval = Key<Double>("statsUpdateInterval", default: 1.0)
@@ -1167,7 +1318,7 @@ extension Defaults.Keys {
     static let showGpuGraph = Key<Bool>("showGpuGraph", default: true)
     static let showNetworkGraph = Key<Bool>("showNetworkGraph", default: false)
     static let showDiskGraph = Key<Bool>("showDiskGraph", default: false)
-    static let cpuTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("cpuTemperatureUnit", default: .celsius)
+    static let cpuTemperatureUnit = Key<LockScreenWeatherTemperatureUnit>("cpuTemperatureUnit", default: .matchingSystemPreference)
     
     // MARK: Terminal Feature
     static let enableTerminalFeature = Key<Bool>("enableTerminalFeature", default: false)
@@ -1191,6 +1342,8 @@ extension Defaults.Keys {
     static let tabSwitchOnHover = Key<Bool>("tabSwitchOnHover", default: false)
 
     // MARK: Timer Feature
+    static let timerAlertDurationSeconds = Key<Int>("timerAlertDurationSeconds", default: 30)
+    static let timerAlertRepeatIntervalMinutes = Key<Int>("timerAlertRepeatIntervalMinutes", default: 5)
     static let enableTimerFeature = Key<Bool>("enableTimerFeature", default: true)
     static let timerDisplayMode = Key<TimerDisplayMode>("timerDisplayMode", default: .tab)
     static let timerPresets = Key<[TimerPreset]>("timerPresets", default: TimerPreset.defaultPresets)
@@ -1210,8 +1363,20 @@ extension Defaults.Keys {
     static let reminderPresentationStyle = Key<ReminderPresentationStyle>("reminderPresentationStyle", default: .ringCountdown)
     static let reminderLeadTime = Key<Int>("reminderLeadTime", default: 5)
     static let reminderSneakPeekDuration = Key<Double>("reminderSneakPeekDuration", default: 5)
+    // Legacy key name: the separate control window is gone, this now shows inline notch controls.
     static let timerControlWindowEnabled = Key<Bool>("timerControlWindowEnabled", default: true)
     
+    // MARK: Per-App Volume
+    static let enablePerAppVolume = Key<Bool>("enablePerAppVolume", default: false)
+    static let showPerAppVolumeIcon = Key<Bool>("showPerAppVolumeIcon", default: true)
+    static let perAppVolumeLevels = Key<[String: Double]>("perAppVolumeLevels", default: [:])
+    static let perAppVolumeMuted = Key<Set<String>>("perAppVolumeMuted", default: [])
+    // MARK: Caffeinate Feature
+    static let enableCaffeinate = Key<Bool>("enableCaffeinate", default: true)
+    static let showCaffeinateIcon = Key<Bool>("showCaffeinateIcon", default: true)
+    static let caffeinateDefaultDuration = Key<CaffeinateDuration>("caffeinateDefaultDuration", default: .indefinite)
+    static let caffeinateKeepsDisplayAwake = Key<Bool>("caffeinateKeepsDisplayAwake", default: true)
+
     // MARK: ColorPicker Feature
     static let enableColorPickerFeature = Key<Bool>("enableColorPickerFeature", default: true)
     static let showColorFormats = Key<Bool>("showColorFormats", default: true)
@@ -1222,12 +1387,18 @@ extension Defaults.Keys {
     // MARK: Clipboard Feature
     static let enableClipboardManager = Key<Bool>("enableClipboardManager", default: true)
     static let clipboardHistorySize = Key<Int>("clipboardHistorySize", default: 3)
+    /// Whether clipboard history is written to disk and restored on launch.
+    /// Off keeps it in memory for the session only — nothing survives a quit.
+    /// Defaults to true so existing installs keep the behaviour they have.
+    static let persistClipboardHistory = Key<Bool>("persistClipboardHistory", default: true)
     static let showClipboardIcon = Key<Bool>("showClipboardIcon", default: true)
     static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .panel)
     
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)
     static let screenAssistantDisplayMode = Key<ScreenAssistantDisplayMode>("screenAssistantDisplayMode", default: .panel)
+    // The provider API keys live in the Keychain (see KeychainAIKeyStore);
+    // these four keys remain only for the one-time migration of older builds.
     static let geminiApiKey = Key<String>("geminiApiKey", default: "")
     static let openaiApiKey = Key<String>("openaiApiKey", default: "")
     static let claudeApiKey = Key<String>("claudeApiKey", default: "")
@@ -1327,6 +1498,8 @@ extension Defaults.Keys {
     // MARK: Screen Recording Detection Feature
     static let enableScreenRecordingDetection = Key<Bool>("enableScreenRecordingDetection", default: true)
     static let showRecordingIndicator = Key<Bool>("showRecordingIndicator", default: true)
+    static let recordingHoverStyle = Key<RecordingHoverStyle>("recordingHoverStyle", default: .default)
+    static let recordingControlMode = Key<RecordingControlMode>("recordingControlMode", default: .withStopButton)
     // Polling removed - now uses event-driven private API detection (CGSIsScreenWatcherPresent)
     // static let enableScreenRecordingPolling = Key<Bool>("enableScreenRecordingPolling", default: false)
 
@@ -1343,6 +1516,7 @@ extension Defaults.Keys {
     
     // MARK: Lock Screen Features
     static let enableLockScreenLiveActivity = Key<Bool>("enableLockScreenLiveActivity", default: true)
+    static let lockScreenLiveActivityIconStyle = Key<LockScreenLiveActivityIconStyle>("lockScreenLiveActivityIconStyle", default: .lock)
     static let enableLockSounds = Key<Bool>("enableLockSounds", default: true)
     
     // MARK: Caps Lock Indicator
@@ -1350,6 +1524,7 @@ extension Defaults.Keys {
     static let capsLockIndicatorUseGreenColor = Key<Bool>("capsLockIndicatorUseGreenColor", default: false) // Legacy toggle
     static let capsLockIndicatorTintMode = Key<CapsLockIndicatorTintMode>("capsLockIndicatorTintMode", default: .white)
     static let didMigrateCapsLockTintMode = Key<Bool>("didMigrateCapsLockTintMode", default: false)
+    static let didMigrateClipboardShortcutToV = Key<Bool>("didMigrateClipboardShortcutToV", default: false)
     static let showCapsLockLabel = Key<Bool>("showCapsLockLabel", default: false)
     
     // MARK: ImageService
@@ -1360,6 +1535,14 @@ extension Defaults.Keys {
     
     // MARK: Lyrics Feature
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
+
+    /// Whether the sung line is swept or simply lit.
+    static let lyricHighlightStyle = Key<LyricHighlightStyle>("lyricHighlightStyle", default: .sweep)
+    /// Keeps the current line under the closed notch after the panel is gone.
+    static let pinnedLyricContext = Key<PinnedLyricContext>("pinnedLyricContext", default: .current)
+    static let pinLyricsWhenClosed = Key<Bool>("pinLyricsWhenClosed", default: false)
+    static let lyricsPanelWidth = Key<CGFloat>("lyricsPanelWidth", default: 280)
+    static let lyricsPanelOffset = Key<CGFloat>("lyricsPanelOffset", default: 0)
     static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)
     
     // MARK: Notes Feature
@@ -1405,12 +1588,75 @@ extension Defaults.Keys {
         normalizeMusicAuxControls()
     }
 
+    /// Move the clipboard shortcut off the old Cmd+Shift+C default.
+    ///
+    /// Settings has always documented Cmd+Shift+V ("similar to Windows+V on PC") while the
+    /// shortcut was registered as Cmd+Shift+C. Changing the default alone fixes nothing for
+    /// anyone who has already launched Atoll: `KeyboardShortcuts.Name` writes its default into
+    /// UserDefaults on first run and never overwrites it, so the old value would win forever.
+    ///
+    /// Only a shortcut still sitting on the old default is moved. Anyone who picked their own
+    /// keeps it — including, unavoidably, anyone who deliberately chose Cmd+Shift+C.
+    ///
+    /// The marker is written last: if this crashed between marking and moving, the migration
+    /// would be considered done while the shortcut still sat on the old key, with no second
+    /// chance to correct it. Running twice is harmless by comparison, since the second run
+    /// finds Cmd+Shift+V rather than the legacy default and changes nothing.
+    static func migrateClipboardShortcutToV() {
+        guard Defaults[.didMigrateClipboardShortcutToV] == false else { return }
+
+        let legacyDefault = KeyboardShortcuts.Shortcut(.c, modifiers: [.shift, .command])
+        if KeyboardShortcuts.getShortcut(for: .clipboardHistoryPanel) == legacyDefault {
+            KeyboardShortcuts.setShortcut(.init(.v, modifiers: [.shift, .command]), for: .clipboardHistoryPanel)
+        }
+
+        Defaults[.didMigrateClipboardShortcutToV] = true
+    }
+
     static func migrateCapsLockTintMode() {
         guard Defaults[.didMigrateCapsLockTintMode] == false else { return }
 
         let legacyGreen = Defaults[.capsLockIndicatorUseGreenColor]
         Defaults[.capsLockIndicatorTintMode] = legacyGreen ? .green : .white
         Defaults[.didMigrateCapsLockTintMode] = true
+    }
+
+    /// The AI provider API keys were stored as plaintext in Defaults; move them
+    /// into the Keychain once. Each Defaults copy is cleared only after its
+    /// Keychain write is confirmed, so a failed write can never lose a key — the
+    /// next launch simply retries. No completion flag is needed: an already
+    /// emptied key has nothing left to migrate.
+    static func migrateAIProviderKeysToKeychain(store: AIKeyStoring = KeychainAIKeyStore.shared) {
+        let legacyKeys: [(Defaults.Key<String>, AIKeyAccount)] = [
+            (.geminiApiKey, .gemini),
+            (.openaiApiKey, .openai),
+            (.claudeApiKey, .claude),
+            (.groqApiKey, .groq)
+        ]
+
+        for (defaultsKey, account) in legacyKeys {
+            let legacyValue = Defaults[defaultsKey].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !legacyValue.isEmpty else { continue }
+
+            // The Keychain already holds a key for this provider, so it is the
+            // current one and the Defaults copy is stale — a leftover from a
+            // partial migration, or a key the user has since replaced. This runs
+            // on every launch, so writing the legacy value here would restore an
+            // old credential over the working one, every time.
+            if store.hasKey(account) {
+                Defaults[defaultsKey] = ""
+                continue
+            }
+
+            if store.write(legacyValue, account: account) == errSecSuccess {
+                Defaults[defaultsKey] = ""
+            } else {
+                Logger.log(
+                    "Could not move the \(account.rawValue) into the Keychain; keeping the Defaults copy and retrying next launch.",
+                    category: .warning
+                )
+            }
+        }
     }
 
     static func migrateMusicControlSlots() {
