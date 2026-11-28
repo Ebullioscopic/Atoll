@@ -559,7 +559,21 @@ class MusicManager: ObservableObject {
     private let mediaChecker = MediaChecker()
 
     // Active controller
-    private var activeController: (any MediaControllerProtocol)?
+    private var activeController: (any MediaControllerProtocol)? {
+        didSet {
+            let follows = activeController is NowPlayingController
+            if follows != activeControllerFollowsSystemNowPlaying {
+                activeControllerFollowsSystemNowPlaying = follows
+            }
+        }
+    }
+
+    /// Whether the active controller tracks whatever macOS reports as Now
+    /// Playing, so `bundleIdentifier` names that app rather than a fixed player.
+    /// Can differ from the saved preference (Pear Desktop auto-switch, deprecated
+    /// Now Playing API).
+    @MainActor
+    @Published private(set) var activeControllerFollowsSystemNowPlaying = false
 
     // Pear Desktop auto-detection
     private static let pearDesktopBundleID = YouTubeMusicConfiguration.default.bundleIdentifier

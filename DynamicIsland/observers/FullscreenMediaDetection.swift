@@ -21,6 +21,7 @@
  */
 
 import ApplicationServices
+import Combine
 import Defaults
 import MacroVisionKit
 import SwiftUI
@@ -31,12 +32,25 @@ class FullscreenMediaDetector: ObservableObject {
     @ObservedObject private var musicManager = MusicManager.shared
     @MainActor @Published private(set) var fullscreenStatus: [String: Bool] = [:]
     private var notificationTask: Task<Void, Never>?
+    private var nowPlayingAppCancellable: AnyCancellable?
+    /// Pending follow-up check while a fullscreen app waits to become Now Playing.
+    @MainActor private var recheckTask: Task<Void, Never>?
+    /// Follow-up checks made since the last Space, screen, frontmost-app or
+    /// playback change; sets the back-off delay of the next one.
+    @MainActor private var rechecksDone = 0
+    /// Bumped on every refresh so a slower, older refresh cannot overwrite a newer one.
+    @MainActor private var refreshGeneration = 0
+    /// The 500 ms settle wait after a change; replaced by each newer change.
+    @MainActor private var settleTask: Task<Void, Never>?
 
     private init() {
         self.detector = MacroVisionKit.shared
         detector.configuration.includeSystemApps = true
         setupNotificationObservers()
-        updateFullScreenStatus()
+        observeNowPlayingApp()
+        Task { @MainActor [weak self] in
+            await self?.refresh(resetRechecks: true)
+        }
     }
 
     private func setupNotificationObservers() {
@@ -48,70 +62,170 @@ class FullscreenMediaDetector: ObservableObject {
                     )
                     
                     for await _ in activeSpaceNotifications {
-                        await self?.handleChange()
+                        await self?.scheduleRefresh()
                     }
                 }
                 
+                // Bringing a player forward (or leaving it) is when playback
+                // usually starts or moves, and causes no Space change.
+                group.addTask {
+                    let activationNotifications = NSWorkspace.shared.notificationCenter.notifications(
+                        named: NSWorkspace.didActivateApplicationNotification
+                    )
+
+                    for await _ in activationNotifications {
+                        await self?.scheduleRefresh()
+                    }
+                }
+
                 group.addTask {
                     let screenParameterNotifications = NSWorkspace.shared.notificationCenter.notifications(
                         named:  NSApplication.didChangeScreenParametersNotification
                     )
                     
                     for await _ in screenParameterNotifications {
-                        await  self?.handleChange()
+                        await self?.scheduleRefresh()
                     }
                 }
             }
         }
     }
 
-    private func handleChange() async {
-        try? await Task.sleep(for: .milliseconds(500))
-        self.updateFullScreenStatus()
+    /// Playback that starts (or moves to another app) after the window went
+    /// fullscreen produces no Space change, so the Now Playing app and the
+    /// play state are triggers of their own — and so is the active controller
+    /// starting or stopping to follow system Now Playing, which can happen
+    /// without the id changing. Under a controller pinned to one player, the
+    /// capped follow-up checks in `refresh` and the frontmost-app trigger cover
+    /// playback in other apps.
+    private func observeNowPlayingApp() {
+        let bundleChanges = musicManager.$bundleIdentifier
+            .removeDuplicates()
+            .dropFirst()
+            .map { _ in () }
+        let trackingChanges = musicManager.$activeControllerFollowsSystemNowPlaying
+            .removeDuplicates()
+            .dropFirst()
+            .map { _ in () }
+        let playbackChanges = musicManager.$isPlaying
+            .removeDuplicates()
+            .dropFirst()
+            .map { _ in () }
+        nowPlayingAppCancellable = Publishers.Merge3(bundleChanges, trackingChanges, playbackChanges)
+            .sink { [weak self] _ in
+                self?.scheduleRefresh()
+            }
     }
 
-    private func updateFullScreenStatus() {
-        guard Defaults[.enableFullscreenMediaDetection] else {
-            let reset = Dictionary(uniqueKeysWithValues: NSScreen.screens.map { ($0.localizedName, false) })
-            if reset != fullscreenStatus {
-                fullscreenStatus = reset
-            }
-            return
+    /// Starts a refresh 500 ms after a change, without waiting for it. Any
+    /// refresh still in flight (for example, waiting on the probe) is dropped at
+    /// once, and a newer change replaces a pending settle wait, so a result for
+    /// the Space being left is never published.
+    @MainActor
+    private func scheduleRefresh() {
+        refreshGeneration += 1
+        recheckTask?.cancel()
+        recheckTask = nil
+        settleTask?.cancel()
+        settleTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            await self?.refresh(resetRechecks: true)
         }
-        
+    }
 
-        let apps = detector.detectFullscreenApps(debug: false)
-        let names = NSScreen.screens.map { $0.localizedName }
-        let hideOption = Defaults[.hideNotchOption]
+    @MainActor
+    private func refresh(resetRechecks: Bool) async {
+        if resetRechecks { rechecksDone = 0 }
+        recheckTask?.cancel()
+        recheckTask = nil
+        refreshGeneration += 1
+        let generation = refreshGeneration
 
-        var newStatus: [String: Bool] = [:]
-        for name in names {
-            newStatus[name] = apps.contains { app in
-                guard app.screen.localizedName == name,
-                      app.bundleIdentifier != "com.apple.finder" else { return false }
-
-                // The notch stays on display by default (the window's collectionBehavior
-                // rides along with fullscreen spaces). It only hides when the user's
-                // "Hide DynamicIsland" option asks for it.
-                switch hideOption {
-                case .always:
-                    // Hide for any app in genuine native fullscreen on this screen.
-                    return isInNativeFullscreen(app)
-                case .nowPlayingOnly:
-                    // Hide only when the currently playing media app is in fullscreen.
-                    return app.bundleIdentifier == musicManager.bundleIdentifier
-                        && isInNativeFullscreen(app)
-                case .never:
-                    // Always on display; never hide.
-                    return false
-                }
-            }
-        }
+        let (newStatus, keepRechecking) = await computeFullScreenStatus()
+        guard generation == refreshGeneration else { return }
 
         if newStatus != fullscreenStatus {
             fullscreenStatus = newStatus
             NSLog("✅ Fullscreen status: \(newStatus)")
         }
+
+        guard keepRechecking,
+              let delay = FullscreenHidePolicy.recheckDelay(afterRechecks: rechecksDone)
+        else { return }
+        rechecksDone += 1
+        recheckTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            await self?.refresh(resetRechecks: false)
+        }
+    }
+
+    /// Per-screen hide state, and whether a follow-up check is worth scheduling.
+    @MainActor
+    private func computeFullScreenStatus() async -> (status: [String: Bool], keepRechecking: Bool) {
+        guard Defaults[.enableFullscreenMediaDetection] else {
+            let reset = Dictionary(uniqueKeysWithValues: NSScreen.screens.map { ($0.localizedName, false) })
+            return (reset, false)
+        }
+
+        let apps = detector.detectFullscreenApps(debug: false)
+            .filter { $0.bundleIdentifier != "com.apple.finder" }
+        let names = NSScreen.screens.map { $0.localizedName }
+        let hideOption = Defaults[.hideNotchOption]
+
+        // Only worth asking when something could hide because of it.
+        let nowPlayingIsObserved = musicManager.activeControllerFollowsSystemNowPlaying
+        let nowPlayingBundleID: String? = (hideOption == .nowPlayingOnly && !apps.isEmpty)
+            ? await resolveNowPlayingBundleID()
+            : nil
+
+        var newStatus: [String: Bool] = [:]
+        var keepRechecking = false
+        for name in names {
+            let candidates = apps.filter { $0.screen.localizedName == name }
+
+            // The notch stays on display by default (the window's collectionBehavior
+            // rides along with fullscreen spaces). It only hides when the user's
+            // "Hide DynamicIsland" option asks for it. The policy is asked first as if
+            // the window were native fullscreen, so the Accessibility check only runs
+            // for apps that would otherwise hide.
+            let hidden = candidates.contains { app in
+                FullscreenHidePolicy.shouldHide(
+                    option: hideOption,
+                    fullscreenBundleID: app.bundleIdentifier,
+                    nowPlayingBundleID: nowPlayingBundleID,
+                    isNativeFullscreen: true
+                ) && isInNativeFullscreen(app)
+            }
+            newStatus[name] = hidden
+
+            // Frame-based candidates only: no Accessibility call here, so an app that
+            // is fullscreen but not Now Playing is never queried over AX.
+            keepRechecking = keepRechecking || FullscreenHidePolicy.shouldKeepRechecking(
+                option: hideOption,
+                detectionEnabled: true,
+                hasFullscreenCandidate: !candidates.isEmpty,
+                isHidden: hidden,
+                nowPlayingIsObserved: nowPlayingIsObserved
+            )
+        }
+
+        return (newStatus, keepRechecking)
+    }
+
+    /// The app macOS reports as Now Playing. When `MusicManager`'s active
+    /// controller follows system Now Playing it already knows; any other
+    /// controller pins `MusicManager` to its player (also when Pear Desktop or a
+    /// deprecated Now Playing API swapped the controller under a "Now Playing"
+    /// preference), so the system is asked directly, falling back to the
+    /// controller's app if the query fails.
+    @MainActor
+    private func resolveNowPlayingBundleID() async -> String? {
+        if musicManager.activeControllerFollowsSystemNowPlaying {
+            return musicManager.bundleIdentifier
+        }
+        return await SystemNowPlayingProbe.currentBundleIdentifier() ?? musicManager.bundleIdentifier
     }
 
     /// Confirms an app the detector flagged as screen-filling is in *genuine* native
@@ -122,34 +236,24 @@ class FullscreenMediaDetector: ObservableObject {
     private func isInNativeFullscreen(_ app: MacroVisionKit.FullscreenWindowInfo) -> Bool {
         guard AXIsProcessTrusted() else { return true }
 
+        let reader = BoundedAXReader(timeout: Self.accessibilityTimeout)
         let appElement = AXUIElementCreateApplication(app.processId)
 
         // Prefer the focused window, then fall back to scanning all windows.
-        if let focused: AXUIElement = copyAttribute(kAXFocusedWindowAttribute as CFString, from: appElement),
-           isWindowFullscreen(focused) {
+        if let focused: AXUIElement = reader.copyAttribute(kAXFocusedWindowAttribute as CFString, from: appElement),
+           reader.isWindowFullscreen(focused) {
             return true
         }
 
-        if let windows: [AXUIElement] = copyAttribute(kAXWindowsAttribute as CFString, from: appElement) {
-            return windows.contains { isWindowFullscreen($0) }
+        if let windows: [AXUIElement] = reader.copyAttribute(kAXWindowsAttribute as CFString, from: appElement) {
+            return windows.contains { reader.isWindowFullscreen($0) }
         }
 
         return false
     }
 
-    private func isWindowFullscreen(_ window: AXUIElement) -> Bool {
-        // "AXFullScreen" is the (undocumented but stable) attribute set true only in native
-        // fullscreen; maximized/zoomed windows report false or omit it.
-        let value: Bool? = copyAttribute("AXFullScreen" as CFString, from: window)
-        return value ?? false
-    }
-
-    private func copyAttribute<T>(_ attribute: CFString, from element: AXUIElement) -> T? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute, &value) == .success,
-              let typed = value as? T else { return nil }
-        return typed
-    }
+    /// Upper bound, in seconds, for one Accessibility read of a fullscreen app.
+    private static let accessibilityTimeout: Float = 0.25
 
     private func cleanupNotificationObservers() {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
@@ -157,5 +261,39 @@ class FullscreenMediaDetector: ObservableObject {
 
     deinit {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+}
+
+/// Accessibility reads for one fullscreen check, each bounded by `timeout`. The
+/// first read that times out marks the app as unresponsive and every later read
+/// returns nil at once, so a hung app costs at most one timeout per check rather
+/// than one per window.
+private final class BoundedAXReader {
+    private let timeout: Float
+    private var unresponsive = false
+
+    init(timeout: Float) {
+        self.timeout = timeout
+    }
+
+    func isWindowFullscreen(_ window: AXUIElement) -> Bool {
+        // "AXFullScreen" is the (undocumented but stable) attribute set true only in native
+        // fullscreen; maximized/zoomed windows report false or omit it.
+        let value: Bool? = copyAttribute("AXFullScreen" as CFString, from: window)
+        return value ?? false
+    }
+
+    func copyAttribute<T>(_ attribute: CFString, from element: AXUIElement) -> T? {
+        guard !unresponsive else { return nil }
+        // A timeout set on one element does not carry over to the elements it returns.
+        AXUIElementSetMessagingTimeout(element, timeout)
+        var value: CFTypeRef?
+        let error = AXUIElementCopyAttributeValue(element, attribute, &value)
+        if error == .cannotComplete {
+            unresponsive = true
+            return nil
+        }
+        guard error == .success, let typed = value as? T else { return nil }
+        return typed
     }
 }
