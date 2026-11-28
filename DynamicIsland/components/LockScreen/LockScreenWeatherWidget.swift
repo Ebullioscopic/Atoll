@@ -895,7 +895,7 @@ struct LockScreenWeatherWidget: View {
 		HStack(alignment: .center, spacing: 6) {
 			Image(systemName: snapshot.symbolName)
 				.font(.system(size: 26, weight: .medium))
-				.symbolRenderingMode(.hierarchical)
+				.symbolRenderingMode(snapshot.usesGaugeTint ? .multicolor : .hierarchical)
 			Text(snapshot.temperatureText)
 				.font(inlinePrimaryFont)
 				.kerning(-0.3)
@@ -940,6 +940,7 @@ struct LockScreenWeatherWidget: View {
 				Image(systemName: iconName)
 					.font(.system(size: 20, weight: .semibold))
 					.symbolRenderingMode(.hierarchical)
+					.modifier(InlineIconTint(tint: inlineIconTint(Color(.systemGreen))))
 			}
 			Text(inlineChargingLabel(for: info))
 				.font(inlinePrimaryFont)
@@ -1025,6 +1026,7 @@ struct LockScreenWeatherWidget: View {
 			Image(systemName: info.iconName)
 				.font(.system(size: 20, weight: .semibold))
 				.symbolRenderingMode(.hierarchical)
+				.modifier(InlineIconTint(tint: inlineIconTint(bluetoothTint(for: clampedBatteryLevel(info.batteryLevel)))))
 			Text(bluetoothPercentageText(for: info.batteryLevel))
 				.font(inlinePrimaryFont)
 				.lineLimit(1)
@@ -1041,6 +1043,7 @@ struct LockScreenWeatherWidget: View {
             Image(systemName: info.usesLaptopSymbol ? "laptopcomputer" : batteryIconName(for: level))
                 .font(.system(size: 20, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
+                .modifier(InlineIconTint(tint: inlineIconTint(batteryTint(for: level))))
 
             // ✅ The actual percentage text you want in inline style
             Text("\(level)%")
@@ -1092,6 +1095,7 @@ struct LockScreenWeatherWidget: View {
 			Image(systemName: "wind")
 				.font(.system(size: 18, weight: .semibold))
 				.symbolRenderingMode(.hierarchical)
+				.modifier(InlineIconTint(tint: inlineIconTint(aqiTint(for: info))))
 			inlineComposite(primary: "\(info.scale.compactLabel) \(info.index)", secondary: info.category.displayName)
 				.lineLimit(1)
 				.minimumScaleFactor(0.85)
@@ -1367,6 +1371,12 @@ struct LockScreenWeatherWidget: View {
 				.foregroundStyle(secondaryLabelColor)
 		}
 		return text
+	}
+
+	/// Inline icons take the gauge colours when "Use colored gauges" is on, and
+	/// keep the widget's own foreground otherwise (#434).
+	private func inlineIconTint(_ tint: Color) -> Color? {
+		snapshot.usesGaugeTint ? tint : nil
 	}
 
 	private func batteryTint(for level: Int) -> Color {
@@ -1711,5 +1721,17 @@ private struct ArcShape: Shape {
 			clockwise: false
 		)
 		return path
+	}
+}
+
+private struct InlineIconTint: ViewModifier {
+	let tint: Color?
+
+	func body(content: Content) -> some View {
+		if let tint {
+			content.foregroundStyle(tint)
+		} else {
+			content
+		}
 	}
 }

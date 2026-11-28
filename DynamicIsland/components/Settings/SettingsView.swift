@@ -6412,6 +6412,10 @@ struct LockScreenSettings: View {
                             Text("Use colored gauges")
                         }
                         .settingsHighlight(id: highlightID("Use colored gauges"))
+
+                        Text("Colors the gauges in the circular layout and the icons in the inline layout.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 } header: {
                     Text("Weather Widget")

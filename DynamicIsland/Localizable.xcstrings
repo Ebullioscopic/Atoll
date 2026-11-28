@@ -94553,7 +94553,8 @@
     "Turn on Show battery indicator in Battery settings to use this." : {},
     "Turn on Show battery in Minimalistic UI to use this." : {},
     "Open player with large album art" : {},
-    "Shows the expanded player as soon as the Mac locks, without changing the wallpaper. Click the album art to switch size." : {}
+    "Shows the expanded player as soon as the Mac locks, without changing the wallpaper. Click the album art to switch size." : {},
+    "Colors the gauges in the circular layout and the icons in the inline layout." : {}
   },
   "version" : "1.2"
 }

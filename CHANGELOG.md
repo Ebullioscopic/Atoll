@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Colored inline lock screen widgets**: with “Use colored gauges” on, the inline layout colors its weather, battery, charging, Bluetooth and air quality icons the way the circular gauges are colored. (#434)
 - **Open the lock screen player with large album art**: a Lock Screen setting opens the expanded player as soon as the Mac locks and keeps it expanded until you click the artwork, without touching the wallpaper. Off by default. (#490)
 - **Hide widgets during screen saver**: a Lock Screen setting keeps the music panel, weather and other lock screen widgets off a running screen saver and brings them back when it stops, so custom screen savers stay immersive. Off by default. (#819)
 - **Custom weather location**: lock screen weather can use a city you type in Lock Screen settings instead of Location Services, for Macs that can't find their position, such as a Mac mini on Ethernet. The city is looked up once with Open-Meteo when you set it. Off by default. (#934)
