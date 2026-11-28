@@ -504,7 +504,7 @@ struct LockScreenMusicPanel: View {
                         badgeCornerRadius: 4
                     )
 
-                    Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
+                    Text(musicManager.artistName.isEmpty ? String(localized: "Unknown Artist") : musicManager.artistName)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(artistLabelColor(factor: 0.6))
                         .lineLimit(1)
@@ -542,7 +542,7 @@ struct LockScreenMusicPanel: View {
                         badgeCornerRadius: 5
                     )
 
-                    Text(musicManager.artistName.isEmpty ? "Unknown Artist" : musicManager.artistName)
+                    Text(musicManager.artistName.isEmpty ? String(localized: "Unknown Artist") : musicManager.artistName)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundColor(artistLabelColor(factor: 0.7))
                         .lineLimit(2)

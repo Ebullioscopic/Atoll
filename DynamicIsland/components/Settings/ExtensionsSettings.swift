@@ -184,7 +184,7 @@ struct ExtensionsSettingsView: View {
                 Text("App Permissions")
                 Spacer()
                 if !authManager.entries.isEmpty {
-                    Text("\(authManager.entries.count) \(authManager.entries.count == 1 ? "app" : "apps")")
+                    Text(authManager.entries.count == 1 ? "1 app" : "\(authManager.entries.count) apps")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -307,7 +307,7 @@ private struct ExtensionEntryRow: View {
                     Text("Status:")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text(entry.status.rawValue.capitalized)
+                    Text(LocalizedStringKey(entry.status.rawValue.capitalized))
                         .font(.caption)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
