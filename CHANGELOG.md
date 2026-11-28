@@ -95,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reduced background work and memory growth: the Shelf thumbnail cache is now bounded (200 items / 64 MB), the Stats process list runs `ps` every 2 s instead of every second and reads network counters with a single `getifaddrs` pass, the CPU temperature reading reuses the SMC key that last worked, media playback state is always published on the main thread, and battery observers keep their ids when another is removed (#653).
 - Less idle energy use: clipboard polling runs every 1 s instead of 0.5 s and stops while the display sleeps, clipboard history is written once per burst of changes instead of on every change, Focus detection watches `Assertions.json` for changes instead of reading it every 2 s, the AirPods listening-mode log stream only runs while AirPods are connected, and the Bluetooth fallback scan is skipped while the display sleeps (#654).
 - The notch no longer re-renders its whole view every second while system stats are being monitored; only the stats views update (#656).
+- Refreshing the LLM Usage card reads large session logs faster: lines are split from each 64 KB chunk in one pass instead of shifting the buffer after every line (#655).
 
 ### Fixed
 - Lock screen widgets, full-screen artwork and overlays now appear on the display set as main in System Settings, instead of always going to the built-in screen when an external monitor is the main display. (#945)
