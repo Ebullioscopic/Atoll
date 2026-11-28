@@ -520,6 +520,7 @@ private struct BatteryCompactStatusRow: View {
     let batteryLevel: Int
     let tint: Color
     var chargingWatts: Double? = nil
+    var showsChargingBolt = false
 
     var body: some View {
         HStack {
@@ -552,6 +553,15 @@ private struct BatteryCompactStatusRow: View {
                             Rectangle()
                                 .fill(tint.gradient)
                                 .frame(width: max(0, width))
+                        }
+
+                        if showsChargingBolt {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 10, weight: .heavy))
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.35), radius: 1)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .accessibilityHidden(true)
                         }
                     }
                     .frame(width: 28, height: 16)
@@ -654,7 +664,8 @@ struct BatteryTemporaryActivityView: View {
                 title: compactTitle,
                 batteryLevel: batteryLevel,
                 tint: batteryTint,
-                chargingWatts: kind == .charging ? power.chargingWatts : nil
+                chargingWatts: kind == .charging ? power.chargingWatts : nil,
+                showsChargingBolt: kind == .charging
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else {
