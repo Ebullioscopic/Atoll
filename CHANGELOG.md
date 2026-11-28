@@ -98,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
+- The lock screen player keeps your liquid glass style next to large full-screen artwork, instead of switching to a dark frosted scrim. (#495)
 - The lock screen notch now matches the physical notch when Atoll's notch is set to a different display than the lock screen, instead of borrowing that display's notch size. (#899)
 - With the notch on more than one display, the Stats tab no longer stops updating when the notch on another display closes or switches tabs. (#851)
 - General › UI Mode no longer shows battery controls that can't be used: the Minimalistic UI battery toggle only appears with Minimalistic UI on and is named for it, and the battery percentage option says which setting it needs when it's unavailable. (#930)

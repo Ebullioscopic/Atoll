@@ -1495,7 +1495,9 @@ struct LockScreenMusicPanel: View {
     @ViewBuilder
     private var panelBackgroundLayer: some View {
         Group {
-            if usesSpotifyCanvasFallbackContentPresentation {
+            // The large-artwork layout keeps the user's liquid glass choice; the
+            // scrim is for the frosted and opaque styles (#495).
+            if usesSpotifyCanvasFallbackContentPresentation && !usesLiquidGlass {
                 canvasFallbackScrim
             } else if usesCustomLiquidGlass {
                 customLiquidPanelBackdrop
