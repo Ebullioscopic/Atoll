@@ -92,6 +92,7 @@ class CalendarManager: ObservableObject {
 
     private func handleEventStoreChanged() {
         Logger.log("CalendarManager: Event store changed notification received", category: .lifecycle)
+        calendarService.invalidateReminderCache()
         let now = Date()
         guard now >= ignoreEventStoreChangesUntil else { return }
 
@@ -232,7 +233,9 @@ class CalendarManager: ObservableObject {
     func updateCurrentDate(_ date: Date) async {
         currentWeekStartDate = Calendar.current.startOfDay(for: date)
         await updateEvents(force: true)
-        await updateLockScreenEvents(force: true)
+        // Lock screen events do not depend on the selected day, so switching
+        // days only refreshes them when they are due anyway (#513).
+        await updateLockScreenEvents(force: false)
     }
 
     func updateLockScreenEvents(force: Bool = false) async {
@@ -351,14 +354,18 @@ class CalendarManager: ObservableObject {
         guard let endDate = Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate) else { return }
         let service = calendarService
 
-        let events = await eventFetchLimiter.run {
-            await service.events(
+        let events = await eventFetchLimiter.run { [weak self] () -> [EventModel]? in
+            // Scrolling through days queues a fetch per day; only the day still
+            // selected when a fetch gets its turn is worth loading (#513).
+            guard await self?.currentWeekStartDate == startDate else { return nil }
+            return await service.events(
                 from: startDate,
                 to: endDate,
                 calendars: calendarIDs
             )
         }
 
+        guard let events, currentWeekStartDate == startDate else { return }
         self.events = events
         lastEventsFetchDate = Date()
     }
