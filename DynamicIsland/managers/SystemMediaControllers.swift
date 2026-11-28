@@ -660,6 +660,7 @@ final class SystemBrightnessController {
     private let brightnessAnimationDurationScale: TimeInterval = 1.6
     private var lastEmittedBrightness: Float = 0.5
     private var confirmedBrightness: Float?
+    private var pendingAdjustDelta: Float = 0
     private let coreBrightnessClient = CoreBrightnessDisplayClient.shared
     private var pollTimer: Timer?
     private let pollInterval: TimeInterval = 0.15
@@ -692,10 +693,13 @@ final class SystemBrightnessController {
             NSLog("⚠️ SystemBrightnessController: CoreBrightnessDisplayClient unavailable; will rely on DisplayServices / IODisplay + polling fallback")
         }
         notifyCurrentBrightness()
-        // Always start polling to keep lastEmittedBrightness in sync with macOS
-        // auto-brightness (Ambient Light Sensor). On recent macOS versions,
-        // DistributedNotificationCenter does not receive ALS brightness changes.
-        startPolling()
+        // Only start polling as a fallback when CoreBrightness notifications
+        // are unavailable. Auto-brightness (ALS) changes that arrive without a
+        // notification are picked up by syncWithSystemBrightnessIfNeeded()
+        // before each key-press delta is applied.
+        if !coreBrightnessClient.isAvailable {
+            startPolling()
+        }
     }
 
     func stop() {
@@ -707,15 +711,23 @@ final class SystemBrightnessController {
         userInitiatedResetTimer?.invalidate()
         userInitiatedResetTimer = nil
         userInitiatedBrightnessChange = false
+        pendingAdjustDelta = 0
     }
 
     func adjust(by delta: Float) {
         markUserInitiated()
 
-        // Keep event-tap callback fast to avoid macOS disabling the tap.
-        // Compute delta and start animation on main queue after syncing baseline with system.
+        // Do not synchronously query CoreBrightness/DisplayServices here. This
+        // method is reached from hardware-key handling, and those calls can be
+        // slow enough for macOS to disable the event tap. Presses that land
+        // before the main-queue block runs are accumulated, then applied on top
+        // of a baseline refreshed from the system (auto-brightness may have
+        // moved it).
+        pendingAdjustDelta += delta
         DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
+            guard let self, self.pendingAdjustDelta != 0 else { return }
+            let delta = self.pendingAdjustDelta
+            self.pendingAdjustDelta = 0
             self.syncWithSystemBrightnessIfNeeded()
             let inFlightTarget = self.brightnessAnimationTimer == nil ? nil : self.brightnessAnimationTarget
             guard let base = inFlightTarget ?? self.confirmedBrightness else {
