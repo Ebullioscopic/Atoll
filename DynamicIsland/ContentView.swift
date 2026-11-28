@@ -207,6 +207,7 @@ struct ContentView: View {
     @State private var hoverClickLocalMonitor: Any?
     @State private var stickyTerminalClickMonitor: Any?
     @State private var hiddenEdgeHoverPollingTask: Task<Void, Never>?
+    @State private var fullscreenPointerMonitor: Any?
     @State private var retainedHoverExitWatchdogTask: Task<Void, Never>?
     @State private var retainedHoverExitWatchdogGeneration: Int = 0
     @State private var isHoveringClosedMusicWaveformControl: Bool = false
@@ -995,6 +996,13 @@ struct ContentView: View {
                 } else {
                     menuBarLayout.stopTracking()
                 }
+                syncFullscreenPointerMonitor()
+            }
+            .onChange(of: vm.hideOnClosed) { _, _ in
+                syncFullscreenPointerMonitor()
+            }
+            .onAppear {
+                syncFullscreenPointerMonitor()
             }
             .onDisappear {
                 performViewTeardown()
@@ -2263,6 +2271,7 @@ struct ContentView: View {
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
         stopHiddenEdgeHoverPolling()
+        stopFullscreenPointerMonitor()
         stopRetainedHoverExitWatchdog()
         cancelMusicControlWindowSync()
         hideMusicControlWindow()
@@ -2313,6 +2322,46 @@ struct ContentView: View {
     private func stopHiddenEdgeHoverPolling() {
         hiddenEdgeHoverPollingTask?.cancel()
         hiddenEdgeHoverPollingTask = nil
+    }
+
+    /// Whether hover over the closed notch has to be followed from the pointer
+    /// position. On macOS 27 a fullscreen Space keeps the top edge of a notched
+    /// display for its own menu bar reveal, so the notch panel never receives
+    /// hover there and could not be opened while hidden in fullscreen (#757).
+    private var needsFullscreenPointerMonitor: Bool {
+        guard #available(macOS 27, *) else { return false }
+        return vm.hideOnClosed
+            && vm.notchState == .closed
+            && !isNonNotchScreen
+            && interactionsEnabled
+    }
+
+    /// Follows pointer moves (event-driven, no polling) only while the closed
+    /// notch is hidden in fullscreen. Once the notch opens, the regular hover
+    /// handling and the hover-exit check of `startHiddenEdgeHoverPolling` take over.
+    private func syncFullscreenPointerMonitor() {
+        guard needsFullscreenPointerMonitor else {
+            stopFullscreenPointerMonitor()
+            return
+        }
+        guard fullscreenPointerMonitor == nil else { return }
+
+        fullscreenPointerMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { _ in
+            Task { @MainActor in
+                guard self.needsFullscreenPointerMonitor else { return }
+                let hovering = self.isMouseOverClosedNotchHitArea()
+                if hovering != self.isHovering {
+                    self.handleHover(hovering)
+                }
+            }
+        }
+    }
+
+    private func stopFullscreenPointerMonitor() {
+        if let fullscreenPointerMonitor {
+            NSEvent.removeMonitor(fullscreenPointerMonitor)
+            self.fullscreenPointerMonitor = nil
+        }
     }
 
     private func startHoverClickMonitor() {
