@@ -997,6 +997,8 @@ extension Defaults.Keys {
     
         // MARK: Behavior
     static let minimumHoverDuration = Key<TimeInterval>("minimumHoverDuration", default: 0.3)
+    /// Multiplier (1×–2×) for the notch open/close and hover animations.
+    static let notchAnimationSpeed = Key<Double>("notchAnimationSpeed", default: 1.0)
     static let enableHaptics = Key<Bool>("enableHaptics", default: true)
     static let openNotchOnHover = Key<Bool>("openNotchOnHover", default: true)
 	static let extendHoverArea = Key<Bool>("extendHoverArea", default: false)
