@@ -224,6 +224,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A hover exit no longer closes the notch it just opened**: opening resizes the panel, which swaps its tracking area under a cursor that never moved, so AppKit reported an exit without a matching enter and the debounced handler closed the notch a frame later — most visibly after a fast flick to the notch, which then either flashed open and shut or did not open at all. A hover exit is now ignored while the cursor is still inside the panel, and a cursor check finishes the exit once the pointer really leaves, since AppKit will not report the next exit for an area that already "exited". (#457)
 
 ### Removed
+- The Screen Assistant "Display Mode" setting. Its Popover option was never implemented, so choosing it made the assistant shortcut do nothing; the shortcut now always opens the assistant panel (#58).
 
 ## [2.3.3] - 2026-07-24
 
