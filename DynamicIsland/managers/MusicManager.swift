@@ -848,6 +848,10 @@ class MusicManager: ObservableObject {
             newController = YouTubeMusicController()
         case .amazonMusic:
             newController = AmazonMusicController()
+        case .netEaseCloudMusic:
+            newController = NetEaseCloudMusicController()
+        case .qqMusic:
+            newController = QQMusicController()
         case .tidal:
             newController = TidalController()
         case .cider:
@@ -2269,7 +2273,7 @@ extension MusicManager {
             return spotifyGreen
         case .amazonMusic:
             return amazonOrange
-        case .tidal, .cider:
+        case .tidal, .cider, .netEaseCloudMusic, .qqMusic:
             return .accentColor
         case .nowPlaying:
             if let bundleIdentifier,
@@ -2290,6 +2294,10 @@ extension MusicManager {
             return spotifyGreen
         case AmazonMusicController.bundleIdentifier:
             return amazonOrange
+        case NetEaseCloudMusicController.bundleIdentifier:
+            return .accentColor
+        case QQMusicController.bundleIdentifier:
+            return .accentColor
         case TidalController.bundleIdentifier:
             return .accentColor
         case CiderController.bundleIdentifier:
