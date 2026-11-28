@@ -1521,6 +1521,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             guard Defaults[.enableShortcuts], Defaults[.enableTerminalFeature] else { return }
 
+            // A popped-out terminal lives in its own window; bring that forward.
+            if TerminalManager.shared.isPoppedOut {
+                TerminalManager.shared.popOut()
+                return
+            }
+
             if vm.notchState == .closed {
                 closeNotchWorkItem?.cancel()
                 closeNotchWorkItem = nil

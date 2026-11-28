@@ -94543,7 +94543,11 @@
       }
     },
     "Open to terminal while a command runs" : {},
-    "The notch opens on the terminal while a command is running in it, until the command finishes or you switch to another tab." : {}
+    "The notch opens on the terminal while a command is running in it, until the command finishes or you switch to another tab." : {},
+    "Open in floating window" : {},
+    "Terminal is in a floating window" : {},
+    "Show Window" : {},
+    "Return to Notch" : {}
   },
   "version" : "1.2"
 }
