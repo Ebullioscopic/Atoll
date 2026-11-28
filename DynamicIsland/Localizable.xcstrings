@@ -94548,7 +94548,10 @@
     "No city found with that name." : {},
     "Weather uses this city instead of Location Services." : {},
     "Showing weather for %@." : {},
-    "Hide widgets during screen saver" : {}
+    "Hide widgets during screen saver" : {},
+    "Show battery in Minimalistic UI" : {},
+    "Turn on Show battery indicator in Battery settings to use this." : {},
+    "Turn on Show battery in Minimalistic UI to use this." : {}
   },
   "version" : "1.2"
 }

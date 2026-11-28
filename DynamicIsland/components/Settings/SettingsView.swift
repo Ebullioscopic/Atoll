@@ -1198,11 +1198,14 @@ struct GeneralSettings: View {
                 }
                 .settingsHighlight(id: highlightID("Enable Minimalistic UI"))
 
-                Defaults.Toggle(key: .showMinimalisticBatteryIndicator) {
-                    Text("Show battery indicator")
+                // Only applies to the minimalistic layout; the standard notch uses
+                // "Show battery indicator" in Battery settings (#930).
+                if enableMinimalisticUI {
+                    Defaults.Toggle(key: .showMinimalisticBatteryIndicator) {
+                        Text("Show battery in Minimalistic UI")
+                    }
+                    .settingsHighlight(id: highlightID("Show battery indicator in Minimalistic UI"))
                 }
-                .disabled(!enableMinimalisticUI)
-                .settingsHighlight(id: highlightID("Show battery indicator in Minimalistic UI"))
 
                 Defaults.Toggle(key: .showBatteryPercentInside) {
                     Text("Show battery percentage inside icon")
@@ -1217,6 +1220,16 @@ struct GeneralSettings: View {
                 .disabled(!showBatteryIndicator
                     || (enableMinimalisticUI && !showMinimalisticBatteryIndicator))
                 .settingsHighlight(id: highlightID("Show battery percentage inside icon"))
+
+                if !showBatteryIndicator {
+                    Text("Turn on Show battery indicator in Battery settings to use this.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if enableMinimalisticUI && !showMinimalisticBatteryIndicator {
+                    Text("Turn on Show battery in Minimalistic UI to use this.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Text("UI Mode")
             } footer: {
