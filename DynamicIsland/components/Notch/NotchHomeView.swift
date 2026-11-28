@@ -454,11 +454,15 @@ struct MusicControlsView: View {
     @Default(.musicSkipBehavior) private var musicSkipBehavior
     @Default(.enableLyrics) private var enableLyrics
     @Default(.showCalendar) private var showCalendar
+    @State private var songInfoHeight: CGFloat = 0
     private let seekInterval: TimeInterval = 10
 
     var body: some View {
         VStack(alignment: .leading) {
             songInfoAndSlider
+            // The slack goes between the slider and the controls, keeping the
+            // controls at the bottom as before.
+            Spacer(minLength: 0)
             if shouldShowControlHUDRow {
                 controlHUDRow
             } else {
@@ -469,6 +473,14 @@ struct MusicControlsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Title, artist, optional lyric line and slider, at their own height.
+    ///
+    /// The reader supplies the width (the marquees need it), but a
+    /// `GeometryReader` also takes whatever height it is offered and lets its
+    /// content overflow it. When the column was short -- a taller header at a
+    /// scaled resolution, a lyric line -- the slider's time labels spilled down
+    /// over the shuffle and volume buttons. The reader is now held at its
+    /// content's measured height, so the controls always sit below the labels.
     private var songInfoAndSlider: some View {
         GeometryReader { geo in
             VStack(alignment: .leading, spacing: 4) {
@@ -477,7 +489,15 @@ struct MusicControlsView: View {
                 musicSlider
                     .zIndex(0)
             }
+            .background {
+                GeometryReader { content in
+                    Color.clear
+                        .onAppear { songInfoHeight = content.size.height }
+                        .onChange(of: content.size.height) { _, height in songInfoHeight = height }
+                }
+            }
         }
+        .frame(height: songInfoHeight > 0 ? songInfoHeight : nil)
         .padding(.top, 10)
         .padding(.leading, 5)
         .frame(maxWidth: .infinity, alignment: .leading)

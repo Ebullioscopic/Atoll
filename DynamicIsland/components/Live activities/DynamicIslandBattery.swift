@@ -480,6 +480,20 @@ private struct BatteryTemporaryHUDMetrics {
     let bottomRadius: CGFloat
 }
 
+extension BatteryTemporaryHUDKind {
+    /// Size of the temporary battery HUD's own surface, before the notch's
+    /// side insets. The window and the root frame size themselves from this
+    /// so they match what the view actually draws.
+    func hudSize(
+        style: BatteryNotificationStyle,
+        closedNotchWidth: CGFloat,
+        baseHeight: CGFloat
+    ) -> CGSize {
+        let metrics = metrics(style: style, closedNotchWidth: closedNotchWidth, baseHeight: baseHeight)
+        return CGSize(width: metrics.width, height: metrics.height)
+    }
+}
+
 private extension BatteryTemporaryHUDKind {
     func metrics(
         style: BatteryNotificationStyle,

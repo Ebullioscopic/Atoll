@@ -61,6 +61,8 @@ struct ContentView: View {
     /// compared against the frontmost app's menus. Only the *size* is read --
     /// the offset that follows does not change it, so there is no feedback.
     @State private var closedContentWidth: CGFloat = 0
+    /// Whether this view holds one of `MenuBarLayout`'s tracking counts.
+    @State private var isTrackingMenuBar = false
     /// Closed content width that menu-bar placement is decided on; see
     /// `recordClosedContentWidth`.
     @State private var closedPlacementWidth: CGFloat = 0
@@ -177,21 +179,15 @@ struct ContentView: View {
                     }
                 }()
                 
-                var width = vm.closedNotchSize.width
-                var height = vm.effectiveClosedNotchHeight
-                
-                switch (kind, style) {
-                case (.charging, _), (.lowBattery, .compact), (.fullBattery, .compact):
-                    width += 180
-                case (.lowBattery, .standard):
-                    width += 100
-                    height += 75
-                case (.fullBattery, .standard):
-                    width += 80
-                    height += 70
-                }
-                
-                return CGSize(width: width, height: height)
+                let hudSize = kind.hudSize(
+                    style: style,
+                    closedNotchWidth: vm.closedNotchSize.width,
+                    baseHeight: vm.effectiveClosedNotchHeight
+                )
+                return CGSize(
+                    width: hudSize.width + closedHUDWindowAllowance.width,
+                    height: hudSize.height + closedHUDWindowAllowance.height
+                )
             }
         }
         
@@ -199,7 +195,8 @@ struct ContentView: View {
             from: baseSize,
             view: coordinator.currentView,
             isNotchOpen: vm.notchState == .open,
-            statsSecondRowProgress: coordinator.statsSecondRowExpansion
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion,
+            closedNotchHeight: vm.effectiveClosedNotchHeight
         )
     }
     
@@ -969,8 +966,16 @@ struct ContentView: View {
                 }
             }
             .onChange(of: isHovering) { _, hovering in
+                if hovering {
+                    startHiddenEdgeHoverPolling()
+                }
                 if shouldShowMusicControlWindow() {
                     enqueueMusicControlWindowSync(forceRefresh: true, delay: hovering ? 0.05 : 0.12)
+                }
+            }
+            .onChange(of: shouldUseHiddenEdgeHoverPolling) { _, shouldPoll in
+                if shouldPoll {
+                    startHiddenEdgeHoverPolling()
                 }
             }
             .onChange(of: recordingManager.isRecording) { _, isRecording in
@@ -997,16 +1002,13 @@ struct ContentView: View {
                 }
             }
             .onAppear {
-                if vm.notchState == .closed { menuBarLayout.startTracking() }
+                syncMenuBarTracking()
             }
-            .onChange(of: vm.notchState) { _, state in
-                // An open notch covers the menu bar wholesale and is the user's
-                // own doing, so there is nothing to step around while it is up.
-                if state == .closed {
-                    menuBarLayout.startTracking()
-                } else {
-                    menuBarLayout.stopTracking()
-                }
+            .onChange(of: needsMenuBarTracking) { _, _ in
+                syncMenuBarTracking()
+            }
+            .onChange(of: vm.notchState) { _, _ in
+                resetGestureProgress()
                 syncFullscreenPointerMonitor()
             }
             .onChange(of: vm.hideOnClosed) { _, _ in
@@ -1024,6 +1026,29 @@ struct ContentView: View {
     /// the notch itself (`MusicLiveActivity` uses the same figure).
     private var closedMusicCenterWidth: CGFloat {
         max(vm.closedNotchSize.width + (isHovering ? 8 : 0), 96)
+    }
+
+    /// Whether the frontmost app's menus need measuring: only while a closed
+    /// activity has wings reaching into the menu bar. An open notch covers the
+    /// menu bar wholesale and is the user's own doing, and an idle notch or the
+    /// floating island cover nothing, so the menu scan (a cross-process
+    /// accessibility walk every few seconds) stays off then.
+    private var needsMenuBarTracking: Bool {
+        vm.notchState == .closed
+            && !vm.hideOnClosed
+            && !isIslandMode
+            && closedContentWidth > vm.closedNotchSize.width
+    }
+
+    private func syncMenuBarTracking() {
+        let needed = needsMenuBarTracking
+        guard needed != isTrackingMenuBar else { return }
+        isTrackingMenuBar = needed
+        if needed {
+            menuBarLayout.startTracking()
+        } else {
+            menuBarLayout.stopTracking()
+        }
     }
 
     /// The physical notch on `screen`, in global x. A screen without one gets
@@ -2277,7 +2302,10 @@ struct ContentView: View {
     /// Cancels every long-lived task / event monitor this view owns. Called from
     /// `.onDisappear` and from `vm.onViewTeardown` on window close. Idempotent.
     private func performViewTeardown() {
-        menuBarLayout.stopTracking()
+        if isTrackingMenuBar {
+            isTrackingMenuBar = false
+            menuBarLayout.stopTracking()
+        }
         hoverTask?.cancel()
         stopHoverClickMonitor()
         removeStickyTerminalClickMonitor()
@@ -2311,23 +2339,26 @@ struct ContentView: View {
                         self.stopHoverClickMonitor()
                         self.finishHoverExit()
                     }
+                } else {
+                    // Nothing to watch: stop instead of waking every second for
+                    // the life of the app. Hovering or hide-until-hover start
+                    // the poll again.
+                    break
                 }
 
                 try? await Task.sleep(for: .milliseconds(self.hiddenEdgeHoverPollingIntervalMs()))
             }
 
-            self.hiddenEdgeHoverPollingTask = nil
+            // A cancelled poll was already cleared by `stopHiddenEdgeHoverPolling`,
+            // which may have started its replacement since.
+            if !Task.isCancelled {
+                self.hiddenEdgeHoverPollingTask = nil
+            }
         }
     }
 
     private func hiddenEdgeHoverPollingIntervalMs() -> Int {
-        if shouldUseHiddenEdgeHoverPolling {
-            return 50
-        }
-        if isHovering && interactionsEnabled {
-            return 100
-        }
-        return 1_000
+        shouldUseHiddenEdgeHoverPolling ? 50 : 100
     }
 
     private func stopHiddenEdgeHoverPolling() {
@@ -2639,20 +2670,18 @@ struct ContentView: View {
         let height = max(closedHeight, recordingSize?.height ?? 0) + 6
             + PinnedLyricsView.reservedHeight(isEligible: pinnedLyricsVisible,
                 availability: musicManager.lyricsAvailability, context: pinnedLyricContext)
-        var width = max(closedWidth, recordingSize?.width ?? 0) + 24
-        var minX = screen.frame.midX - width / 2
-        // Gathered wings sit past the side they were moved to; the pointer is
-        // still over the activity there.
-        let gatheredWings = max(0, closedContentWidth - closedMusicCenterWidth)
-        switch closedActivityPlacement {
-        case .trailing:
-            width += gatheredWings
-        case .leading:
-            width += gatheredWings
-            minX -= gatheredWings
-        case .centered, .retracted:
-            break
-        }
+        // The live activity's wings (album art, waveform, HUD text) reach well
+        // past the physical notch. Measuring only the notch made a pointer
+        // resting on a wing count as outside: the hover poll and the retained
+        // exit then dropped the hover, the surface shrank, AppKit reported a
+        // fresh enter and the activity shook in a loop (#444, #943).
+        let placement = closedActivityPlacement
+        let surfaceWidth = (placement == .retracted ? retractedClosedContentWidth : closedContentWidth)
+            + notchHorizontalPadding * 2
+        let width = max(max(closedWidth, recordingSize?.width ?? 0) + 24, surfaceWidth)
+        // Gathered wings move the whole surface to one side (see
+        // `closedSurfaceOffset`); the hit area moves with it.
+        let minX = screen.frame.midX + closedSurfaceOffset - width / 2
         let minY = screen.frame.maxY - height
 
         return location.x >= minX && location.x <= minX + width
@@ -2749,6 +2778,13 @@ struct ContentView: View {
     }
 
     private func handleScrollGesture(isDownward: Bool, translation: CGFloat, phase: NSEvent.Phase) {
+        // Reset before any guard: if the notch state, calendar hover or the
+        // gesture settings change mid-scroll, the handlers below bail out and
+        // would otherwise leave the content blurred until relaunch.
+        if phase == .ended || phase == .cancelled {
+            resetGestureProgress()
+        }
+
         let reverse = Defaults[.reverseScrollGestures]
         let shouldOpen = isDownward ? !reverse : reverse
 
@@ -2782,6 +2818,13 @@ struct ContentView: View {
                 gestureProgress = .zero
             }
             openNotch()
+        }
+    }
+
+    private func resetGestureProgress() {
+        guard gestureProgress != .zero else { return }
+        withAnimation(.smooth) {
+            gestureProgress = .zero
         }
     }
 

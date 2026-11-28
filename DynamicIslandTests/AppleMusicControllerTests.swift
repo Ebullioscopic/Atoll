@@ -272,6 +272,45 @@ final class AppleMusicControllerTests: XCTestCase {
         withExtendedLifetime(cancellable) {}
     }
 
+    func testPlaybackPositionIsAnchoredToWhenTheRequestWasSent() async {
+        let controller = AppleMusicController(
+            startsObservers: false,
+            playbackInfoProvider: {
+                // A slow script: the position was read before this delay.
+                try? await Task.sleep(for: .milliseconds(300))
+                return AppleMusicPlaybackInfo(
+                    isPlaying: true,
+                    title: "Anchored Song",
+                    artist: "Anchored Artist",
+                    album: "Anchored Album",
+                    currentTime: 42,
+                    duration: 180,
+                    isShuffled: false,
+                    repeatMode: .off,
+                    artwork: nil
+                )
+            }
+        )
+        var published: PlaybackState?
+        let cancellable = controller.playbackStatePublisher
+            .dropFirst()
+            .sink { published = $0 }
+
+        let requestedAt = Date()
+        await controller.updatePlaybackInfo()
+        let appliedAt = Date()
+
+        let state = try? XCTUnwrap(published)
+        XCTAssertEqual(state?.currentTime, 42)
+        if let anchor = state?.lastUpdated {
+            XCTAssertLessThan(anchor.timeIntervalSince(requestedAt), 0.1)
+            XCTAssertGreaterThan(appliedAt.timeIntervalSince(anchor), 0.25)
+        } else {
+            XCTFail("No playback state published")
+        }
+        withExtendedLifetime(cancellable) {}
+    }
+
     func testOlderPlaybackRefreshCannotOverwriteNewerState() async {
         let provider = OutOfOrderPlaybackInfoProvider()
         let controller = AppleMusicController(

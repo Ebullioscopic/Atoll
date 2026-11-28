@@ -500,7 +500,8 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             from: baseSize,
             view: coordinator.currentView,
             isNotchOpen: true,
-            statsSecondRowProgress: coordinator.statsSecondRowExpansion
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion,
+            closedNotchHeight: effectiveClosedNotchHeight
         )
     }
 
