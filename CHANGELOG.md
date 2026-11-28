@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Rename a running timer**: double-click the timer's name in the Timer tab to type a new one, so the notch shows what is being counted down. Return or clicking away saves it, Escape cancels, and an empty name goes back to “Timer”. Clock app timers keep their own names. (#824)
 - **Double-click a date to open your calendar app**: double-clicking a day in the notch calendar opens Calendar, or Fantastical on that day, or Notion Calendar when one is chosen under Third-party Calendar Integration. (#383)
 - **Minimal calendar**: turn off the new “Show date picker” option in Calendar settings to hide the month, week or 3-day picker and show only the day's events when the calendar has the Home tab to itself. The notch then keeps its standard height. On by default. (#341)
 - **Hide the calendar during playback**: a new “Show beside music player” option in Calendar settings keeps the calendar off the Home tab while the music player is on it, so the player (and side lyrics, when on) get the whole space. The calendar still shows when the player is hidden. On by default. (#920)

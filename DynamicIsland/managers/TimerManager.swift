@@ -213,6 +213,16 @@ class TimerManager: ObservableObject {
         scheduleCountdown()
     }
     
+    /// Renames the running Atoll timer; an empty name restores the default (#824).
+    /// Clock app timers keep the name the Clock app reports.
+    func renameTimer(_ name: String) {
+        guard activeSource == .manual, isTimerActive else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        timerName = trimmed.isEmpty ? "Timer" : String(trimmed.prefix(Self.maximumNameLength))
+    }
+
+    static let maximumNameLength = 40
+
     func startDemoTimer(duration: TimeInterval) {
         startTimer(duration: duration, name: "Demo Timer")
     }
