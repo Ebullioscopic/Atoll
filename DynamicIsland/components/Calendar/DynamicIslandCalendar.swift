@@ -381,10 +381,6 @@ struct CalendarView: View {
     @ObservedObject private var calendarManager = CalendarManager.shared
     @State private var selectedDate = Date()
     @State private var dateExpanded = false
-    /// The date strip is built the first time the header is hovered rather
-    /// than with the panel: its ~25 date buttons were a large share of the
-    /// work done in the frame the notch opens, and most opens never expand it.
-    @State private var hasBuiltDateStrip = false
     @Default(.hideAllDayEvents) private var hideAllDayEvents
     @Default(.hideCompletedReminders) private var hideCompletedReminders
 
@@ -420,10 +416,8 @@ struct CalendarView: View {
                 .frame(width: 72, alignment: .leading)
 
                 ZStack {
-                    if hasBuiltDateStrip {
-                        WheelPicker(selectedDate: $selectedDate, config: Config())
-                            .frame(maxWidth: .infinity)
-                    }
+                    WheelPicker(selectedDate: $selectedDate, config: Config())
+                        .frame(maxWidth: .infinity)
                     // Edge fades indicating the date strip is horizontally
                     // scrollable. Subtle (0.45) so they hint without hiding text.
                     LinearGradient(colors: [Color.black.opacity(0.45), .clear], startPoint: .leading, endPoint: .trailing)
@@ -446,7 +440,6 @@ struct CalendarView: View {
             .padding(.top, 2)
             .contentShape(Rectangle())
             .onHover { inside in
-                if inside { hasBuiltDateStrip = true }
                 withAnimation(.easeInOut(duration: 0.18)) {
                     dateExpanded = inside
                 }
