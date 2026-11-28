@@ -8415,6 +8415,7 @@
         }
       }
     },
+    "Adds a \"Convert To\" menu when you right-click a file on the shelf, offering only the formats that file can actually become. The file on disk is never modified or deleted." : {},
     "Adds a Guake-style dropdown terminal tab. The terminal session persists across notch open/close cycles." : {
       "localizations" : {
         "fr" : {
@@ -11706,6 +11707,8 @@
         }
       }
     },
+    "Atoll could not read that file." : {},
+    "Atoll could not write the converted file." : {},
     "Atoll includes a mirror feature that lets you quickly check your appearance using your camera, right from the notch. Camera access is required only to show this live preview. You can turn the mirror feature on or off at any time in the app." : {
       "localizations" : {
         "fr" : {
@@ -32335,6 +32338,7 @@
         }
       }
     },
+    "Enable File Conversion" : {},
     "Enable Focus Detection" : {
       "localizations" : {
         "fr" : {
@@ -65899,6 +65903,7 @@
       }
     },
     "Replace Current Settings?" : {},
+    "Replace the Original Item" : {},
     "Replaces the artwork tile with the live canvas when the current app provides one, and reuses that moving canvas for the surrounding lighting effect." : {
       "localizations" : {
         "fr" : {
@@ -81959,6 +81964,7 @@
         }
       }
     },
+    "That conversion is not supported." : {},
     "That file could not be loaded as an image." : {
       "localizations" : {
         "ko" : {
@@ -81969,6 +81975,7 @@
         }
       }
     },
+    "That video has no audio track to extract." : {},
     "The app is currently using %@ MB, which exceeds the safe limit of %@ MB. Restart now to free memory?" : {
       "localizations" : {
         "en" : {
@@ -82041,6 +82048,7 @@
         }
       }
     },
+    "The export did not finish." : {},
     "The file is not an Atoll settings backup." : {},
     "The highlight travels across the line word by word, in reading order." : {
       "extractionState" : "stale",
