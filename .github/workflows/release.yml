@@ -302,6 +302,8 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE_SPECIFIER="" \
             ASSETCATALOG_COMPILER_APPICON_NAME="$ICON_NAME" \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ steps.version.outputs.build_number }}" \
             $EXTRA_FLAGS
 
       # ─────────────────────────────────────────────────────────────────
