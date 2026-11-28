@@ -1876,7 +1876,7 @@ struct Downloads: View {
                     }
                 }
 
-                Text(style.rawValue)
+                Text(style.localizedName)
                     .font(.caption)
                     .fontWeight(.medium)
                     .lineLimit(2)
@@ -2325,7 +2325,7 @@ private struct HUDAndOSDSettingsView: View {
                         Toggle("Interactive (Drag to Change)", isOn: $verticalHUDInteractive)
                         Picker("Material", selection: $verticalHUDMaterial) {
                             ForEach(availableVerticalMaterials, id: \.self) { material in
-                                Text(material.rawValue).tag(material)
+                                Text(LocalizedStringKey(material.rawValue)).tag(material)
                             }
                         }
 
@@ -2335,7 +2335,7 @@ private struct HUDAndOSDSettingsView: View {
                                     "Glass mode",
                                     selection: $verticalHUDLiquidGlassCustomizationMode,
                                     items: Array(LockScreenGlassCustomizationMode.allCases)
-                                ) { $0.rawValue }
+                                ) { $0.localizedName }
 
                                 if verticalHUDLiquidGlassCustomizationMode == .customLiquid {
                                     VStack(alignment: .leading, spacing: 6) {
@@ -4201,7 +4201,7 @@ struct About: View {
                             Text("(\(Bundle.main.buildVersionNumber ?? ""))")
                                 .foregroundStyle(.secondary)
                         }
-                        Text(Bundle.main.releaseVersionNumber ?? "unkown")
+                        Text(Bundle.main.releaseVersionNumber ?? String(localized: "Unknown"))
                             .foregroundStyle(.secondary)
                     }
                     .onTapGesture {
@@ -4776,7 +4776,7 @@ struct LiveActivitiesSettings: View {
                                 Circle()
                                     .fill(Color.purple)
                                     .frame(width: 8, height: 8)
-                                Text(doNotDisturbManager.currentFocusModeName.isEmpty ? "Focus Enabled" : doNotDisturbManager.currentFocusModeName)
+                                Text(doNotDisturbManager.currentFocusModeName.isEmpty ? String(localized: "Focus Enabled") : doNotDisturbManager.currentFocusModeName)
                                     .foregroundColor(.purple)
                             }
                         } else {
@@ -5330,7 +5330,7 @@ struct Appearance: View {
             case .success(let url):
                 importCustomIcon(from: url)
             case .failure:
-                iconImportError = "Icon import was canceled or failed."
+                iconImportError = String(localized: "Icon import was canceled or failed.")
             }
         }
         .navigationTitle("Appearance")
@@ -5404,7 +5404,7 @@ struct Appearance: View {
 
     private func importCustomIcon(from url: URL) {
         guard let image = NSImage(contentsOf: url) else {
-            iconImportError = "That file could not be loaded as an image."
+            iconImportError = String(localized: "That file could not be loaded as an image.")
             return
         }
         let name = url.deletingPathExtension().lastPathComponent
@@ -5417,7 +5417,7 @@ struct Appearance: View {
             let data = try Data(contentsOf: url)
             try data.write(to: destination, options: [.atomic])
         } catch {
-            iconImportError = "Unable to save the icon file."
+            iconImportError = String(localized: "Unable to save the icon file.")
             return
         }
 
@@ -6486,7 +6486,7 @@ extension LockScreenSettings {
 
     @ViewBuilder
     private func variantSlider(
-        title: String,
+        title: LocalizedStringKey,
         value: Binding<Double>,
         currentValue: Int,
         isEnabled: Bool,
@@ -6515,7 +6515,7 @@ extension LockScreenSettings {
 }
 
 private struct LockScreenIconStyleCard: View {
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
     let isSelected: Bool
     let action: () -> Void
@@ -7879,7 +7879,7 @@ struct TimerSettings: View {
 
     private func selectCustomTimerSound() {
         let panel = NSOpenPanel()
-        panel.title = "Select Timer Sound"
+        panel.title = String(localized: "Select Timer Sound")
         panel.allowedContentTypes = [.audio]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
@@ -8565,7 +8565,7 @@ struct StatsSettings: View {
                     LLMUsageManager.shared.refreshAll(force: true)
                     accountPendingDeletion = nil
                 } catch {
-                    newAPIAccountErrorMessage = "Failed to delete \(account.name): \(error.localizedDescription)"
+                    newAPIAccountErrorMessage = String(localized: "Failed to delete \(account.name): \(error.localizedDescription)")
                 }
             }
             Button("Cancel", role: .cancel) {
@@ -8580,7 +8580,7 @@ struct StatsSettings: View {
         )) {
             Button("OK", role: .cancel) { newAPIAccountErrorMessage = nil }
         } message: {
-            Text(newAPIAccountErrorMessage ?? "An unknown error occurred.")
+            Text(newAPIAccountErrorMessage ?? String(localized: "An unknown error occurred."))
         }
     }
 }
@@ -9275,7 +9275,7 @@ struct CustomOSDSettings: View {
                 Section {
                     Picker("Material", selection: $osdMaterial) {
                         ForEach(availableOSDMaterials, id: \.self) { material in
-                            Text(material.rawValue).tag(material)
+                            Text(LocalizedStringKey(material.rawValue)).tag(material)
                         }
                     }
                     .settingsHighlight(id: highlightID("Material"))
@@ -9289,7 +9289,7 @@ struct CustomOSDSettings: View {
                                 "Glass mode",
                                 selection: $osdLiquidGlassCustomizationMode,
                                 items: Array(LockScreenGlassCustomizationMode.allCases)
-                            ) { $0.rawValue }
+                            ) { $0.localizedName }
 
                             if osdLiquidGlassCustomizationMode == .customLiquid {
                                 VStack(alignment: .leading, spacing: 6) {
@@ -9312,7 +9312,7 @@ struct CustomOSDSettings: View {
 
                     Picker("Icon & Progress Color", selection: $osdIconColorStyle) {
                         ForEach(OSDIconColorStyle.allCases, id: \.self) { style in
-                            Text(style.rawValue).tag(style)
+                            Text(LocalizedStringKey(style.rawValue)).tag(style)
                         }
                     }
                     .settingsHighlight(id: highlightID("Icon & Progress Color"))
