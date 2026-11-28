@@ -259,7 +259,8 @@ class SystemOSDManager {
             }
 
             guard isCurrentTransition(generation, active: true) else { return }
-            if let pid = osduiHelperPID() {
+            let currentPID = osduiHelperPID()
+            if let pid = currentPID {
                 let lastPID = suppressionState.withLock { $0.lastSuspendedPID }
                 if pid == lastPID {
                     return
@@ -267,7 +268,9 @@ class SystemOSDManager {
             }
 
             guard isCurrentTransition(generation, active: true) else { return }
-            suspendOSDUIHelper()
+            // Killed rather than frozen: nothing to record, and the next
+            // instance is examined afresh.
+            guard freezeOSDUIHelper(pid: currentPID) else { return }
 
             // If this transition went stale while the SIGSTOP was in flight,
             // hand the helper over rather than assuming it should be resumed.
@@ -297,8 +300,9 @@ class SystemOSDManager {
             // SIGSTOPped needs no replacing; freezing it in place closes the
             // window entirely, and the watcher still catches any process macOS
             // swaps in later.
-            if let existing = osduiHelperPID() {
-                suspendOSDUIHelper()
+            // One that is showing a HUD is killed instead, and a fresh,
+            // idle one is started and frozen below.
+            if let existing = osduiHelperPID(), freezeOSDUIHelper(pid: existing) {
                 guard isCurrentTransition(generation, active: true) else {
                     relinquishStaleSuspension()
                     return
@@ -412,8 +416,9 @@ class SystemOSDManager {
                 let lastPID = suppressionState.withLock { $0.lastSuspendedPID }
 
                 if let pid = currentPID, pid != lastPID {
-                    suspendOSDUIHelper()
-                    suppressionState.withLock { $0.lastSuspendedPID = pid }
+                    if freezeOSDUIHelper(pid: pid) {
+                        suppressionState.withLock { $0.lastSuspendedPID = pid }
+                    }
                     stableChecks = 0
                     try? await Task.sleep(nanoseconds: 150_000_000) // 150ms
                     continue
@@ -503,6 +508,46 @@ class SystemOSDManager {
     }
 
     private static let helperProcessName = "OSDUIHelper"
+
+    /// Freezes the helper, unless it is showing a HUD at this moment.
+    ///
+    /// SIGSTOP freezes the helper's windows exactly as they are, so a helper
+    /// caught mid-display -- a key that reached macOS before the tap, a HUD
+    /// drawn on the lock screen just before unlocking, a respawn the watcher
+    /// had not caught yet -- left its HUD stuck on the desktop for as long as
+    /// suppression lasted (#593). Such a helper is killed instead, taking its
+    /// window with it; launchd starts a new one on demand, and that one is
+    /// frozen before it has anything to draw. An idle helper owns no windows
+    /// at all, so the check only costs a window list when a new helper is
+    /// about to be frozen. Returns true when the helper was frozen.
+    @discardableResult
+    private static func freezeOSDUIHelper(pid: Int32?) -> Bool {
+        if let pid, isShowingHUD(pid: pid) {
+            let kill = Process()
+            kill.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+            kill.arguments = ["-KILL", "OSDUIHelper"]
+            kill.standardError = Pipe()
+            do {
+                try kill.run()
+                kill.waitUntilExit()
+                return false
+            } catch {
+                NSLog("Failed to kill OSDUIHelper showing a HUD: \(error)")
+            }
+        }
+        suspendOSDUIHelper()
+        return true
+    }
+
+    private static func isShowingHUD(pid: Int32) -> Bool {
+        guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+            return false
+        }
+        return windows.contains { info in
+            guard (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid else { return false }
+            return ((info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1) > 0
+        }
+    }
 
     /// Sends SIGSTOP to all OSDUIHelper processes. Idempotent.
     private static func suspendOSDUIHelper() {
