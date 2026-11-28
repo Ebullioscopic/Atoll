@@ -214,16 +214,16 @@ enum UpdatePhase: Equatable {
     
     var displayName: String {
         switch self {
-        case .idle:           return "Idle"
-        case .checking:       return "Checking for updates…"
-        case .updateFound:    return "Update Available"
-        case .downloading:    return "Downloading…"
-        case .extracting:     return "Extracting…"
-        case .readyToInstall: return "Ready to Install"
-        case .installing:     return "Installing…"
-        case .installed:      return "Installed"
-        case .upToDate:       return "Up to Date"
-        case .error:          return "Error"
+        case .idle:           return String(localized: "Idle")
+        case .checking:       return String(localized: "Checking for updates…")
+        case .updateFound:    return String(localized: "Update Available")
+        case .downloading:    return String(localized: "Downloading…")
+        case .extracting:     return String(localized: "Extracting…")
+        case .readyToInstall: return String(localized: "Ready to Install")
+        case .installing:     return String(localized: "Installing…")
+        case .installed:      return String(localized: "Installed")
+        case .upToDate:       return String(localized: "Up to Date")
+        case .error:          return String(localized: "Error")
         }
     }
 }

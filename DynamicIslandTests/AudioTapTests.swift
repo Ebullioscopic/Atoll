@@ -65,4 +65,14 @@ final class AudioTapTests: XCTestCase {
             )
         )
     }
+
+    func testTidalPreservationRecognizesBrowsers() {
+        XCTAssertTrue(TidalController.isBrowserSource("com.google.Chrome"))
+        XCTAssertTrue(TidalController.isBrowserSource("com.apple.Safari.WebContent"))
+    }
+
+    func testTidalPreservationDoesNotRecognizeOtherMusicApps() {
+        XCTAssertFalse(TidalController.isBrowserSource("com.spotify.client"))
+        XCTAssertFalse(TidalController.isBrowserSource("com.apple.Music"))
+    }
 }

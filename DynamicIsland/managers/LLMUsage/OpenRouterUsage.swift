@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import Defaults
 
 // MARK: - OpenRouter Usage
 
@@ -9,7 +10,7 @@ protocol OpenRouterAPIKeyProviding {
 
 enum OpenRouterKeychain {
     private static let service = "com.Ebullioscopic.Atoll.openrouter"
-    private static let account = "management-key"
+    private static let account = "api-key"
 
     static func read() -> String? {
         let query: [String: Any] = [
@@ -25,6 +26,17 @@ enum OpenRouterKeychain {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Checks for a saved key without loading the secret.
+    static func hasKey() -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+    }
+
     static func save(_ apiKey: String) throws {
         let data = Data(apiKey.utf8)
         let query: [String: Any] = [
@@ -32,14 +44,16 @@ enum OpenRouterKeychain {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
-        let attributes: [String: Any] = [kSecValueData as String: data]
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
         let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         guard updateStatus == errSecSuccess || updateStatus == errSecItemNotFound else {
             throw OpenRouterKeychainError(status: updateStatus)
         }
         if updateStatus == errSecItemNotFound {
-            var item = query
-            item[kSecValueData as String] = data
+            let item = query.merging(attributes) { _, new in new }
             let addStatus = SecItemAdd(item as CFDictionary, nil)
             guard addStatus == errSecSuccess else { throw OpenRouterKeychainError(status: addStatus) }
         }
@@ -60,7 +74,7 @@ enum OpenRouterKeychain {
 
 struct OpenRouterKeychainError: LocalizedError {
     let status: OSStatus
-    var errorDescription: String? { "Unable to store the OpenRouter management key (Keychain status \(status))." }
+    var errorDescription: String? { String(localized: "Unable to store the OpenRouter key (Keychain status \(status)).") }
 }
 
 struct OpenRouterAPIKeyStore: OpenRouterAPIKeyProviding {
@@ -81,7 +95,30 @@ struct OpenRouterClient {
         self.requestHandler = requestHandler
     }
 
-    func fetchSnapshot(apiKey: String, now: Date, calendar: Calendar = .current) async throws -> UsageSnapshot {
+    /// `GET /key` works with a normal API key and reports spend and the key's credit limit.
+    /// Per-model analytics need a management key, so they are only fetched when opted in.
+    func fetchSnapshot(apiKey: String, includeAnalytics: Bool = false, now: Date, calendar: Calendar = .current) async throws -> UsageSnapshot {
+        if includeAnalytics {
+            return try await fetchAnalyticsSnapshot(apiKey: apiKey, now: now, calendar: calendar)
+        }
+        let keyInfo = try await fetchKeyInfo(apiKey: apiKey)
+        var snapshot = UsageSnapshot()
+        snapshot.today.costUSD = keyInfo.usageDaily
+        snapshot.week.costUSD = keyInfo.usageWeekly
+        if let limit = keyInfo.limit, limit > 0 {
+            let remaining = keyInfo.limitRemaining ?? max(limit - keyInfo.usage, 0)
+            snapshot.sessionLimit = UsageLimit(used: max(limit - remaining, 0), limit: limit)
+        }
+        snapshot.lastUpdated = now
+        return snapshot
+    }
+
+    func fetchKeyInfo(apiKey: String) async throws -> OpenRouterKeyInfo {
+        let data = try await request(path: "key", method: "GET", apiKey: apiKey)
+        return try decode(OpenRouterEnvelope<OpenRouterKeyInfo>.self, from: data).data
+    }
+
+    private func fetchAnalyticsSnapshot(apiKey: String, now: Date, calendar: Calendar) async throws -> UsageSnapshot {
         async let credits = fetchCredits(apiKey: apiKey)
         async let today = fetchAnalytics(apiKey: apiKey, start: calendar.startOfDay(for: now), end: now)
         async let week = fetchAnalytics(
@@ -158,6 +195,39 @@ struct OpenRouterClient {
 
 private struct OpenRouterEnvelope<T: Decodable>: Decodable {
     let data: T
+}
+
+struct OpenRouterKeyInfo: Decodable, Equatable {
+    let limit: Double?
+    let limitRemaining: Double?
+    let usage: Double
+    let usageDaily: Double
+    let usageWeekly: Double
+
+    enum CodingKeys: String, CodingKey {
+        case limit
+        case limitRemaining = "limit_remaining"
+        case usage
+        case usageDaily = "usage_daily"
+        case usageWeekly = "usage_weekly"
+    }
+
+    init(limit: Double?, limitRemaining: Double?, usage: Double, usageDaily: Double, usageWeekly: Double) {
+        self.limit = limit
+        self.limitRemaining = limitRemaining
+        self.usage = usage
+        self.usageDaily = usageDaily
+        self.usageWeekly = usageWeekly
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        limit = try container.decodeIfPresent(Double.self, forKey: .limit)
+        limitRemaining = try container.decodeIfPresent(Double.self, forKey: .limitRemaining)
+        usage = try container.decodeIfPresent(Double.self, forKey: .usage) ?? 0
+        usageDaily = try container.decodeIfPresent(Double.self, forKey: .usageDaily) ?? 0
+        usageWeekly = try container.decodeIfPresent(Double.self, forKey: .usageWeekly) ?? 0
+    }
 }
 
 struct OpenRouterCredits: Decodable, Equatable {
@@ -274,8 +344,8 @@ enum OpenRouterClientError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .httpFailure: return "OpenRouter request failed. Check that the saved key is a management key."
-        case .invalidResponse: return "OpenRouter returned an invalid response"
+        case .httpFailure: return String(localized: "OpenRouter request failed. Check the saved key; per-model analytics need a management key.")
+        case .invalidResponse: return String(localized: "OpenRouter returned an invalid response")
         }
     }
 }
@@ -292,8 +362,8 @@ struct OpenRouterUsageProvider: UsageProvider {
 
     func fetchSnapshot(now: Date) async throws -> UsageSnapshot {
         guard let apiKey = keySource.apiKey()?.trimmingCharacters(in: .whitespacesAndNewlines), !apiKey.isEmpty else {
-            throw UsageError.notConfigured("OpenRouter management key not configured")
+            throw UsageError.notConfigured(String(localized: "OpenRouter API key not configured"))
         }
-        return try await client.fetchSnapshot(apiKey: apiKey, now: now)
+        return try await client.fetchSnapshot(apiKey: apiKey, includeAnalytics: Defaults[.openRouterUsageAnalytics], now: now)
     }
 }

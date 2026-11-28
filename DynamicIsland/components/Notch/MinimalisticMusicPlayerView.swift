@@ -141,7 +141,7 @@ struct MinimalisticMusicPlayerView: View {
                         .padding(.top, 4)
                 }
 
-                if enableLyrics {
+                if shouldReserveLyricsSpace {
                     lyricsView
                         .padding(.top, 10)
                 }
@@ -260,10 +260,17 @@ struct MinimalisticMusicPlayerView: View {
 
     private var dynamicHeightSignature: Int {
         var signature = reminderEntries.count * 10
-        if enableLyrics { signature += 1 }
+        if shouldReserveLyricsSpace { signature += 1 }
         if shouldShowTimerCountdown { signature += 100 }
         if showMinimalisticBatteryIndicator { signature += 1000 }
         return signature
+    }
+
+    /// Ads do not have lyrics. Reserving the normal lyrics row for them left a
+    /// large empty strip beneath the controls and made the Dynamic Island look
+    /// nearly square instead of keeping its regular compact proportions.
+    private var shouldReserveLyricsSpace: Bool {
+        enableLyrics && !musicManager.isAdvertisement
     }
 
     /// True when the battery indicator is hidden and we are in notch mode (not DI).
@@ -280,8 +287,8 @@ struct MinimalisticMusicPlayerView: View {
             height += 6 + 4          // progress bar top padding + bar
             height += 54 + 2         // controls + top padding
 
-            if enableLyrics {
-                height += 10 + 34 // lyrics padding + estimated height
+            if shouldReserveLyricsSpace {
+                height += 10 + 40 // lyrics padding + estimated height (increased for 2-line lyrics)
             }
             if shouldShowTimerCountdown {
                 height += minimalisticTimerCountdownBlockHeight
@@ -302,8 +309,8 @@ struct MinimalisticMusicPlayerView: View {
         height += 4 + 4          // progress bar top padding + bar
         height += 54 + 2         // controls + top padding
 
-        if enableLyrics {
-            height += 10 + 34
+        if shouldReserveLyricsSpace {
+            height += 10 + 40
         }
         if shouldShowTimerCountdown {
             height += minimalisticTimerCountdownBlockHeight
@@ -476,7 +483,7 @@ struct MinimalisticMusicPlayerView: View {
             }
         }
         .padding(.horizontal, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: 40, alignment: .topLeading)
         .animation(.smooth(duration: 0.32), value: line)
     }
     
@@ -771,11 +778,7 @@ private struct MinimalisticReminderDetailsView: View {
     }
 
     private var progressBar: some View {
-        TimelineView(
-            .animation(
-                paused: isProgressTimelinePaused
-            )
-        ) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: isProgressTimelinePaused)) { timeline in
             MusicSliderView(
                 sliderValue: $sliderValue,
                 duration: Binding(
@@ -988,7 +991,7 @@ private struct MinimalisticReminderDetailsView: View {
 
     private var displayedSlots: [MusicControlButton] {
         if showCustomControls {
-            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, isSpotifyActive: musicManager.isSpotifyActive)
+            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, canFavorite: musicManager.activeSourceCanEverFavorite)
             return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
         }
 
@@ -1254,7 +1257,8 @@ struct MinimalisticAlbumArtView: View {
             .background(
                 DynamicIslandArtworkSourceView(
                     cornerRadius: albumArtCornerRadius,
-                    contentMode: .fill
+                    contentMode: .fill,
+                    prefersVideo: false
                 )
             )
             .clipped()

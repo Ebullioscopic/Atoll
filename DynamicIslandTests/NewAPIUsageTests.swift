@@ -99,7 +99,7 @@ final class NewAPIUsageTests: XCTestCase {
         XCTAssertEqual(snapshot.weekQuota, 5_678)
         XCTAssertEqual(snapshot.currentRPM, 3)
         XCTAssertEqual(snapshot.currentTPM, 321)
-        XCTAssertEqual(recorder.requests.count, 4)
+        XCTAssertEqual(recorder.requests.count, 3)
 
         for request in recorder.requests {
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer secret-key")
@@ -243,7 +243,31 @@ final class OpenRouterUsageTests: XCTestCase {
         XCTAssertEqual(row, OpenRouterAnalyticsRow(model: "openai/gpt-4o-mini", totalUsage: 0.005, tokensTotal: 6331, requestCount: 6))
     }
 
-    func testFetchSnapshotUsesManagementEndpointsAndMapsUsage() async throws {
+    func testFetchSnapshotUsesKeyEndpointByDefault() async throws {
+        let recorder = RequestRecorder()
+        let client = OpenRouterClient { request in
+            recorder.append(request)
+            XCTAssertEqual(request.url?.path, "/api/v1/key")
+            let body = #"{"data":{"limit":50,"limit_remaining":40,"usage":12.5,"usage_daily":1.25,"usage_weekly":10,"is_free_tier":false}}"#
+            return (
+                Data(body.utf8),
+                HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            )
+        }
+
+        let snapshot = try await client.fetchSnapshot(apiKey: "regular-key", now: Date())
+
+        XCTAssertEqual(recorder.requests.count, 1)
+        XCTAssertEqual(recorder.requests.first?.httpMethod, "GET")
+        XCTAssertEqual(recorder.requests.first?.value(forHTTPHeaderField: "Authorization"), "Bearer regular-key")
+        XCTAssertEqual(snapshot.today.costUSD, 1.25, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.week.costUSD, 10, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.sessionLimit?.used, 10)
+        XCTAssertEqual(snapshot.sessionLimit?.limit, 50)
+        XCTAssertTrue(snapshot.models.isEmpty)
+    }
+
+    func testFetchSnapshotUsesManagementEndpointsWhenAnalyticsEnabled() async throws {
         let recorder = RequestRecorder()
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -265,7 +289,7 @@ final class OpenRouterUsageTests: XCTestCase {
             )
         }
 
-        let snapshot = try await client.fetchSnapshot(apiKey: "management-key", now: now, calendar: calendar)
+        let snapshot = try await client.fetchSnapshot(apiKey: "management-key", includeAnalytics: true, now: now, calendar: calendar)
 
         XCTAssertEqual(snapshot.sessionLimit?.used, 25.0)
         XCTAssertEqual(snapshot.sessionLimit?.limit, 100.0)
@@ -292,7 +316,7 @@ final class OpenRouterUsageTests: XCTestCase {
             _ = try await provider.fetchSnapshot(now: Date())
             XCTFail("Expected missing key to throw")
         } catch {
-            XCTAssertEqual(error.localizedDescription, "OpenRouter management key not configured")
+            XCTAssertEqual(error.localizedDescription, "OpenRouter API key not configured")
         }
     }
 }
