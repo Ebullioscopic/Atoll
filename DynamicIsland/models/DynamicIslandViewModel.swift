@@ -49,8 +49,35 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     @Published var isColorPickerPopoverActive: Bool = false
     @Published var isStatsPopoverActive: Bool = false
     @Published var isReminderPopoverActive: Bool = false
-    @Published var isMediaOutputPopoverActive: Bool = false
+    /// Whether any output picker popover is open.
+    ///
+    /// Four separate views can present one of these -- the media output and
+    /// AirPlay pickers, in both the standard and minimalistic players -- and they
+    /// all used to assign this directly. Whichever ran last won, so closing one
+    /// picker cleared the flag while another was still open and let the notch
+    /// auto-close underneath it. Presenters register instead, and the flag stays
+    /// true while any of them is still open.
+    @Published private(set) var isMediaOutputPopoverActive: Bool = false
+
+    private var activeMediaOutputPopovers: Set<UUID> = []
+
+    /// Registers or withdraws one presenter, identified by a token that is stable
+    /// for the lifetime of the view holding it.
+    func setMediaOutputPopoverActive(_ isActive: Bool, token: UUID) {
+        if isActive {
+            activeMediaOutputPopovers.insert(token)
+        } else {
+            activeMediaOutputPopovers.remove(token)
+        }
+
+        let isAnyActive = !activeMediaOutputPopovers.isEmpty
+        if isMediaOutputPopoverActive != isAnyActive {
+            isMediaOutputPopoverActive = isAnyActive
+        }
+    }
     @Published var isTimerPopoverActive: Bool = false
+    @Published var isPerAppVolumePopoverActive: Bool = false
+    @Published var isCaffeinatePopoverActive: Bool = false
     @Published var shouldRecheckHover: Bool = false
     @Published var isScrollGestureActive: Bool = false
     private var scrollGestureSuppressionTokens: Set<UUID> = []
@@ -219,6 +246,52 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             }
             .store(in: &cancellables)
 
+        // The tab decides the height, so the size has to be recomputed when the
+        // tab changes. Without this `notchSize` keeps whatever the previous tab
+        // resolved to, and the views that measure their content against it --
+        // NotchTimerView, the calendar -- lay out for the tab you left.
+        //
+        // Applied without animation and without touching the window, matching
+        // AppDelegate's tab-switch resize, which is immediate and already owns
+        // the window. Animating this while the window jumped left the two
+        // disagreeing for the length of the animation, and a pointer inside the
+        // notch but outside the shrunken content shape reads as a hover exit,
+        // which closes the notch.
+        //
+        // `@Published` fires on willSet, so `currentView` still holds the old
+        // value at emission time; `receive(on:)` hops a run loop tick so the
+        // new one is read.
+        // Same reasoning as the tab-switch sink below, including the lack of an
+        // animation: the mode changes the height, so notchSize has to follow it,
+        // and it has to land on the same frame the window does. Tweening this
+        // while the window moved separately left the container sized for one
+        // mode around content laid out for the other, and the old grid painted
+        // on over the new one. The window is left to AppDelegate's observer.
+        Defaults.publisher(.calendarViewMode, options: [])
+            .map { $0.newValue }
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                guard self.notchState == .open else { return }
+                let updatedTarget = self.calculateDynamicNotchSize()
+                guard self.notchSize != updatedTarget else { return }
+                self.notchSize = updatedTarget
+            }
+            .store(in: &cancellables)
+
+        coordinator.$currentView
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                guard self.notchState == .open else { return }
+                let updatedTarget = self.calculateDynamicNotchSize()
+                guard self.notchSize != updatedTarget else { return }
+                self.notchSize = updatedTarget
+            }
+            .store(in: &cancellables)
+
         coordinator.$notesLayoutState
             .removeDuplicates()
             .receive(on: RunLoop.main)
@@ -262,6 +335,40 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        Publishers.MergeMany(
+            Defaults.publisher(.enableLyrics, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.showCalendar, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.showStandardMediaControls, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.autoHideInactiveNotchMediaPlayer, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.showMirror, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.lyricsPanelWidth, options: []).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.lyricsPanelOffset, options: []).map { _ in () }.eraseToAnyPublisher(),
+            MusicManager.shared.$isPlaying.map { _ in () }.eraseToAnyPublisher(),
+            MusicManager.shared.$songTitle.map { _ in () }.eraseToAnyPublisher(),
+            MusicManager.shared.$artistName.map { _ in () }.eraseToAnyPublisher(),
+            WebcamManager.shared.$cameraAvailable.map { _ in () }.eraseToAnyPublisher()
+        )
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateSideLyricsNotchSizeIfNeeded()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func updateSideLyricsNotchSizeIfNeeded() {
+        guard notchState == .open, !Defaults[.enableMinimalisticUI] else { return }
+
+        let updatedTarget = calculateDynamicNotchSize()
+        guard notchSize != updatedTarget else { return }
+        withAnimation(.smooth) {
+            notchSize = updatedTarget
+        }
+        AppDelegate.shared?.ensureWindowSize(
+            addShadowPadding(to: updatedTarget, isMinimalistic: false),
+            animated: true,
+            force: false
+        )
     }
 
     private func handleMinimalisticTimerHeightChange() {
@@ -359,18 +466,18 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     
     private func calculateDynamicNotchSize() -> CGSize {
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: screen)) : openNotchSize
-        var adjustedSize = baseSize
 
-        if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
-            let preferred = coordinator.notesLayoutState.preferredHeight
-            adjustedSize.height = max(adjustedSize.height, preferred)
-            return adjustedSize
-        }
-
-        return statsAdjustedNotchSize(
-            from: adjustedSize,
-            isStatsTabActive: coordinator.currentView == .stats,
-            secondRowProgress: coordinator.statsSecondRowExpansion
+        // Always resolved as if open, because that is what every caller is
+        // asking for. `open()` calls this to find the size to expand *to*, and
+        // it runs before `notchState` flips -- reading the live state there
+        // answered for the closed notch and opened the calendar at the short
+        // height, leaving the month grid clipped until some later event
+        // recomputed it. Every other caller guards on `.open` already.
+        return notchTabContentSize(
+            from: baseSize,
+            view: coordinator.currentView,
+            isNotchOpen: true,
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion
         )
     }
 
@@ -437,9 +544,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 NSApp.activate(ignoringOtherApps: true)
 
                 let alert = NSAlert()
-                alert.messageText = "Camera Access Required"
-                alert.informativeText = "Please allow camera access in System Settings."
-                alert.addButton(withTitle: "OK")
+                alert.messageText = String(localized: "Camera Access Required")
+                alert.informativeText = String(localized: "Please allow camera access in System Settings.")
+                alert.addButton(withTitle: String(localized: "OK"))
                 alert.runModal()
 
                 NSApp.setActivationPolicy(.accessory)

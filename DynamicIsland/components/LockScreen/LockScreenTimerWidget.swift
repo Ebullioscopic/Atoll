@@ -35,6 +35,7 @@ struct LockScreenTimerWidget: View {
     @Default(.lockScreenTimerWidgetUsesBlur) private var timerGlassModeIsGlass
     @Default(.timerPresets) private var timerPresets
     @Default(.lockScreenTimerWidgetWidth) private var widgetWidth
+    @Default(.lockScreenWidgetAppearance) private var appearance
 
     @MainActor
     init(animator: LockScreenTimerWidgetAnimator? = nil) {
@@ -152,7 +153,7 @@ struct LockScreenTimerWidget: View {
 
     private var classicBackground: some View {
         RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-            .fill(Color.black.opacity(0.65))
+            .fill(appearance.usesLightGlyphs ? Color.black.opacity(0.65) : Color.white.opacity(0.7))
     }
 
     private var widgetSize: CGSize {
@@ -190,11 +191,14 @@ struct LockScreenTimerWidget: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
         .frame(width: widgetSize.width, height: widgetSize.height)
-        .background(widgetBackground)
+        .background {
+            widgetBackground
+                .environment(\.colorScheme, appearance.materialColorScheme)
+        }
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(appearance.primary(opacity: 0.08), lineWidth: 1)
         }
         .shadow(color: Color.black.opacity(0.25), radius: 18, x: 0, y: 16)
         .overlay(alignment: .topLeading) {
@@ -210,7 +214,7 @@ struct LockScreenTimerWidget: View {
             if !timerManager.isOvertime {
                 CircleButton(
                     icon: pauseIcon,
-                    foreground: Color.white.opacity(0.95),
+                    foreground: appearance.primary(opacity: 0.95),
                     background: accentColor.opacity(0.32),
                     action: togglePause,
                     isEnabled: timerManager.allowsManualInteraction,
@@ -220,8 +224,8 @@ struct LockScreenTimerWidget: View {
 
             CircleButton(
                 icon: secondaryIcon,
-                foreground: Color.white.opacity(0.95),
-                background: Color.black.opacity(0.35),
+                foreground: appearance.primary(opacity: 0.95),
+                background: appearance.usesLightGlyphs ? Color.black.opacity(0.35) : Color.black.opacity(0.12),
                 action: stopTimer,
                 isEnabled: timerManager.allowsManualInteraction,
                 helpText: secondaryLabel

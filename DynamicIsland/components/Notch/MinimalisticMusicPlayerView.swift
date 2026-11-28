@@ -141,7 +141,7 @@ struct MinimalisticMusicPlayerView: View {
                         .padding(.top, 4)
                 }
 
-                if enableLyrics {
+                if shouldReserveLyricsSpace {
                     lyricsView
                         .padding(.top, 10)
                 }
@@ -260,10 +260,17 @@ struct MinimalisticMusicPlayerView: View {
 
     private var dynamicHeightSignature: Int {
         var signature = reminderEntries.count * 10
-        if enableLyrics { signature += 1 }
+        if shouldReserveLyricsSpace { signature += 1 }
         if shouldShowTimerCountdown { signature += 100 }
         if showMinimalisticBatteryIndicator { signature += 1000 }
         return signature
+    }
+
+    /// Ads do not have lyrics. Reserving the normal lyrics row for them left a
+    /// large empty strip beneath the controls and made the Dynamic Island look
+    /// nearly square instead of keeping its regular compact proportions.
+    private var shouldReserveLyricsSpace: Bool {
+        enableLyrics && !musicManager.isAdvertisement
     }
 
     /// True when the battery indicator is hidden and we are in notch mode (not DI).
@@ -280,8 +287,8 @@ struct MinimalisticMusicPlayerView: View {
             height += 6 + 4          // progress bar top padding + bar
             height += 54 + 2         // controls + top padding
 
-            if enableLyrics {
-                height += 10 + 34 // lyrics padding + estimated height
+            if shouldReserveLyricsSpace {
+                height += 10 + 40 // lyrics padding + estimated height (increased for 2-line lyrics)
             }
             if shouldShowTimerCountdown {
                 height += minimalisticTimerCountdownBlockHeight
@@ -302,8 +309,8 @@ struct MinimalisticMusicPlayerView: View {
         height += 4 + 4          // progress bar top padding + bar
         height += 54 + 2         // controls + top padding
 
-        if enableLyrics {
-            height += 10 + 34
+        if shouldReserveLyricsSpace {
+            height += 10 + 40
         }
         if shouldShowTimerCountdown {
             height += minimalisticTimerCountdownBlockHeight
@@ -476,7 +483,7 @@ struct MinimalisticMusicPlayerView: View {
             }
         }
         .padding(.horizontal, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: 40, alignment: .topLeading)
         .animation(.smooth(duration: 0.32), value: line)
     }
     
@@ -771,11 +778,7 @@ private struct MinimalisticReminderDetailsView: View {
     }
 
     private var progressBar: some View {
-        TimelineView(
-            .animation(
-                paused: isProgressTimelinePaused
-            )
-        ) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: isProgressTimelinePaused)) { timeline in
             MusicSliderView(
                 sliderValue: $sliderValue,
                 duration: Binding(
@@ -986,13 +989,9 @@ private struct MinimalisticReminderDetailsView: View {
         )
     }
 
-    private var isAppleMusicActive: Bool {
-        musicManager.bundleIdentifier == "com.apple.Music"
-    }
-
     private var displayedSlots: [MusicControlButton] {
         if showCustomControls {
-            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: isAppleMusicActive)
+            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, canFavorite: musicManager.activeSourceCanEverFavorite)
             return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
         }
 
@@ -1068,6 +1067,17 @@ private struct MinimalisticReminderDetailsView: View {
             ) {
                 enableLyrics.toggle()
             }
+        case .likeTrack:
+            LikeTrackControl { presentation, toggle in
+                controlButton(
+                    icon: presentation.iconName,
+                    isActive: presentation.isActive,
+                    activeColor: brandAccentColor,
+                    symbolEffect: .replace
+                ) {
+                    toggle()
+                }
+            }
         }
     }
 
@@ -1092,7 +1102,7 @@ private struct MinimalisticReminderDetailsView: View {
         @StateObject private var volumeModel = MediaOutputVolumeViewModel()
         @EnvironmentObject private var vm: DynamicIslandViewModel
         @State private var isPopoverPresented = false
-        @State private var isHoveringPopover = false
+        @State private var popoverToken = UUID()
 
         var body: some View {
             MinimalisticSquircircleButton(
@@ -1114,32 +1124,31 @@ private struct MinimalisticReminderDetailsView: View {
                 MediaOutputSelectorPopover(
                     routeManager: routeManager,
                     volumeModel: volumeModel,
-                    onHoverChanged: { hovering in
-                        isHoveringPopover = hovering
-                        updateActivity()
-                    }
+                    onHoverChanged: { _ in }
                 ) {
                     isPopoverPresented = false
-                    isHoveringPopover = false
                     updateActivity()
                 }
             }
-            .onChange(of: isPopoverPresented) { _, presented in
-                if !presented {
-                    isHoveringPopover = false
-                }
+            .onChange(of: isPopoverPresented) { _, _ in
                 updateActivity()
             }
             .onAppear {
                 routeManager.refreshDevices()
             }
             .onDisappear {
-                vm.isMediaOutputPopoverActive = false
+                vm.setMediaOutputPopoverActive(false, token: popoverToken)
             }
         }
 
+        /// Reports whether this picker's popover is open, so the notch knows not
+        /// to auto-close while it is. Keyed by a token unique to this presenter,
+        /// so one picker closing does not clear the flag for another still open.
         private func updateActivity() {
-            vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+            // Presentation alone -- see MediaOutputPickerButton: also requiring
+            // hover let the notch auto-close while the pointer was over the
+            // popover, which is a separate window.
+            vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
         }
     }
 
@@ -1148,7 +1157,7 @@ private struct MinimalisticReminderDetailsView: View {
         @ObservedObject private var airPlayManager = AppleMusicAirPlayManager.shared
         @EnvironmentObject private var vm: DynamicIslandViewModel
         @State private var isPopoverPresented = false
-        @State private var isHoveringPopover = false
+        @State private var popoverToken = UUID()
 
         private var isAppleMusicActive: Bool {
             musicManager.bundleIdentifier == "com.apple.Music"
@@ -1173,18 +1182,13 @@ private struct MinimalisticReminderDetailsView: View {
             .popover(isPresented: $isPopoverPresented, arrowEdge: .bottom) {
                 AirPlaySelectorPopover(
                     airPlayManager: airPlayManager,
-                    onHoverChanged: { hovering in
-                        isHoveringPopover = hovering
-                        updateActivity()
-                    }
+                    onHoverChanged: { _ in }
                 ) {
                     isPopoverPresented = false
-                    isHoveringPopover = false
                     updateActivity()
                 }
             }
-            .onChange(of: isPopoverPresented) { _, presented in
-                if !presented { isHoveringPopover = false }
+            .onChange(of: isPopoverPresented) { _, _ in
                 updateActivity()
             }
             .onAppear {
@@ -1198,12 +1202,18 @@ private struct MinimalisticReminderDetailsView: View {
                 }
             }
             .onDisappear {
-                vm.isMediaOutputPopoverActive = false
+                vm.setMediaOutputPopoverActive(false, token: popoverToken)
             }
         }
 
+        /// Reports whether this picker's popover is open, so the notch knows not
+        /// to auto-close while it is. Keyed by a token unique to this presenter,
+        /// so one picker closing does not clear the flag for another still open.
         private func updateActivity() {
-            vm.isMediaOutputPopoverActive = isPopoverPresented && isHoveringPopover
+            // Presentation alone -- see MediaOutputPickerButton: also requiring
+            // hover let the notch auto-close while the pointer was over the
+            // popover, which is a separate window.
+            vm.setMediaOutputPopoverActive(isPopoverPresented, token: popoverToken)
         }
     }
 
@@ -1247,7 +1257,8 @@ struct MinimalisticAlbumArtView: View {
             .background(
                 DynamicIslandArtworkSourceView(
                     cornerRadius: albumArtCornerRadius,
-                    contentMode: .fill
+                    contentMode: .fill,
+                    prefersVideo: false
                 )
             )
             .clipped()
