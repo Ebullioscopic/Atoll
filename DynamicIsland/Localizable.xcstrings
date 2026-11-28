@@ -94541,7 +94541,9 @@
           }
         }
       }
-    }
+    },
+    "Mirroring Clock timers reads the system log, so macOS may ask for Developer Tools access." : {},
+    "Reads the system log while AirPods are connected, so macOS may ask for Developer Tools access." : {}
   },
   "version" : "1.2"
 }

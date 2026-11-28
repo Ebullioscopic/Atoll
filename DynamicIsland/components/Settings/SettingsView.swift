@@ -2902,6 +2902,7 @@ private struct DevicesSettingsView: View {
                 Defaults.Toggle(key: .showAirPodsListeningModeChanges) {
                     Text("Show AirPods listening mode changes")
                 }
+                .help("Reads the system log while AirPods are connected, so macOS may ask for Developer Tools access.")
                 .settingsHighlight(id: highlightID("Show AirPods listening mode changes"))
                 VStack(alignment: .leading, spacing: 12) {
                     Text("HUD icon style")
@@ -7633,7 +7634,10 @@ struct TimerSettings: View {
         } header: {
             Text("Timer Feature")
         } footer: {
-            Text("Control timer availability, live activity behaviour, and whether the app mirrors timers started from the macOS Clock app.")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Control timer availability, live activity behaviour, and whether the app mirrors timers started from the macOS Clock app.")
+                Text("Mirroring Clock timers reads the system log, so macOS may ask for Developer Tools access.")
+            }
         }
     }
 

@@ -48,6 +48,7 @@
 		A4B5C6D7E8F90123456789AB /* AppleMusicControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */; };
 		A70F1A012F90000100F1A001 /* FingerprintScan.json in Resources */ = {isa = PBXBuildFile; fileRef = A70F1A022F90000100F1A001 /* FingerprintScan.json */; };
 		B1C2D3E4F5061728394A5B6C /* PartialDownloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5061728394A5B6D /* PartialDownloadTests.swift */; };
+		4909696FEECB4DB67344A0A8 /* LogStreamRestartPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECB4DB67344A0A850F9263E /* LogStreamRestartPolicyTests.swift */; };
 		B1C2D3E4F5A60718293A4B01 /* MediaKeyTapRetryPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5A60718293A4B02 /* MediaKeyTapRetryPolicyTests.swift */; };
 		E5F3A4B627C8D9E0F1122334 /* ShelfConversionMatrixTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A4B5C738D9E0F112233445 /* ShelfConversionMatrixTests.swift */; };
 		B4777BB9FE29243B253B8306 /* SpotifyLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA269966BB987D4A1B411A2 /* SpotifyLibraryTests.swift */; };
@@ -122,6 +123,7 @@
 		A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleMusicControllerTests.swift; sourceTree = "<group>"; };
 		A70F1A022F90000100F1A001 /* FingerprintScan.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = FingerprintScan.json; sourceTree = "<group>"; };
 		B1C2D3E4F5061728394A5B6D /* PartialDownloadTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PartialDownloadTests.swift; sourceTree = "<group>"; };
+		EECB4DB67344A0A850F9263E /* LogStreamRestartPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogStreamRestartPolicyTests.swift; sourceTree = "<group>"; };
 		B1C2D3E4F5A60718293A4B02 /* MediaKeyTapRetryPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MediaKeyTapRetryPolicyTests.swift; sourceTree = "<group>"; };
 		C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlyoutFrameCalculatorTests.swift; sourceTree = "<group>"; };
 		C1A2B3C4D5E6F70819AB2C3E /* ClipboardHistoryPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryPersistenceTests.swift; sourceTree = "<group>"; };
@@ -233,6 +235,7 @@
 				9A7D1A022F90000200A71002 /* AudioTapTests.swift */,
 				A4B5C6D7E8F90123456789AC /* AppleMusicControllerTests.swift */,
 				C0DEFACE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift */,
+				EECB4DB67344A0A850F9263E /* LogStreamRestartPolicyTests.swift */,
 				B1C2D3E4F5A60718293A4B02 /* MediaKeyTapRetryPolicyTests.swift */,
 				D82568218362418EA59B2CDC /* LRCParserTests.swift */,
 				2137D0F9431A495AA62ACE96 /* NowPlayingPayloadTests.swift */,
@@ -548,6 +551,7 @@
 				D1A2B3C4D5E6F70819AB2C4D /* SystemHUDPlacementTests.swift in Sources */,
 				F1E2D3C4B5A6E7F8A9B0C1D2 /* JSONLUsageParserTests.swift in Sources */,
 				C0DECAFE1234567890ABCDEF /* FlyoutFrameCalculatorTests.swift in Sources */,
+				4909696FEECB4DB67344A0A8 /* LogStreamRestartPolicyTests.swift in Sources */,
 				B1C2D3E4F5A60718293A4B01 /* MediaKeyTapRetryPolicyTests.swift in Sources */,
 				F5A6B7C8D9E0F1A2B3C4D5E6 /* NewAPIUsageTests.swift in Sources */,
 				9D7BDCD5A9320BB9465DA24E /* LLMUsageManagerTests.swift in Sources */,
