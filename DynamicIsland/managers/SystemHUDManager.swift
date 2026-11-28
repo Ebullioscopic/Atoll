@@ -19,6 +19,7 @@
 import Foundation
 import Defaults
 import Combine
+import CoreAudio
 
 class SystemHUDManager {
     static let shared = SystemHUDManager()
@@ -210,6 +211,25 @@ class SystemHUDManager {
         volume || brightness || backlight || thirdPartyDDCActive
     }
 
+    /// Whether a DDC app can be handling the volume keys for this output.
+    ///
+    /// Lunar and BetterDisplay set the volume of displays. Built-in speakers
+    /// and Bluetooth headphones are never theirs: the keys fall through to
+    /// macOS, which draws its own HUD and sends the app no volume event, so
+    /// handing volume to the provider there left no HUD in Atoll at all --
+    /// after unplugging from a monitor hub, say (#465). Unknown transports
+    /// keep the provider in charge, as before.
+    static func externalProviderControlsVolume(outputTransport: UInt32) -> Bool {
+        switch outputTransport {
+        case kAudioDeviceTransportTypeBuiltIn,
+             kAudioDeviceTransportTypeBluetooth,
+             kAudioDeviceTransportTypeBluetoothLE:
+            return false
+        default:
+            return true
+        }
+    }
+
     @MainActor
     private func applyNativeHUDSuppression(
         for flags: (volume: Bool, brightness: Bool, backlight: Bool, thirdPartyDDC: Bool)
@@ -268,6 +288,17 @@ class SystemHUDManager {
             .store(in: &self.cancellables)
         }
         
+        // With the external volume listener on, whether the provider or this
+        // app owns the volume keys depends on where the sound is going.
+        NotificationCenter.default.publisher(for: .systemAudioRouteDidChange)
+            .sink { [weak self] _ in
+                guard let self, self.isSetupComplete,
+                      Defaults[.enableThirdPartyDDCIntegration],
+                      Defaults[.enableExternalVolumeControlListener] else { return }
+                self.applyResolvedFlags()
+            }
+            .store(in: &cancellables)
+
         // Start observer if any HUD/OSD is enabled
         if Defaults[.enableSystemHUD] || Defaults[.enableCustomOSD] || Defaults[.enableVerticalHUD] || Defaults[.enableCircularHUD] {
             Task { @MainActor in
@@ -314,8 +345,12 @@ class SystemHUDManager {
             brightnessEnabled = false
             keyboardBacklightEnabled = false
 
-            // Optional: route volume exclusively from the selected external provider.
-            if Defaults[.enableExternalVolumeControlListener] {
+            // Optional: route volume exclusively from the selected external
+            // provider -- but only for outputs it can control.
+            if Defaults[.enableExternalVolumeControlListener],
+               Self.externalProviderControlsVolume(
+                   outputTransport: SystemVolumeController.shared.defaultOutputTransportType
+               ) {
                 volumeEnabled = false
             }
         }

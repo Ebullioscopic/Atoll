@@ -90451,6 +90451,9 @@
         }
       }
     },
+    "While sound plays through a display, the volume keys are left to %@ and Atoll shows its volume events. With built-in speakers or Bluetooth audio, Atoll handles the volume keys itself." : {
+      "comment" : "A description below the toggle that explains the effect of enabling the external volume control listener. %@ is the name of the display app (Lunar or BetterDisplay)."
+    },
     "White" : {
       "localizations" : {
         "fr" : {

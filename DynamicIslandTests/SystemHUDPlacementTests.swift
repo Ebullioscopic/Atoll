@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import CoreAudio
 import XCTest
 
 @testable import Atoll
@@ -117,5 +118,21 @@ final class NativeHUDSuppressionTests: XCTestCase {
         XCTAssertTrue(SystemHUDManager.shouldSuppressNativeHUD(
             volume: false, brightness: false, backlight: false, thirdPartyDDCActive: true
         ))
+    }
+}
+
+/// With the external volume listener on, a DDC app only owns the volume keys
+/// for outputs it can control (#465).
+final class ExternalVolumeOwnershipTests: XCTestCase {
+    func testBuiltInAndBluetoothOutputsStayWithAtoll() {
+        XCTAssertFalse(SystemHUDManager.externalProviderControlsVolume(outputTransport: kAudioDeviceTransportTypeBuiltIn))
+        XCTAssertFalse(SystemHUDManager.externalProviderControlsVolume(outputTransport: kAudioDeviceTransportTypeBluetooth))
+        XCTAssertFalse(SystemHUDManager.externalProviderControlsVolume(outputTransport: kAudioDeviceTransportTypeBluetoothLE))
+    }
+
+    func testDisplayAndUnknownOutputsGoToTheProvider() {
+        XCTAssertTrue(SystemHUDManager.externalProviderControlsVolume(outputTransport: kAudioDeviceTransportTypeDisplayPort))
+        XCTAssertTrue(SystemHUDManager.externalProviderControlsVolume(outputTransport: kAudioDeviceTransportTypeHDMI))
+        XCTAssertTrue(SystemHUDManager.externalProviderControlsVolume(outputTransport: 0))
     }
 }

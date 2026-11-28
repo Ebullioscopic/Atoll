@@ -241,6 +241,11 @@ final class SystemVolumeController {
         getMuteState()
     }
 
+    /// CoreAudio transport type of the default output, or 0 if unknown.
+    var defaultOutputTransportType: UInt32 {
+        transportTypeStorage.withLock { $0 }
+    }
+
     /// True when sound is actually going to a Bluetooth device. A paired pair
     /// of AirPods being connected says nothing about where audio is routed.
     var isDefaultOutputBluetooth: Bool {

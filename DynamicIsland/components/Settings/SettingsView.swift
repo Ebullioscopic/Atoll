@@ -2750,7 +2750,7 @@ private struct ExternalDisplayIntegrationsSection: View {
 
                     Text(
                         enableExternalVolumeControlListener
-                        ? "Atoll's built-in volume key interception is disabled while external volume listening is on. Volume HUD/OSD will follow \(thirdPartyDDCProvider.displayName) payloads."
+                        ? "While sound plays through a display, the volume keys are left to \(thirdPartyDDCProvider.displayName) and Atoll shows its volume events. With built-in speakers or Bluetooth audio, Atoll handles the volume keys itself."
                         : "Atoll keeps native volume key interception. External provider volume payloads are ignored while this is off."
                     )
                     .font(.caption)
