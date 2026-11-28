@@ -56,43 +56,63 @@ struct TabSelectionView: View {
     @Default(.enableThirdPartyExtensions) private var enableThirdPartyExtensions
     @Default(.enableExtensionNotchExperiences) private var enableExtensionNotchExperiences
     @Default(.enableExtensionNotchTabs) private var enableExtensionNotchTabs
+    // Observed so the tab list refreshes when the Home tab's content toggles change.
     @Default(.showCalendar) private var showCalendar
     @Default(.showMirror) private var showMirror
     @Default(.showStandardMediaControls) private var showStandardMediaControls
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
+    @Default(.tabBarPosition) private var tabBarPosition
+    @Default(.tabSwitchOnHover) private var tabSwitchOnHover
     @Namespace var animation
+
+    /// Which tab the pointer is currently resting on, when hover switching is on.
+    @State private var hoveredTabID: String?
+
+    /// Whether hover switching may act yet. The tab bar is built when the notch
+    /// opens, and the notch opens under a pointer that is already sitting there,
+    /// so the first hover it reports belongs to the pointer that opened the notch
+    /// rather than to a choice. Acting on that switches tabs on its own.
+    @State private var hoverArmed = false
+
+    /// Long enough that a pointer crossing the rail on its way elsewhere does not
+    /// drag the selection with it, short enough that a deliberate hover still
+    /// feels immediate.
+    private let hoverDwell = Duration.milliseconds(150)
+
+    /// Time the notch is given to finish opening before a hover counts as intent.
+    private let hoverArmingDelay = Duration.milliseconds(500)
     
     private var tabs: [TabModel] {
         var tabsArray: [TabModel] = []
 
-        if homeTabVisible {
+        if coordinator.availableStandardTabs.contains(.home) {
             tabsArray.append(TabModel(label: "Home", icon: "house.fill", view: .home))
         }
 
-        if Defaults[.dynamicShelf] {
+        if coordinator.availableStandardTabs.contains(.shelf) {
             tabsArray.append(TabModel(label: "Shelf", icon: "tray.fill", view: .shelf))
         }
         
-        if enableTimerFeature && timerDisplayMode == .tab {
+        if coordinator.availableStandardTabs.contains(.timer) {
             tabsArray.append(TabModel(label: "Timer", icon: "timer", view: .timer))
         }
 
         // Stats tab only shown when stats feature is enabled
-        if Defaults[.enableStatsFeature] {
+        if coordinator.availableStandardTabs.contains(.stats) {
             tabsArray.append(TabModel(label: "Stats", icon: "chart.xyaxis.line", view: .stats))
         }
 
         // Usage tab only shown when LLM usage feature is enabled
-        if Defaults[.enableLLMUsageFeature] {
+        if coordinator.availableStandardTabs.contains(.llmUsage) {
             tabsArray.append(TabModel(label: "Usage", icon: "chart.bar.doc.horizontal", view: .llmUsage))
         }
 
-        if Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab) {
+        if coordinator.availableStandardTabs.contains(.notes) {
             let label = Defaults[.enableNotes] ? "Notes" : "Clipboard"
             let icon = Defaults[.enableNotes] ? "note.text" : "doc.on.clipboard"
             tabsArray.append(TabModel(label: label, icon: icon, view: .notes))
         }
-        if Defaults[.enableTerminalFeature] {
+        if coordinator.availableStandardTabs.contains(.terminal) {
             tabsArray.append(TabModel(label: "Terminal", icon: "apple.terminal", view: .terminal))
         }
         if extensionTabsEnabled {
@@ -113,20 +133,35 @@ struct TabSelectionView: View {
         }
         return tabsArray
     }
+    @ViewBuilder
     var body: some View {
-        HStack(spacing: 24) {
+        if tabBarPosition == .left {
+            tabStack(vertical: true)
+        } else {
+            // Clipping a column to a capsule would cut the first and last icon,
+            // so the shape stays with the row it was drawn for.
+            tabStack(vertical: false)
+                .clipShape(Capsule())
+        }
+    }
+
+    private func tabStack(vertical: Bool) -> some View {
+        // A layout rather than two stacks, so switching position moves the
+        // icons instead of tearing the view down and building it again.
+        let layout = vertical
+            ? AnyLayout(VStackLayout(spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 24))
+
+        let stack = layout {
             ForEach(Array(tabs.enumerated()), id: \.element.id) { idx, tab in
                 let isSelected = isSelected(tab)
                 let activeAccent = tab.accentColor ?? .white
 
                 // Render the tab button
                 TabButton(label: tab.label, icon: tab.icon, selected: isSelected) {
-                    if tab.view == .extensionExperience {
-                        coordinator.selectedExtensionExperienceID = tab.experienceID
-                    }
-                    coordinator.currentView = tab.view
+                    select(tab)
                 }
-                .frame(height: 26)
+                .frame(width: vertical ? 30 : nil, height: 26)
                 .foregroundStyle(isSelected ? activeAccent : .gray)
                 .background {
                     if isSelected {
@@ -141,14 +176,60 @@ struct TabSelectionView: View {
                             .hidden()
                     }
                 }
-
-                
+                .onHover { inside in
+                    guard tabSwitchOnHover else { return }
+                    if inside {
+                        hoveredTabID = tab.id
+                    } else if hoveredTabID == tab.id {
+                        hoveredTabID = nil
+                    }
+                }
             }
         }
-        .clipShape(Capsule())
+
+        return Group {
+            if vertical {
+                // Enough tabs to outrun the open notch's height would otherwise
+                // be clipped; scrolling keeps the last of them reachable, and
+                // stays inert while they all fit.
+                ScrollView(.vertical, showsIndicators: false) { stack }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .frame(width: 30)
+            } else {
+                stack
+            }
+        }
         .onAppear {
             ensureValidSelection(with: tabs)
         }
+        // Arms hover switching once, a beat after the bar appears.
+        .task {
+            hoverArmed = false
+            try? await Task.sleep(for: hoverArmingDelay)
+            guard !Task.isCancelled else { return }
+            hoverArmed = true
+        }
+        // Moving on to another icon cancels the pending switch along with the
+        // task, so only the icon actually rested on ever wins.
+        .task(id: hoveredTabID) {
+            guard tabSwitchOnHover,
+                  hoverArmed,
+                  let hoveredTabID,
+                  let tab = tabs.first(where: { $0.id == hoveredTabID }),
+                  !isSelected(tab)
+            else { return }
+
+            try? await Task.sleep(for: hoverDwell)
+            guard !Task.isCancelled else { return }
+            select(tab)
+        }
+    }
+
+    private func select(_ tab: TabModel) {
+        if tab.view == .extensionExperience {
+            coordinator.selectedExtensionExperienceID = tab.experienceID
+        }
+        coordinator.currentView = tab.view
     }
 
     private var extensionTabsEnabled: Bool {
@@ -157,13 +238,6 @@ struct TabSelectionView: View {
 
     private var extensionTabPayloads: [ExtensionNotchExperiencePayload] {
         extensionNotchExperienceManager.activeExperiences.filter { $0.descriptor.tab != nil }
-    }
-
-    private var homeTabVisible: Bool {
-        if enableMinimalisticUI {
-            return true
-        }
-        return showStandardMediaControls || showCalendar || showMirror
     }
 
     private func isSelected(_ tab: TabModel) -> Bool {

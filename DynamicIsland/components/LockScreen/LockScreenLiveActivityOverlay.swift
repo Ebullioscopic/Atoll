@@ -66,7 +66,7 @@ struct LockScreenLiveActivityOverlay: View {
 
 			Color.clear
 				.overlay(alignment: .trailing) {
-					LockScreenFingerprintProgressView(progress: animator.progress)
+					LockScreenFingerprintProgressView()
 						.frame(width: indicatorSize, height: indicatorSize)
 				}
 				.frame(width: indicatorSize, height: notchSize.height)

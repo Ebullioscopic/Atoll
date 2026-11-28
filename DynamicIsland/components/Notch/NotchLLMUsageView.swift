@@ -27,6 +27,7 @@ enum AntigravityPool: String, CaseIterable {
 struct NotchLLMUsageView: View {
     @ObservedObject private var manager = LLMUsageManager.shared
     @State private var antigravityPool: AntigravityPool = .gemini
+    @Default(.enableUsageRemainingDisplay) private var enableUsageRemainingDisplay
 
     private func isEnabled(_ provider: ProviderID) -> Bool { Defaults[provider.enabledKey] }
 
@@ -50,7 +51,11 @@ struct NotchLLMUsageView: View {
     private func card(for provider: ProviderID) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text(provider.displayName).font(.headline)
+                Text(provider.displayName)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
                 // Subscription plan badge (e.g. "Max 5x"). Only set for Claude; nil elsewhere.
                 if case .success(let snap) = manager.results[provider] ?? .loading, let plan = snap.plan {
                     Text(plan)
@@ -77,13 +82,44 @@ struct NotchLLMUsageView: View {
             case .failure(let reason):
                 Text(reason).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             case .success(let snap):
-                success(snap, provider: provider)
+                if provider == .copilot {
+                    copilotSuccess(snap)
+                } else if provider == .newAPI {
+                    newAPISuccess(snap)
+                } else if provider == .openrouter {
+                    openRouterSuccess(snap)
+                } else {
+                    success(snap, provider: provider)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .frame(height: llmUsageProviderCardHeight, alignment: .topLeading)
+        // Stretch every card to the height the panel offers so the row stays uniform
+        // (the intent behind the former fixed card height) without a hard-coded size
+        // that either clips content or leaves blank space.
+        .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func copilotSuccess(_ snap: UsageSnapshot) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(snap.copilotQuotas) { quota in
+                    if quota.unlimited {
+                        Text("\(quota.title): Unlimited").font(.caption)
+                    } else if let percent = quota.usedPercent {
+                        quotaGauge(quota.title, UsageLimit(used: percent, limit: 100, resetsAt: quota.resetsAt))
+                        if let remaining = quota.remaining, let entitlement = quota.entitlement {
+                            Text("\(remaining.formatted()) / \(entitlement.formatted()) remaining")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Text("\(quota.title): quota unavailable").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -127,7 +163,7 @@ struct NotchLLMUsageView: View {
             guard let model = model else { return nil }
             let fraction = model.totals.costUSD
             let usedPct = (1 - max(0, min(1, fraction))) * 100
-            return UsageLimit(used: usedPct, limit: 100, resetsAt: nil)
+            return UsageLimit(used: usedPct, limit: 100, resetsAt: model.resetsAt)
         }
         
         return VStack(alignment: .leading, spacing: 6) {
@@ -138,15 +174,139 @@ struct NotchLLMUsageView: View {
                 quotaGauge("Weekly", limit)
             }
             
-            // Show model breakdown for the selected pool
-            let poolModels = snap.models.filter { $0.pool == targetPool }
-            if !poolModels.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(poolModels) { model in
-                        window(model.model, model.totals, compact: true)
+            // Token counts and estimated cost read from the language server's
+            // conversation history (all pools; Antigravity does not split them).
+            VStack(alignment: .leading, spacing: 4) {
+                window("Today", snap.today, compact: true)
+                window("Week", snap.week, compact: true)
+            }
+        }
+    }
+
+    private func openRouterSuccess(_ snap: UsageSnapshot) -> some View {
+        // Token and request counts only come from the opt-in management-key analytics;
+        // a regular API key reports spend and the key's own credit limit.
+        let hasAnalytics = !snap.models.isEmpty || snap.week.requestCount > 0 || snap.week.totalTokens > 0
+        return VStack(alignment: .leading, spacing: 6) {
+            if let limit = snap.sessionLimit {
+                quotaGauge(hasAnalytics ? String(localized: "Credits") : String(localized: "Key limit"), limit)
+            }
+            openRouterWindow(Text("Today"), snap.today, showsAnalytics: hasAnalytics)
+            openRouterWindow(Text("Week"), snap.week, showsAnalytics: hasAnalytics)
+            let models = Array(snap.models.prefix(3))
+            if !models.isEmpty {
+                Divider().opacity(0.25)
+                ForEach(models) { model in
+                    openRouterWindow(Text(verbatim: model.model), model.totals, showsAnalytics: true)
+                }
+            }
+        }
+    }
+
+    private func openRouterWindow(_ label: Text, _ totals: UsageTotals, showsAnalytics: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            label
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .leading)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if showsAnalytics {
+                Text(tokens(totals.totalTokens))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+            }
+            Spacer(minLength: 4)
+            if showsAnalytics {
+                Text("\(quota(totals.requestCount)) req")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Text(money(totals.costUSD))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+    }
+
+    private func newAPISuccess(_ snap: UsageSnapshot) -> some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(snap.newAPIAccounts) { account in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text(account.name)
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                            Spacer()
+                            if account.errorMessage != nil {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                                    .help(account.errorMessage ?? "New API account has an error")
+                            }
+                        }
+
+                        if let errorMessage = account.errorMessage,
+                           account.balanceQuota == nil {
+                            Text(errorMessage)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        } else {
+                            quotaRow("Balance", account.balanceQuota, prominent: true)
+                            quotaRow("Used", account.usedQuota)
+                            quotaRow("Today", account.todayQuota)
+                            quotaRow("Week", account.weekQuota)
+                            HStack(spacing: 12) {
+                                metric("RPM", account.currentRPM)
+                                metric("TPM", account.currentTPM)
+                                metric("Requests", account.requestCount)
+                            }
+                            if let errorMessage = account.errorMessage {
+                                Text(errorMessage)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 2)
+                    .overlay(alignment: .bottom) {
+                        if account.id != snap.newAPIAccounts.last?.id {
+                            Rectangle()
+                                .fill(.white.opacity(0.1))
+                                .frame(height: 1)
+                        }
                     }
                 }
             }
+        }
+        .frame(height: 135)
+    }
+
+    private func quotaRow(_ label: String, _ value: Int?, prominent: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 44, alignment: .leading)
+            Text(value.map(quota) ?? "-")
+                .font(.system(size: prominent ? 15 : 11, weight: prominent ? .bold : .semibold, design: .rounded))
+                .monospacedDigit()
+            Spacer()
+        }
+    }
+
+    private func metric(_ label: String, _ value: Int?) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value.map(quota) ?? "-")
+                .font(.caption2.weight(.semibold))
+                .monospacedDigit()
         }
     }
 
@@ -165,16 +325,26 @@ struct NotchLLMUsageView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(.white.opacity(0.15))
-                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: max(4, geo.size.width * limit.fraction))
+                    Capsule().fill(gaugeTint(limit.fraction)).frame(width: fillWidth(fillFraction(limit), in: geo.size.width))
                 }
             }
             .frame(height: 6)
             HStack {
-                Text("\(usedPct)% used").font(.caption2).monospacedDigit()
+                Text(enableUsageRemainingDisplay ? "\(leftPct)% left" : "\(usedPct)% used").font(.caption2).monospacedDigit()
                 Spacer()
-                Text("\(leftPct)% left").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                Text(enableUsageRemainingDisplay ? "\(usedPct)% used" : "\(leftPct)% left").font(.caption2).foregroundStyle(.secondary).monospacedDigit()
             }
         }
+    }
+
+    /// Share of the gauge to fill: used quota, or remaining quota when that display is on.
+    private func fillFraction(_ limit: UsageLimit) -> Double {
+        enableUsageRemainingDisplay ? 1 - limit.fraction : limit.fraction
+    }
+
+    /// An empty gauge stays empty; any other value gets a visible minimum width.
+    private func fillWidth(_ fraction: Double, in width: CGFloat) -> CGFloat {
+        fraction <= 0 ? 0 : max(4, width * fraction)
     }
 
     private func gaugeTint(_ fraction: Double) -> Color {
@@ -215,9 +385,16 @@ struct NotchLLMUsageView: View {
                 .font(.system(size: compact ? 11 : (prominent ? 17 : 13), weight: prominent ? .bold : .semibold, design: .rounded))
                 .monospacedDigit()
             Spacer(minLength: 4)
-            Text(costLabel(totals))
-                .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
-                .help(costHelp(totals))
+            if totals.isPercentage {
+                // Quota providers store the remaining fraction in costUSD; it is not money.
+                let leftPct = Int((max(0, min(1, totals.costUSD)) * 100).rounded())
+                Text("\(leftPct)% left")
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+            } else {
+                Text(costLabel(totals))
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                    .help(costHelp(totals))
+            }
         }
     }
 
@@ -234,10 +411,18 @@ struct NotchLLMUsageView: View {
         if totals.hasUnpricedModel {
             return "Estimated API-equivalent cost from local token counts (not your subscription bill). Some models used do not have usable pricing, so this is partial or unavailable."
         }
-        return "Estimated API-equivalent cost from local token counts, not your subscription bill."
+        return "Estimated API-equivalent cost from local token counts (cache reads and writes priced at the provider's cache rates), not your subscription bill."
     }
 
     private func tokens(_ n: Int) -> String {
+        switch n {
+        case 1_000_000...: return String(format: "%.1fM", Double(n) / 1_000_000)
+        case 1_000...: return String(format: "%.1fk", Double(n) / 1_000)
+        default: return "\(n)"
+        }
+    }
+
+    private func quota(_ n: Int) -> String {
         switch n {
         case 1_000_000...: return String(format: "%.1fM", Double(n) / 1_000_000)
         case 1_000...: return String(format: "%.1fk", Double(n) / 1_000)

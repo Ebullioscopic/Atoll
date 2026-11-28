@@ -27,6 +27,7 @@ struct NotchNotesView: View {
     @Default(.savedNotes) var savedNotes
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
     @Default(.enableClipboardManager) var enableClipboardManager
+    @Default(.clipboardProvider) var clipboardProvider
     @Default(.enableAppleNotesSync) var enableAppleNotesSync
     
     @State private var selectedNoteId: UUID?
@@ -43,7 +44,7 @@ struct NotchNotesView: View {
     @Default(.enableNotes) var enableNotes
     
     var showSplitView: Bool {
-        return enableClipboardManager && clipboardDisplayMode == .separateTab
+        return ClipboardProviderManager.usesBuiltInClipboard && clipboardDisplayMode == .separateTab
     }
 
     var body: some View {
@@ -127,6 +128,9 @@ struct NotchNotesView: View {
             updateLayoutState()
         }
         .onChange(of: clipboardDisplayMode) { _, _ in
+            updateLayoutState()
+        }
+        .onChange(of: clipboardProvider) { _, _ in
             updateLayoutState()
         }
         .onChange(of: enableNotes) { _, _ in
@@ -595,6 +599,7 @@ struct NoteListView: View {
                                 .textFieldStyle(.plain)
                                 .font(.system(size: 12))
                                 .foregroundStyle(.white)
+                                .environment(\.colorScheme, .dark)
                             if !searchText.isEmpty {
                                 Button(action: { searchText = "" }) {
                                     Image(systemName: "xmark.circle.fill")
@@ -756,7 +761,7 @@ struct NoteRow: View {
                             .lineLimit(1)
                     }
                     
-                    Text(note.content.isEmpty ? "No content" : note.content)
+                    Text(note.content.isEmpty ? String(localized: "No content") : note.content)
                         .font(.system(size: isCompact ? 10 : 12))
                         .foregroundStyle(.white.opacity(0.7))
                         .lineLimit(isCompact ? 1 : 2)
@@ -935,10 +940,14 @@ struct NoteEditorView: View {
             
             // Title & Color Picker Row
             HStack(alignment: .center, spacing: 12) {
+                // The field editor used while typing ignores `.foregroundStyle`
+                // and resolves the label color from its appearance, which is
+                // black in light mode. The notch is always dark, so say so.
                 TextField("Title", text: $title)
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .textFieldStyle(.plain)
                     .foregroundStyle(.white)
+                    .environment(\.colorScheme, .dark)
                 
                 Spacer()
                 

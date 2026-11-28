@@ -112,8 +112,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let webcamManager = WebcamManager.shared
     let dndManager = DoNotDisturbManager.shared  // NEW: DND detection
     let bluetoothAudioManager = BluetoothAudioManager.shared  // NEW: Bluetooth audio detection
+    let networkConnectivityManager = NetworkConnectivityManager.shared
     let idleAnimationManager = IdleAnimationManager.shared  // NEW: Custom idle animations
-    let downloadManager = DownloadManager.shared  // NEW: Chromium downloads detection
+    let downloadManager = DownloadManager.shared  // NEW: browser downloads detection
     let lockScreenPanelManager = LockScreenPanelManager.shared  // NEW: Lock screen music panel
     let mediaControlsStateCoordinator = MediaControlsStateCoordinator.shared
     let systemTimerBridge = SystemTimerBridge.shared
@@ -201,6 +202,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "com.apple.Music",
             "com.spotify.client",
             "com.amazon.music",
+            "com.netease.163music",
+            "com.tencent.QQMusicMac",
             "sh.cider.genten.mac",
             "com.apple.Safari",
             "com.tidal.desktop",
@@ -294,17 +297,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // synchronously here so it is never left frozen. (See issue #568.)
         SystemOSDManager.resumeOSDUIHelperForTermination()
 
+        // Exit cleaning mode — clean-keyboard especially, so the process can never die holding
+        // the event tap and lock the keyboard.
+        KeyboardCleaningManager.shared.stop()
+        ScreenCleaningManager.shared.stop()
+
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
         extensionXPCServiceHost.stop()
         extensionRPCServer.stop()
+        networkConnectivityManager.stopMonitoring()
         
         // Stop AudioTap capture
         AudioTap.shared.stopCapture()
 
         // Restore Lunar's native OSD if integration was active
         LunarManager.shared.appWillTerminate()
+
+        terminateLogStreamChildren()
+    }
+
+    /// The Bluetooth, system timer and Focus managers each tail the unified log
+    /// with a `/usr/bin/log stream` child that nothing stops at quit, so it
+    /// keeps running after Atoll exits. End every such child we spawned.
+    private func terminateLogStreamChildren() {
+        let ownPID = getpid()
+        let capacity = proc_listchildpids(ownPID, nil, 0)
+        guard capacity > 0 else { return }
+
+        var childPIDs = [pid_t](repeating: 0, count: Int(capacity) + 8)
+        let bufferSize = Int32(childPIDs.count * MemoryLayout<pid_t>.stride)
+        let count = proc_listchildpids(ownPID, &childPIDs, bufferSize)
+        guard count > 0 else { return }
+
+        var pathBuffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        for pid in childPIDs.prefix(Int(count)) where pid > 0 {
+            guard proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count)) > 0,
+                  String(cString: pathBuffer) == "/usr/bin/log" else { continue }
+            kill(pid, SIGTERM)
+        }
     }
     
     @objc func onScreenLocked(_: Notification) {
@@ -475,6 +507,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func calculateRequiredNotchSize() -> CGSize {
+        if NetworkConnectivityHUDMetrics.isPresented(
+            state: networkConnectivityManager.hudState,
+            notchState: vm.notchState,
+            hideOnClosed: vm.hideOnClosed,
+            isLocked: LockScreenManager.shared.isLocked
+        ),
+           let connectivitySize = NetworkConnectivityHUDMetrics.size(
+               for: networkConnectivityManager.hudState,
+               closedNotchSize: vm.closedNotchSize,
+               effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+           ) {
+            return addShadowPadding(
+                to: connectivitySize,
+                isMinimalistic: Defaults[.enableMinimalisticUI]
+            )
+        }
+
         // Check if inline sneak peek is showing and notch is closed
         let airPodsListeningModeSneakActive = vm.notchState == .closed &&
                                       coordinator.sneakPeek.show &&
@@ -543,35 +592,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Use minimalistic or normal size based on settings
-        var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
+        let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
-        // Use a consistent height for different view types
-        if coordinator.currentView == .timer {
-            baseSize.height = 250 // Extra space for timer presets
-        } else if coordinator.currentView == .notes {
-            let preferredHeight = coordinator.notesLayoutState.preferredHeight
-            baseSize.height = max(baseSize.height, preferredHeight)
-        } else if coordinator.currentView == .clipboard {
-            // Clipboard has its own fixed height source; don't inherit the notes layout state.
-            baseSize.height = max(baseSize.height, NotesLayoutState.list.preferredHeight)
-        } else if coordinator.currentView == .terminal {
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-            let maxFraction = Defaults[.terminalMaxHeightFraction]
-            baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
-        } else if coordinator.currentView == .llmUsage {
-            baseSize.height = max(baseSize.height, llmUsageOpenNotchHeight)
-        }
-        
-        baseSize = inlineLyricsAdjustedNotchSize(
+        // `resizeWindows` applies one size to every window, so this has to ask
+        // whether *any* notch is open rather than only the primary one. With
+        // showOnAllDisplays and the primary closed, reading `vm` alone resolved
+        // the short height and shrank the window belonging to an open month
+        // calendar on another display, clipping it.
+        //
+        // Sizing each display from its own view model is the fuller answer, but
+        // every closed-notch branch above reads the primary `vm` the same way --
+        // the sneak peek, the recording HUD, the battery HUD -- so that is a
+        // property of this function rather than of the calendar, and changing it
+        // would change those surfaces too.
+        let isAnyNotchOpen = vm.notchState == .open
+            || viewModels.values.contains { $0.notchState == .open }
+
+        let adjustedContentSize = notchTabContentSize(
             from: baseSize,
-            isHomeTabActive: coordinator.currentView == .home
+            view: coordinator.currentView,
+            isNotchOpen: isAnyNotchOpen,
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion
         )
 
-        let adjustedContentSize = statsAdjustedNotchSize(
-            from: baseSize,
-            isStatsTabActive: coordinator.currentView == .stats,
-            secondRowProgress: coordinator.statsSecondRowExpansion
-        )
         let result = addShadowPadding(
             to: adjustedContentSize,
             isMinimalistic: Defaults[.enableMinimalisticUI]
@@ -698,15 +741,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.Keys.migrateMusicControlSlots()
         Defaults.Keys.migrateCapsLockTintMode()
         Defaults.Keys.migrateThirdPartyDDCIntegration()
+        Defaults.Keys.migrateAIProviderKeysToKeychain()
         Defaults.Keys.migrateClipboardShortcutToV()
 
         Defaults.publisher(.enableThirdPartyDDCIntegration, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { _ in
                 Defaults.Keys.syncLegacyThirdPartyDDCKeys()
             }
             .store(in: &cancellables)
 
         Defaults.publisher(.thirdPartyDDCProvider, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { _ in
                 Defaults.Keys.syncLegacyThirdPartyDDCKeys()
             }
@@ -719,6 +765,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         installTopMenuItemsIfNeeded()
 
         Defaults.publisher(.focusMonitoringMode, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateFocusMenuState()
             }
@@ -732,7 +779,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup Lunar integration
         LunarManager.shared.configure(coordinator: coordinator)
+
+        // Bring up the clipboard provider router so it can detect an external clipboard
+        // app (Maccy) and keep Atoll's own polling in step with the user's choice.
+        ClipboardProviderManager.shared.refreshDetectionStatus()
         
+        // Honour "Save History Across Restarts" before anything can read the
+        // stored history back.
+        ClipboardManager.purgeStoredHistoryIfPersistenceDisabled()
+
         // Setup ScreenRecording Manager
         if Defaults[.enableScreenRecordingDetection] && !AppRuntimeEnvironment.isUITesting {
             ScreenRecordingManager.shared.startMonitoring()
@@ -746,6 +801,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup Privacy Indicator Manager (camera/mic; skipped under UI testing).
         if !AppRuntimeEnvironment.isUITesting {
             PrivacyIndicatorManager.shared.startMonitoring()
+            networkConnectivityManager.startMonitoring()
         }
         
         // Setup Real-time Audio Waveform capture if enabled
@@ -758,6 +814,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Observe enableRealTimeWaveform changes
         Defaults.publisher(.enableRealTimeWaveform, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 if change.newValue {
                     Task {
@@ -779,6 +836,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateWindowSizeForTabSwitch()
             }
         }.store(in: &cancellables)
+
+        networkConnectivityManager.$hudState
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                // @Published emits before assigning the new state, so calculate
+                // the target dimensions on the next main-run-loop turn.
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeIfNeeded()
+                }
+            }
+            .store(in: &cancellables)
+
+        MusicManager.shared.$isAdvertisement
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                // @Published emits before assignment; recalculate after the
+                // ad flag has changed so minimalistic mode drops/adds the
+                // lyrics height from both the SwiftUI surface and NSWindow.
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeIfNeeded()
+                }
+            }
+            .store(in: &cancellables)
 
         coordinator.$notesLayoutState
             .removeDuplicates()
@@ -810,6 +890,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         Defaults.publisher(.showDiskGraph, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
+        }.store(in: &cancellables)
+
+        // The calendar's view mode decides the notch height. Applied through the
+        // tab-switch path, which resizes at once and without animating: this is
+        // the direct response to a click, and the content and vm.notchSize both
+        // change on one frame, so a tweened window would be the only thing
+        // out of step.
+        Defaults.publisher(.calendarViewMode, options: []).sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.updateWindowSizeForTabSwitch()
+            }
         }.store(in: &cancellables)
 
         Defaults.publisher(.openNotchWidth, options: []).sink { [weak self] _ in
@@ -869,6 +960,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }.store(in: &cancellables)
 
         Defaults.publisher(.enableScreenAssistant, options: []).sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.updateFeatureShortcutAvailability()
+            }
+        }.store(in: &cancellables)
+
+        Defaults.publisher(.enableCaffeinate, options: []).sink { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.updateFeatureShortcutAvailability()
             }
@@ -1069,19 +1166,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let insertionIndex = preferredMenuInsertionIndex(in: mainMenu)
 
-        let focusMenuItem = NSMenuItem(title: "Focus", action: nil, keyEquivalent: "")
+        let focusMenuItem = NSMenuItem(title: String(localized: "Focus"), action: nil, keyEquivalent: "")
         focusMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Focus.Menu")
-        let focusSubmenu = NSMenu(title: "Focus")
+        let focusSubmenu = NSMenu(title: focusMenuItem.title)
 
         let withoutDevTools = NSMenuItem(
-            title: "Use without DevTools",
+            title: String(localized: "Use without DevTools"),
             action: #selector(selectFocusWithoutDevTools),
             keyEquivalent: ""
         )
         withoutDevTools.target = self
 
         let useDevTools = NSMenuItem(
-            title: "Use DevTools",
+            title: String(localized: "Use DevTools"),
             action: #selector(selectFocusUseDevTools),
             keyEquivalent: ""
         )
@@ -1095,19 +1192,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         focusWithoutDevToolsMenuItem = withoutDevTools
         focusUseDevToolsMenuItem = useDevTools
 
-        let accessibilityMenuItem = NSMenuItem(title: "Accessibility", action: nil, keyEquivalent: "")
+        let accessibilityMenuItem = NSMenuItem(title: String(localized: "Accessibility"), action: nil, keyEquivalent: "")
         accessibilityMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Accessibility.Menu")
-        let accessibilitySubmenu = NSMenu(title: "Accessibility")
+        let accessibilitySubmenu = NSMenu(title: accessibilityMenuItem.title)
 
         let requestAccessibility = NSMenuItem(
-            title: "Request Accessibility Access",
+            title: String(localized: "Request Accessibility Access"),
             action: #selector(requestAccessibilityAccess),
             keyEquivalent: ""
         )
         requestAccessibility.target = self
 
         let openAccessibility = NSMenuItem(
-            title: "Open Accessibility Settings",
+            title: String(localized: "Open Accessibility Settings"),
             action: #selector(openAccessibilitySettings),
             keyEquivalent: ""
         )
@@ -1118,26 +1215,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         accessibilityMenuItem.submenu = accessibilitySubmenu
         mainMenu.insertItem(accessibilityMenuItem, at: insertionIndex + 1)
 
-        let permissionsMenuItem = NSMenuItem(title: "Permissions", action: nil, keyEquivalent: "")
+        let permissionsMenuItem = NSMenuItem(title: String(localized: "Permissions"), action: nil, keyEquivalent: "")
         permissionsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Permissions.Menu")
-        let permissionsSubmenu = NSMenu(title: "Permissions")
+        let permissionsSubmenu = NSMenu(title: permissionsMenuItem.title)
 
         let requestFullDisk = NSMenuItem(
-            title: "Request Full Disk Access",
+            title: String(localized: "Request Full Disk Access"),
             action: #selector(requestFullDiskAccess),
             keyEquivalent: ""
         )
         requestFullDisk.target = self
 
         let openFullDisk = NSMenuItem(
-            title: "Open Full Disk Access Settings",
+            title: String(localized: "Open Full Disk Access Settings"),
             action: #selector(openFullDiskAccessSettings),
             keyEquivalent: ""
         )
         openFullDisk.target = self
 
         let openDevTools = NSMenuItem(
-            title: "Open Developer Tools Settings",
+            title: String(localized: "Open Developer Tools Settings"),
             action: #selector(openDeveloperToolsSettingsFromMenu),
             keyEquivalent: ""
         )
@@ -1150,19 +1247,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         permissionsMenuItem.submenu = permissionsSubmenu
         mainMenu.insertItem(permissionsMenuItem, at: insertionIndex + 2)
 
-        let toolsMenuItem = NSMenuItem(title: "Tools", action: nil, keyEquivalent: "")
+        let toolsMenuItem = NSMenuItem(title: String(localized: "Tools"), action: nil, keyEquivalent: "")
         toolsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Tools.Menu")
-        let toolsSubmenu = NSMenu(title: "Tools")
+        let toolsSubmenu = NSMenu(title: toolsMenuItem.title)
 
-        let loggingLevelItem = NSMenuItem(title: "Logging Level", action: nil, keyEquivalent: "")
-        let loggingLevelSubmenu = NSMenu(title: "Logging Level")
+        let loggingLevelItem = NSMenuItem(title: String(localized: "Logging Level"), action: nil, keyEquivalent: "")
+        loggingLevelItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Tools.LoggingLevel")
+        let loggingLevelSubmenu = NSMenu(title: loggingLevelItem.title)
         
+        // Dispatched by tag, so the titles are safe to localize.
         let levels: [(String, LogLevel)] = [
-            ("No Logging", .none),
-            ("Error", .error),
-            ("Warning", .warning),
-            ("Info", .info),
-            ("Debug", .debug)
+            (String(localized: "No Logging"), .none),
+            (String(localized: "Error"), .error),
+            (String(localized: "Warning"), .warning),
+            (String(localized: "Info"), .info),
+            (String(localized: "Debug"), .debug)
         ]
         
         for (title, level) in levels {
@@ -1177,7 +1276,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         toolsSubmenu.addItem(NSMenuItem.separator())
         
-        let exportLogsItem = NSMenuItem(title: "Export Logs", action: #selector(exportLogs), keyEquivalent: "")
+        let exportLogsItem = NSMenuItem(title: String(localized: "Export Logs"), action: #selector(exportLogs), keyEquivalent: "")
         exportLogsItem.target = self
         toolsSubmenu.addItem(exportLogsItem)
 
@@ -1247,10 +1346,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let level = LogLevel(rawValue: sender.tag) else { return }
         Defaults[.logLevel] = level
         
+        // Look these up by identifier: the titles are localized.
         guard let mainMenu = NSApp.mainMenu,
-              let toolsItem = mainMenu.item(withTitle: "Tools"),
+              let toolsItem = mainMenu.items.first(where: { $0.identifier?.rawValue == "Atoll.Tools.Menu" }),
               let toolsMenu = toolsItem.submenu,
-              let loggingItem = toolsMenu.items.first(where: { $0.title == "Logging Level" }),
+              let loggingItem = toolsMenu.items.first(where: { $0.identifier?.rawValue == "Atoll.Tools.LoggingLevel" }),
               let loggingSubmenu = loggingItem.submenu else { return }
               
         for item in loggingSubmenu.items {
@@ -1261,7 +1361,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func exportLogs() {
         let savePanel = NSSavePanel()
         savePanel.nameFieldStringValue = "Atoll_Logs.zip"
-        savePanel.title = "Export Logs & Crash Reports"
+        savePanel.title = String(localized: "Export Logs & Crash Reports")
         
         savePanel.begin { response in
             guard response == .OK, let url = savePanel.url else { return }
@@ -1309,16 +1409,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     
                     DispatchQueue.main.async {
                         let alert = NSAlert()
-                        alert.messageText = "Logs Exported"
-                        alert.informativeText = "Logs and crash reports have been successfully exported to \(url.lastPathComponent)."
+                        alert.messageText = String(localized: "Logs Exported")
+                        alert.informativeText = String(localized: "Logs and crash reports have been successfully exported to \(url.lastPathComponent).")
                         alert.alertStyle = .informational
                         alert.runModal()
                     }
                 } catch {
                     DispatchQueue.main.async {
                         let alert = NSAlert()
-                        alert.messageText = "Export Failed"
-                        alert.informativeText = "Failed to export logs: \(error.localizedDescription)"
+                        alert.messageText = String(localized: "Export Failed")
+                        alert.informativeText = String(localized: "Failed to export logs: \(error.localizedDescription)")
                         alert.alertStyle = .critical
                         alert.runModal()
                     }
@@ -1348,6 +1448,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             guard Defaults[.enableShortcuts], Defaults[.enableClipboardManager] else { return }
 
+            // An external clipboard app owns the feature: hand the shortcut to it and
+            // skip Atoll's own history entirely.
+            if ClipboardProviderManager.handleClipboardTrigger() { return }
+
             if !ClipboardManager.shared.isMonitoring {
                 ClipboardManager.shared.startMonitoring()
             }
@@ -1366,8 +1470,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             case .separateTab:
                 if vm.notchState == .closed {
-                    vm.open()
-                    coordinator.currentView = .notes
+                    vm.open(target: .notes)
                 } else {
                     if coordinator.currentView == .notes {
                         vm.close()
@@ -1393,8 +1496,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // and close the notch a few seconds after this shortcut opens/switches to it.
                 cancelPendingNotchAutoClose()
                 if activeVM.notchState == .closed {
-                    activeVM.open()
-                    coordinator.currentView = .clipboard
+                    activeVM.open(target: .clipboard)
                 } else {
                     if coordinator.currentView == .clipboard {
                         activeVM.close()
@@ -1410,6 +1512,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ColorPickerPanelManager.shared.toggleColorPickerPanel()
         }
 
+        KeyboardShortcuts.onKeyDown(for: .toggleCaffeinate) {
+            guard Defaults[.enableShortcuts], Defaults[.enableCaffeinate] else { return }
+            CaffeinateManager.shared.toggle()
+        }
+
         KeyboardShortcuts.onKeyDown(for: .toggleTerminalTab) { [weak self] in
             guard let self else { return }
             guard Defaults[.enableShortcuts], Defaults[.enableTerminalFeature] else { return }
@@ -1417,8 +1524,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if vm.notchState == .closed {
                 closeNotchWorkItem?.cancel()
                 closeNotchWorkItem = nil
-                vm.open()
-                coordinator.currentView = .terminal
+                vm.open(target: .terminal)
                 TerminalManager.shared.refreshTerminalAppearanceIfNeeded()
                 TerminalManager.shared.focusTerminalIfPossible()
                 TerminalManager.shared.refreshTerminalAppearanceIfNeeded()
@@ -1461,10 +1567,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func updateFeatureShortcutAvailability() {
         updateShortcut(.startDemoTimer, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableTimerFeature])
-        updateShortcut(.clipboardHistoryPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableClipboardManager])
+        // An external clipboard app owns the clipboard hotkey while it is selected.
+        ClipboardProviderManager.shared.syncShortcutRegistration()
         updateShortcut(.colorPickerPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableColorPickerFeature])
         updateShortcut(.screenAssistantPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableScreenAssistant])
         updateShortcut(.toggleTerminalTab, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableTerminalFeature])
+        updateShortcut(.toggleCaffeinate, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableCaffeinate])
     }
 
     @MainActor
@@ -1545,10 +1653,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             let selectedScreen: NSScreen
 
-            if let preferredScreen = NSScreen.screens.first(where: {
-                $0.localizedName == coordinator.preferredScreen
-            }) {
-                coordinator.selectedScreen = coordinator.preferredScreen
+            if let preferredScreen = coordinator.preferredNSScreen() {
+                coordinator.selectedScreen = preferredScreen.localizedName
                 selectedScreen = preferredScreen
             } else if Defaults[.automaticallySwitchDisplay], let mainScreen = NSScreen.main {
                 coordinator.selectedScreen = mainScreen.localizedName
@@ -1605,7 +1711,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 defer: false
             )
             window.center()
-            window.title = "Onboarding"
+            window.title = String(localized: "Onboarding")
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.contentView = NSHostingView(rootView: OnboardingView(

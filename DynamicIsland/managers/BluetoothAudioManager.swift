@@ -202,13 +202,6 @@ class BluetoothAudioManager: ObservableObject {
             )
         }
 
-        dnc.addObserver(
-            self,
-            selector: #selector(handlePotentialAirPodsListeningModeNotification(_:)),
-            name: nil,
-            object: nil
-        )
-
         let darwinCenter = CFNotificationCenterGetDarwinNotifyCenter()
         for name in listeningModeNotificationNames {
             CFNotificationCenterAddObserver(
@@ -363,30 +356,6 @@ class BluetoothAudioManager: ObservableObject {
             presentListeningModeIfChanged(event)
             return
         }
-        scheduleEventDrivenListeningModeRefresh(reason: notification.name.rawValue)
-    }
-
-    @objc private func handlePotentialAirPodsListeningModeNotification(_ notification: Notification) {
-        guard Defaults[.showAirPodsListeningModeChanges] else { return }
-        let name = notification.name.rawValue.lowercased()
-        let payload = notification.userInfo?
-            .map { "\($0.key)=\($0.value)" }
-            .joined(separator: " ")
-            .lowercased() ?? ""
-
-        let hasExplicitModePayload = payload.contains("listening") ||
-            payload.contains("lsnm") ||
-            payload.contains("noisecontrol") ||
-            payload.contains("anc") ||
-            payload.contains("transparency") ||
-            payload.contains("adaptive") ||
-            payload.contains("conversation")
-
-        let isSpecificSettingsNotification = name.contains("airpodspro.settingschanged") ||
-            name.contains("audioaccessory.prefschanged") ||
-            name.contains("controlcenter.airpods")
-
-        guard hasExplicitModePayload || isSpecificSettingsNotification else { return }
         scheduleEventDrivenListeningModeRefresh(reason: notification.name.rawValue)
     }
 
@@ -1984,7 +1953,8 @@ class BluetoothAudioManager: ObservableObject {
         guard Defaults[.showAirPodsListeningModeChanges] else { return }
         guard event.device.deviceType.isAirPods else { return }
 
-        let address = event.device.address
+        let address = normalizeBluetoothIdentifier(event.device.address)
+        guard !address.isEmpty else { return }
         guard lastListeningModeByAddress[address] != event.mode else { return }
 
         listeningModePresentationTask?.cancel()
@@ -1999,7 +1969,8 @@ class BluetoothAudioManager: ObservableObject {
         guard Defaults[.showAirPodsListeningModeChanges] else { return }
         guard event.device.deviceType.isAirPods else { return }
 
-        let address = event.device.address
+        let address = normalizeBluetoothIdentifier(event.device.address)
+        guard !address.isEmpty else { return }
         guard lastListeningModeByAddress[address] != event.mode else { return }
         lastListeningModeByAddress[address] = event.mode
         activeListeningModeEvent = event
@@ -2201,11 +2172,20 @@ private final class AirPodsListeningModeLogObserver {
         process.standardOutput = outputPipe
         process.standardError = Pipe()
 
-        outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+        outputPipe.fileHandleForReading.readUntilEOF { [weak self] data in
+            guard let text = String(data: data, encoding: .utf8) else { return }
             self?.queue.async {
                 self?.consume(text)
+            }
+        }
+
+        // `log stream` can exit on its own (logd restart, memory pressure). Start a new one so
+        // listening-mode changes keep arriving; stop() clears this handler first.
+        process.terminationHandler = { [weak self] exited in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                guard let self, self.process === exited else { return }
+                self.process = nil
+                self.start()
             }
         }
 
@@ -2220,6 +2200,7 @@ private final class AirPodsListeningModeLogObserver {
     }
 
     func stop() {
+        process?.terminationHandler = nil
         process?.terminate()
         process = nil
     }
@@ -2565,15 +2546,15 @@ enum AirPodsListeningMode: Equatable {
     var displayName: String {
         switch self {
         case .noiseCancellation:
-            return "Noise Cancellation"
+            return String(localized: "Noise Cancellation")
         case .transparency:
-            return "Transparency"
+            return String(localized: "Transparency")
         case .adaptive:
-            return "Adaptive Audio"
+            return String(localized: "Adaptive Audio")
         case .conversationAwareness:
-            return "Conversation Awareness"
+            return String(localized: "Conversation Awareness")
         case .off:
-            return "Off"
+            return String(localized: "Off")
         }
     }
 
@@ -2788,9 +2769,9 @@ enum BluetoothAudioDeviceType {
         case .beats: return "Beats"
         case .beatsstudio: return "Beats Studio"
         case .beatssolo: return "Beats Solo"
-        case .headphones: return "Headphones"
-        case .speaker: return "Speaker"
-        case .generic: return "Bluetooth Device"
+        case .headphones: return String(localized: "Headphones")
+        case .speaker: return String(localized: "Speaker")
+        case .generic: return String(localized: "Bluetooth Device")
         }
     }
 

@@ -275,7 +275,7 @@ struct AnimationEditorView: View {
                                 .fontWeight(.medium)
                             Picker("Loop Mode", selection: $loopMode) {
                                 ForEach(AnimationLoopMode.allCases, id: \.self) { mode in
-                                    Text(mode.rawValue).tag(mode)
+                                    Text(LocalizedStringKey(mode.rawValue)).tag(mode)
                                 }
                             }
                             .pickerStyle(.segmented)
@@ -520,11 +520,11 @@ struct AnimationEditorView: View {
 // MARK: - Supporting Views
 
 private struct EditorSectionCard<Content: View>: View {
-    let title: String
-    let subtitle: String?
+    let title: LocalizedStringKey
+    let subtitle: LocalizedStringKey?
     let content: Content
     
-    init(title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) {
+    init(title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, @ViewBuilder content: () -> Content) {
         self.title = title
         self.subtitle = subtitle
         self.content = content()
@@ -535,7 +535,7 @@ private struct EditorSectionCard<Content: View>: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
-                if let subtitle, !subtitle.isEmpty {
+                if let subtitle {
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -556,7 +556,7 @@ private struct EditorSectionCard<Content: View>: View {
 }
 
 private struct ParameterSliderRow: View {
-    let title: String
+    let title: LocalizedStringKey
     @Binding var value: CGFloat
     let range: ClosedRange<CGFloat>
     let formatter: (CGFloat) -> String
@@ -606,7 +606,7 @@ private struct ParameterSliderRow: View {
 }
 
 private struct PreviewStatChip: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     
     var body: some View {

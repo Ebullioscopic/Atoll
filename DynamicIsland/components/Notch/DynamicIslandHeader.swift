@@ -28,18 +28,31 @@ struct DynamicIslandHeader: View {
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
+    @ObservedObject var screenCleaningManager = ScreenCleaningManager.shared
+    @ObservedObject var keyboardCleaningManager = KeyboardCleaningManager.shared
+    @ObservedObject var caffeinateManager = CaffeinateManager.shared
     @State private var showClipboardPopover = false
     @State private var showColorPickerPopover = false
     @State private var showTimerPopover = false
+    @State private var showPerAppVolumePopover = false
+    @State private var showCaffeinatePopover = false
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.showClipboardIcon) var showClipboardIcon
     @Default(.showColorPickerIcon) var showColorPickerIcon
+    @Default(.enablePerAppVolume) var enablePerAppVolume
+    @Default(.showPerAppVolumeIcon) var showPerAppVolumeIcon
+    @Default(.enableCaffeinate) var enableCaffeinate
+    @Default(.showCaffeinateIcon) var showCaffeinateIcon
+    @Default(.showScreenCleaningIcon) var showScreenCleaningIcon
+    @Default(.showKeyboardCleaningIcon) var showKeyboardCleaningIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
+    @Default(.clipboardProvider) var clipboardProvider
     @Default(.showBatteryIndicator) var showBatteryIndicator
     @Default(.showBatteryPercentInside) var showBatteryPercentInside
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
+    @Default(.tabBarPosition) var tabBarPosition
     
     /// Point size per symbol, so the row reads as one size.
     ///
@@ -53,7 +66,15 @@ struct DynamicIslandHeader: View {
         "list.clipboard": 13,
         "eyedropper": 14.3,
         "timer": 14.4,
-        "gearshape": 14.2
+        "gearshape": 14.2,
+        // Not solved against measured ink the way the others were: the three
+        // sliders stand slightly taller than `timer`, so this trims to match.
+        "slider.vertical.3": 13.8,
+        // Unlike the sizes above, these two were not solved against measured
+        // ink height -- they are the row default, nudged down because the cup
+        // glyph carries a saucer and so reads a shade wider than `timer`.
+        "cup.and.saucer": 14.0,
+        "cup.and.saucer.fill": 14.0
     ]
 
     /// One glyph in the header row, on a common centre.
@@ -61,9 +82,9 @@ struct DynamicIslandHeader: View {
     /// The 20pt box clears the largest frame any of these symbols asks for
     /// (19pt, `list.clipboard`), so none of them is clipped — a smaller box
     /// silently cuts the tall ones.
-    private func headerGlyph(_ name: String) -> some View {
+    private func headerGlyph(_ name: String, color: Color = .white) -> some View {
         Image(systemName: name)
-            .foregroundColor(.white)
+            .foregroundColor(color)
             .font(.system(size: Self.headerGlyphSizes[name] ?? 14.4, weight: .medium))
             .frame(width: 20, height: 20)
     }
@@ -71,7 +92,9 @@ struct DynamicIslandHeader: View {
     var body: some View {
         HStack(spacing: 0) {
             HStack {
-                if !enableMinimalisticUI {
+                // With the tab bar on the left it is drawn beside the content
+                // instead, so the header keeps only its trailing controls.
+                if !enableMinimalisticUI && tabBarPosition == .top {
                     let shouldShowTabs = coordinator.alwaysShowTabs || vm.notchState == .open || !shelfState.items.isEmpty
                     if shouldShowTabs {
                         TabSelectionView()
@@ -88,8 +111,7 @@ struct DynamicIslandHeader: View {
             if vm.notchState == .open {
                 let spacerWidth = min(vm.closedNotchSize.width, 300)
                 Rectangle()
-                    .fill(enableMinimalisticUI ? .clear : (NSScreen.screens
-                        .first(where: { $0.localizedName == coordinator.selectedScreen })?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear))
+                    .fill(enableMinimalisticUI ? .clear : (NSScreen.screen(named: coordinator.selectedScreen)?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear))
                     .frame(width: spacerWidth)
                     .mask {
                         NotchShape()
@@ -117,8 +139,15 @@ struct DynamicIslandHeader: View {
                     
                     if Defaults[.enableClipboardManager]
                         && showClipboardIcon
-                        && clipboardDisplayMode != .separateTab {
+                        // With an external provider the icon is the way into that app,
+                        // so it stays put no matter which built-in display mode is set.
+                        // (`clipboardProvider` is observed so this re-evaluates on change.)
+                        && (ClipboardProviderManager.resolvedProvider.isExternal
+                            || clipboardDisplayMode != .separateTab) {
                         Button(action: {
+                            // An external clipboard app takes the tap instead of Atoll's own UI.
+                            if ClipboardProviderManager.handleClipboardTrigger() { return }
+
                             // Switch behavior based on display mode
                             switch clipboardDisplayMode {
                             case .panel:
@@ -157,7 +186,8 @@ struct DynamicIslandHeader: View {
                             }
                         }
                         .onAppear {
-                            if Defaults[.enableClipboardManager] && !clipboardManager.isMonitoring {
+                            // Skip polling while another app owns the clipboard history.
+                            if ClipboardProviderManager.usesBuiltInClipboard && !clipboardManager.isMonitoring {
                                 clipboardManager.startMonitoring()
                             }
                         }
@@ -223,6 +253,96 @@ struct DynamicIslandHeader: View {
                         }
                     }
                     
+                    if enablePerAppVolume && showPerAppVolumeIcon {
+                        Button(action: {
+                            withAnimation(.smooth) {
+                                showPerAppVolumePopover.toggle()
+                            }
+                        }) {
+                            Capsule()
+                                .fill(.black)
+                                .frame(width: 30, height: 30)
+                                .overlay {
+                                    headerGlyph("slider.vertical.3")
+                                }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .popover(isPresented: $showPerAppVolumePopover, arrowEdge: .bottom) {
+                            PerAppVolumePopover()
+                        }
+                        .onChange(of: showPerAppVolumePopover) { isActive in
+                            vm.isPerAppVolumePopoverActive = isActive
+
+                            if !isActive {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    vm.shouldRecheckHover.toggle()
+                                }
+                            }
+                        }
+                    }
+
+                    if enableCaffeinate && showCaffeinateIcon {
+                        Button(action: {
+                            withAnimation(.smooth) {
+                                showCaffeinatePopover.toggle()
+                            }
+                        }) {
+                            Capsule()
+                                .fill(.black)
+                                .frame(width: 30, height: 30)
+                                .overlay {
+                                    // Tinting the active state is the only
+                                    // signal the closed row can give that the
+                                    // Mac is being held awake, so it is not
+                                    // just a filled-vs-hollow glyph swap.
+                                    headerGlyph(
+                                        caffeinateManager.isActive ? "cup.and.saucer.fill" : "cup.and.saucer",
+                                        color: caffeinateManager.isActive ? .yellow : .white
+                                    )
+                                }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .popover(isPresented: $showCaffeinatePopover, arrowEdge: .bottom) {
+                            CaffeinatePopover()
+                        }
+                        .onChange(of: showCaffeinatePopover) { isActive in
+                            vm.isCaffeinatePopoverActive = isActive
+
+                            if !isActive {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    vm.shouldRecheckHover.toggle()
+                                }
+                            }
+                        }
+                    }
+
+                    // Cleaning quick toggles (opt-in)
+                    if showScreenCleaningIcon {
+                        QuickToggleButton(
+                            isActive: screenCleaningManager.isActive,
+                            help: "Clean screen",
+                            action: { screenCleaningManager.toggle() }
+                        ) {
+                            headerGlyph(
+                                "sparkles.tv.fill",
+                                color: screenCleaningManager.isActive ? .accentColor : .white
+                            )
+                        }
+                    }
+
+                    if showKeyboardCleaningIcon {
+                        QuickToggleButton(
+                            isActive: keyboardCleaningManager.isActive,
+                            help: "Clean keyboard",
+                            action: { keyboardCleaningManager.toggle() }
+                        ) {
+                            headerGlyph(
+                                "keyboard.badge.eye",
+                                color: keyboardCleaningManager.isActive ? .accentColor : .white
+                            )
+                        }
+                    }
+
                     if Defaults[.settingsIconInNotch] {
                         Button(action: {
                             SettingsWindowController.shared.showWindow()
@@ -297,6 +417,7 @@ struct DynamicIslandHeader: View {
         .onChange(of: coordinator.shouldToggleClipboardPopover) { _ in
             // Only toggle if clipboard is enabled
             if Defaults[.enableClipboardManager] {
+                if ClipboardProviderManager.handleClipboardTrigger() { return }
                 switch clipboardDisplayMode {
                 case .panel:
                     ClipboardPanelManager.shared.toggleClipboardPanel()
@@ -326,6 +447,18 @@ struct DynamicIslandHeader: View {
                 showClipboardPopover.toggle()
             }
         }
+        .onChange(of: enablePerAppVolume) { _, newValue in
+            if !newValue {
+                showPerAppVolumePopover = false
+                vm.isPerAppVolumePopoverActive = false
+            }
+        }
+        .onChange(of: enableCaffeinate) { _, newValue in
+            if !newValue {
+                showCaffeinatePopover = false
+                vm.isCaffeinatePopoverActive = false
+            }
+        }
         .onChange(of: enableTimerFeature) { _, newValue in
             if !newValue {
                 showTimerPopover = false
@@ -348,6 +481,29 @@ private extension DynamicIslandHeader {
             && Defaults[.showClipboardIcon]
             && Defaults[.showColorPickerIcon]
             && Defaults[.enableTimerFeature]
+    }
+}
+
+/// Quick toggle button in the notch: same capsule styling as the existing camera/clipboard/color-picker
+/// buttons, just with an added "active" highlight state.
+private struct QuickToggleButton<Glyph: View>: View {
+    let isActive: Bool
+    let help: LocalizedStringKey
+    let action: () -> Void
+    @ViewBuilder let glyph: Glyph
+
+    var body: some View {
+        Button(action: action) {
+            Capsule()
+                .fill(.black)
+                .frame(width: 30, height: 30)
+                .overlay { glyph }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help(help)
+        // The active state is conveyed only by icon color, which VoiceOver can't hear; add a
+        // selected trait so it announces the toggle state.
+        .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 }
 

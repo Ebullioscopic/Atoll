@@ -213,7 +213,7 @@ final class LockScreenWidgetPreviewManager: ObservableObject {
             defer: false
         )
 
-        window.title = "Lock Screen Preview"
+        window.title = String(localized: "Lock Screen Preview")
         window.isReleasedWhenClosed = false
         window.backgroundColor = .clear
         window.center()

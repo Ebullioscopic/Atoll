@@ -39,6 +39,8 @@ struct MinimalisticMusicPlayerView: View {
     @State private var hudValue: Double = 0
     @State private var hudDragging: Bool = false
     @State private var hudLastDragged: Date = .distantPast
+    /// Width of the player header, used to check the artwork fits beside the camera.
+    @State private var measuredHeaderWidth: CGFloat?
     @Default(.enableReminderLiveActivity) private var enableReminderLiveActivity
     @Default(.enableLyrics) private var enableLyrics
     @Default(.timerPresets) private var timerPresets
@@ -123,9 +125,13 @@ struct MinimalisticMusicPlayerView: View {
                         }
                     }
                     .frame(height: 50)
-                } else {
+                } else if notchHuggingFits {
                     // ── Battery OFF (notch mode): U-shaped notch-hugging layout ──
                     notchHuggingHeader
+                } else {
+                    // Battery OFF, but the wing beside the camera is too narrow
+                    // for the artwork: keep the artwork below the notch.
+                    batteryFreeHeader
                 }
 
                 // Compact progress bar
@@ -141,7 +147,7 @@ struct MinimalisticMusicPlayerView: View {
                         .padding(.top, 4)
                 }
 
-                if enableLyrics {
+                if shouldReserveLyricsSpace {
                     lyricsView
                         .padding(.top, 10)
                 }
@@ -150,10 +156,19 @@ struct MinimalisticMusicPlayerView: View {
 
                 reminderList
             }
-            .padding(.horizontal, shouldUseDynamicIslandMode(for: vm.screen) ? -4 : 12)
+            .padding(.horizontal, minimalisticHorizontalPadding)
             .padding(.top, shouldUseDynamicIslandMode(for: vm.screen) ? 14 : (batteryOffNotchMode ? 10 : 6))
             .padding(.bottom, shouldUseDynamicIslandMode(for: vm.screen) ? 14 : (batteryOffNotchMode ? 10 : ReminderLiveActivityManager.baselineMinimalisticBottomPadding))
             .frame(maxWidth: .infinity)
+            .background {
+                GeometryReader { geo in
+                    // Inner width (inside the horizontal padding) is the header width.
+                    let headerWidth = geo.size.width - 2 * minimalisticHorizontalPadding
+                    Color.clear
+                        .onAppear { measuredHeaderWidth = headerWidth }
+                        .onChange(of: headerWidth) { _, newWidth in measuredHeaderWidth = newWidth }
+                }
+            }
             .frame(height: calculateDynamicHeight(), alignment: .top)
             .animation(.smooth(duration: 0.3), value: dynamicHeightSignature)
         }
@@ -260,15 +275,55 @@ struct MinimalisticMusicPlayerView: View {
 
     private var dynamicHeightSignature: Int {
         var signature = reminderEntries.count * 10
-        if enableLyrics { signature += 1 }
+        if shouldReserveLyricsSpace { signature += 1 }
         if shouldShowTimerCountdown { signature += 100 }
         if showMinimalisticBatteryIndicator { signature += 1000 }
+        if notchHuggingFits { signature += 10000 }
         return signature
+    }
+
+    /// Ads do not have lyrics. Reserving the normal lyrics row for them left a
+    /// large empty strip beneath the controls and made the Dynamic Island look
+    /// nearly square instead of keeping its regular compact proportions.
+    private var shouldReserveLyricsSpace: Bool {
+        enableLyrics && !musicManager.isAdvertisement
     }
 
     /// True when the battery indicator is hidden and we are in notch mode (not DI).
     private var batteryOffNotchMode: Bool {
         !showMinimalisticBatteryIndicator && !shouldUseDynamicIslandMode(for: vm.screen)
+    }
+
+    private var minimalisticHorizontalPadding: CGFloat {
+        shouldUseDynamicIslandMode(for: vm.screen) ? -4 : 12
+    }
+
+    private static let notchHuggingAlbumArtSize: CGFloat = 50
+    /// Clearance between the artwork and the camera housing.
+    private static let notchHuggingCameraGap: CGFloat = 6
+
+    /// Width of the camera housing, from the menu bar areas on either side of it.
+    /// Nil on displays without a notch.
+    private var physicalNotchWidth: CGFloat? {
+        guard let screen = NSScreen.screens.first(where: { $0.localizedName == vm.screen }),
+              let left = screen.auxiliaryTopLeftArea,
+              let right = screen.auxiliaryTopRightArea
+        else { return nil }
+        return screen.frame.width - left.width - right.width
+    }
+
+    /// The U-shaped layout pulls the artwork up beside the camera, into the
+    /// menu bar area left of the notch (`auxiliaryTopLeftArea`). The header is
+    /// centred under the notch, so that wing is half of what the header has
+    /// beyond the camera. Without a notch, or when scaled resolutions make the
+    /// camera too wide for the wing, the artwork would sit under the camera,
+    /// so the flat header is used instead. Until the header is measured the
+    /// U-shaped layout is assumed, as it fits on default resolutions.
+    private var notchHuggingFits: Bool {
+        guard batteryOffNotchMode, let notchWidth = physicalNotchWidth else { return false }
+        guard let headerWidth = measuredHeaderWidth else { return true }
+        let wing = (headerWidth - notchWidth) / 2
+        return wing >= Self.notchHuggingAlbumArtSize + Self.notchHuggingCameraGap
     }
 
     private func calculateDynamicHeight() -> CGFloat {
@@ -280,8 +335,8 @@ struct MinimalisticMusicPlayerView: View {
             height += 6 + 4          // progress bar top padding + bar
             height += 54 + 2         // controls + top padding
 
-            if enableLyrics {
-                height += 10 + 34 // lyrics padding + estimated height
+            if shouldReserveLyricsSpace {
+                height += 10 + 40 // lyrics padding + estimated height (increased for 2-line lyrics)
             }
             if shouldShowTimerCountdown {
                 height += minimalisticTimerCountdownBlockHeight
@@ -295,15 +350,16 @@ struct MinimalisticMusicPlayerView: View {
             return height
         }
 
-        // ── Battery OFF (notch mode): tighter height for U-shaped layout ──
-        // The album art is pulled UP into the notch header area, so the
-        // visible header in-flow is only the title + artist text (~26pt).
-        var height: CGFloat = 26 // reduced header (text only; art overlaps upward)
+        // ── Battery OFF (notch mode) ──
+        // U-shaped layout: the album art is pulled UP beside the camera, so
+        // only the title + artist text (~26pt) is in-flow. The fallback header
+        // keeps the full artwork height below the notch.
+        var height: CGFloat = notchHuggingFits ? 26 : Self.notchHuggingAlbumArtSize
         height += 4 + 4          // progress bar top padding + bar
         height += 54 + 2         // controls + top padding
 
-        if enableLyrics {
-            height += 10 + 34
+        if shouldReserveLyricsSpace {
+            height += 10 + 40
         }
         if shouldShowTimerCountdown {
             height += minimalisticTimerCountdownBlockHeight
@@ -326,7 +382,7 @@ struct MinimalisticMusicPlayerView: View {
     private var notchHuggingHeader: some View {
         GeometryReader { geo in
             let totalWidth = geo.size.width
-            let albumArtSize: CGFloat = 50
+            let albumArtSize = Self.notchHuggingAlbumArtSize
             let visualizerWidth: CGFloat = useMusicVisualizer ? 24 : 0
             // How far to pull the album art and waveform up alongside the notch.
             let notchHeight = vm.effectiveClosedNotchHeight
@@ -385,6 +441,68 @@ struct MinimalisticMusicPlayerView: View {
             }
         }
         .frame(height: 26) // Only the text portion is in-flow; album art overlaps upward
+    }
+
+    // MARK: - Battery-Free Header
+
+    /// Fallback for `notchHuggingHeader` when the artwork does not fit beside
+    /// the camera: artwork, title and visualizer sit below the notch.
+    private var batteryFreeHeader: some View {
+        GeometryReader { geo in
+            let totalWidth = geo.size.width
+            let albumArtSize = Self.notchHuggingAlbumArtSize
+            let visualizerWidth: CGFloat = useMusicVisualizer ? 24 : 0
+            
+            ZStack(alignment: .top) {
+                // ── Left: Album art ──
+                HStack {
+                    MinimalisticAlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace)
+                        .frame(width: albumArtSize, height: albumArtSize)
+                    Spacer()
+                }
+                .frame(width: totalWidth)
+
+                // ── Right: Waveform ──
+                if useMusicVisualizer {
+                    HStack {
+                        Spacer()
+                        visualizer
+                            .frame(width: visualizerWidth)
+                        Spacer()
+                            .frame(width: 12)
+                    }
+                    .offset(y: (albumArtSize - 16) / 2)
+                    .frame(width: totalWidth)
+                }
+
+                // ── Center: Title + Artist (below the notch) ──
+                VStack(alignment: .leading, spacing: 1) {
+                    if !musicManager.songTitle.isEmpty {
+                        // Reserve space for the artwork and visualizer beside the title.
+                        let textAreaWidth = max(0, totalWidth - albumArtSize - 10 - (useMusicVisualizer ? (visualizerWidth + 12 + 10) : 0))
+                        MusicTitleMarqueeView(
+                            text: musicManager.songTitle,
+                            isExplicit: musicManager.isCurrentTrackExplicit,
+                            font: .system(size: 12, weight: .semibold),
+                            nsFont: .subheadline,
+                            textColor: .white,
+                            frameWidth: textAreaWidth,
+                            badgeHeight: 13
+                        )
+                    }
+
+                    Text(musicManager.artistName)
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundColor(Defaults[.playerColorTinting] ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .gray)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, albumArtSize + 10)
+                // Align the bottom of the artist text with the artwork.
+                .offset(y: albumArtSize - 28)
+            }
+        }
+        .frame(height: 50)
     }
 
     private var timerCountdownSection: some View {
@@ -476,7 +594,7 @@ struct MinimalisticMusicPlayerView: View {
             }
         }
         .padding(.horizontal, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: 40, alignment: .topLeading)
         .animation(.smooth(duration: 0.32), value: line)
     }
     
@@ -771,11 +889,7 @@ private struct MinimalisticReminderDetailsView: View {
     }
 
     private var progressBar: some View {
-        TimelineView(
-            .animation(
-                paused: isProgressTimelinePaused
-            )
-        ) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: isProgressTimelinePaused)) { timeline in
             MusicSliderView(
                 sliderValue: $sliderValue,
                 duration: Binding(
@@ -988,7 +1102,7 @@ private struct MinimalisticReminderDetailsView: View {
 
     private var displayedSlots: [MusicControlButton] {
         if showCustomControls {
-            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, isSpotifyActive: musicManager.isSpotifyActive)
+            let normalized = slotConfig.normalized(allowingMediaOutput: showMediaOutputControl, isAppleMusicActive: musicManager.isAppleMusicActive, canFavorite: musicManager.activeSourceCanEverFavorite)
             return normalized.contains(where: { $0 != .none }) ? normalized : MusicControlButton.defaultLayout
         }
 
@@ -1254,7 +1368,8 @@ struct MinimalisticAlbumArtView: View {
             .background(
                 DynamicIslandArtworkSourceView(
                     cornerRadius: albumArtCornerRadius,
-                    contentMode: .fill
+                    contentMode: .fill,
+                    prefersVideo: false
                 )
             )
             .clipped()
