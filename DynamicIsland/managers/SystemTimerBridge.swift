@@ -299,9 +299,7 @@ final class SystemTimerBridge: ObservableObject {
         nonJSONLogLineCount = 0
         logPipe = outputPipe
 
-        outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty else { return }
+        outputPipe.fileHandleForReading.readUntilEOF { [weak self] data in
             self?.queue.async { [weak self] in
                 self?.consumeLogData(data)
             }

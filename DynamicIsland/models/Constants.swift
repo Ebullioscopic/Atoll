@@ -1034,6 +1034,7 @@ extension Defaults.Keys {
     static let animationTransformOverrides = Key<[String: AnimationTransformConfig]>("animationTransformOverrides", default: [:])
     static let tileShowLabels = Key<Bool>("tileShowLabels", default: false)
     static let showCalendar = Key<Bool>("showCalendar", default: true)
+    static let calendarViewMode = Key<CalendarViewMode>("calendarViewMode", default: .week)
     static let hideCompletedReminders = Key<Bool>("hideCompletedReminders", default: true)
     static let hideAllDayEvents = Key<Bool>("hideAllDayEvents", default: false)
     static let sliderColor = Key<SliderColorEnum>(
@@ -1315,6 +1316,8 @@ extension Defaults.Keys {
     static let terminalStickyMode = Key<Bool>("terminalStickyMode", default: false)
     
     // MARK: Timer Feature
+    static let timerAlertDurationSeconds = Key<Int>("timerAlertDurationSeconds", default: 30)
+    static let timerAlertRepeatIntervalMinutes = Key<Int>("timerAlertRepeatIntervalMinutes", default: 5)
     static let enableTimerFeature = Key<Bool>("enableTimerFeature", default: true)
     static let timerDisplayMode = Key<TimerDisplayMode>("timerDisplayMode", default: .tab)
     static let timerPresets = Key<[TimerPreset]>("timerPresets", default: TimerPreset.defaultPresets)
@@ -1368,6 +1371,8 @@ extension Defaults.Keys {
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)
     static let screenAssistantDisplayMode = Key<ScreenAssistantDisplayMode>("screenAssistantDisplayMode", default: .panel)
+    // The provider API keys live in the Keychain (see KeychainAIKeyStore);
+    // these four keys remain only for the one-time migration of older builds.
     static let geminiApiKey = Key<String>("geminiApiKey", default: "")
     static let openaiApiKey = Key<String>("openaiApiKey", default: "")
     static let claudeApiKey = Key<String>("claudeApiKey", default: "")
@@ -1588,6 +1593,44 @@ extension Defaults.Keys {
         let legacyGreen = Defaults[.capsLockIndicatorUseGreenColor]
         Defaults[.capsLockIndicatorTintMode] = legacyGreen ? .green : .white
         Defaults[.didMigrateCapsLockTintMode] = true
+    }
+
+    /// The AI provider API keys were stored as plaintext in Defaults; move them
+    /// into the Keychain once. Each Defaults copy is cleared only after its
+    /// Keychain write is confirmed, so a failed write can never lose a key — the
+    /// next launch simply retries. No completion flag is needed: an already
+    /// emptied key has nothing left to migrate.
+    static func migrateAIProviderKeysToKeychain(store: AIKeyStoring = KeychainAIKeyStore.shared) {
+        let legacyKeys: [(Defaults.Key<String>, AIKeyAccount)] = [
+            (.geminiApiKey, .gemini),
+            (.openaiApiKey, .openai),
+            (.claudeApiKey, .claude),
+            (.groqApiKey, .groq)
+        ]
+
+        for (defaultsKey, account) in legacyKeys {
+            let legacyValue = Defaults[defaultsKey].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !legacyValue.isEmpty else { continue }
+
+            // The Keychain already holds a key for this provider, so it is the
+            // current one and the Defaults copy is stale — a leftover from a
+            // partial migration, or a key the user has since replaced. This runs
+            // on every launch, so writing the legacy value here would restore an
+            // old credential over the working one, every time.
+            if store.hasKey(account) {
+                Defaults[defaultsKey] = ""
+                continue
+            }
+
+            if store.write(legacyValue, account: account) == errSecSuccess {
+                Defaults[defaultsKey] = ""
+            } else {
+                Logger.log(
+                    "Could not move the \(account.rawValue) into the Keychain; keeping the Defaults copy and retrying next launch.",
+                    category: .warning
+                )
+            }
+        }
     }
 
     static func migrateMusicControlSlots() {
