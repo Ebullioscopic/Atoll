@@ -97,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
+- With the notch on more than one display, the Stats tab no longer stops updating when the notch on another display closes or switches tabs. (#851)
 - General › UI Mode no longer shows battery controls that can't be used: the Minimalistic UI battery toggle only appears with Minimalistic UI on and is named for it, and the battery percentage option says which setting it needs when it's unavailable. (#930)
 - Turning off lock screen weather no longer hides the battery, charging, Bluetooth, calendar and Focus parts of the status widget. They stay on the lock screen on their own, and Atoll no longer fetches weather or your location while weather is off. (#523)
 - Changing songs with full-screen artwork on the lock screen no longer freezes Atoll: the blurred wallpaper is only rendered for tracks that use it, artwork is no longer pre-encoded to disk while the Mac is unlocked, and the high-memory restart prompt waits until you unlock instead of blocking Atoll behind the lock screen. If Atoll quit while showing artwork, the original wallpaper comes back the next time full-screen artwork is closed. (#791)
