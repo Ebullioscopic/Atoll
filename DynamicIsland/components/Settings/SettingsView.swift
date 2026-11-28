@@ -4088,7 +4088,7 @@ struct CalendarSettings: View {
             await calendarManager.refreshAuthorization()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            Task { await calendarManager.refreshAuthorization() }
+            Task { await calendarManager.refreshAuthorizationIfChanged() }
         }
         .navigationTitle("Calendar")
     }

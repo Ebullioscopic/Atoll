@@ -80,7 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The separate-tab clipboard now uses the same card grid (two columns) with drag-out and per-item delete, replacing the single-column list (#698).
 
 ### Fixed
-- Keep calendar settings available when only Reminders access is missing (and vice versa), show permissions independently, and refresh them after returning from System Settings (#886).
+- Keep calendar settings available when only Reminders access is missing (and vice versa), show permissions independently, and refresh them after returning from System Settings. (#919, closes #886)
 - **Atoll no longer burns a CPU core after a `log stream` helper exits**: the AirPods listening-mode, timer, Focus and media-adapter pipe readers ignored end of file, so once their helper process died the read handler fired again immediately, forever. One Mac logged 145 CPU-hours in the AirPods reader over 19 days. The readers now stop at end of file, and the AirPods listening-mode stream restarts itself 5 seconds after it exits instead of going silent.
 - Quitting Atoll now stops the `/usr/bin/log stream` processes started by the Bluetooth, timer and Focus monitors. They used to keep running after the app exited, and each launch added a new set. (#939)
 - **LLM usage no longer balloons memory on large logs**: parsing a big week of Claude Code JSONL logs (~1 GB) could push Atoll past 2.5 GB and trigger the high memory usage warning, because temporary objects piled up until the whole scan finished. Each read chunk is now drained in its own autorelease pool, which keeps the same scan around 20 MB. (#870)

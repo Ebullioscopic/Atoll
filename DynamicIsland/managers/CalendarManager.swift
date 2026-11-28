@@ -155,6 +155,14 @@ class CalendarManager: ObservableObject {
         await updateLockScreenEvents(force: true)
     }
 
+    /// Skips the forced event reload when the app is reactivated without a permission change.
+    func refreshAuthorizationIfChanged() async {
+        guard EKEventStore.authorizationStatus(for: .event) != calendarAuthorizationStatus
+            || EKEventStore.authorizationStatus(for: .reminder) != reminderAuthorizationStatus
+        else { return }
+        await refreshAuthorization()
+    }
+
     func checkCalendarAuthorization() async {
         await checkAuthorization(for: .event)
     }
