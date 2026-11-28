@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Fixed
+
+### Removed
+
+## [3.0.0] - 2026-11-28
+
 ### Highlights
 - **Lyrics that follow the music:** synced lyrics sweep word by word in time with playback — beside the player, pinned under the closed notch, and in a new lyrics column on the lock screen — with NetEase Cloud Music as a fallback source.
 - **A more capable lock screen:** a volume slider under the playback controls, a large-artwork player that opens on lock, a fingerprint unlock animation, colored widgets, a custom weather city and a day-range temperature gauge.
