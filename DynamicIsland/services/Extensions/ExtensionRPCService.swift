@@ -476,7 +476,7 @@ final class ExtensionRPCService {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
-        panel.title = "Select files to share"
+        panel.title = String(localized: "Select files to share")
 
         let response = panel.runModal()
         guard response == .OK, !panel.urls.isEmpty else {
