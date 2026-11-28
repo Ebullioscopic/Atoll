@@ -206,10 +206,8 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         let stderrPipe = Pipe()
         process.standardError = stderrPipe
         let logName = controllerName
-        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            guard !data.isEmpty,
-                  let message = String(data: data, encoding: .utf8)?
+        stderrPipe.fileHandleForReading.readUntilEOF { data in
+            guard let message = String(data: data, encoding: .utf8)?
                     .trimmingCharacters(in: .whitespacesAndNewlines),
                   !message.isEmpty
             else { return }
