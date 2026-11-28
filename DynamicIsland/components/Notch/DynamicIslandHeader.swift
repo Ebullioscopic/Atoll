@@ -28,7 +28,6 @@ struct DynamicIslandHeader: View {
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
-    @ObservedObject var powerManager = PowerManagementManager.shared
     @ObservedObject var screenCleaningManager = ScreenCleaningManager.shared
     @ObservedObject var keyboardCleaningManager = KeyboardCleaningManager.shared
     @ObservedObject var caffeinateManager = CaffeinateManager.shared
@@ -45,6 +44,8 @@ struct DynamicIslandHeader: View {
     @Default(.showPerAppVolumeIcon) var showPerAppVolumeIcon
     @Default(.enableCaffeinate) var enableCaffeinate
     @Default(.showCaffeinateIcon) var showCaffeinateIcon
+    @Default(.showScreenCleaningIcon) var showScreenCleaningIcon
+    @Default(.showKeyboardCleaningIcon) var showKeyboardCleaningIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
     @Default(.showBatteryIndicator) var showBatteryIndicator
     @Default(.showBatteryPercentInside) var showBatteryPercentInside
@@ -304,44 +305,30 @@ struct DynamicIslandHeader: View {
                         }
                     }
 
-                    // Power and cleaning quick toggles
-                    if Defaults[.showKeepScreenAwakeIcon] {
+                    // Cleaning quick toggles (opt-in)
+                    if showScreenCleaningIcon {
                         QuickToggleButton(
-                            icon: "lock.open.laptopcomputer",
-                            isActive: powerManager.isKeepingScreenAwake,
-                            help: "Keep screen awake"
-                        ) {
-                            powerManager.toggleKeepScreenAwake()
-                        }
-                    }
-
-                    if Defaults[.showPreventLidSleepIcon] {
-                        QuickToggleButton(
-                            icon: "cup.and.saucer.fill",
-                            isActive: powerManager.isPreventingLidSleep,
-                            help: "Stay awake with the lid closed"
-                        ) {
-                            powerManager.togglePreventLidSleep()
-                        }
-                    }
-
-                    if Defaults[.showScreenCleaningIcon] {
-                        QuickToggleButton(
-                            icon: "sparkles.tv.fill",
                             isActive: screenCleaningManager.isActive,
-                            help: "Clean screen"
+                            help: "Clean screen",
+                            action: { screenCleaningManager.toggle() }
                         ) {
-                            screenCleaningManager.toggle()
+                            headerGlyph(
+                                "sparkles.tv.fill",
+                                color: screenCleaningManager.isActive ? .accentColor : .white
+                            )
                         }
                     }
 
-                    if Defaults[.showKeyboardCleaningIcon] {
+                    if showKeyboardCleaningIcon {
                         QuickToggleButton(
-                            icon: "keyboard.badge.eye",
                             isActive: keyboardCleaningManager.isActive,
-                            help: "Clean keyboard"
+                            help: "Clean keyboard",
+                            action: { keyboardCleaningManager.toggle() }
                         ) {
-                            keyboardCleaningManager.toggle()
+                            headerGlyph(
+                                "keyboard.badge.eye",
+                                color: keyboardCleaningManager.isActive ? .accentColor : .white
+                            )
                         }
                     }
 
@@ -487,23 +474,18 @@ private extension DynamicIslandHeader {
 
 /// Quick toggle button in the notch: same capsule styling as the existing camera/clipboard/color-picker
 /// buttons, just with an added "active" highlight state.
-private struct QuickToggleButton: View {
-    let icon: String
+private struct QuickToggleButton<Glyph: View>: View {
     let isActive: Bool
     let help: LocalizedStringKey
     let action: () -> Void
+    @ViewBuilder let glyph: Glyph
 
     var body: some View {
         Button(action: action) {
             Capsule()
                 .fill(.black)
                 .frame(width: 30, height: 30)
-                .overlay {
-                    Image(systemName: icon)
-                        .foregroundColor(isActive ? .accentColor : .white)
-                        .padding()
-                        .imageScale(.medium)
-                }
+                .overlay { glyph }
         }
         .buttonStyle(PlainButtonStyle())
         .help(help)

@@ -244,6 +244,8 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
         SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
         SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
+        SettingsSearchEntry(tab: .general, title: "Clean screen", keywords: ["cleaning", "black screen", "wipe", "display"], highlightID: SettingsTab.general.highlightID(for: "Clean screen")),
+        SettingsSearchEntry(tab: .general, title: "Clean keyboard", keywords: ["cleaning", "lock keyboard", "wipe", "keys"], highlightID: SettingsTab.general.highlightID(for: "Clean keyboard")),
 
         // Live Activities
         SettingsSearchEntry(tab: .liveActivities, title: "Enable Screen Recording Detection", keywords: ["screen recording", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Screen Recording Detection")),
@@ -1143,8 +1145,7 @@ struct GeneralSettings: View {
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @Default(.showBatteryIndicator) var showBatteryIndicator
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
-    @Default(.showKeepScreenAwakeIcon) var showKeepScreenAwakeIcon
-    @Default(.showPreventLidSleepIcon) var showPreventLidSleepIcon
+    @Default(.showKeyboardCleaningIcon) var showKeyboardCleaningIcon
     @Default(.enableHorizontalMusicGestures) var enableHorizontalMusicGestures
     @Default(.musicGestureBehavior) var musicGestureBehavior
     @Default(.reverseSwipeGestures) var reverseSwipeGestures
@@ -1198,34 +1199,6 @@ struct GeneralSettings: View {
             }
 
             Section {
-                Defaults.Toggle(key: .showKeepScreenAwakeIcon) {
-                    Text("Keep screen awake")
-                }
-                // Hiding the icon removes its off-switch in the notch while the feature stays on —
-                // so drop the underlying assertion at the same time.
-                .onChange(of: showKeepScreenAwakeIcon) {
-                    if !showKeepScreenAwakeIcon {
-                        PowerManagementManager.shared.setKeepScreenAwake(false)
-                    }
-                }
-                .settingsHighlight(id: highlightID("Keep screen awake"))
-
-                Defaults.Toggle(key: .showPreventLidSleepIcon) {
-                    Text("Stay awake with the lid closed")
-                }
-                // Likewise: hiding the icon also revokes stay-awake-with-lid-closed, so the machine
-                // isn't left in a "won't sleep on lid close" state.
-                .onChange(of: showPreventLidSleepIcon) {
-                    if !showPreventLidSleepIcon {
-                        PowerManagementManager.shared.setPreventLidSleep(false)
-                    }
-                }
-                .settingsHighlight(id: highlightID("Stay awake with the lid closed"))
-
-                Text("Closing the lid while this is on keeps the Mac running. Do not put it in a bag - it can overheat.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
                 Defaults.Toggle(key: .showScreenCleaningIcon) {
                     Text("Clean screen")
                 }
@@ -1234,15 +1207,21 @@ struct GeneralSettings: View {
                 Defaults.Toggle(key: .showKeyboardCleaningIcon) {
                     Text("Clean keyboard")
                 }
+                // Ask for Accessibility when the user opts in, not on first use in the notch.
+                .onChange(of: showKeyboardCleaningIcon) {
+                    if showKeyboardCleaningIcon {
+                        KeyboardCleaningManager.shared.requestAccessibilityPermissionIfNeeded()
+                    }
+                }
                 .settingsHighlight(id: highlightID("Clean keyboard"))
 
                 Text("Cleaning the keyboard blocks key presses and needs Accessibility permission. Click anywhere to finish; it also stops on its own after two minutes.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
-                Text("Power & cleaning")
+                Text("Cleaning")
             } footer: {
-                Text("These toggles appear in the notch header. They are never restored after a restart.")
+                Text("Adds buttons to the notch header. Cleaning modes are never restored after a restart.")
             }
 
             Section {

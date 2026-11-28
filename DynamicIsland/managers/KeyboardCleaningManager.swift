@@ -241,7 +241,7 @@ final class KeyboardCleaningManager: ObservableObject {
     // MARK: - Permission
 
     @discardableResult
-    private func requestAccessibilityPermissionIfNeeded() -> Bool {
+    func requestAccessibilityPermissionIfNeeded() -> Bool {
         if AXIsProcessTrusted() { return true }
 
         let options = [

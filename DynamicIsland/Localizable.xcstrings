@@ -92368,26 +92368,6 @@
         }
       }
     },
-    "Closing the lid while this is on keeps the Mac running. Do not put it in a bag - it can overheat." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Closing the lid while this is on keeps the Mac running. Do not put it in a bag - it can overheat."
-          }
-        }
-      }
-    },
-    "Keep screen awake" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keep screen awake"
-          }
-        }
-      }
-    },
     "Keyboard is locked for cleaning — click anywhere to finish" : {
       "localizations" : {
         "en" : {
@@ -92398,36 +92378,8 @@
         }
       }
     },
-    "Power & cleaning" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Power & cleaning"
-          }
-        }
-      }
-    },
-    "Stay awake with the lid closed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stay awake with the lid closed"
-          }
-        }
-      }
-    },
-    "These toggles appear in the notch header. They are never restored after a restart." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "These toggles appear in the notch header. They are never restored after a restart."
-          }
-        }
-      }
-    }
+    "Cleaning" : {},
+    "Adds buttons to the notch header. Cleaning modes are never restored after a restart." : {}
   },
   "version" : "1.2"
 }
