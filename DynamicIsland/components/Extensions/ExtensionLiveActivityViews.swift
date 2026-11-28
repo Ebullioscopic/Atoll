@@ -180,11 +180,24 @@ private func logExtensionDiagnostics(_ message: String) {
     Logger.log(message, category: .extensions)
 }
 
+private struct ExtensionTabContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+private struct ExtensionTabViewportHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 struct ExtensionNotchExperienceTabView: View {
     let payload: ExtensionNotchExperiencePayload
 
     @EnvironmentObject private var vm: DynamicIslandViewModel
     @State private var suppressionToken = UUID()
+    @State private var isHovering = false
+    @State private var standardContentHeight: CGFloat = 0
+    @State private var standardViewportHeight: CGFloat = 0
 
     @Default(.enableExtensionNotchInteractiveWebViews) private var interactiveWebViewsEnabled
 
@@ -209,7 +222,15 @@ struct ExtensionNotchExperienceTabView: View {
                         }
                         .padding(.vertical, 14)
                         .padding(.horizontal, 16)
+                        .background(GeometryReader { proxy in
+                            Color.clear.preference(key: ExtensionTabContentHeightKey.self, value: proxy.size.height)
+                        })
                     }
+                    .background(GeometryReader { proxy in
+                        Color.clear.preference(key: ExtensionTabViewportHeightKey.self, value: proxy.size.height)
+                    })
+                    .onPreferenceChange(ExtensionTabContentHeightKey.self) { standardContentHeight = $0 }
+                    .onPreferenceChange(ExtensionTabViewportHeightKey.self) { standardViewportHeight = $0 }
                 }
             } else {
                 Text("Extension tab unavailable")
@@ -222,9 +243,14 @@ struct ExtensionNotchExperienceTabView: View {
         .background(tabBackground)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .onHover { hovering in
-            vm.setScrollGestureSuppression(hovering, token: suppressionToken)
+            isHovering = hovering
+            updateScrollSuppression()
+        }
+        .onChange(of: standardContentOverflows) { _, _ in
+            updateScrollSuppression()
         }
         .onDisappear {
+            isHovering = false
             vm.setScrollGestureSuppression(false, token: suppressionToken)
         }
         .onChange(of: vm.notchState) { _, state in
@@ -232,6 +258,24 @@ struct ExtensionNotchExperienceTabView: View {
                 vm.setScrollGestureSuppression(false, token: suppressionToken)
             }
         }
+    }
+
+    /// Content-only tabs and interactive web content scroll on their own, so they always
+    /// take scroll gestures. A standard tab only does when its sections overflow;
+    /// otherwise scrolling over it still closes the notch.
+    private var needsScrollSuppression: Bool {
+        guard let tabConfiguration else { return false }
+        if tabConfiguration.contentLayout == .contentOnly { return true }
+        if tabConfiguration.webContent != nil && allowInteractiveWebViews { return true }
+        return standardContentOverflows
+    }
+
+    private var standardContentOverflows: Bool {
+        standardContentHeight > standardViewportHeight + 1
+    }
+
+    private func updateScrollSuppression() {
+        vm.setScrollGestureSuppression(isHovering && needsScrollSuppression, token: suppressionToken)
     }
 
     @ViewBuilder

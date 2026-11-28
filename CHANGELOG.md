@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Content-only extension tabs**: extensions can ask for a tab without Atoll's title, padding and outer scroll view and lay out their own scrolling content. Scrolling inside an extension tab whose content scrolls no longer closes the notch, and tabs that fit still close on scroll as before. Requires AtollExtensionKit with `contentLayout`. (#817)
 - **Repeat timer alerts**: configure how long the built-in timer rings and how many minutes of silence precede the next reminder. Reminders continue in overtime until stopped, and pausing silences them. Defaults are 30 seconds of ringing and 5 minutes of silence. (#865, closes #859)
 - **Charging power readings**: the charging HUD now shows actual battery charging watts, and the battery details popover separately shows battery charging power and total power input. Unavailable readings are hidden, and power is sampled only while the HUD or popover is visible. (#894)
 - **Connection status HUDs**: Atoll now shows a Dynamic Island HUD when the Mac goes offline, and a compact inline HUD when it connects to Wi-Fi or Personal Hotspot, using the matching Wi-Fi or hotspot symbol and the connected network name. (#827)
