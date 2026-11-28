@@ -1780,8 +1780,9 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         return anySucceeded
     }
 
-    /// Puts back each screen's captured picture. Returns true only when every screen Atoll
-    /// changed is connected, had a captured original, and now reports that original.
+    /// Fallback for when the store backup can't be restored: puts back each screen's captured
+    /// picture. Returns true only when every screen Atoll changed is connected, had a captured
+    /// original, and now reports that original.
     private func restoreStaticWallpaper() -> Bool {
         guard appliedStaticWallpaper else { return true }
         let ws = NSWorkspace.shared
@@ -1975,15 +1976,23 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     }
 
     private func restoreWallpaper() {
-        var restored = restoreStaticWallpaper()
+        let changedWallpaper = appliedStaticWallpaper || didApplyAerialWallpaper || needsStoreRestoreFromBackup
+        var restored = !changedWallpaper
 
-        if didApplyAerialWallpaper || needsStoreRestoreFromBackup || !restored, hasValidBackup {
+        // The store backup holds the full configuration (Shuffle, rotating folders, Aerials,
+        // per-Space and per-display choices), so it is preferred over per-screen URLs, which
+        // can only put back a single still image.
+        if changedWallpaper, hasValidBackup {
             restored = Self.restoreWallpaperStore(from: backupPlistURL, to: wallpaperPlistURL)
             if restored {
                 restoreLiveWallpaperResources()
                 restartWallpaperAgent()
             }
-        } else if restored, hasValidBackup {
+        }
+        if !restored, appliedStaticWallpaper {
+            restored = restoreStaticWallpaper()
+        }
+        if restored, hasValidBackup {
             try? FileManager.default.removeItem(at: backupPlistURL)
         }
         // On failure the store backup stays on disk so the next session can still restore it.
