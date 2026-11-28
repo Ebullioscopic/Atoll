@@ -48,26 +48,46 @@ struct AppIcons {
     
 }
 
+/// App icons by bundle identifier. Looking one up is two round trips to
+/// launchservicesd, and the music player asks from its SwiftUI body on every
+/// render of the open notch. Dropped whenever an app launches, so an updated
+/// app's new icon shows up after its relaunch.
+private enum AppIconCache {
+    static let icons: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 32
+        return cache
+    }()
+    private static let launchObserver = NSWorkspace.shared.notificationCenter.addObserver(
+        forName: NSWorkspace.didLaunchApplicationNotification,
+        object: nil,
+        queue: nil
+    ) { _ in
+        icons.removeAllObjects()
+    }
+
+    static func icon(for bundleID: String) -> NSImage? {
+        _ = launchObserver
+        if let cached = icons.object(forKey: bundleID as NSString) { return cached }
+        let workspace = NSWorkspace.shared
+        guard let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
+        let icon = workspace.icon(forFile: appURL.path)
+        icons.setObject(icon, forKey: bundleID as NSString)
+        return icon
+    }
+}
+
 func AppIcon(for bundleID: String) -> Image {
-    let workspace = NSWorkspace.shared
-    
-    if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID) {
-        let appIcon = workspace.icon(forFile: appURL.path)
+    if let appIcon = AppIconCache.icon(for: bundleID) {
         return Image(nsImage: appIcon)
     }
     
-    return Image(nsImage: workspace.icon(for: .applicationBundle))
+    return Image(nsImage: NSWorkspace.shared.icon(for: .applicationBundle))
 }
 
 
 func AppIconAsNSImage(for bundleID: String) -> NSImage? {
-    let workspace = NSWorkspace.shared
-    
-    if let appURL = workspace.urlForApplication(withBundleIdentifier: bundleID) {
-        let appIcon = workspace.icon(forFile: appURL.path)
-        return appIcon
-    }
-    return nil
+    AppIconCache.icon(for: bundleID)
 }
 
 func applySelectedAppIcon() {
