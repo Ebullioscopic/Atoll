@@ -436,6 +436,7 @@ private enum SettingsSearchIndex {
         // Stats
         SettingsSearchEntry(tab: .stats, title: "Enable system stats monitoring", keywords: ["stats", "monitoring"], highlightID: SettingsTab.stats.highlightID(for: "Enable system stats monitoring")),
         SettingsSearchEntry(tab: .stats, title: "Enable LLM Usage Monitor", keywords: ["llm", "usage", "ai", "monitor"], highlightID: SettingsTab.stats.highlightID(for: "Enable LLM Usage Monitor")),
+        SettingsSearchEntry(tab: .stats, title: "Show remaining quota instead of usage", keywords: ["llm", "usage", "ai", "quota", "remaining", "left"], highlightID: SettingsTab.stats.highlightID(for: "Show remaining quota instead of usage")),
         SettingsSearchEntry(tab: .stats, title: "Claude Provider", keywords: ["llm", "claude", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Claude Provider")),
         SettingsSearchEntry(tab: .stats, title: "Codex Provider", keywords: ["llm", "codex", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Codex Provider")),
         SettingsSearchEntry(tab: .stats, title: "Copilot Provider", keywords: ["llm", "github", "copilot", "quota"], highlightID: SettingsTab.stats.highlightID(for: "Copilot Provider")),
@@ -8169,6 +8170,13 @@ struct StatsSettings: View {
                     Text("Enable LLM Usage Monitor")
                 }
                 .settingsHighlight(id: highlightID("Enable LLM Usage Monitor"))
+
+                if enableLLMUsageFeature {
+                    Defaults.Toggle(key: .enableUsageRemainingDisplay) {
+                        Text("Show remaining quota instead of usage")
+                    }
+                    .settingsHighlight(id: highlightID("Show remaining quota instead of usage"))
+                }
 
             } header: {
                 Text("General")

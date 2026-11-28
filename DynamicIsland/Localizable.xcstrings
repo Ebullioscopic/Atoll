@@ -91881,7 +91881,8 @@
         }
       },
       "shouldTranslate" : false
-    }
+    },
+    "Show remaining quota instead of usage" : {}
   },
   "version" : "1.2"
 }
