@@ -64,32 +64,39 @@ final class LockScreenDisplayContextProvider {
         return snapshot
     }
 
+    /// Returns the cached context. It is rebuilt on lock, wake, Space and
+    /// screen-parameter changes (which also fire when the main display changes),
+    /// so reads stay cheap while the lock screen widgets lay themselves out.
     func contextSnapshot() -> LockScreenDisplayContext? {
-        refresh(reason: "snapshot")
+        if let context {
+            return context
+        }
+        return refresh(reason: "snapshot-miss")
     }
 
     private func preferredLockScreen() -> NSScreen? {
         let screens = NSScreen.screens
         let displays: [(displayID: CGDirectDisplayID?, isBuiltin: Bool)] = screens.map { screen in
-            let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
-            let displayID = number?.uint32Value
+            let displayID = screen.displayID
             return (displayID: displayID, isBuiltin: displayID.map { CGDisplayIsBuiltin($0) != 0 } ?? false)
         }
-        let index = Self.preferredDisplayIndex(
-            displays: displays,
-            mainDisplayID: CGMainDisplayID(),
-            activeScreenIndex: NSScreen.main.flatMap { screens.firstIndex(of: $0) }
-        )
+        let index = Self.preferredDisplayIndex(displays: displays, mainDisplayID: CGMainDisplayID())
         return index.map { screens[$0] }
     }
 
+    /// macOS draws the login window on the main display (the one with the menu
+    /// bar in System Settings > Displays), so the widgets follow it. This
+    /// supersedes the built-in-first order from ebcd2f6e, which put the widgets
+    /// on the laptop panel even when an external monitor was the main display.
+    /// The bug that commit fixed — widgets jumping between screens because
+    /// `NSScreen.main` follows keyboard focus — stays fixed: the choice never
+    /// depends on focus. In clamshell mode the built-in panel is offline and
+    /// absent from `NSScreen.screens`, so the main (external) display is used.
     nonisolated static func preferredDisplayIndex(
         displays: [(displayID: CGDirectDisplayID?, isBuiltin: Bool)],
-        mainDisplayID: CGDirectDisplayID,
-        activeScreenIndex: Int?
+        mainDisplayID: CGDirectDisplayID
     ) -> Int? {
         displays.firstIndex { $0.displayID == mainDisplayID }
-            ?? activeScreenIndex.flatMap { displays.indices.contains($0) ? $0 : nil }
             ?? displays.firstIndex { $0.isBuiltin }
             ?? displays.indices.first
     }
