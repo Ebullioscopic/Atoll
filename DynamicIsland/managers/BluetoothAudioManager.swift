@@ -981,9 +981,11 @@ class BluetoothAudioManager: ObservableObject {
         for result in results {
             let level = clampBatteryPercentage(result.level)
 
+            // A GATT read is a live value, so it replaces the cached one even when lower;
+            // keeping the higher number left a stale, too-high percentage on screen.
             if let addressKey = result.addressKey, !addressKey.isEmpty {
                 let previous = batteryStatusByAddress[addressKey] ?? -1
-                if level > previous {
+                if level != previous {
                     batteryStatusByAddress[addressKey] = level
                     batteryStatus[addressKey] = String(level)
                     didUpdate = true
@@ -992,7 +994,7 @@ class BluetoothAudioManager: ObservableObject {
 
             if let nameKey = result.nameKey, !nameKey.isEmpty {
                 let previous = batteryStatusByName[nameKey] ?? -1
-                if level > previous {
+                if level != previous {
                     batteryStatusByName[nameKey] = level
                     didUpdate = true
                 }
@@ -2282,6 +2284,10 @@ private final class BluetoothLEBatteryReader: NSObject, CBCentralManagerDelegate
     private var lookupByUUID: [UUID: Lookup] = [:]
     private var completion: (([Result]) -> Void)?
     private var pendingPeripherals: [UUID: CBPeripheral] = [:]
+    /// Peripherals this reader asked CoreBluetooth to connect. Each must be released with
+    /// `cancelPeripheralConnection` once read (or on timeout); otherwise the pending/open LE
+    /// link outlives the request and keeps contending with the headset's audio link.
+    private var readerConnections: [UUID: CBPeripheral] = [:]
     private var results: [UUID: Result] = [:]
     private var missingUUIDs: Set<UUID> = []
     private var timeoutWorkItem: DispatchWorkItem?
@@ -2455,13 +2461,20 @@ private final class BluetoothLEBatteryReader: NSObject, CBCentralManagerDelegate
         case .connected:
             peripheral.discoverServices([Self.batteryServiceUUID])
         default:
+            readerConnections[peripheral.identifier] = peripheral
             central.connect(peripheral, options: nil)
         }
+    }
+
+    private func releaseConnection(for identifier: UUID) {
+        guard let peripheral = readerConnections.removeValue(forKey: identifier) else { return }
+        central.cancelPeripheralConnection(peripheral)
     }
 
     private func markPeripheralFinished(_ identifier: UUID) {
         pendingPeripherals.removeValue(forKey: identifier)
         missingUUIDs.remove(identifier)
+        releaseConnection(for: identifier)
 
         if missingUUIDs.isEmpty {
             central.stopScan()
@@ -2493,6 +2506,9 @@ private final class BluetoothLEBatteryReader: NSObject, CBCentralManagerDelegate
         central.stopScan()
         state = .idle
 
+        for identifier in Array(readerConnections.keys) {
+            releaseConnection(for: identifier)
+        }
         pendingPeripherals.removeAll()
         missingUUIDs.removeAll()
         pendingLookups.removeAll()
