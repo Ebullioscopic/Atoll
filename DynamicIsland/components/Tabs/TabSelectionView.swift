@@ -63,6 +63,10 @@ struct TabSelectionView: View {
     @Default(.enableMinimalisticUI) private var enableMinimalisticUI
     @Default(.tabBarPosition) private var tabBarPosition
     @Default(.tabSwitchOnHover) private var tabSwitchOnHover
+    @Default(.enableGestures) private var enableGestures
+    @Default(.swipeBetweenTabs) private var swipeBetweenTabs
+    @Default(.gestureSensitivity) private var gestureSensitivity
+    @EnvironmentObject private var vm: DynamicIslandViewModel
     @Namespace var animation
 
     /// Which tab the pointer is currently resting on, when hover switching is on.
@@ -81,6 +85,12 @@ struct TabSelectionView: View {
 
     /// Time the notch is given to finish opening before a hover counts as intent.
     private let hoverArmingDelay = Duration.milliseconds(500)
+
+    /// A swipe moves one tab per gesture; set once it has, cleared when the fingers lift.
+    @State private var swipeHandled = false
+
+    /// The tab step a swipe asked for, applied in `onChange` so it reads the current tabs.
+    @State private var requestedSwipeStep: Int?
     
     private var tabs: [TabModel] {
         var tabsArray: [TabModel] = []
@@ -202,6 +212,11 @@ struct TabSelectionView: View {
         .onAppear {
             ensureValidSelection(with: tabs)
         }
+        .onChange(of: requestedSwipeStep) { _, step in
+            guard let step else { return }
+            requestedSwipeStep = nil
+            selectAdjacentTab(step: step)
+        }
         // Arms hover switching once, a beat after the bar appears.
         .task {
             hoverArmed = false
@@ -223,6 +238,51 @@ struct TabSelectionView: View {
             guard !Task.isCancelled else { return }
             select(tab)
         }
+        // Only over the tab bar, so swipes over the content still skip tracks
+        // or scroll the shelf and calendar.
+        .background {
+            if tabSwipeEnabled {
+                Color.clear
+                    .scrollPanGesture(direction: .left) { translation, phase in
+                        handleTabSwipe(step: -1, translation: translation, phase: phase)
+                    }
+                    .scrollPanGesture(direction: .right) { translation, phase in
+                        handleTabSwipe(step: 1, translation: translation, phase: phase)
+                    }
+            }
+        }
+        .onHover { inside in
+            vm.isHoveringSwipeableTabBar = inside && tabSwipeEnabled
+        }
+        .onChange(of: tabSwipeEnabled) { _, enabled in
+            if !enabled { vm.isHoveringSwipeableTabBar = false }
+        }
+        .onDisappear {
+            vm.isHoveringSwipeableTabBar = false
+        }
+    }
+
+    private var tabSwipeEnabled: Bool {
+        enableGestures && swipeBetweenTabs
+    }
+
+    /// Fingers moving right go to the tab on the right, left to the one on the left.
+    private func handleTabSwipe(step: Int, translation: CGFloat, phase: NSEvent.Phase) {
+        if phase == .ended {
+            swipeHandled = false
+            return
+        }
+        guard !swipeHandled, translation > gestureSensitivity else { return }
+        swipeHandled = true
+        requestedSwipeStep = step
+    }
+
+    private func selectAdjacentTab(step: Int) {
+        let tabs = tabs
+        guard let index = tabs.firstIndex(where: { isSelected($0) }) else { return }
+        let target = index + step
+        guard tabs.indices.contains(target) else { return }
+        select(tabs[target])
     }
 
     private func select(_ tab: TabModel) {

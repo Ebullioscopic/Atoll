@@ -47,6 +47,12 @@ extension View {
             )
             .background(ScrollMonitor(direction: direction, threshold: threshold, action: action))
     }
+
+    /// Two-finger scrolls only, without the drag gesture `panGesture` adds, so clicks
+    /// keep going to the view's own buttons.
+    func scrollPanGesture(direction: PanDirection, threshold: CGFloat = 4, action: @escaping (CGFloat, NSEvent.Phase) -> Void) -> some View {
+        background(ScrollMonitor(direction: direction, threshold: threshold, action: action))
+    }
 }
 
 private struct ScrollMonitor: NSViewRepresentable {

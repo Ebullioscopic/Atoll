@@ -44,6 +44,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     
     @Published var hideOnClosed: Bool = true
     @Published var isHoveringCalendar: Bool = false
+    /// The pointer is over the tab bar while swiping between tabs is on, so a horizontal
+    /// swipe there switches tabs instead of skipping tracks (#794).
+    @Published var isHoveringSwipeableTabBar: Bool = false
     @Published var isBatteryPopoverActive: Bool = false
     @Published var isClipboardPopoverActive: Bool = false
     @Published var isColorPickerPopoverActive: Bool = false

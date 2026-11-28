@@ -94593,7 +94593,9 @@
     "DeepSeek returned an invalid response" : {},
     "Balance too low for API calls" : {},
     "Balance" : {},
-    "DeepSeek API key not configured" : {}
+    "DeepSeek API key not configured" : {},
+    "Swipe between tabs" : {},
+    "Swipe two fingers left or right over the tab bar to move to the tab on that side. Swipes over the notch's content are unchanged." : {}
   },
   "version" : "1.2"
 }
