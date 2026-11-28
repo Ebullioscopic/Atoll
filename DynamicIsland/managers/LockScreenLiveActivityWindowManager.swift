@@ -140,8 +140,12 @@ class LockScreenLiveActivityWindowManager {
             return nil
         }
 
+        // The view model sizes the notch for the display Atoll's notch is on. The
+        // lock screen can be on another display (the main one), so measure that
+        // display's notch instead of borrowing a size that doesn't fit it (#899).
         var notchSize = viewModel.closedNotchSize
-        if notchSize.width <= 0 || notchSize.height <= 0 {
+        let viewModelScreen = NSScreen.screen(named: viewModel.screen) ?? NSScreen.main
+        if viewModelScreen != screen || notchSize.width <= 0 || notchSize.height <= 0 {
             notchSize = getClosedNotchSize(screen: screen.localizedName)
         }
 
