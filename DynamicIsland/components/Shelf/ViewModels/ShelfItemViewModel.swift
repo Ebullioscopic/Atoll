@@ -272,9 +272,13 @@ final class ShelfItemViewModel: ObservableObject {
     func performConversion(_ request: ShelfConversionRequest) {
         Task {
             do {
-                let converted = try await request.sourceURL.accessSecurityScopedResource { url in
-                    try await ShelfConversionService.convert(url, to: request.target)
-                }
+                // Detached so decoding and encoding never run on the main actor;
+                // only the AppKit steps inside the service hop back to it.
+                let converted = try await Task.detached(priority: .userInitiated) {
+                    try await request.sourceURL.accessSecurityScopedResource { url in
+                        try await ShelfConversionService.convert(url, to: request.target)
+                    }
+                }.value
                 guard let bookmark = try? Bookmark(url: converted) else {
                     throw ShelfConversionError.writeFailed
                 }

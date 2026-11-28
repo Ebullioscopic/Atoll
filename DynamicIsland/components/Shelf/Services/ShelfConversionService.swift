@@ -64,7 +64,7 @@ enum ShelfConversionService {
         case .audio:
             try await exportAsset(source, to: destination, type: target.type, audioOnly: true)
         case .document:
-            try convertDocument(source, to: destination, type: target.type)
+            try await convertDocument(source, to: destination, type: target.type)
         case .documentToPDF:
             try await convertDocumentToPDF(source, to: destination)
         }
@@ -76,7 +76,8 @@ enum ShelfConversionService {
 
     /// Keeps the original basename so the converted item is still recognisable,
     /// in its own temp directory so two conversions of the same file cannot
-    /// collide.
+    /// collide. Never next to the source, so a read-only source folder (a mounted
+    /// image, a shared volume) converts the same as any other.
     private static func makeDestination(for source: URL, target: ShelfConversionTarget) throws -> URL {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("shelf_convert_\(UUID().uuidString)", isDirectory: true)
@@ -307,10 +308,25 @@ enum ShelfConversionService {
 
     // MARK: - Documents
 
-    private static func readDocument(_ source: URL) throws -> NSAttributedString {
+    private static func readDocument(_ source: URL) async throws -> NSAttributedString {
+        let type = documentType(for: source)
+        // HTML import goes through WebKit, which only runs on the main thread.
+        if type == .html {
+            return try await MainActor.run { ImmutableText(value: try readDocument(source, as: type)) }.value
+        }
+        return try readDocument(source, as: type)
+    }
+
+    /// Carries an immutable `NSAttributedString` back from the main actor; it is
+    /// never mutated after it is read.
+    private struct ImmutableText: @unchecked Sendable {
+        let value: NSAttributedString
+    }
+
+    private static func readDocument(_ source: URL, as type: NSAttributedString.DocumentType) throws -> NSAttributedString {
         guard let text = try? NSAttributedString(
             url: source,
-            options: [.documentType: documentType(for: source)],
+            options: [.documentType: type],
             documentAttributes: nil
         ) else { throw ShelfConversionError.unreadableSource }
         return text
@@ -328,8 +344,8 @@ enum ShelfConversionService {
         }
     }
 
-    private static func convertDocument(_ source: URL, to destination: URL, type: UTType) throws {
-        let text = try readDocument(source)
+    private static func convertDocument(_ source: URL, to destination: URL, type: UTType) async throws {
+        let text = try await readDocument(source)
         let range = NSRange(location: 0, length: text.length)
 
         let outputType: NSAttributedString.DocumentType
@@ -351,12 +367,15 @@ enum ShelfConversionService {
         }
     }
 
+    private static func convertDocumentToPDF(_ source: URL, to destination: URL) async throws {
+        let text = try await readDocument(source)
+        try await renderPDF(text, to: destination)
+    }
+
     /// Main-actor because it lays the text out through `NSTextView` and prints it
-    /// with `NSPrintOperation`; `convert` is nonisolated, so without this the
-    /// AppKit work could run off the main actor.
+    /// with `NSPrintOperation`; reading the file stays off the main actor.
     @MainActor
-    private static func convertDocumentToPDF(_ source: URL, to destination: URL) throws {
-        let text = try readDocument(source)
+    private static func renderPDF(_ text: NSAttributedString, to destination: URL) throws {
 
         // Lay the text out on US Letter pages through an off-screen text view,
         // which is the only way AppKit will paginate an attributed string.
