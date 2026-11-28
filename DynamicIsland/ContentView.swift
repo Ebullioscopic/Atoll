@@ -47,7 +47,10 @@ struct ContentView: View {
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var reminderManager = ReminderLiveActivityManager.shared
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
-    @ObservedObject var statsManager = StatsManager.shared
+    // Not observed: StatsManager publishes every second while monitoring, which
+    // re-evaluated this whole body each tick. ContentView only calls
+    // updateMonitoringState(...); the stats views observe it themselves.
+    let statsManager = StatsManager.shared
     @ObservedObject var recordingManager = ScreenRecordingManager.shared
     @ObservedObject var privacyManager = PrivacyIndicatorManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
