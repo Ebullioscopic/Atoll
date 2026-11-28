@@ -385,7 +385,12 @@ class TerminalManager: ObservableObject {
     /// Keeps the gutter tint ring matching the terminal's resolved (translucent)
     /// background color so the inset gutter blends seamlessly with the cells.
     private func updateGutterTintColor() {
-        terminalGutterTintView.layer?.backgroundColor = resolvedTerminalBackgroundNSColor().cgColor
+        let background = resolvedTerminalBackgroundNSColor()
+        terminalGutterTintView.layer?.backgroundColor = background.cgColor
+        // With an opaque background the blur is fully covered and adds nothing,
+        // but a behind-window blur ignores the fade SwiftUI applies during a tab
+        // switch, so it flashed as a grey panel while the terminal faded in.
+        terminalBackgroundEffectView.isHidden = background.alphaComponent >= 1
     }
 
     // MARK: - Settings Application
