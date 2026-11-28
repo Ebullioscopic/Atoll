@@ -52,6 +52,9 @@ class CameraMonitor: ObservableObject {
     private var isListenerRegistered: Bool = false
     private var cameraDeviceIDs: [CMIOObjectID] = []
     private var deactivationTask: Task<Void, Never>?
+    private var deviceListListener: CMIOObjectPropertyListenerBlock?
+    private var inUseObservations: [NSKeyValueObservation] = []
+    private var captureDevicesByUID: [String: AVCaptureDevice] = [:]
     
     // MARK: - Configuration
     // Pure event-driven - no polling
@@ -96,17 +99,8 @@ class CameraMonitor: ObservableObject {
         
         isMonitoring = true
         
-        // Enumerate camera devices
-        cameraDeviceIDs = enumerateCameraDevices()
-        
-        if cameraDeviceIDs.isEmpty {
-            print("CameraMonitor: ⚠️ No camera devices found")
-        } else {
-            print("CameraMonitor: 📷 Found \(cameraDeviceIDs.count) camera device(s)")
-        }
-        
-        // Setup event listener (CoreMediaIO approach)
-        setupPropertyListener()
+        installDeviceListListeners()
+        rebindDevices()
         
         // Check initial state
         checkCameraStatus()
@@ -129,6 +123,9 @@ class CameraMonitor: ObservableObject {
         if isListenerRegistered {
             removePropertyListener()
         }
+        removeDeviceListListeners()
+        inUseObservations.removeAll()
+        captureDevicesByUID.removeAll()
         
         // Reset state
         deactivationTask?.cancel()
@@ -151,6 +148,112 @@ class CameraMonitor: ObservableObject {
     }
     
     // MARK: - Private Methods
+    
+    /// Re-read the camera list and move every listener onto it.
+    ///
+    /// Cameras come and go while Atoll runs — a phone exposed through a
+    /// Camera Extension, Continuity Camera, a USB webcam — and a camera that
+    /// was not there when monitoring started used to have no listener at all,
+    /// so its use was never noticed.
+    private func rebindDevices() {
+        if isListenerRegistered {
+            removePropertyListener()
+        }
+        cameraDeviceIDs = enumerateCameraDevices()
+        if cameraDeviceIDs.isEmpty {
+            print("CameraMonitor: ⚠️ No camera devices found")
+        } else {
+            print("CameraMonitor: 📷 Found \(cameraDeviceIDs.count) camera device(s)")
+        }
+        setupPropertyListener()
+        
+        // `isInUseByAnotherApplication` is key-value observable, which covers
+        // devices whose CoreMediaIO running state never sends a notification.
+        let captureDevices = Self.captureDevices()
+        captureDevicesByUID = Dictionary(
+            captureDevices.map { ($0.uniqueID, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        inUseObservations = captureDevices.map { device in
+            device.observe(\.isInUseByAnotherApplication, options: [.new]) { [weak self] _, _ in
+                Task { @MainActor in self?.checkCameraStatus() }
+            }
+        }
+    }
+    
+    /// Listen for cameras being added or removed, from CoreMediaIO's device
+    /// list and from AVFoundation's connect/disconnect notifications.
+    private func installDeviceListListeners() {
+        if deviceListListener == nil {
+            var address = Self.devicesAddress
+            let block: CMIOObjectPropertyListenerBlock = { [weak self] _, _ in
+                Task { @MainActor in self?.devicesChanged() }
+            }
+            if CMIOObjectAddPropertyListenerBlock(
+                CMIOObjectID(kCMIOObjectSystemObject), &address, .main, block
+            ) == OSStatus(kCMIOHardwareNoError) {
+                deviceListListener = block
+            }
+        }
+        
+        guard cancellables.isEmpty else { return }
+        let center = NotificationCenter.default
+        center.publisher(for: AVCaptureDevice.wasConnectedNotification)
+            .merge(with: center.publisher(for: AVCaptureDevice.wasDisconnectedNotification))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.devicesChanged() }
+            .store(in: &cancellables)
+    }
+    
+    private func removeDeviceListListeners() {
+        if let block = deviceListListener {
+            var address = Self.devicesAddress
+            CMIOObjectRemovePropertyListenerBlock(
+                CMIOObjectID(kCMIOObjectSystemObject), &address, .main, block
+            )
+            deviceListListener = nil
+        }
+        cancellables.removeAll()
+    }
+    
+    private func devicesChanged() {
+        guard isMonitoring else { return }
+        rebindDevices()
+        checkCameraStatus()
+    }
+    
+    private static var devicesAddress: CMIOObjectPropertyAddress {
+        CMIOObjectPropertyAddress(
+            mSelector: CMIOObjectPropertySelector(kCMIOHardwarePropertyDevices),
+            mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
+            mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain)
+        )
+    }
+    
+    private static func captureDevices() -> [AVCaptureDevice] {
+        AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInWideAngleCamera, .external],
+            mediaType: .video,
+            position: .unspecified
+        ).devices
+    }
+    
+    /// The device's unique ID, which is the same string AVFoundation reports
+    /// as `AVCaptureDevice.uniqueID`.
+    private func deviceUID(_ deviceID: CMIOObjectID) -> String? {
+        var propertyAddress = CMIOObjectPropertyAddress(
+            mSelector: CMIOObjectPropertySelector(kCMIODevicePropertyDeviceUID),
+            mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
+            mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain)
+        )
+        var uid: Unmanaged<CFString>?
+        var dataSize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        let status = CMIOObjectGetPropertyData(
+            deviceID, &propertyAddress, 0, nil, dataSize, &dataSize, &uid
+        )
+        guard status == OSStatus(kCMIOHardwareNoError), let uid else { return nil }
+        return uid.takeRetainedValue() as String
+    }
     
     /// Enumerate all camera devices using CoreMediaIO
     private func enumerateCameraDevices() -> [CMIOObjectID] {
@@ -292,6 +395,8 @@ class CameraMonitor: ObservableObject {
             mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementWildcard)
         )
         
+        let atollIsCapturing = WebcamManager.shared.isSessionRunning
+        
         // Check if any camera device is running
         for deviceID in cameraDeviceIDs {
             var isRunning: UInt32 = 0
@@ -307,9 +412,21 @@ class CameraMonitor: ObservableObject {
                 &isRunning
             )
             
-            if status == OSStatus(kCMIOHardwareNoError) && isRunning != 0 {
-                return true
+            guard status == OSStatus(kCMIOHardwareNoError), isRunning != 0 else { continue }
+            
+            // Camera Extensions can report themselves running somewhere while
+            // no app has them open — their host process keeps the stream up —
+            // and macOS shows no indicator then. For an external camera
+            // AVFoundation can vouch for, its per-app answer wins, unless the
+            // stream may be Atoll's own mirror.
+            if !atollIsCapturing,
+               let uid = deviceUID(deviceID),
+               let captureDevice = captureDevicesByUID[uid],
+               captureDevice.deviceType != .builtInWideAngleCamera,
+               !captureDevice.isInUseByAnotherApplication {
+                continue
             }
+            return true
         }
         
         return false
@@ -317,14 +434,7 @@ class CameraMonitor: ObservableObject {
     
     /// Check current camera status (AVFoundation fallback)
     private func checkCameraStatusAVFoundation() -> Bool {
-        // Use AVFoundation to check if any camera is in use
-        let discoverySession = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInWideAngleCamera, .external],
-            mediaType: .video,
-            position: .unspecified
-        )
-        
-        for device in discoverySession.devices {
+        for device in captureDevicesByUID.values {
             if device.isInUseByAnotherApplication {
                 return true
             }
