@@ -378,6 +378,14 @@ class BluetoothAudioManager: ObservableObject {
         } ?? primaryConnectedAirPodsDevice()
 
         guard let device else { return }
+
+        // The daemons also log the current mode when audio routing changes (e.g. on track
+        // changes), so the first value seen for a device is a baseline, not a change.
+        let key = normalizeBluetoothIdentifier(device.address)
+        if !key.isEmpty, lastListeningModeByAddress[key] == nil {
+            lastListeningModeByAddress[key] = mode
+            return
+        }
         presentListeningModeIfChanged(AirPodsListeningModeEvent(device: device, mode: mode))
     }
     
@@ -2218,27 +2226,8 @@ private final class AirPodsListeningModeLogObserver {
     }
 
     private func handle(_ line: String) {
-        guard Self.isModeChangeLine(line) else { return }
-        guard let mode = AirPodsListeningMode.from(line) else { return }
+        guard let mode = AirPodsListeningMode.fromLogLine(line) else { return }
         onModeChange?(mode, extractBluetoothAddress(from: line))
-    }
-
-    private static func isModeChangeLine(_ line: String) -> Bool {
-        let value = line.lowercased()
-
-        if value.contains("available") ||
-           value.contains("supported") ||
-           value.contains("capability") ||
-           value.contains("capabilities") ||
-           value.contains("listening modes") {
-            return false
-        }
-
-        return value.contains("lsnm") ||
-            value.contains("noisecontrolmode") ||
-            value.contains("active noise control") ||
-            value.contains("activeNoiseControlMode".lowercased()) ||
-            value.contains("activeNoiseCancellationMode".lowercased())
     }
 
     private func extractBluetoothAddress(from line: String) -> String? {
@@ -2648,6 +2637,75 @@ enum AirPodsListeningMode: Equatable {
         }
 
         return from("\(value)")
+    }
+
+    private static let logModeKeyPattern = try? NSRegularExpression(
+        pattern: #"\b(?:lsnm|listeningmode|noisecontrolmode|activenoisecontrolmode|activenoisecancellationmode)\b\s*[:=]?\s*["'(\[]?\s*([a-z]+|\d+)"#,
+        options: [.caseInsensitive]
+    )
+    private static let logModeTransitionPattern = try? NSRegularExpression(
+        pattern: #"\bto\s+["'(\[]?\s*([a-z]+|\d+)"#,
+        options: [.caseInsensitive]
+    )
+
+    /// Reads the listening mode from a Bluetooth daemon log line.
+    ///
+    /// Only the value written right after a listening-mode key (or after "to" in a
+    /// "from … to …" transition) counts. Searching the whole line for words like "anc" or
+    /// "transparency" matched unrelated text ("instance", "balance", capability lists) in
+    /// the routing chatter logged on every track change and popped a mode HUD although
+    /// nothing changed. Lines naming more than one mode without a transition are ignored.
+    static func fromLogLine(_ line: String) -> AirPodsListeningMode? {
+        let value = line.lowercased()
+        if value.contains("available") ||
+           value.contains("supported") ||
+           value.contains("capabilit") ||
+           value.contains("listening modes") {
+            return nil
+        }
+
+        guard let keyPattern = logModeKeyPattern else { return nil }
+        let range = NSRange(line.startIndex..., in: line)
+        let keyMatches = keyPattern.matches(in: line, range: range)
+        guard let firstKeyMatch = keyMatches.first else { return nil }
+
+        func token(_ match: NSTextCheckingResult) -> String? {
+            guard let tokenRange = Range(match.range(at: 1), in: line) else { return nil }
+            return String(line[tokenRange])
+        }
+
+        if let transitionPattern = logModeTransitionPattern {
+            let afterKey = NSRange(
+                location: firstKeyMatch.range.location,
+                length: range.length - firstKeyMatch.range.location
+            )
+            if let transition = transitionPattern.matches(in: line, range: afterKey).last,
+               let mode = token(transition).flatMap(fromLogToken) {
+                return mode
+            }
+        }
+
+        let modes = keyMatches.compactMap { token($0).flatMap(fromLogToken) }
+        guard let mode = modes.first, modes.allSatisfy({ $0 == mode }) else { return nil }
+        return mode
+    }
+
+    private static func fromLogToken(_ token: String) -> AirPodsListeningMode? {
+        if let number = Int(token) {
+            return fromPrivateValue(number)
+        }
+        switch token.lowercased() {
+        case "anc", "noisecancellation", "noisecancelling":
+            return .noiseCancellation
+        case "transparency", "transparent":
+            return .transparency
+        case "autoanc", "adaptive":
+            return .adaptive
+        case "normal", "off":
+            return .off
+        default:
+            return nil
+        }
     }
 
     static func fromPrivateValue(_ value: Int) -> AirPodsListeningMode? {
