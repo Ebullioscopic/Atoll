@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Security policy**: `SECURITY.md` explains how to report a vulnerability privately through GitHub's private vulnerability reporting instead of a public issue. (#776)
 - **DeepSeek balance in the LLM Usage tab**: an optional DeepSeek card shows your prepaid balance per currency (topped-up and granted) and warns when it is too low for API calls. Uses a regular API key stored in the Keychain. Off by default. (#709)
 - **Custom OpenAI base URL for the Screen Assistant**: the OpenAI provider's model settings take a base URL and an optional model ID, so OpenAI-compatible proxies and local servers can be used. The API key is optional when the base URL is not OpenAI's. (#807)
 - **Back up and restore settings**: General settings can export your Atoll settings to a JSON file and import them again, on the same Mac or another one. API keys, sign-ins, clipboard history, notes and other private or device-specific data are never included, and Atoll offers to relaunch after an import. (#885)
