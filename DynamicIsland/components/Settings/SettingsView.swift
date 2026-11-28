@@ -244,7 +244,9 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "Open notch on hover", keywords: ["hover to open", "auto open"], highlightID: SettingsTab.general.highlightID(for: "Open notch on hover")),
         SettingsSearchEntry(tab: .general, title: "Notch animation speed", keywords: ["animation", "speed", "notch"], highlightID: SettingsTab.general.highlightID(for: "Notch animation speed")),
         SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
+        SettingsSearchEntry(tab: .general, title: "Island top margin", keywords: ["dynamic island", "pill", "gap", "offset", "menu bar", "external display"], highlightID: SettingsTab.general.highlightID(for: "Island top margin")),
         SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
+        SettingsSearchEntry(tab: .general, title: "Open the full notch when hovered", keywords: ["hide", "hover", "external", "non-notch", "open directly", "expand"], highlightID: SettingsTab.general.highlightID(for: "Open the full notch when hovered")),
         SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
         SettingsSearchEntry(tab: .general, title: "Export Settings", keywords: ["export", "backup", "save settings", "share settings", "json"], highlightID: nil),
         SettingsSearchEntry(tab: .general, title: "Import Settings", keywords: ["import", "restore", "load settings", "settings file", "json"], highlightID: nil),
@@ -427,6 +429,7 @@ private enum SettingsSearchIndex {
 
         // Shortcuts
         SettingsSearchEntry(tab: .shortcuts, title: "Enable global keyboard shortcuts", keywords: ["keyboard", "shortcut"], highlightID: SettingsTab.shortcuts.highlightID(for: "Enable global keyboard shortcuts")),
+        SettingsSearchEntry(tab: .shortcuts, title: "Close automatically after 3 seconds", keywords: ["toggle notch open", "auto close", "auto hide", "shortcut", "hotkey"], highlightID: SettingsTab.shortcuts.highlightID(for: "Close automatically after 3 seconds")),
 
         // Timer
         SettingsSearchEntry(tab: .timer, title: "Enable timer feature", keywords: ["timer", "enable"], highlightID: SettingsTab.timer.highlightID(for: "Enable timer feature")),
@@ -1160,6 +1163,7 @@ struct GeneralSettings: View {
     @Default(.reverseSwipeGestures) var reverseSwipeGestures
     @Default(.reverseScrollGestures) var reverseScrollGestures
     @Default(.externalDisplayStyle) var externalDisplayStyle
+    @Default(.dynamicIslandTopMargin) var dynamicIslandTopMargin
     @Default(.hideNonNotchUntilHover) var hideNonNotchUntilHover
     @Default(.enableCaffeinate) var enableCaffeinate
     @Default(.caffeinateDefaultDuration) var caffeinateDefaultDuration
@@ -1573,6 +1577,20 @@ struct GeneralSettings: View {
             Text(externalDisplayStyle.description)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if externalDisplayStyle == .dynamicIsland {
+                Slider(value: $dynamicIslandTopMargin, in: 0...12, step: 1) {
+                    HStack {
+                        Text("Island top margin")
+                        Spacer()
+                        Text("\(Int(dynamicIslandTopMargin)) pt")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .onChange(of: dynamicIslandTopMargin) {
+                    NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
+                }
+                .settingsHighlight(id: highlightID("Island top margin"))
+            }
             Defaults.Toggle(key: .hideNonNotchUntilHover) {
                 Text("Hide until hovered on non-notch displays")
             }
@@ -1580,6 +1598,15 @@ struct GeneralSettings: View {
             Text("When enabled, the notch slides up and hides on external (non-notch) displays until you hover over it.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if hideNonNotchUntilHover && openNotchOnHover {
+                Defaults.Toggle(key: .openFullNotchFromHidden) {
+                    Text("Open the full notch when hovered")
+                }
+                .settingsHighlight(id: highlightID("Open the full notch when hovered"))
+                Text("Skips revealing the closed notch first.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         } header: {
             Text("Notch behavior")
         }
@@ -7330,6 +7357,11 @@ struct Shortcuts: View {
                 Section {
                     KeyboardShortcuts.Recorder("Toggle Notch Open:", name: .toggleNotchOpen)
                         .disabled(!enableShortcuts)
+                    Defaults.Toggle(key: .autoCloseNotchOpenedByShortcut) {
+                        Text("Close automatically after 3 seconds")
+                    }
+                    .disabled(!enableShortcuts)
+                    .settingsHighlight(id: highlightID("Close automatically after 3 seconds"))
                 } header: {
                     Text("Navigation")
                 } footer: {

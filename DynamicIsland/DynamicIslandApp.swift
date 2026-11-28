@@ -131,6 +131,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
+    private var screenConfigurationWorkItem: DispatchWorkItem?
 
     // Block-based AudioTap observers, kept with their center so they can be removed by token
     private var audioTapObserverTokens: [(center: NotificationCenter, token: NSObjectProtocol)] = []
@@ -304,6 +305,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
+        screenConfigurationWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
         extensionXPCServiceHost.stop()
         extensionRPCServer.stop()
@@ -907,6 +909,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
+        // The island's top margin is part of the window height on non-notch displays.
+        Defaults.publisher(.dynamicIslandTopMargin, options: []).sink { [weak self] _ in
+            self?.debouncedUpdateWindowSize()
+        }.store(in: &cancellables)
+
         // Observe terminal settings changes
         Defaults.publisher(.enableTerminalFeature, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
@@ -1039,10 +1046,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             forName: Notification.Name.automaticallySwitchDisplayChanged, object: nil, queue: nil
         ) { [weak self] _ in
-            guard let self = self, let window = self.window else { return }
             DispatchQueue.main.async {
-                window.alphaValue =
-                    self.coordinator.selectedScreen == self.coordinator.preferredScreen ? 1 : 0
+                self?.adjustWindowPosition()
             }
         }
 
@@ -1107,6 +1112,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             case .closed:
                 viewModel.open()
 
+                guard Defaults[.autoCloseNotchOpenedByShortcut] else { return }
                 let workItem = DispatchWorkItem { [weak viewModel] in
                     viewModel?.close()
                 }
@@ -1600,7 +1606,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
     
+    /// Opening or closing the lid, waking with displays attached or plugging one in
+    /// sends a burst of these while macOS is still rearranging the displays. The
+    /// windows are rebuilt once, after the burst, so they are not torn down and
+    /// recreated against screens that are about to move or disappear (#327).
     @objc func screenConfigurationDidChange() {
+        screenConfigurationWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.applyScreenConfigurationChange()
+        }
+        screenConfigurationWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+    }
+
+    private func applyScreenConfigurationChange() {
+        screenConfigurationWorkItem = nil
         let currentScreens = NSScreen.screens
 
         let screensChanged =
@@ -1612,10 +1632,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         previousScreens = currentScreens
         
         if screensChanged {
-            DispatchQueue.main.async { [weak self] in
-                self?.cleanupWindows()
-                self?.adjustWindowPosition()
-            }
+            cleanupWindows()
+            adjustWindowPosition()
         }
     }
     
@@ -1651,20 +1669,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         } else {
-            let selectedScreen: NSScreen
-
-            if let preferredScreen = coordinator.preferredNSScreen() {
-                coordinator.selectedScreen = preferredScreen.localizedName
-                selectedScreen = preferredScreen
-            } else if Defaults[.automaticallySwitchDisplay], let mainScreen = NSScreen.main {
-                coordinator.selectedScreen = mainScreen.localizedName
-                selectedScreen = mainScreen
-            } else {
-                if let window = window {
-                    window.alphaValue = 0
-                }
+            guard let selectedScreen = NSScreen.notchHostScreen(
+                preferred: coordinator.preferredNSScreen(),
+                automaticallySwitch: Defaults[.automaticallySwitchDisplay]
+            ) else {
                 return
             }
+            coordinator.selectedScreen = selectedScreen.localizedName
             
             vm.screen = selectedScreen.localizedName
             vm.notchSize = getClosedNotchSize(screen: selectedScreen.localizedName)

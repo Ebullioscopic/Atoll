@@ -110,4 +110,40 @@ final class FullscreenHidePolicyTests: XCTestCase {
         let delays = (0..<5).map { FullscreenHidePolicy.recheckDelay(afterRechecks: $0) }
         XCTAssertEqual(delays, [2, 4, 8, nil, nil])
     }
+
+    // MARK: windowFit
+
+    /// A 1512×982 notched display: the safe area stops 38 pt below the top.
+    private let safeArea = CGRect(x: 0, y: 0, width: 1512, height: 944)
+
+    func testWholeSafeAreaIsAWholeScreenWindow() {
+        XCTAssertEqual(FullscreenHidePolicy.windowFit(window: safeArea, safeArea: safeArea), .whole)
+    }
+
+    /// Split View panes fill the height but only part of the width (#409).
+    func testSplitViewPanesAreTiles() {
+        let left = CGRect(x: 0, y: 0, width: 754, height: 944)
+        let right = CGRect(x: 758, y: 0, width: 754, height: 944)
+        let narrow = CGRect(x: 0, y: 0, width: 500, height: 944)
+        XCTAssertEqual(FullscreenHidePolicy.windowFit(window: left, safeArea: safeArea), .tile)
+        XCTAssertEqual(FullscreenHidePolicy.windowFit(window: right, safeArea: safeArea), .tile)
+        XCTAssertEqual(FullscreenHidePolicy.windowFit(window: narrow, safeArea: safeArea), .tile)
+    }
+
+    func testOrdinaryWindowsAreNotFullscreenShaped() {
+        let floating = CGRect(x: 200, y: 200, width: 800, height: 600)
+        let shortHalf = CGRect(x: 0, y: 0, width: 756, height: 870)
+        let sidebar = CGRect(x: 0, y: 0, width: 200, height: 944)
+        XCTAssertEqual(FullscreenHidePolicy.windowFit(window: floating, safeArea: safeArea), .none)
+        XCTAssertEqual(FullscreenHidePolicy.windowFit(window: shortHalf, safeArea: safeArea), .none)
+        XCTAssertEqual(FullscreenHidePolicy.windowFit(window: sidebar, safeArea: safeArea), .none)
+    }
+
+    /// The fullscreen check reads the window that is on screen, not any other
+    /// window of the same app (#345).
+    func testSameWindowMatchesOnlyTheDetectedFrame() {
+        let detected = CGRect(x: 0, y: 38, width: 1512, height: 944)
+        XCTAssertTrue(FullscreenHidePolicy.isSameWindow(CGRect(x: 0, y: 39, width: 1512, height: 944), as: detected))
+        XCTAssertFalse(FullscreenHidePolicy.isSameWindow(CGRect(x: 1512, y: 0, width: 1920, height: 1080), as: detected))
+    }
 }

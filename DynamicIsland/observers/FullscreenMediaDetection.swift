@@ -23,12 +23,10 @@
 import ApplicationServices
 import Combine
 import Defaults
-import MacroVisionKit
 import SwiftUI
 
 class FullscreenMediaDetector: ObservableObject {
     static let shared = FullscreenMediaDetector()
-    private let detector: MacroVisionKit
     @ObservedObject private var musicManager = MusicManager.shared
     @MainActor @Published private(set) var fullscreenStatus: [String: Bool] = [:]
     private var notificationTask: Task<Void, Never>?
@@ -44,8 +42,6 @@ class FullscreenMediaDetector: ObservableObject {
     @MainActor private var settleTask: Task<Void, Never>?
 
     private init() {
-        self.detector = MacroVisionKit.shared
-        detector.configuration.includeSystemApps = true
         setupNotificationObservers()
         observeNowPlayingApp()
         Task { @MainActor [weak self] in
@@ -169,8 +165,7 @@ class FullscreenMediaDetector: ObservableObject {
             return (reset, false)
         }
 
-        let apps = detector.detectFullscreenApps(debug: false)
-            .filter { $0.bundleIdentifier != "com.apple.finder" }
+        let apps = detectFullscreenCandidates()
         let names = NSScreen.screens.map { $0.localizedName }
         let hideOption = Defaults[.hideNotchOption]
 
@@ -183,7 +178,7 @@ class FullscreenMediaDetector: ObservableObject {
         var newStatus: [String: Bool] = [:]
         var keepRechecking = false
         for name in names {
-            let candidates = apps.filter { $0.screen.localizedName == name }
+            let candidates = apps.filter { $0.screenName == name }
 
             // The notch stays on display by default (the window's collectionBehavior
             // rides along with fullscreen spaces). It only hides when the user's
@@ -228,25 +223,102 @@ class FullscreenMediaDetector: ObservableObject {
         return await SystemNowPlayingProbe.currentBundleIdentifier() ?? musicManager.bundleIdentifier
     }
 
-    /// Confirms an app the detector flagged as screen-filling is in *genuine* native
-    /// fullscreen, not merely maximized/zoomed. On a notched Mac a maximized window and a
-    /// fullscreen window report nearly identical frames, so frame size alone can't tell them
-    /// apart — the Accessibility `AXFullScreen` attribute can. Falls back to the detector's
-    /// frame-based result when Accessibility isn't trusted (so behavior doesn't silently break).
-    private func isInNativeFullscreen(_ app: MacroVisionKit.FullscreenWindowInfo) -> Bool {
-        guard AXIsProcessTrusted() else { return true }
+    /// A window on screen shaped like a fullscreen window: the whole safe area of
+    /// its display, or its full height as one side of a Split View.
+    struct FullscreenWindowCandidate {
+        let processID: pid_t
+        let bundleIdentifier: String?
+        let screenName: String
+        /// Global display coordinates with a top-left origin, as Accessibility reports frames.
+        let bounds: CGRect
+        let fit: FullscreenHidePolicy.WindowFit
+    }
+
+    /// On-screen windows (current Space of each display only) that could be
+    /// fullscreen. Finder, the Dock and Atoll's own windows are skipped.
+    @MainActor
+    private func detectFullscreenCandidates() -> [FullscreenWindowCandidate] {
+        guard let windowInfo = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
+        ) as? [[String: Any]] else { return [] }
+
+        let screens = NSScreen.screens
+        guard let primaryHeight = screens.first?.frame.height else { return [] }
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+
+        var candidates: [FullscreenWindowCandidate] = []
+        for info in windowInfo {
+            guard let pid = info[kCGWindowOwnerPID as String] as? pid_t, pid != ownPID,
+                  let alpha = info[kCGWindowAlpha as String] as? CGFloat, alpha > 0,
+                  let boundsInfo = info[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: boundsInfo as CFDictionary)
+            else { continue }
+
+            let appKitFrame = CGRect(
+                x: bounds.minX,
+                y: primaryHeight - bounds.maxY,
+                width: bounds.width,
+                height: bounds.height
+            )
+            guard let screen = screens.first(where: { $0.frame.contains(appKitFrame) }) else { continue }
+
+            let fit = FullscreenHidePolicy.windowFit(window: appKitFrame, safeArea: Self.safeArea(of: screen))
+            guard fit != .none,
+                  let app = NSRunningApplication(processIdentifier: pid),
+                  app.bundleIdentifier != "com.apple.dock",
+                  app.bundleIdentifier != "com.apple.finder"
+            else { continue }
+
+            candidates.append(FullscreenWindowCandidate(
+                processID: pid,
+                bundleIdentifier: app.bundleIdentifier,
+                screenName: screen.localizedName,
+                bounds: bounds,
+                fit: fit
+            ))
+        }
+        return candidates
+    }
+
+    /// The display area below the camera housing on notched displays.
+    private static func safeArea(of screen: NSScreen) -> CGRect {
+        let insets = screen.safeAreaInsets
+        return CGRect(
+            x: screen.frame.minX + insets.left,
+            y: screen.frame.minY + insets.bottom,
+            width: screen.frame.width - insets.left - insets.right,
+            height: screen.frame.height - insets.top - insets.bottom
+        )
+    }
+
+    /// Confirms a window flagged as screen-filling is in *genuine* native
+    /// fullscreen, not merely maximized/zoomed or tiled. On a notched Mac a maximized
+    /// window and a fullscreen window report nearly identical frames, so frame size
+    /// alone can't tell them apart — the Accessibility `AXFullScreen` attribute can.
+    ///
+    /// The attribute is read from the app window whose frame matches the detected
+    /// on-screen window, so another window of the same app (for example one in
+    /// fullscreen on another Space) cannot hide the notch on this one. Without
+    /// Accessibility, whole-screen windows keep the frame-based result (so behavior
+    /// doesn't silently break) and Split View panes are not treated as fullscreen.
+    private func isInNativeFullscreen(_ candidate: FullscreenWindowCandidate) -> Bool {
+        guard AXIsProcessTrusted() else { return candidate.fit == .whole }
 
         let reader = BoundedAXReader(timeout: Self.accessibilityTimeout)
-        let appElement = AXUIElementCreateApplication(app.processId)
-
-        // Prefer the focused window, then fall back to scanning all windows.
-        if let focused: AXUIElement = reader.copyAttribute(kAXFocusedWindowAttribute as CFString, from: appElement),
-           reader.isWindowFullscreen(focused) {
-            return true
-        }
+        let appElement = AXUIElementCreateApplication(candidate.processID)
 
         if let windows: [AXUIElement] = reader.copyAttribute(kAXWindowsAttribute as CFString, from: appElement) {
-            return windows.contains { reader.isWindowFullscreen($0) }
+            for window in windows {
+                guard let frame = reader.frame(of: window),
+                      FullscreenHidePolicy.isSameWindow(frame, as: candidate.bounds)
+                else { continue }
+                return reader.isWindowFullscreen(window)
+            }
+        }
+
+        // Not every app lists its windows over Accessibility; ask about the focused one.
+        if let focused: AXUIElement = reader.copyAttribute(kAXFocusedWindowAttribute as CFString, from: appElement) {
+            return reader.isWindowFullscreen(focused)
         }
 
         return false
@@ -281,6 +353,23 @@ private final class BoundedAXReader {
         // fullscreen; maximized/zoomed windows report false or omit it.
         let value: Bool? = copyAttribute("AXFullScreen" as CFString, from: window)
         return value ?? false
+    }
+
+    /// The window's frame in global display coordinates (top-left origin).
+    func frame(of window: AXUIElement) -> CGRect? {
+        guard let position = copyValue(kAXPositionAttribute as CFString, from: window, type: .cgPoint, initial: CGPoint.zero),
+              let size = copyValue(kAXSizeAttribute as CFString, from: window, type: .cgSize, initial: CGSize.zero)
+        else { return nil }
+        return CGRect(origin: position, size: size)
+    }
+
+    private func copyValue<T>(_ attribute: CFString, from element: AXUIElement, type: AXValueType, initial: T) -> T? {
+        guard let raw: CFTypeRef = copyAttribute(attribute, from: element),
+              CFGetTypeID(raw) == AXValueGetTypeID()
+        else { return nil }
+        var value = initial
+        guard AXValueGetValue(unsafeBitCast(raw, to: AXValue.self), type, &value) else { return nil }
+        return value
     }
 
     func copyAttribute<T>(_ attribute: CFString, from element: AXUIElement) -> T? {

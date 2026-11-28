@@ -38,6 +38,12 @@ extension NSScreen {
         return CFUUIDCreateString(nil, uuid) as String?
     }
 
+    /// Whether this is the Mac's built-in panel (the one with the notch on notched Macs).
+    var isBuiltInDisplay: Bool {
+        guard let displayID else { return false }
+        return CGDisplayIsBuiltin(displayID) != 0
+    }
+
     /// Resolves a display by its localized name. When several connected displays
     /// share that name (e.g. two identical monitors), the one the user picked in
     /// Settings wins, so name-keyed lookups land on the same display as the window.
@@ -50,6 +56,17 @@ extension NSScreen {
               let preferred = matches.first(where: { $0.displayUUID == uuid })
         else { return matches.first }
         return preferred
+    }
+
+    /// Display that hosts the single notch window when "Show on all displays" is off.
+    static func notchHostScreen(preferred: NSScreen?, automaticallySwitch: Bool) -> NSScreen? {
+        NotchHostDisplay.resolve(
+            preferred: preferred,
+            main: NSScreen.main,
+            builtIn: screens.first(where: \.isBuiltInDisplay),
+            first: screens.first,
+            automaticallySwitch: automaticallySwitch
+        )
     }
 
     /// `(uuid, label)` rows for display pickers.
@@ -67,5 +84,26 @@ extension NSScreen {
             let label = isDuplicated ? "\(name) (\(seen[name, default: 1]))" : name
             return (uuid, label)
         }
+    }
+}
+
+/// Picks the display for the single notch window.
+///
+/// The display chosen in Settings wins while it is connected. Otherwise the notch
+/// must still land somewhere: hiding it leaves the user with no notch at all, which
+/// is what happened when macOS 27 renamed the built-in display and the stored name
+/// stopped matching (#632). "Automatically switch display" follows the main display;
+/// without it the built-in display is preferred, since that is where the notch is.
+enum NotchHostDisplay {
+    static func resolve<Display>(
+        preferred: Display?,
+        main: Display?,
+        builtIn: Display?,
+        first: Display?,
+        automaticallySwitch: Bool
+    ) -> Display? {
+        if let preferred { return preferred }
+        if automaticallySwitch { return main ?? builtIn ?? first }
+        return builtIn ?? main ?? first
     }
 }

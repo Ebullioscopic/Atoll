@@ -406,7 +406,10 @@ func notchTopScreenBleed(for screenName: String?) -> CGFloat {
 /// Vertical offset from the top screen edge for the Dynamic Island pill.
 /// Creates a visual gap so the pill floats below the menu bar, mimicking
 /// the iPhone's Dynamic Island detachment from the physical screen edge.
-let dynamicIslandTopOffset: CGFloat = 6
+/// Adjustable in General settings ("Island top margin"); 6 pt by default.
+var dynamicIslandTopOffset: CGFloat {
+    max(0, Defaults[.dynamicIslandTopMargin])
+}
 
 /// Extra horizontal padding applied OUTSIDE the pill clip shape in Dynamic
 /// Island mode so the drop shadow has room to render without being clipped

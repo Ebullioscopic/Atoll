@@ -94544,7 +94544,11 @@
           }
         }
       }
-    }
+    },
+    "Island top margin" : {},
+    "Open the full notch when hovered" : {},
+    "Skips revealing the closed notch first." : {},
+    "Close automatically after 3 seconds" : {}
   },
   "version" : "1.2"
 }
