@@ -140,8 +140,21 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     @Published var notchSize: CGSize = getClosedNotchSize()
     @Published var closedNotchSize: CGSize = getClosedNotchSize()
     
+    /// This notch's claim on the shared arrow-key monitor. A value rather than
+    /// a reference to `self`, so teardown can release it from `deinit`.
+    private let seekMonitorOwner = UUID()
+
     @MainActor
     deinit {
+        // A view model can be thrown away while its notch is still open --
+        // window cleanup removes one without going through close() -- and the
+        // seek monitor is process-wide, so release this notch's claim. Hopping
+        // to the main actor keeps this valid if deinit runs nonisolated under
+        // Swift 6; releasing a claim that was never made does nothing.
+        let seekMonitorOwner = seekMonitorOwner
+        Task { @MainActor in
+            NotchSeekKeyMonitor.shared.stop(owner: seekMonitorOwner)
+        }
         destroy()
     }
 
@@ -459,6 +472,8 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         notchSize = targetSize
         notchState = .open
 
+        NotchSeekKeyMonitor.shared.start(owner: seekMonitorOwner)
+
         // Force music information update when notch is opened
         MusicManager.shared.forceUpdate()
         focusClipboardTabIfNeeded()
@@ -486,6 +501,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         notchSize = targetSize
         closedNotchSize = targetSize
         notchState = .closed
+        NotchSeekKeyMonitor.shared.stop(owner: seekMonitorOwner)
         resetScrollGestureSuppression()
         resetAutoCloseSuppression()
 
@@ -504,6 +520,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             notchSize = targetSize
             closedNotchSize = targetSize
             notchState = .closed
+            NotchSeekKeyMonitor.shared.stop(owner: seekMonitorOwner)
             resetScrollGestureSuppression()
             resetAutoCloseSuppression()
         }
