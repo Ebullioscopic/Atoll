@@ -179,13 +179,21 @@ class SystemOSDManager {
     /// so a SIGSTOP-frozen OSDUIHelper stays frozen after Atoll quits, breaking
     /// every native OSD Atoll does not replace (keyboard backlight,
     /// external-display brightness, …) and leaving a stuck HUD on screen. This
-    /// sends SIGCONT inline and blocks until it lands, guaranteeing the helper
-    /// is resumed before Atoll exits. Idempotent; safe to call from a
-    /// termination handler.
+    /// acts inline and blocks until it lands, guaranteeing the helper is usable
+    /// before Atoll exits. Idempotent; safe to call from a termination handler.
+    ///
+    /// A helper that was being suppressed is killed rather than resumed.
+    /// Resuming one that has been frozen for hours let it replay HUD requests
+    /// queued while it was stopped and draw them with display geometry from
+    /// before it froze -- the native HUD then showed up in the top-left corner
+    /// of the screen, or not at all (#803). launchd starts a fresh helper on
+    /// the next key press, and any HUD frozen on screen goes with the old one.
     public static func resumeOSDUIHelperForTermination() {
-        suppressionState.withLock { state in
+        let wasSuppressing = suppressionState.withLock { state -> Bool in
+            let wasActive = state.active
             state.active = false
             state.transitionGeneration &+= 1
+            return wasActive
         }
         // This path cleans up itself; tell the crash watchdog to stand down.
         disarmCrashWatchdog()
@@ -202,13 +210,15 @@ class SystemOSDManager {
 
         let resume = Process()
         resume.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-        resume.arguments = ["-CONT", "OSDUIHelper"]
+        // SIGCONT when not suppressing still undoes a stray stop from a stale
+        // transition, without disturbing a helper that is working normally.
+        resume.arguments = [wasSuppressing ? "-KILL" : "-CONT", "OSDUIHelper"]
         resume.standardError = Pipe() // silence "no such process" stderr
         do {
             try resume.run()
             resume.waitUntilExit()
         } catch {
-            NSLog("Failed to SIGCONT OSDUIHelper on termination: \(error)")
+            NSLog("Failed to restore OSDUIHelper on termination: \(error)")
         }
     }
 
