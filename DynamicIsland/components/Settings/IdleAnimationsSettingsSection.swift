@@ -209,7 +209,7 @@ struct IdleAnimationsSettingsSection: View {
         .alert("Import Error", isPresented: $showingError) {
             Button("OK") { }
         } message: {
-            Text(importError ?? "Unknown error occurred")
+            Text(importError ?? String(localized: "An unknown error occurred."))
         }
     }
     
