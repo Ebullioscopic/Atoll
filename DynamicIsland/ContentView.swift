@@ -1247,7 +1247,7 @@ struct ContentView: View {
                       HStack(spacing: 0) {
                           // The tab rail, when the tab bar is set to the leading
                           // edge rather than the header.
-                          if tabBarPosition == .left {
+                          if isLeadingTabRailActive() {
                               TabSelectionView()
                                   .padding(.trailing, 12)
                           }

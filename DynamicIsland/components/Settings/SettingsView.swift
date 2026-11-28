@@ -361,6 +361,8 @@ private enum SettingsSearchIndex {
         // Appearance
         SettingsSearchEntry(tab: .appearance, title: "Main screen style", keywords: ["dynamic island", "pill", "non-notch", "display style", "notch style"], highlightID: SettingsTab.appearance.highlightID(for: "Main screen style")),
         SettingsSearchEntry(tab: .appearance, title: "Settings icon in notch", keywords: ["settings button", "toolbar"], highlightID: SettingsTab.appearance.highlightID(for: "Settings icon in notch")),
+        SettingsSearchEntry(tab: .appearance, title: "Tab bar position", keywords: ["tabs", "tab bar", "rail", "left", "leading", "sidebar"], highlightID: SettingsTab.appearance.highlightID(for: "Tab bar position")),
+        SettingsSearchEntry(tab: .appearance, title: "Switch tabs on hover", keywords: ["tabs", "hover", "switch"], highlightID: SettingsTab.appearance.highlightID(for: "Switch tabs on hover")),
         SettingsSearchEntry(tab: .appearance, title: "Enable window shadow", keywords: ["shadow", "appearance"], highlightID: SettingsTab.appearance.highlightID(for: "Enable window shadow")),
         SettingsSearchEntry(tab: .appearance, title: "Corner radius scaling", keywords: ["corner radius", "shape"], highlightID: SettingsTab.appearance.highlightID(for: "Corner radius scaling")),
         SettingsSearchEntry(tab: .appearance, title: "Use simpler close animation", keywords: ["close animation", "notch"], highlightID: SettingsTab.appearance.highlightID(for: "Use simpler close animation")),

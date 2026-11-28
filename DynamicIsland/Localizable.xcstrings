@@ -91881,7 +91881,14 @@
         }
       },
       "shouldTranslate" : false
-    }
+    },
+    "Tab bar position" : {},
+    "Switch tabs on hover" : {},
+    "Top" : {},
+    "Icons sit in a row above the content" : {},
+    "Icons sit in a column beside the content, leaving the notch narrower" : {},
+    "Resting the pointer on a tab selects it, without a click." : {},
+    "Tab Bar" : {}
   },
   "version" : "1.2"
 }

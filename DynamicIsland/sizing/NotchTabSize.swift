@@ -88,6 +88,16 @@ func notchTabContentSize(
         break
     }
 
+    // The rail takes its width out of the content. The tab-count minimum in
+    // `recommendedMinimumNotchWidth` already allows for it; the side lyrics
+    // panel asks for an exact content width, so the rail goes on top of that.
+    if view == .home, isNotchOpen, isLeadingTabRailActive() {
+        let sideLyricsWidth = sideLyricsRequiredNotchWidth()
+        if sideLyricsWidth > 0 {
+            size.width = min(max(size.width, sideLyricsWidth + tabRailWidth), maxAllowedNotchWidth())
+        }
+    }
+
     // Both of these no-op unless their own tab is the active one, so applying
     // them to every tab is the same as the per-tab returns they replaced.
     size = inlineLyricsAdjustedNotchSize(

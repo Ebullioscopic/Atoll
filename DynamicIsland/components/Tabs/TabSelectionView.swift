@@ -201,8 +201,6 @@ struct TabSelectionView: View {
         .onAppear {
             ensureValidSelection(with: tabs)
         }
-        // Moving on to another icon cancels the pending switch along with the
-        // task, so only the icon actually rested on ever wins.
         // Arms hover switching once, a beat after the bar appears.
         .task {
             hoverArmed = false
@@ -210,6 +208,8 @@ struct TabSelectionView: View {
             guard !Task.isCancelled else { return }
             hoverArmed = true
         }
+        // Moving on to another icon cancels the pending switch along with the
+        // task, so only the icon actually rested on ever wins.
         .task(id: hoveredTabID) {
             guard tabSwitchOnHover,
                   hoverArmed,
