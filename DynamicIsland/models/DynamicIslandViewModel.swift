@@ -144,6 +144,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     /// a reference to `self`, so teardown can release it from `deinit`.
     private let seekMonitorOwner = UUID()
 
+    /// The app that was frontmost when the notch opened, given the keyboard back on close (#386).
+    private var appToRestoreOnClose: NSRunningApplication?
+
     @MainActor
     deinit {
         // A view model can be thrown away while its notch is still open --
@@ -467,6 +470,12 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         }
         let targetSize = calculateDynamicNotchSize()
 
+        if notchState == .closed {
+            let frontmost = NSWorkspace.shared.frontmostApplication
+            let isAtoll = frontmost?.processIdentifier == NSRunningApplication.current.processIdentifier
+            appToRestoreOnClose = isAtoll ? nil : frontmost
+        }
+
         let applyWindowResize: () -> Void = {
             guard let delegate = AppDelegate.shared else { return }
             delegate.ensureWindowSize(
@@ -513,6 +522,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
 
     func close() {
+        returnKeyboardFocusIfNeeded()
         let targetSize = getClosedNotchSize(screen: screen)
         notchSize = targetSize
         closedNotchSize = targetSize
@@ -531,6 +541,28 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         } else if !coordinator.openLastTabByDefault {
             coordinator.currentView = .home
         }
+    }
+
+    /// A typing tab made the notch key, and the Terminal tab also activates Atoll. Hand both
+    /// back to the app that was in front, so a full-screen app doesn't keep its title bar and
+    /// the menu bar revealed (#386). Nothing happens if the user moved on to another window,
+    /// or if Atoll itself (Settings) was in front.
+    private func returnKeyboardFocusIfNeeded() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in self?.returnKeyboardFocusIfNeeded() }
+            return
+        }
+        let app = appToRestoreOnClose
+        appToRestoreOnClose = nil
+        guard let app, !app.isTerminated,
+              let keyWindow = NSApp.keyWindow as? DynamicIslandWindow,
+              keyWindow.notchViewModel === self
+        else { return }
+
+        if NSApp.isActive {
+            NSApp.yieldActivation(to: app)
+        }
+        app.activate()
     }
 
     func closeForLockScreen() {

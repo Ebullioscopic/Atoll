@@ -21,6 +21,7 @@
  */
 
 import Cocoa
+import Defaults
 
 class DynamicIslandWindow: NSPanel {
     static let pinnedCollectionBehavior: NSWindow.CollectionBehavior = [
@@ -60,12 +61,35 @@ class DynamicIslandWindow: NSPanel {
         ScreenCaptureVisibilityManager.shared.register(self, scope: .entireInterface)
     }
     
+    /// The notch's view model, so closing it can tell whether this window holds the keyboard.
+    weak var notchViewModel: DynamicIslandViewModel?
+
+    /// Only tabs that take keyboard input make the notch key (#386). Becoming key takes
+    /// the keyboard from the frontmost app, and in a full-screen Space that left the
+    /// app's title bar and the menu bar showing after the notch closed.
     override var canBecomeKey: Bool {
-        true
+        notchTabTakesKeyboardInput(
+            DynamicIslandViewCoordinator.shared.currentView,
+            arrowKeySeekEnabled: Defaults[.arrowKeySeekEnabled]
+        )
     }
     
     override var canBecomeMain: Bool {
         true
     }
 
+}
+
+/// Whether a notch tab needs the keyboard: text fields, the terminal, the shelf's
+/// Delete and ⌘A, the timer's rename field, extension content, and the home view's
+/// arrow-key seeking when that option is on.
+func notchTabTakesKeyboardInput(_ view: NotchViews, arrowKeySeekEnabled: Bool) -> Bool {
+    switch view {
+    case .terminal, .notes, .clipboard, .shelf, .timer, .extensionExperience:
+        return true
+    case .home:
+        return arrowKeySeekEnabled
+    case .stats, .llmUsage, .colorPicker:
+        return false
+    }
 }
