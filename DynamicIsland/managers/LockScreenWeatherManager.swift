@@ -48,7 +48,12 @@ final class LockScreenWeatherManager: ObservableObject {
 
     func showWeatherWidget() {
         guard Defaults[.enableLockScreenWeatherWidget] else {
-            LockScreenWeatherPanelManager.shared.hide()
+            if let accessorySnapshot = makeSnapshotWithoutWeather() {
+                snapshot = accessorySnapshot
+                deliver(accessorySnapshot, forceShow: true)
+            } else {
+                LockScreenWeatherPanelManager.shared.hide()
+            }
             return
         }
 
@@ -91,6 +96,15 @@ final class LockScreenWeatherManager: ObservableObject {
     @discardableResult
     func refresh(force: Bool = false) async -> LockScreenWeatherSnapshot? {
         NSLog("LockScreenWeatherManager: refresh requested (force=%@)", force ? "true" : "false")
+        guard Defaults[.enableLockScreenWeatherWidget] else {
+            // No location or network access while weather is off.
+            let accessorySnapshot = makeSnapshotWithoutWeather()
+            snapshot = accessorySnapshot
+            if let accessorySnapshot {
+                deliver(accessorySnapshot, forceShow: false)
+            }
+            return accessorySnapshot
+        }
         let interval = Defaults[.lockScreenWeatherRefreshInterval]
         if !force, let lastFetchDate, Date().timeIntervalSince(lastFetchDate) < interval {
             let remaining = interval - Date().timeIntervalSince(lastFetchDate)
@@ -291,6 +305,8 @@ final class LockScreenWeatherManager: ObservableObject {
                         NSLog("LockScreenWeatherManager: widget enabled, triggering refresh")
                         self.locationProvider.prepareAuthorization()
                         _ = await self.refresh(force: true)
+                    } else if LockScreenManager.shared.currentLockStatus {
+                        self.showWeatherWidget()
                     } else {
                         LockScreenWeatherPanelManager.shared.hide()
                     }
@@ -300,6 +316,13 @@ final class LockScreenWeatherManager: ObservableObject {
     }
 
     private func handleAccessoryUpdate(triggerBluetoothRefresh: Bool) {
+        guard Defaults[.enableLockScreenWeatherWidget] else {
+            if let accessorySnapshot = makeSnapshotWithoutWeather() {
+                snapshot = accessorySnapshot
+                deliver(accessorySnapshot, forceShow: false)
+            }
+            return
+        }
         guard let payload = latestWeatherPayload else { return }
 
         if triggerBluetoothRefresh {
@@ -319,6 +342,40 @@ final class LockScreenWeatherManager: ObservableObject {
         } else {
             LockScreenWeatherPanelManager.shared.update(with: snapshot)
         }
+    }
+
+    /// The battery, charging, Bluetooth, calendar and Focus parts of the status
+    /// widget work without weather, so they stay visible when weather is off (#523).
+    static func hasContentWithoutWeather() -> Bool {
+        Defaults[.lockScreenBatteryShowsCharging]
+            || Defaults[.lockScreenBatteryShowsBatteryGauge]
+            || Defaults[.lockScreenBatteryShowsBluetooth]
+            || Defaults[.lockScreenShowCalendarEvent]
+            || Defaults[.enableLockScreenFocusWidget]
+    }
+
+    private func makeSnapshotWithoutWeather() -> LockScreenWeatherSnapshot? {
+        guard Self.hasContentWithoutWeather() else { return nil }
+        let placeholder = LockScreenWeatherSnapshot(
+            temperatureText: "--",
+            symbolName: "cloud.fill",
+            description: "",
+            locationName: nil,
+            charging: nil,
+            bluetooth: nil,
+            battery: nil,
+            showsLocation: false,
+            airQuality: nil,
+            widgetStyle: Defaults[.lockScreenWeatherWidgetStyle],
+            showsChargingPercentage: false,
+            temperatureInfo: nil,
+            usesGaugeTint: false,
+            sunCycle: nil,
+            showsSunrise: false
+        )
+        var accessorySnapshot = makeSnapshot(from: placeholder)
+        accessorySnapshot.showsWeather = false
+        return accessorySnapshot
     }
 
     private func makeSnapshot(from payload: LockScreenWeatherSnapshot) -> LockScreenWeatherSnapshot {
@@ -536,6 +593,9 @@ struct LockScreenWeatherSnapshot: Equatable {
     let usesGaugeTint: Bool
     let sunCycle: SunCycleInfo?
     let showsSunrise: Bool
+    /// False when only the battery/Bluetooth/calendar parts of the widget are
+    /// enabled; the panel then hides the weather segments (#523).
+    var showsWeather: Bool = true
 }
 
 extension LockScreenWeatherSnapshot.AirQualityInfo.Category {

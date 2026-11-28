@@ -428,7 +428,7 @@ struct LockScreenWeatherWidget: View {
 	}
 
 	private var enabledRowKinds: [RowKind] {
-		var enabled: Set<RowKind> = [.weather]
+		var enabled: Set<RowKind> = hasMainRowContent ? [.weather] : []
 		if lockScreenShowCalendarEvent { enabled.insert(.calendar) }
 		if shouldShowFocusWidget { enabled.insert(.focus) }
 		if shouldShowFocusInCalendarSlot { enabled.insert(.calendar); enabled.remove(.focus) }
@@ -443,7 +443,7 @@ struct LockScreenWeatherWidget: View {
 	private func isRowActive(_ kind: RowKind) -> Bool {
 		switch kind {
 		case .weather:
-			return true
+			return hasMainRowContent
 		case .focus:
 			return shouldShowFocusWidget
 		case .calendar:
@@ -468,6 +468,12 @@ struct LockScreenWeatherWidget: View {
 		let bottomActive = isRowActive(bottomKind)
 
 		return (!middleActive && bottomActive) ? -collapseDistance : 0
+	}
+
+	/// With weather turned off the row still carries the battery, charging and
+	/// Bluetooth segments (#523).
+	private var hasMainRowContent: Bool {
+		snapshot.showsWeather || snapshot.charging != nil || snapshot.battery != nil || snapshot.bluetooth != nil
 	}
 
 	private var isInline: Bool { snapshot.widgetStyle == .inline }
@@ -638,18 +644,20 @@ struct LockScreenWeatherWidget: View {
 				bluetoothSegment(for: bluetooth)
 			}
 
-			if let airQuality = snapshot.airQuality {
-				airQualitySegment(for: airQuality)
-			}
+			if snapshot.showsWeather {
+				if let airQuality = snapshot.airQuality {
+					airQualitySegment(for: airQuality)
+				}
 
-			weatherSegment
+				weatherSegment
 
-			if snapshot.showsSunrise, let sunriseText = sunriseTimeText {
-				sunriseSegment(text: sunriseText)
-			}
+				if snapshot.showsSunrise, let sunriseText = sunriseTimeText {
+					sunriseSegment(text: sunriseText)
+				}
 
-			if shouldShowLocation {
-				locationSegment
+				if shouldShowLocation {
+					locationSegment
+				}
 			}
 		}
 		.frame(maxWidth: .infinity, alignment: mainRowAlignment)
@@ -1492,7 +1500,9 @@ struct LockScreenWeatherWidget: View {
 	private var accessibilityLabel: String {
 		var components: [String] = []
 
-		if snapshot.showsLocation, let locationName = snapshot.locationName, !locationName.isEmpty {
+		if !snapshot.showsWeather {
+			// Weather is turned off; only the accessory segments below are shown.
+		} else if snapshot.showsLocation, let locationName = snapshot.locationName, !locationName.isEmpty {
 			components.append(
 				String(
 					format: NSLocalizedString("Weather: %@ %@ in %@", comment: "Weather description, temperature, and location"),
@@ -1519,7 +1529,7 @@ struct LockScreenWeatherWidget: View {
 			components.append(accessibilityBluetoothText(for: bluetooth))
 		}
 
-		if let airQuality = snapshot.airQuality {
+		if snapshot.showsWeather, let airQuality = snapshot.airQuality {
 			components.append(accessibilityAirQualityText(for: airQuality))
 		}
 

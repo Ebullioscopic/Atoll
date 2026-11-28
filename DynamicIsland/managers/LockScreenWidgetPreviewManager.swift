@@ -192,7 +192,8 @@ final class LockScreenWidgetPreviewManager: ObservableObject {
             temperatureInfo: temperatureInfo,
             usesGaugeTint: Defaults[.lockScreenWeatherUsesGaugeTint],
             sunCycle: sunCycle,
-            showsSunrise: showsSunrise
+            showsSunrise: showsSunrise,
+            showsWeather: Defaults[.enableLockScreenWeatherWidget]
         )
     }
 
@@ -221,7 +222,7 @@ final class LockScreenWidgetPreviewManager: ObservableObject {
         let scene = LockScreenPreviewScene(
             screenSize: screen.frame.size,
             weatherSnapshot: mockWeatherSnapshot(),
-            showsWeather: Defaults[.enableLockScreenWeatherWidget],
+            showsWeather: Defaults[.enableLockScreenWeatherWidget] || LockScreenWeatherManager.hasContentWithoutWeather(),
             showsTimer: Defaults[.enableLockScreenTimerWidget],
             showsMediaPanel: Defaults[.enableLockScreenMediaWidget]
         )
@@ -246,7 +247,7 @@ final class LockScreenWidgetPreviewManager: ObservableObject {
         let scene = LockScreenPreviewScene(
             screenSize: screen.frame.size,
             weatherSnapshot: mockWeatherSnapshot(),
-            showsWeather: Defaults[.enableLockScreenWeatherWidget],
+            showsWeather: Defaults[.enableLockScreenWeatherWidget] || LockScreenWeatherManager.hasContentWithoutWeather(),
             showsTimer: Defaults[.enableLockScreenTimerWidget],
             showsMediaPanel: Defaults[.enableLockScreenMediaWidget]
         )
