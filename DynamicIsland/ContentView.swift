@@ -224,8 +224,7 @@ struct ContentView: View {
     @Default(.musicControlWindowEnabled) var musicControlWindowEnabled
     @Default(.showNotHumanFace) var showNotHumanFace
     @Default(.useModernCloseAnimation) var useModernCloseAnimation
-    @AppStorage("notchAnimationSpeed") private var legacyNotchAnimationSpeed = "default"
-    @AppStorage("notchAnimationSpeedMultiplier") private var notchAnimationSpeedMultiplier = 0.0
+    @Default(.notchAnimationSpeed) private var notchAnimationSpeed
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
 
@@ -650,7 +649,7 @@ struct ContentView: View {
     }
 
     private var configuredMainLayout: some View {
-        let speed = NotchAnimationSpeed.resolved(notchAnimationSpeedMultiplier, legacy: legacyNotchAnimationSpeed)
+        let speed = notchAnimationSpeed.isFinite ? min(max(notchAnimationSpeed, 1), 2) : 1
         return mainLayoutBase
             .conditionalModifier(!useModernCloseAnimation) { view in
                 let hoverAnimation = reduceMotion ? Animation.easeOut(duration: 0.15) : Animation.bouncy.speed(1.2 * speed)

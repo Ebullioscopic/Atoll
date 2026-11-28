@@ -240,7 +240,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "Extend hover area", keywords: ["hover", "cursor"], highlightID: SettingsTab.general.highlightID(for: "Extend hover area")),
         SettingsSearchEntry(tab: .general, title: "Enable haptics", keywords: ["haptic", "feedback"], highlightID: SettingsTab.general.highlightID(for: "Enable haptics")),
         SettingsSearchEntry(tab: .general, title: "Open notch on hover", keywords: ["hover to open", "auto open"], highlightID: SettingsTab.general.highlightID(for: "Open notch on hover")),
-        SettingsSearchEntry(tab: .general, title: "Notch animation speed", keywords: ["animation", "speed", "notch", "灵动岛动画速度", "動畫速度", "動態島"], highlightID: SettingsTab.general.highlightID(for: "Notch animation speed")),
+        SettingsSearchEntry(tab: .general, title: "Notch animation speed", keywords: ["animation", "speed", "notch"], highlightID: SettingsTab.general.highlightID(for: "Notch animation speed")),
         SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
         SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
         SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
@@ -1126,8 +1126,7 @@ struct GeneralSettings: View {
     @Default(.showEmojis) var showEmojis
     @Default(.gestureSensitivity) var gestureSensitivity
     @Default(.minimumHoverDuration) var minimumHoverDuration
-    @AppStorage("notchAnimationSpeed") private var legacyNotchAnimationSpeed = "default"
-    @AppStorage("notchAnimationSpeedMultiplier") private var notchAnimationSpeedMultiplier = 0.0
+    @Default(.notchAnimationSpeed) var notchAnimationSpeed
     @Default(.nonNotchHeight) var nonNotchHeight
     @Default(.nonNotchHeightMode) var nonNotchHeightMode
     @Default(.notchHeight) var notchHeight
@@ -1424,14 +1423,11 @@ struct GeneralSettings: View {
             }
             .settingsHighlight(id: highlightID("Open notch on hover"))
             Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
-            Slider(value: Binding(
-                get: { NotchAnimationSpeed.resolved(notchAnimationSpeedMultiplier, legacy: legacyNotchAnimationSpeed) },
-                set: { notchAnimationSpeedMultiplier = $0 }
-            ), in: 1...2, step: 0.1) {
+            Slider(value: $notchAnimationSpeed, in: 1...2, step: 0.1) {
                 HStack {
                     Text("Notch animation speed")
                     Spacer()
-                    Text("\(NotchAnimationSpeed.resolved(notchAnimationSpeedMultiplier, legacy: legacyNotchAnimationSpeed), specifier: "%.1f")×")
+                    Text("\(notchAnimationSpeed, specifier: "%.1f")×")
                         .foregroundStyle(.secondary)
                 }
             }
