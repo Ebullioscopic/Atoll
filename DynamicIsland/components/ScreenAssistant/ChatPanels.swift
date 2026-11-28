@@ -58,7 +58,7 @@ class ChatMessagesPanel: NSPanel {
         isOpaque = false
         hasShadow = true
         level = .floating
-        isMovableByWindowBackground = false  // Fixed position
+        isMovableByWindowBackground = true
         titlebarAppearsTransparent = true
         titleVisibility = .hidden
         isFloatingPanel = true

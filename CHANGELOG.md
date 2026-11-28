@@ -94,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
+- The Screen Assistant response window can now be dragged by its header, like the input bar, so it can be moved out of the way before taking a screenshot (#292).
 - **Accessibility permission is noticed when granted**: settings pick up an Accessibility grant made at any time in System Settings instead of only within 15 seconds of pressing Request Access, and the system prompt Atoll shows on its own now appears at most once per version rather than on every launch. If System Settings already shows Atoll enabled, the settings explain how to fix the stale entry (#443, #897).
 - **Fewer Developer Tools prompts**: the AirPods listening-mode monitor now reads the system log only while AirPods are connected, and neither it nor Clock timer mirroring restarts the log reader over and over after the Developer Tools Access prompt is cancelled. Settings now say which options read the system log. (#280)
 - Lock screen widgets, full-screen artwork and overlays now appear on the display set as main in System Settings, instead of always going to the built-in screen when an external monitor is the main display. (#945)
