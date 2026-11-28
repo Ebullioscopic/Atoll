@@ -43,16 +43,68 @@ final class LockScreenWeatherManager: ObservableObject {
     }
 
     func prepareLocationAccess() {
+        guard !Self.usesCustomLocation else { return }
         locationProvider.prepareAuthorization()
+    }
+
+    // MARK: - Custom location (#934)
+
+    struct CustomLocation: Equatable {
+        let name: String
+        let latitude: Double
+        let longitude: Double
+    }
+
+    /// A city set in settings, used instead of Location Services (for example on
+    /// a Mac with no Wi-Fi, where Core Location can't find a position).
+    static var customLocation: CustomLocation? {
+        guard Defaults[.lockScreenWeatherUsesCustomLocation],
+              let latitude = Defaults[.lockScreenWeatherCustomLatitude],
+              let longitude = Defaults[.lockScreenWeatherCustomLongitude]
+        else { return nil }
+        return CustomLocation(name: Defaults[.lockScreenWeatherCustomLocationName], latitude: latitude, longitude: longitude)
+    }
+
+    private static var usesCustomLocation: Bool {
+        Defaults[.lockScreenWeatherUsesCustomLocation]
+    }
+
+    /// Looks the city up with Open-Meteo's geocoding service and stores the first
+    /// match. Only called when the user submits a city in settings.
+    func setCustomLocation(named query: String) async -> CustomLocation? {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let location = try? await provider.geocode(city: trimmed)
+        else { return nil }
+
+        Defaults[.lockScreenWeatherCustomLocationName] = location.name
+        Defaults[.lockScreenWeatherCustomLatitude] = location.latitude
+        Defaults[.lockScreenWeatherCustomLongitude] = location.longitude
+        latestWeatherPayload = nil
+        _ = await refresh(force: true)
+        return location
+    }
+
+    private func weatherLocation() async -> CLLocation? {
+        if Self.usesCustomLocation {
+            guard let custom = Self.customLocation else { return nil }
+            return CLLocation(latitude: custom.latitude, longitude: custom.longitude)
+        }
+        return await locationProvider.currentLocation()
     }
 
     func showWeatherWidget() {
         guard Defaults[.enableLockScreenWeatherWidget] else {
-            LockScreenWeatherPanelManager.shared.hide()
+            if let accessorySnapshot = makeSnapshotWithoutWeather() {
+                snapshot = accessorySnapshot
+                deliver(accessorySnapshot, forceShow: true)
+            } else {
+                LockScreenWeatherPanelManager.shared.hide()
+            }
             return
         }
 
-        locationProvider.prepareAuthorization()
+        prepareLocationAccess()
         let existingSnapshot = snapshot
         let hadSnapshot = existingSnapshot != nil
         var cachedSnapshot = existingSnapshot
@@ -91,6 +143,15 @@ final class LockScreenWeatherManager: ObservableObject {
     @discardableResult
     func refresh(force: Bool = false) async -> LockScreenWeatherSnapshot? {
         NSLog("LockScreenWeatherManager: refresh requested (force=%@)", force ? "true" : "false")
+        guard Defaults[.enableLockScreenWeatherWidget] else {
+            // No location or network access while weather is off.
+            let accessorySnapshot = makeSnapshotWithoutWeather()
+            snapshot = accessorySnapshot
+            if let accessorySnapshot {
+                deliver(accessorySnapshot, forceShow: false)
+            }
+            return accessorySnapshot
+        }
         let interval = Defaults[.lockScreenWeatherRefreshInterval]
         if !force, let lastFetchDate, Date().timeIntervalSince(lastFetchDate) < interval {
             let remaining = interval - Date().timeIntervalSince(lastFetchDate)
@@ -111,7 +172,7 @@ final class LockScreenWeatherManager: ObservableObject {
         }
 
         do {
-            let location = await locationProvider.currentLocation()
+            let location = await weatherLocation()
             let provider = Defaults[.lockScreenWeatherProviderSource]
             NSLog(
                 "LockScreenWeatherManager: fetching weather from %@ (location %@)",
@@ -272,6 +333,17 @@ final class LockScreenWeatherManager: ObservableObject {
             }
             .store(in: &cancellables)
 
+        Defaults.publisher(.lockScreenWeatherUsesCustomLocation, options: [])
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.latestWeatherPayload = nil
+                Task { @MainActor in
+                    self.prepareLocationAccess()
+                    _ = await self.refresh(force: true)
+                }
+            }
+            .store(in: &cancellables)
+
         Defaults.publisher(.lockScreenWeatherAQIScale, options: [])
             .sink { [weak self] _ in
                 guard let self else { return }
@@ -289,8 +361,10 @@ final class LockScreenWeatherManager: ObservableObject {
                 Task { @MainActor in
                     if change.newValue {
                         NSLog("LockScreenWeatherManager: widget enabled, triggering refresh")
-                        self.locationProvider.prepareAuthorization()
+                        self.prepareLocationAccess()
                         _ = await self.refresh(force: true)
+                    } else if LockScreenManager.shared.currentLockStatus {
+                        self.showWeatherWidget()
                     } else {
                         LockScreenWeatherPanelManager.shared.hide()
                     }
@@ -300,6 +374,13 @@ final class LockScreenWeatherManager: ObservableObject {
     }
 
     private func handleAccessoryUpdate(triggerBluetoothRefresh: Bool) {
+        guard Defaults[.enableLockScreenWeatherWidget] else {
+            if let accessorySnapshot = makeSnapshotWithoutWeather() {
+                snapshot = accessorySnapshot
+                deliver(accessorySnapshot, forceShow: false)
+            }
+            return
+        }
         guard let payload = latestWeatherPayload else { return }
 
         if triggerBluetoothRefresh {
@@ -321,8 +402,43 @@ final class LockScreenWeatherManager: ObservableObject {
         }
     }
 
+    /// The battery, charging, Bluetooth, calendar and Focus parts of the status
+    /// widget work without weather, so they stay visible when weather is off (#523).
+    static func hasContentWithoutWeather() -> Bool {
+        Defaults[.lockScreenBatteryShowsCharging]
+            || Defaults[.lockScreenBatteryShowsBatteryGauge]
+            || Defaults[.lockScreenBatteryShowsBluetooth]
+            || Defaults[.lockScreenShowCalendarEvent]
+            || Defaults[.enableLockScreenFocusWidget]
+    }
+
+    private func makeSnapshotWithoutWeather() -> LockScreenWeatherSnapshot? {
+        guard Self.hasContentWithoutWeather() else { return nil }
+        let placeholder = LockScreenWeatherSnapshot(
+            temperatureText: "--",
+            symbolName: "cloud.fill",
+            description: "",
+            locationName: nil,
+            charging: nil,
+            bluetooth: nil,
+            battery: nil,
+            showsLocation: false,
+            airQuality: nil,
+            widgetStyle: Defaults[.lockScreenWeatherWidgetStyle],
+            showsChargingPercentage: false,
+            temperatureInfo: nil,
+            usesGaugeTint: false,
+            sunCycle: nil,
+            showsSunrise: false
+        )
+        var accessorySnapshot = makeSnapshot(from: placeholder)
+        accessorySnapshot.showsWeather = false
+        return accessorySnapshot
+    }
+
     private func makeSnapshot(from payload: LockScreenWeatherSnapshot) -> LockScreenWeatherSnapshot {
-        let locationName = payload.locationName
+        let customName = Self.customLocation?.name
+        let locationName = (customName?.isEmpty == false) ? customName : payload.locationName
         let chargingInfo = Defaults[.lockScreenBatteryShowsCharging] ? makeChargingInfo() : nil
         let bluetoothInfo = Defaults[.lockScreenBatteryShowsBluetooth] ? makeBluetoothInfo() : nil
         let widgetStyle = Defaults[.lockScreenWeatherWidgetStyle]
@@ -501,17 +617,17 @@ struct LockScreenWeatherSnapshot: Equatable {
 
             var displayName: String {
                 switch self {
-                case .good: return "Good"
-                case .fair: return "Fair"
-                case .moderate: return "Moderate"
-                case .unhealthyForSensitive: return "Sensitive"
-                case .unhealthy: return "Unhealthy"
-                case .poor: return "Poor"
-                case .veryPoor: return "Very Poor"
-                case .veryUnhealthy: return "Very Unhealthy"
-                case .extremelyPoor: return "Extremely Poor"
-                case .hazardous: return "Hazardous"
-                case .unknown: return "Unknown"
+                case .good: return String(localized: "Good")
+                case .fair: return String(localized: "Fair")
+                case .moderate: return String(localized: "Moderate")
+                case .unhealthyForSensitive: return String(localized: "Sensitive")
+                case .unhealthy: return String(localized: "Unhealthy")
+                case .poor: return String(localized: "Poor")
+                case .veryPoor: return String(localized: "Very Poor")
+                case .veryUnhealthy: return String(localized: "Very Unhealthy")
+                case .extremelyPoor: return String(localized: "Extremely Poor")
+                case .hazardous: return String(localized: "Hazardous")
+                case .unknown: return String(localized: "Unknown")
                 }
             }
         }
@@ -536,6 +652,9 @@ struct LockScreenWeatherSnapshot: Equatable {
     let usesGaugeTint: Bool
     let sunCycle: SunCycleInfo?
     let showsSunrise: Bool
+    /// False when only the battery/Bluetooth/calendar parts of the widget are
+    /// enabled; the panel then hides the weather segments (#523).
+    var showsWeather: Bool = true
 }
 
 extension LockScreenWeatherSnapshot.AirQualityInfo.Category {
@@ -610,6 +729,31 @@ private actor LockScreenWeatherProvider {
             }
             return try await fetchOpenMeteoSnapshot(location: location)
         }
+    }
+
+    func geocode(city: String) async throws -> LockScreenWeatherManager.CustomLocation? {
+        var components = URLComponents(string: "https://geocoding-api.open-meteo.com/v1/search")
+        components?.queryItems = [
+            URLQueryItem(name: "name", value: city),
+            URLQueryItem(name: "count", value: "1"),
+            URLQueryItem(name: "language", value: Locale.current.language.languageCode?.identifier ?? "en"),
+            URLQueryItem(name: "format", value: "json")
+        ]
+        guard let url = components?.url else { throw WeatherProviderError.invalidURL }
+
+        let (data, response) = try await session.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+            throw WeatherProviderError.invalidResponse
+        }
+
+        guard let match = try decoder.decode(OpenMeteoGeocodingResponse.self, from: data).results?.first else {
+            return nil
+        }
+        return LockScreenWeatherManager.CustomLocation(
+            name: match.name,
+            latitude: match.latitude,
+            longitude: match.longitude
+        )
     }
 
     private func fetchWttrSnapshot(location: CLLocation?) async throws -> LockScreenWeatherSnapshot {
@@ -862,6 +1006,16 @@ private actor LockScreenWeatherProvider {
         }
         return formatter.date(from: value)
     }
+}
+
+private struct OpenMeteoGeocodingResponse: Decodable {
+    struct Result: Decodable {
+        let name: String
+        let latitude: Double
+        let longitude: Double
+    }
+
+    let results: [Result]?
 }
 
 enum WeatherProviderError: Error {

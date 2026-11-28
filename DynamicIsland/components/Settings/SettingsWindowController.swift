@@ -27,6 +27,11 @@ import Sparkle
 class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
     private var updaterController: SPUStandardUpdaterController?
+    /// Whether the SwiftUI settings content has been created. It is built on
+    /// first show: a hidden NSHostingView still updates its whole Form every
+    /// time the state it observes changes -- on every notch open and close --
+    /// for the whole session, even if Settings is never opened.
+    private var hasContent = false
     
     private init() {
         let window = NSWindow(
@@ -50,11 +55,19 @@ class SettingsWindowController: NSWindowController {
         // Recreate the content view with the proper updater controller
         setupWindow()
     }
+
+    private func installContent() {
+        guard let window = window else { return }
+        let settingsView = SettingsView(updaterController: updaterController)
+        let hostingView = NSHostingView(rootView: settingsView)
+        window.contentView = hostingView
+        hasContent = true
+    }
     
     private func setupWindow() {
         guard let window = window else { return }
         
-        window.title = "Atoll Settings"
+        window.title = String(localized: "Atoll Settings")
         window.titlebarAppearsTransparent = false
         window.titleVisibility = .visible
         window.toolbarStyle = .unified
@@ -72,10 +85,11 @@ class SettingsWindowController: NSWindowController {
         window.isRestorable = true
         window.identifier = NSUserInterfaceItemIdentifier("DynamicIslandSettingsWindow")
         
-        // Create the SwiftUI content
-        let settingsView = SettingsView(updaterController: updaterController)
-        let hostingView = NSHostingView(rootView: settingsView)
-        window.contentView = hostingView
+        // Recreate the SwiftUI content only if it was already shown;
+        // otherwise `showWindow()` creates it.
+        if hasContent {
+            installContent()
+        }
         
         // Handle window closing
         window.delegate = self
@@ -86,6 +100,9 @@ class SettingsWindowController: NSWindowController {
     func showWindow() {
         // Ensure window exists
         _ = window
+        if !hasContent {
+            installContent()
+        }
 
         // Reassert regular window semantics in case any prior state mutated this window.
         window?.level = .normal

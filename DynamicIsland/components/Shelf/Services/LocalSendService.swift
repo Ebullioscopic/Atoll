@@ -513,7 +513,12 @@ final class LocalSendService: NSObject, ObservableObject {
             let files = try await buildTransferFiles(from: items)
             guard !files.isEmpty else { throw LocalSendServiceError.noTransferableItems }
 
-            let prepare = try await prepareUpload(files: files, to: target)
+            // HTTPS receivers require a client certificate; its fingerprint identifies us.
+            let fingerprint = target.https
+                ? await Task.detached(priority: .userInitiated) { LocalSendClientIdentity.shared.load()?.fingerprint }.value
+                : nil
+
+            let prepare = try await prepareUpload(files: files, to: target, fingerprint: fingerprint)
             guard !prepare.fileTokens.isEmpty else {
                 sendProgress = 1
                 await finishSending(startedAt: startedAt, success: true)
@@ -874,7 +879,7 @@ final class LocalSendService: NSObject, ObservableObject {
         return url.mimeType ?? "application/octet-stream"
     }
 
-    private func prepareUpload(files: [TransferFile], to device: LocalSendDeviceInfo) async throws -> (sessionID: String, fileTokens: [String: String]) {
+    private func prepareUpload(files: [TransferFile], to device: LocalSendDeviceInfo, fingerprint: String?) async throws -> (sessionID: String, fileTokens: [String: String]) {
         var filesMap: [String: Any] = [:]
         for file in files {
             filesMap[file.id] = [
@@ -891,7 +896,7 @@ final class LocalSendService: NSObject, ObservableObject {
                 "version": "2.1",
                 "deviceModel": "Mac",
                 "deviceType": "desktop",
-                "fingerprint": "atoll.localsend.bridge",
+                "fingerprint": fingerprint ?? "atoll.localsend.bridge",
                 "token": "atoll.localsend.bridge",
                 "port": defaultPort,
                 "protocol": device.https ? "https" : "http",
@@ -1057,6 +1062,12 @@ final class LocalSendService: NSObject, ObservableObject {
 
 private class LocalSendTLSDelegate: NSObject, URLSessionDelegate {
     func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodClientCertificate {
+            guard let identity = LocalSendClientIdentity.shared.current?.identity else {
+                return (.performDefaultHandling, nil)
+            }
+            return (.useCredential, URLCredential(identity: identity, certificates: nil, persistence: .forSession))
+        }
         if let trust = challenge.protectionSpace.serverTrust {
             return (.useCredential, URLCredential(trust: trust))
         }

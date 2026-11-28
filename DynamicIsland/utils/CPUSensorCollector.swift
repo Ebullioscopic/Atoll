@@ -42,6 +42,7 @@ final class CPUSensorCollector {
     private var channels: CFMutableDictionary?
     private var subscription: IOReportSubscriptionRef?
     private var previousSample: (samples: CFDictionary, time: TimeInterval)?
+    private var cachedPrimaryTemperatureKey: String?
 
     init() {
         setupFrequencyChannel()
@@ -55,8 +56,17 @@ final class CPUSensorCollector {
 
     func readTemperature() -> CPUTemperatureMetrics {
         let platform = hardware.platform
-        if let value = primaryTemperatureKeyCandidates.compactMap({ SMC.shared.getValue($0) }).first(where: { $0 < 110 }) {
-            return CPUTemperatureMetrics(celsius: value)
+        // Try the last key that worked first, then scan candidates with early exit so we
+        // stop issuing SMC reads (each a syscall) as soon as one returns a valid value.
+        var keysToTry = primaryTemperatureKeyCandidates
+        if let cached = cachedPrimaryTemperatureKey {
+            keysToTry = [cached] + keysToTry.filter { $0 != cached }
+        }
+        for key in keysToTry {
+            if let value = SMC.shared.getValue(key), value < 110 {
+                cachedPrimaryTemperatureKey = key
+                return CPUTemperatureMetrics(celsius: value)
+            }
         }
         let list = temperatureFallbackKeys(for: platform)
         var total: Double = 0
@@ -247,7 +257,7 @@ final class CPUSensorCollector {
         case .m4, .m4Pro, .m4Max, .m4Ultra:
             return ["Te05", "Te09", "Te0H", "Te0S", "Tp01", "Tp05", "Tp09", "Tp0D", "Tp0V", "Tp0Y", "Tp0b", "Tp0e"]
         case .m5, .m5Pro, .m5Max, .m5Ultra:
-            return ["Te05", "Te09", "Te0H", "Te0S", "Tp01", "Tp05", "Tp09", "Tp0D", "Tp0V", "Tp0Y", "Tp0b", "Tp0e"]
+            return ["Tp00", "Tp04", "Tp08", "Tp0C", "Tp0G", "Tp0K", "Tp0O", "Tp0R", "Tp0U", "Tp0X", "Tp0a", "Tp0d", "Tp0g", "Tp0j", "Tp0m", "Tp0p", "Tp0u", "Tp0y"]
         default:
             return ["TC0P", "TC0E", "TC0F", "TC0H", "TC0D"]
         }

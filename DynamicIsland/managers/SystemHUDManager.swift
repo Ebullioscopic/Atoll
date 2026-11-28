@@ -19,6 +19,7 @@
 import Foundation
 import Defaults
 import Combine
+import CoreAudio
 
 class SystemHUDManager {
     static let shared = SystemHUDManager()
@@ -27,6 +28,12 @@ class SystemHUDManager {
     private weak var coordinator: DynamicIslandViewCoordinator?
     private var isSetupComplete = false
     private var isSystemOperationInProgress = false
+    /// The lock state the native HUD has actually been handed over for, so a
+    /// handover that restarts OSDUIHelper only happens when it changes.
+    private var lastNativeHUDLockState: Bool?
+    /// Whether the native HUD is currently suppressed for this app's HUDs, so
+    /// a per-channel toggle only restarts OSDUIHelper when that changes.
+    private var nativeHUDSuppressed: Bool?
     
     private init() {
         // Set up observer for settings changes
@@ -112,36 +119,21 @@ class SystemHUDManager {
             guard let self = self, self.isSetupComplete, self.requiresSystemToggleHandling else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            self.applyResolvedFlags()
         }.store(in: &cancellables)
         
         Defaults.publisher(.enableBrightnessHUD, options: []).sink { [weak self] _ in
             guard let self = self, self.isSetupComplete, self.requiresSystemToggleHandling else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            self.applyResolvedFlags()
         }.store(in: &cancellables)
 
         Defaults.publisher(.enableKeyboardBacklightHUD, options: []).sink { [weak self] _ in
             guard let self = self, self.isSetupComplete, self.requiresSystemToggleHandling else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            self.applyResolvedFlags()
         }.store(in: &cancellables)
         
         // Observe individual OSD toggles
@@ -149,36 +141,21 @@ class SystemHUDManager {
             guard let self = self, self.isSetupComplete, Defaults[.enableCustomOSD] else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            self.applyResolvedFlags()
         }.store(in: &cancellables)
         
         Defaults.publisher(.enableOSDBrightness, options: []).sink { [weak self] _ in
             guard let self = self, self.isSetupComplete, Defaults[.enableCustomOSD] else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            self.applyResolvedFlags()
         }.store(in: &cancellables)
         
         Defaults.publisher(.enableOSDKeyboardBacklight, options: []).sink { [weak self] _ in
             guard let self = self, self.isSetupComplete, Defaults[.enableCustomOSD] else {
                 return
             }
-            let flags = self.resolvedControlFlags()
-            self.changesObserver?.update(
-                volumeEnabled: flags.volume,
-                brightnessEnabled: flags.brightness,
-                keyboardBacklightEnabled: flags.backlight
-            )
+            self.applyResolvedFlags()
         }.store(in: &cancellables)
 
         // Restart observer when third-party DDC integration state changes.
@@ -205,6 +182,77 @@ class SystemHUDManager {
     }
     
     private var cancellables = Set<AnyCancellable>()
+
+    private func applyResolvedFlags() {
+        let flags = resolvedControlFlags()
+        changesObserver?.update(
+            volumeEnabled: flags.volume,
+            brightnessEnabled: flags.brightness,
+            keyboardBacklightEnabled: flags.backlight
+        )
+        Task { @MainActor in
+            self.applyNativeHUDSuppression(for: flags)
+        }
+    }
+
+    /// Whether macOS's own HUD has to be suppressed for the given channels.
+    ///
+    /// OSDUIHelper is one process for every channel, so it is suppressed when
+    /// this app draws any of them. When it draws none -- every per-channel HUD
+    /// switched off -- freezing the helper only takes the HUD away entirely and
+    /// risks leaving it stuck on screen (#908). The exception is a running DDC
+    /// helper app, whose own notifications drive this app's HUD.
+    static func shouldSuppressNativeHUD(
+        volume: Bool,
+        brightness: Bool,
+        backlight: Bool,
+        thirdPartyDDCActive: Bool
+    ) -> Bool {
+        volume || brightness || backlight || thirdPartyDDCActive
+    }
+
+    /// Whether a DDC app can be handling the volume keys for this output.
+    ///
+    /// Lunar and BetterDisplay set the volume of displays. Built-in speakers
+    /// and Bluetooth headphones are never theirs: the keys fall through to
+    /// macOS, which draws its own HUD and sends the app no volume event, so
+    /// handing volume to the provider there left no HUD in Atoll at all --
+    /// after unplugging from a monitor hub, say (#465). Unknown transports
+    /// keep the provider in charge, as before.
+    static func externalProviderControlsVolume(outputTransport: UInt32) -> Bool {
+        switch outputTransport {
+        case kAudioDeviceTransportTypeBuiltIn,
+             kAudioDeviceTransportTypeBluetooth,
+             kAudioDeviceTransportTypeBluetoothLE:
+            return false
+        default:
+            return true
+        }
+    }
+
+    @MainActor
+    private func applyNativeHUDSuppression(
+        for flags: (volume: Bool, brightness: Bool, backlight: Bool, thirdPartyDDC: Bool)
+    ) {
+        guard changesObserver != nil else { return }
+        let suppress = Self.shouldSuppressNativeHUD(
+            volume: flags.volume,
+            brightness: flags.brightness,
+            backlight: flags.backlight,
+            thirdPartyDDCActive: flags.thirdPartyDDC
+        )
+        guard suppress != nativeHUDSuppressed else { return }
+        nativeHUDSuppressed = suppress
+        // What was handed over for the lock state says nothing about a
+        // suppression decided afresh here.
+        lastNativeHUDLockState = nil
+
+        if suppress {
+            SystemOSDManager.disableSystemHUD()
+        } else {
+            SystemOSDManager.enableSystemHUD()
+        }
+    }
 
     private var requiresSystemToggleHandling: Bool {
         Defaults[.enableSystemHUD] || Defaults[.enableVerticalHUD] || Defaults[.enableCircularHUD]
@@ -240,6 +288,17 @@ class SystemHUDManager {
             .store(in: &self.cancellables)
         }
         
+        // With the external volume listener on, whether the provider or this
+        // app owns the volume keys depends on where the sound is going.
+        NotificationCenter.default.publisher(for: .systemAudioRouteDidChange)
+            .sink { [weak self] _ in
+                guard let self, self.isSetupComplete,
+                      Defaults[.enableThirdPartyDDCIntegration],
+                      Defaults[.enableExternalVolumeControlListener] else { return }
+                self.applyResolvedFlags()
+            }
+            .store(in: &cancellables)
+
         // Start observer if any HUD/OSD is enabled
         if Defaults[.enableSystemHUD] || Defaults[.enableCustomOSD] || Defaults[.enableVerticalHUD] || Defaults[.enableCircularHUD] {
             Task { @MainActor in
@@ -252,7 +311,7 @@ class SystemHUDManager {
     }
     
     /// Resolves the effective control flags, applying third-party DDC overrides.
-    private func resolvedControlFlags() -> (volume: Bool, brightness: Bool, backlight: Bool) {
+    private func resolvedControlFlags() -> (volume: Bool, brightness: Bool, backlight: Bool, thirdPartyDDC: Bool) {
         var volumeEnabled: Bool
         var brightnessEnabled: Bool
         var keyboardBacklightEnabled: Bool
@@ -281,17 +340,22 @@ class SystemHUDManager {
             }
         }()
 
-        if Defaults[.enableThirdPartyDDCIntegration] && ddcProviderRunning {
+        let thirdPartyDDCActive = Defaults[.enableThirdPartyDDCIntegration] && ddcProviderRunning
+        if thirdPartyDDCActive {
             brightnessEnabled = false
             keyboardBacklightEnabled = false
 
-            // Optional: route volume exclusively from the selected external provider.
-            if Defaults[.enableExternalVolumeControlListener] {
+            // Optional: route volume exclusively from the selected external
+            // provider -- but only for outputs it can control.
+            if Defaults[.enableExternalVolumeControlListener],
+               Self.externalProviderControlsVolume(
+                   outputTransport: SystemVolumeController.shared.defaultOutputTransportType
+               ) {
                 volumeEnabled = false
             }
         }
 
-        return (volumeEnabled, brightnessEnabled, keyboardBacklightEnabled)
+        return (volumeEnabled, brightnessEnabled, keyboardBacklightEnabled, thirdPartyDDCActive)
     }
 
     @MainActor
@@ -314,13 +378,50 @@ class SystemHUDManager {
             keyboardBacklightEnabled: flags.backlight
         )
         
-        // Force disable system HUD to ensure no duplicates
-        SystemOSDManager.disableSystemHUD()
+        // A fresh observer has none of the old one's suppression applied to it,
+        // so re-apply the decision rather than trusting the previous one.
+        nativeHUDSuppressed = nil
+        applyNativeHUDSuppression(for: flags)
         
         print("System observer started (HUD: \(Defaults[.enableSystemHUD]), OSD: \(Defaults[.enableCustomOSD]), Vertical: \(Defaults[.enableVerticalHUD]), ThirdPartyDDC: \(Defaults[.enableThirdPartyDDCIntegration]), Provider: \(Defaults[.thirdPartyDDCProvider].displayName), ExternalVolumeListener: \(Defaults[.enableExternalVolumeControlListener]))")
         isSystemOperationInProgress = false
     }
     
+    /// Hands the HUD to macOS while the Mac is locked, and takes it back on
+    /// unlock.
+    ///
+    /// None of this app's HUD styles can be seen over the lock screen — the
+    /// inline one lives in the notch, the others sit below the lock screen
+    /// shield — so suppressing the system HUD there left the volume keys with
+    /// no feedback at all. The exception is the lock screen music panel, which
+    /// carries its own slider; unsuppressing then would put two indicators on
+    /// screen at once.
+    @MainActor
+    func updateNativeHUDSuppressionForLockState(isLocked: Bool) {
+        // Readiness first, then the record of what has been applied. The other
+        // order marked a request applied that this guard had in fact dropped,
+        // and every later request for the same state returned early on the
+        // strength of it -- so a lock that arrived before setup finished left
+        // the HUD in the wrong hands for the rest of the session.
+        guard isSetupComplete, changesObserver != nil else { return }
+        // Nothing is suppressed, so macOS already draws its HUD everywhere.
+        guard nativeHUDSuppressed == true else { return }
+
+        // Handing the HUD over restarts OSDUIHelper, so only act on a change.
+        guard isLocked != lastNativeHUDLockState else { return }
+        lastNativeHUDLockState = isLocked
+
+        if SystemHUDPlacement.yieldsToNativeHUD(isLocked: isLocked) {
+            SystemOSDManager.enableSystemHUD()
+        } else {
+            SystemOSDManager.disableSystemHUD()
+            // disableSystemHUD arms the watcher, which polls; on unlock the
+            // helper is already awake and can draw one more HUD before the
+            // first poll lands. Freeze it now as well.
+            SystemOSDManager.suppressNativeOSDNow()
+        }
+    }
+
     @MainActor
     private func stopSystemObserver() async {
         guard !isSystemOperationInProgress else { return }
@@ -328,6 +429,7 @@ class SystemHUDManager {
         isSystemOperationInProgress = true
         changesObserver?.stopObserving()
         changesObserver = nil
+        nativeHUDSuppressed = nil
         
         // Re-enable system HUD when we stop observing
         SystemOSDManager.enableSystemHUD()

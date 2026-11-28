@@ -122,14 +122,21 @@ struct ModelSelectionView: View {
     @State private var selectedModel: AIModel? = Defaults[.selectedAIModel]
     @State private var enableThinking: Bool = Defaults[.enableThinkingMode]
     
-    // API Keys
-    @State private var geminiApiKey: String = Defaults[.geminiApiKey]
-    @State private var openaiApiKey: String = Defaults[.openaiApiKey]
-    @State private var claudeApiKey: String = Defaults[.claudeApiKey]
+    // API Keys — held in the Keychain, read into local state only while editing
+    private let keyStore: AIKeyStoring = KeychainAIKeyStore.shared
+    @State private var geminiApiKey: String = KeychainAIKeyStore.shared.value(.gemini)
+    @State private var openaiApiKey: String = KeychainAIKeyStore.shared.value(.openai)
+    @State private var claudeApiKey: String = KeychainAIKeyStore.shared.value(.claude)
     @State private var localEndpoint: String = Defaults[.localModelEndpoint]
-    @State private var groqApiKey: String = Defaults[.groqApiKey]
+    @State private var groqApiKey: String = KeychainAIKeyStore.shared.value(.groq)
+    @State private var openaiBaseURL: String = Defaults[.openaiBaseURL]
+    @State private var openaiCompatibleApiKey: String = KeychainAIKeyStore.shared.value(.openaiCompatible)
+    @State private var openaiCustomModelID: String = Defaults[.openaiCustomModelID]
     
     @State private var showingApiKeyAlert = false
+    /// Set when a Keychain write fails, which keeps the panel open — see
+    /// `saveConfiguration()`.
+    @State private var keychainSaveError: String?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -255,7 +262,10 @@ struct ModelSelectionView: View {
                             openaiApiKey: $openaiApiKey,
                             claudeApiKey: $claudeApiKey,
                             localEndpoint: $localEndpoint,
-                            groqApiKey: $groqApiKey
+                            groqApiKey: $groqApiKey,
+                            openaiBaseURL: $openaiBaseURL,
+                            openaiCompatibleApiKey: $openaiCompatibleApiKey,
+                            openaiCustomModelID: $openaiCustomModelID
                         )
                     }
                 }
@@ -271,9 +281,16 @@ struct ModelSelectionView: View {
                     closePanel()
                 }
                 .buttonStyle(PlainButtonStyle())
-                
+
                 Spacer()
-                
+
+                if let keychainSaveError {
+                    Label(keychainSaveError, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 Button("Save Configuration") {
                     saveConfiguration()
                 }
@@ -296,7 +313,9 @@ struct ModelSelectionView: View {
         case .gemini:
             return !geminiApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .openai:
+            guard OpenAICompatibleEndpoint.chatCompletionsURL(baseURL: openaiBaseURL) != nil else { return false }
             return !openaiApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || !OpenAICompatibleEndpoint.isOpenAI(openaiBaseURL)
         case .claude:
             return !claudeApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .local:
@@ -312,28 +331,73 @@ struct ModelSelectionView: View {
         ensureValidModelSelection()
         enableThinking = Defaults[.enableThinkingMode]
         
-        geminiApiKey = Defaults[.geminiApiKey]
-        openaiApiKey = Defaults[.openaiApiKey]
-        claudeApiKey = Defaults[.claudeApiKey]
+        geminiApiKey = keyStore.value(.gemini)
+        openaiApiKey = keyStore.value(.openai)
+        claudeApiKey = keyStore.value(.claude)
         localEndpoint = Defaults[.localModelEndpoint]
-        groqApiKey = Defaults[.groqApiKey]
+        groqApiKey = keyStore.value(.groq)
+        openaiBaseURL = Defaults[.openaiBaseURL]
+        openaiCompatibleApiKey = keyStore.value(.openaiCompatible)
+        openaiCustomModelID = Defaults[.openaiCustomModelID]
     }
     
     private func saveConfiguration() {
         ensureValidModelSelection()
 
+        // Snapshot what is there before writing anything, so a failure partway
+        // through the accounts can be rolled back instead of leaving some
+        // accounts on the new value and others still on the old one.
+        let previousValues: [AIKeyAccount: String] = Dictionary(
+            uniqueKeysWithValues: AIKeyAccount.allCases.map { ($0, keyStore.value($0)) }
+        )
+        let pending: [(AIKeyAccount, String)] = [
+            (.gemini, geminiApiKey),
+            (.openai, openaiApiKey),
+            (.claude, claudeApiKey),
+            (.groq, groqApiKey),
+            (.openaiCompatible, openaiCompatibleApiKey)
+        ]
+
+        var succeeded: [AIKeyAccount] = []
+        var failed: [(AIKeyAccount, OSStatus)] = []
+        for (account, value) in pending {
+            let status = keyStore.save(value, account: account)
+            if status == errSecSuccess {
+                succeeded.append(account)
+            } else {
+                failed.append((account, status))
+            }
+        }
+
+        guard failed.isEmpty else {
+            // Best-effort rollback: restore every account that did succeed to
+            // what it held before this save, so the failure does not leave a
+            // partial mix of new and old credentials.
+            for account in succeeded {
+                keyStore.save(previousValues[account] ?? "", account: account)
+            }
+            for (account, status) in failed {
+                Logger.log(
+                    "Could not save the \(account.rawValue) key to the Keychain (OSStatus \(status)).",
+                    category: .warning
+                )
+            }
+            keychainSaveError = failed.count == 1
+                ? String(localized: "The \(failed[0].0.rawValue) key could not be saved to the Keychain.")
+                : String(localized: "\(failed.count) keys could not be saved to the Keychain.")
+            return
+        }
+
+        keychainSaveError = nil
         Defaults[.selectedAIProvider] = selectedProvider
         Defaults[.selectedAIModel] = selectedModel
         Defaults[.enableThinkingMode] = enableThinking
-        
-        Defaults[.geminiApiKey] = geminiApiKey
-        Defaults[.openaiApiKey] = openaiApiKey
-        Defaults[.claudeApiKey] = claudeApiKey
         Defaults[.localModelEndpoint] = localEndpoint
-        Defaults[.groqApiKey] = groqApiKey
-        
+        Defaults[.openaiBaseURL] = openaiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        Defaults[.openaiCustomModelID] = openaiCustomModelID.trimmingCharacters(in: .whitespacesAndNewlines)
+
         closePanel()
-        
+
         // Notify that configuration changed
         NotificationCenter.default.post(name: .aiModelConfigurationChanged, object: nil)
     }
@@ -473,6 +537,9 @@ struct ApiConfigurationSection: View {
     @Binding var claudeApiKey: String
     @Binding var localEndpoint: String
     @Binding var groqApiKey: String
+    @Binding var openaiBaseURL: String
+    @Binding var openaiCompatibleApiKey: String
+    @Binding var openaiCustomModelID: String
     
     var body: some View {
         VStack(spacing: 12) {
@@ -491,6 +558,31 @@ struct ApiConfigurationSection: View {
                     placeholder: "Enter your OpenAI API key",
                     value: $openaiApiKey,
                     helpText: "Get your API key from OpenAI Platform"
+                )
+
+                ApiKeyField(
+                    title: "Base URL",
+                    placeholder: "https://api.openai.com/v1",
+                    value: $openaiBaseURL,
+                    helpText: "Change to use an OpenAI-compatible proxy or local server. Use https, or http only for a server on this Mac.",
+                    isSecure: false
+                )
+
+                if !OpenAICompatibleEndpoint.isOpenAI(openaiBaseURL) {
+                    ApiKeyField(
+                        title: "Server API key",
+                        placeholder: "Optional",
+                        value: $openaiCompatibleApiKey,
+                        helpText: "Sent only to the base URL above. Your OpenAI API key is only ever sent to OpenAI."
+                    )
+                }
+
+                ApiKeyField(
+                    title: "Custom model ID",
+                    placeholder: "Optional",
+                    value: $openaiCustomModelID,
+                    helpText: "Sent instead of the model picked above, for example a model name on your own server.",
+                    isSecure: false
                 )
                 
             case .claude:
@@ -526,10 +618,10 @@ struct ApiConfigurationSection: View {
 
 // MARK: - API Key Field
 struct ApiKeyField: View {
-    let title: String
-    let placeholder: String
+    let title: LocalizedStringKey
+    let placeholder: LocalizedStringKey
     @Binding var value: String
-    let helpText: String
+    let helpText: LocalizedStringKey
     var isSecure: Bool = true
     
     var body: some View {

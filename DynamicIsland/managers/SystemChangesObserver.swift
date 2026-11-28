@@ -22,6 +22,41 @@ import Defaults
 import AppKit
 import AVFoundation
 
+/// Who draws the volume/brightness HUD, which depends on whether the Mac is
+/// locked.
+///
+/// None of this app's HUDs can be seen over the lock screen: the inline style
+/// lives in the notch, which is not on screen there, and the window-based
+/// styles sit below the lock screen shield. So while locked the app stands
+/// down and macOS's own HUD is unsuppressed instead — except when the lock
+/// screen music panel is up, which carries its own volume slider and would
+/// otherwise leave two indicators on screen at once.
+enum SystemHUDPlacement {
+    /// This app's HUDs are never shown while locked; something else covers it.
+    static func suppressesAppHUD(isLocked: Bool) -> Bool {
+        isLocked
+    }
+
+    /// True when macOS should be allowed to draw its own HUD again.
+    ///
+    /// Whenever the Mac is locked — including with the music panel up. The
+    /// panel replaces the *volume* indicator only, but native suppression is
+    /// not per-channel: there is one `OSDUIHelper`, frozen or not. Withholding
+    /// it because the panel shows volume therefore left the brightness and
+    /// keyboard-backlight keys with no indicator from either side, since
+    /// `suppressesAppHUD` has already stood this app's HUDs down for every
+    /// channel while locked.
+    ///
+    /// Silently dead keys are the worse failure, so the panel's capsule and the
+    /// native HUD are both allowed to show volume while locked. Removing that
+    /// duplication needs per-channel *interception* — swallow the volume keys
+    /// so only the capsule moves, let brightness through to the native HUD —
+    /// which is a larger change than this decision point.
+    static func yieldsToNativeHUD(isLocked: Bool) -> Bool {
+        isLocked
+    }
+}
+
 final class SystemChangesObserver: MediaKeyInterceptorDelegate {
     private weak var coordinator: DynamicIslandViewCoordinator?
     private let volumeController = SystemVolumeController.shared
@@ -80,11 +115,10 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
         }
         volumeController.start()
 
-        brightnessController.onBrightnessChange = { [weak self] brightness in
-            guard let self, self.brightnessEnabled else { return }
-            self.sendBrightnessNotification(value: brightness)
+        configureBrightnessCallback()
+        if brightnessEnabled {
+            brightnessController.start()
         }
-        brightnessController.start()
 
         configureKeyboardBacklightCallback()
         if keyboardBacklightEnabled {
@@ -105,9 +139,19 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
 
     func update(volumeEnabled: Bool, brightnessEnabled: Bool, keyboardBacklightEnabled: Bool) {
         self.volumeEnabled = volumeEnabled
+        let brightnessStateChanged = self.brightnessEnabled != brightnessEnabled
         self.brightnessEnabled = brightnessEnabled
         let backlightStateChanged = self.keyboardBacklightEnabled != keyboardBacklightEnabled
         self.keyboardBacklightEnabled = keyboardBacklightEnabled
+
+        configureBrightnessCallback()
+        if brightnessStateChanged {
+            if brightnessEnabled {
+                brightnessController.start()
+            } else {
+                brightnessController.stop()
+            }
+        }
 
         if keyboardBacklightEnabled {
             configureKeyboardBacklightCallback()
@@ -169,14 +213,14 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
         
         let baseStep = volumeStep(for: step)
         let delta = direction == .up ? baseStep : -baseStep
-        volumeController.adjust(by: delta)
+        volumeController.enqueueKeyAdjust(by: delta)
         volumeFeedbackPlayer.playIfNeeded()
     }
 
     func mediaKeyInterceptorDidToggleMute(_ interceptor: MediaKeyInterceptor) {
         guard volumeEnabled else { return }
         SystemOSDManager.suppressNativeOSDNow()
-        volumeController.toggleMute()
+        volumeController.enqueueKeyToggleMute()
     }
 
     func mediaKeyInterceptor(
@@ -188,6 +232,20 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
     ) {
         let isBacklight = modifiers.contains(.command) && keyboardBacklightEnabled
         guard isBacklight || brightnessEnabled else { return }
+        handleBrightnessKey(direction: direction, step: step, isBacklight: isBacklight)
+    }
+
+    func mediaKeyInterceptor(
+        _ interceptor: MediaKeyInterceptor,
+        didReceiveKeyboardBacklightCommand direction: MediaKeyDirection,
+        step: MediaKeyStep,
+        isRepeat: Bool
+    ) {
+        guard keyboardBacklightEnabled else { return }
+        handleBrightnessKey(direction: direction, step: step, isBacklight: true)
+    }
+
+    private func handleBrightnessKey(direction: MediaKeyDirection, step: MediaKeyStep, isBacklight: Bool) {
         SystemOSDManager.suppressNativeOSDNow()
 
         // Elastic Limit Detection (Vertical HUD)
@@ -222,6 +280,11 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
 
     @MainActor
     private func sendVolumeNotification(value: Float, isMuted: Bool) {
+        // Locked, macOS draws the HUD (or the lock screen music panel does), so
+        // stand down entirely — including the re-suppression below, which would
+        // otherwise silence the native HUD again on the next keypress.
+        guard !SystemHUDPlacement.suppressesAppHUD(isLocked: LockScreenManager.isLockedSnapshot) else { return }
+
         // The CoreAudio volume write wakes the native OSD; suppress it immediately
         // so only our notch HUD shows (parity with brightness). No-op unless active.
         SystemOSDManager.suppressNativeOSDNow()
@@ -268,7 +331,10 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
 
     @MainActor
     private func resolvedVolumeIcon(isMuted: Bool) -> String {
-        guard let icon = BluetoothAudioManager.shared.activeDeviceIconSymbol() else { return "" }
+        // A connected Bluetooth device only names the output when audio is
+        // actually routed to it; otherwise the HUD's own speaker symbol is right.
+        guard volumeController.isDefaultOutputBluetooth,
+              let icon = BluetoothAudioManager.shared.activeDeviceIconSymbol() else { return "" }
         if isMuted && Self.headsetIconSymbols.contains(icon) {
             return "headphones.slash"
         }
@@ -276,6 +342,8 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
     }
 
     private func sendBrightnessNotification(value: Float) {
+        guard !SystemHUDPlacement.suppressesAppHUD(isLocked: LockScreenManager.isLockedSnapshot) else { return }
+
         // Send to Circular HUD if enabled
         if Defaults[.enableCircularHUD] && Defaults[.enableBrightnessHUD] {
             Task { @MainActor in
@@ -314,6 +382,8 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
     }
 
     private func sendKeyboardBacklightNotification(value: Float) {
+        guard !SystemHUDPlacement.suppressesAppHUD(isLocked: LockScreenManager.isLockedSnapshot) else { return }
+
         // Send to Circular HUD if enabled
         if Defaults[.enableCircularHUD] && Defaults[.enableKeyboardBacklightHUD] {
             Task { @MainActor in
@@ -348,6 +418,17 @@ final class SystemChangesObserver: MediaKeyInterceptorDelegate {
                     icon: ""
                 )
             }
+        }
+    }
+
+    private func configureBrightnessCallback() {
+        if brightnessEnabled {
+            brightnessController.onBrightnessChange = { [weak self] brightness in
+                guard let self, self.brightnessEnabled else { return }
+                self.sendBrightnessNotification(value: brightness)
+            }
+        } else {
+            brightnessController.onBrightnessChange = nil
         }
     }
 

@@ -18,6 +18,7 @@
 
 import Foundation
 import CoreAudio
+import os
 import CoreGraphics
 import IOKit
 
@@ -59,6 +60,54 @@ final class HUDSuppressionCoordinator {
     }
 }
 
+/// Volume key steps waiting to be written, merged into one net change.
+///
+/// A CoreAudio volume write can block for a long time (Bluetooth outputs in
+/// particular). When every key press ran its own write in turn, a burst of
+/// presses queued up writes that kept stepping the volume for seconds after
+/// the keys were released. Presses that arrive while a write is in flight are
+/// summed here and applied together by the next one.
+///
+/// A mute toggle queued between steps closes the open batch, so steps pressed
+/// after the mute are applied after it instead of being merged ahead of it.
+struct VolumeAdjustAccumulator {
+    private(set) var pendingDelta: Float = 0
+    private(set) var isScheduled = false
+    /// Closed batches whose writes are already queued, oldest first.
+    private var closedDeltas: [Float] = []
+
+    /// Adds a step. Returns true when no write is scheduled yet, meaning the
+    /// caller has to schedule one.
+    mutating func add(_ delta: Float) -> Bool {
+        pendingDelta += delta
+        guard !isScheduled else { return false }
+        isScheduled = true
+        return true
+    }
+
+    /// Seals the batch in progress so later steps start a new write, queued
+    /// behind whatever is enqueued next.
+    mutating func close() {
+        guard isScheduled else { return }
+        closedDeltas.append(pendingDelta)
+        pendingDelta = 0
+        isScheduled = false
+    }
+
+    /// Takes the oldest batch, for the scheduled write to apply. Writes run in
+    /// the order they were scheduled, so closed batches come before the open one.
+    mutating func take() -> Float {
+        if !closedDeltas.isEmpty {
+            return closedDeltas.removeFirst()
+        }
+        defer {
+            pendingDelta = 0
+            isScheduled = false
+        }
+        return pendingDelta
+    }
+}
+
 final class SystemVolumeController {
     static let shared = SystemVolumeController()
 
@@ -66,11 +115,63 @@ final class SystemVolumeController {
     var onRouteChange: (() -> Void)?
 
     private let callbackQueue = DispatchQueue(label: "com.dynamicisland.volume-listener")
-    private var currentDeviceID: AudioDeviceID = 0
+    /// Written from `callbackQueue` when the route changes and read from
+    /// wherever a volume is asked for, so it is not a plain stored property.
+    private let deviceIDStorage = OSAllocatedUnfairLock(initialState: AudioDeviceID(0))
+
+    private var currentDeviceID: AudioDeviceID {
+        get { deviceIDStorage.withLock { $0 } }
+        set { deviceIDStorage.withLock { $0 = newValue } }
+    }
+    /// Transport of the default output, refreshed with `currentDeviceID`, so
+    /// views can ask for it while rendering without a CoreAudio round trip.
+    private let transportTypeStorage = OSAllocatedUnfairLock(initialState: UInt32(0))
     private var listenersInstalled = false
+    private struct InstalledListener {
+        let deviceID: AudioDeviceID
+        let address: AudioObjectPropertyAddress
+        let block: AudioObjectPropertyListenerBlock
+    }
+
+    private var installedListeners: [InstalledListener] = []
     private var volumeElement: AudioObjectPropertyElement?
     private var muteElement: AudioObjectPropertyElement?
     private let silenceThreshold: Float = 0.001 // Treat very low values as mute requests.
+
+    /// `kAudioHardwareServiceDeviceProperty_VirtualMainVolume` ('vmvc').
+    ///
+    /// The property macOS's own volume UI works through. Some outputs publish
+    /// no per-channel `VolumeScalar` at all -- HDMI and DisplayPort commonly,
+    /// and built-in speakers on some Macs -- but still answer this one.
+    private let virtualMainVolumeSelector = AudioObjectPropertySelector(0x766D_7663)
+
+    /// The last level actually read from the hardware, per device.
+    ///
+    /// A failed read used to be reported as zero, which is a real volume and
+    /// therefore indistinguishable from silence: the slider dropped to the
+    /// bottom and stayed there. Holding the last known level makes a failed
+    /// read do nothing instead of lying.
+    ///
+    /// Keyed by device because levels are not shared: headphones at 20% and
+    /// speakers at 80% are two different facts, and answering one with the
+    /// other after a route change would be a fresh way of being wrong. The
+    /// most recent reading of any device is kept as the last resort, for a
+    /// device that has never yet answered -- "unchanged" is a better guess
+    /// than "silent" when the truth is "unknown".
+    private struct VolumeMemory {
+        var byDevice: [AudioDeviceID: Float] = [:]
+        /// Absent until some device has answered once.
+        ///
+        /// Starting this at zero gave the same protection everywhere except
+        /// the one place it was needed most: before the first successful
+        /// read there was nothing to hold, so an unreadable device at launch
+        /// published 0% -- silence the user never asked for, and
+        /// indistinguishable from having turned it down themselves.
+        var mostRecent: Float?
+    }
+
+    private let volumeMemory = OSAllocatedUnfairLock(initialState: VolumeMemory())
+    private let pendingKeyAdjust = OSAllocatedUnfairLock(initialState: VolumeAdjustAccumulator())
 
     private let candidateElements: [AudioObjectPropertyElement] = [
         kAudioObjectPropertyElementMain,
@@ -80,6 +181,7 @@ final class SystemVolumeController {
 
     private init() {
         currentDeviceID = resolveDefaultDevice()
+        refreshTransportType()
         refreshPropertyElements()
         installDefaultDeviceListener()
         installVolumeListeners(for: currentDeviceID)
@@ -101,9 +203,49 @@ final class SystemVolumeController {
         if isMuted {
             setMuted(false)
         }
-        var newValue = currentVolume + delta
-        newValue = max(0, min(1, newValue))
-        setVolume(newValue)
+
+        let deviceID = currentDeviceID
+        // Reads on the way through, so a device that can answer populates its
+        // own entry before the check below.
+        let current = currentVolume
+
+        // A relative change needs a real level to be relative to. `getVolume`
+        // will happily answer with another device's level rather than report a
+        // zero it does not mean -- fine for showing a slider, not fine as the
+        // base for a write, where being 60 points out moves the volume 60
+        // points. Absolute sets from the slider still work; only the delta is
+        // refused.
+        guard volumeMemory.withLock({ $0.byDevice[deviceID] != nil }) else {
+            NSLog("⚠️ Not adjusting volume on \(deviceID): no confirmed level to adjust from")
+            return
+        }
+
+        setVolume(max(0, min(1, current + delta)), on: deviceID)
+    }
+
+    /// Applies a volume key step off the main thread.
+    ///
+    /// The media key tap is serviced on the main run loop, so a blocking write
+    /// there both delays later presses and risks the tap being disabled.
+    /// Writes run on the listener queue, which already serialises this
+    /// controller's CoreAudio work, and steps that arrive meanwhile are merged.
+    func enqueueKeyAdjust(by delta: Float) {
+        guard delta != 0 else { return }
+        guard pendingKeyAdjust.withLock({ $0.add(delta) }) else { return }
+        callbackQueue.async { [weak self] in
+            guard let self else { return }
+            let delta = self.pendingKeyAdjust.withLock { $0.take() }
+            self.adjust(by: delta)
+        }
+    }
+
+    /// The mute key's counterpart to `enqueueKeyAdjust`, on the same queue so
+    /// a mute pressed right after a volume key lands after that step.
+    func enqueueKeyToggleMute() {
+        pendingKeyAdjust.withLock { $0.close() }
+        callbackQueue.async { [weak self] in
+            self?.toggleMute()
+        }
     }
 
     func toggleMute() {
@@ -118,46 +260,94 @@ final class SystemVolumeController {
         getMuteState()
     }
 
+    /// CoreAudio transport type of the default output, or 0 if unknown.
+    var defaultOutputTransportType: UInt32 {
+        transportTypeStorage.withLock { $0 }
+    }
+
+    /// True when sound is actually going to a Bluetooth device. A paired pair
+    /// of AirPods being connected says nothing about where audio is routed.
+    var isDefaultOutputBluetooth: Bool {
+        let transport = transportTypeStorage.withLock { $0 }
+        return transport == kAudioDeviceTransportTypeBluetooth
+            || transport == kAudioDeviceTransportTypeBluetoothLE
+    }
+
     func setVolume(_ value: Float) {
+        setVolume(value, on: currentDeviceID)
+    }
+
+    /// Writes a level to one named device.
+    ///
+    /// The device is a parameter rather than something each step looks up for
+    /// itself, because the steps are not instantaneous: elements are discovered
+    /// on whatever device is default at that moment, and the write happens
+    /// after. A route change in between had the write aiming the old device's
+    /// elements at the new device.
+    private func setVolume(_ value: Float, on deviceID: AudioDeviceID) {
         let clamped = max(0, min(1, value))
-        let currentlyMuted = isMuted
+        let currentlyMuted = getMuteState(on: deviceID)
 
         if clamped <= silenceThreshold {
             if !currentlyMuted {
-                setMuted(true)
+                setMuted(true, on: deviceID)
             }
         } else if currentlyMuted {
-            setMuted(false)
+            setMuted(false, on: deviceID)
         }
 
-        let elements = volumeElements()
+        let elements = volumeElements(on: deviceID)
+        var wrote = false
 
         if elements.isEmpty {
             var volume = clamped
-            let status = setData(selector: kAudioDevicePropertyVolumeScalar, data: &volume)
-            if status != noErr {
-                NSLog("⚠️ Failed to set volume: \(status)")
-            }
+            wrote = setData(selector: kAudioDevicePropertyVolumeScalar, on: deviceID, data: &volume) == noErr
         } else {
             for element in elements {
                 var volume = clamped
-                let status = setData(selector: kAudioDevicePropertyVolumeScalar, element: element, data: &volume)
-                if status != noErr {
-                    NSLog("⚠️ Failed to set volume for element \(element): \(status)")
-                } else {
+                let status = setData(selector: kAudioDevicePropertyVolumeScalar, element: element, on: deviceID, data: &volume)
+                if status == noErr {
                     cache(element: element, for: kAudioDevicePropertyVolumeScalar)
+                    wrote = true
+                } else {
+                    NSLog("⚠️ Failed to set volume for element \(element): \(status)")
                 }
             }
         }
+
+        // Same fallback the read side uses, for the same devices: a scalar
+        // nobody accepted does not mean the volume cannot be set.
+        if !wrote, writeVirtualMainVolume(clamped, on: deviceID) {
+            wrote = true
+        }
+
+        if wrote {
+            // The device has just been told what its level is, so that is what
+            // it is until a read says otherwise. Without this, the read that
+            // `notifyCurrentState` is about to do can fail and hand back the
+            // level from before the write -- and the slider springs back to
+            // where the user just dragged it from.
+            volumeMemory.withLock {
+                $0.byDevice[deviceID] = clamped
+                $0.mostRecent = clamped
+            }
+        } else {
+            NSLog("⚠️ Failed to set volume on \(deviceID)")
+        }
+
         notifyCurrentState()
     }
 
     func setMuted(_ muted: Bool) {
+        setMuted(muted, on: currentDeviceID)
+    }
+
+    private func setMuted(_ muted: Bool, on deviceID: AudioDeviceID) {
         var muteFlag: UInt32 = muted ? 1 : 0
-        let elements = muteElements()
+        let elements = muteElements(on: deviceID)
 
         if elements.isEmpty {
-            let status = setData(selector: kAudioDevicePropertyMute, data: &muteFlag)
+            let status = setData(selector: kAudioDevicePropertyMute, on: deviceID, data: &muteFlag)
             if status != noErr {
                 NSLog("⚠️ Failed to set mute state: \(status)")
             }
@@ -166,7 +356,7 @@ final class SystemVolumeController {
 
         for element in elements {
             var value = muteFlag
-            let status = setData(selector: kAudioDevicePropertyMute, element: element, data: &value)
+            let status = setData(selector: kAudioDevicePropertyMute, element: element, on: deviceID, data: &value)
             if status != noErr {
                 NSLog("⚠️ Failed to set mute state for element \(element): \(status)")
             } else {
@@ -192,6 +382,19 @@ final class SystemVolumeController {
         return deviceID
     }
 
+    private func refreshTransportType() {
+        var transport: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = AudioObjectGetPropertyData(currentDeviceID, &address, 0, nil, &size, &transport)
+        let resolved: UInt32 = status == noErr ? transport : 0
+        transportTypeStorage.withLock { $0 = resolved }
+    }
+
     private func installDefaultDeviceListener() {
         guard !listenersInstalled else { return }
         var address = AudioObjectPropertyAddress(
@@ -214,27 +417,63 @@ final class SystemVolumeController {
     }
 
     private func installVolumeListeners(for deviceID: AudioDeviceID) {
+        // Route changes call this again. Without taking the old ones down
+        // first, every change left another live pair listening to a device we
+        // no longer read, each still calling notifyCurrentState.
+        removeVolumeListeners()
+
         if let element = resolveElement(selector: kAudioDevicePropertyVolumeScalar, deviceID: deviceID) {
             volumeElement = element
-            var address = makeAddress(selector: kAudioDevicePropertyVolumeScalar, element: element)
-            AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue) { [weak self] _, _ in
-                self?.notifyCurrentState()
-            }
+            addVolumeListener(selector: kAudioDevicePropertyVolumeScalar, element: element, deviceID: deviceID)
         }
 
         if let element = resolveElement(selector: kAudioDevicePropertyMute, deviceID: deviceID) {
             muteElement = element
-            var address = makeAddress(selector: kAudioDevicePropertyMute, element: element)
-            AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue) { [weak self] _, _ in
-                self?.notifyCurrentState()
-            }
+            addVolumeListener(selector: kAudioDevicePropertyMute, element: element, deviceID: deviceID)
         }
+
+        // The devices this fallback exists for are exactly the ones with no
+        // scalar element to listen on, so without this they would read
+        // correctly once and then never hear about a change made anywhere
+        // else -- the keyboard keys, Control Centre, another app.
+        var virtualAddress = makeAddress(selector: virtualMainVolumeSelector, element: kAudioObjectPropertyElementMain)
+        if propertyExists(deviceID: deviceID, address: &virtualAddress) {
+            addVolumeListener(selector: virtualMainVolumeSelector, element: kAudioObjectPropertyElementMain, deviceID: deviceID)
+        }
+    }
+
+    private func addVolumeListener(
+        selector: AudioObjectPropertySelector,
+        element: AudioObjectPropertyElement,
+        deviceID: AudioDeviceID
+    ) {
+        var address = makeAddress(selector: selector, element: element)
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            self?.notifyCurrentState()
+        }
+
+        let status = AudioObjectAddPropertyListenerBlock(deviceID, &address, callbackQueue, block)
+        guard status == noErr else {
+            NSLog("⚠️ Failed to observe volume property on \(deviceID): \(status)")
+            return
+        }
+
+        installedListeners.append(InstalledListener(deviceID: deviceID, address: address, block: block))
+    }
+
+    private func removeVolumeListeners() {
+        for listener in installedListeners {
+            var address = listener.address
+            AudioObjectRemovePropertyListenerBlock(listener.deviceID, &address, callbackQueue, listener.block)
+        }
+        installedListeners.removeAll()
     }
 
     private func handleDefaultDeviceChanged() {
         callbackQueue.async { [weak self] in
             guard let self else { return }
             self.currentDeviceID = self.resolveDefaultDevice()
+            self.refreshTransportType()
             self.refreshPropertyElements()
             self.installVolumeListeners(for: self.currentDeviceID)
             self.notifyCurrentState()
@@ -246,7 +485,10 @@ final class SystemVolumeController {
     }
 
     private func notifyCurrentState() {
-        let volume = getVolume()
+        // Nothing has ever been read: say nothing rather than announce a
+        // level. There is no volume to report yet, and every value that could
+        // stand in for "unknown" is a real volume to whoever receives it.
+        guard let volume = knownVolume() else { return }
         let muted = getMuteState()
         DispatchQueue.main.async {
             self.onVolumeChange?(volume, muted)
@@ -255,15 +497,44 @@ final class SystemVolumeController {
     }
 
     private func getVolume() -> Float {
-        let elements = volumeElements()
+        knownVolume() ?? 0
+    }
+
+    /// The current level, or nil when no device has ever answered.
+    ///
+    /// Callers that must produce a number fall back to zero; callers that are
+    /// telling somebody else what the volume is should say nothing instead.
+    private func knownVolume() -> Float? {
+        // One snapshot for the whole read. Re-reading `currentDeviceID` in each
+        // helper meant a route change part-way through could read device B and
+        // file the answer under device A -- the precise mix-up the per-device
+        // memory exists to avoid.
+        let deviceID = currentDeviceID
+
+        if let value = readScalarVolume(on: deviceID) ?? readVirtualMainVolume(on: deviceID) {
+            volumeMemory.withLock {
+                $0.byDevice[deviceID] = value
+                $0.mostRecent = value
+            }
+            return value
+        }
+
+        // Every read failed. That is not the same as the volume being zero,
+        // and reporting zero pins the slider to the bottom for as long as the
+        // device stays unreadable.
+        NSLog("⚠️ Unable to fetch volume for \(deviceID); holding the last known level")
+        return volumeMemory.withLock { $0.byDevice[deviceID] ?? $0.mostRecent }
+    }
+
+    /// The per-element `VolumeScalar` reading, or nil when the device exposes
+    /// none that can be read.
+    private func readScalarVolume(on deviceID: AudioDeviceID) -> Float? {
+        let elements = volumeElements(on: deviceID)
 
         if elements.isEmpty {
             var volume = Float32(0)
-            let status = getData(selector: kAudioDevicePropertyVolumeScalar, data: &volume)
-            if status != noErr {
-                NSLog("⚠️ Unable to fetch volume: \(status)")
-            }
-            return volume
+            let status = getData(selector: kAudioDevicePropertyVolumeScalar, on: deviceID, data: &volume)
+            return status == noErr ? volume : nil
         }
 
         var masterVolume: Float?
@@ -272,9 +543,9 @@ final class SystemVolumeController {
 
         for element in elements {
             var value = Float32(0)
-            let status = getData(selector: kAudioDevicePropertyVolumeScalar, element: element, data: &value)
+            let status = getData(selector: kAudioDevicePropertyVolumeScalar, element: element, on: deviceID, data: &value)
             if status == noErr {
-                if element == kAudioObjectPropertyElementMaster {
+                if element == kAudioObjectPropertyElementMain {
                     masterVolume = value
                 }
                 accumulator += value
@@ -282,28 +553,39 @@ final class SystemVolumeController {
             }
         }
 
-        if let masterVolume {
-            return masterVolume
-        }
+        if let masterVolume { return masterVolume }
+        return count > 0 ? accumulator / count : nil
+    }
 
-        if count > 0 {
-            return accumulator / count
-        }
+    private func readVirtualMainVolume(on deviceID: AudioDeviceID) -> Float? {
+        var address = makeAddress(selector: virtualMainVolumeSelector, element: kAudioObjectPropertyElementMain)
+        guard propertyExists(deviceID: deviceID, address: &address) else { return nil }
 
-        var fallback = Float32(0)
-        let status = getData(selector: kAudioDevicePropertyVolumeScalar, data: &fallback)
-        if status != noErr {
-            NSLog("⚠️ Unable to fetch fallback volume: \(status)")
-        }
-        return fallback
+        var value = Float32(0)
+        var size = UInt32(MemoryLayout<Float32>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
+        return status == noErr ? value : nil
+    }
+
+    private func writeVirtualMainVolume(_ value: Float, on deviceID: AudioDeviceID) -> Bool {
+        var address = makeAddress(selector: virtualMainVolumeSelector, element: kAudioObjectPropertyElementMain)
+        guard propertyExists(deviceID: deviceID, address: &address) else { return false }
+
+        var volume = Float32(value)
+        let size = UInt32(MemoryLayout<Float32>.size)
+        return AudioObjectSetPropertyData(deviceID, &address, 0, nil, size, &volume) == noErr
     }
 
     private func getMuteState() -> Bool {
-        let elements = muteElements()
+        getMuteState(on: currentDeviceID)
+    }
+
+    private func getMuteState(on deviceID: AudioDeviceID) -> Bool {
+        let elements = muteElements(on: deviceID)
 
         if elements.isEmpty {
             var mute: UInt32 = 0
-            let status = getData(selector: kAudioDevicePropertyMute, data: &mute)
+            let status = getData(selector: kAudioDevicePropertyMute, on: deviceID, data: &mute)
             if status != noErr {
                 return false
             }
@@ -315,7 +597,7 @@ final class SystemVolumeController {
 
         for element in elements {
             var value: UInt32 = 0
-            let status = getData(selector: kAudioDevicePropertyMute, element: element, data: &value)
+            let status = getData(selector: kAudioDevicePropertyMute, element: element, on: deviceID, data: &value)
             if status == noErr {
                 retrieved = true
                 if value == 0 {
@@ -394,13 +676,14 @@ final class SystemVolumeController {
         }
     }
 
-    private func getData<T>(selector: AudioObjectPropertySelector, data: inout T) -> OSStatus {
+    private func getData<T>(selector: AudioObjectPropertySelector, on deviceID: AudioDeviceID? = nil, data: inout T) -> OSStatus {
+        let target = deviceID ?? currentDeviceID
         var lastStatus: OSStatus = kAudioHardwareUnspecifiedError
         for element in preferredElements(for: selector) {
             var address = makeAddress(selector: selector, element: element)
-            guard propertyExists(deviceID: currentDeviceID, address: &address) else { continue }
+            guard propertyExists(deviceID: target, address: &address) else { continue }
             var size = UInt32(MemoryLayout<T>.size)
-            lastStatus = AudioObjectGetPropertyData(currentDeviceID, &address, 0, nil, &size, &data)
+            lastStatus = AudioObjectGetPropertyData(target, &address, 0, nil, &size, &data)
             if lastStatus == noErr {
                 cache(element: element, for: selector)
                 return lastStatus
@@ -409,13 +692,14 @@ final class SystemVolumeController {
         return lastStatus
     }
 
-    private func setData<T>(selector: AudioObjectPropertySelector, data: inout T) -> OSStatus {
+    private func setData<T>(selector: AudioObjectPropertySelector, on deviceID: AudioDeviceID? = nil, data: inout T) -> OSStatus {
+        let target = deviceID ?? currentDeviceID
         var lastStatus: OSStatus = kAudioHardwareUnspecifiedError
         for element in preferredElements(for: selector) {
             var address = makeAddress(selector: selector, element: element)
-            guard propertyExists(deviceID: currentDeviceID, address: &address) else { continue }
+            guard propertyExists(deviceID: target, address: &address) else { continue }
             let size = UInt32(MemoryLayout<T>.size)
-            lastStatus = AudioObjectSetPropertyData(currentDeviceID, &address, 0, nil, size, &data)
+            lastStatus = AudioObjectSetPropertyData(target, &address, 0, nil, size, &data)
             if lastStatus == noErr {
                 cache(element: element, for: selector)
                 return lastStatus
@@ -424,35 +708,39 @@ final class SystemVolumeController {
         return lastStatus
     }
 
-    private func getData<T>(selector: AudioObjectPropertySelector, element: AudioObjectPropertyElement, data: inout T) -> OSStatus {
+    private func getData<T>(selector: AudioObjectPropertySelector, element: AudioObjectPropertyElement, on deviceID: AudioDeviceID? = nil, data: inout T) -> OSStatus {
+        let target = deviceID ?? currentDeviceID
         var address = makeAddress(selector: selector, element: element)
-        guard propertyExists(deviceID: currentDeviceID, address: &address) else {
+        guard propertyExists(deviceID: target, address: &address) else {
             return kAudioHardwareUnknownPropertyError
         }
         var size = UInt32(MemoryLayout<T>.size)
-        return AudioObjectGetPropertyData(currentDeviceID, &address, 0, nil, &size, &data)
+        return AudioObjectGetPropertyData(target, &address, 0, nil, &size, &data)
     }
 
-    private func setData<T>(selector: AudioObjectPropertySelector, element: AudioObjectPropertyElement, data: inout T) -> OSStatus {
+    private func setData<T>(selector: AudioObjectPropertySelector, element: AudioObjectPropertyElement, on deviceID: AudioDeviceID? = nil, data: inout T) -> OSStatus {
+        let target = deviceID ?? currentDeviceID
         var address = makeAddress(selector: selector, element: element)
-        guard propertyExists(deviceID: currentDeviceID, address: &address) else {
+        guard propertyExists(deviceID: target, address: &address) else {
             return kAudioHardwareUnknownPropertyError
         }
         let size = UInt32(MemoryLayout<T>.size)
-        return AudioObjectSetPropertyData(currentDeviceID, &address, 0, nil, size, &data)
+        return AudioObjectSetPropertyData(target, &address, 0, nil, size, &data)
     }
 
-    private func volumeElements() -> [AudioObjectPropertyElement] {
-        candidateElements.filter { element in
+    private func volumeElements(on deviceID: AudioDeviceID? = nil) -> [AudioObjectPropertyElement] {
+        let target = deviceID ?? currentDeviceID
+        return candidateElements.filter { element in
             var address = makeAddress(selector: kAudioDevicePropertyVolumeScalar, element: element)
-            return propertyExists(deviceID: currentDeviceID, address: &address)
+            return propertyExists(deviceID: target, address: &address)
         }
     }
 
-    private func muteElements() -> [AudioObjectPropertyElement] {
-        candidateElements.filter { element in
+    private func muteElements(on deviceID: AudioDeviceID? = nil) -> [AudioObjectPropertyElement] {
+        let target = deviceID ?? currentDeviceID
+        return candidateElements.filter { element in
             var address = makeAddress(selector: kAudioDevicePropertyMute, element: element)
-            return propertyExists(deviceID: currentDeviceID, address: &address)
+            return propertyExists(deviceID: target, address: &address)
         }
     }
 }
@@ -476,10 +764,16 @@ final class SystemBrightnessController {
     private let maximumBrightnessAnimationDuration: TimeInterval = 0.3
     private let brightnessAnimationDurationScale: TimeInterval = 1.6
     private var lastEmittedBrightness: Float = 0.5
-    private var pendingAdjustTarget: Float?
+    private var confirmedBrightness: Float?
+    private var pendingAdjustDelta: Float = 0
     private let coreBrightnessClient = CoreBrightnessDisplayClient.shared
     private var pollTimer: Timer?
     private let pollInterval: TimeInterval = 0.15
+    /// Set when CoreBrightness notifications are unavailable. The fallback poll
+    /// only runs inside the user-initiated window after a key press, the only
+    /// time its result is shown; outside it a change is absorbed silently, and
+    /// `syncWithSystemBrightnessIfNeeded` re-reads the level before each press.
+    private var usesPollingFallback = false
     private let pollChangeThreshold: Float = 0.005
 
     // MARK: - User-initiated brightness gate
@@ -497,7 +791,9 @@ final class SystemBrightnessController {
 
     private init() {
         registerExternalNotifications()
-        lastEmittedBrightness = currentBrightness
+        if let systemLevel = readSystemBrightness() {
+            lastEmittedBrightness = systemLevel
+        }
     }
 
     func start() {
@@ -507,16 +803,16 @@ final class SystemBrightnessController {
             NSLog("⚠️ SystemBrightnessController: CoreBrightnessDisplayClient unavailable; will rely on DisplayServices / IODisplay + polling fallback")
         }
         notifyCurrentBrightness()
-        // Only start polling as a fallback when CoreBrightness notifications
-        // are unavailable.  When CoreBrightness IS available the distributed
-        // notifications (registerExternalNotifications) handle detection.
-        if !coreBrightnessClient.isAvailable {
-            startPolling()
-        }
+        // Poll only as a fallback when CoreBrightness notifications are
+        // unavailable, and then only after a key press. Auto-brightness (ALS) changes that arrive without a
+        // notification are picked up by syncWithSystemBrightnessIfNeeded()
+        // before each key-press delta is applied.
+        usesPollingFallback = !coreBrightnessClient.isAvailable
     }
 
     func stop() {
         onBrightnessChange = nil
+        usesPollingFallback = false
         brightnessAnimationTimer?.invalidate()
         brightnessAnimationTimer = nil
         pollTimer?.invalidate()
@@ -524,7 +820,7 @@ final class SystemBrightnessController {
         userInitiatedResetTimer?.invalidate()
         userInitiatedResetTimer = nil
         userInitiatedBrightnessChange = false
-        pendingAdjustTarget = nil
+        pendingAdjustDelta = 0
     }
 
     func adjust(by delta: Float) {
@@ -532,15 +828,22 @@ final class SystemBrightnessController {
 
         // Do not synchronously query CoreBrightness/DisplayServices here. This
         // method is reached from hardware-key handling, and those calls can be
-        // slow enough for macOS to disable the event tap. beginBrightnessAnimation
-        // still refreshes the system baseline after the tap callback has returned.
-        let inFlightTarget = brightnessAnimationTimer == nil ? nil : brightnessAnimationTarget
-        let base = pendingAdjustTarget ?? inFlightTarget ?? lastEmittedBrightness
-        pendingAdjustTarget = max(0, min(1, base + delta))
-
+        // slow enough for macOS to disable the event tap. Presses that land
+        // before the main-queue block runs are accumulated, then applied on top
+        // of a baseline refreshed from the system (auto-brightness may have
+        // moved it).
+        pendingAdjustDelta += delta
         DispatchQueue.main.async { [weak self] in
-            guard let self, let target = self.pendingAdjustTarget else { return }
-            self.pendingAdjustTarget = nil
+            guard let self, self.pendingAdjustDelta != 0 else { return }
+            let delta = self.pendingAdjustDelta
+            self.pendingAdjustDelta = 0
+            self.syncWithSystemBrightnessIfNeeded()
+            let inFlightTarget = self.brightnessAnimationTimer == nil ? nil : self.brightnessAnimationTarget
+            guard let base = inFlightTarget ?? self.confirmedBrightness else {
+                NSLog("⚠️ Not adjusting brightness: no confirmed level to adjust from")
+                return
+            }
+            let target = max(0, min(1, base + delta))
             self.beginBrightnessAnimation(to: target)
         }
     }
@@ -562,36 +865,51 @@ final class SystemBrightnessController {
         userInitiatedResetTimer?.invalidate()
         userInitiatedResetTimer = Timer.scheduledTimer(withTimeInterval: userInitiatedWindow, repeats: false) { [weak self] _ in
             self?.userInitiatedBrightnessChange = false
+            self?.stopPolling()
+        }
+        if usesPollingFallback {
+            startPolling()
         }
     }
 
     var currentBrightness: Float {
+        readSystemBrightness() ?? confirmedBrightness ?? lastEmittedBrightness
+    }
+
+    private func readSystemBrightness() -> Float? {
         if let level = coreBrightnessClient.currentBrightness() {
-            return level
+            let clamped = max(0, min(1, level))
+            confirmedBrightness = clamped
+            return clamped
         }
         if let level = getBrightnessViaDisplayServices() {
-            return level
+            let clamped = max(0, min(1, level))
+            confirmedBrightness = clamped
+            return clamped
         }
-        guard let service = displayService() else { return 0.5 }
+        guard let service = displayService() else { return nil }
         var brightness: Float = 0
         let result = IODisplayGetFloatParameter(service, 0, kIODisplayBrightnessKey as CFString, &brightness)
         IOObjectRelease(service)
-        if result != kIOReturnSuccess {
-            return 0.5
+        guard result == kIOReturnSuccess else {
+            return nil
         }
-        return brightness
+        let clamped = max(0, min(1, brightness))
+        confirmedBrightness = clamped
+        return clamped
     }
 
     private func notifyCurrentBrightness() {
-        let brightness = currentBrightness
+        guard let brightness = readSystemBrightness() ?? confirmedBrightness else { return }
         emitBrightnessChange(value: brightness)
     }
 
     private func syncWithSystemBrightnessIfNeeded() {
         // Align our internal baseline with the actual system brightness so that
         // subsequent adjustments apply deltas from the true value (important when
-        // auto-brightness has changed the level behind our back).
-        let systemLevel = currentBrightness
+        // auto-brightness has changed the level behind our back). If all hardware
+        // reads fail, keep the last confirmed baseline rather than falling back to 0.5.
+        guard let systemLevel = readSystemBrightness() else { return }
         if abs(systemLevel - lastEmittedBrightness) > 0.001 {
             // Only update the baseline — don't emit to avoid spurious HUD flashes.
             lastEmittedBrightness = systemLevel
@@ -604,7 +922,7 @@ final class SystemBrightnessController {
         // Refresh baseline from system in case auto-brightness adjusted it.
         syncWithSystemBrightnessIfNeeded()
 
-        let start = lastEmittedBrightness
+        let start = confirmedBrightness ?? lastEmittedBrightness
         if abs(start - target) <= 0.0005 {
             applyBrightness(target)
             emitBrightnessChange(value: target)
@@ -655,15 +973,19 @@ final class SystemBrightnessController {
     private func applyBrightness(_ value: Float) {
         let clamped = max(0, min(1, value))
         if coreBrightnessClient.setBrightness(clamped) {
+            confirmedBrightness = clamped
             return
         }
         if setBrightnessViaDisplayServices(clamped) {
+            confirmedBrightness = clamped
             return
         }
         guard let service = displayService() else { return }
         let status = IODisplaySetFloatParameter(service, 0, kIODisplayBrightnessKey as CFString, clamped)
         IOObjectRelease(service)
-        if status != kIOReturnSuccess {
+        if status == kIOReturnSuccess {
+            confirmedBrightness = clamped
+        } else {
             NSLog("⚠️ Failed to set brightness via IODisplay: \(status)")
         }
     }
@@ -760,27 +1082,31 @@ final class SystemBrightnessController {
                 // Always keep our baseline in sync with the actual system brightness
                 // so that subsequent key-press deltas are accurate, but only fire the
                 // HUD callback when the change was user-initiated (key press).
-                let system = self.currentBrightness
+                guard let system = self.readSystemBrightness() else { return }
                 if self.userInitiatedBrightnessChange {
-                    self.notifyCurrentBrightness()
+                    self.emitBrightnessChange(value: system)
                 } else {
                     // Silently absorb auto-brightness change — update baseline only.
-                    self.lastEmittedBrightness = max(0, min(1, system))
+                    self.lastEmittedBrightness = system
                 }
             }
         }
         notificationsInstalled = true
     }
 
+    private func stopPolling() {
+        pollTimer?.invalidate()
+        pollTimer = nil
+    }
+
     private func startPolling() {
         guard pollTimer == nil else { return }
-        NSLog("ℹ️ SystemBrightnessController: Starting polling-driven brightness detection as fallback (interval: %.2fs)", pollInterval)
         pollTimer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
             guard let self else { return }
             // Skip polling while an animation is actively running — the
             // animation timer already handles emission during key presses.
             guard self.brightnessAnimationTimer == nil else { return }
-            let system = self.currentBrightness
+            guard let system = self.readSystemBrightness() else { return }
             guard abs(system - self.lastEmittedBrightness) > self.pollChangeThreshold else { return }
 
             if self.userInitiatedBrightnessChange {
@@ -792,7 +1118,7 @@ final class SystemBrightnessController {
                 self.emitBrightnessChange(value: system)
             } else {
                 // Auto-brightness or external change — absorb silently.
-                self.lastEmittedBrightness = max(0, min(1, system))
+                self.lastEmittedBrightness = system
             }
         }
     }

@@ -40,6 +40,16 @@
                ReferencedContainer = "container:DynamicIsland.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "0BED81992D1F2C18E8684884"
+               BuildableName = "DynamicIslandTests.xctest"
+               BlueprintName = "DynamicIslandTests"
+               ReferencedContainer = "container:DynamicIsland.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

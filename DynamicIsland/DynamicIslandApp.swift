@@ -112,8 +112,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let webcamManager = WebcamManager.shared
     let dndManager = DoNotDisturbManager.shared  // NEW: DND detection
     let bluetoothAudioManager = BluetoothAudioManager.shared  // NEW: Bluetooth audio detection
+    let networkConnectivityManager = NetworkConnectivityManager.shared
     let idleAnimationManager = IdleAnimationManager.shared  // NEW: Custom idle animations
-    let downloadManager = DownloadManager.shared  // NEW: Chromium downloads detection
+    let downloadManager = DownloadManager.shared  // NEW: browser downloads detection
     let lockScreenPanelManager = LockScreenPanelManager.shared  // NEW: Lock screen music panel
     let mediaControlsStateCoordinator = MediaControlsStateCoordinator.shared
     let systemTimerBridge = SystemTimerBridge.shared
@@ -130,6 +131,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
+    private var screenConfigurationWorkItem: DispatchWorkItem?
+
+    // Block-based AudioTap observers, kept with their center so they can be removed by token
+    private var audioTapObserverTokens: [(center: NotificationCenter, token: NSObjectProtocol)] = []
 //    let calendarManager = CalendarManager.shared
 //    let webcamManager = WebcamManager.shared
 //    var closeNotchWorkItem: DispatchWorkItem?
@@ -187,11 +192,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Setup observers for music player state changes to restart AudioTap capture
     private func setupAudioTapMusicObservers() {
+        // Registration is additive and this runs again every time the waveform setting is
+        // switched back on, so drop the previous generation instead of stacking duplicates.
+        // Block-based observers are only removable through the token they return, which is
+        // why they are retained in `audioTapObserverTokens`.
+        tearDownAudioTapMusicObservers()
+
         // Listen for app launches to restart capture when music apps are opened
         let targetBundleIDs = [
             "com.apple.Music",
             "com.spotify.client",
             "com.amazon.music",
+            "com.netease.163music",
+            "com.tencent.QQMusicMac",
             "sh.cider.genten.mac",
             "com.apple.Safari",
             "com.tidal.desktop",
@@ -202,7 +215,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "com.coppertino.Vox",
         ]
         
-        NSWorkspace.shared.notificationCenter.addObserver(
+        let launchToken = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification,
             object: nil,
             queue: .main
@@ -222,7 +235,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Also observe app terminations to restart capture
-        NSWorkspace.shared.notificationCenter.addObserver(
+        let terminateToken = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification,
             object: nil,
             queue: .main
@@ -237,8 +250,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 AudioTap.shared.restartCapture()
             }
         }
+
+        // Restart capture when the audio output route changes (e.g. AirPods connect/
+        // disconnect). AudioTap skips Spotify while a Bluetooth route is active to keep the
+        // AirPods pause gesture working, so the tap must be rebuilt to re-include or exclude
+        // Spotify whenever the route flips.
+        let routeToken = NotificationCenter.default.addObserver(
+            forName: .systemAudioRouteDidChange,
+            object: nil,
+            queue: .main
+        ) { _ in
+            if Defaults[.enableRealTimeWaveform] {
+                print("🔀 [AudioTap] Audio route changed, restarting capture...")
+                AudioTap.shared.restartCapture()
+            }
+        }
+
+        audioTapObserverTokens = [
+            (NSWorkspace.shared.notificationCenter, launchToken),
+            (NSWorkspace.shared.notificationCenter, terminateToken),
+            (NotificationCenter.default, routeToken),
+        ]
     }
-    
+
+    /// Removes the AudioTap observers registered by `setupAudioTapMusicObservers()`.
+    private func tearDownAudioTapMusicObservers() {
+        for (center, token) in audioTapObserverTokens {
+            center.removeObserver(token)
+        }
+        audioTapObserverTokens.removeAll()
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         let userInfo: [String: Any] = [
             AtollDistributedNotifications.UserInfoKey.sourcePID: NSNumber(value: ProcessInfo.processInfo.processIdentifier)
@@ -256,17 +298,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // synchronously here so it is never left frozen. (See issue #568.)
         SystemOSDManager.resumeOSDUIHelperForTermination()
 
+        // Exit cleaning mode — clean-keyboard especially, so the process can never die holding
+        // the event tap and lock the keyboard.
+        KeyboardCleaningManager.shared.stop()
+        ScreenCleaningManager.shared.stop()
+
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
+        screenConfigurationWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
         extensionXPCServiceHost.stop()
         extensionRPCServer.stop()
+        networkConnectivityManager.stopMonitoring()
         
         // Stop AudioTap capture
         AudioTap.shared.stopCapture()
 
         // Restore Lunar's native OSD if integration was active
         LunarManager.shared.appWillTerminate()
+
+        terminateLogStreamChildren()
+    }
+
+    /// The Bluetooth, system timer and Focus managers each tail the unified log
+    /// with a `/usr/bin/log stream` child that nothing stops at quit, so it
+    /// keeps running after Atoll exits. End every such child we spawned.
+    private func terminateLogStreamChildren() {
+        let ownPID = getpid()
+        let capacity = proc_listchildpids(ownPID, nil, 0)
+        guard capacity > 0 else { return }
+
+        var childPIDs = [pid_t](repeating: 0, count: Int(capacity) + 8)
+        let bufferSize = Int32(childPIDs.count * MemoryLayout<pid_t>.stride)
+        let count = proc_listchildpids(ownPID, &childPIDs, bufferSize)
+        guard count > 0 else { return }
+
+        var pathBuffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        for pid in childPIDs.prefix(Int(count)) where pid > 0 {
+            guard proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count)) > 0,
+                  String(cString: pathBuffer) == "/usr/bin/log" else { continue }
+            kill(pid, SIGTERM)
+        }
     }
     
     @objc func onScreenLocked(_: Notification) {
@@ -334,23 +406,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Rebuilds the notch's CGSSpace membership from the current hide option and the
-    /// live windows. The space pins the notch above every space (fullscreen included)
-    /// and is used **only** for "Never hide"; the hide options keep the set empty so
-    /// FullscreenMediaDetector can hide the notch. Assigning the whole set lets the
-    /// CGSSpace diff additions/removals, so this is safe to call on any change.
+    /// Rebuilds the notch's CGSSpace membership from the live windows.
+    /// This intentionally does not gate on `hideNotchOption == .never`: Space
+    /// membership keeps the window anchored while switching desktops, while
+    /// FullscreenMediaDetector/`hideOnClosed` owns whether the closed notch renders
+    /// in fullscreen.
     @MainActor
     private func syncNotchSpaceMembership() {
-        guard Defaults[.hideNotchOption] == .never else {
-            NotchSpaceManager.shared.notchSpace.windows = []
-            return
-        }
+        NotchSpaceManager.shared.notchSpace.windows = currentDynamicIslandWindows()
+    }
+
+    private func currentDynamicIslandWindows() -> Set<NSWindow> {
         if Defaults[.showOnAllDisplays] {
-            NotchSpaceManager.shared.notchSpace.windows = Set(windows.values)
+            return Set(windows.values)
         } else if let window = window {
-            NotchSpaceManager.shared.notchSpace.windows = [window]
-        } else {
-            NotchSpaceManager.shared.notchSpace.windows = []
+            return [window]
+        }
+        return []
+    }
+
+    @MainActor
+    private func reassertDynamicIslandWindowSpacePresence() {
+        guard !windowsHiddenForLock else { return }
+
+        syncNotchSpaceMembership()
+
+        for window in currentDynamicIslandWindows() {
+            window.collectionBehavior = DynamicIslandWindow.pinnedCollectionBehavior
+            window.orderFrontRegardless()
         }
     }
 
@@ -373,21 +456,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.animationBehavior = .none
         // collectionBehavior is configured in DynamicIslandWindow.init
+        window.notchViewModel = viewModel
 
-        window.contentView = FirstMouseHostingView(
+        let hostingView = FirstMouseHostingView(
             rootView: ContentView()
                 .environmentObject(viewModel)
                 .environmentObject(webcamManager)
                 //.moveToSky()
         )
+        // The notch window is sized and centred only by `resizeWindow`. With the
+        // default sizing options the hosting view pins the window's min/max
+        // size to the SwiftUI content, and whenever the content briefly needs
+        // more room than the window has (a HUD or track change mid-transition)
+        // AppKit grows the window from its bottom-left origin -- pushing the
+        // notch off-centre to the right or up under the camera housing until
+        // the next explicit resize.
+        hostingView.sizingOptions = []
+        window.contentView = hostingView
         
         window.orderFrontRegardless()
-        // Pin above every space (fullscreen included) only for "Never hide"; the
-        // hide options leave the window on the collectionBehavior path so
-        // FullscreenMediaDetector can hide it. See NotchSpaceManager.
-        if Defaults[.hideNotchOption] == .never {
-            NotchSpaceManager.shared.notchSpace.windows.insert(window)
-        }
+        NotchSpaceManager.shared.notchSpace.windows.insert(window)
         //SkyLightOperator.shared.delegateWindow(window)
         return window
     }
@@ -398,13 +486,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.alphaValue = 0
         }
         
-        // Use the same centering logic as updateWindowSizeIfNeeded()
         let screenFrame = screen.frame
+        let topBleed = notchTopScreenBleed(for: screen.localizedName)
         let centerX = screenFrame.origin.x + (screenFrame.width / 2)
         let roundedWidth = window.frame.width.rounded()
         let roundedHeight = window.frame.height.rounded()
         let newX = (centerX - (roundedWidth / 2)).rounded()
-        let newY = (screenFrame.origin.y + screenFrame.height - roundedHeight).rounded()
+        let newY = (screenFrame.maxY + topBleed - roundedHeight).rounded()
 
         window.setFrame(NSRect(
             x: newX,
@@ -431,6 +519,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func calculateRequiredNotchSize() -> CGSize {
+        if NetworkConnectivityHUDMetrics.isPresented(
+            state: networkConnectivityManager.hudState,
+            notchState: vm.notchState,
+            hideOnClosed: vm.hideOnClosed,
+            isLocked: LockScreenManager.shared.isLocked
+        ),
+           let connectivitySize = NetworkConnectivityHUDMetrics.size(
+               for: networkConnectivityManager.hudState,
+               closedNotchSize: vm.closedNotchSize,
+               effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+           ) {
+            return addShadowPadding(
+                to: connectivitySize,
+                isMinimalistic: Defaults[.enableMinimalisticUI]
+            )
+        }
+
         // Check if inline sneak peek is showing and notch is closed
         let airPodsListeningModeSneakActive = vm.notchState == .closed &&
                                       coordinator.sneakPeek.show &&
@@ -451,7 +556,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Calculate required width for inline sneak peek:
             // Album art (~32) + Middle section (380) + Visualizer (~32) + horizontal padding (28) + clip shape margin (12)
             let inlineSneakPeekWidth: CGFloat = 460
-            return CGSize(width: inlineSneakPeekWidth, height: vm.effectiveClosedNotchHeight)
+            let inlineSize = addShadowPadding(
+                to: withClosedHUDAllowance(CGSize(width: inlineSneakPeekWidth, height: vm.effectiveClosedNotchHeight)),
+                isMinimalistic: Defaults[.enableMinimalisticUI]
+            )
+            // The hosting view no longer grows the window (`sizingOptions = []`), so a window
+            // smaller than the normal one clipped the music/timer wings, hover growth and shadow.
+            let standardSize = standardNotchWindowSize()
+            return CGSize(
+                width: max(inlineSize.width, standardSize.width),
+                height: max(inlineSize.height, standardSize.height)
+            )
+        }
+
+        if let recordingHUDSize = recordingHUDLayoutForSizing().size(
+            closedNotchSize: vm.closedNotchSize,
+            effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
+        ) {
+            return addShadowPadding(to: withClosedHUDAllowance(recordingHUDSize), isMinimalistic: Defaults[.enableMinimalisticUI])
         }
 
         // Check for battery HUD expansion
@@ -473,45 +595,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }()
                 
-                var width = closedNotchWidth
-                var height = closedNotchHeight
-                
-                switch (kind, style) {
-                case (.charging, _), (.lowBattery, .compact), (.fullBattery, .compact):
-                    width += 180
-                case (.lowBattery, .standard):
-                    width += 100
-                    height += 75
-                case (.fullBattery, .standard):
-                    width += 80
-                    height += 70
-                }
-                
-                return addShadowPadding(to: CGSize(width: width, height: height), isMinimalistic: Defaults[.enableMinimalisticUI])
+                let hudSize = kind.hudSize(
+                    style: style,
+                    closedNotchWidth: closedNotchWidth,
+                    baseHeight: closedNotchHeight
+                )
+                return addShadowPadding(to: withClosedHUDAllowance(hudSize), isMinimalistic: Defaults[.enableMinimalisticUI])
             }
         }
-        
+
+        return standardNotchWindowSize()
+    }
+
+    private func standardNotchWindowSize() -> CGSize {
         // Use minimalistic or normal size based on settings
-        var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
+        let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
-        // Use a consistent height for different view types
-        if coordinator.currentView == .timer {
-            baseSize.height = 250 // Extra space for timer presets
-        } else if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
-            let preferredHeight = coordinator.notesLayoutState.preferredHeight
-            baseSize.height = max(baseSize.height, preferredHeight)
-        } else if coordinator.currentView == .terminal {
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-            let maxFraction = Defaults[.terminalMaxHeightFraction]
-            baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
-        }
-        
-        let adjustedContentSize = statsAdjustedNotchSize(
+        // `resizeWindows` applies one size to every window, so this has to ask
+        // whether *any* notch is open rather than only the primary one. With
+        // showOnAllDisplays and the primary closed, reading `vm` alone resolved
+        // the short height and shrank the window belonging to an open month
+        // calendar on another display, clipping it.
+        //
+        // Sizing each display from its own view model is the fuller answer, but
+        // every closed-notch branch above reads the primary `vm` the same way --
+        // the sneak peek, the recording HUD, the battery HUD -- so that is a
+        // property of this function rather than of the calendar, and changing it
+        // would change those surfaces too.
+        let isAnyNotchOpen = vm.notchState == .open
+            || viewModels.values.contains { $0.notchState == .open }
+
+        let adjustedContentSize = notchTabContentSize(
             from: baseSize,
-            isStatsTabActive: coordinator.currentView == .stats,
-            secondRowProgress: coordinator.statsSecondRowExpansion
+            view: coordinator.currentView,
+            isNotchOpen: isAnyNotchOpen,
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion,
+            // One size serves every window, so make room for the tallest header.
+            closedNotchHeight: ([vm] + Array(viewModels.values)).map(\.effectiveClosedNotchHeight).max() ?? 0
         )
-        var result = addShadowPadding(
+
+        let result = addShadowPadding(
             to: adjustedContentSize,
             isMinimalistic: Defaults[.enableMinimalisticUI]
         )
@@ -519,16 +642,56 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return result
     }
 
-    /// Adjusts a base notch size for a specific screen by adding Dynamic Island
-    /// shadow insets and top-offset only when the screen lacks a physical notch
-    /// and the user has chosen the Dynamic Island style.
+    private func withClosedHUDAllowance(_ size: CGSize) -> CGSize {
+        CGSize(
+            width: size.width + closedHUDWindowAllowance.width,
+            height: size.height + closedHUDWindowAllowance.height
+        )
+    }
+
+    private func recordingHUDLayoutForSizing() -> RecordingHUDLayout {
+        makeRecordingHUDLayout(
+            notchState: vm.notchState,
+            screenRecordingDetectionEnabled: Defaults[.enableScreenRecordingDetection],
+            showRecordingIndicator: Defaults[.showRecordingIndicator],
+            hideOnClosed: vm.hideOnClosed,
+            isRecording: ScreenRecordingManager.shared.isRecording,
+            closedMusicPairingEligible: closedMusicPairingEligibleForSizing(),
+            recordingControlMode: Defaults[.recordingControlMode],
+            canStopFromHUD: ScreenRecordingManager.shared.shouldShowStopControlsInHUD,
+            enableMinimalisticUI: Defaults[.enableMinimalisticUI],
+            recordingHoverStyle: Defaults[.recordingHoverStyle],
+            suppressHoverExpansion: ScreenRecordingManager.shared.isScreenSharingAppActive,
+            expanded: true
+        )
+    }
+
+    private func closedMusicPairingEligibleForSizing() -> Bool {
+        let musicManager = MusicManager.shared
+        let hasMusicMetadata = !musicManager.songTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !musicManager.artistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasActiveMusicSnapshot = musicManager.isPlaying || (!musicManager.isPlayerIdle && hasMusicMetadata)
+
+        return isClosedMusicPairingEligible(
+            notchState: vm.notchState,
+            hasActiveMusicSnapshot: hasActiveMusicSnapshot,
+            musicLiveActivityEnabled: coordinator.musicLiveActivityEnabled,
+            closedMusicContentEnabled: Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls],
+            hideOnClosed: vm.hideOnClosed,
+            isLocked: LockScreenManager.shared.isLocked,
+            isDeferredAfterUnlock: LockScreenManager.shared.shouldDelayPostUnlockMusicHUD
+        )
+    }
+
+    /// Adds Dynamic Island shadow/top insets on non-notch screens, or top bleed on physical-notch screens.
     private func adjustedSizeForScreen(_ baseSize: CGSize, screen: NSScreen) -> CGSize {
-        guard shouldUseDynamicIslandMode(for: screen.localizedName) else {
-            return baseSize
-        }
         var adjusted = baseSize
-        adjusted.width += dynamicIslandShadowInset * 2
-        adjusted.height += dynamicIslandTopOffset
+        if shouldUseDynamicIslandMode(for: screen.localizedName) {
+            adjusted.width += dynamicIslandShadowInset * 2
+            adjusted.height += dynamicIslandTopOffset
+        } else {
+            adjusted.height += notchTopScreenBleed(for: screen.localizedName)
+        }
         return adjusted
     }
 
@@ -558,14 +721,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func resizeWindow(_ window: NSWindow, on screen: NSScreen, to size: CGSize, animated: Bool) {
         let screenFrame = screen.frame
+        let topBleed = notchTopScreenBleed(for: screen.localizedName)
         // Clamp width to screen width so the notch never extends beyond screen edges on scaled displays
         let clampedWidth = min(size.width, screenFrame.width).rounded()
-        let clampedHeight = min(size.height, screenFrame.height).rounded()
+        let maxHeight = screenFrame.height + topBleed
+        let clampedHeight = min(size.height, maxHeight).rounded()
         let centerX = screenFrame.midX
         let newX = (centerX - (clampedWidth / 2)).rounded()
-        let newY = (screenFrame.origin.y + screenFrame.height - clampedHeight).rounded()
+        let newY = (screenFrame.maxY + topBleed - clampedHeight).rounded()
         let targetFrame = NSRect(x: newX, y: newY, width: clampedWidth, height: clampedHeight)
 
+        // `open()` intentionally requests a forced resize so every display is
+        // considered, but an unchanged frame still needs no AppKit display
+        // transaction. Avoiding that no-op matters during hover/click opens.
+        guard window.frame != targetFrame else { return }
         window.setFrame(targetFrame, display: true)
     }
 
@@ -598,14 +767,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.Keys.migrateMusicControlSlots()
         Defaults.Keys.migrateCapsLockTintMode()
         Defaults.Keys.migrateThirdPartyDDCIntegration()
+        Defaults.Keys.migrateAIProviderKeysToKeychain()
+        Defaults.Keys.migrateClipboardShortcutToV()
 
         Defaults.publisher(.enableThirdPartyDDCIntegration, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { _ in
                 Defaults.Keys.syncLegacyThirdPartyDDCKeys()
             }
             .store(in: &cancellables)
 
         Defaults.publisher(.thirdPartyDDCProvider, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { _ in
                 Defaults.Keys.syncLegacyThirdPartyDDCKeys()
             }
@@ -618,6 +791,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         installTopMenuItemsIfNeeded()
 
         Defaults.publisher(.focusMonitoringMode, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateFocusMenuState()
             }
@@ -631,7 +805,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup Lunar integration
         LunarManager.shared.configure(coordinator: coordinator)
+
+        // Bring up the clipboard provider router so it can detect an external clipboard
+        // app (Maccy) and keep Atoll's own polling in step with the user's choice.
+        ClipboardProviderManager.shared.refreshDetectionStatus()
         
+        // Honour "Save History Across Restarts" before anything can read the
+        // stored history back.
+        ClipboardManager.purgeStoredHistoryIfPersistenceDisabled()
+
         // Setup ScreenRecording Manager
         if Defaults[.enableScreenRecordingDetection] && !AppRuntimeEnvironment.isUITesting {
             ScreenRecordingManager.shared.startMonitoring()
@@ -645,26 +827,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup Privacy Indicator Manager (camera/mic; skipped under UI testing).
         if !AppRuntimeEnvironment.isUITesting {
             PrivacyIndicatorManager.shared.startMonitoring()
+            networkConnectivityManager.startMonitoring()
         }
         
         // Setup Real-time Audio Waveform capture if enabled
         if Defaults[.enableRealTimeWaveform] {
-            Task {
-                await AudioTap.shared.startCapture()
-            }
+            AudioTap.shared.startCapture()
             setupAudioTapMusicObservers()
         }
         
         // Observe enableRealTimeWaveform changes
         Defaults.publisher(.enableRealTimeWaveform, options: [])
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 if change.newValue {
-                    Task {
-                        await AudioTap.shared.startCapture()
-                    }
+                    AudioTap.shared.startCapture()
                     self?.setupAudioTapMusicObservers()
                 } else {
                     AudioTap.shared.stopCapture()
+                    self?.tearDownAudioTapMusicObservers()
                 }
             }
             .store(in: &cancellables)
@@ -677,6 +858,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateWindowSizeForTabSwitch()
             }
         }.store(in: &cancellables)
+
+        networkConnectivityManager.$hudState
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                // @Published emits before assigning the new state, so calculate
+                // the target dimensions on the next main-run-loop turn.
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeIfNeeded()
+                }
+            }
+            .store(in: &cancellables)
+
+        MusicManager.shared.$isAdvertisement
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                // @Published emits before assignment; recalculate after the
+                // ad flag has changed so minimalistic mode drops/adds the
+                // lyrics height from both the SwiftUI surface and NSWindow.
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeIfNeeded()
+                }
+            }
+            .store(in: &cancellables)
 
         coordinator.$notesLayoutState
             .removeDuplicates()
@@ -710,7 +914,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
+        // The calendar's view mode decides the notch height. Applied through the
+        // tab-switch path, which resizes at once and without animating: this is
+        // the direct response to a click, and the content and vm.notchSize both
+        // change on one frame, so a tweened window would be the only thing
+        // out of step.
+        Defaults.publisher(.calendarViewMode, options: []).sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.updateWindowSizeForTabSwitch()
+            }
+        }.store(in: &cancellables)
+
         Defaults.publisher(.openNotchWidth, options: []).sink { [weak self] _ in
+            self?.debouncedUpdateWindowSize()
+        }.store(in: &cancellables)
+
+        // The island's top margin is part of the window height on non-notch displays.
+        Defaults.publisher(.dynamicIslandTopMargin, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
@@ -772,8 +992,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }.store(in: &cancellables)
 
-        // Pin/unpin the notch above all spaces when the hide option changes:
-        // "Never hide" joins the max-level CGSSpace, the hide options leave it.
+        Defaults.publisher(.enableCaffeinate, options: []).sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.updateFeatureShortcutAvailability()
+            }
+        }.store(in: &cancellables)
+
+        // The hide option changes fullscreen visibility, not Spaces pinning.
+        // Re-sync in case the user changes it while macOS is moving Spaces.
         Defaults.publisher(.hideNotchOption, options: []).sink { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.syncNotchSpaceMembership()
@@ -814,6 +1040,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
 
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.reassertDynamicIslandWindowSpacePresence()
+                self?.adjustWindowPosition()
+            }
+        }
+
         NotificationCenter.default.addObserver(
             forName: Notification.Name.selectedScreenChanged, object: nil, queue: nil
         ) { [weak self] _ in
@@ -829,10 +1066,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             forName: Notification.Name.automaticallySwitchDisplayChanged, object: nil, queue: nil
         ) { [weak self] _ in
-            guard let self = self, let window = self.window else { return }
             DispatchQueue.main.async {
-                window.alphaValue =
-                    self.coordinator.selectedScreen == self.coordinator.preferredScreen ? 1 : 0
+                self?.adjustWindowPosition()
             }
         }
 
@@ -897,6 +1132,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             case .closed:
                 viewModel.open()
 
+                guard Defaults[.autoCloseNotchOpenedByShortcut] else { return }
                 let workItem = DispatchWorkItem { [weak viewModel] in
                     viewModel?.close()
                 }
@@ -956,19 +1192,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let insertionIndex = preferredMenuInsertionIndex(in: mainMenu)
 
-        let focusMenuItem = NSMenuItem(title: "Focus", action: nil, keyEquivalent: "")
+        let focusMenuItem = NSMenuItem(title: String(localized: "Focus"), action: nil, keyEquivalent: "")
         focusMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Focus.Menu")
-        let focusSubmenu = NSMenu(title: "Focus")
+        let focusSubmenu = NSMenu(title: focusMenuItem.title)
 
         let withoutDevTools = NSMenuItem(
-            title: "Use without DevTools",
+            title: String(localized: "Use without DevTools"),
             action: #selector(selectFocusWithoutDevTools),
             keyEquivalent: ""
         )
         withoutDevTools.target = self
 
         let useDevTools = NSMenuItem(
-            title: "Use DevTools",
+            title: String(localized: "Use DevTools"),
             action: #selector(selectFocusUseDevTools),
             keyEquivalent: ""
         )
@@ -982,19 +1218,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         focusWithoutDevToolsMenuItem = withoutDevTools
         focusUseDevToolsMenuItem = useDevTools
 
-        let accessibilityMenuItem = NSMenuItem(title: "Accessibility", action: nil, keyEquivalent: "")
+        let accessibilityMenuItem = NSMenuItem(title: String(localized: "Accessibility"), action: nil, keyEquivalent: "")
         accessibilityMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Accessibility.Menu")
-        let accessibilitySubmenu = NSMenu(title: "Accessibility")
+        let accessibilitySubmenu = NSMenu(title: accessibilityMenuItem.title)
 
         let requestAccessibility = NSMenuItem(
-            title: "Request Accessibility Access",
+            title: String(localized: "Request Accessibility Access"),
             action: #selector(requestAccessibilityAccess),
             keyEquivalent: ""
         )
         requestAccessibility.target = self
 
         let openAccessibility = NSMenuItem(
-            title: "Open Accessibility Settings",
+            title: String(localized: "Open Accessibility Settings"),
             action: #selector(openAccessibilitySettings),
             keyEquivalent: ""
         )
@@ -1005,26 +1241,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         accessibilityMenuItem.submenu = accessibilitySubmenu
         mainMenu.insertItem(accessibilityMenuItem, at: insertionIndex + 1)
 
-        let permissionsMenuItem = NSMenuItem(title: "Permissions", action: nil, keyEquivalent: "")
+        let permissionsMenuItem = NSMenuItem(title: String(localized: "Permissions"), action: nil, keyEquivalent: "")
         permissionsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Permissions.Menu")
-        let permissionsSubmenu = NSMenu(title: "Permissions")
+        let permissionsSubmenu = NSMenu(title: permissionsMenuItem.title)
 
         let requestFullDisk = NSMenuItem(
-            title: "Request Full Disk Access",
+            title: String(localized: "Request Full Disk Access"),
             action: #selector(requestFullDiskAccess),
             keyEquivalent: ""
         )
         requestFullDisk.target = self
 
         let openFullDisk = NSMenuItem(
-            title: "Open Full Disk Access Settings",
+            title: String(localized: "Open Full Disk Access Settings"),
             action: #selector(openFullDiskAccessSettings),
             keyEquivalent: ""
         )
         openFullDisk.target = self
 
         let openDevTools = NSMenuItem(
-            title: "Open Developer Tools Settings",
+            title: String(localized: "Open Developer Tools Settings"),
             action: #selector(openDeveloperToolsSettingsFromMenu),
             keyEquivalent: ""
         )
@@ -1037,19 +1273,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         permissionsMenuItem.submenu = permissionsSubmenu
         mainMenu.insertItem(permissionsMenuItem, at: insertionIndex + 2)
 
-        let toolsMenuItem = NSMenuItem(title: "Tools", action: nil, keyEquivalent: "")
+        let toolsMenuItem = NSMenuItem(title: String(localized: "Tools"), action: nil, keyEquivalent: "")
         toolsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Tools.Menu")
-        let toolsSubmenu = NSMenu(title: "Tools")
+        let toolsSubmenu = NSMenu(title: toolsMenuItem.title)
 
-        let loggingLevelItem = NSMenuItem(title: "Logging Level", action: nil, keyEquivalent: "")
-        let loggingLevelSubmenu = NSMenu(title: "Logging Level")
+        let loggingLevelItem = NSMenuItem(title: String(localized: "Logging Level"), action: nil, keyEquivalent: "")
+        loggingLevelItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Tools.LoggingLevel")
+        let loggingLevelSubmenu = NSMenu(title: loggingLevelItem.title)
         
+        // Dispatched by tag, so the titles are safe to localize.
         let levels: [(String, LogLevel)] = [
-            ("No Logging", .none),
-            ("Error", .error),
-            ("Warning", .warning),
-            ("Info", .info),
-            ("Debug", .debug)
+            (String(localized: "No Logging"), .none),
+            (String(localized: "Error"), .error),
+            (String(localized: "Warning"), .warning),
+            (String(localized: "Info"), .info),
+            (String(localized: "Debug"), .debug)
         ]
         
         for (title, level) in levels {
@@ -1064,7 +1302,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         toolsSubmenu.addItem(NSMenuItem.separator())
         
-        let exportLogsItem = NSMenuItem(title: "Export Logs", action: #selector(exportLogs), keyEquivalent: "")
+        let exportLogsItem = NSMenuItem(title: String(localized: "Export Logs"), action: #selector(exportLogs), keyEquivalent: "")
         exportLogsItem.target = self
         toolsSubmenu.addItem(exportLogsItem)
 
@@ -1134,10 +1372,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let level = LogLevel(rawValue: sender.tag) else { return }
         Defaults[.logLevel] = level
         
+        // Look these up by identifier: the titles are localized.
         guard let mainMenu = NSApp.mainMenu,
-              let toolsItem = mainMenu.item(withTitle: "Tools"),
+              let toolsItem = mainMenu.items.first(where: { $0.identifier?.rawValue == "Atoll.Tools.Menu" }),
               let toolsMenu = toolsItem.submenu,
-              let loggingItem = toolsMenu.items.first(where: { $0.title == "Logging Level" }),
+              let loggingItem = toolsMenu.items.first(where: { $0.identifier?.rawValue == "Atoll.Tools.LoggingLevel" }),
               let loggingSubmenu = loggingItem.submenu else { return }
               
         for item in loggingSubmenu.items {
@@ -1148,7 +1387,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func exportLogs() {
         let savePanel = NSSavePanel()
         savePanel.nameFieldStringValue = "Atoll_Logs.zip"
-        savePanel.title = "Export Logs & Crash Reports"
+        savePanel.title = String(localized: "Export Logs & Crash Reports")
         
         savePanel.begin { response in
             guard response == .OK, let url = savePanel.url else { return }
@@ -1196,22 +1435,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     
                     DispatchQueue.main.async {
                         let alert = NSAlert()
-                        alert.messageText = "Logs Exported"
-                        alert.informativeText = "Logs and crash reports have been successfully exported to \(url.lastPathComponent)."
+                        alert.messageText = String(localized: "Logs Exported")
+                        alert.informativeText = String(localized: "Logs and crash reports have been successfully exported to \(url.lastPathComponent).")
                         alert.alertStyle = .informational
                         alert.runModal()
                     }
                 } catch {
                     DispatchQueue.main.async {
                         let alert = NSAlert()
-                        alert.messageText = "Export Failed"
-                        alert.informativeText = "Failed to export logs: \(error.localizedDescription)"
+                        alert.messageText = String(localized: "Export Failed")
+                        alert.informativeText = String(localized: "Failed to export logs: \(error.localizedDescription)")
                         alert.alertStyle = .critical
                         alert.runModal()
                     }
                 }
             }
         }
+    }
+
+    // Cancel the auto-close armed by `toggleNotchOpen`. Switching to the clipboard tab
+    // from the header only changes `coordinator.currentView`, so without this the notch
+    // can close mid-copy/drag a few seconds after it was opened.
+    func cancelPendingNotchAutoClose() {
+        closeNotchWorkItem?.cancel()
+        closeNotchWorkItem = nil
     }
 
     private func registerOptionalShortcutHandlers() {
@@ -1226,6 +1473,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyDown(for: .clipboardHistoryPanel) { [weak self] in
             guard let self else { return }
             guard Defaults[.enableShortcuts], Defaults[.enableClipboardManager] else { return }
+
+            // An external clipboard app owns the feature: hand the shortcut to it and
+            // skip Atoll's own history entirely.
+            if ClipboardProviderManager.handleClipboardTrigger() { return }
 
             if !ClipboardManager.shared.isMonitoring {
                 ClipboardManager.shared.startMonitoring()
@@ -1245,13 +1496,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             case .separateTab:
                 if vm.notchState == .closed {
-                    vm.open()
-                    coordinator.currentView = .notes
+                    vm.open(target: .notes)
                 } else {
                     if coordinator.currentView == .notes {
                         vm.close()
                     } else {
                         coordinator.currentView = .notes
+                    }
+                }
+            case .notchTab:
+                // Act on the notch under the cursor, matching toggleNotchOpen: with
+                // showOnAllDisplays the rendered windows use viewModels[screen], so mutating
+                // the primary vm could flip currentView without opening a visible notch.
+                var activeVM = vm
+                if Defaults[.showOnAllDisplays] {
+                    let mouseLocation = NSEvent.mouseLocation
+                    for screen in NSScreen.screens where screen.frame.contains(mouseLocation) {
+                        if let screenViewModel = viewModels[screen] {
+                            activeVM = screenViewModel
+                            break
+                        }
+                    }
+                }
+                // Cancel any pending auto-close armed by toggleNotchOpen, so it can't fire
+                // and close the notch a few seconds after this shortcut opens/switches to it.
+                cancelPendingNotchAutoClose()
+                if activeVM.notchState == .closed {
+                    activeVM.open(target: .clipboard)
+                } else {
+                    if coordinator.currentView == .clipboard {
+                        activeVM.close()
+                    } else {
+                        coordinator.currentView = .clipboard
                     }
                 }
             }
@@ -1262,15 +1538,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ColorPickerPanelManager.shared.toggleColorPickerPanel()
         }
 
+        KeyboardShortcuts.onKeyDown(for: .toggleCaffeinate) {
+            guard Defaults[.enableShortcuts], Defaults[.enableCaffeinate] else { return }
+            CaffeinateManager.shared.toggle()
+        }
+
         KeyboardShortcuts.onKeyDown(for: .toggleTerminalTab) { [weak self] in
             guard let self else { return }
             guard Defaults[.enableShortcuts], Defaults[.enableTerminalFeature] else { return }
 
+            // A popped-out terminal lives in its own window; bring that forward.
+            if TerminalManager.shared.isPoppedOut {
+                TerminalManager.shared.popOut()
+                return
+            }
+
             if vm.notchState == .closed {
                 closeNotchWorkItem?.cancel()
                 closeNotchWorkItem = nil
-                vm.open()
-                coordinator.currentView = .terminal
+                vm.open(target: .terminal)
                 TerminalManager.shared.refreshTerminalAppearanceIfNeeded()
                 TerminalManager.shared.focusTerminalIfPossible()
                 TerminalManager.shared.refreshTerminalAppearanceIfNeeded()
@@ -1290,33 +1576,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        KeyboardShortcuts.onKeyDown(for: .screenAssistantPanel) { [weak self] in
-            guard let self else { return }
+        KeyboardShortcuts.onKeyDown(for: .screenAssistantPanel) {
             guard Defaults[.enableShortcuts], Defaults[.enableScreenAssistant] else { return }
 
-            switch Defaults[.screenAssistantDisplayMode] {
-            case .panel:
-                ScreenAssistantPanelManager.shared.toggleScreenAssistantPanel()
-            case .popover:
-                if vm.notchState == .closed {
-                    vm.open()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        NotificationCenter.default.post(name: NSNotification.Name("ToggleScreenAssistantPopover"), object: nil)
-                    }
-                } else {
-                    NotificationCenter.default.post(name: NSNotification.Name("ToggleScreenAssistantPopover"), object: nil)
-                }
-            }
+            ScreenAssistantPanelManager.shared.toggleScreenAssistantPanel()
         }
     }
 
     @MainActor
     private func updateFeatureShortcutAvailability() {
         updateShortcut(.startDemoTimer, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableTimerFeature])
-        updateShortcut(.clipboardHistoryPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableClipboardManager])
+        // An external clipboard app owns the clipboard hotkey while it is selected.
+        ClipboardProviderManager.shared.syncShortcutRegistration()
         updateShortcut(.colorPickerPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableColorPickerFeature])
         updateShortcut(.screenAssistantPanel, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableScreenAssistant])
         updateShortcut(.toggleTerminalTab, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableTerminalFeature])
+        updateShortcut(.toggleCaffeinate, isEnabled: Defaults[.enableShortcuts] && Defaults[.enableCaffeinate])
     }
 
     @MainActor
@@ -1344,7 +1619,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
     
+    /// Opening or closing the lid, waking with displays attached or plugging one in
+    /// sends a burst of these while macOS is still rearranging the displays. The
+    /// windows are rebuilt once, after the burst, so they are not torn down and
+    /// recreated against screens that are about to move or disappear (#327).
     @objc func screenConfigurationDidChange() {
+        screenConfigurationWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.applyScreenConfigurationChange()
+        }
+        screenConfigurationWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+    }
+
+    private func applyScreenConfigurationChange() {
+        screenConfigurationWorkItem = nil
         let currentScreens = NSScreen.screens
 
         let screensChanged =
@@ -1356,10 +1645,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         previousScreens = currentScreens
         
         if screensChanged {
-            DispatchQueue.main.async { [weak self] in
-                self?.cleanupWindows()
-                self?.adjustWindowPosition()
-            }
+            cleanupWindows()
+            adjustWindowPosition()
         }
     }
     
@@ -1395,22 +1682,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         } else {
-            let selectedScreen: NSScreen
-
-            if let preferredScreen = NSScreen.screens.first(where: {
-                $0.localizedName == coordinator.preferredScreen
-            }) {
-                coordinator.selectedScreen = coordinator.preferredScreen
-                selectedScreen = preferredScreen
-            } else if Defaults[.automaticallySwitchDisplay], let mainScreen = NSScreen.main {
-                coordinator.selectedScreen = mainScreen.localizedName
-                selectedScreen = mainScreen
-            } else {
-                if let window = window {
-                    window.alphaValue = 0
-                }
+            guard let selectedScreen = NSScreen.notchHostScreen(
+                preferred: coordinator.preferredNSScreen(),
+                automaticallySwitch: Defaults[.automaticallySwitchDisplay]
+            ) else {
                 return
             }
+            coordinator.selectedScreen = selectedScreen.localizedName
             
             vm.screen = selectedScreen.localizedName
             vm.notchSize = getClosedNotchSize(screen: selectedScreen.localizedName)
@@ -1418,15 +1696,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if window == nil {
                 window = createDynamicIslandWindow(for: selectedScreen, with: vm)
             }
-            
             if let window = window {
                 positionWindow(window, on: selectedScreen, changeAlpha: changeAlpha)
-                
+
                 if vm.notchState == .closed {
                     vm.close()
                 }
             }
         }
+
+        syncNotchSpaceMembership()
     }
     
     @objc func togglePopover(_ sender: Any?) {
@@ -1456,7 +1735,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 defer: false
             )
             window.center()
-            window.title = "Onboarding"
+            window.title = String(localized: "Onboarding")
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.contentView = NSHostingView(rootView: OnboardingView(

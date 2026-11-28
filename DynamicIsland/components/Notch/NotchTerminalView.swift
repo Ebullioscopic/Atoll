@@ -136,6 +136,20 @@ struct NotchTerminalView: View {
 
                     Spacer()
 
+                    if !terminalManager.isPoppedOut {
+                        Button {
+                            terminalManager.popOut()
+                            vm.close()
+                        } label: {
+                            Image(systemName: "pip.enter")
+                                .font(.system(size: 10))
+                                .foregroundStyle(terminalForegroundColor)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open in floating window")
+                        .accessibilityLabel("Open in floating window")
+                    }
+
                     // Restart button
                     Button {
                         terminalManager.restartShell()
@@ -146,6 +160,8 @@ struct NotchTerminalView: View {
                     }
                     .buttonStyle(.plain)
                     .help("Restart shell")
+                    .accessibilityLabel("Restart shell")
+                    .disabled(terminalManager.isPoppedOut)
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 6)
@@ -154,21 +170,44 @@ struct NotchTerminalView: View {
                 Divider()
                     .padding(.horizontal, notchTerminalContentEdgePadding.horizontal)
 
-                // Terminal content — the containerView is stable across
-                // notch close/open cycles; updateNSView handles restart.
-                TerminalNSViewRepresentable(terminalManager: terminalManager)
-                    .clipShape(terminalClipShape)
-                    .padding(
-                        EdgeInsets(
-                            top: notchTerminalContentEdgePadding.top,
-                            leading: notchTerminalContentEdgePadding.horizontal,
-                            bottom: notchTerminalContentEdgePadding.bottom,
-                            trailing: notchTerminalContentEdgePadding.horizontal
-                        )
-                    )
-                    .onHover { hovering in
-                        updateSuppression(for: hovering)
+                if terminalManager.isPoppedOut {
+                    VStack(spacing: 8) {
+                        Image(systemName: "pip")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.secondary)
+
+                        Text("Terminal is in a floating window")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 8) {
+                            Button("Show Window") {
+                                terminalManager.popOut()
+                            }
+                            Button("Return to Notch") {
+                                terminalManager.returnToNotch()
+                            }
+                        }
+                        .controlSize(.small)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // Terminal content — the containerView is stable across
+                    // notch close/open cycles; updateNSView handles restart.
+                    TerminalNSViewRepresentable(terminalManager: terminalManager)
+                        .clipShape(terminalClipShape)
+                        .padding(
+                            EdgeInsets(
+                                top: notchTerminalContentEdgePadding.top,
+                                leading: notchTerminalContentEdgePadding.horizontal,
+                                bottom: notchTerminalContentEdgePadding.bottom,
+                                trailing: notchTerminalContentEdgePadding.horizontal
+                            )
+                        )
+                        .onHover { hovering in
+                            updateSuppression(for: hovering)
+                        }
+                }
             } else {
                 // Feature disabled placeholder
                 VStack(spacing: 8) {
@@ -191,6 +230,7 @@ struct NotchTerminalView: View {
             updateSuppression(for: false)
         }
         .onAppear {
+            guard !terminalManager.isPoppedOut else { return }
             terminalManager.refreshTerminalAppearanceIfNeeded()
             terminalManager.focusTerminalIfPossible()
         }

@@ -97,8 +97,21 @@ final class AppleMusicAirPlayManager: ObservableObject {
 
         guard let result = try? await AppleScriptHelper.execute(script) else { return }
 
+        let fetched = Self.parseDevices(from: result)
+        devices = fetched
+        for device in fetched {
+            lastCommittedVolume[device.id] = device.volume
+        }
+    }
+
+    /// Parses the AppleScript device list. Music returns an empty list when it has
+    /// no AirPlay devices (or the query fails), so the count can be zero.
+    nonisolated static func parseDevices(from result: NSAppleEventDescriptor) -> [AirPlayDevice] {
+        let count = result.numberOfItems
+        guard count > 0 else { return [] }
+
         var fetched: [AirPlayDevice] = []
-        for i in 1...result.numberOfItems {
+        for i in 1...count {
             guard let item = result.atIndex(i) else { continue }
             let name = item.atIndex(1)?.stringValue ?? "Unknown"
             let kind = item.atIndex(2)?.stringValue ?? "AirPlay device"
@@ -108,10 +121,7 @@ final class AppleMusicAirPlayManager: ObservableObject {
             let id = addr.isEmpty ? name : addr
             fetched.append(AirPlayDevice(id: id, name: name, kind: kind, isSelected: selected, volume: volume))
         }
-        devices = fetched
-        for device in fetched {
-            lastCommittedVolume[device.id] = device.volume
-        }
+        return fetched
     }
 
     func toggleDevice(_ device: AirPlayDevice) async {

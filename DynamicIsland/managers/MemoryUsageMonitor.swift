@@ -57,16 +57,22 @@ final class MemoryUsageMonitor {
     }
 
     private func evaluateMemoryFootprint() async {
-        guard let usage = currentResidentSize() else { return }
+        guard let usage = Self.currentMemoryFootprint() else { return }
         if usage >= thresholdBytes {
             restartIfNeeded(currentUsage: usage)
         } else if Date().timeIntervalSince(lastLogSample) >= logSampleInterval {
             lastLogSample = Date()
-            Logger.log("[MemoryMonitor] Resident usage: \(formatMegabytes(usage)) MB", category: .memory)
+            Logger.log("[MemoryMonitor] Physical footprint: \(formatMegabytes(usage)) MB", category: .memory)
         }
     }
 
     private func restartIfNeeded(currentUsage: UInt64) {
+        // A modal alert behind the lock screen can't be seen or answered, and its
+        // modal loop stalls the lock screen widgets and HUDs until unlock (#791).
+        guard !Self.isScreenLocked else {
+            Logger.log("[MemoryMonitor] Usage \(formatMegabytes(currentUsage)) MB exceeds threshold; deferring prompt until unlock", category: .warning)
+            return
+        }
         let now = Date()
         guard now.timeIntervalSince(lastRestartAttempt) >= restartCooldown else {
             Logger.log("[MemoryMonitor] Usage \(formatMegabytes(currentUsage)) MB exceeds threshold but cooldown active", category: .warning)
@@ -80,10 +86,10 @@ final class MemoryUsageMonitor {
     private func presentRestartAlert(currentUsage: UInt64) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "DynamicIsland memory usage is high"
-        alert.informativeText = "The app is currently using \(formatMegabytes(currentUsage)) MB, which exceeds the safe limit of \(formatMegabytes(thresholdBytes)) MB. Restart now to free memory?"
-        alert.addButton(withTitle: "Restart Now")
-        alert.addButton(withTitle: "Later")
+        alert.messageText = String(localized: "DynamicIsland memory usage is high")
+        alert.informativeText = String(localized: "The app is currently using \(formatMegabytes(currentUsage)) MB, which exceeds the safe limit of \(formatMegabytes(thresholdBytes)) MB. Restart now to free memory?")
+        alert.addButton(withTitle: String(localized: "Restart Now"))
+        alert.addButton(withTitle: String(localized: "Later"))
 
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
@@ -91,6 +97,11 @@ final class MemoryUsageMonitor {
         } else {
             Logger.log("[MemoryMonitor] Restart postponed by user", category: .warning)
         }
+    }
+
+    private static var isScreenLocked: Bool {
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else { return false }
+        return session["CGSSessionScreenIsLocked"] as? Bool ?? false
     }
 
     private func relaunchApplication() {
@@ -110,19 +121,21 @@ final class MemoryUsageMonitor {
         }
     }
 
-    private func currentResidentSize() -> UInt64? {
-        var info = mach_task_basic_info()
-        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+    static func currentMemoryFootprint() -> UInt64? {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
             }
         }
         guard result == KERN_SUCCESS else {
             Logger.log("[MemoryMonitor] task_info failed with code \(result)", category: .error)
             return nil
         }
-        return UInt64(info.resident_size)
+        // Clean, shared file-backed pages inflate RSS but do not belong to
+        // the app's physical footprint and cannot be freed by a restart.
+        return UInt64(info.phys_footprint)
     }
 
     private func formatMegabytes(_ bytes: UInt64) -> String {

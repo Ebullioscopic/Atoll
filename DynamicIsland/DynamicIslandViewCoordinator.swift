@@ -87,16 +87,10 @@ struct sneakPeek {
     var targetScreenName: String? = nil
 }
 
-enum BrowserType {
-    case chromium
-    case safari
-}
-
 struct ExpandedItem {
     var show: Bool = false
     var type: SneakContentType = .battery
     var value: CGFloat = 0
-    var browser: BrowserType = .chromium
     var autoHideDuration: TimeInterval? = nil
 }
 
@@ -140,6 +134,10 @@ class DynamicIslandViewCoordinator: ObservableObject {
     @AppStorage("alwaysShowTabs") var alwaysShowTabs: Bool = true {
         didSet {
             if !alwaysShowTabs {
+                // Remembered and fixed tabs both need the tab bar.
+                if selectedOpenDestination != .automatic {
+                    notchOpenDestination = NotchOpenDestination.automatic.rawValue
+                }
                 openLastTabByDefault = false
                 if TrayDrop.shared.isEmpty || !Defaults[.openShelfByDefault] {
                     currentView = .home
@@ -156,6 +154,50 @@ class DynamicIslandViewCoordinator: ObservableObject {
         }
     }
     
+    @AppStorage("notchOpenDestination") var notchOpenDestination: String = ""
+
+    var selectedOpenDestination: NotchOpenDestination {
+        NotchOpenDestination.selected(notchOpenDestination, rememberLast: openLastTabByDefault)
+    }
+
+    func setOpenDestination(_ destination: NotchOpenDestination) {
+        notchOpenDestination = destination.rawValue
+        openLastTabByDefault = destination == .lastUsed
+    }
+
+    var availableStandardTabs: [NotchOpenDestination] {
+        StandardNotchTabAvailability(
+            home: Defaults[.enableMinimalisticUI] || Defaults[.showStandardMediaControls] || Defaults[.showCalendar] || Defaults[.showMirror],
+            shelf: Defaults[.dynamicShelf],
+            timer: Defaults[.enableTimerFeature] && Defaults[.timerDisplayMode] == .tab,
+            stats: Defaults[.enableStatsFeature],
+            llmUsage: Defaults[.enableLLMUsageFeature],
+            notes: Defaults[.enableNotes] || (ClipboardProviderManager.usesBuiltInClipboard && Defaults[.clipboardDisplayMode] == .separateTab),
+            terminal: Defaults[.enableTerminalFeature]
+        ).available
+    }
+
+    func selectOpenDestination() {
+        guard !Defaults[.enableMinimalisticUI] else { currentView = .home; return }
+        let destination = selectedOpenDestination
+        guard destination.isFixed else { return }
+        guard let tab = destination.resolved(available: availableStandardTabs) else {
+            // TabSelectionView chooses the first available extension if one exists.
+            currentView = .home
+            return
+        }
+        switch tab {
+        case .home: currentView = .home
+        case .shelf: currentView = .shelf
+        case .timer: currentView = .timer
+        case .stats: currentView = .stats
+        case .llmUsage: currentView = .llmUsage
+        case .notes: currentView = .notes
+        case .terminal: currentView = .terminal
+        case .automatic, .lastUsed: break
+        }
+    }
+
     @AppStorage("hudReplacement") var hudReplacement: Bool = true
     
     @AppStorage("preferred_screen_name") var preferredScreen = NSScreen.main?.localizedName ?? "Unknown" {
@@ -164,14 +206,44 @@ class DynamicIslandViewCoordinator: ObservableObject {
             NotificationCenter.default.post(name: Notification.Name.selectedScreenChanged, object: nil)
         }
     }
-    
+
+    /// UUID of the preferred display (`CGDisplayCreateUUIDFromDisplayID`). Unlike
+    /// `preferredScreen` (the display's localized name), it tells identical monitors
+    /// apart, and unlike a `CGDirectDisplayID` it is stable across reconnects and
+    /// reboots. Empty means "not set" (legacy installs only stored the name).
+    @AppStorage(NSScreen.preferredDisplayUUIDDefaultsKey) var preferredScreenUUID: String = "" {
+        didSet {
+            NotificationCenter.default.post(name: Notification.Name.selectedScreenChanged, object: nil)
+        }
+    }
+
     @Published var selectedScreen: String = NSScreen.main?.localizedName ?? "Unknown"
+
+    /// The display the user picked in Settings, matched by its stable UUID so
+    /// identical monitors (which share a localized name) can be told apart. Falls
+    /// back to the stored name when no UUID is stored or that display isn't connected.
+    func preferredNSScreen() -> NSScreen? {
+        if !preferredScreenUUID.isEmpty,
+           let match = NSScreen.screens.first(where: { $0.displayUUID == preferredScreenUUID }) {
+            return match
+        }
+        return NSScreen.screens.first(where: { $0.localizedName == preferredScreen })
+    }
+
+    /// Legacy installs only stored the preferred display's name; backfill its UUID.
+    private func migratePreferredScreenUUIDIfNeeded() {
+        guard preferredScreenUUID.isEmpty,
+              let uuid = NSScreen.screens.first(where: { $0.localizedName == preferredScreen })?.displayUUID
+        else { return }
+        preferredScreenUUID = uuid
+    }
 
     @Published var optionKeyPressed: Bool = true
     private let extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     
     private init() {
         selectedScreen = preferredScreen
+        migratePreferredScreenUUIDIfNeeded()
         Defaults.publisher(.timerDisplayMode)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
@@ -235,6 +307,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
             Defaults.publisher(.enableNotes).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableClipboardManager).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.clipboardDisplayMode).map { _ in () }.eraseToAnyPublisher(),
+            Defaults.publisher(.clipboardProvider).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableTerminalFeature).map { _ in () }.eraseToAnyPublisher(),
             Defaults.publisher(.enableMinimalisticUI).map { _ in () }.eraseToAnyPublisher()
         )
@@ -363,6 +436,26 @@ class DynamicIslandViewCoordinator: ObservableObject {
             return
         }
         DispatchQueue.main.async {
+            // Guard against redundant hide
+            if !status && !self.sneakPeek.show {
+                return
+            }
+
+            // If already showing the exact same sneak peek, just renew the timer without re-animating
+            let current = self.sneakPeek
+            if status && current.show
+                && current.type == type
+                && current.icon == icon
+                && abs(current.value - value) < 0.01
+                && current.title == title
+                && current.subtitle == subtitle
+                && current.accentColor == accentColor
+                && current.styleOverride == styleOverride
+                && current.targetScreenName == targetScreen?.localizedName {
+                self.scheduleSneakPeekHide(after: self.sneakPeekDuration)
+                return
+            }
+
             // Single write so `sneakPeek.didSet` (which schedules the auto-hide)
             // fires once, not once per field — the per-field writes raced the hide
             // Task and could wedge `show == true` with no pending hide.
@@ -419,7 +512,6 @@ class DynamicIslandViewCoordinator: ObservableObject {
         status: Bool,
         type: SneakContentType,
         value: CGFloat = 0,
-        browser: BrowserType = .chromium,
         autoHideDuration: TimeInterval? = nil
     ) {
         Task { @MainActor in
@@ -427,7 +519,6 @@ class DynamicIslandViewCoordinator: ObservableObject {
                 self.expandingView.show = status
                 self.expandingView.type = type
                 self.expandingView.value = value
-                self.expandingView.browser = browser
                 self.expandingView.autoHideDuration = autoHideDuration
             }
         }

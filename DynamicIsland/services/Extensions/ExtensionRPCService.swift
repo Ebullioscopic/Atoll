@@ -476,7 +476,7 @@ final class ExtensionRPCService {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
-        panel.title = "Select files to share"
+        panel.title = String(localized: "Select files to share")
 
         let response = panel.runModal()
         guard response == .OK, !panel.urls.isEmpty else {
@@ -488,7 +488,10 @@ final class ExtensionRPCService {
 
         for url in panel.urls {
             if let bookmark = try? Bookmark(url: url) {
-                let item = ShelfItem(kind: .file(bookmark: bookmark.data))
+                let item = ShelfItem(
+                    kind: .file(bookmark: bookmark.data),
+                    cachedPath: url.standardizedFileURL.path
+                )
                 newItems.append(item)
                 newItemIDs.append(.string(item.id.uuidString))
             }
@@ -548,7 +551,10 @@ final class ExtensionRPCService {
                 let url = URL(fileURLWithPath: path)
                 guard FileManager.default.fileExists(atPath: path) else { continue }
                 if let bookmark = try? Bookmark(url: url) {
-                    let item = ShelfItem(kind: .file(bookmark: bookmark.data))
+                    let item = ShelfItem(
+                        kind: .file(bookmark: bookmark.data),
+                        cachedPath: url.standardizedFileURL.path
+                    )
                     newItems.append(item)
                     newItemIDs.append(.string(item.id.uuidString))
                 }
@@ -571,7 +577,11 @@ final class ExtensionRPCService {
                 guard (try? fileData.write(to: fileURL)) != nil else { continue }
 
                 if let bookmark = try? Bookmark(url: fileURL) {
-                    let item = ShelfItem(kind: .file(bookmark: bookmark.data), isTemporary: true)
+                    let item = ShelfItem(
+                        kind: .file(bookmark: bookmark.data),
+                        isTemporary: true,
+                        cachedPath: fileURL.standardizedFileURL.path
+                    )
                     newItems.append(item)
                     newItemIDs.append(.string(item.id.uuidString))
                 }

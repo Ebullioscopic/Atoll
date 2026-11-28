@@ -253,10 +253,93 @@ private struct SpotifyCanvasFallbackLayoutFrames {
     let lyricsFrame: NSRect?
 }
 
+// MARK: - Artwork Encoding
+
+/// Encodes artwork through a single bitmap. `tiffRepresentation` serialises every
+/// representation of an image, and app-icon fallbacks carry ~32 of them up to
+/// 2048 px, which spiked memory past 1 GB (#866).
+enum ArtworkImageEncoding {
+    static let maxPixelDimension: CGFloat = 2048
+    private static let fingerprintSide = 32
+
+    static func cgImage(from image: NSImage, maxPixelDimension: CGFloat = maxPixelDimension) -> CGImage? {
+        let pointSize = image.size
+        guard pointSize.width > 0, pointSize.height > 0 else { return nil }
+
+        let largestRepPixels = image.representations
+            .map { CGFloat(max($0.pixelsWide, $0.pixelsHigh)) }
+            .max() ?? 0
+        let naturalPixels = largestRepPixels > 0 ? largestRepPixels : max(pointSize.width, pointSize.height)
+        let targetPixels = min(naturalPixels, maxPixelDimension)
+        let scale = targetPixels / max(pointSize.width, pointSize.height)
+        var rect = CGRect(x: 0, y: 0, width: pointSize.width * scale, height: pointSize.height * scale)
+        guard let cgImage = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else { return nil }
+
+        // AppKit can hand back a larger representation than the proposed rect.
+        let largestSide = CGFloat(max(cgImage.width, cgImage.height))
+        guard largestSide > maxPixelDimension else { return cgImage }
+        let downscale = maxPixelDimension / largestSide
+        let width = max(Int((CGFloat(cgImage.width) * downscale).rounded()), 1)
+        let height = max(Int((CGFloat(cgImage.height) * downscale).rounded()), 1)
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              )
+        else { return nil }
+        context.interpolationQuality = .high
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
+    }
+
+    static func pngData(from image: NSImage) -> Data? {
+        guard let cgImage = cgImage(from: image) else { return nil }
+        return NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:])
+    }
+
+    /// Hashes a small thumbnail instead of a full PNG encode, so comparing artwork
+    /// on every album-art change stays cheap on the main thread.
+    static func fingerprint(for image: NSImage) -> String? {
+        guard let cgImage = cgImage(from: image, maxPixelDimension: 256) else { return nil }
+        let side = fingerprintSide
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                data: nil,
+                width: side,
+                height: side,
+                bitsPerComponent: 8,
+                bytesPerRow: side * 4,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              )
+        else { return nil }
+        context.interpolationQuality = .medium
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
+        guard let data = context.data else { return nil }
+
+        var hasher = Hasher()
+        hasher.combine(Data(bytes: data, count: side * side * 4))
+        hasher.combine(cgImage.width)
+        hasher.combine(cgImage.height)
+        hasher.combine(Int(image.size.width.rounded()))
+        hasher.combine(Int(image.size.height.rounded()))
+        return String(hasher.finalize())
+    }
+}
+
 // MARK: - Window Manager
 
 @MainActor
 final class FullScreenArtworkWindowManager: ObservableObject {
+    private var targetScreen: NSScreen? {
+        LockScreenDisplayContextProvider.shared.contextSnapshot()?.screen ?? NSScreen.main
+    }
+
     private enum ArtworkOverlayMode {
         case none
         case spotifyFallback
@@ -337,6 +420,13 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     private var activeWallpaperKey: String?
     private var pendingFallbackStaticURL: URL?
     private var pendingFallbackWallpaperKey: String?
+    private var originalDesktopImageURLs: [String: URL] = [:]
+    private var capturedScreenKeys: Set<String> = []
+    private var staticWallpaperScreenKeys: Set<String> = []
+    private var didCaptureStoreBackup = false
+    private var appliedStaticWallpaper = false
+    private var didApplyAerialWallpaper = false
+    private var needsStoreRestoreFromBackup = false
     private var fallbackRightClickMonitor: Any?
     private var artworkLayoutOverCanvasPreferenceCancellable: AnyCancellable?
     private var lyricsTextCancellable: AnyCancellable?
@@ -356,7 +446,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
 
     func show(artwork: NSImage, videoURL: URL? = nil, allowLiveWallpaper: Bool = false) {
         guard !isShowing else { return }
-        guard let screen = NSScreen.main else { return }
+        guard let screen = targetScreen else { return }
         applyPresentation(
             artwork: artwork,
             videoURL: videoURL,
@@ -413,6 +503,9 @@ final class FullScreenArtworkWindowManager: ObservableObject {
             .debounce(for: .milliseconds(180), scheduler: DispatchQueue.main)
             .sink { [weak self] newArt in
                 guard let self else { return }
+                // Full-screen artwork only appears on the lock screen; skip encoding
+                // and writing every artwork change to disk while unlocked.
+                guard self.isShowing || LockScreenManager.shared.isLocked else { return }
                 guard let fingerprint = self.imageFingerprint(for: newArt) else { return }
                 guard fingerprint != self.cachedArtworkFingerprint else { return }
                 let url = self.artworkCacheFileURL(for: fingerprint)
@@ -541,9 +634,10 @@ final class FullScreenArtworkWindowManager: ObservableObject {
 
         guard let rawArtworkFileURL = persistedArtworkFileURL(for: artwork, fingerprint: artworkFingerprint) else { return }
         let expectCanvas = effectiveVideoURL != nil
-        let blurredFallbackURL = blurredWallpaperFileURL(for: artwork, fingerprint: artworkFingerprint, screen: screen) ?? rawArtworkFileURL
+        // The blurred, screen-sized render is only needed for the Spotify fallback
+        // and canvas tracks; building it for every track change stalled the lock screen (#791).
         let wallpaperURL = (shouldUseStaticFallbackWallpaper || expectCanvas)
-            ? blurredFallbackURL
+            ? (blurredWallpaperFileURL(for: artwork, fingerprint: artworkFingerprint, screen: screen) ?? rawArtworkFileURL)
             : rawArtworkFileURL
         let wallpaperKey = wallpaperIdentityKey(
             fingerprint: artworkFingerprint,
@@ -558,25 +652,24 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         artworkFileURL = wallpaperURL
 
         if backupWallpaperConfiguration {
-            backupWallpaperConfig()
+            captureWallpaperBackupIfNeeded()
         }
 
         if requiresWallpaperRefresh {
             if expectCanvas {
-                pendingFallbackStaticURL = blurredFallbackURL
+                pendingFallbackStaticURL = wallpaperURL
                 pendingFallbackWallpaperKey = wallpaperKey
                 activeWallpaperKey = nil
                 activeLiveWallpaperFingerprint = nil
             } else {
                 showWallpaperTransition(on: screen, imageURL: wallpaperURL)
 
-                guard applyArtworkToPlist(imageURL: wallpaperURL) else {
-                    print("[FullScreenArtworkWindowManager] Failed to patch plist")
+                guard applyStaticWallpaper(imageURL: wallpaperURL) else {
+                    print("[FullScreenArtworkWindowManager] Failed to set desktop image")
                     hideWallpaperTransition()
                     return
                 }
 
-                restartWallpaperAgent()
                 activeWallpaperKey = wallpaperKey
                 activeLiveWallpaperFingerprint = nil
                 pendingFallbackStaticURL = nil
@@ -621,7 +714,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     private func refreshPresentationForCurrentTrack() {
         guard isShowing else { return }
         guard MusicManager.shared.hasActiveSession else { return }
-        guard let screen = NSScreen.main else { return }
+        guard let screen = targetScreen else { return }
 
         applyPresentation(
             artwork: MusicManager.shared.albumArt,
@@ -807,25 +900,16 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     }
 
     private nonisolated func encodeToPNG(_ image: NSImage) -> Data? {
-        guard let tiffData = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData)
-        else { return nil }
-        return bitmap.representation(using: .png, properties: [:])
+        autoreleasepool { ArtworkImageEncoding.pngData(from: image) }
     }
 
     private nonisolated func imageFingerprint(for image: NSImage) -> String? {
-        guard let pngData = encodeToPNG(image) else { return nil }
-        var hasher = Hasher()
-        hasher.combine(pngData)
-        hasher.combine(Int(image.size.width.rounded()))
-        hasher.combine(Int(image.size.height.rounded()))
-        return String(hasher.finalize())
+        autoreleasepool { ArtworkImageEncoding.fingerprint(for: image) }
     }
 
     private func encodeBlurredWallpaperPNG(from artwork: NSImage, targetPixelSize: CGSize) -> Data? {
-        guard let tiffData = artwork.tiffRepresentation,
-              let sourceImage = CIImage(data: tiffData)
-        else { return nil }
+        guard let artworkImage = ArtworkImageEncoding.cgImage(from: artwork) else { return nil }
+        let sourceImage = CIImage(cgImage: artworkImage)
 
         let targetRect = CGRect(origin: .zero, size: targetPixelSize)
         let sourceExtent = sourceImage.extent
@@ -858,32 +942,48 @@ final class FullScreenArtworkWindowManager: ObservableObject {
                 ]
             )
 
-        let context = CIContext(options: nil)
+        let context = Self.wallpaperCIContext
         guard let cgImage = context.createCGImage(blurredImage, from: targetRect) else { return nil }
 
-        let renderedImage = NSImage(cgImage: cgImage, size: NSSize(width: targetPixelSize.width, height: targetPixelSize.height))
-        let composedImage = NSImage(size: renderedImage.size)
+        let pixelWidth = Int(targetPixelSize.width.rounded())
+        let pixelHeight = Int(targetPixelSize.height.rounded())
+        guard pixelWidth > 0, pixelHeight > 0,
+              let bitmap = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: pixelWidth,
+                pixelsHigh: pixelHeight,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+              ),
+              let graphicsContext = NSGraphicsContext(bitmapImageRep: bitmap)
+        else { return nil }
 
-        composedImage.lockFocus()
-        renderedImage.draw(in: NSRect(origin: .zero, size: renderedImage.size))
+        let canvasRect = NSRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = graphicsContext
+        graphicsContext.cgContext.draw(cgImage, in: canvasRect)
 
         NSColor(calibratedWhite: 0.02, alpha: 0.08).setFill()
-        NSBezierPath(rect: NSRect(origin: .zero, size: renderedImage.size)).fill()
+        NSBezierPath(rect: canvasRect).fill()
 
         let gradient = NSGradient(colors: [
             NSColor.white.withAlphaComponent(0.05),
             NSColor.clear,
             NSColor.black.withAlphaComponent(0.16)
         ])
-        gradient?.draw(in: NSRect(origin: .zero, size: renderedImage.size), angle: -90)
-        composedImage.unlockFocus()
+        gradient?.draw(in: canvasRect, angle: -90)
+        graphicsContext.flushGraphics()
+        NSGraphicsContext.restoreGraphicsState()
 
-        guard let finalTIFF = composedImage.tiffRepresentation,
-              let finalBitmap = NSBitmapImageRep(data: finalTIFF)
-        else { return nil }
-
-        return finalBitmap.representation(using: .png, properties: [:])
+        return bitmap.representation(using: .png, properties: [:])
     }
+
+    private static let wallpaperCIContext = CIContext(options: [.cacheIntermediates: false])
 
     private func applyDeferredStaticFallback() {
         guard let url = pendingFallbackStaticURL else { return }
@@ -891,15 +991,14 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         pendingFallbackStaticURL = nil
         pendingFallbackWallpaperKey = nil
 
-        if let screen = NSScreen.main {
+        if let screen = targetScreen {
             showWallpaperTransition(on: screen, imageURL: url)
         }
-        guard applyArtworkToPlist(imageURL: url) else {
+        guard applyStaticWallpaper(imageURL: url) else {
             print("[FullScreenArtworkWindowManager] Failed to apply deferred static fallback")
             hideWallpaperTransition()
             return
         }
-        restartWallpaperAgent()
         activeWallpaperKey = key
         activeLiveWallpaperFingerprint = nil
         hideVideoWindow()
@@ -927,7 +1026,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
             return
         }
 
-        if let screen = NSScreen.main {
+        if let screen = targetScreen {
             showVideoWindow(on: screen, videoURL: videoURL)
         }
         scheduleWallpaperTransitionHide(after: .milliseconds(420))
@@ -974,12 +1073,14 @@ final class FullScreenArtworkWindowManager: ObservableObject {
                     self.applyDeferredStaticFallback()
                     return
                 }
+                self.captureWallpaperBackupIfNeeded()
                 guard self.applyAerialToPlist(assetID: assetID) else {
                     self.applyDeferredStaticFallback()
                     return
                 }
 
                 self.activeLiveWallpaperFingerprint = nextFingerprint
+                self.didApplyAerialWallpaper = true
                 self.pendingFallbackStaticURL = nil
                 self.pendingFallbackWallpaperKey = nil
                 self.restartWallpaperAgent()
@@ -1316,7 +1417,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     private func updateArtworkOverlayFrameIfNeeded() {
         guard isShowing, currentArtworkOverlayMode != .none else { return }
         guard let window = artworkOverlayWindow else { return }
-        guard let screen = NSScreen.main, let frame = artworkOverlayFrame(on: screen) else { return }
+        guard let screen = targetScreen, let frame = artworkOverlayFrame(on: screen) else { return }
         window.setFrame(frame, display: true)
     }
 
@@ -1334,7 +1435,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         return frames.artworkFrame
     }
 
-    private func updateLyricsOverlayIfNeeded(on screen: NSScreen? = NSScreen.main) {
+    private func updateLyricsOverlayIfNeeded(on screen: NSScreen? = nil) {
         guard isShowing, isShowingSpotifyCanvasFallback, Defaults[.enableLyrics] else {
             hideLyricsOverlay()
             return
@@ -1346,7 +1447,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
             return
         }
 
-        guard let screen, let frame = spotifyCanvasFallbackLayoutFrames(on: screen)?.lyricsFrame else {
+        guard let screen = screen ?? targetScreen, let frame = spotifyCanvasFallbackLayoutFrames(on: screen)?.lyricsFrame else {
             hideLyricsOverlay()
             return
         }
@@ -1578,9 +1679,131 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         FileManager.default.fileExists(atPath: backupPlistURL.path)
     }
 
+    /// Captures both backups before Atoll first changes the wallpaper in a session. Every
+    /// wallpaper change calls this first; it only does work the first time and for new screens.
+    private func captureWallpaperBackupIfNeeded() {
+        backupWallpaperConfig()
+        captureStaticWallpaperBackupIfNeeded()
+    }
+
     private func backupWallpaperConfig() {
-        guard !hasValidBackup else { return }
-        try? FileManager.default.copyItem(at: wallpaperPlistURL, to: backupPlistURL)
+        guard !didCaptureStoreBackup else { return }
+        didCaptureStoreBackup = true
+        let fm = FileManager.default
+        if hasValidBackup {
+            // A backup left by an earlier session that never restored (quit or crash) holds the
+            // original only while the store still shows Atoll's wallpaper; otherwise it is stale.
+            if storeShowsAtollWallpaper() {
+                needsStoreRestoreFromBackup = true
+                return
+            }
+            try? fm.removeItem(at: backupPlistURL)
+        }
+        try? fm.copyItem(at: wallpaperPlistURL, to: backupPlistURL)
+    }
+
+    private func storeShowsAtollWallpaper() -> Bool {
+        if NSScreen.screens.contains(where: { NSWorkspace.shared.desktopImageURL(for: $0).map(Self.isAtollArtworkFile) ?? false }) {
+            return true
+        }
+        guard let data = try? Data(contentsOf: wallpaperPlistURL) else { return false }
+        return Self.wallpaperStoreReferencesAtoll(data, liveWallpaperAssetID: customLiveWallpaperAssetID)
+    }
+
+    nonisolated static func wallpaperStoreReferencesAtoll(_ storeData: Data, liveWallpaperAssetID: String) -> Bool {
+        ["atoll_artwork_wallpaper", liveWallpaperAssetID].contains { marker in
+            storeData.range(of: Data(marker.utf8)) != nil
+        }
+    }
+
+    /// Copies the wallpaper store backup over the live store and removes the backup only once the
+    /// store verifiably holds the backed-up bytes.
+    nonisolated static func restoreWallpaperStore(from backupURL: URL, to storeURL: URL) -> Bool {
+        guard let backupData = try? Data(contentsOf: backupURL) else { return false }
+        do {
+            try backupData.write(to: storeURL, options: .atomic)
+        } catch {
+            print("[FullScreenArtworkWindowManager] Failed to restore plist: \(error)")
+            return false
+        }
+        guard (try? Data(contentsOf: storeURL)) == backupData else { return false }
+        try? FileManager.default.removeItem(at: backupURL)
+        return true
+    }
+
+    private func screenKey(_ screen: NSScreen) -> String {
+        if let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber {
+            return "screen-\(number.uint32Value)"
+        }
+        return "screen-\(screen.localizedName)"
+    }
+
+    private func captureStaticWallpaperBackupIfNeeded() {
+        let ws = NSWorkspace.shared
+        for screen in NSScreen.screens {
+            let key = screenKey(screen)
+            guard !capturedScreenKeys.contains(key) else { continue }
+            capturedScreenKeys.insert(key)
+            guard let url = ws.desktopImageURL(for: screen) else { continue }
+            // Atoll's own artwork means an earlier session ended (quit or crash) before
+            // restoring; the wallpaper store backup kept from that session holds the original.
+            if Self.isAtollArtworkFile(url) {
+                needsStoreRestoreFromBackup = true
+                continue
+            }
+            originalDesktopImageURLs[key] = url
+        }
+    }
+
+    nonisolated static func isAtollArtworkFile(_ url: URL) -> Bool {
+        url.isFileURL && url.lastPathComponent.hasPrefix("atoll_artwork_wallpaper")
+    }
+
+    @discardableResult
+    private func applyStaticWallpaper(imageURL: URL) -> Bool {
+        captureWallpaperBackupIfNeeded()
+        let ws = NSWorkspace.shared
+        var anySucceeded = false
+        for screen in NSScreen.screens {
+            let options = ws.desktopImageOptions(for: screen) ?? [:]
+            do {
+                try ws.setDesktopImageURL(imageURL, for: screen, options: options)
+                staticWallpaperScreenKeys.insert(screenKey(screen))
+                anySucceeded = true
+            } catch {
+                print("[FullScreenArtworkWindowManager] setDesktopImageURL failed: \(error)")
+            }
+        }
+        if anySucceeded {
+            appliedStaticWallpaper = true
+        }
+        return anySucceeded
+    }
+
+    /// Fallback for when the store backup can't be restored: puts back each screen's captured
+    /// picture. Returns true only when every screen Atoll changed is connected, had a captured
+    /// original, and now reports that original.
+    private func restoreStaticWallpaper() -> Bool {
+        guard appliedStaticWallpaper else { return true }
+        let ws = NSWorkspace.shared
+        let screensByKey = Dictionary(NSScreen.screens.map { (screenKey($0), $0) }, uniquingKeysWith: { first, _ in first })
+        var restoredAll = true
+        for key in staticWallpaperScreenKeys {
+            guard let screen = screensByKey[key], let url = originalDesktopImageURLs[key] else {
+                restoredAll = false
+                continue
+            }
+            let options = ws.desktopImageOptions(for: screen) ?? [:]
+            do {
+                try ws.setDesktopImageURL(url, for: screen, options: options)
+            } catch {
+                print("[FullScreenArtworkWindowManager] Failed to restore desktop image: \(error)")
+            }
+            if ws.desktopImageURL(for: screen)?.standardizedFileURL != url.standardizedFileURL {
+                restoredAll = false
+            }
+        }
+        return restoredAll
     }
 
     private func applyArtworkToPlist(imageURL: URL) -> Bool {
@@ -1753,19 +1976,37 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     }
 
     private func restoreWallpaper() {
-        let fm = FileManager.default
-        guard hasValidBackup else { return }
+        let changedWallpaper = appliedStaticWallpaper || didApplyAerialWallpaper || needsStoreRestoreFromBackup
+        var restored = !changedWallpaper
 
-        do {
-            try fm.removeItem(at: wallpaperPlistURL)
-            try fm.copyItem(at: backupPlistURL, to: wallpaperPlistURL)
-            try fm.removeItem(at: backupPlistURL)
-        } catch {
-            print("[FullScreenArtworkWindowManager] Failed to restore plist: \(error)")
+        // The store backup holds the full configuration (Shuffle, rotating folders, Aerials,
+        // per-Space and per-display choices), so it is preferred over per-screen URLs, which
+        // can only put back a single still image.
+        if changedWallpaper, hasValidBackup {
+            restored = Self.restoreWallpaperStore(from: backupPlistURL, to: wallpaperPlistURL)
+            if restored {
+                restoreLiveWallpaperResources()
+                restartWallpaperAgent()
+            }
+        }
+        if !restored, appliedStaticWallpaper {
+            restored = restoreStaticWallpaper()
+        }
+        if restored, hasValidBackup {
+            try? FileManager.default.removeItem(at: backupPlistURL)
+        }
+        // On failure the store backup stays on disk so the next session can still restore it.
+        if !restored {
+            print("[FullScreenArtworkWindowManager] Wallpaper restore incomplete; keeping backup")
         }
 
-        restoreLiveWallpaperResources()
-        restartWallpaperAgent()
+        appliedStaticWallpaper = false
+        originalDesktopImageURLs.removeAll()
+        capturedScreenKeys.removeAll()
+        staticWallpaperScreenKeys.removeAll()
+        didCaptureStoreBackup = false
+        didApplyAerialWallpaper = false
+        needsStoreRestoreFromBackup = false
     }
 
     // MARK: - Track Change Observer

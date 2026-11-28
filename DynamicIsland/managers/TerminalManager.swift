@@ -18,6 +18,7 @@
  */
 
 import AppKit
+import Combine
 import Foundation
 import SwiftUI
 import SwiftTerm
@@ -120,6 +121,22 @@ final class TerminalScrollKnobView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
+// MARK: - Notch Terminal View
+
+/// SwiftTerm's terminal view with the input-method window level `NSTextView` reports.
+///
+/// The notch panel sits above the menu bar (`.mainMenu + 3`). Input methods place
+/// their candidate window at the level returned by `NSTextInputClient.windowLevel()`,
+/// and without it they assume a regular floating window, so the candidate list
+/// opened under the notch and was hidden while composing (for example Chinese
+/// Pinyin) in the Terminal tab. Notes is unaffected because `NSTextView` already
+/// answers with its window's level.
+final class NotchLocalProcessTerminalView: LocalProcessTerminalView {
+    @objc func windowLevel() -> Int {
+        (window?.level ?? .floating).rawValue
+    }
+}
+
 // MARK: - Terminal Manager
 
 /// Manages the Guake-style dropdown terminal session lifecycle.
@@ -138,7 +155,19 @@ class TerminalManager: ObservableObject {
     @Published var isProcessRunning: Bool = false
 
     /// The current terminal title reported by the shell.
-    @Published var terminalTitle: String = "Terminal"
+    @Published var terminalTitle: String = "Terminal" {
+        didSet { panelController?.setTitle(terminalTitle) }
+    }
+
+    /// Whether the terminal is in its floating window rather than the notch tab.
+    @Published private(set) var isPoppedOut = false
+    private var panelController: TerminalPanelController?
+
+    /// SwiftTerm holds its process delegate weakly, and the delegate is the
+    /// notch representable's coordinator, which goes away whenever the notch
+    /// tab does. Kept here so titles and exits still arrive while the terminal
+    /// is popped out or the notch is closed.
+    private var retainedProcessDelegate: LocalProcessTerminalViewDelegate?
 
     /// Stable container returned to SwiftUI — never deallocated.
     /// Uses `StableTerminalContainerView` to prevent zero-frame transients
@@ -199,13 +228,60 @@ class TerminalManager: ObservableObject {
         return v
     }()
 
-    private init() {}
+    /// A command the user chose to leave by switching tabs while it ran; the
+    /// notch stops opening to the terminal for it (see `shouldOpenToTerminal`).
+    private var dismissedCommandProcessGroup: pid_t?
+    private var cancellables = Set<AnyCancellable>()
+
+    private init() {
+        DynamicIslandViewCoordinator.shared.$currentView
+            .removeDuplicates()
+            .scan((previous: NotchViews?.none, current: NotchViews?.none)) { ($0.current, $1) }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] change in
+                guard let self, change.previous == .terminal, change.current != .terminal else { return }
+                self.dismissedCommandProcessGroup = self.foregroundCommandProcessGroup
+            }
+            .store(in: &cancellables)
+
+        Defaults.publisher(.enableTerminalFeature, options: [])
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] change in
+                if !change.newValue { self?.returnToNotch() }
+            }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - Running command
+
+    /// The process group in the terminal's foreground when it is not the shell
+    /// itself, i.e. a command started from the prompt is still running. `nil` at
+    /// the prompt or when no shell is running. A single `tcgetpgrp` on the pty,
+    /// read only when asked — nothing polls.
+    var foregroundCommandProcessGroup: pid_t? {
+        guard isProcessRunning, let process = terminalView?.process else { return nil }
+        let fd = process.childfd
+        let shell = process.shellPid
+        guard fd >= 0, shell > 0 else { return nil }
+        let group = tcgetpgrp(fd)
+        guard group > 0, group != shell else { return nil }
+        return group
+    }
+
+    /// Whether the notch should open on the terminal tab: the setting is on and
+    /// a command is running that the user has not already switched away from.
+    func shouldOpenToTerminal() -> Bool {
+        guard !isPoppedOut, Defaults[.terminalOpenWhileCommandRuns], Defaults[.enableTerminalFeature],
+              let group = foregroundCommandProcessGroup else { return false }
+        return group != dismissedCommandProcessGroup
+    }
 
     // MARK: - Lifecycle
 
     /// Ensures the terminal view exists inside the container and returns the container.
     /// Call this from the `NSViewRepresentable` wrapper.
     func ensureTerminalView(delegate: LocalProcessTerminalViewDelegate) {
+        retainedProcessDelegate = delegate
         if let existing = terminalView, existing.superview === containerView {
             // Already mounted — just re-wire the delegate in case the coordinator changed.
             existing.processDelegate = delegate
@@ -225,7 +301,7 @@ class TerminalManager: ObservableObject {
         // Replace only the terminal view - keep the blur underlay between restarts.
         terminalView?.removeFromSuperview()
 
-        let view = LocalProcessTerminalView(frame: initialFrame)
+        let view = NotchLocalProcessTerminalView(frame: initialFrame)
         view.autoresizingMask = [.width, .height]
 
         // Apply all settings from Defaults
@@ -303,6 +379,45 @@ class TerminalManager: ObservableObject {
     /// Called when the shell process terminates.
     func processDidTerminate(exitCode: Int32?) {
         isProcessRunning = false
+        // Nothing in the floating window restarts the shell; like a Terminal
+        // window, it closes when its shell exits and a new one starts in the notch.
+        if isPoppedOut {
+            returnToNotch()
+        }
+    }
+
+    // MARK: - Floating window
+
+    /// Moves the terminal into a floating window that stays above other apps.
+    func popOut() {
+        guard !isPoppedOut else {
+            panelController?.show(containerView: containerView)
+            return
+        }
+        isPoppedOut = true
+        // Let SwiftUI take the notch's terminal view down first, so it does not
+        // pull the container back out of the window as it goes.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isPoppedOut else { return }
+            let controller = self.panelController ?? TerminalPanelController { [weak self] in
+                self?.isPoppedOut = false
+            }
+            self.panelController = controller
+            controller.setTitle(self.terminalTitle)
+            controller.show(containerView: self.containerView)
+            self.refreshTerminalAppearanceIfNeeded()
+            self.focusTerminalIfPossible()
+        }
+    }
+
+    /// Closes the floating window; the terminal goes back to its notch tab.
+    func returnToNotch() {
+        guard isPoppedOut else { return }
+        if let panelController, panelController.isVisible {
+            panelController.close()
+        } else {
+            isPoppedOut = false
+        }
     }
 
     /// Restarts the shell by tearing down the old terminal and creating a fresh one.
@@ -385,7 +500,12 @@ class TerminalManager: ObservableObject {
     /// Keeps the gutter tint ring matching the terminal's resolved (translucent)
     /// background color so the inset gutter blends seamlessly with the cells.
     private func updateGutterTintColor() {
-        terminalGutterTintView.layer?.backgroundColor = resolvedTerminalBackgroundNSColor().cgColor
+        let background = resolvedTerminalBackgroundNSColor()
+        terminalGutterTintView.layer?.backgroundColor = background.cgColor
+        // With an opaque background the blur is fully covered and adds nothing,
+        // but a behind-window blur ignores the fade SwiftUI applies during a tab
+        // switch, so it flashed as a grey panel while the terminal faded in.
+        terminalBackgroundEffectView.isHidden = background.alphaComponent >= 1
     }
 
     // MARK: - Settings Application
@@ -603,7 +723,7 @@ class TerminalManager: ObservableObject {
 
     /// Resigns terminal focus before closing notch to avoid stale responder state.
     func resignTerminalFirstResponderIfNeeded() {
-        guard let view = terminalView else { return }
+        guard !isPoppedOut, let view = terminalView else { return }
         guard let window = containerView.window ?? view.window else { return }
         guard window.firstResponder === view else { return }
         _ = window.makeFirstResponder(nil)
@@ -659,12 +779,12 @@ enum TerminalCursorStyleOption: String, CaseIterable, Defaults.Serializable {
 
     var displayName: String {
         switch self {
-        case .blinkBlock: return "Block (blinking)"
-        case .steadyBlock: return "Block (steady)"
-        case .blinkUnderline: return "Underline (blinking)"
-        case .steadyUnderline: return "Underline (steady)"
-        case .blinkBar: return "Bar (blinking)"
-        case .steadyBar: return "Bar (steady)"
+        case .blinkBlock: return String(localized: "Block (blinking)")
+        case .steadyBlock: return String(localized: "Block (steady)")
+        case .blinkUnderline: return String(localized: "Underline (blinking)")
+        case .steadyUnderline: return String(localized: "Underline (steady)")
+        case .blinkBar: return String(localized: "Bar (blinking)")
+        case .steadyBar: return String(localized: "Bar (steady)")
         }
     }
 }

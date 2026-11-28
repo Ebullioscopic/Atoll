@@ -57,8 +57,11 @@ class CalendarManager: ObservableObject {
     private let lockScreenRefreshInterval: TimeInterval = 15
     private var lockScreenRefreshTask: Task<Void, Never>?
 
-    var hasCalendarAccess: Bool { isAuthorized(calendarAuthorizationStatus) }
-    var hasReminderAccess: Bool { isAuthorized(reminderAuthorizationStatus) }
+    var access: CalendarAccess {
+        CalendarAccess(calendarStatus: calendarAuthorizationStatus, reminderStatus: reminderAuthorizationStatus)
+    }
+    var hasCalendarAccess: Bool { access.hasCalendarAccess }
+    var hasReminderAccess: Bool { access.hasReminderAccess }
 
     private init() {
         currentWeekStartDate = CalendarManager.startOfDay(Date())
@@ -89,6 +92,7 @@ class CalendarManager: ObservableObject {
 
     private func handleEventStoreChanged() {
         Logger.log("CalendarManager: Event store changed notification received", category: .lifecycle)
+        calendarService.invalidateReminderCache()
         let now = Date()
         guard now >= ignoreEventStoreChangesUntil else { return }
 
@@ -135,7 +139,7 @@ class CalendarManager: ObservableObject {
 
     @MainActor
     private func maybeRefreshEventsAfterReload() async {
-        guard hasCalendarAccess else { return }
+        guard access.canShowSettings else { return }
         let now = Date()
         if let lastFetch = lastEventsFetchDate, now.timeIntervalSince(lastFetch) < reloadRefreshInterval {
             return
@@ -143,61 +147,39 @@ class CalendarManager: ObservableObject {
         await updateEvents()
     }
 
-    private func isAuthorized(_ status: EKAuthorizationStatus) -> Bool {
-        switch status {
-        case .authorized, .fullAccess:
-            return true
-        default:
-            return false
-        }
+    /// Refresh without prompting when returning from System Settings.
+    func refreshAuthorization() async {
+        calendarAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
+        reminderAuthorizationStatus = EKEventStore.authorizationStatus(for: .reminder)
+        await reloadCalendarAndReminderLists()
+        await updateEvents(force: true)
+        await updateLockScreenEvents(force: true)
+    }
+
+    /// Skips the forced event reload when the app is reactivated without a permission change.
+    func refreshAuthorizationIfChanged() async {
+        guard EKEventStore.authorizationStatus(for: .event) != calendarAuthorizationStatus
+            || EKEventStore.authorizationStatus(for: .reminder) != reminderAuthorizationStatus
+        else { return }
+        await refreshAuthorization()
     }
 
     func checkCalendarAuthorization() async {
-        let status = EKEventStore.authorizationStatus(for: .event)
-        calendarAuthorizationStatus = status
-
-        switch status {
-        case .notDetermined:
-            let granted = await calendarService.requestAccess(to: .event)
-            calendarAuthorizationStatus = granted ? .fullAccess : .denied
-            if granted {
-                await reloadCalendarAndReminderLists()
-                await updateEvents(force: true)
-                await updateLockScreenEvents(force: true)
-            }
-        case .restricted, .denied:
-            NSLog("Calendar access denied or restricted")
-        case .authorized, .fullAccess:
-            await reloadCalendarAndReminderLists()
-            await updateEvents(force: true)
-            await updateLockScreenEvents(force: true)
-        case .writeOnly:
-            NSLog("Calendar write only")
-        @unknown default:
-            NSLog("Unknown calendar authorization status")
-        }
+        await checkAuthorization(for: .event)
     }
 
     func checkReminderAuthorization() async {
-        let status = EKEventStore.authorizationStatus(for: .reminder)
-        reminderAuthorizationStatus = status
+        await checkAuthorization(for: .reminder)
+    }
 
-        switch status {
-        case .notDetermined:
-            let granted = await calendarService.requestAccess(to: .reminder)
-            reminderAuthorizationStatus = granted ? .fullAccess : .denied
-            if granted {
-                await reloadCalendarAndReminderLists()
-            }
-        case .restricted, .denied:
-            NSLog("Reminder access denied or restricted")
-        case .authorized, .fullAccess:
-            await reloadCalendarAndReminderLists()
-        case .writeOnly:
-            NSLog("Reminder write only")
-        @unknown default:
-            NSLog("Unknown reminder authorization status")
+    private func checkAuthorization(for entity: EKEntityType) async {
+        let status = EKEventStore.authorizationStatus(for: entity)
+        // Calendar write-only permission still needs an explicit full-access
+        // request before calendars can be listed or read.
+        if CalendarAccess.canRequest(status) {
+            _ = await calendarService.requestAccess(to: entity)
         }
+        await refreshAuthorization()
     }
 
     func updateSelectedCalendars() {
@@ -249,9 +231,14 @@ class CalendarManager: ObservableObject {
     }
 
     func updateCurrentDate(_ date: Date) async {
-        currentWeekStartDate = Calendar.current.startOfDay(for: date)
+        // Each notch open re-selects today; republishing an unchanged day or
+        // event list re-rendered the calendar mid-animation for nothing.
+        let day = Calendar.current.startOfDay(for: date)
+        if currentWeekStartDate != day { currentWeekStartDate = day }
         await updateEvents(force: true)
-        await updateLockScreenEvents(force: true)
+        // Lock screen events do not depend on the selected day, so switching
+        // days only refreshes them when they are due anyway (#513).
+        await updateLockScreenEvents(force: false)
     }
 
     func updateLockScreenEvents(force: Bool = false) async {
@@ -370,15 +357,19 @@ class CalendarManager: ObservableObject {
         guard let endDate = Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate) else { return }
         let service = calendarService
 
-        let events = await eventFetchLimiter.run {
-            await service.events(
+        let events = await eventFetchLimiter.run { [weak self] () -> [EventModel]? in
+            // Scrolling through days queues a fetch per day; only the day still
+            // selected when a fetch gets its turn is worth loading (#513).
+            guard await self?.currentWeekStartDate == startDate else { return nil }
+            return await service.events(
                 from: startDate,
                 to: endDate,
                 calendars: calendarIDs
             )
         }
 
-        self.events = events
+        guard let events, currentWeekStartDate == startDate else { return }
+        if self.events != events { self.events = events }
         lastEventsFetchDate = Date()
     }
 

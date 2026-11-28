@@ -22,12 +22,45 @@ import AppKit
 import Defaults
 import SwiftUI
 import AVFoundation
+import os
+import SkyLightWindow
+
+private extension NSEvent.EventSubtype {
+    static let powerKey = NSEvent.EventSubtype(rawValue: 1)!
+}
 
 enum LockScreenAnimationTimings {
     static let lockExpand: TimeInterval = 0.45
     static let unlockCollapse: TimeInterval = 0.82
+    // The lock animator needs 0.35 seconds to move from the closed to the open
+    // symbol. Leave a small settling beat before the island starts contracting.
+    static let lockUnlockHold: TimeInterval = 0.82
+    // FingerprintScan.json plays through its completed scan at 5x speed in
+    // roughly 1.4 seconds. Keep the island fully open until that point.
+    static let fingerprintUnlockHold: TimeInterval = 1.45
+    static let fingerprintScanReset: TimeInterval = 1.55
+    // SwiftUI and the delegated AppKit overlay both need one rendered frame
+    // after reaching their collapsed size before their content is unmounted.
+    static let unlockRemovalPadding: TimeInterval = 0.14
     static let postUnlockMusicHUDPause: TimeInterval = 1.0
     static let postUnlockMusicHUDReveal: TimeInterval = 0.34
+
+    static var currentUnlockHold: TimeInterval {
+        switch Defaults[.lockScreenLiveActivityIconStyle] {
+        case .lock:
+            return lockUnlockHold
+        case .fingerprint, .both:
+            return fingerprintUnlockHold
+        }
+    }
+
+    static var currentUnlockSequenceDuration: TimeInterval {
+        currentUnlockHold + unlockCollapse
+    }
+
+    static var currentUnlockRemovalDelay: TimeInterval {
+        currentUnlockSequenceDuration + unlockRemovalPadding
+    }
 }
 
 @MainActor
@@ -39,16 +72,46 @@ class LockScreenManager: ObservableObject {
     private weak var viewModel: DynamicIslandViewModel?
     
     // MARK: - Published Properties
-    @Published var isLocked: Bool = false
+    @Published var isLocked: Bool = false {
+        didSet { LockScreenManager.setLockedSnapshot(isLocked) }
+    }
+
+    /// Lock state readable off the main actor. The HUD dispatchers run on
+    /// whichever thread CoreAudio or the brightness watcher calls them from,
+    /// and only need a plain answer to "are we locked".
+    ///
+    /// Behind a lock rather than `nonisolated(unsafe)`: the writer is the main
+    /// actor, by way of `isLocked`'s `didSet`, and the readers are whatever
+    /// threads CoreAudio and the brightness watcher happen to use, so the
+    /// unsynchronised version was a data race that merely looked benign
+    /// because a Bool is one word wide.
+    nonisolated private static let lockedSnapshot = OSAllocatedUnfairLock(initialState: false)
+
+    nonisolated static var isLockedSnapshot: Bool {
+        lockedSnapshot.withLock { $0 }
+    }
+
+    /// Records the lock state for off-main-actor readers.
+    nonisolated private static func setLockedSnapshot(_ locked: Bool) {
+        lockedSnapshot.withLock { $0 = locked }
+    }
     @Published var isLockIdle: Bool = true
     @Published var shouldDelayPostUnlockMusicHUD: Bool = false
     @Published var lastUpdated: Date = .distantPast
+    @Published private(set) var isFingerprintAnimating: Bool = false
+    @Published private(set) var fingerprintAnimationGeneration: Int = 0
     
     // MARK: - Private Properties
     private var debounceIdleTask: Task<Void, Never>?
     private var collapseTask: Task<Void, Never>?
     private var postUnlockMusicHUDTask: Task<Void, Never>?
     private var lockStatePollTask: Task<Void, Never>?
+    private var fingerprintAnimationResetTask: Task<Void, Never>?
+    private var powerKeyMonitors: [Any] = []
+    private var isScreenSaverRunning = false
+    private var hidWidgetsForScreenSaver = false
+    private var screenSaverPreferenceCancellable: AnyCancellable?
+    private var lastPowerKeyEventDate: Date = .distantPast
     
     // MARK: - Helpers
     
@@ -71,6 +134,8 @@ class LockScreenManager: ObservableObject {
         collapseTask?.cancel()
         postUnlockMusicHUDTask?.cancel()
         lockStatePollTask?.cancel()
+        fingerprintAnimationResetTask?.cancel()
+        powerKeyMonitors.forEach(NSEvent.removeMonitor)
     }
     
     // MARK: - Setup
@@ -92,6 +157,26 @@ class LockScreenManager: ObservableObject {
             object: nil
         )
 
+        // The screen saver usually locks the Mac too, so lock and screen saver
+        // arrive together; these tell the two apart (#819).
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(screenSaverDidStart),
+            name: .init("com.apple.screensaver.didstart"),
+            object: nil
+        )
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(screenSaverDidStop),
+            name: .init("com.apple.screensaver.didstop"),
+            object: nil
+        )
+        screenSaverPreferenceCancellable = Defaults.publisher(.lockScreenHideWidgetsDuringScreenSaver, options: [])
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateScreenSaverWidgetVisibility()
+            }
+
         // Fallback: macOS sometimes delays `com.apple.screenIsUnlocked`, leaving
         // lock-screen widgets visible after the user-perceived unlock.
         // The workspace session-active notification typically fires earlier; the
@@ -103,9 +188,86 @@ class LockScreenManager: ObservableObject {
             object: nil
         )
 
+        // Power/Touch ID presses arrive as system-defined power-key events on
+        // Macs that expose them outside Secure Input. Listen locally and
+        // globally: global monitors do not receive events delivered to Atoll,
+        // while local monitors only receive those events.
+        if let localMonitor = NSEvent.addLocalMonitorForEvents(matching: .systemDefined) { [weak self] event in
+            if event.subtype == .powerKey {
+                Task { @MainActor in
+                    self?.handlePowerKeyEvent()
+                }
+            }
+            return event
+        } {
+            powerKeyMonitors.append(localMonitor)
+        }
+
+        if let globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .systemDefined) { [weak self] event in
+            guard event.subtype == .powerKey else { return }
+            Task { @MainActor in
+                self?.handlePowerKeyEvent()
+            }
+        } {
+            powerKeyMonitors.append(globalMonitor)
+        }
+
         print("LockScreenManager: ✅ Observers registered for lock/unlock events")
     }
+
+    private func handlePowerKeyEvent() {
+        guard isLocked,
+              Defaults[.enableLockScreenLiveActivity],
+              Defaults[.lockScreenLiveActivityIconStyle].showsFingerprint else { return }
+
+        let now = Date()
+        guard now.timeIntervalSince(lastPowerKeyEventDate) > 0.2 else { return }
+        lastPowerKeyEventDate = now
+        startFingerprintAnimation(resetIfStillLocked: true)
+    }
+
+    private func startFingerprintAnimation(resetIfStillLocked: Bool) {
+        fingerprintAnimationResetTask?.cancel()
+        fingerprintAnimationResetTask = nil
+        isFingerprintAnimating = true
+        fingerprintAnimationGeneration &+= 1
+
+        guard resetIfStillLocked else { return }
+        fingerprintAnimationResetTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(LockScreenAnimationTimings.fingerprintScanReset))
+            guard let self, !Task.isCancelled, self.isLocked else { return }
+            self.isFingerprintAnimating = false
+        }
+    }
+
+    private func resetFingerprintAnimation() {
+        fingerprintAnimationResetTask?.cancel()
+        fingerprintAnimationResetTask = nil
+        isFingerprintAnimating = false
+    }
     
+    // MARK: - Screen Saver
+
+    @objc private func screenSaverDidStart() {
+        isScreenSaverRunning = true
+        updateScreenSaverWidgetVisibility()
+    }
+
+    @objc private func screenSaverDidStop() {
+        isScreenSaverRunning = false
+        updateScreenSaverWidgetVisibility()
+    }
+
+    /// Lock screen widgets live in one SkyLight space above the lock screen, so
+    /// hiding that space clears all of them off the screen saver at once.
+    private func updateScreenSaverWidgetVisibility() {
+        let shouldHide = isScreenSaverRunning && Defaults[.lockScreenHideWidgetsDuringScreenSaver]
+        guard shouldHide != hidWidgetsForScreenSaver else { return }
+        if LockScreenWidgetSpaceVisibility.setHidden(shouldHide) {
+            hidWidgetsForScreenSaver = shouldHide
+        }
+    }
+
     // MARK: - Event Handlers
     
     @objc private func screenLocked() {
@@ -121,6 +283,7 @@ class LockScreenManager: ObservableObject {
         // Update state SYNCHRONOUSLY without Task/await to avoid any delay
         lastUpdated = Date()
         updateIdleState(locked: true)
+        resetFingerprintAnimation()
         postUnlockMusicHUDTask?.cancel()
         shouldDelayPostUnlockMusicHUD = false
         
@@ -142,10 +305,10 @@ class LockScreenManager: ObservableObject {
         // Show panel FIRST (creates and shows window on lock screen)
         print("[\(timestamp())] LockScreenManager: 🎵 Showing lock screen panel")
         LockScreenPanelManager.shared.showPanel()
+        updateNativeHUDSuppression()
         LockScreenLiveActivityWindowManager.shared.showLocked()
         LockScreenWeatherManager.shared.showWeatherWidget()
         LockScreenTimerWidgetManager.shared.handleLockStateChange(isLocked: true)
-        TimerControlWindowManager.shared.hide(animated: false)
         
         // THEN trigger lock icon in Atoll (only if enabled in settings)
         if Defaults[.enableLockScreenLiveActivity] {
@@ -171,16 +334,24 @@ class LockScreenManager: ObservableObject {
         LockScreenDisplayContextProvider.shared.refresh(reason: "screen-unlocked")
         lastUpdated = Date()
         updateIdleState(locked: false)
+        if Defaults[.enableLockScreenLiveActivity],
+           Defaults[.lockScreenLiveActivityIconStyle].showsFingerprint {
+            startFingerprintAnimation(resetIfStillLocked: false)
+        }
         isLocked = false
+        isScreenSaverRunning = false
+        updateScreenSaverWidgetVisibility()
+        updateNativeHUDSuppression()
         stopLockStatePolling()
         postUnlockMusicHUDTask?.cancel()
         shouldDelayPostUnlockMusicHUD = Defaults[.enableLockScreenLiveActivity]
+        let unlockRemovalDelay = LockScreenAnimationTimings.currentUnlockRemovalDelay
 
         if shouldDelayPostUnlockMusicHUD {
             postUnlockMusicHUDTask = Task { [weak self] in
                 try? await Task.sleep(
                     for: .seconds(
-                        LockScreenAnimationTimings.unlockCollapse
+                        unlockRemovalDelay
                             + LockScreenAnimationTimings.postUnlockMusicHUDPause
                     )
                 )
@@ -213,7 +384,7 @@ class LockScreenManager: ObservableObject {
         if Defaults[.enableLockScreenLiveActivity] {
             collapseTask?.cancel()
             collapseTask = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(LockScreenAnimationTimings.unlockCollapse))
+                try? await Task.sleep(for: .seconds(unlockRemovalDelay))
                 guard let self = self, !Task.isCancelled else { return }
                 await MainActor.run {
                     self.coordinator.toggleExpandingView(status: false, type: .lockScreen)
@@ -240,6 +411,12 @@ class LockScreenManager: ObservableObject {
         return session["CGSSessionScreenIsLocked"] as? Bool ?? false
     }
 
+    /// Starts the twice-a-second poll of the canonical session lock state.
+    ///
+    /// Runs only while this manager believes the Mac is locked, and does two
+    /// things on each tick: fires `screenUnlocked()` as soon as the OS reports
+    /// the session unlocked, and re-presents the media panel if something has
+    /// taken it down while the Mac is still locked.
     private func startLockStatePolling() {
         lockStatePollTask?.cancel()
         lockStatePollTask = Task { [weak self] in
@@ -251,12 +428,17 @@ class LockScreenManager: ObservableObject {
                     if !Self.isSessionScreenLocked() {
                         print("[\(self.timestamp())] LockScreenManager: 🔓 Polling detected unlock ahead of notification")
                         self.screenUnlocked()
+                        return
                     }
+
+                    // Still locked: make sure the media panel is actually there.
+                    LockScreenPanelManager.shared.ensurePresentedWhileLocked()
                 }
             }
         }
     }
 
+    /// Cancels the lock state poll. Safe to call when no poll is running.
     private func stopLockStatePolling() {
         lockStatePollTask?.cancel()
         lockStatePollTask = nil
@@ -265,6 +447,18 @@ class LockScreenManager: ObservableObject {
     // MARK: - Idle State Management
 
     /// Copy EXACT logic from ScreenRecordingManager
+    /// Volume feedback on the lock screen comes from macOS, for as long as the
+    /// Mac is locked. Whether the music panel is up no longer changes that, so
+    /// this only has to run when the lock state itself changes.
+    func updateNativeHUDSuppression() {
+        // Acting only on a change matters -- handing the HUD over restarts
+        // OSDUIHelper -- but the record of what has been applied belongs with
+        // the code that applies it. Kept here, it was written before a callee
+        // that can decline the request, so a dropped request still counted as
+        // applied and no later one for the same state ever retried.
+        SystemHUDManager.shared.updateNativeHUDSuppressionForLockState(isLocked: isLocked)
+    }
+
     private func updateIdleState(locked: Bool) {
         if locked {
             isLockIdle = false
@@ -274,12 +468,14 @@ class LockScreenManager: ObservableObject {
             debounceIdleTask = Task { [weak self] in
                 // Keep the lock live activity mounted until the collapse animation finishes,
                 // otherwise the content disappears before the island fully closes.
-                let idleDelay = LockScreenAnimationTimings.unlockCollapse
+                let idleDelay = LockScreenAnimationTimings.currentUnlockRemovalDelay
                 try? await Task.sleep(for: .seconds(idleDelay))
                 guard let self = self, !Task.isCancelled else { return }
                 await MainActor.run {
                     if self.lastUpdated.timeIntervalSinceNow < -idleDelay {
-                        withAnimation(.smooth(duration: 0.3)) {
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
                             self.isLockIdle = !self.isLocked
                         }
                     }
@@ -367,5 +563,29 @@ final class LockSoundPlayer {
         case unlock
 
         var resourceName: String { rawValue }
+    }
+}
+
+/// Shows or hides the SkyLight space that lock screen widgets are delegated to.
+/// Uses the same SkyLight framework as SkyLightOperator; does nothing if the
+/// symbols are missing.
+enum LockScreenWidgetSpaceVisibility {
+    private typealias SpaceListFunction = @convention(c) (Int32, CFArray) -> Int32
+
+    private static let skyLight = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/SkyLight", RTLD_NOW)
+    private static let hideSpaces: SpaceListFunction? = function(named: "SLSHideSpaces")
+    private static let showSpaces: SpaceListFunction? = function(named: "SLSShowSpaces")
+
+    private static func function(named name: String) -> SpaceListFunction? {
+        guard let skyLight, let symbol = dlsym(skyLight, name) else { return nil }
+        return unsafeBitCast(symbol, to: SpaceListFunction.self)
+    }
+
+    @MainActor
+    @discardableResult
+    static func setHidden(_ hidden: Bool) -> Bool {
+        guard let function = hidden ? hideSpaces : showSpaces else { return false }
+        let skyLightOperator = SkyLightOperator.shared
+        return function(skyLightOperator.connection, [skyLightOperator.space] as CFArray) == 0
     }
 }

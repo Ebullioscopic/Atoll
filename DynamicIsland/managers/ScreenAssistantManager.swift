@@ -22,6 +22,42 @@ import AVFoundation
 import Defaults
 import Foundation
 
+/// Builds the chat completions URL for the OpenAI provider from a user-set base URL.
+enum OpenAICompatibleEndpoint {
+    static let defaultBaseURL = "https://api.openai.com/v1"
+
+    private static let openAIHost = "api.openai.com"
+    private static let loopbackHosts: Set<String> = ["localhost", "127.0.0.1", "::1", "[::1]"]
+
+    /// Accepts a base such as `https://api.openai.com/v1` or a full `…/chat/completions` URL.
+    /// An empty value means OpenAI itself. Only https is accepted, except plain http to a
+    /// server on this Mac, so prompts and keys never cross the network unencrypted.
+    static func chatCompletionsURL(baseURL: String) -> URL? {
+        var base = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if base.isEmpty { base = defaultBaseURL }
+        while base.hasSuffix("/") { base.removeLast() }
+        if !base.hasSuffix("/chat/completions") { base += "/chat/completions" }
+
+        guard let components = URLComponents(string: base),
+              let scheme = components.scheme?.lowercased(),
+              let host = components.host?.lowercased(), !host.isEmpty else { return nil }
+        guard scheme == "https" || (scheme == "http" && loopbackHosts.contains(host)) else { return nil }
+        return components.url
+    }
+
+    /// True when requests go to OpenAI itself, the only server the saved OpenAI key is sent to.
+    static func isOpenAI(_ baseURL: String) -> Bool {
+        guard let url = chatCompletionsURL(baseURL: baseURL) else { return false }
+        return url.scheme?.lowercased() == "https" && url.host?.lowercased() == openAIHost
+    }
+
+    /// The key to send: the OpenAI key for OpenAI, otherwise only the key entered for the
+    /// custom server, so the OpenAI key is never handed to a third-party host.
+    static func apiKey(baseURL: String, openAIKey: String, customServerKey: String) -> String {
+        isOpenAI(baseURL) ? openAIKey : customServerKey
+    }
+}
+
 // Chat message model
 struct ChatMessage: Identifiable, Codable {
     let id = UUID()
@@ -66,11 +102,11 @@ struct ScreenAssistantFile: Identifiable, Codable {
         
         var displayName: String {
             switch self {
-            case .document: return "Document"
-            case .image: return "Image"
-            case .audio: return "Audio"
-            case .video: return "Video"
-            case .other: return "File"
+            case .document: return String(localized: "Document")
+            case .image: return String(localized: "Image")
+            case .audio: return String(localized: "Audio")
+            case .video: return String(localized: "Video")
+            case .other: return String(localized: "File")
             }
         }
     }
@@ -121,6 +157,9 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     private var audioRecorder: AVAudioRecorder?
     private var recordingTimer: Timer?
     private var activeRequest: URLSessionTask?
+
+    /// Provider API keys live in the Keychain, never in Defaults.
+    private let keyStore: AIKeyStoring = KeychainAIKeyStore.shared
     
     // Panel management
     private var chatMessagesPanel: ChatMessagesPanel?
@@ -372,7 +411,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         
         // Print attached files details
         for (index, file) in attachedFiles.enumerated() {
-            print("📎 ScreenAssistant: File \(index + 1): \(file.name) (\(file.type.displayName))")
+            print("📎 ScreenAssistant: File \(index + 1): \(file.name) (\(file.type.rawValue))")
         }
         
         // Clear input and files after sending
@@ -403,7 +442,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
     
     private func sendToGeminiAPI(message: String, files: [ScreenAssistantFile]) {
-        let apiKey = Defaults[.geminiApiKey]
+        let apiKey = keyStore.value(.gemini)
         guard !apiKey.isEmpty else {
             print("❌ ScreenAssistant: No Gemini API key configured")
             addAssistantMessage("Error: No Gemini API key configured. Please set your API key in model settings.")
@@ -426,8 +465,14 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
     
     private func sendToOpenAIAPI(message: String, files: [ScreenAssistantFile]) {
-        let apiKey = Defaults[.openaiApiKey]
-        guard !apiKey.isEmpty else {
+        let baseURL = Defaults[.openaiBaseURL]
+        let apiKey = OpenAICompatibleEndpoint.apiKey(
+            baseURL: baseURL,
+            openAIKey: keyStore.value(.openai),
+            customServerKey: keyStore.value(.openaiCompatible)
+        )
+        // Local OpenAI-compatible servers often need no key; OpenAI itself always does.
+        guard !apiKey.isEmpty || !OpenAICompatibleEndpoint.isOpenAI(baseURL) else {
             print("❌ ScreenAssistant: No OpenAI API key configured")
             addAssistantMessage("Error: No OpenAI API key configured. Please set your API key in model settings.")
             isLoading = false
@@ -436,11 +481,12 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         
         // Get selected model or default to gpt-4o
         let selectedModel = Defaults[.selectedAIModel] ?? AIModel(id: "gpt-4o", name: "GPT-4o", supportsThinking: false)
-        let modelId = selectedModel.id
+        let customModelId = Defaults[.openaiCustomModelID].trimmingCharacters(in: .whitespacesAndNewlines)
+        let modelId = customModelId.isEmpty ? selectedModel.id : customModelId
         
-        guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+        guard let url = OpenAICompatibleEndpoint.chatCompletionsURL(baseURL: baseURL) else {
             print("❌ ScreenAssistant: Invalid OpenAI API URL")
-            addAssistantMessage("Error: Invalid API URL")
+            addAssistantMessage("Error: Invalid API URL. Check the OpenAI base URL in model settings.")
             isLoading = false
             return
         }
@@ -449,7 +495,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
 
     private func sendToGroqAPI(message: String, files: [ScreenAssistantFile]) {
-        let apiKey = Defaults[.groqApiKey]
+        let apiKey = keyStore.value(.groq)
         guard !apiKey.isEmpty else {
             print("❌ ScreenAssistant: No Groq API key configured")
             addAssistantMessage("Error: No Groq API key configured. Please set your API key in model settings.")
@@ -483,7 +529,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
     
     private func sendToClaudeAPI(message: String, files: [ScreenAssistantFile]) {
-        let apiKey = Defaults[.claudeApiKey]
+        let apiKey = keyStore.value(.claude)
         guard !apiKey.isEmpty else {
             print("❌ ScreenAssistant: No Claude API key configured")
             addAssistantMessage("Error: No Claude API key configured. Please set your API key in model settings.")
@@ -722,7 +768,9 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if !apiKey.isEmpty {
+            request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: requestBody, options: .prettyPrinted)
@@ -988,7 +1036,7 @@ class ScreenAssistantManager: NSObject, ObservableObject {
     }
     
     private func createGeminiFilePart(for file: ScreenAssistantFile) -> [String: Any]? {
-        print("📎 ScreenAssistant: Processing file for Gemini 2.5: \(file.name) (\(file.type.displayName))")
+        print("📎 ScreenAssistant: Processing file for Gemini 2.5: \(file.name) (\(file.type.rawValue))")
         
         guard let fileURL = file.fileURL, let url = URL(string: fileURL) else {
             print("❌ ScreenAssistant: No valid URL for file \(file.name)")

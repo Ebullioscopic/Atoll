@@ -54,6 +54,14 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
 
     /// True only after a stream line explicitly identified the selected app as the now playing source.
     private var targetSessionActive = false
+    /// Diff lines omit the source. Remember when they belong to another app so
+    /// they cannot overwrite a preserved target snapshot.
+    private var competingSessionActive = false
+    private var competingSessionSource: String?
+
+    /// Reused across every stream update to avoid re-allocating a formatter
+    /// on each (1+/second) now playing payload.
+    private static let iso8601Formatter = ISO8601DateFormatter()
 
     init?(bundleIdentifier: String, controllerName: String) {
         self.targetBundleIdentifier = bundleIdentifier
@@ -132,18 +140,56 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
     }
 
     func isActive() -> Bool {
-        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == targetBundleIdentifier }
+        RunningApplicationsCache.shared.isRunning(targetBundleIdentifier)
     }
 
+    // MARK: - Favouriting
+
+    // Declared here rather than left to the protocol's defaults so subclasses
+    // can override them: the conformance is on this class, so a witness picked
+    // from an extension would be the one used no matter what a subclass says.
+
+    @MainActor
+    var canEverFavorite: Bool { false }
+
+    @MainActor
+    var supportsFavoriting: Bool { false }
+
+    @MainActor
+    var favoritingIsReadOnly: Bool { false }
+
+    func isCurrentTrackFavorited() async -> Bool? { nil }
+
+    @discardableResult
+    func setCurrentTrackFavorited(_ favorited: Bool) async -> Bool { false }
+
     func toggleShuffle() async {
-        MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
-        playbackState.isShuffled.toggle()
+        await MainActor.run {
+            MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
+            playbackState.isShuffled.toggle()
+        }
+    }
+
+    /// Openings for a subclass whose app reports shuffle and repeat somewhere
+    /// other than the Media Remote stream. `playbackState` is settable only in
+    /// this file, so a subclass cannot reach it directly.
+
+    func applyShuffleState(_ isShuffled: Bool) {
+        guard playbackState.isShuffled != isShuffled else { return }
+        playbackState.isShuffled = isShuffled
+    }
+
+    func applyRepeatMode(_ mode: RepeatMode) {
+        guard playbackState.repeatMode != mode else { return }
+        playbackState.repeatMode = mode
     }
 
     func toggleRepeat() async {
-        let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
-        playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off
-        MRMediaRemoteSetRepeatModeFunction(newRepeatMode)
+        await MainActor.run {
+            let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
+            playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off
+            MRMediaRemoteSetRepeatModeFunction(newRepeatMode)
+        }
     }
 
     private func setupNowPlayingObserver() async {
@@ -168,10 +214,8 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         let stderrPipe = Pipe()
         process.standardError = stderrPipe
         let logName = controllerName
-        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            guard !data.isEmpty,
-                  let message = String(data: data, encoding: .utf8)?
+        stderrPipe.fileHandleForReading.readUntilEOF { data in
+            guard let message = String(data: data, encoding: .utf8)?
                     .trimmingCharacters(in: .whitespacesAndNewlines),
                   !message.isEmpty
             else { return }
@@ -214,9 +258,21 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
         return state
     }
 
-    private func applyIdleBecauseDifferentSource() {
+    private func applyIdleBecauseDifferentSource() async {
         targetSessionActive = false
-        playbackState = Self.makeIdlePlaybackState(bundleIdentifier: targetBundleIdentifier)
+        competingSessionActive = true
+        competingSessionSource = nil
+        let idleState = Self.makeIdlePlaybackState(bundleIdentifier: targetBundleIdentifier)
+        await MainActor.run { [weak self] in
+            self?.playbackState = idleState
+        }
+    }
+
+    /// Subclasses may retain their state while another Media Remote client is
+    /// in front, but only when they can independently prove they are still
+    /// producing audio. The default keeps the existing strict filtering.
+    func shouldPreservePlaybackState(whenCompetingWith source: String) -> Bool {
+        false
     }
 
     private func handleAdapterUpdate(_ update: NowPlayingUpdate) async {
@@ -233,62 +289,87 @@ class FilteredNowPlayingController: ObservableObject, MediaControllerProtocol {
 
         if let source = explicitSource {
             if source != targetBundleIdentifier {
-                applyIdleBecauseDifferentSource()
+                if shouldPreservePlaybackState(whenCompetingWith: source) {
+                    competingSessionActive = true
+                    competingSessionSource = source
+                    return
+                }
+                await applyIdleBecauseDifferentSource()
                 return
             }
             targetSessionActive = true
+            competingSessionActive = false
+            competingSessionSource = nil
+        } else if competingSessionActive {
+            // Source-less lines are diffs for the most recently identified
+            // source, which is the competing app at this point. Revalidate
+            // the preserved source on each diff so a stopped TIDAL stream
+            // cannot leave stale metadata indefinitely.
+            if let source = competingSessionSource,
+               !shouldPreservePlaybackState(whenCompetingWith: source) {
+                await applyIdleBecauseDifferentSource()
+            }
+            return
         } else if !diff {
-            applyIdleBecauseDifferentSource()
+            await applyIdleBecauseDifferentSource()
             return
         } else if !targetSessionActive {
             return
         }
 
-        var newPlaybackState = PlaybackState(bundleIdentifier: targetBundleIdentifier)
+        // Merge and publish inside one main-actor transaction. Reading the
+        // baseline out here and publishing a whole snapshot later left a window
+        // where a command, WebSocket or artwork update could land on the main
+        // actor and then be overwritten by this older, fuller snapshot.
+        await MainActor.run { [weak self] in
+            guard let self else { return }
 
-        newPlaybackState.title = payload.title ?? (diff ? self.playbackState.title : "")
-        newPlaybackState.artist = payload.artist ?? (diff ? self.playbackState.artist : "")
-        newPlaybackState.album = payload.album ?? (diff ? self.playbackState.album : "")
-        newPlaybackState.duration = payload.duration ?? (diff ? self.playbackState.duration : 0)
-        newPlaybackState.currentTime = payload.elapsedTime ?? (diff ? self.playbackState.currentTime : 0)
+            var newPlaybackState = PlaybackState(bundleIdentifier: self.targetBundleIdentifier)
 
-        if let shuffleMode = payload.shuffleMode {
-            newPlaybackState.isShuffled = shuffleMode != 1
-        } else if !diff {
-            newPlaybackState.isShuffled = false
-        } else {
-            newPlaybackState.isShuffled = self.playbackState.isShuffled
+            newPlaybackState.title = payload.title ?? (diff ? self.playbackState.title : "")
+            newPlaybackState.artist = payload.artist ?? (diff ? self.playbackState.artist : "")
+            newPlaybackState.album = payload.album ?? (diff ? self.playbackState.album : "")
+            newPlaybackState.duration = payload.duration ?? (diff ? self.playbackState.duration : 0)
+            newPlaybackState.currentTime = payload.elapsedTime ?? (diff ? self.playbackState.currentTime : 0)
+
+            if let shuffleMode = payload.shuffleMode {
+                newPlaybackState.isShuffled = shuffleMode != 1
+            } else if !diff {
+                newPlaybackState.isShuffled = false
+            } else {
+                newPlaybackState.isShuffled = self.playbackState.isShuffled
+            }
+            if let repeatModeValue = payload.repeatMode {
+                newPlaybackState.repeatMode = RepeatMode(rawValue: repeatModeValue) ?? .off
+            } else if !diff {
+                newPlaybackState.repeatMode = .off
+            } else {
+                newPlaybackState.repeatMode = self.playbackState.repeatMode
+            }
+
+            if let artworkDataString = payload.artworkData {
+                newPlaybackState.artwork = Data(
+                    base64Encoded: artworkDataString.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            } else if !diff {
+                newPlaybackState.artwork = nil
+            }
+
+            if let dateString = payload.timestamp,
+               let date = Self.iso8601Formatter.date(from: dateString) {
+                newPlaybackState.lastUpdated = date
+            } else if !diff {
+                newPlaybackState.lastUpdated = Date()
+            } else {
+                newPlaybackState.lastUpdated = self.playbackState.lastUpdated
+            }
+
+            newPlaybackState.playbackRate = payload.playbackRate ?? (diff ? self.playbackState.playbackRate : 1.0)
+            newPlaybackState.isPlaying = payload.playing ?? (diff ? self.playbackState.isPlaying : false)
+            newPlaybackState.bundleIdentifier = self.targetBundleIdentifier
+
+            self.playbackState = newPlaybackState
         }
-        if let repeatModeValue = payload.repeatMode {
-            newPlaybackState.repeatMode = RepeatMode(rawValue: repeatModeValue) ?? .off
-        } else if !diff {
-            newPlaybackState.repeatMode = .off
-        } else {
-            newPlaybackState.repeatMode = self.playbackState.repeatMode
-        }
-
-        if let artworkDataString = payload.artworkData {
-            newPlaybackState.artwork = Data(
-                base64Encoded: artworkDataString.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-        } else if !diff {
-            newPlaybackState.artwork = nil
-        }
-
-        if let dateString = payload.timestamp,
-           let date = ISO8601DateFormatter().date(from: dateString) {
-            newPlaybackState.lastUpdated = date
-        } else if !diff {
-            newPlaybackState.lastUpdated = Date()
-        } else {
-            newPlaybackState.lastUpdated = self.playbackState.lastUpdated
-        }
-
-        newPlaybackState.playbackRate = payload.playbackRate ?? (diff ? self.playbackState.playbackRate : 1.0)
-        newPlaybackState.isPlaying = payload.playing ?? (diff ? self.playbackState.isPlaying : false)
-        newPlaybackState.bundleIdentifier = targetBundleIdentifier
-
-        self.playbackState = newPlaybackState
     }
 }
 
@@ -303,13 +384,27 @@ final class AmazonMusicController: FilteredNowPlayingController {
     }
 }
 
-final class CiderController: FilteredNowPlayingController {
-    static let bundleIdentifier = "sh.cider.genten.mac"
+final class NetEaseCloudMusicController: FilteredNowPlayingController {
+    static let bundleIdentifier = "com.netease.163music"
 
     init?() {
         super.init(
             bundleIdentifier: Self.bundleIdentifier,
-            controllerName: "CiderController"
+            controllerName: "NetEaseCloudMusicController"
         )
     }
 }
+
+final class QQMusicController: FilteredNowPlayingController {
+    static let bundleIdentifier = "com.tencent.QQMusicMac"
+
+    init?() {
+        super.init(
+            bundleIdentifier: Self.bundleIdentifier,
+            controllerName: "QQMusicController"
+        )
+    }
+}
+
+// CiderController now lives in CiderController.swift, where its
+// favouriting support sits alongside it.

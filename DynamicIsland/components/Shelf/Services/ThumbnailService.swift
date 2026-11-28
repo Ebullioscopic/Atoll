@@ -28,42 +28,71 @@ import UniformTypeIdentifiers
 actor ThumbnailService {
     static let shared = ThumbnailService()
 
-    private var cache: [String: NSImage] = [:]
+    private let cache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 200
+        cache.totalCostLimit = 64 * 1024 * 1024 // 64 MB
+        return cache
+    }()
+    // NSCache cannot enumerate its keys, so we track them separately to
+    // support path-based invalidation in clearCache(for:).
+    private var cacheKeys: Set<String> = []
     private var pendingRequests: [String: Task<NSImage?, Never>] = [:]
     private let thumbnailGenerator = QLThumbnailGenerator.shared
 
     private init() {}
-    
+
     func thumbnail(for url: URL, size: CGSize) async -> NSImage? {
         let cacheKey = "\(url.path)_\(size.width)x\(size.height)"
-        
-        if let cached = cache[cacheKey] {
+
+        if let cached = cache.object(forKey: cacheKey as NSString) {
             return cached
         }
-        
+
         if let pending = pendingRequests[cacheKey] {
             return await pending.value
         }
-        
+
         let task = Task<NSImage?, Never> {
             let thumbnail = await generateQuickLookThumbnail(for: url, size: size)
             if let thumbnail = thumbnail {
-                cache[cacheKey] = thumbnail
+                cache.setObject(thumbnail, forKey: cacheKey as NSString, cost: estimatedCost(of: thumbnail))
+                cacheKeys.insert(cacheKey)
+                // NSCache evicts silently, so `cacheKeys` would grow unbounded.
+                // Reconcile against the cache once it exceeds the count limit,
+                // dropping keys whose objects are already gone.
+                if cacheKeys.count > 256 {
+                    cacheKeys = cacheKeys.filter { cache.object(forKey: $0 as NSString) != nil }
+                }
             }
             pendingRequests[cacheKey] = nil
             return thumbnail
         }
-        
+
         pendingRequests[cacheKey] = task
         return await task.value
     }
-    
+
     func clearCache() {
-        cache.removeAll()
+        cache.removeAllObjects()
+        cacheKeys.removeAll()
     }
-    
+
     func clearCache(for url: URL) {
-        cache = cache.filter { !$0.key.starts(with: url.path) }
+        // Keys are "<path>_<w>x<h>"; match on the "<path>_" boundary so that
+        // invalidating /tmp/a does not also evict /tmp/ab's thumbnails.
+        let prefix = "\(url.path)_"
+        let keysToRemove = cacheKeys.filter { $0.hasPrefix(prefix) }
+        for key in keysToRemove {
+            cache.removeObject(forKey: key as NSString)
+            cacheKeys.remove(key)
+        }
+    }
+
+    /// Rough byte estimate (width * height * 4 bytes/pixel) used as the NSCache cost.
+    private func estimatedCost(of image: NSImage) -> Int {
+        let size = image.size
+        return max(1, Int(size.width * size.height * 4))
     }
     
     // MARK: - Private Methods

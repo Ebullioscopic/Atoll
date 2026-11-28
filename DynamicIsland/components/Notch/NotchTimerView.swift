@@ -43,6 +43,9 @@ struct NotchTimerView: View {
     @State private var customSeconds: Int = 0
     @State private var isSyncingCustomDuration = false
     @State private var lockedAccentColor: Color?
+    @State private var isRenamingTimer = false
+    @State private var timerNameDraft = ""
+    @FocusState private var isTimerNameFieldFocused: Bool
 
     var body: some View {
         Group {
@@ -51,12 +54,12 @@ struct NotchTimerView: View {
                     leftColumn
                     if shouldShowPresetColumn {
                         Divider()
-                            .frame(height: max(0, maxTabContentHeight - 8))
+                            .frame(height: max(0, columnsContentHeight - 8))
                             .opacity(0.2)
                         presetColumn
                     }
                 }
-                .frame(maxHeight: maxTabContentHeight, alignment: .top)
+                .frame(maxHeight: columnsContentHeight, alignment: .top)
                 .padding(.horizontal, 16)
                     .padding(.vertical, 6)
                 .transition(.opacity.combined(with: .blurReplace))
@@ -77,6 +80,7 @@ struct NotchTimerView: View {
                 lockAccentColorIfNeeded()
             } else {
                 lockedAccentColor = nil
+                isRenamingTimer = false
             }
         }
         .onChange(of: timerManager.activePresetId) { _, _ in
@@ -98,7 +102,7 @@ struct NotchTimerView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(maxHeight: maxTabContentHeight, alignment: .top)
+        .frame(maxHeight: composerContentHeight, alignment: .top)
         .padding(.bottom, 2)
     }
 
@@ -114,7 +118,7 @@ struct NotchTimerView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             } else {
                 let computedHeight = CGFloat(timerPresets.count) * 60 + 4
-                let listHeight = min(max(0, maxTabContentHeight - 16), computedHeight)
+                let listHeight = min(max(0, presetContentHeight - 16), computedHeight)
                 ZStack {
                     List {
                         ForEach(timerPresets) { preset in
@@ -146,10 +150,16 @@ struct NotchTimerView: View {
                         .frame(maxHeight: .infinity, alignment: .bottom)
                 }
                 .frame(height: listHeight)
+                .onHover { hovering in
+                    updatePresetScrollSuppression(for: hovering)
+                }
+                .onDisappear {
+                    updatePresetScrollSuppression(for: false)
+                }
             }
         }
         .frame(width: 210, alignment: .leading)
-        .frame(maxHeight: maxTabContentHeight, alignment: .top)
+        .frame(maxHeight: presetContentHeight, alignment: .top)
         .padding(.bottom, 2)
     }
 
@@ -212,15 +222,38 @@ struct NotchTimerView: View {
             let marqueeWidth = max(48, geometry.size.width - badgeWidth - spacing)
 
             HStack(alignment: .center, spacing: spacing) {
-                MarqueeText(
-                    .constant(timerDisplayName),
-                    font: .system(size: 20, weight: .semibold),
-                    nsFont: .title3,
-                    textColor: .white,
-                    minDuration: 0.2,
-                    frameWidth: marqueeWidth
-                )
-                .frame(width: marqueeWidth, height: 24, alignment: .leading)
+                if isRenamingTimer {
+                    TextField(String(localized: "Timer name"), text: $timerNameDraft)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .focused($isTimerNameFieldFocused)
+                        .onSubmit(commitTimerRename)
+                        .onExitCommand { isRenamingTimer = false }
+                        .onChange(of: isTimerNameFieldFocused) { _, focused in
+                            if !focused { commitTimerRename() }
+                        }
+                        .onChange(of: timerNameDraft) { _, newValue in
+                            if newValue.count > TimerManager.maximumNameLength {
+                                timerNameDraft = String(newValue.prefix(TimerManager.maximumNameLength))
+                            }
+                        }
+                        .frame(width: marqueeWidth, height: 24, alignment: .leading)
+                } else {
+                    MarqueeText(
+                        .constant(timerDisplayName),
+                        font: .system(size: 20, weight: .semibold),
+                        nsFont: .title3,
+                        textColor: .white,
+                        minDuration: 0.2,
+                        frameWidth: marqueeWidth
+                    )
+                    .frame(width: marqueeWidth, height: 24, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2, perform: beginTimerRename)
+                    .help(canRenameTimer ? String(localized: "Double-click to rename") : "")
+                    .accessibilityAction(named: Text("Rename")) { beginTimerRename() }
+                }
 
                 if let status {
                     statusBadge(status)
@@ -279,6 +312,26 @@ struct NotchTimerView: View {
                 .padding(.top, 6)
                 .padding(.bottom, 2)
         }
+    }
+
+    /// Only timers Atoll runs itself can be renamed; Clock app timers report their own name.
+    private var canRenameTimer: Bool {
+        timerManager.hasManualTimerRunning
+    }
+
+    private func beginTimerRename() {
+        guard canRenameTimer else { return }
+        timerNameDraft = timerManager.timerName
+        isRenamingTimer = true
+        DispatchQueue.main.async {
+            isTimerNameFieldFocused = true
+        }
+    }
+
+    private func commitTimerRename() {
+        guard isRenamingTimer else { return }
+        isRenamingTimer = false
+        timerManager.renameTimer(timerNameDraft)
     }
 
     private func togglePauseAction() {
@@ -377,9 +430,45 @@ struct NotchTimerView: View {
         max(24, vm.effectiveClosedNotchHeight)
     }
 
-    private var maxTabContentHeight: CGFloat {
-        let available = resolvedNotchHeight - headerHeight - 36
-        return max(130, available)
+    @State private var presetScrollSuppressionToken = UUID()
+    @State private var isSuppressingPresetScroll = false
+
+    /// Scrolling the preset list used to reach the notch's close gesture, which
+    /// reads an upward scroll as "close". The list is scrollable whenever the
+    /// presets are taller than the column, so three presets were enough to make
+    /// scrolling them dismiss the notch. Every other scrollable surface in the
+    /// notch already registers this -- the clipboard, notes, the terminal, the
+    /// home view and the ruler picker -- and this list was the one that did not.
+    private func updatePresetScrollSuppression(for hovering: Bool) {
+        guard hovering != isSuppressingPresetScroll else { return }
+        isSuppressingPresetScroll = hovering
+        vm.setScrollGestureSuppression(hovering, token: presetScrollSuppressionToken)
+    }
+
+    /// Height the composer on the left was laid out against: the standard open
+    /// notch, not the timer tab's larger request.
+    ///
+    /// The tab asks for 250pt, but that surplus was added for the preset list
+    /// ("Extra space for timer presets"). The composer is top-aligned above a
+    /// `Spacer`, so handing it the taller value puts the difference straight
+    /// into the gap under the card rather than into anything it draws.
+    private var composerContentHeight: CGFloat {
+        let tunedHeight = min(resolvedNotchHeight, openNotchSize.height)
+        return max(130, tunedHeight - headerHeight - 36)
+    }
+
+    /// Height the preset list may draw into: the tab's full height, which is
+    /// what the surplus exists for. The list caps itself at its own content
+    /// height, so it takes only as much of this as its presets need.
+    private var presetContentHeight: CGFloat {
+        max(130, resolvedNotchHeight - headerHeight - 36)
+    }
+
+    /// Height the two columns are laid out inside, which has to fit the taller
+    /// of them -- the preset list when it is on screen, the composer when the
+    /// running timer has replaced it.
+    private var columnsContentHeight: CGFloat {
+        shouldShowPresetColumn ? presetContentHeight : composerContentHeight
     }
 
     private func lockAccentColorIfNeeded() {

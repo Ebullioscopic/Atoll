@@ -196,6 +196,26 @@ extension EventModel {
         return nil
     }
     
+    /// Opens the calendar app chosen in Settings, on `date` where the app can
+    /// show a given day (#383). Apple Calendar has no public URL for a day, so
+    /// it is simply brought forward.
+    static func openCalendarApp(at date: Date) {
+        if Defaults[.enableThirdPartyCalendarApp] {
+            switch Defaults[.selectedCalendarApp] {
+            case .fantastical:
+                if let url = fantasticalShowURL(for: date) {
+                    NSWorkspace.shared.open(url)
+                    return
+                }
+            case .notionCalendar:
+                launchNotionCalendar()
+                return
+            }
+        }
+        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") else { return }
+        NSWorkspace.shared.openApplication(at: appURL, configuration: NSWorkspace.OpenConfiguration())
+    }
+
     /// Launches Notion Calendar app directly (fallback or general access)
     static func launchNotionCalendar() {
         // Launch via bundle identifier (Notion Calendar's bundle ID is "com.cron.electron")

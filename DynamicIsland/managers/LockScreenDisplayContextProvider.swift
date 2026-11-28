@@ -64,6 +64,9 @@ final class LockScreenDisplayContextProvider {
         return snapshot
     }
 
+    /// Returns the cached context. It is rebuilt on lock, wake, Space and
+    /// screen-parameter changes (which also fire when the main display changes),
+    /// so reads stay cheap while the lock screen widgets lay themselves out.
     func contextSnapshot() -> LockScreenDisplayContext? {
         if let context {
             return context
@@ -72,26 +75,30 @@ final class LockScreenDisplayContextProvider {
     }
 
     private func preferredLockScreen() -> NSScreen? {
-        if let builtin = NSScreen.screens.first(where: { screen in
-            guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
-                return false
-            }
-            return CGDisplayIsBuiltin(CGDirectDisplayID(number.uint32Value)) != 0
-        }) {
-            return builtin
+        let screens = NSScreen.screens
+        let displays: [(displayID: CGDirectDisplayID?, isBuiltin: Bool)] = screens.map { screen in
+            let displayID = screen.displayID
+            return (displayID: displayID, isBuiltin: displayID.map { CGDisplayIsBuiltin($0) != 0 } ?? false)
         }
+        let index = Self.preferredDisplayIndex(displays: displays, mainDisplayID: CGMainDisplayID())
+        return index.map { screens[$0] }
+    }
 
-        let mainDisplayID = CGMainDisplayID()
-        if let mainScreen = NSScreen.screens.first(where: { screen in
-            guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
-                return false
-            }
-            return CGDirectDisplayID(number.uint32Value) == mainDisplayID
-        }) {
-            return mainScreen
-        }
-
-        return NSScreen.main ?? NSScreen.screens.first
+    /// macOS draws the login window on the main display (the one with the menu
+    /// bar in System Settings > Displays), so the widgets follow it. This
+    /// supersedes the built-in-first order from ebcd2f6e, which put the widgets
+    /// on the laptop panel even when an external monitor was the main display.
+    /// The bug that commit fixed — widgets jumping between screens because
+    /// `NSScreen.main` follows keyboard focus — stays fixed: the choice never
+    /// depends on focus. In clamshell mode the built-in panel is offline and
+    /// absent from `NSScreen.screens`, so the main (external) display is used.
+    nonisolated static func preferredDisplayIndex(
+        displays: [(displayID: CGDirectDisplayID?, isBuiltin: Bool)],
+        mainDisplayID: CGDirectDisplayID
+    ) -> Int? {
+        displays.firstIndex { $0.displayID == mainDisplayID }
+            ?? displays.firstIndex { $0.isBuiltin }
+            ?? displays.indices.first
     }
 
     private func registerObservers() {

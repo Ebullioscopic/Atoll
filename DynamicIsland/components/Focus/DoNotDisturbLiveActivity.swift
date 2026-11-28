@@ -80,7 +80,7 @@ struct DoNotDisturbLiveActivity: View {
 
     private var resolvedScreen: NSScreen? {
         if let name = vm.screen,
-           let match = NSScreen.screens.first(where: { $0.localizedName == name }) {
+           let match = NSScreen.screen(named: name) {
             return match
         }
         return NSScreen.main
@@ -323,13 +323,24 @@ struct DoNotDisturbLiveActivity: View {
     // MARK: - State transitions
 
     private func handleInitialState() {
-        if manager.isDoNotDisturbActive {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                isExpanded = true
-            }
-            if focusToastMode {
-                scheduleTransientCollapse()
-            }
+        guard manager.isDoNotDisturbActive else { return }
+
+        // The view is rebuilt every time a HUD, sneak peek or other live
+        // activity hands the closed notch back. In toast mode only a toast that
+        // is still due plays; otherwise every unrelated HUD replayed it.
+        var remaining = ToastTiming.activeDisplay
+        if focusToastMode {
+            let elapsed = Date().timeIntervalSince(manager.focusToastStartedAt)
+            let remainingSeconds = Double(ToastTiming.activeDisplay) / 1000 - elapsed
+            guard remainingSeconds > 0 else { return }
+            remaining = UInt64(remainingSeconds * 1000)
+        }
+
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            isExpanded = true
+        }
+        if focusToastMode {
+            scheduleTransientCollapse(after: remaining)
         }
     }
 
@@ -463,12 +474,12 @@ struct DoNotDisturbLiveActivity: View {
         }
     }
 
-    private func scheduleTransientCollapse() {
+    private func scheduleTransientCollapse(after milliseconds: UInt64 = ToastTiming.activeDisplay) {
         collapseTask?.cancel()
         cleanupTask?.cancel()
 
         collapseTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(ToastTiming.activeDisplay))
+            try? await Task.sleep(for: .milliseconds(milliseconds))
             withAnimation(.smooth(duration: 0.32)) {
                 isExpanded = false
                 showInactiveIcon = false

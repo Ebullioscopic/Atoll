@@ -47,6 +47,12 @@ extension View {
             )
             .background(ScrollMonitor(direction: direction, threshold: threshold, action: action))
     }
+
+    /// Two-finger scrolls only, without the drag gesture `panGesture` adds, so clicks
+    /// keep going to the view's own buttons.
+    func scrollPanGesture(direction: PanDirection, threshold: CGFloat = 4, action: @escaping (CGFloat, NSEvent.Phase) -> Void) -> some View {
+        background(ScrollMonitor(direction: direction, threshold: threshold, action: action))
+    }
 }
 
 private struct ScrollMonitor: NSViewRepresentable {
@@ -120,9 +126,14 @@ private struct ScrollMonitor: NSViewRepresentable {
         private func handleScroll(_ event: NSEvent) {
             guard lastEventTimestamp != event.timestamp else { return }
             lastEventTimestamp = event.timestamp
-            guard isCursorNearObservedView(using: event) else { return }
 
-            if event.phase == .ended || event.momentumPhase == .ended {
+            // A gesture that started on the view must still end if the cursor
+            // drifted off it mid-scroll; otherwise the view keeps its in-flight
+            // gesture feedback (blur/stretch) indefinitely.
+            let isEnd = event.phase == .ended || event.phase == .cancelled || event.momentumPhase == .ended
+            guard (isEnd && active) || isCursorNearObservedView(using: event) else { return }
+
+            if isEnd {
                 if active {
                     action(accumulated.magnitude, .ended)
                 } else {
@@ -132,6 +143,18 @@ private struct ScrollMonitor: NSViewRepresentable {
                 accumulated = 0
                 return
             }
+
+            // Momentum is the tail of a flick the user has already let go of, not
+            // new input. A trackpad delivers a swipe as a run of touch events and
+            // then a run of momentum ones, and the gesture ends between the two --
+            // so the momentum was accumulating from zero against the same
+            // threshold the touch had just crossed, firing the action a second
+            // time. One swipe skipped two tracks.
+            //
+            // Discrete gestures read the touch, not the coast. The cost is that a
+            // very light flick that only used to reach the threshold once momentum
+            // carried it now needs a slightly longer swipe.
+            guard event.momentumPhase.isEmpty else { return }
 
             let s = direction.signed(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
             guard s.magnitude > noiseThreshold else { return }

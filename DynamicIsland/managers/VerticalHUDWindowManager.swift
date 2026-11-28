@@ -72,35 +72,48 @@ final class VerticalHUDWindowManager {
         guard !windows.isEmpty else { return }
         
         for (screen, window) in windows {
-            let screenFrame = screen.frame
-            let position = Defaults[.verticalHUDPosition]
-            let width = Defaults[.verticalHUDWidth]
-            let height = Defaults[.verticalHUDHeight]
-            let padding = Defaults[.verticalHUDPadding]
-            
-            // Add padding for shadow and elastic stretch
-            // We use 120px total padding (60px per side) to absolutely guarantee no clipping.
-            let shadowPadding: CGFloat = 120
-            let totalWidth = width + shadowPadding
-            let totalHeight = height + shadowPadding
-            
-            let x: CGFloat
-            if position == "left" {
-                // Left edge of HUD is at (minX + padding).
-                // Window edge = HUD Edge - half shadow padding
-                x = screenFrame.minX + padding - (shadowPadding / 2)
-            } else {
-                // Right edge of HUD is at (maxX - padding).
-                // Left edge of HUD = maxX - padding - width.
-                // Window edge = HUD Edge - half shadow padding
-                x = screenFrame.maxX - width - padding - (shadowPadding / 2)
-            }
-            
-            let y = screenFrame.midY - (totalHeight / 2)
-            let newFrame = NSRect(x: x, y: y, width: totalWidth, height: totalHeight)
-            
-            window.nsWindow.setFrame(newFrame, display: true, animate: true)
+            window.nsWindow.setFrame(frame(for: screen), display: true, animate: true)
             applyInteractivity(window)
+        }
+    }
+
+    private func frame(for screen: NSScreen) -> NSRect {
+        let screenFrame = screen.frame
+        let position = Defaults[.verticalHUDPosition]
+        let width = Defaults[.verticalHUDWidth]
+        let height = Defaults[.verticalHUDHeight]
+        let padding = Defaults[.verticalHUDPadding]
+
+        // Add padding for shadow and elastic stretch
+        // We use 120px total padding (60px per side) to absolutely guarantee no clipping.
+        let shadowPadding: CGFloat = 120
+        let totalWidth = width + shadowPadding
+        let totalHeight = height + shadowPadding
+
+        let x: CGFloat
+        if position == "left" {
+            // Left edge of HUD is at (minX + padding).
+            // Window edge = HUD Edge - half shadow padding
+            x = screenFrame.minX + padding - (shadowPadding / 2)
+        } else {
+            // Right edge of HUD is at (maxX - padding).
+            // Left edge of HUD = maxX - padding - width.
+            // Window edge = HUD Edge - half shadow padding
+            x = screenFrame.maxX - width - padding - (shadowPadding / 2)
+        }
+
+        // Center vertically
+        let y = screenFrame.midY - (totalHeight / 2)
+        return NSRect(x: x, y: y, width: totalWidth, height: totalHeight)
+    }
+
+    /// Drops windows whose display has gone. Their screens no longer get a
+    /// HUD, so keeping them only leaks a window per reconnect.
+    private func pruneDisconnectedScreens() {
+        let current = NSScreen.screens
+        for (screen, window) in windows where !current.contains(screen) {
+            window.nsWindow.orderOut(nil)
+            windows[screen] = nil
         }
     }
 
@@ -142,9 +155,18 @@ final class VerticalHUDWindowManager {
         let screens = targetScreen.map { [$0] } ?? NSScreen.screens
         guard !screens.isEmpty else { return }
         
+        pruneDisconnectedScreens()
+
         // Show on target screen(s)
         for screen in screens {
             let windowContext = ensureWindow(for: type, screen: screen)
+            // Re-place on every show: an arrangement or main-display change
+            // moves screens in global coordinates, and a window left at its old
+            // frame lands on another display, doubling that display's HUD.
+            let targetFrame = frame(for: screen)
+            if windowContext.nsWindow.frame != targetFrame {
+                windowContext.nsWindow.setFrame(targetFrame, display: false)
+            }
             updateContent(window: windowContext, type: type, value: value, icon: icon)
             
             // Ensure visible
@@ -178,30 +200,8 @@ final class VerticalHUDWindowManager {
         let osdView = VerticalHUDView(state: state)
         let hostingView = NSHostingView(rootView: osdView)
         
-        // Calculate frame
-        let screenFrame = screen.frame
-        let position = Defaults[.verticalHUDPosition]
-        let width = Defaults[.verticalHUDWidth]
-        let height = Defaults[.verticalHUDHeight]
-        let padding = Defaults[.verticalHUDPadding]
-        
-        // Add padding for shadow and elastic stretch
-        // We use 120px total padding (60px per side) to absolutely guarantee no clipping.
-        let shadowPadding: CGFloat = 120
-        let totalWidth = width + shadowPadding
-        let totalHeight = height + shadowPadding
-        
-        let x: CGFloat
-        if position == "left" {
-            x = screenFrame.minX + padding - (shadowPadding / 2)
-        } else {
-            x = screenFrame.maxX - width - padding - (shadowPadding / 2)
-        }
-        
-        // Center vertically
-        let y = screenFrame.midY - (totalHeight / 2)
-        let frame = NSRect(x: x, y: y, width: totalWidth, height: totalHeight)
-        
+        let frame = frame(for: screen)
+
         let win = NSWindow(
             contentRect: frame,
             styleMask: [.borderless, .nonactivatingPanel],

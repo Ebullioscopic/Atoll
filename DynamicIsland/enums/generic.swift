@@ -254,6 +254,21 @@ enum LockScreenWeatherTemperatureUnit: String, CaseIterable, Defaults.Serializab
 
     var id: String { rawValue }
 
+    /// What macOS itself would show.
+    ///
+    /// The Temperature control in Language & Region is set independently of the
+    /// measurement system, so this has to read the temperature preference rather
+    /// than infer it: a US-region Mac can be set to Celsius and a metric one to
+    /// Fahrenheit, and both happen. `UnitTemperature(forLocale:)` reports that
+    /// preference; deriving it from a formatted measurement follows the
+    /// measurement system instead and gets both of those cases backwards.
+    ///
+    /// Used only as the initial value: once someone picks a unit, that choice
+    /// is stored and this is not consulted again.
+    static var matchingSystemPreference: LockScreenWeatherTemperatureUnit {
+        UnitTemperature(forLocale: .current) == .fahrenheit ? .fahrenheit : .celsius
+    }
+
     var usesMetricSystem: Bool { self == .celsius }
 
     var symbol: String {
@@ -337,6 +352,27 @@ enum LockScreenReminderChipStyle: String, CaseIterable, Defaults.Serializable, I
                 return String(localized: "White")
             }
         }
+}
+
+/// Glyph contrast for lock-screen widgets sitting on the wallpaper.
+/// Dark = light glyphs (default). Light = dark glyphs for bright wallpapers.
+enum LockScreenWidgetAppearance: String, CaseIterable, Defaults.Serializable, Identifiable {
+    case dark = "Dark"
+    case light = "Light"
+
+    var id: String { rawValue }
+
+    var localizedName: String {
+        switch self {
+        case .dark:
+            return String(localized: "Dark")
+        case .light:
+            return String(localized: "Light")
+        }
+    }
+
+    /// When true, widgets use light (white) glyphs.
+    var usesLightGlyphs: Bool { self == .dark }
 }
 
 enum TimerInputStyle: String, CaseIterable, Defaults.Serializable, Identifiable {

@@ -27,11 +27,90 @@ import SwiftUI
 let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
+/// Layout budgets applied to the home view only while the side lyrics panel is active
+enum SideLyricsLayout {
+    /// Room the standard player needs for its album art and five-button control row
+    static let minimumPlayerWidth: CGFloat = 380
+
+    /// Room the webcam mirror needs to stay usable next to the player
+    static let minimumMirrorWidth: CGFloat = 220
+
+    /// Spacing between the player, mirror, and lyrics panel columns
+    static let hStackSpacing: CGFloat = 20
+
+    /// Combined home-view and notch content insets surrounding those columns
+    static let combinedInset: CGFloat = 40
+}
+
+/// Whether the home view puts the compact calendar beside the music player
+/// while the player is on screen (#920).
+func calendarShownBesidePlayer() -> Bool {
+    Defaults[.showCalendar] && Defaults[.showCalendarBesideMusicPlayer]
+}
+
+func sideLyricsRequiredNotchWidth() -> CGFloat {
+    guard Defaults[.enableLyrics],
+          !calendarShownBesidePlayer(),
+          !Defaults[.enableMinimalisticUI],
+          Defaults[.showStandardMediaControls],
+          (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+    else { return 0 }
+
+    let panelWidth = max(0, Defaults[.lyricsPanelWidth])
+    let offsetDistance = abs(Defaults[.lyricsPanelOffset])
+    let mirrorWidth = Defaults[.showMirror] && WebcamManager.shared.cameraAvailable
+        ? SideLyricsLayout.minimumMirrorWidth + SideLyricsLayout.hStackSpacing
+        : 0
+
+    // Include the home-view and notch content insets so the player receives
+    // the same usable width it had before the panel was added.
+    return SideLyricsLayout.minimumPlayerWidth
+        + panelWidth
+        + SideLyricsLayout.hStackSpacing
+        + offsetDistance
+        + mirrorWidth
+        + SideLyricsLayout.combinedInset
+}
+
+/// Columns the home view gives the calendar and the mirror when both sit
+/// beside the standard music player, so neither squeezes the player (#447, #800).
+enum HomeWidgetsLayout {
+    /// Width the compact calendar keeps beside the player and the mirror
+    static let calendarWidth: CGFloat = 215
+
+    /// Width of the square mirror preview beside the player and the calendar
+    static let mirrorWidth: CGFloat = 130
+}
+
+/// Whether the music player, the compact calendar and the mirror are all on the home view.
+/// Mirrors the conditions ``NotchHomeView`` lays them out under.
+func homeWidgetsShareHomeView() -> Bool {
+    calendarShownBesidePlayer()
+        && Defaults[.showMirror]
+        && WebcamManager.shared.cameraAvailable
+        && !Defaults[.enableMinimalisticUI]
+        && Defaults[.showStandardMediaControls]
+        && (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+}
+
+/// Width the open notch needs for the home view's columns, or 0 when the
+/// configured width always suffices.
+func homeContentRequiredNotchWidth() -> CGFloat {
+    let widgetsWidth = homeWidgetsShareHomeView()
+        ? SideLyricsLayout.minimumPlayerWidth
+            + HomeWidgetsLayout.calendarWidth
+            + HomeWidgetsLayout.mirrorWidth
+            + SideLyricsLayout.hStackSpacing * 2
+            + SideLyricsLayout.combinedInset
+        : 0
+    return max(sideLyricsRequiredNotchWidth(), widgetsWidth)
+}
+
 var openNotchSize: CGSize {
     let storedWidth = Defaults[.openNotchWidth]
     let minWidth = currentRecommendedMinimumNotchWidth()
     let maxWidth = maxAllowedNotchWidth()
-    let width = min(max(storedWidth, minWidth), maxWidth)
+    let width = min(max(storedWidth, minWidth, homeContentRequiredNotchWidth()), maxWidth)
     return .init(width: width, height: 200)
 }
 
@@ -40,7 +119,7 @@ var openNotchSize: CGSize {
 func maxAllowedNotchWidth(for screenName: String? = nil) -> CGFloat {
     let screen: NSScreen?
     if let screenName {
-        screen = NSScreen.screens.first { $0.localizedName == screenName }
+        screen = NSScreen.screen(named: screenName)
     } else {
         screen = NSScreen.main
     }
@@ -83,7 +162,7 @@ func enabledStandardTabCount() -> Int {
     }
 
     // Notes / Clipboard tab
-    if Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab) {
+    if Defaults[.enableNotes] || (ClipboardProviderManager.usesBuiltInClipboard && Defaults[.clipboardDisplayMode] == .separateTab) {
         count += 1
     }
 
@@ -95,8 +174,23 @@ func enabledStandardTabCount() -> Int {
     return count
 }
 
+/// Width the leading tab rail occupies: the icons plus the gap to the content.
+let tabRailWidth: CGFloat = 42
+
+/// Whether the open notch draws its tabs as a leading rail. Minimalistic mode
+/// has no tab bar at all, so the rail never shows there.
+func isLeadingTabRailActive() -> Bool {
+    Defaults[.tabBarPosition] == .left && !Defaults[.enableMinimalisticUI]
+}
+
 /// Returns the recommended minimum notch width for the given tab count.
 func recommendedMinimumNotchWidth(forTabCount count: Int) -> CGFloat {
+    // A rail spends height per tab rather than width, so the tab count stops
+    // driving the width. What the leading position still needs is the 640pt of
+    // content a header of up to four tabs leaves, plus the width the rail takes
+    // out of it — a constant 682pt, under the 690 and 770 a header row asks for
+    // at five and six tabs.
+    if isLeadingTabRailActive() { return 640 + tabRailWidth }
     if count >= 6 { return 770 }
     if count >= 5 { return 690 }
     return 640
@@ -122,12 +216,17 @@ func enforceMinimumNotchWidth() {
     }
 }
 private let minimalisticBaseOpenNotchSize: CGSize = .init(width: 420, height: 180)
-private let minimalisticLyricsExtraHeight: CGFloat = 40
+// 10pt top padding + 40pt lyrics content; keep in sync with MinimalisticMusicPlayerView.calculateDynamicHeight
+private let minimalisticLyricsExtraHeight: CGFloat = 50
 let minimalisticTimerCountdownTopPadding: CGFloat = 12
 let minimalisticTimerCountdownContentHeight: CGFloat = 82
 let minimalisticTimerCountdownBlockHeight: CGFloat = minimalisticTimerCountdownTopPadding + minimalisticTimerCountdownContentHeight
 let statsSecondRowContentHeight: CGFloat = 120
 let statsGridSpacingHeight: CGFloat = 12
+let statsAdditionalRowHeight: CGFloat = statsSecondRowContentHeight + statsGridSpacingHeight
+/// Height the month calendar needs to show every week row at a readable size.
+/// 6 rows at ~27pt plus the title row, weekday row and the notch's own chrome.
+let calendarFullMonthNotchHeight: CGFloat = 340
 let notchShadowPaddingStandard: CGFloat = 18
 let notchShadowPaddingMinimalistic: CGFloat = 12
 
@@ -140,7 +239,7 @@ func minimalisticOpenNotchSize(isDynamicIslandMode: Bool) -> CGSize {
         size.height = 144 // Exact height of the minimalistic music player view
     }
 
-    if Defaults[.enableLyrics] {
+    if Defaults[.enableLyrics] && !MusicManager.shared.isAdvertisement {
         size.height += minimalisticLyricsExtraHeight
     }
     
@@ -203,6 +302,86 @@ func notchTerminalBottomCornerRadii(
     return (outerBottom, max(0, outerBottom - p))
 }
 
+/// Height of the inline lyrics line shown under the artist name on the home tab.
+///
+/// The player column is laid out inside a greedy `GeometryReader`, so the lyrics
+/// line takes its space out of the gap above the transport controls instead of
+/// growing the notch. Handing that height back keeps the controls from being
+/// crowded when lyrics are on.
+let inlineLyricsLineHeight: CGFloat = 18
+
+/// Grows the open notch by one lyrics line when the home tab renders inline lyrics.
+///
+/// The extra height is applied whenever inline lyrics are enabled rather than only
+/// while a line is on screen, so the notch keeps a stable height between lyric lines.
+///
+/// Minimalistic UI is excluded: its player draws lyrics whenever they are enabled,
+/// regardless of the calendar, and sizes itself for them through its own resize
+/// publisher. Adding this line there would reserve room for a line the standard
+/// player is not drawing.
+/// Whether the home tab's calendar is the full-width ``StandaloneCalendarView``
+/// rather than the narrow ``CalendarView`` shown beside the music player. Only
+/// the standalone variant owns a month grid, and only it can spend extra height.
+///
+/// Mirrors ``NotchHomeView.shouldShowMusicPlayer``, which stays the layout's own
+/// source of truth because SwiftUI tracks its `@Default` reads for invalidation.
+func standaloneCalendarActive() -> Bool {
+    guard Defaults[.showCalendar],
+          !Defaults[.enableMinimalisticUI]
+    else {
+        return false
+    }
+
+    let playerVisible = Defaults[.showStandardMediaControls]
+        && (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+    return !playerVisible
+}
+
+func inlineLyricsAdjustedNotchSize(
+    from baseSize: CGSize,
+    isHomeTabActive: Bool
+) -> CGSize {
+    // The same conditions `sideLyricsRequiredNotchWidth` tests, for the same
+    // reason: the extra line belongs to the standard player, so it is only
+    // owed when that player is on screen to draw it. Without the last two the
+    // notch grew for a line nobody could see whenever the player was switched
+    // off, or hidden by auto-hide with nothing playing.
+    guard isHomeTabActive,
+          !Defaults[.enableMinimalisticUI],
+          Defaults[.enableLyrics],
+          calendarShownBesidePlayer(),
+          Defaults[.showStandardMediaControls],
+          (!Defaults[.autoHideInactiveNotchMediaPlayer] || MusicManager.shared.hasActiveSession)
+    else {
+        return baseSize
+    }
+
+    var adjustedSize = baseSize
+    adjustedSize.height += inlineLyricsLineHeight
+    return adjustedSize
+}
+
+/// Header height the 200pt open notch was laid out for. The open header is as
+/// tall as the closed notch, so a taller one -- a scaled ("More Space")
+/// resolution, a taller menu bar, or a custom notch height -- takes its extra
+/// height straight out of the music player below it.
+let openNotchHeaderBaselineHeight: CGFloat = 32
+
+/// Grows the open home tab by however much its header is taller than the
+/// baseline, so the player keeps the room its controls and time labels need
+/// instead of drawing one over the other. Minimalistic UI sizes its own player.
+func headerAdjustedNotchSize(
+    from baseSize: CGSize,
+    isHomeTabActive: Bool,
+    closedNotchHeight: CGFloat,
+    isMinimalistic: Bool
+) -> CGSize {
+    guard isHomeTabActive, !isMinimalistic else { return baseSize }
+    var adjustedSize = baseSize
+    adjustedSize.height += max(0, closedNotchHeight - openNotchHeaderBaselineHeight)
+    return adjustedSize
+}
+
 func statsAdjustedNotchSize(
     from baseSize: CGSize,
     isStatsTabActive: Bool,
@@ -239,6 +418,13 @@ func notchShadowPaddingValue(isMinimalistic: Bool) -> CGFloat {
     isMinimalistic ? notchShadowPaddingMinimalistic : notchShadowPaddingStandard
 }
 
+/// Room the window must leave around a closed HUD surface (battery, recording)
+/// beyond the surface itself: the notch's side insets, which are the closed
+/// bottom corner radius on each side, plus the 8pt the surface grows on hover.
+/// A window narrower than its content used to be widened by AppKit from its
+/// left edge, pushing the notch off-centre.
+let closedHUDWindowAllowance = CGSize(width: cornerRadiusInsets.closed.bottom * 2 + 8, height: 8)
+
 func addShadowPadding(to size: CGSize, isMinimalistic: Bool) -> CGSize {
     CGSize(width: size.width, height: size.height + notchShadowPaddingValue(isMinimalistic: isMinimalistic))
 }
@@ -258,7 +444,7 @@ func shouldUseDynamicIslandMode(for screenName: String?) -> Bool {
 
     var selectedScreen: NSScreen? = NSScreen.main
     if let screenName {
-        selectedScreen = NSScreen.screens.first(where: { $0.localizedName == screenName })
+        selectedScreen = NSScreen.screen(named: screenName)
     }
 
     guard let screen = selectedScreen else {
@@ -278,10 +464,20 @@ let dynamicIslandPillCornerRadiusInsets: (opened: CGFloat, closed: (standard: CG
     closed: (standard: 16, minimalistic: 16)
 )
 
+/// Extra window height past `screen.maxY` on physical-notch displays.
+let notchTopScreenBleedAmount: CGFloat = 4
+
+func notchTopScreenBleed(for screenName: String?) -> CGFloat {
+    shouldUseDynamicIslandMode(for: screenName) ? 0 : notchTopScreenBleedAmount
+}
+
 /// Vertical offset from the top screen edge for the Dynamic Island pill.
 /// Creates a visual gap so the pill floats below the menu bar, mimicking
 /// the iPhone's Dynamic Island detachment from the physical screen edge.
-let dynamicIslandTopOffset: CGFloat = 6
+/// Adjustable in General settings ("Island top margin"); 6 pt by default.
+var dynamicIslandTopOffset: CGFloat {
+    max(0, Defaults[.dynamicIslandTopMargin])
+}
 
 /// Extra horizontal padding applied OUTSIDE the pill clip shape in Dynamic
 /// Island mode so the drop shadow has room to render without being clipped
@@ -297,7 +493,7 @@ func getScreenFrame(_ screen: String? = nil) -> CGRect? {
     var selectedScreen = NSScreen.main
 
     if let customScreen = screen {
-        selectedScreen = NSScreen.screens.first(where: { $0.localizedName == customScreen })
+        selectedScreen = NSScreen.screen(named: customScreen)
     }
     
     if let screen = selectedScreen {
@@ -315,7 +511,7 @@ func getClosedNotchSize(screen: String? = nil) -> CGSize {
     var selectedScreen = NSScreen.main
 
     if let customScreen = screen {
-        selectedScreen = NSScreen.screens.first(where: { $0.localizedName == customScreen })
+        selectedScreen = NSScreen.screen(named: customScreen)
     }
 
     // Check if the screen is available

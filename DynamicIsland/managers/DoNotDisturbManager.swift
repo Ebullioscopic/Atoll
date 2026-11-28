@@ -33,6 +33,12 @@ final class DoNotDisturbManager: ObservableObject {
     // Used by the brief-toast UI to show an ON toast when the active mode switches while Focus stays enabled.
     @Published var focusToastTrigger: UUID = UUID()
 
+    /// When the current brief "On" toast started: Focus turning on or switching
+    /// mode. The indicator view is torn down whenever a HUD or another live
+    /// activity takes the closed notch and is rebuilt afterwards, so it reads
+    /// this to tell a toast that is still due from one that already played.
+    private(set) var focusToastStartedAt: Date = .distantPast
+
     /// Briefly `true` after focus turns OFF while toast mode is enabled,
     /// keeping the standalone DoNotDisturbLiveActivity mounted long enough
     /// for the "Off" dismissal animation to play out.
@@ -44,7 +50,14 @@ final class DoNotDisturbManager: ObservableObject {
     private let focusLogStream = FocusLogStream()
     private let assertionsURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/DoNotDisturb/DB/Assertions.json")
-    private var pollingSource: DispatchSourceTimer?
+    private var assertionsFileSource: DispatchSourceFileSystemObject?
+    private var assertionsDirSource: DispatchSourceFileSystemObject?
+    /// Whether the assertions watch should be running. Only touched on `pollingQueue`.
+    private var isWatchingAssertions = false
+    /// Re-arm interval used only while neither the file nor its folder can be opened
+    /// (e.g. Full Disk Access not granted yet), so granting access later still works.
+    private static let assertionsWatchRetryInterval: TimeInterval = 30
+    private var isAssertionsWatchRetryScheduled = false
     private var lastAssertionsModificationDate: Date?
     private var modeCancellable: AnyCancellable?
     /// Periodic task that verifies focus is still active when `isDoNotDisturbActive` is true.
@@ -170,6 +183,9 @@ final class DoNotDisturbManager: ObservableObject {
             // mode set by the log-stream or notification handler.
             if usableIdentifier == nil && usableName == nil {
                 if let isActive = isActive, isActive != previousActive {
+                    if isActive {
+                        self.focusToastStartedAt = Date()
+                    }
                     withAnimation(.smooth(duration: 0.25)) {
                         self.isDoNotDisturbActive = isActive
                     }
@@ -245,6 +261,7 @@ final class DoNotDisturbManager: ObservableObject {
 
             // If Focus remains active and the mode switches (e.g., DND -> Sleep), trigger an ON toast for the new mode.
             if isActive == nil, previousActive == true, identifierChanged {
+                self.focusToastStartedAt = Date()
                 self.focusToastTrigger = UUID()
             }
 
@@ -254,6 +271,9 @@ final class DoNotDisturbManager: ObservableObject {
 
             guard let isActive = isActive, shouldToggleActive else { return }
 
+            if isActive {
+                self.focusToastStartedAt = Date()
+            }
             withAnimation(.smooth(duration: 0.25)) {
                 self.isDoNotDisturbActive = isActive
             }
@@ -582,22 +602,130 @@ private extension DoNotDisturbManager {
     }
 
     func startAssertionsPolling() {
-        stopAssertionsPolling()
-        lastAssertionsModificationDate = nil
-
-        let timer = DispatchSource.makeTimerSource(queue: pollingQueue)
-        timer.schedule(deadline: .now() + .seconds(1), repeating: .seconds(2), leeway: .milliseconds(250))
-        timer.setEventHandler { [weak self] in
-            self?.pollAssertionsState()
+        // Confine all dispatch-source lifecycle to `pollingQueue`: the source event
+        // handlers run there and re-arm the watch, so start/stop must run there too —
+        // otherwise the `assertions*Source` vars race between the main thread and
+        // `pollingQueue`. Watching the file via filesystem events (instead of a 2s
+        // mtime poll) yields zero idle wake-ups; a directory-watch fallback re-arms
+        // the file watch if the file is absent or gets rotated away.
+        pollingQueue.async { [weak self] in
+            guard let self else { return }
+            self.tearDownAssertionSources()
+            self.isWatchingAssertions = true
+            self.lastAssertionsModificationDate = nil
+            self.beginWatchingAssertionsFile()
+            // Read current state immediately so an already-active Focus shows on start.
+            self.pollAssertionsState()
         }
-        timer.resume()
-        pollingSource = timer
     }
 
     func stopAssertionsPolling() {
-        pollingSource?.cancel()
-        pollingSource = nil
-        lastAssertionsModificationDate = nil
+        pollingQueue.async { [weak self] in
+            self?.isWatchingAssertions = false
+            self?.tearDownAssertionSources()
+            self?.lastAssertionsModificationDate = nil
+        }
+    }
+
+    /// Cancels and clears the assertion filesystem sources. Must run on `pollingQueue`.
+    private func tearDownAssertionSources() {
+        assertionsFileSource?.cancel()
+        assertionsFileSource = nil
+        assertionsDirSource?.cancel()
+        assertionsDirSource = nil
+    }
+
+    /// Arms a filesystem-object watch on `Assertions.json`. If the file doesn't exist yet, falls
+    /// back to watching its parent directory until the file appears. Re-arms itself when the file
+    /// is deleted or renamed (macOS rewrites this file atomically on Focus changes).
+    private func beginWatchingAssertionsFile() {
+        assertionsFileSource?.cancel()
+        assertionsFileSource = nil
+
+        let fd = open(assertionsURL.path, O_EVTONLY)
+        guard fd >= 0 else {
+            beginWatchingAssertionsDirectory()
+            return
+        }
+
+        // File is present now; drop any directory fallback watch.
+        assertionsDirSource?.cancel()
+        assertionsDirSource = nil
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .extend, .attrib, .rename, .delete],
+            queue: pollingQueue
+        )
+        source.setEventHandler { [weak self] in
+            guard let self, let current = self.assertionsFileSource else { return }
+            let flags = current.data
+            if flags.contains(.delete) || flags.contains(.rename) {
+                // File was rotated/removed: re-evaluate (defaults to inactive) then re-arm the watch.
+                self.lastAssertionsModificationDate = nil
+                self.assertionsFileDidChange()
+                self.beginWatchingAssertionsFile()
+            } else {
+                self.assertionsFileDidChange()
+            }
+        }
+        source.setCancelHandler { close(fd) }
+        assertionsFileSource = source
+        source.resume()
+    }
+
+    /// Fallback used when `Assertions.json` is missing: watch the containing directory and switch
+    /// to the file watch as soon as the file is created.
+    private func beginWatchingAssertionsDirectory() {
+        assertionsDirSource?.cancel()
+        assertionsDirSource = nil
+
+        let directoryURL = assertionsURL.deletingLastPathComponent()
+        let fd = open(directoryURL.path, O_EVTONLY)
+        guard fd >= 0 else {
+            guard !isAssertionsWatchRetryScheduled else { return }
+            isAssertionsWatchRetryScheduled = true
+            pollingQueue.asyncAfter(deadline: .now() + Self.assertionsWatchRetryInterval) { [weak self] in
+                guard let self else { return }
+                self.isAssertionsWatchRetryScheduled = false
+                guard self.isWatchingAssertions,
+                      self.assertionsFileSource == nil, self.assertionsDirSource == nil else { return }
+                self.beginWatchingAssertionsFile()
+                self.pollAssertionsState()
+            }
+            return
+        }
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .extend, .attrib, .rename, .delete],
+            queue: pollingQueue
+        )
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            guard FileManager.default.fileExists(atPath: self.assertionsURL.path) else { return }
+            self.lastAssertionsModificationDate = nil
+            self.beginWatchingAssertionsFile()
+            self.assertionsFileDidChange()
+        }
+        source.setCancelHandler { close(fd) }
+        assertionsDirSource = source
+        source.resume()
+    }
+
+    /// `pollAssertionsState` ignores the file for a few seconds after a Focus
+    /// notification. The old 2 s poll simply tried again; with file events there
+    /// may be no later event, so re-read once that window has closed.
+    private func assertionsFileDidChange() {
+        let sinceNotification = Date().timeIntervalSince(lastNotificationTimestamp)
+        guard sinceNotification < Self.notificationCooldown else {
+            pollAssertionsState()
+            return
+        }
+        pollingQueue.asyncAfter(deadline: .now() + (Self.notificationCooldown - sinceNotification)) { [weak self] in
+            guard let self, self.isWatchingAssertions else { return }
+            self.pollAssertionsState()
+        }
     }
 
     func pollAssertionsState() {
@@ -1146,18 +1274,12 @@ private final class FocusLogStream {
             process.standardOutput = pipe
             process.standardError = pipe
 
-            pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-                guard let self else { return }
-                let data = handle.availableData
-
-                if data.isEmpty {
-                    self.queue.async { [weak self] in
-                        self?.handleTermination()
-                    }
-                    return
+            pipe.fileHandleForReading.readUntilEOF(onEOF: { [weak self] in
+                self?.queue.async { [weak self] in
+                    self?.handleTermination()
                 }
-
-                self.queue.async { [weak self] in
+            }) { [weak self] data in
+                self?.queue.async { [weak self] in
                     self?.handleIncomingData(data)
                 }
             }

@@ -20,6 +20,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import Defaults
 import Foundation
 import AppKit
 import SwiftUI
@@ -33,6 +34,7 @@ final class ShelfItemViewModel: ObservableObject {
     @Published var thumbnail: NSImage?
     @Published var displayName: String = ""
     @Published var icon: NSImage?
+    @Published private(set) var metadataRevision = 0
     @Published var isDropTargeted: Bool = false
     @Published var isRenaming: Bool = false
     @Published var draftTitle: String = ""
@@ -54,18 +56,36 @@ final class ShelfItemViewModel: ObservableObject {
 
     // Single coordinated load: resolves bookmark once, populates all metadata
     func loadMetadata() async {
-        guard case .file(let bookmarkData) = item.kind else { return }
+        guard case .file(let bookmarkData) = item.kind else {
+            // Links and text have no file to resolve; without this their cell
+            // had no name and no icon and drew as empty space.
+            displayName = item.displayName
+            icon = item.icon
+            metadataRevision += 1
+            return
+        }
         let bookmark = Bookmark(data: bookmarkData)
         let (url, _) = await bookmark.resolveAsync()
         guard let resolvedURL = url else { return }
-        
-        // Load display name
+
+        // Self-healing: refresh the cached path in case the file moved since it
+        // was dropped. No-op when unchanged, so it won't churn persistence.
+        let itemID = item.id
+        let resolvedPath = resolvedURL.standardizedFileURL.path
+        await MainActor.run {
+            ShelfStateViewModel.shared.applyCachedPath(resolvedPath, for: itemID, resolvedFrom: bookmarkData)
+        }
+
+        // Publish the display name as soon as it's available; wait until the
+        // icon is ready to signal one refresh for the combined preview metadata.
         let name = await loadDisplayNameFromURL(resolvedURL)
         await MainActor.run { self.displayName = name }
-        
-        // Load icon
+
         let image = await loadIconFromURL(resolvedURL)
-        await MainActor.run { self.icon = image }
+        await MainActor.run {
+            self.icon = image
+            self.metadataRevision += 1
+        }
         
         // Load thumbnail
         if let thumbnailImage = await ThumbnailService.shared.thumbnail(for: resolvedURL, size: CGSize(width: 56, height: 56)) {
@@ -83,36 +103,41 @@ final class ShelfItemViewModel: ObservableObject {
     }
 
     private func loadDisplayNameFromURL(_ url: URL) async -> String {
-        if url.pathExtension.lowercased() == "json" && url.path.contains("TextBlocks") {
-            do {
-                let data = try Data(contentsOf: url)
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                struct TextBlockData: Codable {
-                    let content: String
-                    let title: String?
-                    var displayTitle: String {
-                        if let title = title, !title.isEmpty { return title }
-                        let firstLine = content.components(separatedBy: .newlines).first ?? content
-                        if firstLine.count > 50 { return String(firstLine.prefix(47)) + "..." }
-                        return firstLine
+        // This view model is main-actor isolated. `async` alone does not move
+        // synchronous file reads off that actor, so keep metadata I/O on a
+        // utility worker (especially important for large or remote files).
+        return await Task.detached(priority: .utility) { [url] in
+            if url.pathExtension.lowercased() == "json" && url.path.contains("TextBlocks") {
+                do {
+                    let data = try Data(contentsOf: url)
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    struct TextBlockData: Codable {
+                        let content: String
+                        let title: String?
+                        var displayTitle: String {
+                            if let title = title, !title.isEmpty { return title }
+                            let firstLine = content.components(separatedBy: .newlines).first ?? content
+                            if firstLine.count > 50 { return String(firstLine.prefix(47)) + "..." }
+                            return firstLine
+                        }
                     }
-                }
-                if let textData = try? decoder.decode(TextBlockData.self, from: data) {
-                    return textData.displayTitle
-                }
-            } catch { /* fall through */ }
-        } else if url.pathExtension.lowercased() == "webloc" && url.path.contains("WebLocs") {
-            do {
-                let data = try Data(contentsOf: url)
-                if let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
-                   let urlString = plist["URL"] as? String {
-                    let title = plist["Title"] as? String
-                    return title ?? urlString
-                }
-            } catch { /* fall through */ }
-        }
-        return (try? url.resourceValues(forKeys: [.localizedNameKey]).localizedName) ?? url.lastPathComponent
+                    if let textData = try? decoder.decode(TextBlockData.self, from: data) {
+                        return textData.displayTitle
+                    }
+                } catch { /* fall through */ }
+            } else if url.pathExtension.lowercased() == "webloc" && url.path.contains("WebLocs") {
+                do {
+                    let data = try Data(contentsOf: url)
+                    if let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                       let urlString = plist["URL"] as? String {
+                        let title = plist["Title"] as? String
+                        return title ?? urlString
+                    }
+                } catch { /* fall through */ }
+            }
+            return (try? url.resourceValues(forKeys: [.localizedNameKey]).localizedName) ?? url.lastPathComponent
+        }.value
     }
 
     func loadIcon() async {
@@ -125,7 +150,11 @@ final class ShelfItemViewModel: ObservableObject {
     }
 
     private func loadIconFromURL(_ url: URL) async -> NSImage {
-        return NSWorkspace.shared.icon(forFile: url.path)
+        // Mirror ShelfItem.loadIcon(): LaunchServices can do disk work while
+        // resolving an icon, so don't perform it on the UI actor.
+        return await Task.detached(priority: .utility) { [path = url.path] in
+            NSWorkspace.shared.icon(forFile: path)
+        }.value
     }
 
     // Async version to resolve file URL without blocking main thread
@@ -229,9 +258,50 @@ final class ShelfItemViewModel: ObservableObject {
         if event.clickCount == 2 { handleDoubleClick() }
     }
 
+    /// Best-effort content type for the conversion matrix, falling back to the
+    /// path extension when the file has no recorded type.
+    static func contentType(of url: URL) -> UTType {
+        if let type = (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType {
+            return type
+        }
+        return UTType(filenameExtension: url.pathExtension) ?? .data
+    }
+
     func handleRightClick(event: NSEvent, view: NSView) {
         if !selection.isSelected(item.id) { selection.selectSingle(item) }
         presentContextMenu(event: event, in: view)
+    }
+
+    /// Converts the selected file and puts the result on the Shelf. The source
+    /// file is never touched: on success the converted copy is added and the
+    /// original item is dropped from the Shelf only when the user asked for a
+    /// replacement.
+    func performConversion(_ request: ShelfConversionRequest) {
+        Task {
+            do {
+                // Detached so decoding and encoding never run on the main actor;
+                // only the AppKit steps inside the service hop back to it.
+                let converted = try await Task.detached(priority: .userInitiated) {
+                    try await request.sourceURL.accessSecurityScopedResource { url in
+                        try await ShelfConversionService.convert(url, to: request.target)
+                    }
+                }.value
+                guard let bookmark = try? Bookmark(url: converted) else {
+                    throw ShelfConversionError.writeFailed
+                }
+                let newItem = ShelfItem(kind: .file(bookmark: bookmark.data), isTemporary: true)
+                ShelfStateViewModel.shared.add([newItem])
+                if Defaults[.shelfConversionReplacesOriginalItem] {
+                    ShelfActionService.remove(item)
+                }
+            } catch {
+                Logger.log(
+                    "Shelf conversion to \(request.target.title) failed: \(error.localizedDescription)",
+                    category: .error
+                )
+                NSAlert.popError(error)
+            }
+        }
     }
 
     func handleDoubleClick() {
@@ -330,7 +400,9 @@ final class ShelfItemViewModel: ObservableObject {
         let menu = NSMenu()
 
         func addMenuItem(title: String) {
-            let mi = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            let mi = NSMenuItem(title: NSLocalizedString(title, comment: ""), action: nil, keyEquivalent: "")
+            // Dispatch keys off the identifier so localized titles cannot break it.
+            mi.identifier = NSUserInterfaceItemIdentifier(title)
             menu.addItem(mi)
         }
 
@@ -353,7 +425,7 @@ final class ShelfItemViewModel: ObservableObject {
         }
 
         if !selectedOpenableURLs.isEmpty {
-            let openWith = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
+            let openWith = NSMenuItem(title: String(localized: "Open With"), action: nil, keyEquivalent: "")
             let submenu = NSMenu()
 
             // Choose a representative URL to compute apps (prefer current item if not a folder)
@@ -378,7 +450,7 @@ final class ShelfItemViewModel: ObservableObject {
             let defaultApp = defaultAppURL()
 
             if openWithApps.isEmpty {
-                let noApps = NSMenuItem(title: "No Compatible Apps Found", action: nil, keyEquivalent: "")
+                let noApps = NSMenuItem(title: String(localized: "No Compatible Apps Found"), action: nil, keyEquivalent: "")
                 noApps.isEnabled = false
                 submenu.addItem(noApps)
             } else {
@@ -413,7 +485,7 @@ final class ShelfItemViewModel: ObservableObject {
             }
 
             submenu.addItem(NSMenuItem.separator())
-            let other = NSMenuItem(title: "Other…", action: nil, keyEquivalent: "")
+            let other = NSMenuItem(title: String(localized: "Other…"), action: nil, keyEquivalent: "")
             other.representedObject = "__OTHER__"
             submenu.addItem(other)
 
@@ -425,11 +497,13 @@ final class ShelfItemViewModel: ObservableObject {
         // Allow Quick Look for files and link URLs
         if !selectedFileURLs.isEmpty || !selectedLinkURLs.isEmpty {
             // Add Quick Look menu item
-            let quickLookItem = NSMenuItem(title: "Quick Look", action: nil, keyEquivalent: "")
+            let quickLookItem = NSMenuItem(title: String(localized: "Quick Look"), action: nil, keyEquivalent: "")
+            quickLookItem.identifier = NSUserInterfaceItemIdentifier("Quick Look")
             menu.addItem(quickLookItem)
             
             // Add Slideshow as alternate menu item (shown when Option key is held)
-            let slideshowItem = NSMenuItem(title: "Quick Look", action: nil, keyEquivalent: "")
+            let slideshowItem = NSMenuItem(title: String(localized: "Quick Look"), action: nil, keyEquivalent: "")
+            slideshowItem.identifier = NSUserInterfaceItemIdentifier("Quick Look")
             slideshowItem.isAlternate = true
             slideshowItem.keyEquivalentModifierMask = [.option]
             menu.addItem(slideshowItem)
@@ -443,23 +517,26 @@ final class ShelfItemViewModel: ObservableObject {
         if !imageURLs.isEmpty {
             menu.addItem(NSMenuItem.separator())
 
-            let imageActions = NSMenuItem(title: "Image Actions", action: nil, keyEquivalent: "")
+            let imageActions = NSMenuItem(title: String(localized: "Image Actions"), action: nil, keyEquivalent: "")
             let imageSubmenu = NSMenu()
 
             // Remove Background - only for single images
             if imageURLs.count == 1 {
-                let removeBg = NSMenuItem(title: "Remove Background", action: nil, keyEquivalent: "")
+                let removeBg = NSMenuItem(title: String(localized: "Remove Background"), action: nil, keyEquivalent: "")
+                removeBg.identifier = NSUserInterfaceItemIdentifier("Remove Background")
                 imageSubmenu.addItem(removeBg)
             }
 
             // Convert Image - only for single images
             if imageURLs.count == 1 {
-                let convertItem = NSMenuItem(title: "Convert Image…", action: nil, keyEquivalent: "")
+                let convertItem = NSMenuItem(title: String(localized: "Convert Image…"), action: nil, keyEquivalent: "")
+                convertItem.identifier = NSUserInterfaceItemIdentifier("Convert Image…")
                 imageSubmenu.addItem(convertItem)
             }
 
             // Create PDF - for one or more images
-            let createPDF = NSMenuItem(title: "Create PDF", action: nil, keyEquivalent: "")
+            let createPDF = NSMenuItem(title: String(localized: "Create PDF"), action: nil, keyEquivalent: "")
+            createPDF.identifier = NSUserInterfaceItemIdentifier("Create PDF")
             imageSubmenu.addItem(createPDF)
 
             imageActions.submenu = imageSubmenu
@@ -467,9 +544,34 @@ final class ShelfItemViewModel: ObservableObject {
             menu.addItem(NSMenuItem.separator())
         }
 
+        // Add a "Convert To" submenu whose contents come from the source file's
+        // own type, so a conversion that would fail is never offered. Single file
+        // only; link and text items have nothing to convert.
+        if Defaults[.enableShelfConversion],
+           selectedItems.count == 1,
+           case .file = item.kind,
+           let sourceURL = selectedFileURLs.first {
+            let targets = ShelfConversionMatrix.targets(for: Self.contentType(of: sourceURL))
+            if !targets.isEmpty {
+                let convertTo = NSMenuItem(title: "Convert To", action: nil, keyEquivalent: "")
+                let convertSubmenu = NSMenu()
+                for target in targets {
+                    let entry = NSMenuItem(title: target.title, action: nil, keyEquivalent: "")
+                    // Carried on the item rather than matched by title, because these
+                    // titles are data and the handler's title switch is not.
+                    entry.representedObject = ShelfConversionRequest(sourceURL: sourceURL, target: target)
+                    convertSubmenu.addItem(entry)
+                }
+                convertTo.submenu = convertSubmenu
+                menu.addItem(convertTo)
+                menu.addItem(NSMenuItem.separator())
+            }
+        }
+
         // Add compression option for files/folders (single or multiple)
         if !selectedFileURLs.isEmpty {
-            let compressItem = NSMenuItem(title: "Compress", action: nil, keyEquivalent: "")
+            let compressItem = NSMenuItem(title: String(localized: "Compress"), action: nil, keyEquivalent: "")
+            compressItem.identifier = NSUserInterfaceItemIdentifier("Compress")
             menu.addItem(compressItem)
         }
 
@@ -479,7 +581,8 @@ final class ShelfItemViewModel: ObservableObject {
         addMenuItem(title: "Copy")
         // If there are file URLs, add "Copy Path" as an alternate menu item (Option key)
         if !selectedFileURLs.isEmpty {
-            let copyPathItem = NSMenuItem(title: "Copy Path", action: nil, keyEquivalent: "")
+            let copyPathItem = NSMenuItem(title: String(localized: "Copy Path"), action: nil, keyEquivalent: "")
+            copyPathItem.identifier = NSUserInterfaceItemIdentifier("Copy Path")
             copyPathItem.isAlternate = true
             copyPathItem.keyEquivalentModifierMask = [.option]
             menu.addItem(copyPathItem)
@@ -531,10 +634,16 @@ final class ShelfItemViewModel: ObservableObject {
         }
 
         @MainActor @objc func handle(_ sender: NSMenuItem) {
-            let title = sender.title
+            // Menu titles are localized; the identifier carries the stable action key.
+            let title = sender.identifier?.rawValue ?? sender.title
 
             if let marker = sender.representedObject as? String, marker == "__OTHER__" {
                 openWithPanel()
+                return
+            }
+
+            if let request = sender.representedObject as? ShelfConversionRequest {
+                viewModel.performConversion(request)
                 return
             }
 
@@ -693,7 +802,11 @@ final class ShelfItemViewModel: ObservableObject {
                             await TemporaryFileStorageService.shared.createZip(from: urls)
                         }) {
                             if let bookmark = try? Bookmark(url: zipTempURL) {
-                                let newItem = ShelfItem(kind: .file(bookmark: bookmark.data), isTemporary: true)
+                                let newItem = ShelfItem(
+                                    kind: .file(bookmark: bookmark.data),
+                                    isTemporary: true,
+                                    cachedPath: zipTempURL.standardizedFileURL.path
+                                )
                                 ShelfStateViewModel.shared.add([newItem])
                             } else {
                                 // Fallback: reveal the temporary file in Finder
@@ -729,9 +842,9 @@ final class ShelfItemViewModel: ObservableObject {
             guard let fileURL = targetURL else { return }
 
             let panel = NSOpenPanel()
-            panel.title = "Choose Application"
-            panel.message = "Choose an application to open the document \"\(item.displayName)\"."
-            panel.prompt = "Open"
+            panel.title = String(localized: "Choose Application")
+            panel.message = String(localized: "Choose an application to open the document \"\(item.displayName)\".")
+            panel.prompt = String(localized: "Open")
             panel.allowsMultipleSelection = false
             panel.canChooseFiles = true
             panel.canChooseDirectories = false
@@ -784,20 +897,23 @@ final class ShelfItemViewModel: ObservableObject {
             let chooserDelegate = AppChooserDelegate(recommended: recommendedApps)
             panel.delegate = chooserDelegate
 
-            let enableLabel = NSTextField(labelWithString: "Enable:")
+            let enableLabel = NSTextField(labelWithString: String(localized: "Enable:"))
             enableLabel.font = .systemFont(ofSize: NSFont.systemFontSize)
             enableLabel.alignment = .natural
             enableLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
             
             let popup = NSPopUpButton(frame: .zero, pullsDown: false)
-            popup.addItems(withTitles: ["Recommended Applications", "All Applications"])
+            popup.addItems(withTitles: [
+                String(localized: "Recommended Applications"),
+                String(localized: "All Applications"),
+            ])
             popup.font = .systemFont(ofSize: NSFont.systemFontSize)
             popup.selectItem(at: 0)
             
             popup.setContentHuggingPriority(.defaultLow, for: .horizontal)
             popup.widthAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
             
-            let alwaysCheckbox = NSButton(checkboxWithTitle: "Always Open With", target: nil, action: nil)
+            let alwaysCheckbox = NSButton(checkboxWithTitle: String(localized: "Always Open With"), target: nil, action: nil)
             alwaysCheckbox.font = .systemFont(ofSize: NSFont.systemFontSize)
             alwaysCheckbox.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
@@ -887,8 +1003,8 @@ final class ShelfItemViewModel: ObservableObject {
                     let didStart = fileURL.startAccessingSecurityScopedResource()
 
                     let savePanel = NSSavePanel()
-                    savePanel.title = "Rename File"
-                    savePanel.prompt = "Rename"
+                    savePanel.title = String(localized: "Rename File")
+                    savePanel.prompt = String(localized: "Rename")
                     savePanel.nameFieldStringValue = fileURL.lastPathComponent
                     savePanel.directoryURL = fileURL.deletingLastPathComponent()
                     savePanel.begin { response in
@@ -900,7 +1016,11 @@ final class ShelfItemViewModel: ObservableObject {
                                     try FileManager.default.moveItem(at: fileURL, to: newURL)
 
                                     if let newBookmark = try? Bookmark(url: newURL) {
-                                        ShelfStateViewModel.shared.updateBookmark(for: item, bookmark: newBookmark.data)
+                                        ShelfStateViewModel.shared.updateBookmark(
+                                            for: item,
+                                            bookmark: newBookmark.data,
+                                            path: newURL.standardizedFileURL.path
+                                        )
                                     }
                                 } catch {
                                     print("❌ Failed to rename file: \(error.localizedDescription)")
@@ -940,7 +1060,7 @@ final class ShelfItemViewModel: ObservableObject {
                     }
                 } catch {
                     print("❌ Failed to remove background: \(error.localizedDescription)")
-                    await showErrorAlert(title: "Background Removal Failed", message: error.localizedDescription)
+                    await showErrorAlert(title: String(localized: "Background Removal Failed"), message: error.localizedDescription)
                 }
             }
         }
@@ -970,7 +1090,7 @@ final class ShelfItemViewModel: ObservableObject {
                     }
                 } catch {
                     print("❌ Failed to create PDF: \(error.localizedDescription)")
-                    await showErrorAlert(title: "PDF Creation Failed", message: error.localizedDescription)
+                    await showErrorAlert(title: String(localized: "PDF Creation Failed"), message: error.localizedDescription)
                 }
             }
         }
@@ -984,17 +1104,17 @@ final class ShelfItemViewModel: ObservableObject {
             
             // Create and show conversion options dialog with better layout
             let alert = NSAlert()
-            alert.messageText = "Convert Image"
+            alert.messageText = String(localized: "Convert Image")
             alert.alertStyle = .informational
-            alert.addButton(withTitle: "Convert")
-            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: String(localized: "Convert"))
+            alert.addButton(withTitle: String(localized: "Cancel"))
             
             // Create accessory view with better spacing and organization
             let accessoryView = NSView(frame: NSRect(x: 0, y: 0, width: 380, height: 180))
             accessoryView.wantsLayer = true
             
             // MARK: Format Row
-            let formatLabel = NSTextField(labelWithString: "Format:")
+            let formatLabel = NSTextField(labelWithString: String(localized: "Format:"))
             formatLabel.frame = NSRect(x: 0, y: 145, width: 100, height: 20)
             formatLabel.font = .systemFont(ofSize: 12, weight: .medium)
             accessoryView.addSubview(formatLabel)
@@ -1006,26 +1126,32 @@ final class ShelfItemViewModel: ObservableObject {
             accessoryView.addSubview(formatPopup)
             
             // MARK: Image Size Row
-            let imageSizeLabel = NSTextField(labelWithString: "Image Size:")
+            let imageSizeLabel = NSTextField(labelWithString: String(localized: "Image Size:"))
             imageSizeLabel.frame = NSRect(x: 0, y: 105, width: 100, height: 20)
             imageSizeLabel.font = .systemFont(ofSize: 12, weight: .medium)
             accessoryView.addSubview(imageSizeLabel)
             
             let imageSizePopup = NSPopUpButton(frame: NSRect(x: 120, y: 100, width: 160, height: 28))
-            imageSizePopup.addItems(withTitles: ["Actual Size", "Large", "Medium", "Small", "Custom..."])
+            imageSizePopup.addItems(withTitles: [
+                String(localized: "Actual Size"),
+                String(localized: "Large"),
+                String(localized: "Medium"),
+                String(localized: "Small"),
+                String(localized: "Custom..."),
+            ])
             imageSizePopup.selectItem(at: 0)
             imageSizePopup.font = .systemFont(ofSize: 12)
             accessoryView.addSubview(imageSizePopup)
             
             // Custom size field (initially hidden)
             let customSizeField = NSTextField(frame: NSRect(x: 285, y: 103, width: 85, height: 22))
-            customSizeField.placeholderString = "e.g., 1920"
+            customSizeField.placeholderString = String(localized: "e.g., 1920")
             customSizeField.font = .systemFont(ofSize: 12)
             customSizeField.isHidden = true
             accessoryView.addSubview(customSizeField)
             
             // MARK: Preserve Metadata Checkbox
-            let metadataCheckbox = NSButton(checkboxWithTitle: "Preserve Metadata", target: nil, action: nil)
+            let metadataCheckbox = NSButton(checkboxWithTitle: String(localized: "Preserve Metadata"), target: nil, action: nil)
             metadataCheckbox.frame = NSRect(x: 120, y: 65, width: 200, height: 20)
             metadataCheckbox.font = .systemFont(ofSize: 12)
             metadataCheckbox.state = .on
@@ -1041,7 +1167,7 @@ final class ShelfItemViewModel: ObservableObject {
             let qualityRow = NSView(frame: NSRect(x: 0, y: 15, width: 380, height: 30))
             qualityRow.wantsLayer = true
             
-            let qualityLabel = NSTextField(labelWithString: "Compression:")
+            let qualityLabel = NSTextField(labelWithString: String(localized: "Compression:"))
             qualityLabel.frame = NSRect(x: 0, y: 7, width: 100, height: 20)
             qualityLabel.font = .systemFont(ofSize: 12, weight: .medium)
             qualityRow.addSubview(qualityLabel)
@@ -1178,7 +1304,7 @@ final class ShelfItemViewModel: ObservableObject {
                         }
                     } catch {
                         print("❌ Failed to convert image: \(error.localizedDescription)")
-                        showErrorAlert(title: "Image Conversion Failed", message: error.localizedDescription)
+                        showErrorAlert(title: String(localized: "Image Conversion Failed"), message: error.localizedDescription)
                     }
                 }
             }
@@ -1190,7 +1316,7 @@ final class ShelfItemViewModel: ObservableObject {
             alert.messageText = title
             alert.informativeText = message
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: String(localized: "OK"))
             alert.runModal()
         }
     }
