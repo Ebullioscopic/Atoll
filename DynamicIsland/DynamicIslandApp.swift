@@ -612,7 +612,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             from: baseSize,
             view: coordinator.currentView,
             isNotchOpen: isAnyNotchOpen,
-            statsSecondRowProgress: coordinator.statsSecondRowExpansion
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion,
+            // One size serves every window, so make room for the tallest header.
+            closedNotchHeight: ([vm] + Array(viewModels.values)).map(\.effectiveClosedNotchHeight).max() ?? 0
         )
 
         let result = addShadowPadding(

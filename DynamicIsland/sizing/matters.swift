@@ -321,6 +321,27 @@ func inlineLyricsAdjustedNotchSize(
     return adjustedSize
 }
 
+/// Header height the 200pt open notch was laid out for. The open header is as
+/// tall as the closed notch, so a taller one -- a scaled ("More Space")
+/// resolution, a taller menu bar, or a custom notch height -- takes its extra
+/// height straight out of the music player below it.
+let openNotchHeaderBaselineHeight: CGFloat = 32
+
+/// Grows the open home tab by however much its header is taller than the
+/// baseline, so the player keeps the room its controls and time labels need
+/// instead of drawing one over the other. Minimalistic UI sizes its own player.
+func headerAdjustedNotchSize(
+    from baseSize: CGSize,
+    isHomeTabActive: Bool,
+    closedNotchHeight: CGFloat,
+    isMinimalistic: Bool
+) -> CGSize {
+    guard isHomeTabActive, !isMinimalistic else { return baseSize }
+    var adjustedSize = baseSize
+    adjustedSize.height += max(0, closedNotchHeight - openNotchHeaderBaselineHeight)
+    return adjustedSize
+}
+
 func statsAdjustedNotchSize(
     from baseSize: CGSize,
     isStatsTabActive: Bool,

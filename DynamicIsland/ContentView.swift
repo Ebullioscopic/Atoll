@@ -191,7 +191,8 @@ struct ContentView: View {
             from: baseSize,
             view: coordinator.currentView,
             isNotchOpen: vm.notchState == .open,
-            statsSecondRowProgress: coordinator.statsSecondRowExpansion
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion,
+            closedNotchHeight: vm.effectiveClosedNotchHeight
         )
     }
     

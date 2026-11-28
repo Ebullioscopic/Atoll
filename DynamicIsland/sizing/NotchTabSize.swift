@@ -47,7 +47,8 @@ func notchTabContentSize(
     from baseSize: CGSize,
     view: NotchViews,
     isNotchOpen: Bool,
-    statsSecondRowProgress: CGFloat
+    statsSecondRowProgress: CGFloat,
+    closedNotchHeight: CGFloat = 0
 ) -> CGSize {
     var size = baseSize
 
@@ -103,6 +104,12 @@ func notchTabContentSize(
     size = inlineLyricsAdjustedNotchSize(
         from: size,
         isHomeTabActive: view == .home && isNotchOpen
+    )
+    size = headerAdjustedNotchSize(
+        from: size,
+        isHomeTabActive: view == .home && isNotchOpen,
+        closedNotchHeight: closedNotchHeight,
+        isMinimalistic: Defaults[.enableMinimalisticUI]
     )
 
     return statsAdjustedNotchSize(
