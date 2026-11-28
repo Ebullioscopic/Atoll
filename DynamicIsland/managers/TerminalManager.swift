@@ -18,6 +18,7 @@
  */
 
 import AppKit
+import Combine
 import Foundation
 import SwiftUI
 import SwiftTerm
@@ -199,7 +200,46 @@ class TerminalManager: ObservableObject {
         return v
     }()
 
-    private init() {}
+    /// A command the user chose to leave by switching tabs while it ran; the
+    /// notch stops opening to the terminal for it (see `shouldOpenToTerminal`).
+    private var dismissedCommandProcessGroup: pid_t?
+    private var cancellables = Set<AnyCancellable>()
+
+    private init() {
+        DynamicIslandViewCoordinator.shared.$currentView
+            .removeDuplicates()
+            .scan((previous: NotchViews?.none, current: NotchViews?.none)) { ($0.current, $1) }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] change in
+                guard let self, change.previous == .terminal, change.current != .terminal else { return }
+                self.dismissedCommandProcessGroup = self.foregroundCommandProcessGroup
+            }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - Running command
+
+    /// The process group in the terminal's foreground when it is not the shell
+    /// itself, i.e. a command started from the prompt is still running. `nil` at
+    /// the prompt or when no shell is running. A single `tcgetpgrp` on the pty,
+    /// read only when asked — nothing polls.
+    var foregroundCommandProcessGroup: pid_t? {
+        guard isProcessRunning, let process = terminalView?.process else { return nil }
+        let fd = process.childfd
+        let shell = process.shellPid
+        guard fd >= 0, shell > 0 else { return nil }
+        let group = tcgetpgrp(fd)
+        guard group > 0, group != shell else { return nil }
+        return group
+    }
+
+    /// Whether the notch should open on the terminal tab: the setting is on and
+    /// a command is running that the user has not already switched away from.
+    func shouldOpenToTerminal() -> Bool {
+        guard Defaults[.terminalOpenWhileCommandRuns], Defaults[.enableTerminalFeature],
+              let group = foregroundCommandProcessGroup else { return false }
+        return group != dismissedCommandProcessGroup
+    }
 
     // MARK: - Lifecycle
 

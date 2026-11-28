@@ -9840,6 +9840,16 @@ struct TerminalSettings: View {
                         }
                     }
                     .settingsHighlight(id: highlightID("Keep terminal open"))
+
+                    Defaults.Toggle(key: .terminalOpenWhileCommandRuns) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Open to terminal while a command runs")
+                            Text("The notch opens on the terminal while a command is running in it, until the command finishes or you switch to another tab.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .settingsHighlight(id: highlightID("Open to terminal while a command runs"))
                 }
             } header: {
                 Text("General")

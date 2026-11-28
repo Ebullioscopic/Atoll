@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Open to the terminal while a command runs**: an option in Terminal settings opens the notch on the terminal tab while a command is running in it, until the command finishes or you switch to another tab. Off by default. (#604)
 - **Free Download Manager downloads**: the download live activity now also recognises Free Download Manager's `.fdmdownload` temporary files in your Downloads folder. (#321)
 - **Back up and restore settings**: General settings can export your Atoll settings to a JSON file and import them again, on the same Mac or another one. API keys, sign-ins, clipboard history, notes and other private or device-specific data are never included, and Atoll offers to relaunch after an import. (#885)
 - **GitHub Copilot usage monitor**: an optional LLM Usage card shows your Copilot account quotas (premium requests, chat, completions) with consumed percentage, remaining allowance, plan and reset date, for GitHub.com and data-residency `ghe.com` tenants. The token is stored in the Keychain and removed when the provider is turned off. It reads GitHub's undocumented `copilot_internal/user` endpoint, which may change. Off by default. (#940)

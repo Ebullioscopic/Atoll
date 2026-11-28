@@ -453,10 +453,15 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
     func open(target: NotchViews? = nil) {
         // Chosen before sizing, so the notch opens at the height of that tab.
+        var openedToRunningCommand = false
         if let target {
             coordinator.currentView = target
         } else if notchState == .closed {
             coordinator.selectOpenDestination()
+            if !Defaults[.enableMinimalisticUI], TerminalManager.shared.shouldOpenToTerminal() {
+                coordinator.currentView = .terminal
+                openedToRunningCommand = true
+            }
         }
         let targetSize = calculateDynamicNotchSize()
 
@@ -482,7 +487,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
         // Force music information update when notch is opened
         MusicManager.shared.forceUpdate()
-        if target == nil && !coordinator.selectedOpenDestination.isFixed {
+        if target == nil && !coordinator.selectedOpenDestination.isFixed && !openedToRunningCommand {
             focusClipboardTabIfNeeded()
         }
     }
