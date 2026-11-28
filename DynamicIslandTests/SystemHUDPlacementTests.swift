@@ -90,3 +90,32 @@ final class VolumeAdjustAccumulatorTests: XCTestCase {
         XCTAssertTrue(accumulator.add(0.1))
     }
 }
+
+/// OSDUIHelper is frozen only when this app has a HUD to show instead (#908).
+final class NativeHUDSuppressionTests: XCTestCase {
+    func testLeavesTheNativeHUDAloneWhenNoChannelIsHandled() {
+        XCTAssertFalse(SystemHUDManager.shouldSuppressNativeHUD(
+            volume: false, brightness: false, backlight: false, thirdPartyDDCActive: false
+        ))
+    }
+
+    func testSuppressesWhenAnyChannelIsHandled() {
+        XCTAssertTrue(SystemHUDManager.shouldSuppressNativeHUD(
+            volume: true, brightness: false, backlight: false, thirdPartyDDCActive: false
+        ))
+        XCTAssertTrue(SystemHUDManager.shouldSuppressNativeHUD(
+            volume: false, brightness: true, backlight: false, thirdPartyDDCActive: false
+        ))
+        XCTAssertTrue(SystemHUDManager.shouldSuppressNativeHUD(
+            volume: false, brightness: false, backlight: true, thirdPartyDDCActive: false
+        ))
+    }
+
+    /// A DDC app drives this app's HUD through its own notifications, with
+    /// every channel flag cleared.
+    func testSuppressesForARunningDDCApp() {
+        XCTAssertTrue(SystemHUDManager.shouldSuppressNativeHUD(
+            volume: false, brightness: false, backlight: false, thirdPartyDDCActive: true
+        ))
+    }
+}

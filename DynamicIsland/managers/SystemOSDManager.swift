@@ -41,6 +41,8 @@ class SystemOSDManager {
         // Coalesces immediate suppression requests from a key event and its
         // resulting system-value notification.
         var immediateSuppressionInFlight = false
+        // Set once `crashWatchdogInput` has been created.
+        var crashWatchdogStarted = false
     }
     private static let suppressionState = OSAllocatedUnfairLock(initialState: SuppressionState())
 
@@ -185,6 +187,8 @@ class SystemOSDManager {
             state.active = false
             state.transitionGeneration &+= 1
         }
+        // This path cleans up itself; tell the crash watchdog to stand down.
+        disarmCrashWatchdog()
 
         // Cancel the watcher and wait for it to fully exit before resuming. A
         // bare cancel is cooperative, so an in-flight suspendOSDUIHelper() could
@@ -214,6 +218,8 @@ class SystemOSDManager {
     public static func disableSystemHUD() {
         // Ensure sleep/wake observers are registered.
         _ = sleepWakeSetupOnce
+        _ = crashWatchdogInput
+        suppressionState.withLock { $0.crashWatchdogStarted = true }
         let generation = suppressionState.withLock { state -> UInt64 in
             state.active = true
             state.transitionGeneration &+= 1
@@ -533,6 +539,51 @@ class SystemOSDManager {
         } catch {
             NSLog("Failed to resume OSDUIHelper after stale suppression: \(error)")
         }
+    }
+
+    // MARK: - Crash watchdog
+
+    /// Write end of a pipe whose read end is the stdin of a tiny `/bin/sh`
+    /// child, created the first time suppression starts.
+    ///
+    /// The termination handler only runs on a normal quit. If Atoll crashes,
+    /// is force quit or is killed, OSDUIHelper stayed SIGSTOPped and the
+    /// native HUD was dead -- or frozen on screen -- until the next login
+    /// (#908). The kernel closes this write end however the process ends; the
+    /// child, blocked in `read` at no cost, then sees EOF and kills the helper
+    /// so launchd starts a fresh one on the next key press. A normal quit
+    /// writes `q` first, and the child exits without touching anything.
+    private static let crashWatchdogInput: FileHandle? = {
+        let pipe = Pipe()
+        let writeFD = pipe.fileHandleForWriting.fileDescriptor
+        // Keep the write end out of every child process, the watchdog
+        // included, or EOF would never arrive; and never let a write to a
+        // vanished watchdog raise SIGPIPE in this process.
+        _ = fcntl(writeFD, F_SETFD, FD_CLOEXEC)
+        _ = fcntl(writeFD, F_SETNOSIGPIPE, 1)
+
+        let watchdog = Process()
+        watchdog.executableURL = URL(fileURLWithPath: "/bin/sh")
+        watchdog.arguments = [
+            "-c",
+            "trap '' HUP INT TERM; read -r line; [ \"$line\" = q ] || /usr/bin/killall -9 OSDUIHelper"
+        ]
+        watchdog.standardInput = pipe
+        watchdog.standardOutput = FileHandle.nullDevice
+        watchdog.standardError = FileHandle.nullDevice
+        do {
+            try watchdog.run()
+        } catch {
+            NSLog("⚠️ Could not start the OSDUIHelper crash watchdog: \(error)")
+            return nil
+        }
+        return pipe.fileHandleForWriting
+    }()
+
+    private static func disarmCrashWatchdog() {
+        // Only if it was ever started; this must not spawn it at quit.
+        guard suppressionState.withLock({ $0.crashWatchdogStarted }) else { return }
+        try? crashWatchdogInput?.write(contentsOf: Data("q\n".utf8))
     }
 
     /// Check if OSDUIHelper is currently running
