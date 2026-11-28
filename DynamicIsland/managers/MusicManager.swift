@@ -33,23 +33,63 @@ struct LyricLine: Identifiable, Codable, Equatable {
     let id = UUID()
     let timestamp: TimeInterval
     let text: String
+    /// Whether `timestamp` means anything.
+    ///
+    /// Some tracks only have plain lyrics available, with no timings at all.
+    /// Those still belong on screen -- you can read along yourself -- but
+    /// nothing may pretend to know which line is being sung.
+    let isTimed: Bool
 
-    init(timestamp: TimeInterval, text: String) {
+    init(timestamp: TimeInterval, text: String, isTimed: Bool = true) {
         self.timestamp = timestamp
         self.text = text
+        self.isTimed = isTimed
+    }
+
+    /// Splits an untimed lyrics body into the lines it is written as.
+    ///
+    /// The whole body used to be kept as a single `LyricLine`, which made every
+    /// verse of the song one enormous "current line" -- so the highlight swept
+    /// across the entire text at once, cutting through the middle of words.
+    static func untimedLines(from body: String) -> [LyricLine] {
+        body
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .map { LyricLine(timestamp: 0, text: $0, isTimed: false) }
     }
 
     // Compares content only; `id` is regenerated per instance, so identical
     // lyrics parsed twice would otherwise never compare equal
     static func == (lhs: LyricLine, rhs: LyricLine) -> Bool {
-        lhs.timestamp == rhs.timestamp && lhs.text == rhs.text
+        lhs.timestamp == rhs.timestamp && lhs.text == rhs.text && lhs.isTimed == rhs.isTimed
     }
 }
 
-private struct LyricsLookupKey: Hashable {
+struct LyricsLookupKey: Hashable {
     let title: String
     let artist: String
     let album: String
+    let recording: Recording
+
+    enum Recording: Hashable {
+        case identifier(source: String, value: String)
+        case duration(TimeInterval?)
+    }
+
+    init(title: String, artist: String, album: String, source: String,
+         contentIdentifier: String?, duration: TimeInterval) {
+        self.title = title
+        self.artist = artist
+        self.album = album
+        let identifier = contentIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !identifier.isEmpty {
+            recording = .identifier(source: source, value: identifier)
+        } else {
+            // Whole seconds absorb insignificant provider precision differences.
+            recording = .duration(duration.isFinite && duration > 0 ? duration.rounded() : nil)
+        }
+    }
 
     /// Whether this is worth searching for.
     ///
@@ -529,6 +569,8 @@ class MusicManager: ObservableObject {
     @Published var songTitle: String = "I'm Handsome"
     @Published var artistName: String = "Me"
     @Published var albumArt: NSImage = defaultImage
+    @Published var albumArtGlowTexture: NSImage = defaultImage
+    private var albumArtGeneration: Int = 0
     @Published var isPlaying = false
     @Published var album: String = "Self Love"
     @Published var isPlayerIdle: Bool = true
@@ -584,6 +626,10 @@ class MusicManager: ObservableObject {
     @Published var isShuffled: Bool = false
     @Published var repeatMode: RepeatMode = .off
     @Published var isLiveStream: Bool = false
+    /// Spotify advertisements often have no artist, album, artwork, or track
+    /// identifier. Keeping this separate from `isLiveStream` lets the UI avoid
+    /// reserving song-only space (notably lyrics) for that short media item.
+    @Published private(set) var isAdvertisement: Bool = false
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @Published var usingAppIconForArtwork: Bool = false
     @Published private(set) var skipGesturePulse: SkipGesturePulse?
@@ -591,6 +637,13 @@ class MusicManager: ObservableObject {
     // MARK: - Lyrics Properties
     @Published var currentLyrics: String = ""
     @Published var syncedLyrics: [LyricLine] = []
+    @Published private(set) var lyricsAvailability: LyricsAvailability = .unavailable
+
+    /// Whether the loaded lyrics carry real timings, as opposed to being a
+    /// plain body split into readable lines.
+    var hasTimedLyrics: Bool {
+        syncedLyrics.contains { $0.isTimed }
+    }
     @Published var showLyrics: Bool = false
     @Published var currentLyricIndex: Int = -1
 
@@ -603,7 +656,7 @@ class MusicManager: ObservableObject {
     // tell it apart from a newer fetch for the same track.
     private var lyricsFetchID: UUID?
     private var activeLyricsKey: LyricsLookupKey?
-    private var lyricsCache: [LyricsLookupKey: [LyricLine]] = [:]
+    private var lyricsCache: [LyricsLookupKey: LyricsResolution] = [:]
     // Bounded, insertion-order eviction so the cache cannot grow unboundedly.
     private static let lyricsCacheLimit = 80
     private var lyricsCacheOrder: [LyricsLookupKey] = []
@@ -628,7 +681,7 @@ class MusicManager: ObservableObject {
     private var likeToggleTask: Task<Void, Never>?
 
     /// Inserts lyrics with insertion-order eviction to keep the cache bounded.
-    private func storeLyricsInCache(_ lyrics: [LyricLine], for key: LyricsLookupKey) {
+    func storeLyricsInCache(_ lyrics: LyricsResolution, for key: LyricsLookupKey) {
         if lyricsCache[key] == nil {
             lyricsCacheOrder.append(key)
             while lyricsCacheOrder.count > Self.lyricsCacheLimit {
@@ -859,7 +912,19 @@ class MusicManager: ObservableObject {
     // MARK: - Update Methods
     @MainActor
     // swiftlint:disable:next cyclomatic_complexity function_body_length
-    private func updateFromPlaybackState(_ state: PlaybackState) {
+    func updateFromPlaybackState(_ state: PlaybackState) {
+        let advertisement = Self.isLikelyAdvertisement(state)
+        let advertisementChanged = advertisement != isAdvertisement
+        let advertisementStarted = advertisement && !isAdvertisement
+        if advertisement != isAdvertisement {
+            isAdvertisement = advertisement
+        }
+
+        if advertisementStarted {
+            discardLyrics()
+            dismissTransientMusicPreview()
+        }
+
         // Check for playback state changes (playing/paused)
         let eventIsPlaying = state.isPlaying
         let expectedState = optimisticPlaybackTransition.expectedState
@@ -924,6 +989,11 @@ class MusicManager: ObservableObject {
             self.album = state.album
         }
 
+        let durationChanged = state.duration != self.songDuration
+        if durationChanged {
+            self.songDuration = state.duration
+        }
+
         // Handle artwork and visual transitions for changed content
         let shouldAutoPeekOnTrackChange = Defaults[.showSneakPeekOnTrackChange]
 
@@ -949,7 +1019,6 @@ class MusicManager: ObservableObject {
             self.lastArtworkContentIdentifier = state.contentIdentifier
             self.lastArtworkContentURL = state.contentURL
 
-            self.prepareLyricsForCurrentTrack()
             if let liveArtworkURL = state.liveArtworkURL {
                 self.videoArtworkURL = liveArtworkURL
             } else {
@@ -967,8 +1036,13 @@ class MusicManager: ObservableObject {
             self.refreshExplicitFlag(for: state)
         }
 
+        // Duration-only updates can identify another recording or start/end an ad.
+        let lyricsIdentityChanged = durationChanged && currentLyricsLookupContext()?.key != activeLyricsKey
+        if hasContentChange || lyricsIdentityChanged || advertisementChanged {
+            self.prepareLyricsForCurrentTrack()
+        }
+
         let timeChanged = state.currentTime != self.elapsedTime
-        let durationChanged = state.duration != self.songDuration
         let playbackRateChanged = state.playbackRate != self.playbackRate
         let shuffleChanged = state.isShuffled != self.isShuffled
         let repeatModeChanged = state.repeatMode != self.repeatMode
@@ -977,10 +1051,6 @@ class MusicManager: ObservableObject {
             self.elapsedTime = state.currentTime
             // Update current lyric based on elapsed time
             self.updateCurrentLyric(for: state.currentTime)
-        }
-
-        if durationChanged {
-            self.songDuration = state.duration
         }
 
         if playbackRateChanged {
@@ -1422,8 +1492,19 @@ class MusicManager: ObservableObject {
     private func applyAlbumArt(_ newAlbumArt: NSImage) {
         withAnimation(.smooth) {
             albumArt = newAlbumArt
-            if Defaults[.coloredSpectrogram] {
-                calculateAverageColor()
+        }
+        if Defaults[.coloredSpectrogram] {
+            avgColor = newAlbumArt.quickAverageColor()
+            calculateAverageColor()
+        }
+        // Capture generation to discard stale glow texture results
+        let generation = albumArtGeneration + 1
+        albumArtGeneration = generation
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let glowTexture = newAlbumArt.preBlurred(radius: 40)
+            DispatchQueue.main.async {
+                guard let self, self.albumArtGeneration == generation else { return }
+                self.albumArtGlowTexture = glowTexture
             }
         }
     }
@@ -1440,10 +1521,8 @@ class MusicManager: ObservableObject {
     func calculateAverageColor() {
         albumArt.prominentOpposingColors { [weak self] primary, secondary in
             DispatchQueue.main.async {
-                withAnimation(.smooth) {
-                    self?.avgColor = primary
-                    self?.secondaryColor = secondary
-                }
+                self?.avgColor = primary
+                self?.secondaryColor = secondary
             }
         }
     }
@@ -1452,7 +1531,7 @@ class MusicManager: ObservableObject {
         let standardControlsEnabled = Defaults[.showStandardMediaControls]
         let minimalisticEnabled = Defaults[.enableMinimalisticUI]
 
-        guard standardControlsEnabled || minimalisticEnabled else { return }
+        guard !isAdvertisement, standardControlsEnabled || minimalisticEnabled else { return }
 
         if isPlaying && Defaults[.enableSneakPeek] {
             if Defaults[.sneakPeekStyles] == .standard {
@@ -1461,6 +1540,47 @@ class MusicManager: ObservableObject {
                 coordinator.toggleExpandingView(status: true, type: .music)
             }
         }
+    }
+
+    @MainActor
+    private func dismissTransientMusicPreview() {
+        if coordinator.sneakPeek.show, coordinator.sneakPeek.type == .music {
+            coordinator.toggleSneakPeek(status: false, type: .music)
+        }
+        if coordinator.expandingView.show, coordinator.expandingView.type == .music {
+            coordinator.toggleExpandingView(status: false, type: .music)
+        }
+    }
+
+    /// Media Remote does not expose an explicit "advertisement" bit. Spotify
+    /// does, however, identify ads with an `ad` URI when possible; older
+    /// clients instead publish a short titled item with none of the metadata a
+    /// song owns. Requiring the Spotify source and missing artwork keeps the
+    /// fallback narrow enough not to classify ordinary short tracks as ads.
+    static func isLikelyAdvertisement(_ state: PlaybackState) -> Bool {
+        guard state.bundleIdentifier.caseInsensitiveCompare(SpotifyController.bundleIdentifier)
+            == .orderedSame else { return false }
+
+        let identifiers = [state.contentIdentifier, state.contentURL]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        if identifiers.contains(where: {
+            $0.hasPrefix("spotify:ad:") || $0.contains("/ad/")
+        }) {
+            return true
+        }
+
+        func isMissing(_ value: String) -> Bool {
+            let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return normalized.isEmpty || normalized == "unknown"
+        }
+
+        let hasPromoTitle = !isMissing(state.title)
+        let hasShortDuration = state.duration.isFinite && state.duration > 0 && state.duration <= 120
+        return hasPromoTitle
+            && hasShortDuration
+            && isMissing(state.artist)
+            && isMissing(state.album)
+            && state.artwork == nil
     }
 
     // MARK: - Public Methods for controlling playback
@@ -1669,6 +1789,7 @@ class MusicManager: ObservableObject {
         lyricsFetchID = nil
         lyricsFetchTask?.cancel()
         lyricsFetchTask = nil
+        lyricsAvailability = .unavailable
         syncedLyrics = []
         currentLyrics = ""
         currentLyricIndex = -1
@@ -1685,6 +1806,11 @@ class MusicManager: ObservableObject {
             return
         }
 
+        guard !isAdvertisement else {
+            discardLyrics()
+            return
+        }
+
         guard let lookup = currentLyricsLookupContext() else {
             discardLyrics()
             return
@@ -1696,6 +1822,7 @@ class MusicManager: ObservableObject {
         activeLyricsKey = key
 
         if trackChanged {
+            lyricsAvailability = .loading
             syncedLyrics = []
             currentLyricIndex = -1
             currentLyrics = shouldShowLoading ? "Loading lyrics..." : ""
@@ -1730,40 +1857,47 @@ class MusicManager: ObservableObject {
         lyricsFetchTask = Task { [weak self] in
             guard let self else { return }
 
-            do {
-                let lyrics = try await self.fetchLyricsFromAPI(
-                    artist: requestArtist,
-                    title: requestTitle,
-                    album: requestAlbum
-                )
-                guard !Task.isCancelled else { return }
+            let lyrics = await LyricsProviderFallback.resolve(
+                primary: {
+                    try await self.fetchLyricsFromAPI(
+                        artist: requestArtist,
+                        title: requestTitle,
+                        album: requestAlbum
+                    )
+                },
+                fallback: {
+                    try await self.fetchLyricsFromNetEase(artist: requestArtist, title: requestTitle)
+                }
+            )
+            guard !Task.isCancelled else { return }
 
-                await MainActor.run {
-                    guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
+            await MainActor.run {
+                guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
+                // Empty is not a fact about the track. Caching it would stick a
+                // transport blip — including the old path where LRCLIB threw
+                // and NetEase was never asked — and hide a later hit.
+                if lyrics.availability != .unavailable {
                     self.storeLyricsInCache(lyrics, for: key)
-                    self.lyricsFetchKey = nil
-                    self.lyricsFetchID = nil
-                    self.lyricsFetchTask = nil
-                    self.applyLyricsToDisplay(lyrics)
                 }
-            } catch {
-                print("Failed to fetch lyrics: \(error)")
-                await MainActor.run {
-                    guard self.lyricsFetchID == fetchID, self.activeLyricsKey == key else { return }
-                    self.lyricsFetchKey = nil
-                    self.lyricsFetchID = nil
-                    self.lyricsFetchTask = nil
-                    self.syncedLyrics = []
-                    self.currentLyricIndex = -1
-                    self.currentLyrics = "No lyrics found"
-                    self.stopLyricSync()
-                }
+                self.lyricsFetchKey = nil
+                self.lyricsFetchID = nil
+                self.lyricsFetchTask = nil
+                self.applyLyricsToDisplay(lyrics)
             }
         }
     }
 
-    private func fetchLyricsFromAPI(artist: String, title: String, album: String) async throws -> [LyricLine] {
-        guard !artist.isEmpty, !title.isEmpty else { return [] }
+    /// All media sources share this fallback and semantic result.
+    private func fetchLyricsFromNetEase(artist: String, title: String) async throws -> LyricsResolution {
+        guard !artist.isEmpty, !title.isEmpty else { return LyricsResolution() }
+        // Track updates assign duration after preparing lyrics; read it only
+        // after LRCLIB has answered, as in the existing fallback.
+        let duration = await MainActor.run { self.songDuration }
+        return try await NetEaseLyrics.fetch(title: title, artist: artist, duration: duration)
+    }
+
+    private func fetchLyricsFromAPI(artist: String, title: String, album: String) async throws -> LyricsResolution {
+        guard !artist.isEmpty, !title.isEmpty else { return LyricsResolution() }
 
         // Normalize input and percent-encode
         let cleanArtist = artist.folding(options: .diacriticInsensitive, locale: .current)
@@ -1771,58 +1905,33 @@ class MusicManager: ObservableObject {
         let cleanAlbum = album.folding(options: .diacriticInsensitive, locale: .current)
         guard let encodedArtist = cleanArtist.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let encodedTitle = cleanTitle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
-            return []
+            return LyricsResolution()
         }
 
         // Use LRCLIB search endpoint which returns an array JSON with `plainLyrics` and/or `syncedLyrics`.
         let urlString = "https://lrclib.net/api/search?track_name=\(encodedTitle)&artist_name=\(encodedArtist)"
-        guard let url = URL(string: urlString) else { return [] }
+        guard let url = URL(string: urlString) else { return LyricsResolution() }
 
         let (data, response) = try await URLSession.shared.data(from: url)
         if let http = response as? HTTPURLResponse, http.statusCode == 200 {
+            // Metadata updates assign duration after preparing lyrics. Read it
+            // after the request, before trusting a whole-track instrumental flag.
+            let duration = await MainActor.run { self.songDuration }
             // Try parse as array JSON (preferred)
             if let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-               let bestMatch = bestLyricsMatch(in: jsonArray, artist: cleanArtist, title: cleanTitle, album: cleanAlbum) {
-                let first = bestMatch
-                let plain = (first["plainLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                let synced = (first["syncedLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-
-                if !synced.isEmpty {
-                    return parseLRC(synced)
-                } else if !plain.isEmpty {
-                    return [LyricLine(timestamp: 0, text: plain)]
-                } else {
-                    return []
+               let bestMatch = bestLyricsMatch(in: jsonArray, artist: cleanArtist, title: cleanTitle, album: cleanAlbum, duration: duration) {
+                let resolution = LyricsResolution.lrclib(bestMatch)
+                // Text-only instrumental placeholders need the same recording
+                // identity check as structured provider flags.
+                if resolution.availability == .instrumental,
+                   !LyricsSearchResults.isReliableInstrumentalMatch(bestMatch, title: cleanTitle, duration: duration) {
+                    return LyricsResolution()
                 }
-            } else {
-                // Fallback: try to decode as UTF8 and handle as LRC or plain text
-                if let lrcString = String(data: data, encoding: .utf8) {
-                    let trimmed = lrcString.trimmingCharacters(in: .whitespacesAndNewlines)
-
-                    if trimmed.isEmpty  {
-                        return []
-                    }
-
-                    // If it contains a syncedLyrics key in an object, try that
-                    if let json = try? JSONSerialization.jsonObject(with: data, options: []) {
-                        if let dict = json as? [String: Any],
-                            let synced = dict["syncedLyrics"] as? String
-                        {
-                            return parseLRC(synced)
-                        }
-                        if let array = json as? [Any], array.isEmpty {
-                            return []
-                        }
-                    }
-
-                    // Otherwise treat as plain lyrics blob
-                    return [LyricLine(timestamp: 0, text: trimmed)]
-                }
-                return []
+                return resolution
             }
-        } else {
-            return []
         }
+        // A search response with no matching recording is not a plain lyric body.
+        return LyricsResolution()
     }
 
     // pi-lens-ignore: large_tuple
@@ -1834,7 +1943,10 @@ class MusicManager: ObservableObject {
         let key = LyricsLookupKey(
             title: requestTitle.lowercased(),
             artist: requestArtist.lowercased(),
-            album: requestAlbum.lowercased()
+            album: requestAlbum.lowercased(),
+            source: lastArtworkBundleIdentifier ?? "",
+            contentIdentifier: lastArtworkContentIdentifier,
+            duration: songDuration
         )
 
         return key.isValid ? (key, requestArtist, requestTitle, requestAlbum) : nil
@@ -1867,12 +1979,14 @@ class MusicManager: ObservableObject {
         return normalizedLyricsRequestComponent(normalized)
     }
 
-    private func bestLyricsMatch(in results: [[String: Any]], artist: String, title: String, album: String) -> [String: Any]? {
-        LyricsSearchResults.bestMatch(in: results, artist: artist, title: title, album: album)
+    private func bestLyricsMatch(in results: [[String: Any]], artist: String, title: String, album: String, duration: TimeInterval) -> [String: Any]? {
+        LyricsSearchResults.bestMatch(in: results, artist: artist, title: title, album: album, duration: duration)
     }
 
-    private func applyLyricsToDisplay(_ lyrics: [LyricLine]) {
+    func applyLyricsToDisplay(_ resolution: LyricsResolution) {
+        let lyrics = resolution.lines
         syncedLyrics = lyrics
+        lyricsAvailability = resolution.availability
         currentLyricIndex = -1
 
         guard !lyrics.isEmpty else {
@@ -1890,12 +2004,18 @@ class MusicManager: ObservableObject {
         }
     }
 
-    private func parseLRC(_ lrc: String) -> [LyricLine] {
-        LRCParser.parse(lrc)
-    }
-
     func updateCurrentLyric(for elapsedTime: TimeInterval) {
         guard !syncedLyrics.isEmpty else { return }
+
+        // Untimed lyrics have no line to point at. Leaving the index at -1 is
+        // what stops the sweep and the current-line styling from picking a line
+        // arbitrarily -- every one of these carries timestamp 0, so the search
+        // below would otherwise land on the last line of the song and stay there.
+        guard hasTimedLyrics else {
+            if currentLyricIndex != -1 { currentLyricIndex = -1 }
+            if !currentLyrics.isEmpty { currentLyrics = "" }
+            return
+        }
 
         // Find the current lyric based on elapsed time
         var newIndex = -1
@@ -1927,6 +2047,18 @@ class MusicManager: ObservableObject {
 
     // Start a background task that periodically updates the displayed lyric
     private func startLyricSync() {
+        // Nothing to follow when the lyrics carry no timings; the loop would
+        // wake repeatedly only to conclude there is no line to point at.
+        //
+        // Asked before the "already running" return, not after it: a refetch
+        // on the same track can replace timed lyrics with untimed ones while
+        // the previous loop is still alive, and that loop would otherwise go
+        // on waking at its maximum rate for the rest of the track, finding
+        // nothing to point at each time.
+        guard hasTimedLyrics else {
+            stopLyricSync()
+            return
+        }
         // If already running, keep it
         if lyricSyncTask != nil { return }
 

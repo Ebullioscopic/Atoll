@@ -27,11 +27,53 @@ import Foundation
 final class TidalController: FilteredNowPlayingController {
     static let bundleIdentifier = "com.tidal.desktop"
 
+    private static let browserBundlePrefixes = [
+        "com.apple.Safari",
+        "com.google.Chrome",
+        "com.brave.Browser",
+        "com.microsoft.edgemac",
+        "org.mozilla.firefox",
+        "company.thebrowser.Browser",
+        "com.vivaldi.Vivaldi",
+        "com.operasoftware.Opera",
+        "com.duckduckgo.macos.browser",
+        "com.kagi.kagimacOS",
+        "company.thebrowser.Arc",
+    ]
+
     init?() {
         super.init(
             bundleIdentifier: Self.bundleIdentifier,
             controllerName: "TidalController"
         )
+    }
+
+    /// Browsers can become macOS' foreground Now Playing client without
+    /// stopping TIDAL's audio. In that case keep TIDAL's last state instead of
+    /// replacing it with an idle placeholder. Muted videos never become an
+    /// active audio process, matching the distinction reported by users.
+    override func shouldPreservePlaybackState(whenCompetingWith source: String) -> Bool {
+        guard Self.isBrowserSource(source), playbackState.isPlaying else { return false }
+
+        return AudioProcessQuery.processObjectIDs().contains { processObject in
+            guard let processBundleIdentifier = AudioProcessQuery.bundleIdentifier(for: processObject),
+                  AudioTapTargetMatcher.targetBundleIdentifier(
+                    for: processBundleIdentifier,
+                    among: [Self.bundleIdentifier]
+                  ) != nil else {
+                return false
+            }
+            return AudioProcessQuery.isRunningOutput(processObject)
+        }
+    }
+
+    static func isBrowserSource(_ source: String) -> Bool {
+        let normalized = source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return browserBundlePrefixes.contains { prefix in
+            let normalizedPrefix = prefix.lowercased()
+            return normalized == normalizedPrefix
+                || normalized.hasPrefix(normalizedPrefix + ".")
+        }
     }
 
     // MARK: - Favouriting, read only

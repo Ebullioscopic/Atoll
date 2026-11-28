@@ -2201,11 +2201,20 @@ private final class AirPodsListeningModeLogObserver {
         process.standardOutput = outputPipe
         process.standardError = Pipe()
 
-        outputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+        outputPipe.fileHandleForReading.readUntilEOF { [weak self] data in
+            guard let text = String(data: data, encoding: .utf8) else { return }
             self?.queue.async {
                 self?.consume(text)
+            }
+        }
+
+        // `log stream` can exit on its own (logd restart, memory pressure). Start a new one so
+        // listening-mode changes keep arriving; stop() clears this handler first.
+        process.terminationHandler = { [weak self] exited in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                guard let self, self.process === exited else { return }
+                self.process = nil
+                self.start()
             }
         }
 
@@ -2220,6 +2229,7 @@ private final class AirPodsListeningModeLogObserver {
     }
 
     func stop() {
+        process?.terminationHandler = nil
         process?.terminate()
         process = nil
     }
@@ -2565,15 +2575,15 @@ enum AirPodsListeningMode: Equatable {
     var displayName: String {
         switch self {
         case .noiseCancellation:
-            return "Noise Cancellation"
+            return String(localized: "Noise Cancellation")
         case .transparency:
-            return "Transparency"
+            return String(localized: "Transparency")
         case .adaptive:
-            return "Adaptive Audio"
+            return String(localized: "Adaptive Audio")
         case .conversationAwareness:
-            return "Conversation Awareness"
+            return String(localized: "Conversation Awareness")
         case .off:
-            return "Off"
+            return String(localized: "Off")
         }
     }
 
@@ -2788,9 +2798,9 @@ enum BluetoothAudioDeviceType {
         case .beats: return "Beats"
         case .beatsstudio: return "Beats Studio"
         case .beatssolo: return "Beats Solo"
-        case .headphones: return "Headphones"
-        case .speaker: return "Speaker"
-        case .generic: return "Bluetooth Device"
+        case .headphones: return String(localized: "Headphones")
+        case .speaker: return String(localized: "Speaker")
+        case .generic: return String(localized: "Bluetooth Device")
         }
     }
 

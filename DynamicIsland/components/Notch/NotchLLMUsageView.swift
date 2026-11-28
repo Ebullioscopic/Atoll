@@ -50,7 +50,11 @@ struct NotchLLMUsageView: View {
     private func card(for provider: ProviderID) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text(provider.displayName).font(.headline)
+                Text(provider.displayName)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
                 // Subscription plan badge (e.g. "Max 5x"). Only set for Claude; nil elsewhere.
                 if case .success(let snap) = manager.results[provider] ?? .loading, let plan = snap.plan {
                     Text(plan)
@@ -86,7 +90,10 @@ struct NotchLLMUsageView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .frame(height: llmUsageProviderCardHeight, alignment: .topLeading)
+        // Stretch every card to the height the panel offers so the row stays uniform
+        // (the intent behind the former fixed card height) without a hard-coded size
+        // that either clips content or leaves blank space.
+        .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
     }
 
@@ -131,7 +138,7 @@ struct NotchLLMUsageView: View {
             guard let model = model else { return nil }
             let fraction = model.totals.costUSD
             let usedPct = (1 - max(0, min(1, fraction))) * 100
-            return UsageLimit(used: usedPct, limit: 100, resetsAt: nil)
+            return UsageLimit(used: usedPct, limit: 100, resetsAt: model.resetsAt)
         }
         
         return VStack(alignment: .leading, spacing: 6) {
@@ -142,14 +149,11 @@ struct NotchLLMUsageView: View {
                 quotaGauge("Weekly", limit)
             }
             
-            // Show model breakdown for the selected pool
-            let poolModels = snap.models.filter { $0.pool == targetPool }
-            if !poolModels.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(poolModels) { model in
-                        window(model.model, model.totals, compact: true)
-                    }
-                }
+            // Token counts and estimated cost read from the language server's
+            // conversation history (all pools; Antigravity does not split them).
+            VStack(alignment: .leading, spacing: 4) {
+                window("Today", snap.today, compact: true)
+                window("Week", snap.week, compact: true)
             }
         }
     }
@@ -299,9 +303,16 @@ struct NotchLLMUsageView: View {
                 .font(.system(size: compact ? 11 : (prominent ? 17 : 13), weight: prominent ? .bold : .semibold, design: .rounded))
                 .monospacedDigit()
             Spacer(minLength: 4)
-            Text(costLabel(totals))
-                .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
-                .help(costHelp(totals))
+            if totals.isPercentage {
+                // Quota providers store the remaining fraction in costUSD; it is not money.
+                let leftPct = Int((max(0, min(1, totals.costUSD)) * 100).rounded())
+                Text("\(leftPct)% left")
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+            } else {
+                Text(costLabel(totals))
+                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                    .help(costHelp(totals))
+            }
         }
     }
 
@@ -318,7 +329,7 @@ struct NotchLLMUsageView: View {
         if totals.hasUnpricedModel {
             return "Estimated API-equivalent cost from local token counts (not your subscription bill). Some models used do not have usable pricing, so this is partial or unavailable."
         }
-        return "Estimated API-equivalent cost from local token counts, not your subscription bill."
+        return "Estimated API-equivalent cost from local token counts (cache reads and writes priced at the provider's cache rates), not your subscription bill."
     }
 
     private func tokens(_ n: Int) -> String {
