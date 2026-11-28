@@ -297,6 +297,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // synchronously here so it is never left frozen. (See issue #568.)
         SystemOSDManager.resumeOSDUIHelperForTermination()
 
+        // Exit cleaning mode — clean-keyboard especially, so the process can never die holding
+        // the event tap and lock the keyboard.
+        KeyboardCleaningManager.shared.stop()
+        ScreenCleaningManager.shared.stop()
+
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)

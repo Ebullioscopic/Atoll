@@ -8526,6 +8526,7 @@
         }
       }
     },
+    "Adds buttons to the notch header. Cleaning modes are never restored after a restart." : {},
     "Adds the AirPlay/route picker button back to the customizable controls palette." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -19015,6 +19016,37 @@
         }
       }
     },
+    "Clean keyboard" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clean keyboard"
+          }
+        }
+      }
+    },
+    "Clean screen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clean screen"
+          }
+        }
+      }
+    },
+    "Cleaning" : {},
+    "Cleaning the keyboard blocks key presses and needs Accessibility permission. Click anywhere to finish; it also stops on its own after two minutes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cleaning the keyboard blocks key presses and needs Accessibility permission. Click anywhere to finish; it also stops on its own after two minutes."
+          }
+        }
+      }
+    },
     "Clear" : {
       "localizations" : {
         "fr" : {
@@ -19923,6 +19955,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "點按「取色」或使用 Cmd+Shift+P 開始取色"
+          }
+        }
+      }
+    },
+    "Click anywhere or press Esc to finish cleaning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click anywhere or press Esc to finish cleaning"
           }
         }
       }
@@ -44690,6 +44732,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "鍵盤背光 OSD"
+          }
+        }
+      }
+    },
+    "Keyboard is locked for cleaning — click anywhere to finish" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keyboard is locked for cleaning — click anywhere to finish"
           }
         }
       }

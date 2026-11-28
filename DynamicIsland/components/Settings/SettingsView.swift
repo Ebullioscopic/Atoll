@@ -248,6 +248,8 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
         SettingsSearchEntry(tab: .general, title: "Export Settings", keywords: ["export", "backup", "save settings", "share settings", "json"], highlightID: nil),
         SettingsSearchEntry(tab: .general, title: "Import Settings", keywords: ["import", "restore", "load settings", "settings file", "json"], highlightID: nil),
+        SettingsSearchEntry(tab: .general, title: "Clean screen", keywords: ["cleaning", "black screen", "wipe", "display"], highlightID: SettingsTab.general.highlightID(for: "Clean screen")),
+        SettingsSearchEntry(tab: .general, title: "Clean keyboard", keywords: ["cleaning", "lock keyboard", "wipe", "keys"], highlightID: SettingsTab.general.highlightID(for: "Clean keyboard")),
 
         // Live Activities
         SettingsSearchEntry(tab: .liveActivities, title: "Enable Screen Recording Detection", keywords: ["screen recording", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Screen Recording Detection")),
@@ -1152,6 +1154,7 @@ struct GeneralSettings: View {
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @Default(.showBatteryIndicator) var showBatteryIndicator
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
+    @Default(.showKeyboardCleaningIcon) var showKeyboardCleaningIcon
     @Default(.enableHorizontalMusicGestures) var enableHorizontalMusicGestures
     @Default(.musicGestureBehavior) var musicGestureBehavior
     @Default(.reverseSwipeGestures) var reverseSwipeGestures
@@ -1216,6 +1219,32 @@ struct GeneralSettings: View {
                 Text("UI Mode")
             } footer: {
                 Text("Minimalistic mode focuses on media controls and system HUDs, hiding all extra features for a clean, focused experience. Automatically enables simpler animations.")
+            }
+
+            Section {
+                Defaults.Toggle(key: .showScreenCleaningIcon) {
+                    Text("Clean screen")
+                }
+                .settingsHighlight(id: highlightID("Clean screen"))
+
+                Defaults.Toggle(key: .showKeyboardCleaningIcon) {
+                    Text("Clean keyboard")
+                }
+                // Ask for Accessibility when the user opts in, not on first use in the notch.
+                .onChange(of: showKeyboardCleaningIcon) {
+                    if showKeyboardCleaningIcon {
+                        KeyboardCleaningManager.shared.requestAccessibilityPermissionIfNeeded()
+                    }
+                }
+                .settingsHighlight(id: highlightID("Clean keyboard"))
+
+                Text("Cleaning the keyboard blocks key presses and needs Accessibility permission. Click anywhere to finish; it also stops on its own after two minutes.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Cleaning")
+            } footer: {
+                Text("Adds buttons to the notch header. Cleaning modes are never restored after a restart.")
             }
 
             Section {

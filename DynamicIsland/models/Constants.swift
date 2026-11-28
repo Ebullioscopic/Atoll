@@ -1461,6 +1461,12 @@ extension Defaults.Keys {
     static let clipboardDisplayMode = Key<ClipboardDisplayMode>("clipboardDisplayMode", default: .panel)
     static let clipboardProvider = Key<ClipboardProvider>("clipboardProvider", default: .builtIn)
     
+    // MARK: Cleaning Toggles
+    // These only control whether the icons show in the notch (opt-in). Whether a cleaning mode
+    // is active is runtime state and intentionally not persisted.
+    static let showScreenCleaningIcon = Key<Bool>("showScreenCleaningIcon", default: false)
+    static let showKeyboardCleaningIcon = Key<Bool>("showKeyboardCleaningIcon", default: false)
+
     // MARK: Screen Assistant Feature
     static let enableScreenAssistant = Key<Bool>("enableScreenAssistant", default: true)
     static let screenAssistantDisplayMode = Key<ScreenAssistantDisplayMode>("screenAssistantDisplayMode", default: .panel)

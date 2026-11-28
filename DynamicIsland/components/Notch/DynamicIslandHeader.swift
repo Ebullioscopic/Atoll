@@ -28,6 +28,8 @@ struct DynamicIslandHeader: View {
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
+    @ObservedObject var screenCleaningManager = ScreenCleaningManager.shared
+    @ObservedObject var keyboardCleaningManager = KeyboardCleaningManager.shared
     @ObservedObject var caffeinateManager = CaffeinateManager.shared
     @State private var showClipboardPopover = false
     @State private var showColorPickerPopover = false
@@ -42,6 +44,8 @@ struct DynamicIslandHeader: View {
     @Default(.showPerAppVolumeIcon) var showPerAppVolumeIcon
     @Default(.enableCaffeinate) var enableCaffeinate
     @Default(.showCaffeinateIcon) var showCaffeinateIcon
+    @Default(.showScreenCleaningIcon) var showScreenCleaningIcon
+    @Default(.showKeyboardCleaningIcon) var showKeyboardCleaningIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
     @Default(.clipboardProvider) var clipboardProvider
     @Default(.showBatteryIndicator) var showBatteryIndicator
@@ -312,6 +316,33 @@ struct DynamicIslandHeader: View {
                         }
                     }
 
+                    // Cleaning quick toggles (opt-in)
+                    if showScreenCleaningIcon {
+                        QuickToggleButton(
+                            isActive: screenCleaningManager.isActive,
+                            help: "Clean screen",
+                            action: { screenCleaningManager.toggle() }
+                        ) {
+                            headerGlyph(
+                                "sparkles.tv.fill",
+                                color: screenCleaningManager.isActive ? .accentColor : .white
+                            )
+                        }
+                    }
+
+                    if showKeyboardCleaningIcon {
+                        QuickToggleButton(
+                            isActive: keyboardCleaningManager.isActive,
+                            help: "Clean keyboard",
+                            action: { keyboardCleaningManager.toggle() }
+                        ) {
+                            headerGlyph(
+                                "keyboard.badge.eye",
+                                color: keyboardCleaningManager.isActive ? .accentColor : .white
+                            )
+                        }
+                    }
+
                     if Defaults[.settingsIconInNotch] {
                         Button(action: {
                             SettingsWindowController.shared.showWindow()
@@ -450,6 +481,29 @@ private extension DynamicIslandHeader {
             && Defaults[.showClipboardIcon]
             && Defaults[.showColorPickerIcon]
             && Defaults[.enableTimerFeature]
+    }
+}
+
+/// Quick toggle button in the notch: same capsule styling as the existing camera/clipboard/color-picker
+/// buttons, just with an added "active" highlight state.
+private struct QuickToggleButton<Glyph: View>: View {
+    let isActive: Bool
+    let help: LocalizedStringKey
+    let action: () -> Void
+    @ViewBuilder let glyph: Glyph
+
+    var body: some View {
+        Button(action: action) {
+            Capsule()
+                .fill(.black)
+                .frame(width: 30, height: 30)
+                .overlay { glyph }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help(help)
+        // The active state is conveyed only by icon color, which VoiceOver can't hear; add a
+        // selected trait so it announces the toggle state.
+        .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 }
 
