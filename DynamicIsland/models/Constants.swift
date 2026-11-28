@@ -1432,6 +1432,7 @@ extension Defaults.Keys {
     static let terminalForegroundColor = Key<Color>("terminalForegroundColor", default: .white)
     static let terminalCursorColor = Key<Color>("terminalCursorColor", default: Color(.selectedControlColor))
     static let terminalStickyMode = Key<Bool>("terminalStickyMode", default: false)
+    static let terminalOpenWhileCommandRuns = Key<Bool>("terminalOpenWhileCommandRuns", default: false)
     
     // MARK: Tab Bar
     static let tabBarPosition = Key<TabBarPosition>("tabBarPosition", default: .top)

@@ -94567,7 +94567,13 @@
     "Timer name" : {},
     "Double-click to rename" : {},
     "Turn this off to give the music player the whole Home tab. The calendar still appears there when the player is hidden." : {},
-    "Show date picker" : {}
+    "Show date picker" : {},
+    "Return to Notch" : {},
+    "Terminal is in a floating window" : {},
+    "Show Window" : {},
+    "Open to terminal while a command runs" : {},
+    "The notch opens on the terminal while a command is running in it, until the command finishes or you switch to another tab." : {},
+    "Open in floating window" : {}
   },
   "version" : "1.2"
 }
