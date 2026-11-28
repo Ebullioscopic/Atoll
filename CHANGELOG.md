@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Island top margin**: when external displays use the Dynamic Island style, a slider in General settings sets the gap between the top of the screen and the island, from 0 to 12 pt (6 pt by default). (#487)
 - **Back up and restore settings**: General settings can export your Atoll settings to a JSON file and import them again, on the same Mac or another one. API keys, sign-ins, clipboard history, notes and other private or device-specific data are never included, and Atoll offers to relaunch after an import. (#885)
 - **GitHub Copilot usage monitor**: an optional LLM Usage card shows your Copilot account quotas (premium requests, chat, completions) with consumed percentage, remaining allowance, plan and reset date, for GitHub.com and data-residency `ghe.com` tenants. The token is stored in the Keychain and removed when the provider is turned off. It reads GitHub's undocumented `copilot_internal/user` endpoint, which may change. Off by default. (#940)
 - **OpenRouter usage tracking**: the LLM Usage tab can show today's and this week's OpenRouter spend and your key's credit limit, using a regular API key stored in the Keychain. Per-model token and request analytics are an opt-in that needs a management key. Off by default. (#834)
@@ -94,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
+- With "Hide until hovered on non-notch displays", the notch no longer stays revealed after the pointer leaves it along the top edge of the screen; it used to hide again only after being opened once. (#487)
 - Opening and closing the lid in clamshell mode, or connecting a display, no longer leaves the notch or the floating media controls in the wrong place. Atoll now waits for the display setup to settle before rebuilding the notch, and keeps it on a connected display. (#327)
 - On macOS 27 the notch can be opened by hovering again while it is hidden in a fullscreen app on a display with a notch. (#757)
 - "Hide DynamicIsland" in fullscreen now also hides the island when the fullscreen Space is in Split View. The fullscreen check now reads the window that is actually on screen, so a fullscreen window of the same app on another Space no longer hides the island on this one. (#409)

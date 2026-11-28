@@ -909,6 +909,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.debouncedUpdateWindowSize()
         }.store(in: &cancellables)
 
+        // The island's top margin is part of the window height on non-notch displays.
+        Defaults.publisher(.dynamicIslandTopMargin, options: []).sink { [weak self] _ in
+            self?.debouncedUpdateWindowSize()
+        }.store(in: &cancellables)
+
         // Observe terminal settings changes
         Defaults.publisher(.enableTerminalFeature, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()

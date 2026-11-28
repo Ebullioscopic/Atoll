@@ -244,6 +244,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .general, title: "Open notch on hover", keywords: ["hover to open", "auto open"], highlightID: SettingsTab.general.highlightID(for: "Open notch on hover")),
         SettingsSearchEntry(tab: .general, title: "Notch animation speed", keywords: ["animation", "speed", "notch"], highlightID: SettingsTab.general.highlightID(for: "Notch animation speed")),
         SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
+        SettingsSearchEntry(tab: .general, title: "Island top margin", keywords: ["dynamic island", "pill", "gap", "offset", "menu bar", "external display"], highlightID: SettingsTab.general.highlightID(for: "Island top margin")),
         SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
         SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
         SettingsSearchEntry(tab: .general, title: "Export Settings", keywords: ["export", "backup", "save settings", "share settings", "json"], highlightID: nil),
@@ -1160,6 +1161,7 @@ struct GeneralSettings: View {
     @Default(.reverseSwipeGestures) var reverseSwipeGestures
     @Default(.reverseScrollGestures) var reverseScrollGestures
     @Default(.externalDisplayStyle) var externalDisplayStyle
+    @Default(.dynamicIslandTopMargin) var dynamicIslandTopMargin
     @Default(.hideNonNotchUntilHover) var hideNonNotchUntilHover
     @Default(.enableCaffeinate) var enableCaffeinate
     @Default(.caffeinateDefaultDuration) var caffeinateDefaultDuration
@@ -1573,6 +1575,20 @@ struct GeneralSettings: View {
             Text(externalDisplayStyle.description)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if externalDisplayStyle == .dynamicIsland {
+                Slider(value: $dynamicIslandTopMargin, in: 0...12, step: 1) {
+                    HStack {
+                        Text("Island top margin")
+                        Spacer()
+                        Text("\(Int(dynamicIslandTopMargin)) pt")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .onChange(of: dynamicIslandTopMargin) {
+                    NotificationCenter.default.post(name: Notification.Name.notchHeightChanged, object: nil)
+                }
+                .settingsHighlight(id: highlightID("Island top margin"))
+            }
             Defaults.Toggle(key: .hideNonNotchUntilHover) {
                 Text("Hide until hovered on non-notch displays")
             }

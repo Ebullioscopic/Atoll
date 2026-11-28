@@ -2584,7 +2584,10 @@ struct ContentView: View {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(80))
                 guard !Task.isCancelled else { break }
-                guard self.vm.notchState == .open else { break }
+                // A retained exit on the closed notch has to be finished too, or
+                // `isHovering` stays set and the notch stays enlarged (or revealed
+                // with "Hide until hovered") until it is opened and closed (#487).
+                guard self.vm.notchState == .open || self.isHovering else { break }
 
                 if self.shouldRetainHoverExit() {
                     consecutiveOutsideSamples = 0
