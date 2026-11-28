@@ -94547,7 +94547,8 @@
     "Searching…" : {},
     "No city found with that name." : {},
     "Weather uses this city instead of Location Services." : {},
-    "Showing weather for %@." : {}
+    "Showing weather for %@." : {},
+    "Hide widgets during screen saver" : {}
   },
   "version" : "1.2"
 }

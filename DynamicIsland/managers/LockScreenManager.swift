@@ -23,6 +23,7 @@ import Defaults
 import SwiftUI
 import AVFoundation
 import os
+import SkyLightWindow
 
 private extension NSEvent.EventSubtype {
     static let powerKey = NSEvent.EventSubtype(rawValue: 1)!
@@ -107,6 +108,9 @@ class LockScreenManager: ObservableObject {
     private var lockStatePollTask: Task<Void, Never>?
     private var fingerprintAnimationResetTask: Task<Void, Never>?
     private var powerKeyMonitors: [Any] = []
+    private var isScreenSaverRunning = false
+    private var hidWidgetsForScreenSaver = false
+    private var screenSaverPreferenceCancellable: AnyCancellable?
     private var lastPowerKeyEventDate: Date = .distantPast
     
     // MARK: - Helpers
@@ -152,6 +156,26 @@ class LockScreenManager: ObservableObject {
             name: .init("com.apple.screenIsUnlocked"),
             object: nil
         )
+
+        // The screen saver usually locks the Mac too, so lock and screen saver
+        // arrive together; these tell the two apart (#819).
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(screenSaverDidStart),
+            name: .init("com.apple.screensaver.didstart"),
+            object: nil
+        )
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(screenSaverDidStop),
+            name: .init("com.apple.screensaver.didstop"),
+            object: nil
+        )
+        screenSaverPreferenceCancellable = Defaults.publisher(.lockScreenHideWidgetsDuringScreenSaver, options: [])
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateScreenSaverWidgetVisibility()
+            }
 
         // Fallback: macOS sometimes delays `com.apple.screenIsUnlocked`, leaving
         // lock-screen widgets visible after the user-perceived unlock.
@@ -222,6 +246,28 @@ class LockScreenManager: ObservableObject {
         isFingerprintAnimating = false
     }
     
+    // MARK: - Screen Saver
+
+    @objc private func screenSaverDidStart() {
+        isScreenSaverRunning = true
+        updateScreenSaverWidgetVisibility()
+    }
+
+    @objc private func screenSaverDidStop() {
+        isScreenSaverRunning = false
+        updateScreenSaverWidgetVisibility()
+    }
+
+    /// Lock screen widgets live in one SkyLight space above the lock screen, so
+    /// hiding that space clears all of them off the screen saver at once.
+    private func updateScreenSaverWidgetVisibility() {
+        let shouldHide = isScreenSaverRunning && Defaults[.lockScreenHideWidgetsDuringScreenSaver]
+        guard shouldHide != hidWidgetsForScreenSaver else { return }
+        if LockScreenWidgetSpaceVisibility.setHidden(shouldHide) {
+            hidWidgetsForScreenSaver = shouldHide
+        }
+    }
+
     // MARK: - Event Handlers
     
     @objc private func screenLocked() {
@@ -293,6 +339,8 @@ class LockScreenManager: ObservableObject {
             startFingerprintAnimation(resetIfStillLocked: false)
         }
         isLocked = false
+        isScreenSaverRunning = false
+        updateScreenSaverWidgetVisibility()
         updateNativeHUDSuppression()
         stopLockStatePolling()
         postUnlockMusicHUDTask?.cancel()
@@ -515,5 +563,29 @@ final class LockSoundPlayer {
         case unlock
 
         var resourceName: String { rawValue }
+    }
+}
+
+/// Shows or hides the SkyLight space that lock screen widgets are delegated to.
+/// Uses the same SkyLight framework as SkyLightOperator; does nothing if the
+/// symbols are missing.
+enum LockScreenWidgetSpaceVisibility {
+    private typealias SpaceListFunction = @convention(c) (Int32, CFArray) -> Int32
+
+    private static let skyLight = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/SkyLight", RTLD_NOW)
+    private static let hideSpaces: SpaceListFunction? = function(named: "SLSHideSpaces")
+    private static let showSpaces: SpaceListFunction? = function(named: "SLSShowSpaces")
+
+    private static func function(named name: String) -> SpaceListFunction? {
+        guard let skyLight, let symbol = dlsym(skyLight, name) else { return nil }
+        return unsafeBitCast(symbol, to: SpaceListFunction.self)
+    }
+
+    @MainActor
+    @discardableResult
+    static func setHidden(_ hidden: Bool) -> Bool {
+        guard let function = hidden ? hideSpaces : showSpaces else { return false }
+        let skyLightOperator = SkyLightOperator.shared
+        return function(skyLightOperator.connection, [skyLightOperator.space] as CFArray) == 0
     }
 }

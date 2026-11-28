@@ -402,6 +402,7 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .lockScreen, title: "Show lock screen weather", keywords: ["weather widget"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show lock screen weather"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Widget layout", keywords: ["inline", "circular", "widget layout", "weather layout", "status widget"], highlightID: SettingsTab.lockScreen.highlightID(for: "Widget layout"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Weather data provider", keywords: ["wttr", "open meteo"], highlightID: SettingsTab.lockScreen.highlightID(for: "Weather data provider"), lockScreenSection: .widgets),
+        SettingsSearchEntry(tab: .lockScreen, title: "Hide widgets during screen saver", keywords: ["screensaver", "screen saver", "immersive"], highlightID: SettingsTab.lockScreen.highlightID(for: "Hide widgets during screen saver"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Use a custom location", keywords: ["city", "location", "weather"], highlightID: SettingsTab.lockScreen.highlightID(for: "Use a custom location"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Temperature unit", keywords: ["celsius", "fahrenheit"], highlightID: SettingsTab.lockScreen.highlightID(for: "Temperature unit"), lockScreenSection: .widgets),
         SettingsSearchEntry(tab: .lockScreen, title: "Show location label", keywords: ["location", "weather"], highlightID: SettingsTab.lockScreen.highlightID(for: "Show location label"), lockScreenSection: .widgets),
@@ -6156,6 +6157,11 @@ struct LockScreenSettings: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+
+                    Defaults.Toggle(key: .lockScreenHideWidgetsDuringScreenSaver) {
+                        Text("Hide widgets during screen saver")
+                    }
+                    .settingsHighlight(id: highlightID("Hide widgets during screen saver"))
                 } header: {
                     Text("Appearance")
                 } footer: {
