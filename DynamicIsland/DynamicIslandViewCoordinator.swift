@@ -158,14 +158,44 @@ class DynamicIslandViewCoordinator: ObservableObject {
             NotificationCenter.default.post(name: Notification.Name.selectedScreenChanged, object: nil)
         }
     }
-    
+
+    /// UUID of the preferred display (`CGDisplayCreateUUIDFromDisplayID`). Unlike
+    /// `preferredScreen` (the display's localized name), it tells identical monitors
+    /// apart, and unlike a `CGDirectDisplayID` it is stable across reconnects and
+    /// reboots. Empty means "not set" (legacy installs only stored the name).
+    @AppStorage(NSScreen.preferredDisplayUUIDDefaultsKey) var preferredScreenUUID: String = "" {
+        didSet {
+            NotificationCenter.default.post(name: Notification.Name.selectedScreenChanged, object: nil)
+        }
+    }
+
     @Published var selectedScreen: String = NSScreen.main?.localizedName ?? "Unknown"
+
+    /// The display the user picked in Settings, matched by its stable UUID so
+    /// identical monitors (which share a localized name) can be told apart. Falls
+    /// back to the stored name when no UUID is stored or that display isn't connected.
+    func preferredNSScreen() -> NSScreen? {
+        if !preferredScreenUUID.isEmpty,
+           let match = NSScreen.screens.first(where: { $0.displayUUID == preferredScreenUUID }) {
+            return match
+        }
+        return NSScreen.screens.first(where: { $0.localizedName == preferredScreen })
+    }
+
+    /// Legacy installs only stored the preferred display's name; backfill its UUID.
+    private func migratePreferredScreenUUIDIfNeeded() {
+        guard preferredScreenUUID.isEmpty,
+              let uuid = NSScreen.screens.first(where: { $0.localizedName == preferredScreen })?.displayUUID
+        else { return }
+        preferredScreenUUID = uuid
+    }
 
     @Published var optionKeyPressed: Bool = true
     private let extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     
     private init() {
         selectedScreen = preferredScreen
+        migratePreferredScreenUUIDIfNeeded()
         Defaults.publisher(.timerDisplayMode)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in

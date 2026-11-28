@@ -1117,7 +1117,7 @@ struct SettingsView: View {
 }
 
 struct GeneralSettings: View {
-    @State private var screens: [String] = NSScreen.screens.compactMap { $0.localizedName }
+    @State private var screens: [(uuid: String, label: String)] = NSScreen.displayPickerItems()
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @Default(.mirrorShape) var mirrorShape
@@ -1148,6 +1148,20 @@ struct GeneralSettings: View {
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.general.highlightID(for: title)
+    }
+
+    /// Bridges the picker to the coordinator: persists the stable display UUID and
+    /// keeps the legacy display-name preference in sync for downstream consumers.
+    private var preferredDisplayBinding: Binding<String> {
+        Binding(
+            get: { coordinator.preferredNSScreen()?.displayUUID ?? coordinator.preferredScreenUUID },
+            set: { newUUID in
+                coordinator.preferredScreenUUID = newUUID
+                if let screen = NSScreen.screens.first(where: { $0.displayUUID == newUUID }) {
+                    coordinator.preferredScreen = screen.localizedName
+                }
+            }
+        )
     }
 
     var body: some View {
@@ -1205,13 +1219,13 @@ struct GeneralSettings: View {
                     NotificationCenter.default.post(name: Notification.Name.showOnAllDisplaysChanged, object: nil)
                 }
                 .settingsHighlight(id: highlightID("Show on all displays"))
-                Picker("Show on a specific display", selection: $coordinator.preferredScreen) {
-                    ForEach(screens, id: \.self) { screen in
-                        Text(screen)
+                Picker("Show on a specific display", selection: preferredDisplayBinding) {
+                    ForEach(screens, id: \.uuid) { screen in
+                        Text(screen.label).tag(screen.uuid)
                     }
                 }
                 .onChange(of: NSScreen.screens) {
-                    screens =  NSScreen.screens.compactMap({$0.localizedName})
+                    screens = NSScreen.displayPickerItems()
                 }
                 .disabled(showOnAllDisplays)
                 .settingsHighlight(id: highlightID("Show on a specific display"))
@@ -3671,6 +3685,7 @@ struct Media: View {
 struct CalendarSettings: View {
     @ObservedObject private var calendarManager = CalendarManager.shared
     @Default(.showCalendar) var showCalendar: Bool
+    @Default(.calendarViewMode) var calendarViewMode: CalendarViewMode
     @Default(.enableLyrics) private var enableLyrics
     @Default(.enableReminderLiveActivity) var enableReminderLiveActivity
     @Default(.reminderPresentationStyle) var reminderPresentationStyle
@@ -3776,6 +3791,23 @@ struct CalendarSettings: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Picker("Calendar view", selection: $calendarViewMode) {
+                        ForEach(CalendarViewMode.allCases) { viewMode in
+                            Text(viewMode.displayName).tag(viewMode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(!showCalendar)
+
+                    Text(calendarViewMode.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .settingsHighlight(id: highlightID("Calendar view"))
 
                 Section(header: Text("Event List")) {
                     Toggle("Hide completed reminders", isOn: $hideCompletedReminders)
@@ -7375,6 +7407,8 @@ func warningBadge(_ text: String, _ description: String) -> some View {
 }
 
 struct TimerSettings: View {
+    @Default(.timerAlertDurationSeconds) private var alertDurationSeconds
+    @Default(.timerAlertRepeatIntervalMinutes) private var alertRepeatIntervalMinutes
     @ObservedObject private var coordinator = DynamicIslandViewCoordinator.shared
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.timerPresets) private var timerPresets
@@ -7473,6 +7507,7 @@ struct TimerSettings: View {
         }
     }
 
+    /// Groups the enabled timer settings, including the repeat-alert controls.
     @ViewBuilder
     private var timerConfigurationSections: some View {
         Group {
@@ -7481,6 +7516,7 @@ struct TimerSettings: View {
             appearanceSection
             timerPresetsSection
             timerSoundSection
+            timerAlertSection
         }
     }
 
@@ -7705,6 +7741,69 @@ struct TimerSettings: View {
             Text("Timer Sound")
         } footer: {
             Text("Select a custom sound to play when a timer ends. Supported formats include MP3, M4A, WAV, and AIFF.")
+        }
+    }
+
+    /// Bounds the saved ring duration before showing its minute and second components.
+    private var duration: Int {
+        min(3600, max(1, alertDurationSeconds))
+    }
+
+    /// Edits ring minutes while preserving the saved seconds component.
+    private var minutesBinding: Binding<Int> {
+        Binding(
+            get: { duration / 60 },
+            set: { alertDurationSeconds = min(3600, max(1, $0 * 60 + duration % 60)) }
+        )
+    }
+
+    /// Edits ring seconds while preserving the saved minutes component.
+    private var secondsBinding: Binding<Int> {
+        Binding(
+            get: { duration % 60 },
+            set: { alertDurationSeconds = min(3600, max(1, duration / 60 * 60 + $0)) }
+        )
+    }
+
+    /// Bounds and edits the silent interval in whole minutes.
+    private var intervalBinding: Binding<Int> {
+        Binding(
+            get: { min(1440, max(1, alertRepeatIntervalMinutes)) },
+            set: { alertRepeatIntervalMinutes = min(1440, max(1, $0)) }
+        )
+    }
+
+    /// Excludes a zero-length ring and values beyond one hour.
+    private var secondsRange: ClosedRange<Int> {
+        if duration / 60 == 60 { return 0...0 }
+        return duration / 60 == 0 ? 1...59 : 0...59
+    }
+
+    /// Presents ring duration and repeat interval using existing timer controls.
+    private var timerAlertSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Ring duration")
+                HStack(spacing: 16) {
+                    TimerPresetComponentControl(title: String(localized: "Minutes"), value: minutesBinding, range: 0...60)
+                    TimerPresetComponentControl(title: String(localized: "Seconds"), value: secondsBinding, range: secondsRange)
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Remind again after")
+                HStack {
+                    TimerPresetComponentControl(title: String(localized: "Minutes"), value: intervalBinding, range: 1...1440)
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Timer Alerts")
+        } footer: {
+            Text("When an Atoll timer ends, it rings for the selected duration, then stays silent for the selected interval. This repeats until you stop the timer. Changes also apply to an active reminder.")
         }
     }
 
@@ -8652,9 +8751,34 @@ struct ScreenAssistantSettings: View {
     @ObservedObject var screenAssistantManager = ScreenAssistantManager.shared
     @Default(.enableScreenAssistant) var enableScreenAssistant
     @Default(.screenAssistantDisplayMode) var screenAssistantDisplayMode
-    @Default(.geminiApiKey) var geminiApiKey
+    /// The key itself lives in the Keychain, so only its presence is mirrored
+    /// into view state — the secret is never held longer than an edit.
+    private let keyStore: AIKeyStoring = KeychainAIKeyStore.shared
+    @State private var hasGeminiApiKey = KeychainAIKeyStore.shared.hasKey(.gemini)
     @State private var apiKeyText = ""
     @State private var showingApiKey = false
+    /// Shown when the Keychain refuses a write or a delete. The field keeps its
+    /// text in that case so the entered key is not lost.
+    @State private var keyStoreError: String?
+
+    /// Writes the field to the Keychain — an empty field deletes the stored key,
+    /// which is the only way to remove one from here. Returns whether the field
+    /// and the disclosure may now be reset: on failure they must not be, or the
+    /// user is told nothing and loses what they typed.
+    private func commitGeminiKey() -> Bool {
+        let status = keyStore.save(apiKeyText, account: .gemini)
+        guard status == errSecSuccess else {
+            Logger.log(
+                "Could not write the Gemini key to the Keychain (OSStatus \(status)).",
+                category: .warning
+            )
+            keyStoreError = String(localized: "The key could not be saved to the Keychain.")
+            return false
+        }
+        keyStoreError = nil
+        hasGeminiApiKey = keyStore.hasKey(.gemini)
+        return true
+    }
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.screenAssistant.highlightID(for: title)
@@ -8678,24 +8802,23 @@ struct ScreenAssistantSettings: View {
                     HStack {
                         Text("Gemini API Key")
                         Spacer()
-                        if geminiApiKey.isEmpty {
-                            Text("Not Set")
-                                .foregroundColor(.red)
-                        } else {
+                        if hasGeminiApiKey {
                             Text("••••••••")
                                 .foregroundColor(.green)
+                        } else {
+                            Text("Not Set")
+                                .foregroundColor(.red)
                         }
 
-                        Button(showingApiKey ? "Hide" : (geminiApiKey.isEmpty ? "Set" : "Change")) {
+                        Button(showingApiKey ? "Hide" : (hasGeminiApiKey ? "Change" : "Set")) {
                             if showingApiKey {
+                                guard commitGeminiKey() else { return }
                                 showingApiKey = false
-                                if !apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    Defaults[.geminiApiKey] = apiKeyText
-                                }
                                 apiKeyText = ""
                             } else {
                                 showingApiKey = true
-                                apiKeyText = geminiApiKey
+                                keyStoreError = nil
+                                apiKeyText = keyStore.value(.gemini)
                             }
                         }
                     }
@@ -8709,6 +8832,13 @@ struct ScreenAssistantSettings: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
 
+                            if let keyStoreError {
+                                Label(keyStoreError, systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
                             HStack {
                                 Button("Open Google AI Studio") {
                                     NSWorkspace.shared.open(URL(string: "https://aistudio.google.com/app/apikey")!)
@@ -8717,12 +8847,15 @@ struct ScreenAssistantSettings: View {
 
                                 Spacer()
 
-                                Button("Save") {
-                                    Defaults[.geminiApiKey] = apiKeyText
+                                Button(apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Remove" : "Save") {
+                                    guard commitGeminiKey() else { return }
                                     showingApiKey = false
                                     apiKeyText = ""
                                 }
-                                .disabled(apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                // Clearing the field and confirming is how a key is
+                                // removed, so an empty field is only invalid when
+                                // there is nothing stored to remove.
+                                .disabled(!hasGeminiApiKey && apiKeyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }
                         }
                     }
@@ -8806,6 +8939,14 @@ struct ScreenAssistantSettings: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Screen Assistant")
+        // The Keychain is not observable, so pick up keys saved elsewhere (the
+        // model selection panel) instead of showing a stale "Not Set".
+        .onAppear {
+            hasGeminiApiKey = keyStore.hasKey(.gemini)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aiModelConfigurationChanged)) { _ in
+            hasGeminiApiKey = keyStore.hasKey(.gemini)
+        }
     }
 
     private func timeAgoString(from date: Date) -> String {

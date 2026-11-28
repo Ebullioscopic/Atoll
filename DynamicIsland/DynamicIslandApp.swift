@@ -307,6 +307,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Restore Lunar's native OSD if integration was active
         LunarManager.shared.appWillTerminate()
+
+        terminateLogStreamChildren()
+    }
+
+    /// The Bluetooth, system timer and Focus managers each tail the unified log
+    /// with a `/usr/bin/log stream` child that nothing stops at quit, so it
+    /// keeps running after Atoll exits. End every such child we spawned.
+    private func terminateLogStreamChildren() {
+        let ownPID = getpid()
+        let capacity = proc_listchildpids(ownPID, nil, 0)
+        guard capacity > 0 else { return }
+
+        var childPIDs = [pid_t](repeating: 0, count: Int(capacity) + 8)
+        let bufferSize = Int32(childPIDs.count * MemoryLayout<pid_t>.stride)
+        let count = proc_listchildpids(ownPID, &childPIDs, bufferSize)
+        guard count > 0 else { return }
+
+        var pathBuffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        for pid in childPIDs.prefix(Int(count)) where pid > 0 {
+            guard proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count)) > 0,
+                  String(cString: pathBuffer) == "/usr/bin/log" else { continue }
+            kill(pid, SIGTERM)
+        }
     }
     
     @objc func onScreenLocked(_: Notification) {
@@ -562,33 +585,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Use minimalistic or normal size based on settings
-        var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
+        let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
-        // Use a consistent height for different view types
-        if coordinator.currentView == .timer {
-            baseSize.height = 250 // Extra space for timer presets
-        } else if coordinator.currentView == .notes {
-            let preferredHeight = coordinator.notesLayoutState.preferredHeight
-            baseSize.height = max(baseSize.height, preferredHeight)
-        } else if coordinator.currentView == .clipboard {
-            // Clipboard has its own fixed height source; don't inherit the notes layout state.
-            baseSize.height = max(baseSize.height, NotesLayoutState.list.preferredHeight)
-        } else if coordinator.currentView == .terminal {
-            let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
-            let maxFraction = Defaults[.terminalMaxHeightFraction]
-            baseSize.height = min(screenHeight * maxFraction, max(300, screenHeight * maxFraction))
-        }
-        
-        baseSize = inlineLyricsAdjustedNotchSize(
+        // `resizeWindows` applies one size to every window, so this has to ask
+        // whether *any* notch is open rather than only the primary one. With
+        // showOnAllDisplays and the primary closed, reading `vm` alone resolved
+        // the short height and shrank the window belonging to an open month
+        // calendar on another display, clipping it.
+        //
+        // Sizing each display from its own view model is the fuller answer, but
+        // every closed-notch branch above reads the primary `vm` the same way --
+        // the sneak peek, the recording HUD, the battery HUD -- so that is a
+        // property of this function rather than of the calendar, and changing it
+        // would change those surfaces too.
+        let isAnyNotchOpen = vm.notchState == .open
+            || viewModels.values.contains { $0.notchState == .open }
+
+        let adjustedContentSize = notchTabContentSize(
             from: baseSize,
-            isHomeTabActive: coordinator.currentView == .home
+            view: coordinator.currentView,
+            isNotchOpen: isAnyNotchOpen,
+            statsSecondRowProgress: coordinator.statsSecondRowExpansion
         )
 
-        let adjustedContentSize = statsAdjustedNotchSize(
-            from: baseSize,
-            isStatsTabActive: coordinator.currentView == .stats,
-            secondRowProgress: coordinator.statsSecondRowExpansion
-        )
         let result = addShadowPadding(
             to: adjustedContentSize,
             isMinimalistic: Defaults[.enableMinimalisticUI]
@@ -715,6 +734,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Defaults.Keys.migrateMusicControlSlots()
         Defaults.Keys.migrateCapsLockTintMode()
         Defaults.Keys.migrateThirdPartyDDCIntegration()
+        Defaults.Keys.migrateAIProviderKeysToKeychain()
         Defaults.Keys.migrateClipboardShortcutToV()
 
         Defaults.publisher(.enableThirdPartyDDCIntegration, options: [])
@@ -859,6 +879,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         Defaults.publisher(.showDiskGraph, options: []).sink { [weak self] _ in
             self?.debouncedUpdateWindowSize()
+        }.store(in: &cancellables)
+
+        // The calendar's view mode decides the notch height. Applied through the
+        // tab-switch path, which resizes at once and without animating: this is
+        // the direct response to a click, and the content and vm.notchSize both
+        // change on one frame, so a tweened window would be the only thing
+        // out of step.
+        Defaults.publisher(.calendarViewMode, options: []).sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.updateWindowSizeForTabSwitch()
+            }
         }.store(in: &cancellables)
 
         Defaults.publisher(.openNotchWidth, options: []).sink { [weak self] _ in
@@ -1609,10 +1640,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             let selectedScreen: NSScreen
 
-            if let preferredScreen = NSScreen.screens.first(where: {
-                $0.localizedName == coordinator.preferredScreen
-            }) {
-                coordinator.selectedScreen = coordinator.preferredScreen
+            if let preferredScreen = coordinator.preferredNSScreen() {
+                coordinator.selectedScreen = preferredScreen.localizedName
                 selectedScreen = preferredScreen
             } else if Defaults[.automaticallySwitchDisplay], let mainScreen = NSScreen.main {
                 coordinator.selectedScreen = mainScreen.localizedName
