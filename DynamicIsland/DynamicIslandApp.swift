@@ -555,7 +555,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Calculate required width for inline sneak peek:
             // Album art (~32) + Middle section (380) + Visualizer (~32) + horizontal padding (28) + clip shape margin (12)
             let inlineSneakPeekWidth: CGFloat = 460
-            return CGSize(width: inlineSneakPeekWidth, height: vm.effectiveClosedNotchHeight)
+            let inlineSize = addShadowPadding(
+                to: withClosedHUDAllowance(CGSize(width: inlineSneakPeekWidth, height: vm.effectiveClosedNotchHeight)),
+                isMinimalistic: Defaults[.enableMinimalisticUI]
+            )
+            // The hosting view no longer grows the window (`sizingOptions = []`), so a window
+            // smaller than the normal one clipped the music/timer wings, hover growth and shadow.
+            let standardSize = standardNotchWindowSize()
+            return CGSize(
+                width: max(inlineSize.width, standardSize.width),
+                height: max(inlineSize.height, standardSize.height)
+            )
         }
 
         if let recordingHUDSize = recordingHUDLayoutForSizing().size(
@@ -592,7 +602,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return addShadowPadding(to: withClosedHUDAllowance(hudSize), isMinimalistic: Defaults[.enableMinimalisticUI])
             }
         }
-        
+
+        return standardNotchWindowSize()
+    }
+
+    private func standardNotchWindowSize() -> CGSize {
         // Use minimalistic or normal size based on settings
         let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
