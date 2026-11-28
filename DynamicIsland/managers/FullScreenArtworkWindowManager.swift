@@ -420,6 +420,10 @@ final class FullScreenArtworkWindowManager: ObservableObject {
     private var activeWallpaperKey: String?
     private var pendingFallbackStaticURL: URL?
     private var pendingFallbackWallpaperKey: String?
+    private var originalDesktopImageURLs: [String: URL] = [:]
+    private var didCaptureStaticBackup = false
+    private var appliedStaticWallpaper = false
+    private var didApplyAerialWallpaper = false
     private var fallbackRightClickMonitor: Any?
     private var artworkLayoutOverCanvasPreferenceCancellable: AnyCancellable?
     private var lyricsTextCancellable: AnyCancellable?
@@ -653,13 +657,16 @@ final class FullScreenArtworkWindowManager: ObservableObject {
             } else {
                 showWallpaperTransition(on: screen, imageURL: wallpaperURL)
 
-                guard applyArtworkToPlist(imageURL: wallpaperURL) else {
-                    print("[FullScreenArtworkWindowManager] Failed to patch plist")
+                if backupWallpaperConfiguration {
+                    captureStaticWallpaperBackupIfNeeded()
+                }
+
+                guard applyStaticWallpaper(imageURL: wallpaperURL) else {
+                    print("[FullScreenArtworkWindowManager] Failed to set desktop image")
                     hideWallpaperTransition()
                     return
                 }
 
-                restartWallpaperAgent()
                 activeWallpaperKey = wallpaperKey
                 activeLiveWallpaperFingerprint = nil
                 pendingFallbackStaticURL = nil
@@ -984,12 +991,12 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         if let screen = targetScreen {
             showWallpaperTransition(on: screen, imageURL: url)
         }
-        guard applyArtworkToPlist(imageURL: url) else {
+        captureStaticWallpaperBackupIfNeeded()
+        guard applyStaticWallpaper(imageURL: url) else {
             print("[FullScreenArtworkWindowManager] Failed to apply deferred static fallback")
             hideWallpaperTransition()
             return
         }
-        restartWallpaperAgent()
         activeWallpaperKey = key
         activeLiveWallpaperFingerprint = nil
         hideVideoWindow()
@@ -1070,6 +1077,7 @@ final class FullScreenArtworkWindowManager: ObservableObject {
                 }
 
                 self.activeLiveWallpaperFingerprint = nextFingerprint
+                self.didApplyAerialWallpaper = true
                 self.pendingFallbackStaticURL = nil
                 self.pendingFallbackWallpaperKey = nil
                 self.restartWallpaperAgent()
@@ -1673,6 +1681,56 @@ final class FullScreenArtworkWindowManager: ObservableObject {
         try? FileManager.default.copyItem(at: wallpaperPlistURL, to: backupPlistURL)
     }
 
+    private func screenKey(_ screen: NSScreen) -> String {
+        if let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber {
+            return "screen-\(number.uint32Value)"
+        }
+        return "screen-\(screen.localizedName)"
+    }
+
+    private func captureStaticWallpaperBackupIfNeeded() {
+        guard !didCaptureStaticBackup else { return }
+        let ws = NSWorkspace.shared
+        for screen in NSScreen.screens {
+            if let url = ws.desktopImageURL(for: screen) {
+                originalDesktopImageURLs[screenKey(screen)] = url
+            }
+        }
+        didCaptureStaticBackup = true
+    }
+
+    @discardableResult
+    private func applyStaticWallpaper(imageURL: URL) -> Bool {
+        let ws = NSWorkspace.shared
+        var anySucceeded = false
+        for screen in NSScreen.screens {
+            let options = ws.desktopImageOptions(for: screen) ?? [:]
+            do {
+                try ws.setDesktopImageURL(imageURL, for: screen, options: options)
+                anySucceeded = true
+            } catch {
+                print("[FullScreenArtworkWindowManager] setDesktopImageURL failed: \(error)")
+            }
+        }
+        if anySucceeded {
+            appliedStaticWallpaper = true
+        }
+        return anySucceeded
+    }
+
+    private func restoreStaticWallpaper() {
+        guard appliedStaticWallpaper else { return }
+        let ws = NSWorkspace.shared
+        for screen in NSScreen.screens {
+            guard let url = originalDesktopImageURLs[screenKey(screen)] else { continue }
+            let options = ws.desktopImageOptions(for: screen) ?? [:]
+            try? ws.setDesktopImageURL(url, for: screen, options: options)
+        }
+        appliedStaticWallpaper = false
+        didCaptureStaticBackup = false
+        originalDesktopImageURLs.removeAll()
+    }
+
     private func applyArtworkToPlist(imageURL: URL) -> Bool {
         guard let plistData = try? Data(contentsOf: wallpaperPlistURL),
               var plist = try? PropertyListSerialization.propertyList(from: plistData, format: nil) as? [String: Any]
@@ -1844,18 +1902,26 @@ final class FullScreenArtworkWindowManager: ObservableObject {
 
     private func restoreWallpaper() {
         let fm = FileManager.default
-        guard hasValidBackup else { return }
 
-        do {
-            try fm.removeItem(at: wallpaperPlistURL)
-            try fm.copyItem(at: backupPlistURL, to: wallpaperPlistURL)
-            try fm.removeItem(at: backupPlistURL)
-        } catch {
-            print("[FullScreenArtworkWindowManager] Failed to restore plist: \(error)")
+        if appliedStaticWallpaper {
+            restoreStaticWallpaper()
         }
 
-        restoreLiveWallpaperResources()
-        restartWallpaperAgent()
+        if didApplyAerialWallpaper, hasValidBackup {
+            do {
+                try fm.removeItem(at: wallpaperPlistURL)
+                try fm.copyItem(at: backupPlistURL, to: wallpaperPlistURL)
+                try fm.removeItem(at: backupPlistURL)
+            } catch {
+                print("[FullScreenArtworkWindowManager] Failed to restore plist: \(error)")
+            }
+            restoreLiveWallpaperResources()
+            restartWallpaperAgent()
+        } else if hasValidBackup {
+            try? fm.removeItem(at: backupPlistURL)
+        }
+
+        didApplyAerialWallpaper = false
     }
 
     // MARK: - Track Change Observer

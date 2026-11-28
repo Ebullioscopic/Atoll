@@ -94,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
+- Full-screen lock screen artwork sets a static wallpaper with the system desktop-picture API on every display and restores each display's own picture afterwards, instead of rewriting the wallpaper store and restarting WallpaperAgent on every track. Players other than Apple Music and Spotify, such as Amazon Music, no longer try to show a live canvas they cannot provide. (#488)
 - Memory no longer jumps past 1 GB, with repeated restart prompts, when a player such as Firefox publishes a track without artwork and full-screen lock screen artwork falls back to the app icon. Artwork is now encoded from a single bitmap and compared with a small thumbnail instead of a full PNG. (#866)
 - Atoll no longer quits when the lock screen or notch music player opens with Apple Music while Music reports no AirPlay devices, which happened on macOS 27. (#659)
 - Lock screen widgets, full-screen artwork and overlays now appear on the display set as main in System Settings, instead of always going to the built-in screen when an external monitor is the main display. (#945)
