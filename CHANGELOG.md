@@ -82,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings: add/edit/delete accounts, toggle provider, validation with inline errors
 
 ### Changed
+- Opening, closing and hovering the notch is smoother on 120 Hz displays, and the notch does less work on the main thread while it animates (calendar date strip, player app and icon lookups, notch shadow, hidden Settings window).
 - The charging notification draws a lightning bolt inside its battery icon, as on iPhone, instead of relying on the word “Charging” alone. (#486)
 - Completed the French (fr) localization: the 1,035 strings that had no French entry are translated, and 189 existing entries are corrected, including a Quit item that still read "Quitter boring.notch". Wording follows the terms of French macOS. (#935)
 - Fixed lyrics/timer overlap in the minimalistic music player: the lyrics height allocation in `calculateDynamicHeight` was 10pt short of what the window sizing function reserved, so the timer section was pushed past its allocation in Dynamic Island mode. The shared constant now accounts for the full 10pt top padding + 40pt content height. (#812)
