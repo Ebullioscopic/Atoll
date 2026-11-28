@@ -131,6 +131,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Debouncing mechanism for window size updates
     private var windowSizeUpdateWorkItem: DispatchWorkItem?
+    private var screenConfigurationWorkItem: DispatchWorkItem?
 
     // Block-based AudioTap observers, kept with their center so they can be removed by token
     private var audioTapObserverTokens: [(center: NotificationCenter, token: NSObjectProtocol)] = []
@@ -304,6 +305,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
+        screenConfigurationWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
         extensionXPCServiceHost.stop()
         extensionRPCServer.stop()
@@ -1598,7 +1600,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
     
+    /// Opening or closing the lid, waking with displays attached or plugging one in
+    /// sends a burst of these while macOS is still rearranging the displays. The
+    /// windows are rebuilt once, after the burst, so they are not torn down and
+    /// recreated against screens that are about to move or disappear (#327).
     @objc func screenConfigurationDidChange() {
+        screenConfigurationWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.applyScreenConfigurationChange()
+        }
+        screenConfigurationWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+    }
+
+    private func applyScreenConfigurationChange() {
+        screenConfigurationWorkItem = nil
         let currentScreens = NSScreen.screens
 
         let screensChanged =
@@ -1610,10 +1626,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         previousScreens = currentScreens
         
         if screensChanged {
-            DispatchQueue.main.async { [weak self] in
-                self?.cleanupWindows()
-                self?.adjustWindowPosition()
-            }
+            cleanupWindows()
+            adjustWindowPosition()
         }
     }
     

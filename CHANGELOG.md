@@ -94,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Show on a specific display" now remembers the chosen display by its hardware UUID instead of its name, so two identical monitors can be told apart and the choice survives reconnects and reboots. Displays that share a name are numbered in the picker (#696).
 
 ### Fixed
+- Opening and closing the lid in clamshell mode, or connecting a display, no longer leaves the notch or the floating media controls in the wrong place. Atoll now waits for the display setup to settle before rebuilding the notch, and keeps it on a connected display. (#327)
 - On macOS 27 the notch can be opened by hovering again while it is hidden in a fullscreen app on a display with a notch. (#757)
 - "Hide DynamicIsland" in fullscreen now also hides the island when the fullscreen Space is in Split View. The fullscreen check now reads the window that is actually on screen, so a fullscreen window of the same app on another Space no longer hides the island on this one. (#409)
 - The input method candidate window (for example Chinese Pinyin) is no longer hidden behind the notch while typing in the Terminal tab. (#548)
